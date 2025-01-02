@@ -13,15 +13,16 @@
 // limitations under the License.
 
 #include "CheckpointManagerV2.h"
+
 #include <leveldb/write_batch.h>
-#include <boost/filesystem.hpp>
+
+#include "app_config/AppConfig.h"
+#include "checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
 
 DEFINE_FLAG_INT32(logtail_checkpoint_check_gc_interval_sec, "60 seconds", 60);
 DEFINE_FLAG_INT32(logtail_checkpoint_gc_threshold_sec, "30 minutes", 30 * 60);
@@ -35,46 +36,46 @@ namespace logtail {
 
 namespace detail {
 
-    std::string getDatabasePath() {
-        return GetExactlyOnceCheckpoint();
-    }
+std::string getDatabasePath() {
+    return GetExactlyOnceCheckpoint();
+}
 
-    // Log error locally and send alarm.
-    void logDatabaseError(const std::string& op, const std::string& key, const leveldb::Status& s) {
-        const std::string title = "error when access checkpoint database";
-        std::string msg;
-        msg.append("op:").append(op).append(", key:").append(key).append(", status:").append(s.ToString());
-        LOG_ERROR(sLogger, (title, msg));
-        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_V2_ALARM, title + ", " + msg);
-    }
+// Log error locally and send alarm.
+void logDatabaseError(const std::string& op, const std::string& key, const leveldb::Status& s) {
+    const std::string title = "error when access checkpoint database";
+    std::string msg;
+    msg.append("op:").append(op).append(", key:").append(key).append(", status:").append(s.ToString());
+    LOG_ERROR(sLogger, (title, msg));
+    AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_V2_ALARM, title + ", " + msg);
+}
 
-    // Range key is represented by data pointer and size to avoid copy.
-    //
-    // @return empty if failed to extract.
-    std::string extractPrimaryKeyFromRangeKey(const char* data, size_t size) {
-        const int32_t kExepectedCount = 2;
-        int32_t underlineCount = 0;
-        for (; size > 0; --size) {
-            if (data[size - 1] != '_') {
-                continue;
-            }
-            if (++underlineCount == kExepectedCount) {
-                break;
-            }
+// Range key is represented by data pointer and size to avoid copy.
+//
+// @return empty if failed to extract.
+std::string extractPrimaryKeyFromRangeKey(const char* data, size_t size) {
+    const int32_t kExepectedCount = 2;
+    int32_t underlineCount = 0;
+    for (; size > 0; --size) {
+        if (data[size - 1] != '_') {
+            continue;
         }
-        if (size > 2) {
-            return std::string(data, size - 1);
+        if (++underlineCount == kExepectedCount) {
+            break;
         }
-        return "";
     }
+    if (size > 2) {
+        return std::string(data, size - 1);
+    }
+    return "";
+}
 
-    void makeRangeKey(std::string& key, uint32_t idx) {
-        key.append("_").append(std::to_string(idx)).append("_r");
-    }
+void makeRangeKey(std::string& key, uint32_t idx) {
+    key.append("_").append(std::to_string(idx)).append("_r");
+}
 
-    bool isRangeKey(const char* data, size_t len) {
-        return len > 0 && data[len - 1] == 'r';
-    }
+bool isRangeKey(const char* data, size_t len) {
+    return len > 0 && data[len - 1] == 'r';
+}
 
 } // namespace detail
 

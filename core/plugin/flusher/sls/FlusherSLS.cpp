@@ -22,18 +22,12 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
-#include "sls_logs.pb.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "pipeline/Pipeline.h"
 #include "pipeline/batch/FlushStrategy.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
-#ifdef __ENTERPRISE__
-#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
-#endif
+#include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSConstant.h"
@@ -42,11 +36,9 @@
 #include "plugin/flusher/sls/SendResult.h"
 #include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
-// TODO: temporarily used here
-#include "pipeline/PipelineManager.h"
-#include "plugin/flusher/sls/DiskBufferWriter.h"
+#include "sls_logs.pb.h"
 #ifdef __ENTERPRISE__
-#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#include "config/provider/EnterpriseConfigProvider.h"
 #endif
 
 using namespace std;
@@ -810,8 +802,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 //  the possibility of hash key conflict is very low, so data is
                 //  dropped here.
                 cpt->Commit();
-                failDetail << ", drop exactly once log group and commit checkpoint" << " checkpointKey:" << cpt->key
-                           << " checkpoint:" << cpt->data.DebugString();
+                failDetail << ", drop exactly once log group and commit checkpoint"
+                           << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
                 AlarmManager::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,

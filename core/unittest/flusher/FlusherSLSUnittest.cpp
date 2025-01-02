@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
-#include "common/http/Constant.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "common/compression/CompressorFactory.h"
+#include "common/http/Constant.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
@@ -32,15 +29,13 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
-#ifdef __ENTERPRISE__
-#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
-#endif
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSConstant.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
 #include "unittest/flusher/SLSNetworkRequestMock.h"
 #endif
 
@@ -718,9 +713,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
                           FlusherSLS::GetRegionConcurrencyLimiter(flusher.mRegion)->GetCurrentLimit());
     }
     EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
-                                                              EndpointMode::DEFAULT,
-                                                              "test_project.test_region-b.log.aliyuncs.com",
-                                                              chrono::milliseconds(100));
+                                                                 EndpointMode::DEFAULT,
+                                                                 "test_project.test_region-b.log.aliyuncs.com",
+                                                                 chrono::milliseconds(100));
     flusher.mCandidateHostsInfo->SelectBestHost();
 #endif
     // log telemetry type
@@ -1045,9 +1040,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
 
         EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
-                                                                  EndpointMode::ACCELERATE,
-                                                                  "test_project." + kAccelerationDataEndpoint,
-                                                                  chrono::milliseconds(10));
+                                                                     EndpointMode::ACCELERATE,
+                                                                     "test_project." + kAccelerationDataEndpoint,
+                                                                     chrono::milliseconds(10));
         flusher.mCandidateHostsInfo->SelectBestHost();
         APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, req->mHost);

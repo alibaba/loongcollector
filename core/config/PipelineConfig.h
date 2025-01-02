@@ -16,13 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "json/json.h"
 
 namespace logtail {
 

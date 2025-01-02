@@ -14,18 +14,15 @@
 
 #include "ConfigManager.h"
 
-#include <curl/curl.h>
+#include <cctype>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include <cctype>
 #if defined(__linux__)
 #include <fnmatch.h>
 #include <unistd.h>
 #endif
 #include <limits.h>
-#include <re2/re2.h>
 
 #include <fstream>
 #include <set>

@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstdint>
+
+#include <atomic>
 #include <future>
 
 #include "monitor/MetricManager.h"

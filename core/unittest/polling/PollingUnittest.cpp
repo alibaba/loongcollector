@@ -12,49 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include "common/Flags.h"
-#include <json/json.h>
-#include "file_server/EventDispatcher.h"
-#include "file_server/ConfigManager.h"
+#include "json/json.h"
+
 #include "app_config/AppConfig.h"
-#include "file_server/reader/LogFileReader.h"
-#include "file_server/event_handler/EventHandler.h"
-#include "monitor/Monitor.h"
+#include "common/Flags.h"
 #include "common/StringTools.h"
-#include "logger/Logger.h"
+#include "file_server/ConfigManager.h"
+#include "file_server/EventDispatcher.h"
 #include "file_server/event/Event.h"
+#include "file_server/event_handler/EventHandler.h"
+#include "file_server/reader/LogFileReader.h"
+#include "logger/Logger.h"
+#include "monitor/Monitor.h"
+#include "unittest/Unittest.h"
 #if defined(__linux__)
 #include <pthread.h>
 #include <unistd.h>
 #endif
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
-#include <string>
-#include <errno.h>
-#include <typeinfo>
-#include <iostream>
-#include <fstream>
+
 #include <algorithm>
-#include <boost/regex.hpp>
-#include "protobuf/sls/metric.pb.h"
-#include "protobuf/sls/sls_logs.pb.h"
-#include "monitor/AlarmManager.h"
-#include "file_server/event_handler/LogInput.h"
+#include <fstream>
+#include <iostream>
+#include <queue>
+#include <set>
+#include <string>
+#include <typeinfo>
+#include <vector>
+
+#include "boost/regex.hpp"
+
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
-#include <set>
-#include <vector>
-#include <queue>
+#include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
-#include "file_server/polling/PollingModify.h"
 #include "file_server/polling/PollingEventQueue.h"
+#include "file_server/polling/PollingModify.h"
+#include "monitor/AlarmManager.h"
+#include "protobuf/sls/metric.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 using namespace std;
 using namespace sls_logs;

@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
 #include "common/MachineInfoUtil.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 class HostnameValidationUnittest : public ::testing::Test {
 public:
     void DecHostnameValidationTest() {
         std::string hostname;
-        hostname = "4294967296";  // 2^32
+        hostname = "4294967296"; // 2^32
         EXPECT_TRUE(IsDigitsDotsHostname(hostname.c_str()));
-        hostname = "4294967295";  // 2^32-1
+        hostname = "4294967295"; // 2^32-1
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
         hostname = "0";
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
@@ -35,7 +35,7 @@ public:
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
         hostname = "0.123";
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
-        hostname = "255.16777216";  // 2^24
+        hostname = "255.16777216"; // 2^24
         EXPECT_TRUE(IsDigitsDotsHostname(hostname.c_str()));
         hostname = "255.16777215"; // 2^24-1
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
@@ -102,16 +102,16 @@ public:
 
     void OctHostnameValidationTest() {
         std::string hostname;
-        hostname = "040000000000";  // 2^32
+        hostname = "040000000000"; // 2^32
         EXPECT_TRUE(IsDigitsDotsHostname(hostname.c_str()));
-        hostname = "037777777777";  // 2^32-1
+        hostname = "037777777777"; // 2^32-1
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
 
         hostname = "0400.0123";
         EXPECT_TRUE(IsDigitsDotsHostname(hostname.c_str()));
         hostname = "0377.0123";
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));
-        hostname = "0377.0100000000";  // 2^24
+        hostname = "0377.0100000000"; // 2^24
         EXPECT_TRUE(IsDigitsDotsHostname(hostname.c_str()));
         hostname = "0377.077777777"; // 2^24-1
         EXPECT_FALSE(IsDigitsDotsHostname(hostname.c_str()));

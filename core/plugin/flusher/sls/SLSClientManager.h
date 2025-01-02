@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <map>
 #include <optional>
 #include <string>
@@ -37,7 +38,7 @@ public:
     static SLSClientManager* GetInstance();
 
     virtual void Init();
-    virtual void Stop() {};
+    virtual void Stop(){};
 
     const std::string& GetUserAgent() const { return mUserAgent; }
 

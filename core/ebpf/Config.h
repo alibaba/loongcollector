@@ -14,11 +14,11 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <string>
 #include <variant>
 #include <vector>
+
+#include "json/json.h"
 
 #include "ebpf/include/export.h"
 #include "pipeline/PipelineContext.h"

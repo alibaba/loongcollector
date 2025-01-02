@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <optional>
 #include <vector>
+
+#include "json/json.h"
 
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"

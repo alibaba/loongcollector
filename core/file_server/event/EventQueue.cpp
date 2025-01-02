@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "EventQueue.h"
-#include "file_server/event/Event.h"
-#include "common/StringTools.h"
+
 #include "common/Flags.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "file_server/event/Event.h"
 #include "logger/Logger.h"
 
 DECLARE_FLAG_INT32(max_polling_event_queue_size);

@@ -54,7 +54,7 @@ UNIT_TEST_CASE(ProcessorDesensitizeNativeUnittest, TestMultipleLines);
 
 UNIT_TEST_CASE(ProcessorDesensitizeNativeUnittest, TestMultipleLinesWithProcessorMergeMultilineLogNative);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }

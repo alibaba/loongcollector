@@ -22,7 +22,7 @@ namespace logtail {
 
 class ZstdCompressor : public Compressor {
 public:
-    ZstdCompressor(CompressType type, int32_t level = 1) : Compressor(type), mCompressionLevel(level) {};
+    ZstdCompressor(CompressType type, int32_t level = 1) : Compressor(type), mCompressionLevel(level){};
 
 #ifdef APSARA_UNIT_TEST_MAIN
     bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) override;

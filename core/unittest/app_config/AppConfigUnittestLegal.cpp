@@ -13,12 +13,13 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
-#include "common/StringTools.h"
+
+#include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
-#include "app_config/AppConfig.h"
+#include "common/StringTools.h"
 #include "file_server/reader/LogFileReader.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_STRING(ilogtail_config);
 DECLARE_FLAG_INT32(logreader_filedeleted_remove_interval);

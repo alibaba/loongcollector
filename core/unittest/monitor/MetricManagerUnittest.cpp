@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include <fstream>
-#include <json/json.h>
-#include <list>
 #include <atomic>
+#include <fstream>
+#include <list>
 #include <thread>
-#include "MetricManager.h"
+
+#include "json/json.h"
+
 #include "MetricConstants.h"
+#include "MetricManager.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
@@ -53,7 +55,8 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
     labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-hangzhou"));
 
     MetricsRecordRef fileMetric;
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(fileMetric, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        fileMetric, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
     APSARA_TEST_EQUAL(fileMetric->GetLabels()->size(), 3);
 
 
@@ -91,7 +94,8 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
         labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-hangzhou"));
 
         MetricsRecordRef fileMetric2;
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter2 = fileMetric2.CreateCounter("filed2");
         fileCounter2->Add(222UL);
     }
@@ -102,7 +106,8 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
         labels.emplace_back(std::make_pair<std::string, std::string>("logstore", "logstore1"));
         labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-hangzhou"));
         MetricsRecordRef fileMetric3;
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter3 = fileMetric3.CreateCounter("filed3");
         fileCounter3->Add(333UL);
     }
@@ -136,7 +141,8 @@ void createMetrics(int count) {
         labels.emplace_back(std::make_pair<std::string, std::string>("count", std::to_string(count)));
         labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-beijing"));
         MetricsRecordRef fileMetric;
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(fileMetric, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            fileMetric, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric.CreateCounter("filed1");
         fileCounter->Add(111UL);
     }
@@ -204,7 +210,8 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
     labels.emplace_back(std::make_pair<std::string, std::string>("project", "test1"));
     labels.emplace_back(std::make_pair<std::string, std::string>("logstore", "test1"));
     labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-beijing"));
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(*fileMetric1, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        *fileMetric1, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
     CounterPtr fileCounter = fileMetric1->CreateCounter("filed1");
     fileCounter->Add(111UL);
 
@@ -213,7 +220,8 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
         labels.emplace_back(std::make_pair<std::string, std::string>("project", "test2"));
         labels.emplace_back(std::make_pair<std::string, std::string>("logstore", "test2"));
         labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-beijing"));
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(*fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            *fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric2->CreateCounter("filed1");
         fileCounter->Add(111UL);
     }
@@ -223,7 +231,8 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
         labels.emplace_back(std::make_pair<std::string, std::string>("project", "test3"));
         labels.emplace_back(std::make_pair<std::string, std::string>("logstore", "test3"));
         labels.emplace_back(std::make_pair<std::string, std::string>("region", "cn-beijing"));
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(*fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            *fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric3->CreateCounter("filed1");
         fileCounter->Add(111UL);
     }

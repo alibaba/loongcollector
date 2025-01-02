@@ -14,13 +14,12 @@
 
 #include "ebpf/SourceManager.h"
 
-#include <gflags/gflags.h>
-
 #include <filesystem>
 #include <memory>
 #include <string>
 
 #include "app_config/AppConfig.h"
+#include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"

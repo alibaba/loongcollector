@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-#include <sys/utsname.h>
-#include <sys/errno.h>
 #include <stdlib.h>
+#include <sys/errno.h>
+#include <sys/utsname.h>
+
 #include <string>
+
 #include "logger/Logger.h"
 #include "protobuf/sls/sls_logs.pb.h"
 

@@ -32,4 +32,4 @@ const string METRIC_OUT_SIZE_BYTES = "out_size_bytes";
 const string METRIC_TOTAL_DELAY_MS = "total_delay_ms";
 const string METRIC_TOTAL_PROCESS_TIME_MS = "total_process_time_ms";
 
-}
+} // namespace logtail

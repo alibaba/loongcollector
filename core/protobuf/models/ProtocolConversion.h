@@ -16,23 +16,27 @@
 
 #pragma once
 
-#include "models/PipelineEventGroup.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "protobuf/models/pipeline_event_group.pb.h"
 #include "protobuf/models/log_event.pb.h"
 #include "protobuf/models/metric_event.pb.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "protobuf/models/span_event.pb.h"
 
 namespace logtail {
 
-bool TransferPBToPipelineEventGroup(const models::PipelineEventGroup& src, PipelineEventGroup& dst, std::string& errMsg);
+bool TransferPBToPipelineEventGroup(const models::PipelineEventGroup& src,
+                                    PipelineEventGroup& dst,
+                                    std::string& errMsg);
 bool TransferPBToLogEvent(const models::LogEvent& src, LogEvent& dst, std::string& errMsg);
 bool TransferPBToMetricEvent(const models::MetricEvent& src, MetricEvent& dst, std::string& errMsg);
 bool TransferPBToSpanEvent(const models::SpanEvent& src, SpanEvent& dst, std::string& errMsg);
 
-bool TransferPipelineEventGroupToPB(const PipelineEventGroup& src, models::PipelineEventGroup& dst, std::string& errMsg);
+bool TransferPipelineEventGroupToPB(const PipelineEventGroup& src,
+                                    models::PipelineEventGroup& dst,
+                                    std::string& errMsg);
 bool TransferLogEventToPB(const LogEvent& src, models::LogEvent& dst, std::string& errMsg);
 bool TransferMetricEventToPB(const MetricEvent& src, models::MetricEvent& dst, std::string& errMsg);
 bool TransferSpanEventToPB(const SpanEvent& src, models::SpanEvent& dst, std::string& errMsg);

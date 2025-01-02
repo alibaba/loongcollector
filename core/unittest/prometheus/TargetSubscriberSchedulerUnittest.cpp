@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include <json/json.h>
-
 #include <iostream>
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "common/JsonUtil.h"
 #include "prometheus/labels/Labels.h"
@@ -188,7 +188,8 @@ void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
 
     std::vector<Labels> newScrapeSchedulerSet;
-    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
+    APSARA_TEST_TRUE(
+        targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
     APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
 }
 
@@ -197,7 +198,8 @@ void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
     std::vector<Labels> newScrapeSchedulerSet;
-    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
+    APSARA_TEST_TRUE(
+        targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
     APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
 
     auto result = targetSubscriber->BuildScrapeSchedulerSet(newScrapeSchedulerSet);

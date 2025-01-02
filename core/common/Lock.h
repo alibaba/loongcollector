@@ -18,12 +18,12 @@
 #include <mutex>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#include <boost/concept_check.hpp>
-#include <boost/range/algorithm/equal.hpp>
-#include <boost/range/size.hpp>
+#include "boost/concept_check.hpp"
+#include "boost/range/algorithm/equal.hpp"
+#include "boost/range/size.hpp"
 #pragma GCC diagnostic pop
-#include <boost/thread.hpp>
-#include <boost/smart_ptr/detail/spinlock.hpp>
+#include "boost/smart_ptr/detail/spinlock.hpp"
+#include "boost/thread.hpp"
 #ifdef _MSC_VER
 #define NOGDI
 #include <windows.h>

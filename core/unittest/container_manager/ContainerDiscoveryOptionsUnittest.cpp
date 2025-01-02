@@ -15,7 +15,7 @@
 #include <memory>
 #include <string>
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "common/JsonUtil.h"
 #include "container_manager/ContainerDiscoveryOptions.h"

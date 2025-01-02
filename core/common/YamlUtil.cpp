@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "common/YamlUtil.h"
-#include "common/ExceptionBase.h"
-#include <vector>
+
 #include <algorithm>
 #include <string>
+#include <vector>
+
+#include "common/ExceptionBase.h"
 
 using namespace std;
 
@@ -42,30 +44,30 @@ bool ParseYamlTable(const string& config, YAML::Node& yamlRoot, string& errorMsg
     return true;
 }
 
-bool VisitNode(const YAML::Node &node, std::vector<YAML::Node>& visited) {
+bool VisitNode(const YAML::Node& node, std::vector<YAML::Node>& visited) {
     visited.push_back(node);
     if (node.IsMap()) {
-        for (const auto &child : node) {
+        for (const auto& child : node) {
             if (std::find(visited.begin(), visited.end(), child.second) != visited.end()) {
-                return true;  // Cycle detected
+                return true; // Cycle detected
             }
             if (VisitNode(child.second, visited)) {
-                return true;  // Propagate the failure up the call stack
+                return true; // Propagate the failure up the call stack
             }
         }
     } else if (node.IsSequence()) {
-        for (const auto &child : node) {
+        for (const auto& child : node) {
             if (std::find(visited.begin(), visited.end(), child) != visited.end()) {
-                return true;  // Cycle detected
+                return true; // Cycle detected
             }
             if (VisitNode(child, visited)) {
-                return true;  // Propagate the failure up the call stack
+                return true; // Propagate the failure up the call stack
             }
         }
     }
     // If the node is a scalar, we don't need to do anything special.
     visited.pop_back();
-    return false;  // No cycle detected, continue recursion
+    return false; // No cycle detected, continue recursion
 }
 
 bool CheckYamlCycle(const YAML::Node& root) {

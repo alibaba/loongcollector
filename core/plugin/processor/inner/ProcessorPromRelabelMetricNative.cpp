@@ -15,9 +15,9 @@
  */
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 
-#include <json/json.h>
-
 #include <cstddef>
+
+#include "json/json.h"
 
 #include "common/Flags.h"
 #include "common/StringTools.h"

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "app_config/AppConfig.h"
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "unittest/Unittest.h"
-#include "common/FileSystemUtil.h"
-#include "app_config/AppConfig.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
 DECLARE_FLAG_INT32(ebpf_receive_event_chan_cap);
@@ -42,7 +42,7 @@ private:
             OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
         } else {
             CreateAgentDir();
-            std::string conf  = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
+            std::string conf = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
             AppConfig::GetInstance()->LoadAppConfig(conf);
             OverwriteFile(conf, v.toStyledString());
         }
@@ -84,7 +84,7 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     AppConfig* app_config = AppConfig::GetInstance();
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
     APSARA_TEST_EQUAL(INT32_FLAG(checkpoint_find_max_file_count), 600);
-        
+
     // test multi-layer json, include bool, string, int, double
     configStr = R"(
         {

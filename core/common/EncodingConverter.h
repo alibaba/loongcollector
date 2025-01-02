@@ -17,9 +17,11 @@
 #ifndef __SLS_ILOGTAIL_ENCODING_CONVERTER_H__
 #define __SLS_ILOGTAIL_ENCODING_CONVERTER_H__
 
-#include <vector>
-#include <string>
 #include <cstddef>
+
+#include <string>
+#include <vector>
+
 #include "common/memory/SourceBuffer.h"
 
 namespace logtail {

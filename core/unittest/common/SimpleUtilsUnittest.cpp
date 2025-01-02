@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "DevInodeUnittest.h"
+#include "FileSystemUtilUnittest.h"
 #include "LoadParameterUnittest.h"
 #include "RandomUtilUnittest.h"
-#include "FileSystemUtilUnittest.h"
-#include "DevInodeUnittest.h"
 #include "TimeUtilUnittest.h"
 
 int main(int argc, char** argv) {

@@ -16,9 +16,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
+
+#include <atomic>
 #include <mutex>
 #include <string>
 
@@ -93,7 +94,6 @@ private:
     void Increase();
     void Decrease(double fallBackRatio);
     void AdjustConcurrency(bool success, std::chrono::system_clock::time_point currentTime);
-
 };
 
 } // namespace logtail

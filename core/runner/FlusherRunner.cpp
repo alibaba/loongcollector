@@ -154,8 +154,9 @@ void FlusherRunner::Run() {
         mLastRunTime->Set(chrono::duration_cast<chrono::seconds>(curTime.time_since_epoch()).count());
 
         vector<SenderQueueItem*> items;
-        int32_t limit
-            = Application::GetInstance()->IsExiting() ? -1 : AppConfig::GetInstance()->GetSendRequestGlobalConcurrency();
+        int32_t limit = Application::GetInstance()->IsExiting()
+            ? -1
+            : AppConfig::GetInstance()->GetSendRequestGlobalConcurrency();
         SenderQueueManager::GetInstance()->GetAvailableItems(items, limit);
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);

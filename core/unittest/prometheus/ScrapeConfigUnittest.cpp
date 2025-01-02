@@ -1,10 +1,12 @@
 
 #include <cstdio>
+
 #include <string>
 
-#include "FileSystemUtil.h"
 #include "JsonUtil.h"
 #include "json/value.h"
+
+#include "FileSystemUtil.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 #include "unittest/Unittest.h"
 

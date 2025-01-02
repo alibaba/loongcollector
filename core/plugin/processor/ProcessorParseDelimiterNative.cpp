@@ -238,7 +238,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
         mOutFailedEventsTotal->Add(1);
         return true;
     }
-        
+
     size_t reserveSize
         = mOverflowedFieldsTreatment == OverflowedFieldsTreatment::EXTEND ? (mKeys.size() + 10) : (mKeys.size() + 1);
     std::vector<StringView> columnValues;

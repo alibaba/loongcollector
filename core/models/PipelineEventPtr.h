@@ -22,8 +22,8 @@
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEvent.h"
-#include "models/SpanEvent.h"
 #include "models/RawEvent.h"
+#include "models/SpanEvent.h"
 
 namespace logtail {
 class EventPool;

@@ -19,7 +19,7 @@
 using namespace std;
 
 namespace logtail {
-    
+
 static void Base64Encoding(istream& is, ostream& os, char makeupChar, const char* alphabet) {
     int out[4];
     int remain = 0;

@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdlib.h>
-#include <string>
+
 #include <memory>
+#include <string>
+
 #include "common/Flags.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
+#include "unittest/Unittest.h"
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);

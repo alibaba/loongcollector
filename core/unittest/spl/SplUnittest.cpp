@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
+#include <iostream>
+#include <sstream>
 
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "plugin/processor/ProcessorSPL.h"
 #include "models/LogEvent.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
-#include <iostream>
-#include <sstream>
+#include "plugin/processor/ProcessorSPL.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
@@ -29,9 +29,7 @@ static std::atomic_bool running(true);
 
 class SplUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
     PipelineContext mContext;
     Json::Value GetCastConfig(std::string spl);
     void TestInit();
@@ -43,10 +41,10 @@ public:
     void TestRegexCSV();
 
     void TestTag();
-    //void TestMultiParse();
+    // void TestMultiParse();
 };
 
-//APSARA_UNIT_TEST_CASE(SplUnittest, TestInit, 8);
+// APSARA_UNIT_TEST_CASE(SplUnittest, TestInit, 8);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestWhere, 0);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestExtend, 1);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestJsonParse, 2);
@@ -54,9 +52,9 @@ APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexParse, 3);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexCSV, 4);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexKV, 5);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestTag, 6);
-//APSARA_UNIT_TEST_CASE(SplUnittest, TestMultiParse, 7);
+// APSARA_UNIT_TEST_CASE(SplUnittest, TestMultiParse, 7);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -65,7 +63,7 @@ Json::Value SplUnittest::GetCastConfig(std::string spl) {
     Json::Value config;
     config["Script"] = Json::Value(spl);
     config["TimeoutMilliSeconds"] = Json::Value(1000);
-    config["MaxMemoryBytes"] = Json::Value(50*1024*1024);
+    config["MaxMemoryBytes"] = Json::Value(50 * 1024 * 1024);
     return config;
 }
 
@@ -74,15 +72,15 @@ void SplUnittest::TestInit() {
     std::ifstream input("spl.txt");
     std::string line;
 
-    while( std::getline( input, line ) ) {
+    while (std::getline(input, line)) {
         Json::Value config = GetCastConfig(line);
 
         ProcessorSPL& processor = *(new ProcessorSPL);
         ProcessorInstance processorInstance(&processor, getPluginMeta());
-        
+
         bool init = processorInstance.Init(config, mContext);
         if (!init) {
-            std::cout<<"error:" <<line<<'\n';
+            std::cout << "error:" << line << '\n';
         }
         APSARA_TEST_TRUE(init);
     }
@@ -119,13 +117,13 @@ void SplUnittest::TestWhere() {
         ]
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -137,8 +135,8 @@ void SplUnittest::TestWhere() {
                 StringView content = log->GetContent("content");
                 APSARA_TEST_EQUAL("value_3_0", content);
             }
-            //std::string outJson = logGroup.ToJsonString();
-            //std::cout << "outJson: " << outJson << std::endl;
+            // std::string outJson = logGroup.ToJsonString();
+            // std::cout << "outJson: " << outJson << std::endl;
         }
     }
 
@@ -148,7 +146,8 @@ void SplUnittest::TestWhere() {
 
 void SplUnittest::TestExtend() {
     // make config
-    Json::Value config = GetCastConfig(R"(* | extend a=json_extract(content, '$.body.a'), b=json_extract(content, '$.body.b'))");
+    Json::Value config
+        = GetCastConfig(R"(* | extend a=json_extract(content, '$.body.a'), b=json_extract(content, '$.body.b'))");
 
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -168,13 +167,13 @@ void SplUnittest::TestExtend() {
         ]
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -187,7 +186,7 @@ void SplUnittest::TestExtend() {
             APSARA_TEST_EQUAL("1", content);
             content = log->GetContent("b");
             APSARA_TEST_EQUAL("2", content);
-        }        
+        }
     }
     return;
 }
@@ -226,13 +225,13 @@ void SplUnittest::TestJsonParse() {
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
     APSARA_TEST_EQUAL(logGroupList.size(), 1);
@@ -296,13 +295,13 @@ void SplUnittest::TestRegexParse() {
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -367,13 +366,13 @@ void SplUnittest::TestRegexCSV() {
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -407,7 +406,6 @@ void SplUnittest::TestRegexCSV() {
 
     return;
 }
-
 
 
 void SplUnittest::TestRegexKV() {
@@ -444,13 +442,13 @@ void SplUnittest::TestRegexKV() {
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -483,7 +481,6 @@ void SplUnittest::TestRegexKV() {
     }
     return;
 }
-
 
 
 void SplUnittest::TestTag() {
@@ -520,13 +517,13 @@ void SplUnittest::TestTag() {
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -539,8 +536,8 @@ void SplUnittest::TestTag() {
             tag = logGroup.GetTag("taiye");
             APSARA_TEST_EQUAL("123", tag);
 
-            //std::string outJson = logGroup.ToJsonString();
-            //std::cout << "outJson: " << outJson << std::endl;
+            // std::string outJson = logGroup.ToJsonString();
+            // std::cout << "outJson: " << outJson << std::endl;
         }
         {
             auto& logGroup = logGroupList[1];
@@ -549,20 +546,19 @@ void SplUnittest::TestTag() {
             tag = logGroup.GetTag("taiye");
             APSARA_TEST_EQUAL("123", tag);
 
-            //std::string outJson = logGroup.ToJsonString();
-            //std::cout << "outJson: " << outJson << std::endl;
+            // std::string outJson = logGroup.ToJsonString();
+            // std::cout << "outJson: " << outJson << std::endl;
         }
     }
-    
+
     return;
 }
-
 
 
 /*
 void SplUnittest::TestMultiParse() {
     // make config
-    Json::Value config = GetCastConfig(R"(.let src = * 
+    Json::Value config = GetCastConfig(R"(.let src = *
 | parse-json content;
 .let ds1 = $src
 | where type = 'kv'
@@ -604,13 +600,13 @@ $ds2;
         }
     })";
     eventGroup.FromJsonString(inJson);
-    
+
     std::vector<PipelineEventGroup> logGroupList;
     logGroupList.emplace_back(std::move(eventGroup));
     // run function
     ProcessorSPL& processor = *(new ProcessorSPL);
     ProcessorInstance processorInstance(&processor, getPluginMeta());
-    
+
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     processor.Process(logGroupList);
 
@@ -650,7 +646,7 @@ $ds2;
                 APSARA_TEST_EQUAL("c", content);
             }
         }
-    }    
+    }
     return;
 }
 */

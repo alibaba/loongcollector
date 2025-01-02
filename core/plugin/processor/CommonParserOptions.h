@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <string>
+
+#include "json/json.h"
 
 #include "models/LogEvent.h"
 #include "pipeline/PipelineContext.h"

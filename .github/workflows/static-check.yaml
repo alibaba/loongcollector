@@ -83,7 +83,15 @@ jobs:
         if: matrix.runner == 'ubuntu'
         run: make check-dependency-licenses
 
-      - name: Lint
+      - name: C++ Core Lint
+        uses: jidicula/clang-format-action@v4.13.0
+        with:
+          clang-format-version: '14'
+          check-path: 'core'
+          include-regex: '.*\.(cpp|h)$'
+          fallback-style: 'Google'
+
+      - name: Go Plugin Lint
         run: make lint
 
       - name: UnitTest

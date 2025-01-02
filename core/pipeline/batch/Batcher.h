@@ -16,13 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <map>
 #include <mutex>
 #include <optional>
 #include <vector>
+
+#include "json/json.h"
 
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
@@ -288,8 +289,12 @@ public:
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    EventFlushStrategy<T>& GetEventFlushStrategy() { return mEventFlushStrategy; }
-    std::optional<GroupFlushStrategy>& GetGroupFlushStrategy() { return mGroupFlushStrategy; }
+    EventFlushStrategy<T>& GetEventFlushStrategy() {
+        return mEventFlushStrategy;
+    }
+    std::optional<GroupFlushStrategy>& GetGroupFlushStrategy() {
+        return mGroupFlushStrategy;
+    }
 #endif
 
 private:

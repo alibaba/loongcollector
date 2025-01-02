@@ -84,7 +84,8 @@ DoubleGaugePtr ReentrantMetricsRecord::GetDoubleGauge(const std::string& name) {
     return nullptr;
 }
 
-ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels, DynamicMetricLabels dynamicLabels) {
+ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels,
+                                                                                    DynamicMetricLabels dynamicLabels) {
     std::lock_guard<std::mutex> lock(mutex);
 
     std::string key = GenerateKey(labels);

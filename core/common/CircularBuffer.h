@@ -15,7 +15,12 @@
  */
 
 #pragma once
+
+#include <cassert>
+
 #include <atomic>
+#include <thread>
+
 #include "MemoryBarrier.h"
 #include "Semaphore.h"
 
@@ -67,7 +72,7 @@ public:
             if (TryPushItem(item)) {
                 return;
             }
-            usleep(SLEEP_TIME); // microseconds
+            std::this_thread::sleep_for(std::chrono::microseconds(this->SLEEP_TIME));
         }
     }
 
@@ -99,7 +104,7 @@ public:
             if (TryPopItem(item)) {
                 return;
             }
-            usleep(SLEEP_TIME); // microseconds
+            std::this_thread::sleep_for(std::chrono::microseconds(this->SLEEP_TIME));
         }
     }
 
@@ -108,7 +113,7 @@ public:
 private:
     // Because we always "Keep One Item Open", the actually size should be N + 1
     static const size_t SIZE = N + 1;
-    static const int SLEEP_TIME = 10; // microsecond
+    const int SLEEP_TIME = 10; // microsecond
     volatile size_t mWriter;
     volatile size_t mReader;
     volatile T mData[SIZE];

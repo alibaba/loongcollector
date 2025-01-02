@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "FileEncryption.h"
-#include <time.h>
+
 #include <stdlib.h>
-#include "StringTools.h"
+#include <time.h>
+
 #include "FileSystemUtil.h"
+#include "StringTools.h"
 #include "logger/Logger.h"
 
 using namespace std;

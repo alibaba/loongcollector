@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <cstdint>
+
 #include <functional>
 #include <map>
 #include <memory>
@@ -110,7 +111,9 @@ public:
         *mBody = body;
     }
 
-    void AddHeader(const std::string& key, const std::string& value) { mHeader[key] = value; }
+    void AddHeader(const std::string& key, const std::string& value) {
+        mHeader[key] = value;
+    }
 #endif
 
 private:
