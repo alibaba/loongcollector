@@ -533,7 +533,7 @@ void ModifyHandler::Handle(const Event& event) {
         for (auto& pair : mNameReaderMap) {
             LogFileReaderPtrArray& readerArray = pair.second;
             for (auto& reader : readerArray) {
-                if (reader->GetContainerID() != event.GetObject()) {
+                if (reader->GetContainerID() != event.GetContainerID()) {
                     continue;
                 }
                 reader->SetContainerStopped();

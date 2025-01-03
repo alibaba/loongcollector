@@ -16,7 +16,9 @@
 
 #pragma once
 #include <stdint.h>
+
 #include <string>
+
 #include "common/DevInode.h"
 
 namespace logtail {
@@ -45,6 +47,7 @@ private:
     uint64_t mInode;
     int64_t mHashKey;
     std::string mConfigName;
+    std::string mContainerID;
 
     // for read timeout
     int64_t mLastReadPos;
@@ -97,7 +100,7 @@ public:
     uint64_t GetDev() const { return mDev; }
 
     uint64_t GetInode() const { return mInode; }
-    
+
     int GetWd() const { return mWd; }
 
     const uint32_t GetCookie() const { return mCookie; }
@@ -106,11 +109,13 @@ public:
 
     const std::string& GetConfigName() const { return mConfigName; }
 
+    const std::string& GetContainerID() const { return mContainerID; }
+
     int64_t GetLastReadPos() const { return mLastReadPos; }
 
     int64_t GetLastFilePos() const { return mLastFilePos; }
 
-    void SetSource(const std::string& source) { mSource = source; }  
+    void SetSource(const std::string& source) { mSource = source; }
 
     void SetDev(uint64_t dev) { mDev = dev; }
 
@@ -120,10 +125,12 @@ public:
 
     void SetConfigName(const std::string& configName) { mConfigName = configName; }
 
+    void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
+
     void SetLastReadPos(int64_t lastReadPos) { mLastReadPos = lastReadPos; }
 
     void SetLastFilePos(int64_t lastFilePos) { mLastFilePos = lastFilePos; }
- 
+
     bool IsCreate() const { return mType & EVENT_CREATE; }
 
     bool IsModify() const { return mType & EVENT_MODIFY; }
