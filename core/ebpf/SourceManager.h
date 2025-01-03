@@ -42,6 +42,7 @@ enum class eBPFPluginType {
 class SourceManager {
 public:
     const std::string m_lib_name_ = "network_observer";
+    const std::string mDriverLibName = "ebpf_driver";
 
     SourceManager(const SourceManager&) = delete;
     SourceManager& operator=(const SourceManager&) = delete;

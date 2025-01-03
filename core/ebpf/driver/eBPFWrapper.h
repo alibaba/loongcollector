@@ -25,6 +25,9 @@ extern "C" {
 #include <map>
 #include <thread>
 #include <functional>
+#include <atomic>
+#include <unistd.h>
+#include <iostream>
 
 #include "BPFMapTraits.h"
 
@@ -205,7 +208,7 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
     if (ret) {
 //       LOG(WARNING) << "failed to lookup inner map id, skip delete element. outter map name: " 
-        << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
+        // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
         
       return 0;
     }
@@ -239,7 +242,7 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
     if (ret) {
 //       LOG(WARNING) << "failed to lookup inner map id. outter map name: " 
-        << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
+        // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
         
       return 1;
     }
@@ -275,7 +278,7 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
     if (ret) {
 //       LOG(INFO) << "failed to lookup inner map fd, begin to init outter map. outter map name: " 
-        << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
+        // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
       struct bpf_map_create_opts* popt = nullptr;
       struct bpf_map_create_opts opt;
       if (BPFMapTraits<MapInMapType>::map_flag != -1) {
@@ -307,7 +310,7 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
     if (ret) {
 //       LOG(WARNING) << "failed to lookup inner map fd. outter map name: " 
-        << outter_map_name << " errno: " << ret << " inner_map_fd:" << inner_map_fd;
+        // << outter_map_name << " errno: " << ret << " inner_map_fd:" << inner_map_fd;
       return 1;
     }
 
@@ -365,6 +368,51 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     return 0;
   }
 
+  void DeletePerfBuffer(void* pb) {
+    struct perf_buffer * pb_ptr = static_cast<struct perf_buffer *>(pb);
+    perf_buffer__free(pb);
+  }
+
+  int PollPerfBuffer(void* pb, int max_events, int timeout_ms) {
+      return perf_buffer__poll(pb, timeout_ms);
+      // if (err < 0 && err != -EINTR)
+      // {
+      //     std::cout << "error polling perf buffer: " << strerror(-err) << std::endl;
+      //     goto cleanup;
+      // }
+
+      // if (err == -EINTR)
+      //     goto cleanup;
+  }
+
+  void* CreatePerfBuffer(const std::string& name, int page_cnt, void* ctx, perf_buffer_sample_fn data_cb, perf_buffer_lost_fn loss_cb) {
+    int mapFd = SearchMapFd(name);
+    if (mapFd < 0) {
+      return nullptr;
+    }
+
+    struct perf_buffer_opts pb_opts = {};
+    pb_opts.sample_cb = data_cb;
+    pb_opts.ctx = ctx;
+    pb_opts.lost_cb = loss_cb;
+
+    struct perf_buffer *pb = NULL;
+    pb = perf_buffer__new(mapFd, page_cnt == 0 ? 128 : page_cnt, &pb_opts);
+    auto err = libbpf_get_error(pb);
+    if (err) {
+        std::cout << "error new perf buffer: " << strerror(-err) << std::endl;
+        return nullptr;
+    }
+
+    if (!pb)
+    {
+        err = -errno;
+        std::cout << "failed to open perf buffer: " << err << std::endl;
+        return nullptr;
+    }
+    return pb;
+  }
+
   /**
    * Attach perf buffers 
    */
@@ -396,10 +444,10 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     // for (auto &th: perf_threads_) {
     //   if (th.second.joinable()) th.second.join();
     // }
-    for (auto& th : perf_threads_) {
-      if (th.joinable()) th.join();
-    }
-    perf_threads_.clear();
+    // for (auto& th : perf_threads_) {
+    //   if (th.joinable()) th.join();
+    // }
+    // perf_threads_.clear();
     return 0;
   }
 
@@ -480,7 +528,7 @@ private:
 
   T *skel_ = nullptr;
   volatile bool inited_ = false;
-  std::vector<std::thread> perf_threads_;
+  // std::vector<std::thread> perf_threads_;
   std::atomic_bool flag_ = false;
   // links, used for strore bpf programs
   friend class NetworkSecurityManager;

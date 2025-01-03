@@ -99,7 +99,7 @@ void SourceManager::Init() {
     }
 
     mBinaryPath = GetProcessExecutionDir();
-    mFullLibName = "lib" + m_lib_name_ + ".so";
+    mFullLibName = "lib" + mDriverLibName + ".so";
     for (auto& x : mRunning) {
         x = false;
     }
@@ -190,7 +190,7 @@ void SourceManager::FillCommonConf(std::unique_ptr<nami::eBPFConfig>& conf) {
 }
 
 bool SourceManager::CheckPluginRunning(nami::PluginType plugin_type) {
-    if (!LoadDynamicLib(m_lib_name_)) {
+    if (!LoadDynamicLib(mDriverLibName)) {
         LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(plugin_type)));
         return false;
     }

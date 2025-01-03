@@ -1,11 +1,129 @@
 #pragma once
 
 #include <string>
+
 #include "ebpf/include/export.h"
+#include <coolbpf/security/bpf_process_event_type.h>
 
 namespace logtail {
 namespace ebpf {
 
+/**
+ * eBPF Type for Kernel Event
+ */
+struct MsgCommon {
+  uint8_t op;
+  uint8_t flags;
+  uint8_t pad_v2[2];
+  uint32_t size;
+  uint64_t ktime;
+};
+
+struct MsgExecveKey {
+  uint32_t pid;
+  uint32_t pad;
+  uint64_t ktime;
+};
+
+struct MsgCapabilities {
+  uint64_t permitted;
+  uint64_t effective;
+  uint64_t inheritable;
+};
+
+struct MsgUserNamespace {
+  int32_t level;
+  uint32_t uid;
+  uint32_t gid;
+  uint32_t ns_inum;
+};
+
+struct MsgGenericCred {
+  uint32_t uid;
+  uint32_t gid;
+  uint32_t suid;
+  uint32_t sgid;
+  uint32_t euid;
+  uint32_t egid;
+  uint32_t fsuid;
+  uint32_t fsgid;
+  uint32_t secure_bits;
+  uint32_t pad;
+  MsgCapabilities cap;
+  MsgUserNamespace user_ns;
+};
+
+struct MsgK8s {
+  uint32_t net_ns;
+  uint32_t cid;
+  uint64_t cgrpid;
+  char docker[DOCKER_ID_LENGTH];
+//  std::array<char, DOCKER_ID_LENGTH> docker;
+};
+
+struct MsgNamespaces {
+  uint32_t uts_inum;
+  uint32_t ipc_inum;
+  uint32_t mnt_inum;
+  uint32_t pid_inum;
+  uint32_t pid_child_inum;
+  uint32_t net_inum;
+  uint32_t time_inum;
+  uint32_t time_child_inum;
+  uint32_t cgroup_inum;
+  uint32_t user_inum;
+};
+
+struct MsgExecveEvent {
+public:
+  MsgCommon common;
+  MsgK8s kube;
+  MsgExecveKey parent;
+  uint64_t parent_flags;
+  MsgGenericCred creds;
+  MsgNamespaces namespaces;
+  MsgExecveKey cleanup_process;
+};
+
+struct MsgK8sUnix {
+  std::string docker;
+};
+
+struct MsgUserRecord {
+  std::string name;
+};
+
+struct MsgProcess {
+  uint32_t size;
+  uint32_t pid;
+  uint32_t tid;
+  uint32_t nspid;
+  uint32_t secure_exec;
+  uint32_t uid;
+  uint32_t auid;
+  uint32_t flags;
+  uint32_t nlink;
+  uint64_t ino;
+  uint64_t ktime;
+  std::string filename;
+  std::string args;
+  std::string cmdline;
+  std::string cwd;
+  MsgUserRecord user;
+};
+
+class MsgExecveEventUnix {
+public:
+  MsgExecveEventUnix() : msg(nullptr) {}
+  std::unique_ptr<MsgExecveEvent> msg;
+  MsgK8sUnix kube;
+  MsgProcess process;
+  std::string exec_id;
+  std::string parent_exec_id;
+  bool kernel_thread;
+  std::string tags;
+  inline void print() const;
+};
 
 class SecurityEvent {
 public:

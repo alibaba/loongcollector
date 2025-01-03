@@ -12,20 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+namespace logtail {
+namespace ebpf {
 
-#include "ebpf/include/export.h"
-
-using start_plugin_func = int (*)(nami::PluginConfig *);
-using update_plugin_func = int (*)(nami::PluginConfig *);
-using stop_plugin_func = void (*)(nami::PluginType);
-using suspend_plugin_func = int (*)(nami::PluginType);
-using resume_plugin_func = int (*)(nami::PluginType);
-
-extern "C" {
-int start_plugin(nami::PluginConfig *arg);
-int update_plugin(nami::PluginConfig *arg);
-int stop_plugin(nami::PluginType);
-int suspend_plugin(nami::PluginType);
-int resume_plugin(nami::PluginType);
+}
 }

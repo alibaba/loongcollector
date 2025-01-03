@@ -13,6 +13,10 @@
 #include <variant>
 #include <vector>
 
+extern "C" {
+#include <coolbpf/net.h>
+}
+
 enum class SecureEventType {
     SECURE_EVENT_TYPE_SOCKET_SECURE,
     SECURE_EVENT_TYPE_FILE_SECURE,
@@ -287,6 +291,16 @@ struct NetworkObserveConfig {
     long upca_offset_;
     long upps_offset_;
     long upcr_offset_;
+
+    // perfworkers ...
+    net_ctrl_process_func_t mCtrlHandler = nullptr;
+    net_data_process_func_t mDataHandler = nullptr;
+    net_statistics_process_func_t mStatsHandler = nullptr;
+    net_lost_func_t mLostHandler = nullptr;
+    net_print_fn_t mPrintHandler = nullptr;
+    void * mCustomCtx;
+
+
     bool enable_span_ = false;
     bool enable_metric_ = false;
     bool enable_event_ = false;
@@ -363,6 +377,12 @@ public:
 
 using NamiStatisticsHandler = std::function<void(std::vector<eBPFStatistics>&)>;
 
+struct PluginConfig {
+    PluginType mPluginType;
+    // log control
+    std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig> mConfig;
+};
+
 struct eBPFConfig {
     PluginType plugin_type_;
     UpdataType type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
@@ -370,6 +390,7 @@ struct eBPFConfig {
     std::string host_name_;
     std::string host_ip_;
     std::string host_path_prefix_;
+    
     // specific config
     std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig> config_;
     NamiStatisticsHandler stats_handler_;
