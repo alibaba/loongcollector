@@ -116,7 +116,7 @@ public:
      *
      * @param path for whom event handler will be removed.
      */
-    void StopAllDir(const std::string& baseDir, const std::string& configName);
+    void StopAllDir(const std::string& baseDir, const std::string& configName, const std::string& containerID);
 
     EventHandler* GetHandler(const char* path) {
         MapType<std::string, int>::Type::iterator itr = mPathWdMap.find(path);

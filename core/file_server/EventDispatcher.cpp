@@ -835,12 +835,13 @@ void EventDispatcher::UnregisterEventHandler(const string& path) {
     LOG_INFO(sLogger, ("remove the watcher for dir", path)("wd", wd));
 }
 
-void EventDispatcher::StopAllDir(const string& baseDir, const string& configName) {
+void EventDispatcher::StopAllDir(const string& baseDir, const string& configName, const string& containerID) {
     LOG_DEBUG(sLogger, ("Stop all sub dir", baseDir));
     auto subDirAndHandlers = FindAllSubDirAndHandler(baseDir);
     for (auto& subDirAndHandler : subDirAndHandlers) {
         Event e(subDirAndHandler.first, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
         e.SetConfigName(configName);
+        e.SetContainerID(containerID);
         subDirAndHandler.second->Handle(e);
     }
 }
