@@ -27,6 +27,7 @@
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"
@@ -39,7 +40,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#include "file_server/FileServer.h"
 
 using namespace std;
 
@@ -320,7 +320,9 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
             string path = source;
             if (object.size() > 0)
                 path += PATH_SEPARATOR + object;
-            dispatcher->StopAllDir(path);
+            LOG_WARNING(sLogger,
+                        ("container stopped", "unregister all dir")("dir", path)("config", ev->GetConfigName()));
+            dispatcher->StopAllDir(path, ev->GetConfigName());
         } else {
             EventHandler* handler = dispatcher->GetHandler(source.c_str());
             if (handler) {
