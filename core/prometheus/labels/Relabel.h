@@ -15,10 +15,10 @@
  */
 
 #pragma once
-#include <string>
+#include <json/json.h>
 
-#include "boost/regex.hpp"
-#include "json/json.h"
+#include <boost/regex.hpp>
+#include <string>
 
 #include "prometheus/labels/Labels.h"
 
@@ -36,6 +36,7 @@ enum class Action {
     LABELKEEP,
     LOWERCASE,
     UPPERCASE,
+    DROPMETRIC,
     UNDEFINED
 };
 
@@ -64,6 +65,8 @@ public:
     std::string mReplacement;
     // Action is the action to be performed for the relabeling.
     Action mAction;
+
+    std::set<std::string> mMatchList;
 
 private:
     void CollectLabelsToDelete(const std::string& labelName, std::vector<std::string>& toDelete) const;
