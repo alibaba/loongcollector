@@ -16,9 +16,14 @@
 
 #pragma once
 
+#include <cstddef>
 #include <map>
+#include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEvent.h"
@@ -77,13 +82,31 @@ public:
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
+
+    void PushBackTag(const std::string& key, const std::string& val);
+    void PushBackTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+    void PushBackTagNoCopy(StringView key, StringView val);
+
+    std::optional<size_t> GetTagIndex(StringView key) const {
+        auto it = std::find_if(
+            mTags.mInner.begin(), mTags.mInner.end(), [key](const auto& tag) { return tag.first == key; });
+        return it != mTags.mInner.end() ? std::optional<size_t>(std::distance(mTags.mInner.begin(), it)) : std::nullopt;
+    };
+    void SetTagNameByIndexNoCopy(size_t index, StringView newKey) { mTags.SetNameByIndex(index, newKey); }
+
+    void FinalizeTags(const std::function<bool(std::pair<StringView, StringView>)>& isValid) {
+        mTags.FinalizeItems(isValid);
+    }
+    void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };
+
     void DelTag(StringView key);
 
-    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
     size_t TagsSize() const { return mTags.mInner.size(); }
 
     size_t DataSize() const override;
+
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson(bool enableEventMeta = false) const override;
@@ -95,7 +118,7 @@ private:
 
     StringView mName;
     MetricValue mValue;
-    SizedMap mTags;
+    SizedVector<std::pair<StringView, StringView>> mTags;
 };
 
 } // namespace logtail

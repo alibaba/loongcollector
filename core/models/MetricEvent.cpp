@@ -16,6 +16,8 @@
 
 #include "models/MetricEvent.h"
 
+#include <algorithm>
+
 using namespace std;
 
 namespace logtail {
@@ -48,7 +50,7 @@ void MetricEvent::SetNameNoCopy(StringView name) {
 }
 
 StringView MetricEvent::GetTag(StringView key) const {
-    auto it = mTags.mInner.find(key);
+    auto it = std::find_if(mTags.mInner.begin(), mTags.mInner.end(), [&key](const auto& p) { return p.first == key; });
     if (it != mTags.mInner.end()) {
         return it->second;
     }
@@ -56,7 +58,8 @@ StringView MetricEvent::GetTag(StringView key) const {
 }
 
 bool MetricEvent::HasTag(StringView key) const {
-    return mTags.mInner.find(key) != mTags.mInner.end();
+    auto it = std::find_if(mTags.mInner.begin(), mTags.mInner.end(), [&key](const auto& p) { return p.first == key; });
+    return it != mTags.mInner.end();
 }
 
 void MetricEvent::SetTag(StringView key, StringView val) {
@@ -73,6 +76,18 @@ void MetricEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val)
 
 void MetricEvent::SetTagNoCopy(StringView key, StringView val) {
     mTags.Insert(key, val);
+}
+
+void MetricEvent::PushBackTag(const std::string& key, const std::string& val) {
+    PushBackTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
+}
+
+void MetricEvent::PushBackTagNoCopy(const StringBuffer& key, const StringBuffer& val) {
+    PushBackTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
+}
+
+void MetricEvent::PushBackTagNoCopy(StringView key, StringView val) {
+    mTags.PushBack(key, val);
 }
 
 void MetricEvent::DelTag(StringView key) {

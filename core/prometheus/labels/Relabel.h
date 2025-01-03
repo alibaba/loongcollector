@@ -46,7 +46,7 @@ class RelabelConfig {
 public:
     RelabelConfig();
     bool Init(const Json::Value&);
-    bool Process(Labels&, std::vector<std::string>& toDelete) const;
+    bool Process(Labels&) const;
 
     // A list of labels from which values are taken and concatenated
     // with the configured separator in order.
@@ -66,14 +66,13 @@ public:
     Action mAction;
 
 private:
-    void CollectLabelsToDelete(const std::string& labelName, std::vector<std::string>& toDelete) const;
 };
 
 class RelabelConfigList {
 public:
     bool Init(const Json::Value& relabelConfigs);
-    bool Process(MetricEvent&, std::vector<std::string>& toDelete) const;
-    bool Process(Labels&, std::vector<std::string>& toDelete) const;
+    bool Process(MetricEvent&) const;
+    bool Process(Labels&) const;
 
     [[nodiscard]] bool Empty() const;
 
