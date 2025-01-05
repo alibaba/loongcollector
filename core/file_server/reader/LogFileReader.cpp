@@ -314,7 +314,14 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mLastFileSignatureSize = checkPointPtr->mSignatureSize;
             mRealLogPath = checkPointPtr->mRealFileName;
             mLastEventTime = checkPointPtr->mLastUpdateTime;
-            mContainerStopped = checkPointPtr->mContainerStopped;
+            if (checkPointPtr->mContainerID == mContainerID) {
+                mContainerStopped = checkPointPtr->mContainerStopped;
+            } else {
+                LOG_INFO(
+                    sLogger,
+                    ("container id is different between container discovery and checkpoint",
+                     checkPointPtr->mRealFileName)("checkpoint", checkPointPtr->mContainerID)("current", mContainerID));
+            }
             // new property to recover reader exactly from checkpoint
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
             LOG_INFO(sLogger,
