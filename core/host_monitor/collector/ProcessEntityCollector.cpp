@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "BaseCollector.h"
 #include "Common.h"
 #include "FileSystemUtil.h"
 #include "Logger.h"
@@ -55,21 +56,10 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
     // TODO: fix after host id ready
     mHostEntityID = ""; // FetchHostId();
     mDomain = "";
-    std::ostringstream oss;
-    if (mDomain == DEFAULT_HOST_TYPE_ECS) {
-        oss << DEFAULT_CONTENT_VALUE_DOMAIN_ACS << "." << DEFAULT_HOST_TYPE_ECS << "."
-            << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
-        mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
-    } else {
-        oss << DEFAULT_CONTENT_VALUE_DOMAIN_INFRA << "." << DEFAULT_HOST_TYPE_HOST << "."
-            << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
-        mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
-    }
-    mEntityType = oss.str();
+    mEntityType = "";
 };
 
 void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
-    group.SetMetadata(EventGroupMetaKey::COLLECT_TIME, std::to_string(time(nullptr)));
     std::vector<ProcessStatPtr> processes;
     GetSortedProcess(processes, ProcessTopN);
     for (auto process : processes) {
@@ -87,13 +77,23 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
         event->SetContent(DEFAULT_CONTENT_KEY_DOMAIN, mDomain);
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
-        event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, "30");
+        auto interval = group.GetMetadata(EventGroupMetaKey::HOST_MONITOR_COLLECT_INTERVAL);
+        if (!interval.empty()) {
+            try {
+                auto keepAliveSeconds = std::stoi(interval.data()) * 2;
+                event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
+            } catch (const std::invalid_argument& e) {
+                LOG_ERROR(sLogger, ("process entity collector", "invalid interval")("interval", interval));
+            } catch (const std::out_of_range& e) {
+                LOG_ERROR(sLogger, ("process entity collector", "interval out of range")("interval", interval));
+            }
+        }
 
         // custom fields
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PID, std::to_string(process->pid));
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PPID, std::to_string(process->parentPid));
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_COMM, process->name);
-        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME, processCreateTime);
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_KTIME, processCreateTime);
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_USER, ""); TODO: get user name
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CWD, ""); TODO: get cwd
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_BINARY, ""); TODO: get binary
@@ -153,11 +153,16 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
     const auto now = steady_clock::now();
 
     // TODO: more accurate cache
-    auto prev = mPrevProcessStat[pid];
-    isFirstCollect = prev == nullptr || prev->lastTime.time_since_epoch().count() == 0;
+    auto prev = mPrevProcessStat.find(pid);
+    if (prev == mPrevProcessStat.end() || prev->second == nullptr
+        || prev->second->lastTime.time_since_epoch().count() == 0) {
+        isFirstCollect = true;
+    } else {
+        isFirstCollect = false;
+    }
     // proc/[pid]/stat的统计粒度通常为10ms，两次采样之间需要足够大才能平滑。
-    if (prev && now < prev->lastTime + seconds{1}) {
-        return prev;
+    if (prev != mPrevProcessStat.end() && prev->second && now < prev->second->lastTime + seconds{1}) {
+        return prev->second;
     }
     auto ptr = ReadNewProcessStat(pid);
     if (!ptr) {
@@ -170,18 +175,17 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
         ptr->cpuInfo.user = ptr->utime.count();
         ptr->cpuInfo.sys = ptr->stime.count();
         ptr->cpuInfo.total = ptr->cpuInfo.user + ptr->cpuInfo.sys;
-        if (isFirstCollect || ptr->cpuInfo.total <= prev->cpuInfo.total) {
+        if (isFirstCollect || ptr->cpuInfo.total <= prev->second->cpuInfo.total) {
             // first time called
             ptr->cpuInfo.percent = 0.0;
         } else {
-            auto totalDiff = static_cast<double>(ptr->cpuInfo.total - prev->cpuInfo.total);
+            auto totalDiff = static_cast<double>(ptr->cpuInfo.total - prev->second->cpuInfo.total);
             auto timeDiff = static_cast<double>(ptr->lastTime.time_since_epoch().count()
-                                                - prev->lastTime.time_since_epoch().count());
+                                                - prev->second->lastTime.time_since_epoch().count());
             ptr->cpuInfo.percent = totalDiff / timeDiff * 100;
         }
     }
 
-    prev = ptr;
     mPrevProcessStat[pid] = ptr;
     return ptr;
 }

@@ -22,15 +22,11 @@
 namespace logtail {
 
 bool HostMonitorTimerEvent::IsValid() const {
-    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig.mConfigName,
-                                                                     mCollectConfig.mCollectorName);
+    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig.mCollectorName);
 }
 
 bool HostMonitorTimerEvent::Execute() {
-    LOG_DEBUG(sLogger, ("schedule host monitor collector", mCollectConfig.mConfigName));
-    HostMonitorInputRunner::GetInstance()->ScheduleOnce(mCollectConfig);
-    auto event = std::make_unique<HostMonitorTimerEvent>(GetExecTime() + mCollectConfig.mInterval, mCollectConfig);
-    Timer::GetInstance()->PushEvent(std::move(event));
+    HostMonitorInputRunner::GetInstance()->ScheduleOnce(GetExecTime(), mCollectConfig);
     return true;
 }
 

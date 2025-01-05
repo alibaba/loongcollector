@@ -46,7 +46,9 @@ public:
     void Init();
     void Stop();
     void PushEvent(std::unique_ptr<TimerEvent>&& e);
+#ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
+#endif
 
 private:
     Timer() = default;

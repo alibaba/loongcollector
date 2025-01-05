@@ -16,17 +16,27 @@
 
 #pragma once
 
-#include "PipelineEventGroup.h"
+#include "host_monitor/collector/BaseCollector.h"
 
 namespace logtail {
 
-class BaseCollector {
+class MockCollector : public BaseCollector {
 public:
-    BaseCollector() = default;
-    virtual ~BaseCollector() = default;
+    MockCollector() = default;
+    ~MockCollector() = default;
 
-    virtual void Collect(PipelineEventGroup& group) = 0;
-    virtual const std::string& Name() const = 0;
+    void Collect(PipelineEventGroup& group) {
+        auto event = group.AddLogEvent();
+        time_t logtime = time(nullptr);
+        event->SetTimestamp(logtime);
+        std::string key = "mock_key";
+        std::string value = "mock_value";
+        event->SetContent(key, value);
+    }
+    static const std::string sName;
+    const std::string& Name() const { return sName; }
 };
+
+const std::string MockCollector::sName = "mock";
 
 } // namespace logtail

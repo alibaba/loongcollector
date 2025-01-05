@@ -28,13 +28,24 @@
 #include "common/ThreadPool.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/BaseCollector.h"
-#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "pipeline/queue/QueueKey.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
 
 const int DEFAULT_SCHEDULE_INTERVAL = 10;
+
+struct CollectorInstance {
+    CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
+
+    std::unique_ptr<BaseCollector> mCollector;
+    bool mIsEnabled = false;
+
+    BaseCollector* GetCollector() const { return mCollector.get(); }
+    bool IsEnabled() const { return mIsEnabled; }
+    void Enable() { mIsEnabled = true; }
+    void Disable() { mIsEnabled = false; }
+};
 
 class HostMonitorInputRunner : public InputRunner {
 public:
@@ -56,23 +67,21 @@ public:
     void Stop() override;
     bool HasRegisteredPlugins() const override;
 
-    bool IsCollectTaskValid(const std::string& configName, const std::string& collectorName);
-    void ScheduleOnce(HostMonitorTimerEvent::CollectConfig& collectConfig);
+    bool IsCollectTaskValid(const std::string& collectorName);
+    void ScheduleOnce(std::chrono::steady_clock::time_point execTime,
+                      HostMonitorTimerEvent::CollectConfig& collectConfig);
 
 private:
     HostMonitorInputRunner();
 
     template <typename T>
     void RegisterCollector();
-    std::shared_ptr<BaseCollector> GetCollector(const std::string& collectorName);
 
     std::atomic_bool mIsStarted = false;
-
     ThreadPool mThreadPool;
 
     mutable std::shared_mutex mRegisteredCollectorMapMutex;
-    std::unordered_map<std::string, bool> mRegisteredCollectorMap;
-    std::unordered_map<std::string, std::shared_ptr<BaseCollector>> mCollectorInstanceMap;
+    std::unordered_map<std::string, CollectorInstance> mRegisteredCollectorMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class HostMonitorInputRunnerUnittest;

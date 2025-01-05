@@ -39,7 +39,6 @@ public:
               mInputIndex(inputIndex),
               mInterval(interval) {}
 
-        std::string mConfigName;
         std::string mCollectorName;
         QueueKey mProcessQueueKey;
         size_t mInputIndex;

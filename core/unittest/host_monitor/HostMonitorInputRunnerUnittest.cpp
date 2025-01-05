@@ -24,6 +24,7 @@
 #include "QueueKeyManager.h"
 #include "common/timer/Timer.h"
 #include "unittest/Unittest.h"
+#include "unittest/host_monitor/MockCollector.h"
 
 using namespace std;
 
@@ -35,6 +36,12 @@ public:
     void TestScheduleOnce() const;
 
 private:
+    static void SetUpTestCase() {
+        auto collector = std::make_unique<MockCollector>();
+        HostMonitorInputRunner::GetInstance()->mRegisteredCollectorMap.emplace(MockCollector::sName,
+                                                                               CollectorInstance(std::move(collector)));
+    }
+
     void TearDown() override {
         HostMonitorInputRunner::GetInstance()->Stop();
         Timer::GetInstance()->Clear();
@@ -44,11 +51,12 @@ private:
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->UpdateCollector({"process_entity"}, QueueKey{}, 0);
-    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid("test", "process_entity"));
+    runner->UpdateCollector({MockCollector::sName}, QueueKey{}, 0);
+    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid(MockCollector::sName));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
+    APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
     runner->RemoveCollector();
-    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", "process_entity"));
+    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid(MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
@@ -57,17 +65,20 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
     runner->mThreadPool.Start();
+    runner->mRegisteredCollectorMap.find(MockCollector::sName)->second.Enable();
     std::string configName = "test";
     auto queueKey = QueueKeyManager::GetInstance()->GetKey(configName);
     auto ctx = PipelineContext();
     ctx.SetConfigName(configName);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
 
-    HostMonitorTimerEvent::CollectConfig collectConfig("process_entity", queueKey, 0, std::chrono::seconds(60));
-    runner->ScheduleOnce(collectConfig);
+    HostMonitorTimerEvent::CollectConfig collectConfig(MockCollector::sName, queueKey, 0, std::chrono::seconds(60));
+    std::chrono::time_point now = std::chrono::steady_clock::now();
+    runner->ScheduleOnce(now, collectConfig);
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    runner->ScheduleOnce(collectConfig);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
+    APSARA_TEST_EQUAL_FATAL((now + std::chrono::seconds(60)).time_since_epoch().count(),
+                            Timer::GetInstance()->mQueue.top()->GetExecTime().time_since_epoch().count());
     auto item = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::make_shared<SourceBuffer>(), 0));
     ProcessQueueManager::GetInstance()->EnablePop(configName);
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));

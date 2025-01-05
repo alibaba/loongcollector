@@ -39,7 +39,7 @@ extern const std::string DEFAULT_CONTENT_KEY_PROCESS_PID;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_PPID;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_USER;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_COMM;
-extern const std::string DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME;
+extern const std::string DEFAULT_CONTENT_KEY_PROCESS_KTIME;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_CWD;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_BINARY;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS;

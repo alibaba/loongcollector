@@ -36,9 +36,7 @@ bool InputHostMeta::Start() {
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
     LOG_INFO(sLogger, ("input host meta stop", mContext->GetConfigName()));
-    if (isPipelineRemoving) {
-        HostMonitorInputRunner::GetInstance()->RemoveCollector();
-    }
+    HostMonitorInputRunner::GetInstance()->RemoveCollector();
     return true;
 }
 
