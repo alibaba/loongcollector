@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -24,8 +25,8 @@
 
 #include "common/Lock.h"
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
-#include "file_server/event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/event/Event.h"
 
 namespace logtail {
 

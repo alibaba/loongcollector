@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #include <assert.h>
-#include <json/json.h>
+
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "file_server/ConfigManager.h"
@@ -36,7 +37,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <boost/regex.hpp>
 #include <fstream>
 #include <iostream>
 #include <queue>
@@ -44,6 +44,8 @@
 #include <string>
 #include <typeinfo>
 #include <vector>
+
+#include "boost/regex.hpp"
 
 #include "checkpoint/CheckpointManagerV2.h"
 #include "common/FileEncryption.h"

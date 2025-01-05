@@ -96,10 +96,7 @@ DEFINE_FLAG_INT32(ilogtail_epoll_wait_events, "epoll_wait event number", 100);
 DEFINE_FLAG_INT32(ilogtail_max_epoll_events, "the max events number in epoll", 10000);
 
 // sls sender
-DEFINE_FLAG_INT32(sls_client_send_timeout, "timeout time of one operation for SlsClient", 15);
 DEFINE_FLAG_BOOL(sls_client_send_compress, "whether compresses the data or not when put data", true);
-DEFINE_FLAG_INT32(send_retrytimes, "how many times should retry if PostLogStoreLogs operation fail", 3);
-DEFINE_FLAG_DOUBLE(loggroup_bytes_inflation, "", 1.2);
 DEFINE_FLAG_STRING(default_region_name,
                    "for compatible with old user_log_config.json or old config server",
                    "__default_region__");

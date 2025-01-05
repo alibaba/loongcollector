@@ -1,10 +1,10 @@
 #pragma once
 
 #include <cstdint>
+
 #include <string>
 
 #include "common/http/HttpRequest.h"
-#include "models/PipelineEventGroup.h"
 #include "prometheus/async/PromFuture.h"
 
 namespace logtail {

@@ -12,24 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RuntimeUtil.h"
+
 #include "Flags.h"
 #include "app_config/AppConfig.h"
-#include "RuntimeUtil.h"
 #if defined(__linux__)
-#include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <unistd.h>
 #elif defined(_MSC_VER)
-#include <Windows.h>
 #include <Psapi.h>
+#include <Windows.h>
 #endif
-#include <errno.h>
 #include <cstdio>
+#include <errno.h>
+
 #include <sstream>
-#include "logger/Logger.h"
-#include "LogtailCommonFlags.h"
+
 #include "FileSystemUtil.h"
+#include "LogtailCommonFlags.h"
+#include "logger/Logger.h"
 
 DECLARE_FLAG_STRING(logtail_sys_conf_dir);
 DECLARE_FLAG_BOOL(logtail_mode);
@@ -78,17 +81,8 @@ std::string GetBinaryName(void) {
 bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
                          std::string& errorMessage,
                          const std::string& executionDir) {
-    std::string path = GetAgentDataDir();
-    if (CheckExistance(path))
-        return true;
-    if (!Mkdirs(path)) {
-        std::stringstream ss;
-        ss << "create data dir failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
-    }
     if (BOOL_FLAG(logtail_mode)) {
-        path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
+        std::string path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
         if (CheckExistance(path))
             return true;
         if (!Mkdir(path)) {
@@ -111,6 +105,16 @@ bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
 
         fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
         fclose(pFile);
+    } else {
+        std::string path = GetAgentDataDir();
+        if (CheckExistance(path))
+            return true;
+        if (!Mkdirs(path)) {
+            std::stringstream ss;
+            ss << "create data dir failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
     }
     return true;
 }

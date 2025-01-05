@@ -17,13 +17,14 @@
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 
 #include <cstdlib>
+
 #include <memory>
 #include <string>
 
-#include "Common.h"
-#include "TimeUtil.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
@@ -110,17 +111,19 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                 auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
                     v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
 
-                // zero-cost upgrade
-                if (mUnRegisterMs > 0
-                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
-                        > mUnRegisterMs)
-                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
-                        < mUnRegisterMs)) {
-                    // scrape once just now
-                    LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                    v->ScrapeOnce(std::chrono::steady_clock::now());
+                    // zero-cost upgrade
+                    if (mUnRegisterMs > 0
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
+                            > mUnRegisterMs)
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
+                            < mUnRegisterMs)) {
+                        // scrape once just now
+                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
+                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
+                    }
+                    v->ScheduleNext();
                 }
                 v->ScheduleNext();
             }
@@ -291,7 +294,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
-    auto request = std::make_unique<PromHttpRequest>(sdk::HTTP_GET,
+    auto request = std::make_unique<PromHttpRequest>(HTTP_GET,
                                                      false,
                                                      mServiceHost,
                                                      mServicePort,

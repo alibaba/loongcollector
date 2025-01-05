@@ -286,16 +286,13 @@ void ForceReadUnittest::TestTimeoutForceRead() {
     {
         // TODO: difficult to test, the behavior should be
         // read -> add timeout event -> handle timeout -> write -> event valid -> read not empty -> rollback
-    }
-    {
+    } {
         // TODO: difficult to test, the behavior should be
         // read -> add timeout event -> handle timeout -> event valid -> write -> read not empty -> rollback
-    }
-    {
+    } {
         // TODO: difficult to test, the behavior should be
         // read -> add timeout event -> handle timeout -> event valid -> read empty -> write -> not rollback
-    }
-    {
+    } {
         // TODO: difficult to test, the behavior should be
         // read -> add timeout event -> handle timeout -> event valid -> read empty -> not rollback -> write
     }

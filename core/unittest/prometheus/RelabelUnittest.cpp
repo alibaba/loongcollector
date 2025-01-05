@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <json/json.h>
-
-#include <boost/regex.hpp>
 #include <string>
+
+#include "boost/regex.hpp"
+#include "json/json.h"
 
 #include "common/JsonUtil.h"
 #include "prometheus/labels/Relabel.h"

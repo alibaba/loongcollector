@@ -25,65 +25,119 @@ public:
 };
 
 void ConcurrencyLimiterUnittest::TestLimiter() const {
-    shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter = make_shared<ConcurrencyLimiter>("", 80);
-    // comcurrency = 10, count = 0
+    auto curSystemTime = chrono::system_clock::now();
+    int maxConcurrency = 80;
+    int minConcurrency = 20;
+
+    shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter
+        = make_shared<ConcurrencyLimiter>("", maxConcurrency, minConcurrency);
+    // fastFallBack
     APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
-    sConcurrencyLimiter->PostPop();
-    APSARA_TEST_EQUAL(1U, sConcurrencyLimiter->GetInSendingCount());
-    sConcurrencyLimiter->OnFail();
-    sConcurrencyLimiter->OnSendDone();
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold(); i++) {
+        sConcurrencyLimiter->PostPop();
+        APSARA_TEST_EQUAL(1U, sConcurrencyLimiter->GetInSendingCount());
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnFail(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
     APSARA_TEST_EQUAL(40U, sConcurrencyLimiter->GetCurrentLimit());
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
-    APSARA_TEST_EQUAL(30U, sConcurrencyLimiter->GetCurrentInterval());
 
-    // count = 10, comcurrency = 10
+    // success one time
     APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
-    int num = 10;
-    for (int i = 0; i < num; i++) {
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold(); i++) {
         APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
         sConcurrencyLimiter->PostPop();
     }
     APSARA_TEST_EQUAL(10U, sConcurrencyLimiter->GetInSendingCount());
-    for (int i = 0; i < num; i++) {
-        sConcurrencyLimiter->OnSuccess();
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold(); i++) {
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnSuccess(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+
+    APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
+    APSARA_TEST_EQUAL(41U, sConcurrencyLimiter->GetCurrentLimit());
+
+    // slowFallBack
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold() - 2; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnSuccess(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+    for (int i = 0; i < 2; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnFail(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+    uint32_t expect = 41 * 0.8;
+    APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
+    APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
+
+    // no FallBack
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold() - 1; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnSuccess(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+    for (int i = 0; i < 1; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnFail(curSystemTime);
         sConcurrencyLimiter->OnSendDone();
     }
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
-    APSARA_TEST_EQUAL(50U, sConcurrencyLimiter->GetCurrentLimit());
-    APSARA_TEST_EQUAL(30U, sConcurrencyLimiter->GetCurrentInterval());
+    APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
 
-    // limit = 50/2/2/2/2/2/2/2 = 25/2/2/2/2/2/2 = 3/2/2/2 = 1/2/2 = 0 
-    // interval = 30 * 1.5  = 45
-    num = 7;
-    for (int i = 0; i < num; i++) {
+    // test FallBack to minConcurrency
+    for (int i = 0; i < 10; i++) {
+        for (uint32_t j = 0; j < sConcurrencyLimiter->GetStatisticThreshold(); j++) {
+            sConcurrencyLimiter->PostPop();
+            curSystemTime = chrono::system_clock::now();
+            sConcurrencyLimiter->OnFail(curSystemTime);
+            sConcurrencyLimiter->OnSendDone();
+        }
+    }
+    APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
+    APSARA_TEST_EQUAL(minConcurrency, sConcurrencyLimiter->GetCurrentLimit());
+
+    // test limit by concurrency
+    for (int i = 0; i < minConcurrency; i++) {
         APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
         sConcurrencyLimiter->PostPop();
     }
-    APSARA_TEST_EQUAL(7U, sConcurrencyLimiter->GetInSendingCount());
-    for (int i = 0; i < num; i++) {
-        sConcurrencyLimiter->OnFail();
+    APSARA_TEST_EQUAL(false, sConcurrencyLimiter->IsValidToPop());
+    for (int i = 0; i < minConcurrency; i++) {
         sConcurrencyLimiter->OnSendDone();
     }
-    APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
-    APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetCurrentLimit());
-    APSARA_TEST_EQUAL(45U, sConcurrencyLimiter->GetCurrentInterval());
 
-    num = 3;
-    for (int i = 0; i < num; i++) {
-        if (i == 0) {
-            APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
-        } else {
-            APSARA_TEST_EQUAL(false, sConcurrencyLimiter->IsValidToPop());
-        }
+    // test time exceed interval; 8 success, 1 fail, and last one timeout
+    sConcurrencyLimiter->SetCurrentLimit(40);
+    for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold() - 3; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnSuccess(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
     }
-
-    sConcurrencyLimiter->PostPop();
-    sConcurrencyLimiter->OnSuccess();
-    sConcurrencyLimiter->OnSendDone();
-
+    for (int i = 0; i < 1; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnFail(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+    sleep(4);
+    for (int i = 0; i < 1; i++) {
+        sConcurrencyLimiter->PostPop();
+        curSystemTime = chrono::system_clock::now();
+        sConcurrencyLimiter->OnSuccess(curSystemTime);
+        sConcurrencyLimiter->OnSendDone();
+    }
+    expect = 40 * 0.8;
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
-    APSARA_TEST_EQUAL(1U, sConcurrencyLimiter->GetCurrentLimit());
-    APSARA_TEST_EQUAL(30U, sConcurrencyLimiter->GetCurrentInterval());
+    APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
 }
 
 UNIT_TEST_CASE(ConcurrencyLimiterUnittest, TestLimiter)

@@ -136,8 +136,8 @@ struct ApplicationBatchSpan {
 class SingleEvent {
 public:
     explicit __attribute__((visibility("default"))) SingleEvent() {}
-    explicit __attribute__((visibility("default"))) SingleEvent(std::vector<std::pair<std::string, std::string>>&& tags,
-                                                                uint64_t ts)
+    explicit __attribute__((visibility("default")))
+    SingleEvent(std::vector<std::pair<std::string, std::string>>&& tags, uint64_t ts)
         : tags_(tags), timestamp_(ts) {}
     std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
     uint64_t GetTimestamp() { return timestamp_; }

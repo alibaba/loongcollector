@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
+
+#include "json/json.h"
 
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"
@@ -59,6 +59,7 @@ private:
     friend class InputFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

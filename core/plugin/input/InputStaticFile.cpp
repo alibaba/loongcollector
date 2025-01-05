@@ -24,7 +24,7 @@ InputStaticFile::InputStaticFile(/* args */) {
 InputStaticFile::~InputStaticFile() {
 }
 
-void InputStaticFile::Init(PipelineConfig &&config) {
+void InputStaticFile::Init(PipelineConfig&& config) {
     // mAdhocFileManager = AdhocFileManager::GetInstance();
     // GetStaticFileList();
 }
@@ -46,4 +46,4 @@ void InputStaticFile::GetStaticFileList() {
 void InputStaticFile::SortFileList() {
 }
 
-}
+} // namespace logtail

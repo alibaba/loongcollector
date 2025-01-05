@@ -14,7 +14,7 @@
 
 #include "common/compression/ZstdCompressor.h"
 
-#include <zstd/zstd.h>
+#include "zstd/zstd.h"
 
 using namespace std;
 
@@ -40,8 +40,7 @@ bool ZstdCompressor::Compress(const string& input, string& output, string& error
 #ifdef APSARA_UNIT_TEST_MAIN
 bool ZstdCompressor::UnCompress(const string& input, string& output, string& errorMsg) {
     try {
-        size_t length
-            = ZSTD_decompress(const_cast<char*>(output.c_str()), output.size(), input.c_str(), input.size());
+        size_t length = ZSTD_decompress(const_cast<char*>(output.c_str()), output.size(), input.c_str(), input.size());
         if (ZSTD_isError(length)) {
             errorMsg = ZSTD_getErrorName(length);
             return false;

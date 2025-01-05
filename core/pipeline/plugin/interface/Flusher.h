@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <memory>
+
+#include "json/json.h"
 
 #include "models/PipelineEventGroup.h"
 #include "pipeline/plugin/interface/Plugin.h"
@@ -62,6 +63,7 @@ protected:
     friend class FlusherInstanceUnittest;
     friend class FlusherRunnerUnittest;
     friend class FlusherUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

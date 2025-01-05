@@ -16,11 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
 #include <ctime>
+
 #include <limits>
+
+#include "json/json.h"
 
 #include "models/PipelineEventPtr.h"
 #include "pipeline/batch/BatchStatus.h"

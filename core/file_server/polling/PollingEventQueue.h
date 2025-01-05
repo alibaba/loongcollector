@@ -15,9 +15,9 @@
  */
 
 #pragma once
-#include <vector>
 #include <deque>
 #include <mutex>
+#include <vector>
 
 namespace logtail {
 

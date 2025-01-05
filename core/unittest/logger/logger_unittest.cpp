@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "logger/Logger.h"
+
 #include <iostream>
 
 int main() {

@@ -20,10 +20,11 @@
 #include <string.h>
 #elif defined(_MSC_VER)
 #include <Windows.h>
+
 #include <string>
 #elif defined(__APPLE__)
-#include <sys/unistd.h>
 #include <sys/errno.h>
+#include <sys/unistd.h>
 #endif
 
 // Errno utility.

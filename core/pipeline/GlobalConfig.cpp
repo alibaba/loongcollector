@@ -14,7 +14,7 @@
 
 #include "pipeline/GlobalConfig.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"
@@ -94,7 +94,7 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
     }
 
     // Priority
-    uint32_t priority = 0;
+    uint32_t priority = 1;
     if (!GetOptionalUIntParam(config, "Priority", priority, errorMsg)) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),

@@ -27,6 +27,7 @@
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"
@@ -39,10 +40,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
-#include "file_server/FileServer.h"
 
 using namespace std;
 
@@ -59,8 +56,6 @@ DEFINE_FLAG_INT32(read_local_event_interval, "seconds", 60);
 DEFINE_FLAG_BOOL(force_close_file_on_container_stopped,
                  "whether close file handler immediately when associate container stopped",
                  false);
-
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 
 namespace logtail {
@@ -350,7 +345,8 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
     mLastRunTime->Set(mLastReadEventTime.load());
-    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(
+        GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
     mRegisterdHandlersTotal->Set(EventDispatcher::GetInstance()->GetHandlerCount());
     mActiveReadersTotal->Set(CheckPointManager::Instance()->GetReaderCount());
     mEventProcessCount = 0;
@@ -529,6 +525,7 @@ Event* LogInput::PopEventQueue() {
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogInput::CleanEnviroments() {
     mIdleFlag = true;
+    mInteruptFlag = true;
     usleep(100 * 1000);
     while (true) {
         Event* ev = PopEventQueue();

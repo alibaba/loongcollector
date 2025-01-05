@@ -198,9 +198,8 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config, const PipelineCo
     return true;
 }
 
-void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(Json::Value& res,
-                                                                        const FileDiscoveryOptions* fileDiscovery,
-                                                                        const PluginInstance::PluginMeta& pluginMeta) const {
+void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
+    Json::Value& res, const FileDiscoveryOptions* fileDiscovery, const PluginInstance::PluginMeta& pluginMeta) const {
     Json::Value plugin(Json::objectValue);
     Json::Value detail(Json::objectValue);
     Json::Value object(Json::objectValue);

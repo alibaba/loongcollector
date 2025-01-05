@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "json/json.h"
 
 #include "config/PipelineConfig.h"
 #include "models/PipelineEventGroup.h"
@@ -121,6 +121,7 @@ private:
     friend class PipelineUnittest;
     friend class InputContainerStdioUnittest;
     friend class InputFileUnittest;
+    friend class InputInternalMetricsUnittest;
     friend class InputPrometheusUnittest;
     friend class ProcessorTagNativeUnittest;
     friend class FlusherSLSUnittest;
@@ -128,6 +129,7 @@ private:
     friend class InputProcessSecurityUnittest;
     friend class InputNetworkSecurityUnittest;
     friend class InputNetworkObserverUnittest;
+    friend class PipelineUpdateUnittest;
     friend class InputHostMetaUnittest;
 #endif
 };

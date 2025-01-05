@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <limits>
 #include <mutex>
 #include <optional>
@@ -32,7 +33,7 @@ class PipelineEventGroup;
 
 class EventPool {
 public:
-    EventPool(bool enableLock = true) : mEnableLock(enableLock) {};
+    EventPool(bool enableLock = true) : mEnableLock(enableLock){};
     ~EventPool();
     EventPool(const EventPool&) = delete;
     EventPool& operator=(const EventPool&) = delete;

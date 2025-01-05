@@ -16,17 +16,16 @@
 
 #include "prometheus/labels/TextParser.h"
 
-#include <boost/algorithm/string.hpp>
-#include <charconv>
 #include <cmath>
+
 #include <string>
 
-#include "common/StringTools.h"
+#include "boost/algorithm/string.hpp"
+
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/StringView.h"
-#include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
 using namespace std;

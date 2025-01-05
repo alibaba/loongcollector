@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "common/http/HttpResponse.h"
 #include "pipeline/plugin/interface/Flusher.h"
 #include "pipeline/queue/SenderQueueItem.h"
@@ -27,7 +29,9 @@ class HttpFlusher : public Flusher {
 public:
     virtual ~HttpFlusher() = default;
 
-    virtual bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const = 0;
+    virtual bool
+    BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg)
+        = 0;
     virtual void OnSendDone(const HttpResponse& response, SenderQueueItem* item) = 0;
 
     virtual SinkType GetSinkType() override { return SinkType::HTTP; }

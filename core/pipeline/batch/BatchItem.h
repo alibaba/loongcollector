@@ -94,7 +94,8 @@ public:
     void Add(PipelineEventPtr&& e) {
         mBatch.mEvents.emplace_back(std::move(e));
         mStatus.Update(mBatch.mEvents.back());
-        // mTotalEnqueTimeMs += std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        // mTotalEnqueTimeMs +=
+        // std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
         //                          .time_since_epoch()
         //                          .count();
     }

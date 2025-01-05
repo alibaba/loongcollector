@@ -46,6 +46,7 @@ type Config struct {
 	AccessKeyID     string        `mapstructure:"access_key_id" yaml:"access_key_id"`
 	AccessKeySecret string        `mapstructure:"access_key_secret" yaml:"access_key_secret"`
 	Endpoint        string        `mapstructure:"endpoint" yaml:"endpoint"`
+	QueryEndpoint   string        `mapstructure:"query_endpoint" yaml:"query_endpoint"`
 	Aliuid          string        `mapstructure:"aliuid" yaml:"aliuid"`
 	Region          string        `mapstructure:"region" yaml:"region"`
 	RetryTimeout    time.Duration `mapstructure:"retry_timeout" yaml:"retry_timeout"`
@@ -93,6 +94,7 @@ func ParseConfig() {
 	TestConfig.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
 	TestConfig.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
 	TestConfig.Endpoint = os.Getenv("ENDPOINT")
+	TestConfig.QueryEndpoint = os.Getenv("QUERY_ENDPOINT")
 	TestConfig.Aliuid = os.Getenv("ALIUID")
 	TestConfig.Region = os.Getenv("REGION")
 	timeout, err := strconv.ParseInt(os.Getenv("RETRY_TIMEOUT"), 10, 64)

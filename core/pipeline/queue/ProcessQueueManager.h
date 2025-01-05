@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
+
+#include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -93,6 +94,7 @@ private:
     void Clear();
     friend class ProcessQueueManagerUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
     friend class HostMonitorInputRunnerUnittest;
 #endif
 };

@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
 #include <chrono>
 #include <cstdlib>
+
+#include <algorithm>
 #include <iostream>
 #include <random>
 #include <string>
 #include <vector>
 
 #include "boost/utility/string_view.hpp"
-#include "constants/Constants.h"
+
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "models/LogEvent.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
@@ -1225,14 +1227,12 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
     processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processor.Init(config));
     // log 测试
-    {
-        // log 不存在情况下
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+    {// log 不存在情况下
+     {auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1244,12 +1244,12 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.FromJsonString(inJson.str());
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events" :
                 [
                     {
@@ -1266,16 +1266,16 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // log为空
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// log为空
+{
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1287,12 +1287,12 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.FromJsonString(inJson.str());
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events" :
                 [
                     {
@@ -1311,16 +1311,16 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // log为不是string
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// log为不是string
+{
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1332,12 +1332,12 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.FromJsonString(inJson.str());
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events" :
                 [
                     {
@@ -1354,20 +1354,18 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-    }
-    // time
-    {
-        // time不存在
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+} // namespace logtail
+// time
+{// time不存在
+ {// make eventGroup
+  auto sourceBuffer = std::make_shared<SourceBuffer>();
+PipelineEventGroup eventGroup(sourceBuffer);
+std::stringstream inJson;
+eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1379,13 +1377,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+// run test function
+processor.Process(eventGroup);
+// judge result
+std::stringstream expectJson;
+expectJson << R"({
                 "events" :
                 [
                     {
@@ -1402,17 +1400,17 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // time 为空
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+std::string outJson = eventGroup.ToJsonString();
+APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// time 为空
+{
+    // make eventGroup
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1424,13 +1422,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+    eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events" :
                 [
                     {
@@ -1447,17 +1445,17 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // time 不是string
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// time 不是string
+{
+    // make eventGroup
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1469,13 +1467,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+    eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events" :
                 [
                     {
@@ -1492,20 +1490,20 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-    }
-    // stream
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+}
+// stream
+{
+    // stream不存在
     {
-        // stream不存在
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1517,13 +1515,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -1540,17 +1538,17 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // stream非法
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // stream非法
+    {
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1562,13 +1560,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -1585,17 +1583,17 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // stream不是string
-        {
-            // make eventGroup
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::stringstream inJson;
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // stream不是string
+    {
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -1607,13 +1605,13 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-            // run test function
-            processor.Process(eventGroup);
-            // judge result
-            std::stringstream expectJson;
-            expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -1630,10 +1628,10 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
                     "container.type":"docker_json-file"
                 }
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     }
+}
 }
 
 void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() {
@@ -1767,15 +1765,12 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
         processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // log 测试
-        {
-            // log 不存在情况下
-            {
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        {// log 不存在情况下
+         {auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1787,27 +1782,26 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        eventGroup.FromJsonString(inJson.str());
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // log为空
-            {
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // log为空
+    {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1819,12 +1813,12 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        eventGroup.FromJsonString(inJson.str());
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "events": [
                         {
                             "contents" :
@@ -1842,17 +1836,16 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // log为不是string
-            {
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // log为不是string
+    {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1864,31 +1857,28 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        eventGroup.FromJsonString(inJson.str());
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-        }
-        // time
-        {
-            // time不存在
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+}
+// time
+{// time不存在
+ {// make eventGroup
+  auto sourceBuffer = std::make_shared<SourceBuffer>();
+PipelineEventGroup eventGroup(sourceBuffer);
+std::stringstream inJson;
+eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1900,29 +1890,28 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+// run test function
+processor.Process(eventGroup);
+// judge result
+std::stringstream expectJson;
+expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // time 为空
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+std::string outJson = eventGroup.ToJsonString();
+APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// time 为空
+{
+    // make eventGroup
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1934,29 +1923,28 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+    eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // time 不是string
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+// time 不是string
+{
+    // make eventGroup
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::stringstream inJson;
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -1968,32 +1956,31 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+    eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+    // run test function
+    processor.Process(eventGroup);
+    // judge result
+    std::stringstream expectJson;
+    expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-        }
-        // stream
-        {
-            // stream不存在
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+}
+// stream
+{
+    // stream不存在
+    {
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -2005,29 +1992,28 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // stream非法
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // stream非法
+    {
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -2039,29 +2025,28 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-            // stream不是string
-            {
-                // make eventGroup
-                auto sourceBuffer = std::make_shared<SourceBuffer>();
-                PipelineEventGroup eventGroup(sourceBuffer);
-                std::stringstream inJson;
-                eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT,
-                                       ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-                inJson << R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // stream不是string
+    {
+        // make eventGroup
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::stringstream inJson;
+        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+        inJson << R"({
                     "events": [
                         {
                             "contents": {
@@ -2073,22 +2058,22 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
                         }
                     ]
                 })";
-                eventGroup.FromJsonString(inJson.str());
+        eventGroup.FromJsonString(inJson.str());
 
-                // run test function
-                processor.Process(eventGroup);
-                // judge result
-                std::stringstream expectJson;
-                expectJson << R"({
+        // run test function
+        processor.Process(eventGroup);
+        // judge result
+        std::stringstream expectJson;
+        expectJson << R"({
                     "metadata":{
                         "container.type":"docker_json-file"
                     }
                 })";
-                std::string outJson = eventGroup.ToJsonString();
-                APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-            }
-        }
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     }
+}
+}
 }
 
 void ProcessorParseContainerLogNativeUnittest::TestParseDockerLog() {

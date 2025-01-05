@@ -15,10 +15,16 @@
  */
 
 #pragma once
+
 #include <cstdint>
 #include <ctime>
+
 #include <map>
 #include <mutex>
+
+#include "common/Flags.h"
+
+DECLARE_FLAG_INT32(dns_cache_ttl_sec);
 
 namespace logtail {
 
@@ -75,7 +81,7 @@ public:
     }
 
 private:
-    DnsCache(const int32_t ttlSeconds = 60 * 10) : mUpdateTime(time(NULL)), mDnsTTL(ttlSeconds) {}
+    DnsCache(const int32_t ttlSeconds = INT32_FLAG(dns_cache_ttl_sec));
     ~DnsCache() = default;
 
     bool IsRawIp(const char* host) {

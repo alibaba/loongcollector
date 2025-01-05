@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <functional>
 #include <map>
 #include <string>
@@ -25,11 +23,21 @@
 #include <unordered_set>
 #include <vector>
 
+#include "json/json.h"
+
 #include "InstanceConfig.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 extern const int32_t kDefaultMaxSendBytePerSec;
+
+extern const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+extern const int32_t MIN_SEND_REQUEST_CONCURRENCY;
+extern const int32_t MAX_SEND_REQUEST_CONCURRENCY;
+extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
+extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;
+extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
+extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
 
 void CreateAgentDir();
 
@@ -39,6 +47,9 @@ std::string GetAgentConfDir();
 std::string GetAgentRunDir();
 std::string GetAgentThirdPartyDir();
 
+std::string GetAgentGoCheckpointDir();
+std::string GetAgentGoLogConfDir();
+std::string GetAgentPrometheusAuthorizationPath();
 std::string GetAgentConfigFile();
 std::string GetAgentAppInfoFile();
 std::string GetAdhocCheckpointDirPath();
@@ -131,6 +142,7 @@ private:
     int32_t mNumOfBufferFile;
     int32_t mLocalFileSize;
     int32_t mSendRequestConcurrency;
+    int32_t mSendRequestGlobalConcurrency;
     std::string mBufferFilePath;
 
     // checkpoint
@@ -206,6 +218,7 @@ private:
     std::vector<std::string> mHostPathBlacklist;
 
     std::string mBindInterface;
+
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -319,9 +332,15 @@ public:
     void LoadLocalInstanceConfig();
 
     // 获取全局参数方法
-    const Json::Value& GetLocalInstanceConfig() { return mLocalInstanceConfig; };
-    const Json::Value& GetEnvConfig() { return mEnvConfig; };
-    const Json::Value& GetRemoteInstanceConfig() { return mRemoteInstanceConfig; };
+    const Json::Value& GetLocalInstanceConfig() {
+        return mLocalInstanceConfig;
+    };
+    const Json::Value& GetEnvConfig() {
+        return mEnvConfig;
+    };
+    const Json::Value& GetRemoteInstanceConfig() {
+        return mRemoteInstanceConfig;
+    };
 
     template <typename T>
     T MergeConfig(const T& defaultValue,
@@ -363,26 +382,40 @@ public:
 
     // 获取特定配置
     // CPU限制参数等仅与框架相关的参数，计算逻辑可以放在AppConfig
-    float GetMachineCpuUsageThreshold() const { return mMachineCpuUsageThreshold; }
-    float GetScaledCpuUsageUpLimit() const { return mScaledCpuUsageUpLimit; }
-    float GetCpuUsageUpLimit() const { return mCpuUsageUpLimit; }
+    float GetMachineCpuUsageThreshold() const {
+        return mMachineCpuUsageThreshold;
+    }
+    float GetScaledCpuUsageUpLimit() const {
+        return mScaledCpuUsageUpLimit;
+    }
+    float GetCpuUsageUpLimit() const {
+        return mCpuUsageUpLimit;
+    }
 
     // 文件标签相关，获取从文件中来的tags
-    std::vector<sls_logs::LogTag>& GetFileTags() { return mFileTags.getReadBuffer(); }
+    std::vector<sls_logs::LogTag>& GetFileTags() {
+        return mFileTags.getReadBuffer();
+    }
     // 更新从文件中来的tags
     void UpdateFileTags();
 
     // Agent属性相关，获取从文件中来的attrs
-    std::map<std::string, std::string>& GetAgentAttrs() { return mAgentAttrs.getReadBuffer(); }
+    std::map<std::string, std::string>& GetAgentAttrs() {
+        return mAgentAttrs.getReadBuffer();
+    }
     // 更新从文件中来的attrs
     void UpdateAgentAttrs();
 
     // Legacy:获取各种参数
-    bool NoInotify() const { return mNoInotify; }
+    bool NoInotify() const {
+        return mNoInotify;
+    }
 
     bool IsInInotifyBlackList(const std::string& path) const;
 
-    bool IsLogParseAlarmValid() const { return mLogParseAlarmFlag; }
+    bool IsLogParseAlarmValid() const {
+        return mLogParseAlarmFlag;
+    }
 
     // std::string GetDefaultRegion() const;
 
@@ -403,41 +436,85 @@ public:
         return mIlogtailConfigJson;
     }
 
-    bool IsAcceptMultiConfig() const { return mAcceptMultiConfigFlag; }
+    bool IsAcceptMultiConfig() const {
+        return mAcceptMultiConfigFlag;
+    }
 
-    void SetAcceptMultiConfig(bool flag) { mAcceptMultiConfigFlag = flag; }
+    void SetAcceptMultiConfig(bool flag) {
+        mAcceptMultiConfigFlag = flag;
+    }
 
-    int32_t GetMaxMultiConfigSize() const { return mMaxMultiConfigSize; }
+    int32_t GetMaxMultiConfigSize() const {
+        return mMaxMultiConfigSize;
+    }
 
-    void SetMaxMultiConfigSize(int32_t maxSize) { mMaxMultiConfigSize = maxSize; }
+    void SetMaxMultiConfigSize(int32_t maxSize) {
+        mMaxMultiConfigSize = maxSize;
+    }
 
-    const std::string& GetCheckPointFilePath() const { return mCheckPointFilePath; }
+    const std::string& GetCheckPointFilePath() const {
+        return mCheckPointFilePath;
+    }
 
-    bool IsInputFlowControl() const { return mInputFlowControl; }
+    bool IsInputFlowControl() const {
+        return mInputFlowControl;
+    }
 
-    bool IsResourceAutoScale() const { return mResourceAutoScale; }
+    bool IsResourceAutoScale() const {
+        return mResourceAutoScale;
+    }
 
-    int64_t GetMemUsageUpLimit() const { return mMemUsageUpLimit; }
+    int64_t GetMemUsageUpLimit() const {
+        return mMemUsageUpLimit;
+    }
 
-    int32_t GetMaxHoldedDataSize() const { return mMaxHoldedDataSize; }
+    int32_t GetMaxHoldedDataSize() const {
+        return mMaxHoldedDataSize;
+    }
 
-    uint32_t GetMaxBufferNum() const { return mMaxBufferNum; }
+    uint32_t GetMaxBufferNum() const {
+        return mMaxBufferNum;
+    }
 
-    int32_t GetMaxBytePerSec() const { return mMaxBytePerSec; }
+    int32_t GetMaxBytePerSec() const {
+        return mMaxBytePerSec;
+    }
 
-    void SetMaxBytePerSec(int32_t maxBytePerSec) { mMaxBytePerSec = maxBytePerSec; }
+    void SetMaxBytePerSec(int32_t maxBytePerSec) {
+        mMaxBytePerSec = maxBytePerSec;
+    }
 
-    int32_t GetBytePerSec() const { return mBytePerSec; }
+    int32_t GetBytePerSec() const {
+        return mBytePerSec;
+    }
 
-    int32_t GetNumOfBufferFile() const { return mNumOfBufferFile; }
+    int32_t GetNumOfBufferFile() const {
+        return mNumOfBufferFile;
+    }
 
-    int32_t GetLocalFileSize() const { return mLocalFileSize; }
+    int32_t GetLocalFileSize() const {
+        return mLocalFileSize;
+    }
 
-    const std::string& GetBufferFilePath() const { return mBufferFilePath; }
+    const std::string& GetBufferFilePath() const {
+        return mBufferFilePath;
+    }
+    // 单地域并发度
+    int32_t GetSendRequestConcurrency() const {
+        return mSendRequestConcurrency;
+    }
+    // 全局并发度
+    int32_t GetSendRequestGlobalConcurrency() const {
+        return mSendRequestGlobalConcurrency;
+    }
 
-    int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
+    double GetGlobalConcurrencyFreePercentageForOneRegion() const {
+        return GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+    }
 
-    int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
+    int32_t GetProcessThreadCount() const {
+        return mProcessThreadCount;
+    }
 
     // const std::string& GetMappingConfigPath() const { return mMappingConfigPath; }
 
@@ -451,61 +528,105 @@ public:
 
     // const std::string& GetRemoteUserYamlConfigDirPath() const { return mUserRemoteYamlConfigDirPath; }
 
-    bool IgnoreDirInodeChanged() const { return mIgnoreDirInodeChanged; }
+    bool IgnoreDirInodeChanged() const {
+        return mIgnoreDirInodeChanged;
+    }
 
-    void SetProcessExecutionDir(const std::string& dir) { mProcessExecutionDir = dir; }
+    void SetProcessExecutionDir(const std::string& dir) {
+        mProcessExecutionDir = dir;
+    }
 
-    const std::string& GetProcessExecutionDir() { return mProcessExecutionDir; }
+    const std::string& GetProcessExecutionDir() {
+        return mProcessExecutionDir;
+    }
 
-    void SetWorkingDir(const std::string& dir) { mWorkingDir = dir; }
+    void SetWorkingDir(const std::string& dir) {
+        mWorkingDir = dir;
+    }
 
-    const std::string& GetWorkingDir() const { return mWorkingDir; }
+    const std::string& GetWorkingDir() const {
+        return mWorkingDir;
+    }
 
     // const std::string& GetContainerMountConfigPath() const { return mContainerMountConfigPath; }
 
-    const std::string& GetConfigIP() const { return mConfigIP; }
+    const std::string& GetConfigIP() const {
+        return mConfigIP;
+    }
 
     // const std::string& GetCustomizedConfigIp() const { return mCustomizedConfigIP; }
 
-    const std::string& GetConfigHostName() const { return mConfigHostName; }
+    const std::string& GetConfigHostName() const {
+        return mConfigHostName;
+    }
 
-    int32_t GetSystemBootTime() const { return mSystemBootTime; }
+    int32_t GetSystemBootTime() const {
+        return mSystemBootTime;
+    }
 
-    const std::string& GetDockerFilePathConfig() const { return mDockerFilePathConfig; }
+    const std::string& GetDockerFilePathConfig() const {
+        return mDockerFilePathConfig;
+    }
 
-    int32_t GetDataServerPort() const { return mSendDataPort; }
+    int32_t GetDataServerPort() const {
+        return mSendDataPort;
+    }
 
-    bool ShennongSocketEnabled() const { return mShennongSocket; }
+    bool ShennongSocketEnabled() const {
+        return mShennongSocket;
+    }
 
-    const std::vector<sls_logs::LogTag>& GetEnvTags() const { return mEnvTags; }
+    const std::vector<sls_logs::LogTag>& GetEnvTags() const {
+        return mEnvTags;
+    }
 
-    bool IsPurageContainerMode() const { return mPurageContainerMode; }
+    bool IsPurageContainerMode() const {
+        return mPurageContainerMode;
+    }
 
-    int32_t GetForceQuitReadTimeout() const { return mForceQuitReadTimeout; }
+    int32_t GetForceQuitReadTimeout() const {
+        return mForceQuitReadTimeout;
+    }
 
     // const std::string& GetAlipayZone() const { return mAlipayZone; }
 
     // If @dirPath is not accessible, GetProcessExecutionDir will be set.
     void SetLoongcollectorConfDir(const std::string& dirPath);
 
-    const std::string& GetLoongcollectorConfDir() const { return mLoongcollectorConfDir; }
+    const std::string& GetLoongcollectorConfDir() const {
+        return mLoongcollectorConfDir;
+    }
 
-    inline bool IsHostIPReplacePolicyEnabled() const { return mEnableHostIPReplace; }
+    inline bool IsHostIPReplacePolicyEnabled() const {
+        return mEnableHostIPReplace;
+    }
 
-    inline bool IsResponseVerificationEnabled() const { return mEnableResponseVerification; }
+    inline bool IsResponseVerificationEnabled() const {
+        return mEnableResponseVerification;
+    }
 
     // EndpointAddressType GetConfigServerAddressNetType() const { return mConfigServerAddressNetType; }
 
-    inline bool EnableCheckpointSyncWrite() const { return mEnableCheckpointSyncWrite; }
+    inline bool EnableCheckpointSyncWrite() const {
+        return mEnableCheckpointSyncWrite;
+    }
 
-    inline bool EnableLogTimeAutoAdjust() const { return mEnableLogTimeAutoAdjust; }
+    inline bool EnableLogTimeAutoAdjust() const {
+        return mEnableLogTimeAutoAdjust;
+    }
 
-    inline const std::set<std::string>& GetDynamicPlugins() const { return mDynamicPlugins; }
+    inline const std::set<std::string>& GetDynamicPlugins() const {
+        return mDynamicPlugins;
+    }
     bool IsHostPathMatchBlacklist(const std::string& dirPath) const;
 
-    const Json::Value& GetConfig() const { return mLocalInstanceConfig; }
+    const Json::Value& GetConfig() const {
+        return mLocalInstanceConfig;
+    }
 
-    const std::string& GetBindInterface() const { return mBindInterface; }
+    const std::string& GetBindInterface() const {
+        return mBindInterface;
+    }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
@@ -518,6 +639,9 @@ public:
     friend class InputPrometheusUnittest;
     friend class InputContainerStdioUnittest;
     friend class BatcherUnittest;
+    friend class EnterpriseSLSClientManagerUnittest;
+    friend class FlusherRunnerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

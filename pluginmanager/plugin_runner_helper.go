@@ -126,6 +126,20 @@ func GetFlushCancelToken(runner PluginRunner) <-chan struct{} {
 	return make(<-chan struct{})
 }
 
+func GetConfigInputs(runner PluginRunner) []pipeline.ServiceInput {
+	inputs := make([]pipeline.ServiceInput, 0)
+	if r, ok := runner.(*pluginv1Runner); ok {
+		for _, i := range r.ServicePlugins {
+			inputs = append(inputs, i.Input)
+		}
+	} else if r, ok := runner.(*pluginv2Runner); ok {
+		for _, i := range r.ServicePlugins {
+			inputs = append(inputs, i.Input)
+		}
+	}
+	return inputs
+}
+
 func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 	flushers := make([]pipeline.Flusher, 0)
 	if r, ok := runner.(*pluginv1Runner); ok {

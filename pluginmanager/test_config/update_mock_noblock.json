@@ -10,6 +10,7 @@
     {
       "type": "service_mock",
       "detail": {
+        "Block": false,
         "LogsPerSecond": 10000,
         "MaxLogCount": 20000,
         "Fields": {
@@ -57,9 +58,7 @@
   "flushers": [
     {
       "type": "flusher_checker",
-      "detail": {
-        "Block": false
-      }
+      "detail": {}
     }
   ]
 }

@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 
+#include "json/json.h"
+
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
-#include "plugin/input/InputContainerStdio.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/PluginRegistry.h"
+#include "plugin/input/InputContainerStdio.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);

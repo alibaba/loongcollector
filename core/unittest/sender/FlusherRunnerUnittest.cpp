@@ -17,6 +17,7 @@
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #include "unittest/Unittest.h"
+#include "unittest/pipeline/HttpSinkMock.h"
 #include "unittest/plugin/PluginMock.h"
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
@@ -31,6 +32,8 @@ public:
     void TestPushToHttpSink();
 
 protected:
+    static void SetUpTestCase() { AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10; }
+
     void TearDown() override {
         SenderQueueManager::GetInstance()->Clear();
         HttpSink::GetInstance()->mQueue.Clear();
@@ -54,7 +57,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         FlusherRunner::GetInstance()->Dispatch(realItem);
 
         unique_ptr<HttpSinkRequest> req;
-        APSARA_TEST_TRUE(HttpSink::GetInstance()->mQueue.TryPop(req));
+        APSARA_TEST_TRUE(HttpSinkMock::GetInstance()->mQueue.TryPop(req));
         APSARA_TEST_NOT_EQUAL(nullptr, req);
     }
     {

@@ -22,7 +22,9 @@ namespace logtail {
 
 bool IsHttpsEndpoint(const std::string& endpoint);
 
-std::string StandardizeEndpoint(const std::string& endpoint, const std::string& defaultEndpoint);
+std::string ExtractEndpoint(const std::string& endpoint);
+
+std::string StandardizeHost(const std::string& endpoint, const std::string& defaultEndpoint);
 
 std::string GetHostFromEndpoint(const std::string& endpoint);
 

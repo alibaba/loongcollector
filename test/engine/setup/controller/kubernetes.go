@@ -153,6 +153,20 @@ func (c *DeploymentController) RemoveFilter(deploymentName string, filter Contai
 	return c.waitDeploymentAvailable(deploymentName, filter.K8sNamespace)
 }
 
+func (c *DeploymentController) Scale(deploymentName, deploymentNamespace string, replicas int) error {
+	deployment, err := c.k8sClient.AppsV1().Deployments(deploymentNamespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	replicaInt32 := int32(replicas)
+	deployment.Spec.Replicas = &replicaInt32
+	_, err = c.k8sClient.AppsV1().Deployments(deploymentNamespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return c.waitDeploymentAvailable(deploymentName, deploymentNamespace)
+}
+
 func (c *DeploymentController) waitDeploymentAvailable(deploymentName, deploymentNamespace string) error {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()

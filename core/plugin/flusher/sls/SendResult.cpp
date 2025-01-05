@@ -14,23 +14,23 @@
 
 #include "plugin/flusher/sls/SendResult.h"
 
-#include "sdk/Common.h"
+#include "plugin/flusher/sls/SLSConstant.h"
 
 namespace logtail {
 
 SendResult ConvertErrorCode(const std::string& errorCode) {
-    if (errorCode == sdk::LOGE_REQUEST_ERROR || errorCode == sdk::LOGE_CLIENT_OPERATION_TIMEOUT
-        || errorCode == sdk::LOGE_REQUEST_TIMEOUT) {
+    if (errorCode == LOGE_REQUEST_ERROR || errorCode == LOGE_CLIENT_OPERATION_TIMEOUT
+        || errorCode == LOGE_REQUEST_TIMEOUT) {
         return SEND_NETWORK_ERROR;
-    } else if (errorCode == sdk::LOGE_SERVER_BUSY || errorCode == sdk::LOGE_INTERNAL_SERVER_ERROR) {
+    } else if (errorCode == LOGE_SERVER_BUSY || errorCode == LOGE_INTERNAL_SERVER_ERROR) {
         return SEND_SERVER_ERROR;
-    } else if (errorCode == sdk::LOGE_WRITE_QUOTA_EXCEED || errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
+    } else if (errorCode == LOGE_WRITE_QUOTA_EXCEED || errorCode == LOGE_SHARD_WRITE_QUOTA_EXCEED) {
         return SEND_QUOTA_EXCEED;
-    } else if (errorCode == sdk::LOGE_UNAUTHORIZED) {
+    } else if (errorCode == LOGE_UNAUTHORIZED) {
         return SEND_UNAUTHORIZED;
-    } else if (errorCode == sdk::LOGE_INVALID_SEQUENCE_ID) {
+    } else if (errorCode == LOGE_INVALID_SEQUENCE_ID) {
         return SEND_INVALID_SEQUENCE_ID;
-    } else if (errorCode == sdk::LOGE_PARAMETER_INVALID) {
+    } else if (errorCode == LOGE_PARAMETER_INVALID) {
         return SEND_PARAMETER_INVALID;
     } else {
         return SEND_DISCARD_ERROR;

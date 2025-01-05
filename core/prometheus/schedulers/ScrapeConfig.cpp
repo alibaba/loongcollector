@@ -1,16 +1,16 @@
 
 #include "prometheus/schedulers/ScrapeConfig.h"
 
-#include <json/value.h>
-
 #include <string>
 
+#include "json/value.h"
+
+#include "common/EncodingUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
-#include "sdk/Common.h"
 
 using namespace std;
 
@@ -223,7 +223,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     }
 
     auto token = username + ":" + password;
-    auto token64 = sdk::Base64Enconde(token);
+    auto token64 = Base64Enconde(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
     return true;
 }

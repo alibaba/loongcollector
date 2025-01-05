@@ -16,8 +16,9 @@
 
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 
-#include <boost/regex.hpp>
 #include <string>
+
+#include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
@@ -74,8 +75,7 @@ bool ProcessorMergeMultilineLogNative::Init(const Json::Value& config) {
     }
 
     mMergedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MERGED_EVENTS_TOTAL);
-    mUnmatchedEventsTotal
-        = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL);
+    mUnmatchedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL);
 
     return true;
 }

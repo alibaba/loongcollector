@@ -22,12 +22,11 @@
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineManager.h"
-#include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
-DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
+DEFINE_FLAG_INT32(processor_runner_exit_timeout_sec, "", 60);
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -49,6 +48,7 @@ void ProcessorRunner::Init() {
     for (uint32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
         mThreadRes[threadNo] = async(launch::async, &ProcessorRunner::Run, this, threadNo);
     }
+    mIsFlush = false;
 }
 
 void ProcessorRunner::Stop() {
@@ -58,8 +58,7 @@ void ProcessorRunner::Stop() {
         if (!mThreadRes[threadNo].valid()) {
             continue;
         }
-        future_status s
-            = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_secs)));
+        future_status s = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_sec)));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("processor runner", "stopped successfully")("threadNo", threadNo));
         } else {
@@ -142,7 +141,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
         if (hasOldPipeline) {
-            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",

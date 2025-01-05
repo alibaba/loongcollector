@@ -18,28 +18,28 @@
 #include <string>
 
 namespace logtail {
-    extern const std::string DEFAULT_TRACE_TAG_TRACE_ID;
-    extern const std::string DEFAULT_TRACE_TAG_SPAN_ID;
-    extern const std::string DEFAULT_TRACE_TAG_PARENT_ID;
-    extern const std::string DEFAULT_TRACE_TAG_SPAN_NAME;
-    extern const std::string DEFAULT_TRACE_TAG_SERVICE_NAME;
-    extern const std::string DEFAULT_TRACE_TAG_START_TIME_NANO;
-    extern const std::string DEFAULT_TRACE_TAG_END_TIME_NANO;
-    extern const std::string DEFAULT_TRACE_TAG_DURATION;
-    extern const std::string DEFAULT_TRACE_TAG_ATTRIBUTES;
-    extern const std::string DEFAULT_TRACE_TAG_RESOURCE;
-    extern const std::string DEFAULT_TRACE_TAG_LINKS;
-    extern const std::string DEFAULT_TRACE_TAG_EVENTS;
-    extern const std::string DEFAULT_TRACE_TAG_TIMESTAMP;
-    extern const std::string DEFAULT_TRACE_TAG_STATUS_CODE;
-    extern const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE;
-    extern const std::string DEFAULT_TRACE_TAG_SPAN_KIND;
-    extern const std::string DEFAULT_TRACE_TAG_TRACE_STATE;
-    extern const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME ;
+extern const std::string DEFAULT_TRACE_TAG_TRACE_ID;
+extern const std::string DEFAULT_TRACE_TAG_SPAN_ID;
+extern const std::string DEFAULT_TRACE_TAG_PARENT_ID;
+extern const std::string DEFAULT_TRACE_TAG_SPAN_NAME;
+extern const std::string DEFAULT_TRACE_TAG_SERVICE_NAME;
+extern const std::string DEFAULT_TRACE_TAG_START_TIME_NANO;
+extern const std::string DEFAULT_TRACE_TAG_END_TIME_NANO;
+extern const std::string DEFAULT_TRACE_TAG_DURATION;
+extern const std::string DEFAULT_TRACE_TAG_ATTRIBUTES;
+extern const std::string DEFAULT_TRACE_TAG_RESOURCE;
+extern const std::string DEFAULT_TRACE_TAG_LINKS;
+extern const std::string DEFAULT_TRACE_TAG_EVENTS;
+extern const std::string DEFAULT_TRACE_TAG_TIMESTAMP;
+extern const std::string DEFAULT_TRACE_TAG_STATUS_CODE;
+extern const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE;
+extern const std::string DEFAULT_TRACE_TAG_SPAN_KIND;
+extern const std::string DEFAULT_TRACE_TAG_TRACE_STATE;
+extern const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME;
 #ifdef __ENTERPRISE__
-    // for arms
-    extern const std::string DEFAULT_TRACE_TAG_APP_ID;
-    extern const std::string DEFAULT_TRACE_TAG_IP;
+// for arms
+extern const std::string DEFAULT_TRACE_TAG_APP_ID;
+extern const std::string DEFAULT_TRACE_TAG_IP;
 #endif
 
 } // namespace logtail

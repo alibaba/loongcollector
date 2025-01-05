@@ -38,21 +38,19 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
+#include "pipeline/PipelineManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
+#include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
-#include "sdk/Common.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
-#include "pipeline/PipelineManager.h"
-#include "provider/Provider.h"
 
 using namespace std;
 using namespace sls_logs;
 
 DEFINE_FLAG_BOOL(logtail_dump_monitor_info, "enable to dump Logtail monitor info (CPU, mem)", false);
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
 DECLARE_FLAG_BOOL(check_profile_region);
 
 namespace logtail {
@@ -62,9 +60,6 @@ string LoongCollectorMonitor::mIpAddr;
 string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
-string LoongCollectorMonitor::mECSInstanceID;
-string LoongCollectorMonitor::mECSUserID;
-string LoongCollectorMonitor::mECSRegionID;
 string LoongCollectorMonitor::mStartTime;
 
 inline void CpuStat::Reset() {
@@ -592,11 +587,6 @@ LoongCollectorMonitor::LoongCollectorMonitor() {
     mIpAddr = GetHostIp();
     mOsDetail = GetOsDetail();
     mUsername = GetUsername();
-    // TODO: This may take up to 3s to construct the object. This is bad.
-    ECSMeta ecsMeta = FetchECSMeta();
-    mECSInstanceID = ecsMeta.instanceID;
-    mECSUserID = ecsMeta.userID;
-    mECSRegionID = ecsMeta.regionID;
 }
 
 LoongCollectorMonitor::~LoongCollectorMonitor() {

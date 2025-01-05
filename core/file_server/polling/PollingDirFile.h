@@ -17,17 +17,17 @@
 #pragma once
 #include <map>
 
-#include "file_server/polling/PollingCache.h"
 #include "common/Lock.h"
 #include "common/LogRunnable.h"
 #include "common/Thread.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/polling/PollingCache.h"
 #include "monitor/Monitor.h"
 
 namespace logtail {
 
 namespace fsutil {
-    class PathStat;
+class PathStat;
 }
 
 class PollingDirFile : public LogRunnable {

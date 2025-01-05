@@ -20,9 +20,9 @@
 #include <variant>
 
 #ifdef APSARA_UNIT_TEST_MAIN
-#include <json/json.h>
-
 #include <string>
+
+#include "json/json.h"
 #endif
 
 #include "common/memory/SourceBuffer.h"
@@ -58,8 +58,8 @@ struct UntypedMultiDoubleValues {
     void SetValueNoCopy(StringView key, double val);
     void DelValue(StringView key);
 
-    std::map<StringView, double>::const_iterator ValusBegin() const;
-    std::map<StringView, double>::const_iterator ValusEnd() const;
+    std::map<StringView, double>::const_iterator ValuesBegin() const;
+    std::map<StringView, double>::const_iterator ValuesEnd() const;
     size_t ValusSize() const;
 
     size_t DataSize() const;

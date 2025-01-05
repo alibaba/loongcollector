@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <filesystem>
 #include <string>
+
+#include "json/json.h"
 
 namespace logtail {
 

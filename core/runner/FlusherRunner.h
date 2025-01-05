@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstdint>
+
+#include <atomic>
 #include <future>
 
 #include "monitor/MetricManager.h"
@@ -83,6 +84,7 @@ private:
     friend class PluginRegistryUnittest;
     friend class FlusherRunnerUnittest;
     friend class InstanceConfigManagerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

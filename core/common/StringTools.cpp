@@ -16,9 +16,9 @@
 
 #include <string.h>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/exception/all.hpp>
-#include <boost/filesystem.hpp>
+#include "boost/algorithm/string.hpp"
+#include "boost/exception/all.hpp"
+#include "boost/filesystem.hpp"
 
 #include "logger/Logger.h"
 #if defined(_MSC_VER)

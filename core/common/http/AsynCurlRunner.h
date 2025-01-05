@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <curl/multi.h>
-
 #include <atomic>
 #include <condition_variable>
 #include <future>
 #include <memory>
 #include <mutex>
+
+#include "curl/multi.h"
 
 #include "common/SafeQueue.h"
 #include "common/http/HttpRequest.h"
@@ -48,9 +48,7 @@ private:
     ~AsynCurlRunner() = default;
 
     void Run();
-    bool AddRequestToClient(std::unique_ptr<AsynHttpRequest>&& request);
     void DoRun();
-    void HandleCompletedRequests(int& runningHandlers);
 
     CURLM* mClient = nullptr;
     SafeQueue<std::unique_ptr<AsynHttpRequest>> mQueue;

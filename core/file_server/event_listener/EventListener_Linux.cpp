@@ -13,15 +13,17 @@
 // limitations under the License.
 
 #include "EventListener_Linux.h"
+
 #include <sys/inotify.h>
-#include <unistd.h>
 #include <sys/ioctl.h>
-#include "logger/Logger.h"
-#include "monitor/AlarmManager.h"
+#include <unistd.h>
+
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 
 DEFINE_FLAG_BOOL(fs_events_inotify_enable, "", true);
 

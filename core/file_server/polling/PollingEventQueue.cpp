@@ -13,8 +13,9 @@
 // limitations under the License.
 
 #include "file_server/polling/PollingEventQueue.h"
-#include "common/StringTools.h"
+
 #include "common/Flags.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "file_server/event/Event.h"
 #include "logger/Logger.h"

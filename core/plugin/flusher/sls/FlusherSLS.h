@@ -16,13 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
+
+#include "json/json.h"
 
 #include "common/compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
@@ -30,8 +31,13 @@
 #include "pipeline/batch/Batcher.h"
 #include "pipeline/limiter/ConcurrencyLimiter.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/serializer/SLSSerializer.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 
 namespace logtail {
 
@@ -43,17 +49,13 @@ public:
     static std::shared_ptr<ConcurrencyLimiter> GetRegionConcurrencyLimiter(const std::string& region);
     static void ClearInvalidConcurrencyLimiters();
 
+    static void InitResource();
     static void RecycleResourceIfNotUsed();
 
     static std::string GetDefaultRegion();
     static void SetDefaultRegion(const std::string& region);
     static std::string GetAllProjects();
-    static bool IsRegionContainingConfig(const std::string& region);
     static std::string GetProjectRegion(const std::string& project);
-
-    // TODO: should be moved to enterprise config provider
-    static bool GetRegionStatus(const std::string& region);
-    static void UpdateRegionStatus(const std::string& region, bool status);
 
     static const std::string sName;
 
@@ -66,7 +68,10 @@ public:
     bool Send(PipelineEventGroup&& g) override;
     bool Flush(size_t key) override;
     bool FlushAll() override;
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override;
+    bool BuildRequest(SenderQueueItem* item,
+                      std::unique_ptr<HttpSinkRequest>& req,
+                      bool* keepItem,
+                      std::string* errMsg) override;
     void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override;
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
@@ -77,8 +82,11 @@ public:
     std::string mProject;
     std::string mLogstore;
     std::string mRegion;
-    std::string mEndpoint;
     std::string mAliuid;
+#ifdef __ENTERPRISE__
+    EndpointMode mEndpointMode = EndpointMode::DEFAULT;
+#endif
+    std::string mEndpoint;
     sls_logs::SlsTelemetryType mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
     std::vector<std::string> mShardHashKeys;
     uint32_t mMaxSendRate = 0; // preserved only for exactly once
@@ -87,10 +95,6 @@ public:
     std::unique_ptr<Compressor> mCompressor;
 
 private:
-    static const std::unordered_set<std::string> sNativeParam;
-
-    static void InitResource();
-
     static void IncreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);
     static void DecreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);
 
@@ -99,17 +103,14 @@ private:
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sRegionConcurrencyLimiterMap;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sLogstoreConcurrencyLimiterMap;
 
+    static const std::unordered_set<std::string> sNativeParam;
+
     static std::mutex sDefaultRegionLock;
     static std::string sDefaultRegion;
 
     static std::mutex sProjectRegionMapLock;
     static std::unordered_map<std::string, int32_t> sProjectRefCntMap;
-    static std::unordered_map<std::string, int32_t> sRegionRefCntMap;
     static std::unordered_map<std::string, std::string> sProjectRegionMap;
-
-    // TODO: should be moved to enterprise config provider
-    static std::mutex sRegionStatusLock;
-    static std::unordered_map<std::string, bool> sAllRegionStatus;
 
     static bool sIsResourceInited;
 
@@ -121,13 +122,28 @@ private:
     std::string GetShardHashKey(const BatchedEvents& g) const;
     void AddPackId(BatchedEvents& g) const;
 
+    std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
+                                                                   const std::string& accessKeySecret,
+                                                                   SLSClientManager::AuthType type,
+                                                                   SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostMetricStoreLogsRequest(const std::string& accessKeyId,
+                                                                      const std::string& accessKeySecret,
+                                                                      SLSClientManager::AuthType type,
+                                                                      SLSSenderQueueItem* item) const;
+
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
+#ifdef __ENTERPRISE__
+    // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateHostsInfo.
+    // Otherwise, timeout machanisim must be emplyed to clean up unused CandidateHostsInfo.
+    std::shared_ptr<CandidateHostsInfo> mCandidateHostsInfo;
+#endif
 
     CounterPtr mSendCnt;
     CounterPtr mSendDoneCnt;
     CounterPtr mSuccessCnt;
+    CounterPtr mDiscardCnt;
     CounterPtr mNetworkErrorCnt;
     CounterPtr mServerErrorCnt;
     CounterPtr mShardWriteQuotaErrorCnt;

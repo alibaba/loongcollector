@@ -161,7 +161,8 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, double>{});
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
+    size_t basicSize
+        = sizeof(time_t) + sizeof(long) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
     basicSize += 4;
 
     // add tag, and key not existed
@@ -346,7 +347,7 @@ void MetricEventUnittest::TestTagsIterator() {
 void MetricEventUnittest::TestCopy() {
     MetricEvent* oldMetricEvent = mEventGroup->AddMetricEvent();
     oldMetricEvent->SetValue(map<StringView, double>{{"test-1", 10.0}, {"test-2", 2.0}});
-    APSARA_TEST_EQUAL(1, mEventGroup->GetEvents().size());
+    APSARA_TEST_EQUAL(1U, mEventGroup->GetEvents().size());
 
     PipelineEventGroup newGroup = mEventGroup->Copy();
     MetricEvent newMetricEvent = newGroup.GetEvents().at(0).Cast<MetricEvent>();
@@ -357,7 +358,8 @@ void MetricEventUnittest::TestCopy() {
     APSARA_TEST_EQUAL(10.0, val);
     APSARA_TEST_EQUAL(true, newMetricEvent.GetValue<UntypedMultiDoubleValues>()->GetValue("test-2", val));
     APSARA_TEST_EQUAL(2.0, val);
-    APSARA_TEST_NOT_EQUAL(newMetricEvent.GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr, oldMetricEvent->GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr);
+    APSARA_TEST_NOT_EQUAL(newMetricEvent.GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr,
+                          oldMetricEvent->GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr);
 }
 
 UNIT_TEST_CASE(MetricEventUnittest, TestName)

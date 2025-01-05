@@ -15,12 +15,14 @@
  */
 
 #pragma once
-#include <string>
-#include <map>
-#include <vector>
-#include <deque>
-#include <unordered_map>
 #include <ctime>
+
+#include <deque>
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "common/SplitedFilePath.h"
 
 namespace logtail {

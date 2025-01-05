@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "config/TaskConfig.h"
 #include "task_pipeline/Task.h"
@@ -35,7 +35,9 @@ public:
     const Json::Value& GetConfig() const { return *mConfig; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    Task* GetPlugin() const { return mPlugin.get(); }
+    Task* GetPlugin() const {
+        return mPlugin.get();
+    }
 #endif
 
 private:

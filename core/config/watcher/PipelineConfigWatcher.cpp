@@ -19,13 +19,13 @@
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
 #include "config/common_provider/CommonConfigProvider.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "task_pipeline/TaskPipelineManager.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 using namespace std;
 
@@ -440,7 +440,7 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
             return false;
         }
         if (!IsConfigEnabled(configName, *detail)) {
-            LOG_INFO(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
+            LOG_DEBUG(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
             return false;
         }
         PipelineConfig config(configName, std::move(detail));
