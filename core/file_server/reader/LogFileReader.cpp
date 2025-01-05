@@ -326,11 +326,11 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
             LOG_INFO(sLogger,
                      ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
-                         "config", GetConfigName())("log reader queue name", mHostLogPath)("file device",
-                                                                                           ToString(mDevInode.dev))(
-                         "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
-                         "file signature size", mLastFileSignatureSize)("real file path", mRealLogPath)(
-                         "last file position", mLastFilePos)("index in reader array", mIdxInReaderArrayFromLastCpt));
+                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
+                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
+                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID));
             // if file is open or
             // last update time is new and the file's container is not stopped we
             // we should use first modify

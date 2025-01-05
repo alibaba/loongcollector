@@ -546,7 +546,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                                "file size", reader->GetFileSize()));
+                                "file size", reader->GetFileSize())("container id", event.GetContainerID()));
                         if (!readerArray[0]->ShouldForceReleaseDeletedFileFd() && reader->HasDataInCache()) {
                             ForceReadLogAndPush(readerArray[0]);
                         }
