@@ -27,6 +27,9 @@ public:
 
     virtual void Collect(PipelineEventGroup& group) = 0;
     virtual const std::string& Name() const = 0;
+
+protected:
+    bool mValidState = false;
 };
 
 } // namespace logtail

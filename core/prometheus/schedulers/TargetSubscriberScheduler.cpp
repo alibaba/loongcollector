@@ -111,19 +111,17 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                 auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
                     v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
 
-                    // zero-cost upgrade
-                    if (mUnRegisterMs > 0
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
-                            > mUnRegisterMs)
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
-                            < mUnRegisterMs)) {
-                        // scrape once just now
-                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
-                    }
-                    v->ScheduleNext();
+                // zero-cost upgrade
+                if (mUnRegisterMs > 0
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
+                        > mUnRegisterMs)
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
+                        < mUnRegisterMs)) {
+                    // scrape once just now
+                    LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
+                    v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
                 }
                 v->ScheduleNext();
             }

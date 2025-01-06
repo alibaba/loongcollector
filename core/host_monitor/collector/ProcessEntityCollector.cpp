@@ -16,12 +16,12 @@
 
 #include "ProcessEntityCollector.h"
 
-#include <sched.h>
-#include <unistd.h>
-
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <sched.h>
+#include <unistd.h>
+
 #include <functional>
 #include <memory>
 #include <queue>
@@ -29,12 +29,11 @@
 #include <utility>
 #include <vector>
 
-#include "BaseCollector.h"
-#include "Common.h"
 #include "FileSystemUtil.h"
 #include "Logger.h"
 #include "PipelineEventGroup.h"
 #include "StringTools.h"
+#include "common/HashUtil.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/SystemInformationTools.h"
 
@@ -60,6 +59,9 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
 };
 
 void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
+    if (!mValidState) {
+        return;
+    }
     std::vector<ProcessStatPtr> processes;
     GetSortedProcess(processes, ProcessTopN);
     for (auto process : processes) {
@@ -273,7 +275,7 @@ bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
 const std::string ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime) {
     std::ostringstream oss;
     oss << mHostEntityID << pid << createTime;
-    auto bigID = sdk::CalcMD5(oss.str());
+    auto bigID = CalcMD5(oss.str());
     std::transform(bigID.begin(), bigID.end(), bigID.begin(), ::tolower);
     return bigID;
 }

@@ -107,8 +107,7 @@ string ScrapeScheduler::GetId() const {
     return mHash;
 }
 
-void ScrapeScheduler::SetComponent(shared_ptr<Timer> timer, EventPool* eventPool) {
-    mTimer = std::move(timer);
+void ScrapeScheduler::SetComponent(EventPool* eventPool) {
     mEventPool = eventPool;
     mPromStreamScraper.mEventPool = mEventPool;
 }

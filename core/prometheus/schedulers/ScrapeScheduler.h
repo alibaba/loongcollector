@@ -48,7 +48,7 @@ public:
 
     std::string GetId() const;
 
-    void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
+    void SetComponent(EventPool* eventPool);
 
     void ScheduleNext() override;
     void ScrapeOnce(std::chrono::steady_clock::time_point execTime);

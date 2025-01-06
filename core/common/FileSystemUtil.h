@@ -26,6 +26,7 @@
 #include <Windows.h>
 #endif
 #include <filesystem>
+#include <functional>
 
 #include "DevInode.h"
 #include "ErrorUtil.h"
@@ -264,9 +265,7 @@ public:
     int64_t GetFileSize() const;
 
     // GetMode returns st_mode.
-    int GetMode() const {
-        return static_cast<int>(mRawStat.st_mode);
-    }
+    int GetMode() const { return static_cast<int>(mRawStat.st_mode); }
 };
 
 } // namespace fsutil
