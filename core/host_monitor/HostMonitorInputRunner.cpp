@@ -16,6 +16,8 @@
 
 #include "HostMonitorInputRunner.h"
 
+#include <chrono>
+
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -100,13 +102,14 @@ bool HostMonitorInputRunner::HasRegisteredPlugins() const {
     return false;
 }
 
-bool HostMonitorInputRunner::IsCollectTaskValid(const std::string& collectorName) {
+bool HostMonitorInputRunner::IsCollectTaskValid(std::chrono::steady_clock::time_point execTime,
+                                                const std::string& collectorName) {
     std::shared_lock lock(mRegisteredCollectorMapMutex);
     auto it = mRegisteredCollectorMap.find(collectorName);
     if (it == mRegisteredCollectorMap.end()) {
         return false;
     }
-    return it->second.IsEnabled();
+    return it->second.IsEnabled() && (it->second.mLastEnableTime <= execTime);
 }
 
 void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point execTime,

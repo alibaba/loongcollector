@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include <atomic>
 #include <memory>
 #include <shared_mutex>
@@ -40,10 +42,14 @@ struct CollectorInstance {
 
     std::unique_ptr<BaseCollector> mCollector;
     bool mIsEnabled = false;
+    std::chrono::steady_clock::time_point mLastEnableTime;
 
     BaseCollector* GetCollector() const { return mCollector.get(); }
     bool IsEnabled() const { return mIsEnabled; }
-    void Enable() { mIsEnabled = true; }
+    void Enable() {
+        mIsEnabled = true;
+        mLastEnableTime = std::chrono::steady_clock::now();
+    }
     void Disable() { mIsEnabled = false; }
 };
 
@@ -67,7 +73,7 @@ public:
     void Stop() override;
     bool HasRegisteredPlugins() const override;
 
-    bool IsCollectTaskValid(const std::string& collectorName);
+    bool IsCollectTaskValid(std::chrono::steady_clock::time_point execTime, const std::string& collectorName);
     void ScheduleOnce(std::chrono::steady_clock::time_point execTime,
                       HostMonitorTimerEvent::CollectConfig& collectConfig);
 

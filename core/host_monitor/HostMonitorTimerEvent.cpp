@@ -22,7 +22,7 @@
 namespace logtail {
 
 bool HostMonitorTimerEvent::IsValid() const {
-    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig.mCollectorName);
+    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(GetExecTime(), mCollectConfig.mCollectorName);
 }
 
 bool HostMonitorTimerEvent::Execute() {
