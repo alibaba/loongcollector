@@ -75,7 +75,7 @@ public:
     HttpResponse()
         : mHeader(compareHeader),
           mBody(new std::string(), [](void* p) { delete static_cast<std::string*>(p); }),
-          mWriteCallback(DefaultWriteCallback) {};
+          mWriteCallback(DefaultWriteCallback) {}
     HttpResponse(void* body,
                  const std::function<void(void*)>& bodyDeleter,
                  size_t (*callback)(char*, size_t, size_t, void*))

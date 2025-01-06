@@ -84,10 +84,11 @@ jobs:
         run: make check-dependency-licenses
 
       - name: C++ Core Lint
-        uses: jidicula/clang-format-action@v4.13.0
+        uses: jidicula/clang-format-action@v4.14.0
         with:
           clang-format-version: '18'
           check-path: 'core'
+          exclude-regex: 'common/xxhash'
           include-regex: '.*\.(cpp|h)$'
 
       - name: Go Plugin Lint
