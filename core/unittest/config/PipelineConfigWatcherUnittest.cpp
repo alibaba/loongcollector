@@ -228,10 +228,12 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
     {
         // case: added -> added, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: added -> added, first < second -> first > second
         // should not happen
-    } { // case: added -> modified, first > second
+    }
+    { // case: added -> modified, first > second
         PrepareConfig();
         ofstream fout(configDir2 / "test2.json", ios::trunc);
         fout << lessPriorityConfig;
@@ -306,10 +308,12 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
     {
         // case: added -> modified, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: added -> modified, first < second -> first > second
         // should not happen
-    } { // case: added -> removed, first > second
+    }
+    { // case: added -> removed, first > second
         PrepareConfig();
         ofstream fout(configDir2 / "test2.json", ios::trunc);
         fout << lessPriorityConfig;
@@ -370,10 +374,12 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
     {
         // case: added -> removed, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: added -> removed, first < second -> first > second
         // should not happen
-    } { // case: added -> unchanged, first > second
+    }
+    { // case: added -> unchanged, first > second
         PrepareConfig();
         ofstream fout(configDir2 / "test2.json", ios::trunc);
         fout << lessPriorityConfig;
@@ -434,8 +440,9 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
     {
         // case: added -> unchanged, first > second -> first < second
         // should not happen
-    } { // case: added -> unchanged, first < second -> first > second
-        // should not happen
+    }
+    { // case: added -> unchanged, first < second -> first > second
+      // should not happen
     }
 }
 
@@ -509,10 +516,12 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
     {
         // case: modified -> added, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: modified -> added, first < second -> first > second
         // should not happen
-    } { // case: modified -> modified, first > second
+    }
+    { // case: modified -> modified, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -737,10 +746,12 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
     {
         // case: modified -> removed, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: modified -> removed, first < second -> first > second
         // should not happen
-    } { // case: modified -> unchanged, first > second
+    }
+    { // case: modified -> unchanged, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -943,10 +954,12 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
     {
         // case: removed -> added, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: removed -> added, first < second -> first > second
         // should not happen
-    } { // case: removed -> modified, first > second
+    }
+    { // case: removed -> modified, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1023,10 +1036,12 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
     {
         // case: removed -> modified, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: removed -> modified, first < second -> first > second
         // should not happen
-    } { // case: removed -> removed, first > second
+    }
+    { // case: removed -> removed, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1087,10 +1102,12 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
     {
         // case: removed -> removed, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: removed -> removed, first < second -> first > second
         // should not happen
-    } { // case: removed -> unchanged, first > second
+    }
+    { // case: removed -> unchanged, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1153,8 +1170,9 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
     {
         // case: removed -> unchanged, first > second -> first < second
         // should not happen
-    } { // case: removed -> unchanged, first < second -> first > second
-        // should not happen
+    }
+    { // case: removed -> unchanged, first < second -> first > second
+      // should not happen
     }
 }
 
@@ -1224,10 +1242,12 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     {
         // case: unchanged -> added, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: unchanged -> added, first < second -> first > second
         // should not happen
-    } { // case: unchanged -> modified, first > second
+    }
+    { // case: unchanged -> modified, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1428,10 +1448,12 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     {
         // case: unchanged -> removed, first > second -> first < second
         // should not happen
-    } {
+    }
+    {
         // case: unchanged -> removed, first < second -> first > second
         // should not happen
-    } { // case: unchanged -> unchanged, first > second
+    }
+    { // case: unchanged -> unchanged, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1492,8 +1514,9 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     {
         // case: unchanged -> unchanged, first > second -> first < second
         // should not happen
-    } { // case: unchanged -> unchanged, first < second -> first > second
-        // should not happen
+    }
+    { // case: unchanged -> unchanged, first < second -> first > second
+      // should not happen
     }
 }
 

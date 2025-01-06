@@ -20,7 +20,7 @@
 
 namespace logtail {
 
-AdhocFileManager::AdhocFileManager(){
+AdhocFileManager::AdhocFileManager() {
     // mRunFlag = false;
 };
 

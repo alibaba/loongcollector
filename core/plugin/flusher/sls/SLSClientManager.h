@@ -38,7 +38,7 @@ public:
     static SLSClientManager* GetInstance();
 
     virtual void Init();
-    virtual void Stop(){};
+    virtual void Stop() {};
 
     const std::string& GetUserAgent() const { return mUserAgent; }
 

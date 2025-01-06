@@ -86,7 +86,7 @@ jobs:
       - name: C++ Core Lint
         uses: jidicula/clang-format-action@v4.13.0
         with:
-          clang-format-version: '14'
+          clang-format-version: '18'
           check-path: 'core'
           include-regex: '.*\.(cpp|h)$'
           fallback-style: 'Google'
