@@ -16,7 +16,6 @@
 
 #include "HostMonitorTimerEvent.h"
 
-#include "common/timer/Timer.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 
 namespace logtail {

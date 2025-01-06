@@ -33,8 +33,9 @@ extern const std::string DEFAULT_CONTENT_KEY_METHOD;
 extern const std::string DEFAULT_CONTENT_VALUE_METHOD_UPDATE;
 extern const std::string DEFAULT_CONTENT_VALUE_METHOD_EXPIRE;
 
-// for process entity
-extern const std::string DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
+// process entity
+extern const std::string DEFAULT_CONTENT_VALUE_ENTITY_TYPE_ECS_PROCESS;
+extern const std::string DEFAULT_CONTENT_VALUE_ENTITY_TYPE_HOST_PROCESS;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_PID;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_PPID;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_USER;
@@ -45,4 +46,13 @@ extern const std::string DEFAULT_CONTENT_KEY_PROCESS_BINARY;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID;
+
+// link
+extern const std::string DEFAULT_CONTENT_KEY_SRC_DOMAIN;
+extern const std::string DEFAULT_CONTENT_KEY_SRC_ENTITY_TYPE;
+extern const std::string DEFAULT_CONTENT_KEY_SRC_ENTITY_ID;
+extern const std::string DEFAULT_CONTENT_KEY_DEST_DOMAIN;
+extern const std::string DEFAULT_CONTENT_KEY_DEST_ENTITY_TYPE;
+extern const std::string DEFAULT_CONTENT_KEY_DEST_ENTITY_ID;
+extern const std::string DEFAULT_CONTENT_KEY_RELATION_TYPE;
 } // namespace logtail

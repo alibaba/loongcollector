@@ -35,8 +35,6 @@
 
 namespace logtail {
 
-const int DEFAULT_SCHEDULE_INTERVAL = 10;
-
 struct CollectorInstance {
     CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
 
@@ -66,7 +64,10 @@ public:
     }
 
     // Only support singleton mode
-    void UpdateCollector(const std::vector<std::string>& collectorNames, QueueKey processQueueKey, int inputIndex);
+    void UpdateCollector(const std::vector<std::string>& collectorNames,
+                         QueueKey processQueueKey,
+                         int inputIndex,
+                         int interval);
     void RemoveCollector();
 
     void Init() override;

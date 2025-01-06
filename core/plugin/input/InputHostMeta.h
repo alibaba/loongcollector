@@ -16,7 +16,10 @@
 
 #pragma once
 
+#include "Flags.h"
 #include "pipeline/plugin/interface/Input.h"
+
+DECLARE_FLAG_INT32(host_monitor_default_interval);
 
 namespace logtail {
 
@@ -29,6 +32,9 @@ public:
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return true; }
+
+private:
+    int mInterval = INT32_FLAG(host_monitor_default_interval);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputHostMetaUnittest;

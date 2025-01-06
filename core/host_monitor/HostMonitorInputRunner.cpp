@@ -41,8 +41,9 @@ HostMonitorInputRunner::HostMonitorInputRunner() : mThreadPool(ThreadPool(3)) {
 
 void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& newCollectors,
                                              QueueKey processQueueKey,
-                                             int inputIndex) {
-    std::unique_lock lock(mRegisteredCollectorMapMutex);
+                                             int inputIndex,
+                                             int interval) {
+    std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     for (auto& collector : newCollectors) {
         auto iter = mRegisteredCollectorMap.find(collector);
         if (iter == mRegisteredCollectorMap.end()) {
@@ -53,7 +54,7 @@ void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& new
         iter->second.Enable();
         // add timer event
         HostMonitorTimerEvent::CollectConfig collectConfig(
-            collector, processQueueKey, inputIndex, std::chrono::seconds(DEFAULT_SCHEDULE_INTERVAL));
+            collector, processQueueKey, inputIndex, std::chrono::seconds(interval));
         auto now = std::chrono::steady_clock::now();
         auto event = std::make_unique<HostMonitorTimerEvent>(now, collectConfig);
         Timer::GetInstance()->PushEvent(std::move(event));
@@ -62,7 +63,7 @@ void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& new
 }
 
 void HostMonitorInputRunner::RemoveCollector() {
-    std::unique_lock lock(mRegisteredCollectorMapMutex);
+    std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     for (auto& collector : mRegisteredCollectorMap) {
         collector.second.Disable();
     }
@@ -93,7 +94,7 @@ void HostMonitorInputRunner::Stop() {
 }
 
 bool HostMonitorInputRunner::HasRegisteredPlugins() const {
-    std::shared_lock lock(mRegisteredCollectorMapMutex);
+    std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     for (auto& collector : mRegisteredCollectorMap) {
         if (collector.second.IsEnabled()) {
             return true;
@@ -104,7 +105,7 @@ bool HostMonitorInputRunner::HasRegisteredPlugins() const {
 
 bool HostMonitorInputRunner::IsCollectTaskValid(std::chrono::steady_clock::time_point execTime,
                                                 const std::string& collectorName) {
-    std::shared_lock lock(mRegisteredCollectorMapMutex);
+    std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     auto it = mRegisteredCollectorMap.find(collectorName);
     if (it == mRegisteredCollectorMap.end()) {
         return false;
@@ -118,7 +119,7 @@ void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point 
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
         group.SetMetadata(EventGroupMetaKey::HOST_MONITOR_COLLECT_INTERVAL, std::to_string(config.mInterval.count()));
 
-        std::unique_lock lock(mRegisteredCollectorMapMutex);
+        std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
         auto collector = mRegisteredCollectorMap.find(config.mCollectorName);
         if (collector == mRegisteredCollectorMap.end()) {
             LOG_ERROR(

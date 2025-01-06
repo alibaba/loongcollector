@@ -22,6 +22,7 @@
 #include <sched.h>
 #include <unistd.h>
 
+#include <exception>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -30,6 +31,7 @@
 #include <vector>
 
 #include "FileSystemUtil.h"
+#include "Flags.h"
 #include "Logger.h"
 #include "PipelineEventGroup.h"
 #include "StringTools.h"
@@ -52,10 +54,6 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
     } else {
         mValidState = true;
     }
-    // TODO: fix after host id ready
-    mHostEntityID = ""; // FetchHostId();
-    mDomain = "";
-    mEntityType = "";
 };
 
 void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
@@ -73,23 +71,27 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
             = std::to_string(duration_cast<seconds>(process->startTime.time_since_epoch()).count());
 
         // common fields
-        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_TYPE, mEntityType);
-        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_ID,
-                          GetProcessEntityID(std::to_string(process->pid), processCreateTime));
-        event->SetContent(DEFAULT_CONTENT_KEY_DOMAIN, mDomain);
+        std::string domain, entityType, hostEntityID, hostEntityType;
+        FetchDomainInfo(domain, entityType, hostEntityID, hostEntityType);
+        event->SetContent(DEFAULT_CONTENT_KEY_DOMAIN, domain);
+        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_TYPE, entityType);
+        auto entityID = GetProcessEntityID(std::to_string(process->pid), processCreateTime, hostEntityID);
+        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_ID, entityID);
+
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
         auto interval = group.GetMetadata(EventGroupMetaKey::HOST_MONITOR_COLLECT_INTERVAL);
+        int keepAliveSeconds = INT32_FLAG(host_monitor_default_interval) * 2;
         if (!interval.empty()) {
             try {
-                auto keepAliveSeconds = std::stoi(interval.data()) * 2;
-                event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
-            } catch (const std::invalid_argument& e) {
-                LOG_ERROR(sLogger, ("process entity collector", "invalid interval")("interval", interval));
-            } catch (const std::out_of_range& e) {
-                LOG_ERROR(sLogger, ("process entity collector", "interval out of range")("interval", interval));
+                keepAliveSeconds = std::stoi(interval.data()) * 2;
+            } catch (const std::exception& e) {
+                LOG_ERROR(sLogger,
+                          ("process entity collector",
+                           "invalid interval")("interval", interval)("use default interval instead", keepAliveSeconds));
             }
         }
+        event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
 
         // custom fields
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PID, std::to_string(process->pid));
@@ -102,6 +104,21 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS, ""); TODO: get arguments
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE, ""); TODO: get language
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID, ""); TODO: get container id
+
+        // process -> host link
+        auto linkEvent = group.AddLogEvent();
+        linkEvent->SetTimestamp(logtime);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_DOMAIN, domain);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_ENTITY_TYPE, entityType);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_ENTITY_ID, entityID);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_DEST_DOMAIN, domain);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_DEST_ENTITY_TYPE, hostEntityType);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_DEST_ENTITY_ID, hostEntityID);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_RELATION_TYPE, DEFAULT_CONTENT_VALUE_METHOD_UPDATE);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_RELATION_TYPE, DEFAULT_CONTENT_VALUE_METHOD_UPDATE);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
+        linkEvent->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
     }
 }
 
@@ -272,12 +289,31 @@ bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
     return true;
 }
 
-const std::string ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime) {
+const std::string
+ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime, const std::string& hostEntityID) {
     std::ostringstream oss;
-    oss << mHostEntityID << pid << createTime;
+    oss << hostEntityID << pid << createTime;
     auto bigID = CalcMD5(oss.str());
     std::transform(bigID.begin(), bigID.end(), bigID.begin(), ::tolower);
     return bigID;
+}
+
+void ProcessEntityCollector::FetchDomainInfo(std::string& domain,
+                                             std::string& entityType,
+                                             std::string& hostEntityID,
+                                             std::string& hostEntityType) {
+    ECSMeta metaObj = HostIdentifier::Instance()->GetECSMeta();
+    if (metaObj.isValid) {
+        domain = DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
+        entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_ECS_PROCESS;
+        hostEntityID = metaObj.instanceID;
+        hostEntityType = DEFAULT_HOST_TYPE_ECS;
+    } else {
+        domain = DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
+        entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_HOST_PROCESS;
+        hostEntityID = HostIdentifier::Instance()->GetHostId().id;
+        hostEntityType = DEFAULT_HOST_TYPE_HOST;
+    }
 }
 
 } // namespace logtail

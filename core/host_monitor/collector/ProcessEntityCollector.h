@@ -36,6 +36,7 @@
 #include "host_monitor/collector/BaseCollector.h"
 
 DECLARE_FLAG_INT32(process_collect_silent_count);
+DECLARE_FLAG_INT32(host_monitor_default_interval);
 
 using namespace std::chrono;
 
@@ -158,16 +159,17 @@ private:
     ProcessStatPtr ParseProcessStat(pid_t pid, std::string& line);
     bool WalkAllProcess(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
 
-    const std::string GetProcessEntityID(StringView pid, StringView createTime);
+    const std::string GetProcessEntityID(StringView pid, StringView createTime, const std::string& hostEntityID);
+    void FetchDomainInfo(std::string& domain,
+                         std::string& entityType,
+                         std::string& hostEntityID,
+                         std::string& hostEntityType);
 
     steady_clock::time_point mProcessSortTime;
     std::vector<ProcessStatPtr> mSortProcessStats;
     std::unordered_map<pid_t, ProcessStatPtr> mPrevProcessStat;
 
     const int mProcessSilentCount;
-    std::string mHostEntityID;
-    std::string mEntityType;
-    std::string mDomain;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessEntityCollectorUnittest;

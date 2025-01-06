@@ -53,8 +53,7 @@ void ProcessEntityCollectorUnittest::TestSortProcessByCpu() const {
 
 void ProcessEntityCollectorUnittest::TestGetProcessEntityID() const {
     ProcessEntityCollector collect;
-    collect.mHostEntityID = "123";
-    APSARA_TEST_EQUAL(collect.GetProcessEntityID("123", "123"), "f5bb0c8de146c67b44babbf4e6584cc0");
+    APSARA_TEST_EQUAL(collect.GetProcessEntityID("123", "123", "123"), "f5bb0c8de146c67b44babbf4e6584cc0");
 }
 
 UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetNewProcessStat);

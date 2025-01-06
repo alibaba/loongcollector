@@ -81,10 +81,15 @@ public:
     }
 
     bool UpdateECSMetaAndHostid(const ECSMeta& meta);
-    bool FetchECSMeta(ECSMeta& metaObj);
     void DumpECSMeta();
+#ifdef __ENTERPRISE__
+    bool FetchECSMeta(ECSMeta& metaObj);
+#endif
 
 private:
+#ifndef __ENTERPRISE__
+    bool FetchECSMeta(ECSMeta& metaObj);
+#endif
     void getECSMetaFromFile();
     // 从云助手获取序列号
     void getSerialNumberFromEcsAssist();

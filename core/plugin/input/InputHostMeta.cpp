@@ -18,6 +18,7 @@
 
 #include "HostMonitorInputRunner.h"
 #include "Logger.h"
+#include "ParamExtractor.h"
 #include "constants/EntityConstants.h"
 
 namespace logtail {
@@ -25,13 +26,26 @@ namespace logtail {
 const std::string InputHostMeta::sName = "input_host_meta";
 
 bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    std::string errorMsg;
+    if (!GetOptionalIntParam(config, "Interval", mInterval, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              false,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
     return true;
 }
 
 bool InputHostMeta::Start() {
     LOG_INFO(sLogger, ("input host meta start", mContext->GetConfigName()));
     HostMonitorInputRunner::GetInstance()->Init();
-    HostMonitorInputRunner::GetInstance()->UpdateCollector({"process_entity"}, mContext->GetProcessQueueKey(), mIndex);
+    HostMonitorInputRunner::GetInstance()->UpdateCollector(
+        {"process_entity"}, mContext->GetProcessQueueKey(), mIndex, mInterval);
     return true;
 }
 

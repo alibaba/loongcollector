@@ -504,13 +504,13 @@ size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string
 HostIdentifier::HostIdentifier() {
 #ifdef __ENTERPRISE__
     getECSMetaFromFile();
-    updateHostId();
 #else
     ECSMeta ecsMeta;
     if (FetchECSMeta(ecsMeta)) {
         UpdateECSMetaAndHostid(ecsMeta);
     }
 #endif
+    updateHostId();
 }
 
 bool HostIdentifier::UpdateECSMetaAndHostid(const ECSMeta& meta) {
