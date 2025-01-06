@@ -17,6 +17,7 @@
 #include "ebpf/type/table/DataTable.h"
 
 namespace logtail {
+namespace ebpf {
 
 constexpr DataElement kHost = {
     "host",
@@ -546,5 +547,5 @@ constexpr DataElement kFile = {
     AggregationType::NoAggregate
 }; 
 
-
+}
 }

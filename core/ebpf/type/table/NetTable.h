@@ -18,6 +18,7 @@
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail{
+namespace ebpf {
 
 static constexpr DataElement kNetMetricsElements [] = {
 
@@ -50,4 +51,5 @@ static constexpr DataElement kNetElements[] = {
 static constexpr auto kNetTable =
     DataTableSchema("net_record", "net events", kNetElements);
 
-};
+} 
+}

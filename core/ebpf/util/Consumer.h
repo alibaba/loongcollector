@@ -32,9 +32,12 @@ namespace ebpf {
 template <typename T>
 class Consumer {
 public:
+    using TaskFunc = std::function<void()>;
     using ProcessFunc = std::function<bool(const std::vector<T>&, size_t)>;
     Consumer(moodycamel::BlockingConcurrentQueue<T>& queue, std::chrono::milliseconds maxWaitTime, const ProcessFunc& func)
         : mQueue(queue), mMaxWaitTime(maxWaitTime), mStopFlag(false), mSuspendFlag(false), mProcessFunc(func) {}
+    Consumer(moodycamel::BlockingConcurrentQueue<T>& queue, std::chrono::milliseconds maxWaitTime, const TaskFunc& tfunc, const ProcessFunc& pfunc)
+        : mQueue(queue), mMaxWaitTime(maxWaitTime), mStopFlag(false), mSuspendFlag(false), mTaskFunc(tfunc), mProcessFunc(pfunc) {}
 
     void start() {
         mWorker = std::thread(&Consumer::run, this);
@@ -65,6 +68,23 @@ public:
     }
 
 private:
+    void Run() {
+        while (!mStopFlag) {
+            {
+                std::unique_lock<std::mutex> lock(mMtx);
+                mCv.wait(lock, [this] { return !mSuspendFlag || mStopFlag; });
+            }
+
+            if (mStopFlag) break;
+            // attention: what if suspend flag is changed now ... 
+
+            LOG_INFO(sLogger, ("begin run task func", ""));
+            if (mTaskFunc) {
+                mTaskFunc();
+            }
+            
+        }
+    }
     void run() {
         std::vector<T> items(1024);
         while (!mStopFlag) {
@@ -90,6 +110,7 @@ private:
     std::atomic<bool> mSuspendFlag;
     std::mutex mMtx;
     std::condition_variable mCv;
+    TaskFunc mTaskFunc;
     ProcessFunc mProcessFunc;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConsumerUnittest;

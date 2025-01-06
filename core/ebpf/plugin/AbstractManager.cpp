@@ -12,8 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "logger/Logger.h"
+#include "AbstractManager.h"
+#include <security/type.h>
+
 namespace logtail {
 namespace ebpf {
+
+int AbstractManager::GetCallNameIdx(const std::string& callName) {
+    if (callName == "security_file_permission") return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION;
+    else if (callName == "security_mmap_file") return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_MMAP_FILE;
+    else if (callName == "security_path_truncate") return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_PATH_TRUNCATE;
+    else if (callName == "sys_write") return SECURE_FUNC_TRACEPOINT_FUNC_SYS_WRITE;
+    else if (callName == "sys_read") return SECURE_FUNC_TRACEPOINT_FUNC_SYS_READ;
+    else if (callName == "tcp_close") return SECURE_FUNC_TRACEPOINT_FUNC_TCP_CLOSE;
+    else if (callName == "tcp_connect") return SECURE_FUNC_TRACEPOINT_FUNC_TCP_CONNECT;
+    else if (callName == "tcp_sendmsg") return SECURE_FUNC_TRACEPOINT_FUNC_TCP_SENDMSG;
+    LOG_WARNING(sLogger, ("unknown call name", callName));
+    return -1;
+}
 
 }
 }

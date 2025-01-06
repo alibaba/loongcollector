@@ -30,6 +30,7 @@ extern "C" {
 #include <iostream>
 
 #include "BPFMapTraits.h"
+#include "NetworkObserver.h"
 
 namespace nami {
 
@@ -53,8 +54,13 @@ public:
 
 void* PerfThreadWoker(void *ctx, const std::string& name, std::atomic<bool>& flag);
 
+class BPFWrapperBase {
+public:
+    virtual ~BPFWrapperBase() = default;
+};
+
 template<typename T>
-class BPFWrapper {
+class BPFWrapper : public BPFWrapperBase {
 public:
   static std::shared_ptr<BPFWrapper<T>> Create() { return std::make_shared<BPFWrapper<T>>(); }
 
@@ -370,11 +376,11 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
 
   void DeletePerfBuffer(void* pb) {
     struct perf_buffer * pb_ptr = static_cast<struct perf_buffer *>(pb);
-    perf_buffer__free(pb);
+    perf_buffer__free((struct perf_buffer*)pb);
   }
 
   int PollPerfBuffer(void* pb, int max_events, int timeout_ms) {
-      return perf_buffer__poll(pb, timeout_ms);
+      return perf_buffer__poll((struct perf_buffer*)pb, timeout_ms);
       // if (err < 0 && err != -EINTR)
       // {
       //     std::cout << "error polling perf buffer: " << strerror(-err) << std::endl;
@@ -385,16 +391,16 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
       //     goto cleanup;
   }
 
-  void* CreatePerfBuffer(const std::string& name, int page_cnt, void* ctx, perf_buffer_sample_fn data_cb, perf_buffer_lost_fn loss_cb) {
+  void* CreatePerfBuffer(const std::string& name, int page_cnt, void* ctx, perf_process_event_fn data_cb, perf_loss_event_fn loss_cb) {
     int mapFd = SearchMapFd(name);
     if (mapFd < 0) {
       return nullptr;
     }
 
     struct perf_buffer_opts pb_opts = {};
-    pb_opts.sample_cb = data_cb;
+    pb_opts.sample_cb = static_cast<perf_buffer_sample_fn>(data_cb);
     pb_opts.ctx = ctx;
-    pb_opts.lost_cb = loss_cb;
+    pb_opts.lost_cb = static_cast<perf_buffer_lost_fn>(loss_cb);
 
     struct perf_buffer *pb = NULL;
     pb = perf_buffer__new(mapFd, page_cnt == 0 ? 128 : page_cnt, &pb_opts);
@@ -479,7 +485,6 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
     inited_ = false;
   }
   // pin map
-private:
 
   int SearchProgFd(const std::string& name) {
     auto it = bpf_progs_.find(name);
@@ -505,8 +510,13 @@ private:
     return bpf_map__fd(it->second);
   }
 
-  bool CreateBPFMap() {
-    bpf_create_map(bpf_map_type::BPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), 100, 0);
+  int GetBPFMapFdById(int id) {
+    return bpf_map_get_fd_by_id(id);
+  }
+
+  bool CreateBPFMap(enum bpf_map_type map_type, int key_size,
+		   int value_size, int max_entries, unsigned int map_flags) {
+    bpf_create_map(map_type, key_size, value_size, max_entries, map_flags);
     return true;
   }
 

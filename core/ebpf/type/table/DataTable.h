@@ -26,6 +26,7 @@
 #include "models/ArrayView.h"
 
 namespace logtail {
+namespace ebpf {
 
 /* AggregationType defination
 NoAggregate means that this field doesn't engage in aggregate. level means the level of aggregation map this field will exist in. 
@@ -70,72 +71,63 @@ class DataElement {
 };
 
 class DataTableSchema {
- public:
-  // TODO(oazizi): This constructor should only be called at compile-time. Need to enforce this.
-  template <std::size_t N>
-  constexpr DataTableSchema(std::string_view name, std::string_view desc,
-                            const DataElement (&elements)[N])
-      : name_(name), desc_(desc), elements_(elements) {
-  }
-
-  template <std::size_t N>
-  constexpr DataTableSchema(std::string_view name, std::string_view desc,
-                            const DataElement (&elements)[N])
-      : name_(name),
-        desc_(desc),
-        elements_(elements) {
-  }
-
-  DataTableSchema(std::string_view name, std::string_view desc,
-                  const std::vector<DataElement>& elements)
-      : name_(name), desc_(desc), elements_(elements.data(), elements.size()) {
-  }
-
-  constexpr std::string_view name() const { return name_; }
-  constexpr std::string_view desc() const { return desc_; }
-  constexpr ArrayView<DataElement> elements() const { return elements_; }
-
-  constexpr uint32_t ColIndex(std::string_view key) const {
-    uint32_t i = 0;
-    for (i = 0; i < elements_.size(); i++) {
-      if (elements_[i].name() == key) {
-        break;
-      }
+public:
+    // TODO(oazizi): This constructor should only be called at compile-time. Need to enforce this.
+    template <std::size_t N>
+    constexpr DataTableSchema(std::string_view name, std::string_view desc,
+                              const DataElement (&elements)[N])
+        : name_(name), desc_(desc), elements_(elements) {
     }
-    return i;
-  }
 
-  constexpr bool HasCol(std::string_view key) const {
-    uint32_t i = 0;
-    for (i = 0; i < elements_.size(); i++) {
-      if (elements_[i].name() == key) {
-        return true;
-      }
+    DataTableSchema(std::string_view name, std::string_view desc,
+                    const std::vector<DataElement>& elements)
+        : name_(name), desc_(desc), elements_(elements.data(), elements.size()) {
     }
-    return false;
-  }
 
-  constexpr std::string_view ColName(size_t i) const {
-    return elements_[i].name();
-  }
+    constexpr std::string_view name() const { return name_; }
+    constexpr std::string_view desc() const { return desc_; }
+    constexpr ArrayView<DataElement> elements() const { return elements_; }
 
-  constexpr std::string_view ColMetricKey(size_t i) const {
-    return elements_[i].metric_key();
-  }
-  constexpr std::string_view ColSpanKey(size_t i) const {
-    return elements_[i].span_key();
-  }
-  constexpr std::string_view ColLogKey(size_t i) const {
-    return elements_[i].log_key();
-  }
+    constexpr uint32_t ColIndex(std::string_view key) const {
+        uint32_t i = 0;
+        for (i = 0; i < elements_.size(); i++) {
+          if (elements_[i].name() == key) {
+            break;
+          }
+        }
+        return i;
+    }
 
- private:
-  constexpr void CheckSchema() {
-  }
+    constexpr bool HasCol(std::string_view key) const {
+        uint32_t i = 0;
+        for (i = 0; i < elements_.size(); i++) {
+            if (elements_[i].name() == key) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-  const std::string_view name_;
-  const std::string_view desc_;
-  const ArrayView<DataElement> elements_;
+    constexpr std::string_view ColName(size_t i) const {
+        return elements_[i].name();
+    }
+
+    constexpr std::string_view ColMetricKey(size_t i) const {
+        return elements_[i].metric_key();
+    }
+    constexpr std::string_view ColSpanKey(size_t i) const {
+       return elements_[i].span_key();
+    }
+    constexpr std::string_view ColLogKey(size_t i) const {
+        return elements_[i].log_key();
+    }
+
+private:
+
+    const std::string_view name_;
+    const std::string_view desc_;
+    const ArrayView<DataElement> elements_;
 };
 
+}
 }

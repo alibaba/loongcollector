@@ -19,10 +19,10 @@ extern "C" {
 #include <vector>
 
 #include "ebpf/plugin/AbstractManager.h"
+#include "common/queue/blockingconcurrentqueue.h"
 
 // #include "export/export.h"
 // #include "conn_tracker_manager.h"
-// #include "util/queue/blockingconcurrentqueue.h"
 // #include "util/queue/concurrentqueue.h"
 // #include "type/abstract_raw_event.h"
 // #include "type/ebpf_type.h"
@@ -55,18 +55,11 @@ namespace ebpf {
 //   // Step1. init ebpf module and register callbacks
 //   // Step2. start a thread to parse the
 //   int Init(std::shared_ptr<nami::eBPFConfig>) override;
-//   int Attach(std::vector<AttachProgOps> &attach_ops) override;
-//   int Detach(std::vector<AttachProgOps> &attach_ops) override;
 //   int Destroy() override;
-//   int SetTailCall(const std::string &map_name, const std::vector<std::string> &functions) override;
-//   int UpdateConfig(const std::shared_ptr<nami::eBPFConfig> &new_config) override;
 //   int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
 //   int DisableCallName(const std::string& call_name) override { return 0; }
-//   virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
+// //   virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
 //   void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
-//   std::shared_ptr<eBPFStatistics> GetStatistics() override;
-//   std::shared_ptr<eBPFStatistics> AllocNewStats() override {
-//     return std::dynamic_pointer_cast<eBPFStatistics>(std::make_shared<NetworkObserverStatistics>());
 //   }
 
 //   void Stop();

@@ -18,6 +18,7 @@
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail{
+namespace ebpf {
 
 constexpr DataElement kStatusCode = {
     "status_code",
@@ -48,4 +49,5 @@ static constexpr auto kHTTPTable =
 
 static constexpr int kHTTPPathIdx = kHTTPTable.ColIndex("path");
 
+}
 }

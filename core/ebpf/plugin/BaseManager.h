@@ -14,34 +14,19 @@
 
 #pragma once
 
-#include "ebpf/type/table/DataTable.h"
-#include "ebpf/type/table/BaseElements.h"
+#include <unordered_map>
+#include <atomic>
+#include <array>
+#include <set>
+#include <queue>
+
 
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kProcessSecurityElements [] = {
-    kExecId,
-    kParentExecId,
-    kProcessId,
-    kUid,
-    kUser,
-    kBinary,
-    kArguments,
-    kCWD,
-    kKtime,
-    kCap,
-    kParentProcess,
-    kContainerId,
-    kEventTime,
-    kCallName,
-    kEventType
+class BaseManager {
+    
 };
-
-static constexpr size_t kProcessSecurityTableSize = std::size(kProcessSecurityElements);
-
-static constexpr auto kProcessSecurityTable =
-    DataTableSchema("process_security_table", "", kProcessSecurityElements);
 
 }
 }

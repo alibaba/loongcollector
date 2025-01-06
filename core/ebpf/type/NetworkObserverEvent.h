@@ -15,6 +15,8 @@
 #pragma once
 
 #include <cstddef>
+// TODO @qianlu.kk include from source files or from install dir??
+// if we include from install dir, maybe we need to add depedencies 
 #include <coolbpf/net.h>
 #include <string>
 #include <unordered_map>
@@ -176,15 +178,18 @@ public:
     end_ts(conn_data->end_ts),
     protocol(static_cast<ProtocolType>(conn_data->protocol)), role(conn_data->role) {
 
-//    conn_id = ConnId(conn_data->conn_id);
-//    size_t offset = offsetof(struct conn_data_event_t, msg);
-//    memcpy(&data_event->conn_id, event_data, offset);
     req_msg = std::string(conn_data->msg, conn_data->request_len);
     resp_msg = std::string(conn_data->msg+conn_data->request_len, conn_data->response_len);
-//    size_t msg_length = event_data->request_len + event_data->response_len;
-//    data_event->msg = std::string(event_data->msg, msg_length);
   }
 };
+
+class AbstractRecord {
+
+};
+
+class ConnStatsRecord : public AbstractRecord {};
+
+class AppRecord : public AbstractRecord {};
 
 }
 }

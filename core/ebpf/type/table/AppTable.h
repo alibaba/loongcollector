@@ -18,6 +18,7 @@
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {
+namespace ebpf {
 
 static constexpr DataElement kConnTrackerElements [] = {
     kHost,
@@ -110,4 +111,5 @@ static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 static constexpr auto kAppTraceTable =
     DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
+}
 }

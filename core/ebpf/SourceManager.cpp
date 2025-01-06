@@ -25,6 +25,7 @@
 #include "common/RuntimeUtil.h"
 #include "ebpf/include/SysAkApi.h"
 #include "logger/Logger.h"
+#include "ebpf/driver/NetworkObserver.h"
 
 namespace logtail {
 namespace ebpf {
@@ -125,29 +126,66 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     // init config
     // this memory will be managed by plugin
 
-    mFuncs[(int)ebpf_func::EBPF_INIT] = LOAD_EBPF_FUNC_ADDR(init);
-    mFuncs[(int)ebpf_func::EBPF_UPDATE] = LOAD_EBPF_FUNC_ADDR(update);
-    mFuncs[(int)ebpf_func::EBPF_SUSPEND] = LOAD_EBPF_FUNC_ADDR(suspend);
-    mFuncs[(int)ebpf_func::EBPF_DEINIT] = LOAD_EBPF_FUNC_ADDR(deinit);
-    mFuncs[(int)ebpf_func::EBPF_REMOVE] = LOAD_EBPF_FUNC_ADDR(removep);
-    mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG] = LOAD_EBPF_FUNC_ADDR(ebpf_cleanup_dog);
-    mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_role);
-    mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS] = LOAD_EBPF_FUNC_ADDR(ebpf_disable_process);
-    mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_addr);
+    // mFuncs[(int)ebpf_func::EBPF_INIT] = LOAD_EBPF_FUNC_ADDR(init);
+    // mFuncs[(int)ebpf_func::EBPF_UPDATE] = LOAD_EBPF_FUNC_ADDR(update);
+    // mFuncs[(int)ebpf_func::EBPF_SUSPEND] = LOAD_EBPF_FUNC_ADDR(suspend);
+    // mFuncs[(int)ebpf_func::EBPF_DEINIT] = LOAD_EBPF_FUNC_ADDR(deinit);
+    // mFuncs[(int)ebpf_func::EBPF_REMOVE] = LOAD_EBPF_FUNC_ADDR(removep);
+    // mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG] = LOAD_EBPF_FUNC_ADDR(ebpf_cleanup_dog);
+    // mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_role);
+    // mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS] = LOAD_EBPF_FUNC_ADDR(ebpf_disable_process);
+    // mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_addr);
 
-    mOffsets[(int)ebpf_func::EBPF_INIT] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_INIT]);
-    mOffsets[(int)ebpf_func::EBPF_UPDATE] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_UPDATE]);
-    mOffsets[(int)ebpf_func::EBPF_SUSPEND] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SUSPEND]);
-    mOffsets[(int)ebpf_func::EBPF_DEINIT] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_DEINIT]);
-    mOffsets[(int)ebpf_func::EBPF_REMOVE] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_REMOVE]);
-    mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG]
-        = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG]);
-    mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE]
-        = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE]);
-    mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS]
-        = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS]);
-    mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR]
-        = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR]);
+    mFuncs[(int)ebpf_op_func::PREPARE_SKELETON] = LOAD_EBPF_FUNC_ADDR(prepare_skeleton);
+    mFuncs[(int)ebpf_op_func::DESTROY_SKELETON] = LOAD_EBPF_FUNC_ADDR(destroy_skeleton);
+    mFuncs[(int)ebpf_op_func::DYNAMIC_ATTACH_BPF_PROG] = LOAD_EBPF_FUNC_ADDR(dynamic_attach_bpf_prog);
+    mFuncs[(int)ebpf_op_func::DYNAMIC_DETACH_BPF_PROG] = LOAD_EBPF_FUNC_ADDR(dynamic_detach_bpf_prog);
+    mFuncs[(int)ebpf_op_func::SET_TAILCALL] = LOAD_EBPF_FUNC_ADDR(set_tailcall);
+
+    mFuncs[(int)ebpf_op_func::SEARCH_MAP_FD] = LOAD_EBPF_FUNC_ADDR(search_map_fd);
+    mFuncs[(int)ebpf_op_func::GET_BPF_MAP_FD_BY_ID] = LOAD_EBPF_FUNC_ADDR(get_bpf_map_fd_by_id);
+    mFuncs[(int)ebpf_op_func::CREATE_BPF_MAP] = LOAD_EBPF_FUNC_ADDR(create_bpf_map);
+
+    mFuncs[(int)ebpf_op_func::LOOKUP_BPF_MAP_ELEM] = LOAD_EBPF_FUNC_ADDR(lookup_bpf_map_elem);
+    mFuncs[(int)ebpf_op_func::REMOVE_BPF_MAP_ELEM] = LOAD_EBPF_FUNC_ADDR(remove_bpf_map_elem);
+    mFuncs[(int)ebpf_op_func::UPDATE_BPF_MAP_ELEM] = LOAD_EBPF_FUNC_ADDR(update_bpf_map_elem);
+
+    mFuncs[(int)ebpf_op_func::CREATE_PERF_BUFFER] = LOAD_EBPF_FUNC_ADDR(create_perf_buffer);
+    mFuncs[(int)ebpf_op_func::DELETE_PERF_BUFFER] = LOAD_EBPF_FUNC_ADDR(delete_perf_buffer);
+    mFuncs[(int)ebpf_op_func::POLL_PERF_BUFFER] = LOAD_EBPF_FUNC_ADDR(poll_perf_buffer);
+
+    mFuncs[(int)ebpf_op_func::INIT_NETWORK_OBSERVER] = LOAD_EBPF_FUNC_ADDR(init_network_observer);
+    mFuncs[(int)ebpf_op_func::START_NETWORK_OBSERVER] = LOAD_EBPF_FUNC_ADDR(start_network_observer);
+    mFuncs[(int)ebpf_op_func::STOP_NETWORK_OBSERVER] = LOAD_EBPF_FUNC_ADDR(stop_network_observer);
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_CONFIG] = LOAD_EBPF_FUNC_ADDR(network_observer_config);
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_POLL_EVENTS] = LOAD_EBPF_FUNC_ADDR(network_observer_poll_events);
+
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_CLEAN_UP_DOG] = LOAD_EBPF_FUNC_ADDR(ebpf_cleanup_dog);
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_UPDATE_CONN_ADDR] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_addr);
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_DISABLE_PROCESS] = LOAD_EBPF_FUNC_ADDR(ebpf_disable_process);
+    mFuncs[(int)ebpf_op_func::NETWORK_OBSERVER_UPDATE_CONN_ROLE] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_role);
+
+    mFuncs[(int)ebpf_op_func::SETUP_NET_DATA_PROCESS_FUNC] = LOAD_EBPF_FUNC_ADDR(ebpf_setup_net_data_process_func);
+    mFuncs[(int)ebpf_op_func::SETUP_NET_EVENT_PROCESS_FUNC] = LOAD_EBPF_FUNC_ADDR(ebpf_setup_net_event_process_func);
+    mFuncs[(int)ebpf_op_func::SETUP_NET_STATISTICS_PROCESS_FUNC] = LOAD_EBPF_FUNC_ADDR(ebpf_setup_net_statistics_process_func);
+    mFuncs[(int)ebpf_op_func::SETUP_NET_LOST_FUNC] = LOAD_EBPF_FUNC_ADDR(ebpf_setup_net_lost_func);
+    mFuncs[(int)ebpf_op_func::SETUP_PRINT_FUNC] = LOAD_EBPF_FUNC_ADDR(ebpf_setup_print_func);
+    
+
+    // TODO @qianlu.kk set offset ... 
+    // mOffsets[(int)ebpf_func::EBPF_INIT] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_INIT]);
+    // mOffsets[(int)ebpf_func::EBPF_UPDATE] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_UPDATE]);
+    // mOffsets[(int)ebpf_func::EBPF_SUSPEND] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SUSPEND]);
+    // mOffsets[(int)ebpf_func::EBPF_DEINIT] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_DEINIT]);
+    // mOffsets[(int)ebpf_func::EBPF_REMOVE] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_REMOVE]);
+    // mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG]
+    //     = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_CLEAN_UP_DOG]);
+    // mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE]
+    //     = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE]);
+    // mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS]
+    //     = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_DISABLE_PROCESS]);
+    // mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR]
+    //     = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR]);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {

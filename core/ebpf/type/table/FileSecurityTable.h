@@ -18,7 +18,7 @@
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {
-
+namespace ebpf {
 
 static constexpr DataElement kFileSecurityElements [] = {
     kExecId,
@@ -46,4 +46,5 @@ static constexpr size_t kFileSecurityTableSize = std::size(kFileSecurityElements
 static constexpr auto kFileSecurityTable =
     DataTableSchema("file_security_table", "", kFileSecurityElements);
 
+}
 }

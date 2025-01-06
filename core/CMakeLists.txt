@@ -145,6 +145,7 @@ endif()
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
