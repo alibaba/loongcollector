@@ -183,6 +183,13 @@ bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
             return false;
         }
     }
+
+    if (scrapeConfig.isMember(prometheus::EXTERNAL_LABELS)) {
+        if (!InitExternalLabels(scrapeConfig[prometheus::EXTERNAL_LABELS])) {
+            LOG_ERROR(sLogger, ("external labels config error", ""));
+            return false;
+        }
+    }
     return true;
 }
 
@@ -394,6 +401,22 @@ bool ScrapeConfig::InitTLSConfig(const Json::Value& tlsConfig) {
         }
     }
     mEnableTLS = true;
+    return true;
+}
+
+bool ScrapeConfig::InitExternalLabels(const Json::Value& externalLabels) {
+    if (!externalLabels.isObject()) {
+        LOG_ERROR(sLogger, ("external_labels config error", ""));
+        return false;
+    }
+    for (auto& key : externalLabels.getMemberNames()) {
+        if (externalLabels[key].isString()) {
+            mExternalLabels.emplace_back(key, externalLabels[key].asString());
+        } else {
+            LOG_ERROR(sLogger, ("external_labels config error", ""));
+            return false;
+        }
+    }
     return true;
 }
 

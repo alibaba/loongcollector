@@ -94,6 +94,10 @@ void ScrapeConfigUnittest::TestInit() {
                     ]
                 }
             ],
+            "external_labels": {
+                "test_key1": "test_value1",
+                "test_key2": "test_value2"
+            },
             "params" : {
                 "__param_query": [
                     "test_query"
@@ -142,6 +146,13 @@ void ScrapeConfigUnittest::TestInit() {
     APSARA_TEST_EQUAL(scrapeConfig.mRelabelConfigs.mRelabelConfigs.size(), 1UL);
     APSARA_TEST_EQUAL(scrapeConfig.mParams["__param_query"][0], "test_query");
     APSARA_TEST_EQUAL(scrapeConfig.mParams["__param_query_1"][0], "test_query_1");
+
+    // external labels
+    APSARA_TEST_EQUAL(scrapeConfig.mExternalLabels.size(), 2UL);
+    APSARA_TEST_EQUAL(scrapeConfig.mExternalLabels[0].first, "test_key1");
+    APSARA_TEST_EQUAL(scrapeConfig.mExternalLabels[0].second, "test_value1");
+    APSARA_TEST_EQUAL(scrapeConfig.mExternalLabels[1].first, "test_key2");
+    APSARA_TEST_EQUAL(scrapeConfig.mExternalLabels[1].second, "test_value2");
 }
 
 void ScrapeConfigUnittest::TestAuth() {
