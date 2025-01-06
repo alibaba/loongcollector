@@ -41,8 +41,7 @@ PipelineManager::PipelineManager()
     : mInputRunners({
           PrometheusInputRunner::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
-          ebpf::eBPFServer::GetInstance(),
-          HostMonitorInputRunner::GetInstance(),
+              ebpf::eBPFServer::GetInstance(), HostMonitorInputRunner::GetInstance(),
 #endif
       }) {
 }

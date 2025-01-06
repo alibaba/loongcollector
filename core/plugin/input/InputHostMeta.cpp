@@ -14,10 +14,11 @@
 
 #include "InputHostMeta.h"
 
+#include "json/value.h"
+
 #include "HostMonitorInputRunner.h"
 #include "Logger.h"
 #include "constants/EntityConstants.h"
-#include "json/value.h"
 
 namespace logtail {
 
