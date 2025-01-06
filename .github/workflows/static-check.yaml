@@ -89,7 +89,6 @@ jobs:
           clang-format-version: '18'
           check-path: 'core'
           include-regex: '.*\.(cpp|h)$'
-          fallback-style: 'Google'
 
       - name: Go Plugin Lint
         run: make lint
