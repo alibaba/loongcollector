@@ -17,11 +17,11 @@
     ```yaml
     enable: true
     inputs:
-    - Type: input_file          # 文件输入类型
-        FilePaths: 
+      - Type: input_file     # 文件输入类型
+        FilePaths:
         - ./simple.log
     flushers:
-    - Type: flusher_stdout    # 标准输出流输出类型
+      - Type: flusher_stdout # 标准输出流输出类型
         OnlyStdout: true
     ```
 
