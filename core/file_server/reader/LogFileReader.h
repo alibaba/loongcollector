@@ -296,6 +296,8 @@ public:
 
     void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
 
+    bool UpdateContainerInfo();
+
     bool IsFileOpened() const { return mLogFileOp.IsOpen(); }
 
     bool ShouldForceReleaseDeletedFileFd();

@@ -2530,6 +2530,23 @@ const std::string& LogFileReader::GetConvertedPath() const {
 #endif
 }
 
+bool LogFileReader::UpdateContainerInfo() {
+    FileDiscoveryConfig discoveryConfig = FileServer::GetInstance()->GetFileDiscoveryConfig(mConfigName);
+    ContainerInfo* containerPath = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
+    if (containerPath && containerPath->mID != mContainerID) {
+        // if config have wildcard path, use mWildcardPaths[0] as base path
+        SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
+                                                                         : discoveryConfig.first->GetBasePath(),
+                      containerPath->mRealBaseDir.size());
+        SetContainerID(containerPath->mID);
+        mExtraTags.clear();
+        AddExtraTags(containerPath->mMetadatas);
+        AddExtraTags(containerPath->mTags);
+        return true;
+    }
+    return false;
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogFileReader::UpdateReaderManual() {
     if (mLogFileOp.IsOpen()) {
