@@ -232,10 +232,16 @@ void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
 
-    // send event to close reader
+    // different container id, should not close reader
     Event event2(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
-    event2.SetContainerID("1");
+    event2.SetContainerID("3");
     mHandlerPtr->Handle(event2);
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+
+    // send event to close reader
+    Event event3(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
+    event3.SetContainerID("1");
+    mHandlerPtr->Handle(event3);
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
 }
 
