@@ -147,9 +147,7 @@ protected:
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
     }
 
-    static void TearDownTestCase() {
-        PluginRegistry::GetInstance()->UnloadPlugins();
-    }
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
         LogInput::GetInstance()->CleanEnviroments();

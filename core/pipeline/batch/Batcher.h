@@ -289,12 +289,8 @@ public:
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    EventFlushStrategy<T>& GetEventFlushStrategy() {
-        return mEventFlushStrategy;
-    }
-    std::optional<GroupFlushStrategy>& GetGroupFlushStrategy() {
-        return mGroupFlushStrategy;
-    }
+    EventFlushStrategy<T>& GetEventFlushStrategy() { return mEventFlushStrategy; }
+    std::optional<GroupFlushStrategy>& GetGroupFlushStrategy() { return mGroupFlushStrategy; }
 #endif
 
 private:

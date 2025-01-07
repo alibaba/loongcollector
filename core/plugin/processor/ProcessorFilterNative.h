@@ -53,7 +53,7 @@ class BinaryFilterOperatorNode : public BaseFilterNode {
 public:
     BinaryFilterOperatorNode(FilterOperator op, BaseFilterNodePtr left, BaseFilterNodePtr right)
         : BaseFilterNode(OPERATOR_NODE), op(op), left(left), right(right) {}
-    virtual ~BinaryFilterOperatorNode(){};
+    virtual ~BinaryFilterOperatorNode() {}
 
 public:
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
@@ -85,7 +85,7 @@ class UnaryFilterOperatorNode : public BaseFilterNode {
 public:
     UnaryFilterOperatorNode(BaseFilterNodePtr child) : BaseFilterNode(OPERATOR_NODE), child(child) {}
 
-    virtual ~UnaryFilterOperatorNode(){};
+    virtual ~UnaryFilterOperatorNode() {}
 
 public:
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);

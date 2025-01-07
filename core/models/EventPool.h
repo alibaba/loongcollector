@@ -33,7 +33,7 @@ class PipelineEventGroup;
 
 class EventPool {
 public:
-    EventPool(bool enableLock = true) : mEnableLock(enableLock){};
+    explicit EventPool(bool enableLock = true) : mEnableLock(enableLock) {}
     ~EventPool();
     EventPool(const EventPool&) = delete;
     EventPool& operator=(const EventPool&) = delete;

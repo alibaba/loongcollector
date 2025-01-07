@@ -54,9 +54,7 @@ public:
     virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    std::optional<RateLimiter>& GetRateLimiter() {
-        return mRateLimiter;
-    }
+    std::optional<RateLimiter>& GetRateLimiter() { return mRateLimiter; }
     std::vector<std::pair<std::shared_ptr<ConcurrencyLimiter>, CounterPtr>>& GetConcurrencyLimiters() {
         return mConcurrencyLimiters;
     }

@@ -72,8 +72,8 @@ void ScrapeSchedulerUnittest::TestProcess() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-    HttpResponse httpResponse = HttpResponse(
-        &event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -132,8 +132,8 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-    HttpResponse httpResponse = HttpResponse(
-        &event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
 
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"

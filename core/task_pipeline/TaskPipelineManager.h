@@ -43,9 +43,7 @@ public:
     std::vector<std::string> GetAllPipelineNames() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void ClearEnvironment() {
-        mPipelineNameEntityMap.clear();
-    }
+    void ClearEnvironment() { mPipelineNameEntityMap.clear(); }
 #endif
 
 private:
