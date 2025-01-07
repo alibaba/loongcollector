@@ -40,7 +40,6 @@ RUN source /tmp/.env && rm /tmp/.env; \
     useradd --uid $USER_UID --gid $GROUP_GID -m $USERNAME; \
     echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME; \
     chmod 0440 /etc/sudoers.d/$USERNAME; \
-    chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     chmod -R 755 $(eval echo ~$USERNAME);
 
 USER $USERNAME
