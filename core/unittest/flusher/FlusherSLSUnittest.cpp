@@ -454,7 +454,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         {
             "flushers": [
                 {
-                    "type": "flusher_sls",
+                    "type": "flusher_sls/4",
                     "detail": {}
                 }
             ]
@@ -462,6 +462,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
+    pipeline.mPluginID.store(4);
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
