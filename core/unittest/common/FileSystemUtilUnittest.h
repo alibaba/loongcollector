@@ -183,9 +183,7 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
 
     {
         auto filePath = ((mTestRoot / "file").string());
-        {
-            std::ofstream(filePath).write("xxx", 3);
-        }
+        { std::ofstream(filePath).write("xxx", 3); }
         fsutil::PathStat stat;
         EXPECT_TRUE(fsutil::PathStat::stat(filePath, stat));
         DevInode devInode = stat.GetDevInode();
