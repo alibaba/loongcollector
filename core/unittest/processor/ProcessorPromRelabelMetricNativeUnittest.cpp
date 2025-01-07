@@ -159,7 +159,6 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     // check external labels
     APSARA_TEST_EQUAL("test_value1", eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTag("test_key1"));
     APSARA_TEST_EQUAL("test_value2", eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTag("test_key2"));
-
 }
 
 void ProcessorPromRelabelMetricNativeUnittest::TestAddAutoMetrics() {
