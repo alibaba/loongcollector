@@ -176,6 +176,7 @@ public:
     friend class ConfigUpdatorUnittest;
     friend class EventDispatcherTest;
     friend class SenderUnittest;
+    friend class EventDispatcherContainerUnittest;
 #endif
 };
 

@@ -2532,16 +2532,24 @@ const std::string& LogFileReader::GetConvertedPath() const {
 
 bool LogFileReader::UpdateContainerInfo() {
     FileDiscoveryConfig discoveryConfig = FileServer::GetInstance()->GetFileDiscoveryConfig(mConfigName);
-    ContainerInfo* containerPath = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
-    if (containerPath && containerPath->mID != mContainerID) {
+    if (discoveryConfig.first == nullptr) {
+        return false;
+    }
+    ContainerInfo* containerInfo = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
+    if (containerInfo && containerInfo->mID != mContainerID) {
+        LOG_INFO(sLogger,
+                 ("container info of file reader changed", "may be because container restart")(
+                     "old container id", mContainerID)("new container id", containerInfo->mID)(
+                     "container status", containerInfo->mStopped ? "stopped" : "running"));
         // if config have wildcard path, use mWildcardPaths[0] as base path
         SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
                                                                          : discoveryConfig.first->GetBasePath(),
-                      containerPath->mRealBaseDir.size());
-        SetContainerID(containerPath->mID);
+                      containerInfo->mRealBaseDir.size());
+        SetContainerID(containerInfo->mID);
+        mContainerStopped = containerInfo->mStopped;
         mExtraTags.clear();
-        AddExtraTags(containerPath->mMetadatas);
-        AddExtraTags(containerPath->mTags);
+        AddExtraTags(containerInfo->mMetadatas);
+        AddExtraTags(containerInfo->mTags);
         return true;
     }
     return false;

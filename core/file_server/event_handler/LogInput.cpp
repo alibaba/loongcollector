@@ -320,8 +320,6 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
             string path = source;
             if (object.size() > 0)
                 path += PATH_SEPARATOR + object;
-            LOG_WARNING(sLogger,
-                        ("container stopped", "unregister all dir")("dir", path)("config", ev->GetConfigName()));
             dispatcher->StopAllDir(path, ev->GetConfigName(), ev->GetContainerID());
         } else {
             EventHandler* handler = dispatcher->GetHandler(source.c_str());

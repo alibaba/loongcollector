@@ -43,6 +43,13 @@ public:
     void TestHandleContainerStoppedEventWhenNotReadToEnd();
     void TestHandleModifyEventWhenContainerStopped();
     void TestRecoverReaderFromCheckpoint();
+    void TestHandleModifyEventWhenContainerRestartCase1();
+    void TestHandleModifyEventWhenContainerRestartCase2();
+    void TestHandleModifyEventWhenContainerRestartCase3();
+    void TestHandleModifyEventWhenContainerRestartCase4();
+    void TestHandleModifyEventWhenContainerRestartCase5();
+    void TestHandleModifyEventWhenContainerRestartCase6();
+    void TestHandleModifyEvnetWhenContainerStopTwice();
 
 protected:
     static void SetUpTestCase() {
@@ -106,6 +113,11 @@ protected:
 
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
+        discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+            [](ContainerInfo& containerInfo, const PipelineContext* ctx, const FileDiscoveryOptions* opts) {
+                containerInfo.mRealBaseDir = containerInfo.mUpperDir;
+                return true;
+            });
         mConfig = std::make_pair(&discoveryOpts, &ctx);
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
 
@@ -118,6 +130,7 @@ protected:
         mReaderPtr = std::make_shared<LogFileReader>(
             gRootDir, gLogName, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
         mReaderPtr->UpdateReaderManual();
+        mReaderPtr->SetContainerID("1");
         APSARA_TEST_TRUE_FATAL(mReaderPtr->CheckFileSignatureAndOffset(true));
 
         // build a modify handler
@@ -126,8 +139,15 @@ protected:
         mHandlerPtr->mNameReaderMap[gLogName] = readerPtrArray;
         mReaderPtr->SetReaderArray(&mHandlerPtr->mNameReaderMap[gLogName]);
         mHandlerPtr->mDevInodeReaderMap[mReaderPtr->mDevInode] = mReaderPtr;
+
+        auto containerInfo = std::make_shared<std::vector<ContainerInfo>>();
+        discoveryOpts.SetContainerInfo(containerInfo);
+        addContainerInfo("1");
     }
-    void TearDown() override { bfs::remove_all(gRootDir); }
+    void TearDown() override {
+        bfs::remove_all(gRootDir);
+        ProcessQueueManager::GetInstance()->Clear();
+    }
 
     static std::string gRootDir;
     static std::string gLogName;
@@ -148,6 +168,46 @@ private:
         writer << logContent;
         writer.close();
     }
+
+    void addContainerInfo(const std::string containerID) {
+        std::string errorMsg;
+        std::string containerStr = R"(
+        {
+            "ID": ")"
+            + containerID + R"(",
+            "Mounts": [
+                {
+                    "Source": ")"
+            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
+                    "Destination" : ")"
+            + gRootDir + PATH_SEPARATOR + gLogName + R"("
+                }
+            ],
+            "UpperDir": ")"
+            + gRootDir + R"(",
+            "LogPath": ")"
+            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
+            "MetaDatas": [
+                "_container_name_",
+                "test-container"
+            ],
+            "Path": ")"
+            + gRootDir + PATH_SEPARATOR + gLogName + R"("
+        }
+    )";
+        Json::Value containerJson;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
+        APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
+    }
+
+    void stopContainer(const std::string containerID) {
+        for (auto& containerInfo : *(discoveryOpts.mContainerInfos)) {
+            if (containerInfo.mID == containerID) {
+                containerInfo.mStopped = true;
+                break;
+            }
+        }
+    }
 };
 
 std::string ModifyHandlerUnittest::gRootDir;
@@ -157,6 +217,13 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToE
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase2);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase3);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase4);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase5);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));
@@ -167,6 +234,7 @@ void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
 
     // send event to close reader
     Event event2(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
+    event2.SetContainerID("1");
     mHandlerPtr->Handle(event2);
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
 }
@@ -177,6 +245,7 @@ void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenNotReadToEnd() {
 
     // send event to close reader
     Event event(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
+    event.SetContainerID("1");
     mHandlerPtr->Handle(event);
     APSARA_TEST_TRUE_FATAL(mReaderPtr->IsContainerStopped());
     APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
@@ -190,6 +259,7 @@ void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerStopped() {
     mReaderPtr->SetContainerStopped();
     // send event to read to end
     Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    event.SetContainerID("1");
     mHandlerPtr->Handle(event);
     APSARA_TEST_TRUE_FATAL(mReaderPtr->IsReadToEnd());
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
@@ -312,6 +382,121 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.dev, devInode.dev);
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.inode, devInode.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase1() {
+    // stop -> start -> modify
+    // stop
+    mReaderPtr->SetContainerStopped();
+    // start
+    addContainerInfo("2");
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase2() {
+    // stop -> modify -> start
+    // stop
+    mReaderPtr->SetContainerStopped();
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "1");
+    // start
+    addContainerInfo("2");
+
+    Event event2(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event2);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase3() {
+    // start -> modify -> stop
+    // start
+    addContainerInfo("2");
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "1");
+    // stop
+    mReaderPtr->SetContainerStopped();
+
+    Event event2(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event2);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase4() {
+    // start -> stop -> modify
+    // start
+    addContainerInfo("2");
+    // stop
+    mReaderPtr->SetContainerStopped();
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase5() {
+    // modify -> stop -> start
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    // stop
+    mReaderPtr->SetContainerStopped();
+    // start
+    addContainerInfo("2");
+
+    Event event2(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event2);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase6() {
+    // modify -> start -> stop
+    // modify
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    // start
+    addContainerInfo("2");
+    // stop
+    mReaderPtr->SetContainerStopped();
+
+    Event event2(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event2);
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestHandleModifyEvnetWhenContainerStopTwice() {
+    addContainerInfo("2");
+    stopContainer("1");
+    stopContainer("2");
+    mReaderPtr->SetContainerStopped();
+
+    Event event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
+    mHandlerPtr->Handle(event);
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
 }
 
 } // end of namespace logtail

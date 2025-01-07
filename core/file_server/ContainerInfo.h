@@ -48,6 +48,7 @@ struct ContainerInfo {
     std::vector<sls_logs::LogTag> mTags; // ContainerNameTag
     std::vector<sls_logs::LogTag> mMetadatas; // ExternalEnvTag and ExternalK8sLabelTag
     Json::Value mJson; // this obj's json, for saving to local file
+    bool mStopped = false; // whether this container is stopped
 
     static bool ParseByJSONObj(const Json::Value&, ContainerInfo&, std::string&);
     static bool ParseAllByJSONObj(const Json::Value&, std::unordered_map<std::string, ContainerInfo>&, std::string&);

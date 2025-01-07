@@ -244,8 +244,6 @@ void CreateModifyHandler::Handle(const Event& event) {
         mCreateHandlerPtr->Handle(event);
     } else if (event.IsContainerStopped() && isDir) {
         for (auto& pair : mModifyHandlerPtrMap) {
-            LOG_INFO(sLogger,
-                     ("pair config name", pair.second->GetConfigName())("event config name", event.GetConfigName()));
             if (pair.second->GetConfigName() == event.GetConfigName()) {
                 LOG_DEBUG(sLogger,
                           ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
@@ -793,14 +791,13 @@ void ModifyHandler::Handle(const Event& event) {
                     reader->CloseFilePtr();
                 } else if (reader->IsContainerStopped()) {
                     // update container info one more time, ensure file is hold by same cotnainer
-                    if (reader->UpdateContainerInfo()) {
-                        LOG_INFO(
-                            sLogger,
-                            ("close the file", "but file is reused by a new container")(
-                                "project", reader->GetProject())("logstore", reader->GetLogstore())(
-                                "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                                "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                                "file size", reader->GetFileSize())("container id", reader->GetContainerID()));
+                    if (reader->UpdateContainerInfo() && !reader->IsContainerStopped()) {
+                        LOG_INFO(sLogger,
+                                 ("file is reused by a new container", reader->GetContainerID())(
+                                     "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                     "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                     "file device", reader->GetDevInode().dev)(
+                                     "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
                     } else {
                         // release fd as quick as possible
                         LOG_INFO(sLogger,

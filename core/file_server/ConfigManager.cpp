@@ -1014,6 +1014,7 @@ void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
         Event* pStoppedEvent = new Event(iter->mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
         pStoppedEvent->SetConfigName(cmd->mConfigName);
         pStoppedEvent->SetContainerID(containerInfo.mID);
+        iter->mStopped = true;
         LOG_DEBUG(
             sLogger,
             ("GetContainerStoppedEvent Type", pStoppedEvent->GetType())("Source", pStoppedEvent->GetSource())(

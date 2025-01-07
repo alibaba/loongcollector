@@ -287,6 +287,7 @@ protected:
     friend class FuseFileUnittest;
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
+    friend class ModifyHandlerUnittest;
 
     void CleanEnviroments();
     int32_t GetInotifyWatcherCount();
