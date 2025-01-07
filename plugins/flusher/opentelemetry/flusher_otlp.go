@@ -49,7 +49,6 @@ type FlusherOTLP struct {
 	Traces  *helper.GrpcClientConfig `json:"Traces"`
 
 	converter    *converter.Converter
-	metadata     metadata.MD
 	context      pipeline.Context
 	logClient    *grpcClient[plogotlp.GRPCClient]
 	metricClient *grpcClient[pmetricotlp.GRPCClient]
