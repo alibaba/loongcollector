@@ -17,24 +17,25 @@
 #pragma once
 #include <sys/types.h>
 #if defined(__linux__)
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #endif
 #include <stddef.h>
 #include <time.h>
+
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
-#include "monitor/LogFileProfiler.h"
-#include "file_server/polling/PollingModify.h"
-#include "file_server/polling/PollingDirFile.h"
-#include "file_server/event_listener/EventListener.h"
+
 #include "checkpoint/CheckPointManager.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/event_listener/EventListener.h"
+#include "file_server/polling/PollingDirFile.h"
+#include "file_server/polling/PollingModify.h"
 namespace logtail {
 
 class TimeoutHandler;
@@ -99,7 +100,7 @@ public:
      *
      * @return true on success; on error false is returned
      */
-    bool RegisterEventHandler(const char* path, const FileDiscoveryConfig&, EventHandler*& handler);
+    bool RegisterEventHandler(const std::string& path, const FileDiscoveryConfig&, EventHandler*& handler);
 
     /** Unregister handler for path; If no handler registered for path, do nothing but return.
      * After this call, no event watched on this path any more.
@@ -109,7 +110,7 @@ public:
      * @param path for whom event handler will be removed.
      */
     // TODO see whether report errors
-    void UnregisterEventHandler(const char* path);
+    void UnregisterEventHandler(const std::string& path);
 
     /** Close handlers for path; If no handler registered for path, do nothing but return.
      *
@@ -134,7 +135,7 @@ public:
      *
      * @return true if registered, false if not
      */
-    bool IsRegistered(const char* path);
+    bool IsRegistered(const std::string& path);
 
     /** Test whether a directory is registered.
      *
@@ -184,11 +185,11 @@ public:
     //  * @return true on success; false on failure
     //  */
     // bool Dispatch();
-// #if defined(_MSC_VER)
-//     virtual void InitWindowsSignalObject() {}
-//     virtual void SyncWindowsSignalObject() {}
-//     virtual void ReleaseWindowsSignalObject() {}
-// #endif
+    // #if defined(_MSC_VER)
+    //     virtual void InitWindowsSignalObject() {}
+    //     virtual void SyncWindowsSignalObject() {}
+    //     virtual void ReleaseWindowsSignalObject() {}
+    // #endif
     // #if defined(__linux__)
     //     virtual void InitShennong() = 0;
     //     virtual void CheckShennong() = 0;
@@ -203,9 +204,10 @@ public:
     void CheckSymbolicLink();
 
     void DumpCheckPointPeriod(int32_t curTime);
+    void DumpCheckPoint();
 
     void StartTimeCount();
-    void PropagateTimeout(const char* path);
+    void PropagateTimeout(const std::string& path);
     void HandleTimeout();
 
     void ReadInotifyEvents(std::vector<Event*>& eventVec);
@@ -230,8 +232,8 @@ protected:
     /**
      * @return true on success; false if path isn't registered by RegisterEventHandler.
      */
-    bool AddTimeoutWatch(const char* path);
-    void AddExistedFileEvents(const char* path, int wd);
+    bool AddTimeoutWatch(const std::string& path);
+    void AddExistedFileEvents(const std::string& path, int wd);
 
     enum class ValidateCheckpointResult {
         kNormal,

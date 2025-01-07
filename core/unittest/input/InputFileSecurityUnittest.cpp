@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <variant>
+
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
-#include "ebpf/config.h"
-#include "plugin/input/InputFileSecurity.h"
+#include "ebpf/Config.h"
+#include "ebpf/eBPFServer.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/input/InputFileSecurity.h"
 #include "unittest/Unittest.h"
-#include "ebpf/eBPFServer.h"
 
 using namespace std;
 
@@ -85,9 +85,11 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    nami::SecurityFileFilter thisFilter1
+        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL("/etc", thisFilter1.mFilePathList[0]);
     APSARA_TEST_EQUAL("/bin", thisFilter1.mFilePathList[1]);
 
@@ -108,9 +110,11 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter2 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    nami::SecurityFileFilter thisFilter2
+        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter2.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter2.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter2.mFilePathList[2]);
@@ -134,9 +138,11 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    nami::SecurityFileFilter thisFilter
+        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(0, thisFilter.mFilePathList.size());
 
     // invalid optional param
@@ -155,9 +161,11 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    nami::SecurityFileFilter thisFilter1
+        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(0, thisFilter1.mFilePathList.size());
 
     // lose mandatory param
@@ -172,6 +180,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
@@ -198,9 +207,11 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+    string serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
 }
@@ -225,9 +236,11 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
     input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+    string serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(false));
@@ -239,7 +252,7 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
 }
 
 UNIT_TEST_CASE(InputFileSecurityUnittest, TestName)
-UNIT_TEST_CASE(InputFileSecurityUnittest, TestSupportAck)   
+UNIT_TEST_CASE(InputFileSecurityUnittest, TestSupportAck)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStart)

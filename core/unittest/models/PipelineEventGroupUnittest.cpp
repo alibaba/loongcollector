@@ -15,15 +15,23 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
+#include "models/EventPool.h"
 #include "models/PipelineEventGroup.h"
+#include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
+
+using namespace std;
 
 namespace logtail {
 
 class PipelineEventGroupUnittest : public ::testing::Test {
 public:
+    void TestCreateEvent();
+    void TestAddEvent();
     void TestSwapEvents();
+    void TestReserveEvents();
     void TestCopy();
+    void TestDestructor();
     void TestSetMetadata();
     void TestDelMetadata();
     void TestFromJsonToJson();
@@ -34,19 +42,169 @@ protected:
         mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
     }
 
+    void TearDown() override {
+        mEventGroup.reset();
+        mPool.Clear();
+        gThreadedEventPool.Clear();
+    }
+
 private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     std::unique_ptr<PipelineEventGroup> mEventGroup;
+    EventPool mPool;
 };
+
+void PipelineEventGroupUnittest::TestCreateEvent() {
+    {
+        auto logEvent = mEventGroup->CreateLogEvent();
+        auto metricEvent = mEventGroup->CreateMetricEvent();
+        auto spanEvent = mEventGroup->CreateSpanEvent();
+        auto rawEvent = mEventGroup->CreateRawEvent();
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+    {
+        auto logEvent = mEventGroup->CreateLogEvent(true);
+        auto metricEvent = mEventGroup->CreateMetricEvent(true);
+        auto spanEvent = mEventGroup->CreateSpanEvent(true);
+        auto rawEvent = mEventGroup->CreateRawEvent(true);
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+    {
+        auto logEvent = mEventGroup->CreateLogEvent(true, &mPool);
+        auto metricEvent = mEventGroup->CreateMetricEvent(true, &mPool);
+        auto spanEvent = mEventGroup->CreateSpanEvent(true, &mPool);
+        auto rawEvent = mEventGroup->CreateRawEvent(true, &mPool);
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+}
+
+void PipelineEventGroupUnittest::TestAddEvent() {
+    {
+        auto logEvent = mEventGroup->AddLogEvent();
+        auto metricEvent = mEventGroup->AddMetricEvent();
+        auto spanEvent = mEventGroup->AddSpanEvent();
+        auto rawEvent = mEventGroup->AddRawEvent();
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+    {
+        auto logEvent = mEventGroup->AddLogEvent(true);
+        auto metricEvent = mEventGroup->AddMetricEvent(true);
+        auto spanEvent = mEventGroup->AddSpanEvent(true);
+        auto rawEvent = mEventGroup->AddRawEvent(true);
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+    {
+        auto logEvent = mEventGroup->AddLogEvent(true, &mPool);
+        auto metricEvent = mEventGroup->AddMetricEvent(true, &mPool);
+        auto spanEvent = mEventGroup->AddSpanEvent(true, &mPool);
+        auto rawEvent = mEventGroup->AddRawEvent(true, &mPool);
+        APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
+    }
+}
 
 void PipelineEventGroupUnittest::TestSwapEvents() {
     mEventGroup->AddLogEvent();
     mEventGroup->AddMetricEvent();
     mEventGroup->AddSpanEvent();
+    mEventGroup->AddRawEvent();
     EventsContainer eventContainer;
     mEventGroup->SwapEvents(eventContainer);
-    APSARA_TEST_EQUAL_FATAL(3U, eventContainer.size());
+    APSARA_TEST_EQUAL_FATAL(4U, eventContainer.size());
     APSARA_TEST_EQUAL_FATAL(0U, mEventGroup->GetEvents().size());
+}
+
+void PipelineEventGroupUnittest::TestDestructor() {
+    LogEvent* log = nullptr;
+    MetricEvent* metric = nullptr;
+    SpanEvent* span = nullptr;
+    RawEvent* raw = nullptr;
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        log = g.AddLogEvent(true);
+        log->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mLogEventPool.size());
+    APSARA_TEST_EQUAL(log, gThreadedEventPool.mLogEventPool.back());
+    APSARA_TEST_EQUAL(0, log->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        metric = g.AddMetricEvent(true);
+        metric->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mMetricEventPool.size());
+    APSARA_TEST_EQUAL(metric, gThreadedEventPool.mMetricEventPool.back());
+    APSARA_TEST_EQUAL(0, metric->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        span = g.AddSpanEvent(true);
+        span->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mSpanEventPool.size());
+    APSARA_TEST_EQUAL(span, gThreadedEventPool.mSpanEventPool.back());
+    APSARA_TEST_EQUAL(0, span->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        raw = g.AddRawEvent(true);
+        raw->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mRawEventPool.size());
+    APSARA_TEST_EQUAL(raw, gThreadedEventPool.mRawEventPool.back());
+    APSARA_TEST_EQUAL(0, raw->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        log = g.AddLogEvent(true, &mPool);
+        log->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, mPool.mLogEventPoolBak.size());
+    APSARA_TEST_EQUAL(log, mPool.mLogEventPoolBak.back());
+    APSARA_TEST_EQUAL(0, log->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        metric = g.AddMetricEvent(true, &mPool);
+        metric->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, mPool.mMetricEventPoolBak.size());
+    APSARA_TEST_EQUAL(metric, mPool.mMetricEventPoolBak.back());
+    APSARA_TEST_EQUAL(0, metric->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        span = g.AddSpanEvent(true, &mPool);
+        span->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, mPool.mSpanEventPoolBak.size());
+    APSARA_TEST_EQUAL(span, mPool.mSpanEventPoolBak.back());
+    APSARA_TEST_EQUAL(0, span->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        raw = g.AddRawEvent(true, &mPool);
+        raw->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, mPool.mRawEventPoolBak.size());
+    APSARA_TEST_EQUAL(raw, mPool.mRawEventPoolBak.back());
+    APSARA_TEST_EQUAL(0, raw->GetTimestamp());
+}
+
+void PipelineEventGroupUnittest::TestReserveEvents() {
+    mEventGroup->ReserveEvents(10);
+    APSARA_TEST_EQUAL(10U, mEventGroup->GetEvents().capacity());
 }
 
 void PipelineEventGroupUnittest::TestCopy() {
@@ -135,8 +293,12 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
 }
 
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestCreateEvent)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestAddEvent)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSwapEvents)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestReserveEvents)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestCopy)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDestructor)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSetMetadata)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDelMetadata)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestFromJsonToJson)

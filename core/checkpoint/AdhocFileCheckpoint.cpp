@@ -15,6 +15,7 @@
  */
 
 #include "AdhocFileCheckpoint.h"
+
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -49,4 +50,4 @@ FileReadStatus GetStatusFromString(std::string statusStr) {
     }
 }
 
-}
+} // namespace logtail

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -107,4 +108,49 @@ func TestTimerSend(t *testing.T) {
 			return
 		}
 	}
+}
+
+func TestFilter(t *testing.T) {
+	eventCh := make(chan *K8sMetaEvent)
+	stopCh := make(chan struct{})
+	gracePeriod := 1
+	cache := NewDeferredDeletionMetaStore(eventCh, stopCh, int64(gracePeriod), cache.MetaNamespaceKeyFunc)
+	cache.Items["default/test"] = &ObjectWrapper{
+		Raw: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Labels: map[string]string{
+					"app": "test",
+				},
+			},
+		},
+	}
+	cache.Items["default/test2"] = &ObjectWrapper{
+		Raw: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test2",
+				Namespace: "default",
+				Labels: map[string]string{
+					"app": "test2",
+				},
+			},
+		},
+	}
+	cache.Items["default/test3"] = &ObjectWrapper{
+		Raw: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test3",
+				Namespace: "default",
+				Labels: map[string]string{
+					"app": "test2",
+				},
+			},
+		},
+	}
+	objs := cache.Filter(func(obj *ObjectWrapper) bool {
+		return obj.Raw.(*corev1.Pod).Labels["app"] == "test2"
+	}, 1)
+	assert.Len(t, objs, 1)
+	assert.Equal(t, "test2", objs[0].Raw.(*corev1.Pod).Labels["app"])
 }

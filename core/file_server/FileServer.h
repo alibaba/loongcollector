@@ -25,8 +25,8 @@
 #include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
-#include "monitor/LogtailMetric.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "pipeline/PipelineContext.h"
 
 

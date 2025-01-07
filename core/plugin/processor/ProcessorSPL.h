@@ -16,12 +16,10 @@
 
 #include <string>
 
-#include "monitor/LogtailMetric.h"
-#include "pipeline/plugin/interface/Processor.h"
+#include "spl/LoongCollectorSplPipeline.h"
 
-namespace apsara::sls::spl {
-class SplPipeline;
-}
+#include "monitor/MetricManager.h"
+#include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
 
@@ -33,7 +31,7 @@ public:
     // Source field name.
     std::string mSpl;
     uint32_t mTimeoutMills = 1000;
-    uint32_t mMaxMemoryBytes = 50*1024*1024;
+    uint32_t mMaxMemoryBytes = 50 * 1024 * 1024;
 
     bool Init(const Json::Value& config) override;
     void Process(std::vector<PipelineEventGroup>& logGroupList) override;
@@ -43,7 +41,7 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    std::shared_ptr<apsara::sls::spl::SplPipeline> mSPLPipelinePtr;
+    std::shared_ptr<LoongCollectorSplPipeline> mSPLPipelinePtr;
 
     CounterPtr mSplExcuteErrorCount;
     CounterPtr mSplExcuteTimeoutErrorCount;

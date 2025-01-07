@@ -33,6 +33,7 @@ type ServiceMock struct {
 	Index         int64
 	LogsPerSecond int
 	MaxLogCount   int
+	Block         bool
 	nowLogCount   int
 	context       pipeline.Context
 }
@@ -66,6 +67,18 @@ func (p *ServiceMock) Start(c pipeline.Collector) error {
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
 	for {
+		for {
+			if p.Block {
+				time.Sleep(time.Millisecond * 100)
+				continue
+			}
+			select {
+			case <-p.shutdown:
+				return nil
+			default:
+			}
+			break
+		}
 		beginTime := time.Now()
 		for i := 0; i < p.LogsPerSecond; i++ {
 			p.MockOneLog(c)

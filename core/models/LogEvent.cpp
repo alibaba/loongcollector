@@ -27,6 +27,15 @@ unique_ptr<PipelineEvent> LogEvent::Copy() const {
     return make_unique<LogEvent>(*this);
 }
 
+void LogEvent::Reset() {
+    PipelineEvent::Reset();
+    mContents.clear();
+    mIndex.clear();
+    mAllocatedContentSize = 0;
+    mFileOffset = 0;
+    mRawSize = 0;
+}
+
 StringView LogEvent::GetContent(StringView key) const {
     auto it = mIndex.find(key);
     if (it != mIndex.end()) {
@@ -56,15 +65,15 @@ void LogEvent::SetContentNoCopy(const StringBuffer& key, const StringBuffer& val
 }
 
 void LogEvent::SetContentNoCopy(StringView key, StringView val) {
-    auto it = mIndex.find(key);
-    if (it != mIndex.end()) {
+    auto rst = mIndex.insert(make_pair(key, mContents.size()));
+    if (!rst.second) {
+        auto& it = rst.first;
         auto& field = mContents[it->second].first;
         mAllocatedContentSize += key.size() + val.size() - field.first.size() - field.second.size();
         field = make_pair(key, val);
     } else {
         mAllocatedContentSize += key.size() + val.size();
         mContents.emplace_back(make_pair(key, val), true);
-        mIndex[key] = mContents.size() - 1;
     }
 }
 
@@ -76,6 +85,11 @@ void LogEvent::DelContent(StringView key) {
         mContents[it->second].second = false;
         mIndex.erase(it);
     }
+}
+
+void LogEvent::SetLevel(const std::string& level) {
+    const StringBuffer& b = GetSourceBuffer()->CopyString(level);
+    mLevel = StringView(b.data, b.size);
 }
 
 LogEvent::ContentIterator LogEvent::FindContent(StringView key) {

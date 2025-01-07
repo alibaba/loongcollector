@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <vector>
+
+#include "json/json.h"
 
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "pipeline/plugin/interface/Plugin.h"

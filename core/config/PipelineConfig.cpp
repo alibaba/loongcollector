@@ -16,12 +16,11 @@
 
 #include <string>
 
+#include "boost/regex.hpp"
+
 #include "app_config/AppConfig.h"
-#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
-#include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
-#include "common/YamlUtil.h"
 #include "pipeline/plugin/PluginRegistry.h"
 
 DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration", false);
@@ -103,7 +102,7 @@ bool PipelineConfig::Parse() {
 
     string key, errorMsg;
     const Json::Value* itr = nullptr;
-    LogtailAlarm& alarm = *LogtailAlarm::GetInstance();
+    AlarmManager& alarm = *AlarmManager::GetInstance();
     // to send alarm and init MetricsRecord, project, logstore and region should be extracted first.
     key = "flushers";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
@@ -138,7 +137,6 @@ bool PipelineConfig::Parse() {
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
-    bool hasObserverInput = false;
     bool hasFileInput = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
@@ -195,6 +193,20 @@ bool PipelineConfig::Parse() {
                                mRegion);
         }
         const string pluginType = it->asString();
+        // when input is singleton, there should only one input to simpify config load transaction
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType)) {
+            mSingletonInput = pluginType;
+            if (itr->size() > 1) {
+                PARAM_ERROR_RETURN(sLogger,
+                                   alarm,
+                                   "more than 1 input plugin is given when global singleton input plugin is used",
+                                   noModule,
+                                   mName,
+                                   mProject,
+                                   mLogstore,
+                                   mRegion);
+            }
+        }
         if (i == 0) {
             if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
@@ -236,19 +248,23 @@ bool PipelineConfig::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+#ifndef APSARA_UNIT_TEST_MAIN
         // TODO: remove these special restrictions
-        if (pluginType == "input_observer_network") {
-            hasObserverInput = true;
-        } else if (pluginType == "input_file" || pluginType == "input_container_stdio") {
+        if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
         }
+#else
+        // TODO: remove these special restrictions after all C++ inputs support Go processors
+        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos) {
+            hasFileInput = true;
+        }
+#endif
     }
     // TODO: remove these special restrictions
-    bool hasSpecialInput = hasObserverInput || hasFileInput;
-    if (hasSpecialInput && (*mDetail)["inputs"].size() > 1) {
+    if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
-                           "more than 1 input_file or input_container_stdio plugin is given",
+                           "more than 1 input_file or input_container_stdio is given",
                            noModule,
                            mName,
                            mProject,
@@ -331,7 +347,7 @@ bool PipelineConfig::Parse() {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
-                        if (!hasObserverInput && !hasFileInput) {
+                        if (!hasFileInput) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
                                                "extended processor plugins coexist with native input plugins other "
@@ -364,18 +380,8 @@ bool PipelineConfig::Parse() {
                                                mLogstore,
                                                mRegion);
                         }
+                        mHasNativeProcessor = true;
                     } else {
-                        // TODO: remove these special restrictions
-                        if (hasObserverInput) {
-                            PARAM_ERROR_RETURN(sLogger,
-                                               alarm,
-                                               "native processor plugins coexist with input_observer_network",
-                                               noModule,
-                                               mName,
-                                               mProject,
-                                               mLogstore,
-                                               mRegion);
-                        }
                         mHasNativeProcessor = true;
                     }
                 } else {
@@ -470,7 +476,7 @@ bool PipelineConfig::Parse() {
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
-            if (mHasNativeInput && !hasFileInput && !hasObserverInput) {
+            if (mHasNativeInput && !hasFileInput) {
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
                                    "extended flusher plugins coexist with native input plugins other than "
@@ -533,7 +539,9 @@ bool PipelineConfig::Parse() {
             }
             mRouter.emplace_back(i, itr);
         } else {
-            mRouter.emplace_back(i, nullptr);
+            if (!IsFlushingThroughGoPipelineExisted()) {
+                mRouter.emplace_back(i, nullptr);
+            }
         }
     }
 
@@ -680,59 +688,6 @@ bool PipelineConfig::ReplaceEnvVar() {
     bool res = false;
     ReplaceEnvVarRef(*mDetail, res);
     return res;
-}
-
-bool LoadConfigDetailFromFile(const filesystem::path& filepath, Json::Value& detail) {
-    const string& ext = filepath.extension().string();
-    if (ext != ".yaml" && ext != ".yml" && ext != ".json") {
-        LOG_WARNING(sLogger, ("unsupported config file format", "skip current object")("filepath", filepath));
-        return false;
-    }
-    string content;
-    if (!ReadFile(filepath.string(), content)) {
-        LOG_WARNING(sLogger, ("failed to open config file", "skip current object")("filepath", filepath));
-        return false;
-    }
-    if (content.empty()) {
-        LOG_WARNING(sLogger, ("empty config file", "skip current object")("filepath", filepath));
-        return false;
-    }
-    string errorMsg;
-    if (!ParseConfigDetail(content, ext, detail, errorMsg)) {
-        LOG_WARNING(sLogger,
-                    ("config file format error", "skip current object")("error msg", errorMsg)("filepath", filepath));
-        return false;
-    }
-    return true;
-}
-
-bool ParseConfigDetail(const string& content, const string& extension, Json::Value& detail, string& errorMsg) {
-    if (extension == ".json") {
-        return ParseJsonTable(content, detail, errorMsg);
-    } else if (extension == ".yaml" || extension == ".yml") {
-        YAML::Node yamlRoot;
-        if (!ParseYamlTable(content, yamlRoot, errorMsg)) {
-            return false;
-        }
-        detail = ConvertYamlToJson(yamlRoot);
-        return true;
-    }
-    return false;
-}
-
-bool IsConfigEnabled(const string& name, const Json::Value& detail) {
-    const char* key = "enable";
-    const Json::Value* itr = detail.find(key, key + strlen(key));
-    if (itr != nullptr) {
-        if (!itr->isBool()) {
-            LOG_WARNING(sLogger,
-                        ("problem encountered in config parsing",
-                         "param enable is not of type bool")("action", "ignore the config")("config", name));
-            return false;
-        }
-        return itr->asBool();
-    }
-    return true;
 }
 
 } // namespace logtail

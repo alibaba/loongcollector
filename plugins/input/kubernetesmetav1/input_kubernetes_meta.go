@@ -45,7 +45,6 @@ type InputKubernetesMeta struct {
 	DaemonSet             bool
 	StatefulSet           bool
 	Configmap             bool
-	Secret                bool
 	Job                   bool
 	CronJob               bool
 	Namespace             bool
@@ -183,9 +182,6 @@ func (in *InputKubernetesMeta) addInformerListerCollectors() {
 	if in.Configmap {
 		in.collectors = append(in.collectors, newCollector(Configmap, in.informerFactory.Core().V1().ConfigMaps().Lister(), in.collectConfigmaps))
 	}
-	if in.Secret {
-		in.collectors = append(in.collectors, newCollector(Secret, in.informerFactory.Core().V1().Secrets().Lister(), in.collectSecrets))
-	}
 }
 
 func (in *InputKubernetesMeta) Description() string {
@@ -262,7 +258,6 @@ func init() {
 			CronJob:               true,
 			Namespace:             true,
 			Configmap:             true,
-			Secret:                true,
 			IntervalMs:            defaultIntervalMs,
 		}
 	}

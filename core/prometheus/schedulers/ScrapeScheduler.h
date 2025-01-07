@@ -21,12 +21,10 @@
 
 #include "BaseScheduler.h"
 #include "common/http/HttpResponse.h"
-#include "common/timer/Timer.h"
-#include "models/PipelineEventGroup.h"
-#include "monitor/LoongCollectorMetricTypes.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
-#include "prometheus/labels/TextParser.h"
+#include "prometheus/component/StreamScraper.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -43,13 +41,14 @@ public:
                     Labels labels,
                     QueueKey queueKey,
                     size_t inputIndex);
-    ScrapeScheduler(const ScrapeScheduler&) = default;
+    ScrapeScheduler(const ScrapeScheduler&) = delete;
     ~ScrapeScheduler() override = default;
 
-    void OnMetricResult(const HttpResponse&, uint64_t timestampMilliSec);
-    void SetTimer(std::shared_ptr<Timer> timer);
+    void OnMetricResult(HttpResponse&, uint64_t timestampMilliSec);
 
     std::string GetId() const;
+
+    void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
 
     void ScheduleNext() override;
     void ScrapeOnce(std::chrono::steady_clock::time_point execTime);
@@ -57,27 +56,18 @@ public:
     void InitSelfMonitor(const MetricLabels&);
 
 private:
-    void PushEventGroup(PipelineEventGroup&&);
-    void SetAutoMetricMeta(PipelineEventGroup& eGroup);
-    void SetTargetLabels(PipelineEventGroup& eGroup);
-
-    PipelineEventGroup BuildPipelineEventGroup(const std::string& content);
-
     std::unique_ptr<TimerEvent> BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime);
 
-    std::shared_ptr<ScrapeConfig> mScrapeConfigPtr;
+    prom::StreamScraper mPromStreamScraper;
 
+    std::shared_ptr<ScrapeConfig> mScrapeConfigPtr;
     std::string mHash;
     std::string mHost;
     int32_t mPort;
     std::string mInstance;
-    Labels mTargetLabels;
 
-    std::unique_ptr<TextParser> mParser;
-
+    // pipeline
     QueueKey mQueueKey;
-    size_t mInputIndex;
-    std::shared_ptr<Timer> mTimer;
 
     // auto metrics
     uint64_t mScrapeTimestampMilliSec = 0;
@@ -93,7 +83,6 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParsePrometheusMetricUnittest;
     friend class ScrapeSchedulerUnittest;
-    std::vector<std::shared_ptr<ProcessQueueItem>> mItem;
 #endif
 };
 

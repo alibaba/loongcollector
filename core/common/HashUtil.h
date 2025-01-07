@@ -16,6 +16,7 @@
 
 #pragma once
 #include <cstdint>
+
 #include <string>
 
 // Hash and file signature utility.
@@ -24,6 +25,7 @@ namespace logtail {
 // Hash(string(@poolIn, @inputBytesNum)) => @md5.
 // TODO: Same implementation in sdk module, merge them.
 void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16]);
+std::string CalcMD5(const std::string& message);
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);
 bool CheckAndUpdateSignature(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);

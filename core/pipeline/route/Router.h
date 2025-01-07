@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <optional>
 #include <vector>
 
+#include "json/json.h"
+
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/route/Condition.h"
 
 namespace logtail {
@@ -32,7 +32,7 @@ class Flusher;
 class Router {
 public:
     bool Init(std::vector<std::pair<size_t, const Json::Value*>> config, const PipelineContext& ctx);
-    std::vector<size_t> Route(const PipelineEventGroup& g) const;
+    std::vector<std::pair<size_t, PipelineEventGroup>> Route(PipelineEventGroup& g) const;
 
 private:
     std::vector<std::pair<size_t, Condition>> mConditions;

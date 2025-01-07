@@ -21,7 +21,7 @@
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
-#include "common/ParamExtractor.h"
+#include "monitor/Monitor.h"
 #include "pipeline/Pipeline.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
@@ -67,11 +67,11 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
         return;
     }
 
-    addTagIfRequired(logGroup, "HOST_NAME", TagKeyDefaultValue[TagKey::HOST_NAME], LogFileProfiler::mHostname);
-#ifndef __ENTERPRISE__
-    addTagIfRequired(logGroup, "HOST_IP", HOST_IP_DEFAULT_KEY, LogFileProfiler::mIpAddr);
-#endif
-
+    // process level
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LoongCollectorMonitor::mHostname);
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+    auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {

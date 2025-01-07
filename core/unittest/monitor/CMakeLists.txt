@@ -13,14 +13,18 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.22)
-project(logtail_metric_unittest)
+project(metric_manager_unittest)
 
-add_executable(logtail_metric_unittest LogtailMetricUnittest.cpp)
-target_link_libraries(logtail_metric_unittest ${UT_BASE_TARGET})
+add_executable(metric_manager_unittest MetricManagerUnittest.cpp)
+target_link_libraries(metric_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(plugin_metric_manager_unittest PluginMetricManagerUnittest.cpp)
 target_link_libraries(plugin_metric_manager_unittest ${UT_BASE_TARGET})
 
+add_executable(self_monitor_metric_event_unittest SelfMonitorMetricEventUnittest.cpp)
+target_link_libraries(self_monitor_metric_event_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
-gtest_discover_tests(logtail_metric_unittest)
+gtest_discover_tests(metric_manager_unittest)
 gtest_discover_tests(plugin_metric_manager_unittest)
+gtest_discover_tests(self_monitor_metric_event_unittest)

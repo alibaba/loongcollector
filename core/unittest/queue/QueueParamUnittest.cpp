@@ -37,6 +37,18 @@ void BoundedQueueParamUnittest::TestInit() {
         APSARA_TEST_EQUAL(param.GetHighWatermark(), 1U);
         APSARA_TEST_EQUAL(param.GetLowWatermark(), 0U);
     }
+    {
+        BoundedQueueParam param(100, 0.5);
+        APSARA_TEST_EQUAL(param.GetCapacity(), 100U);
+        APSARA_TEST_EQUAL(param.GetHighWatermark(), 100U);
+        APSARA_TEST_EQUAL(param.GetLowWatermark(), 50U);
+    }
+    {
+        BoundedQueueParam param(0, 1.0);
+        APSARA_TEST_EQUAL(param.GetCapacity(), 1U);
+        APSARA_TEST_EQUAL(param.GetHighWatermark(), 1U);
+        APSARA_TEST_EQUAL(param.GetLowWatermark(), 0U);
+    }
 }
 
 UNIT_TEST_CASE(BoundedQueueParamUnittest, TestInit)

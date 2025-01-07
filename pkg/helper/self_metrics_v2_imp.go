@@ -109,6 +109,10 @@ func (c *cumulativeCounterImp) Export() map[string]string {
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
+func (c *cumulativeCounterImp) Type() pipeline.SelfMetricType {
+	return pipeline.CounterType
+}
+
 // delta is a counter metric that can be incremented or decremented.
 // It gets the increased value in the last window.
 type counterImp struct {
@@ -146,6 +150,10 @@ func (c *counterImp) Export() map[string]string {
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
+func (c *counterImp) Type() pipeline.SelfMetricType {
+	return pipeline.CounterType
+}
+
 // gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
 type gaugeImp struct {
 	value float64
@@ -179,6 +187,10 @@ func (g *gaugeImp) Serialize(log *protocol.Log) {
 func (g *gaugeImp) Export() map[string]string {
 	metricValue := g.Collect()
 	return g.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (g *gaugeImp) Type() pipeline.SelfMetricType {
+	return pipeline.GaugeType
 }
 
 // averageImp is a metric to compute the average value of a series of values in the last window.
@@ -234,6 +246,10 @@ func (a *averageImp) Export() map[string]string {
 	return a.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
+func (a *averageImp) Type() pipeline.SelfMetricType {
+	return pipeline.GaugeType
+}
+
 // maxImp is a metric to compute the max value of a series of values in the last window.
 // if there is no value added in the last window, zero will be returned.
 type maxImp struct {
@@ -268,6 +284,10 @@ func (m *maxImp) Collect() pipeline.MetricValue[float64] {
 func (m *maxImp) Export() map[string]string {
 	metricValue := m.Collect()
 	return m.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (m *maxImp) Type() pipeline.SelfMetricType {
+	return pipeline.GaugeType
 }
 
 // latencyImp is a metric to compute the average latency of a series of values in the last window.
@@ -324,6 +344,10 @@ func (l *latencyImp) Export() map[string]string {
 	return l.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value/1000, 'f', 4, 64)) // ns to us
 }
 
+func (l *latencyImp) Type() pipeline.SelfMetricType {
+	return pipeline.GaugeType
+}
+
 // strMetricImp is a metric that represents a single string value.
 type strMetricImp struct {
 	sync.RWMutex
@@ -364,6 +388,10 @@ func (s *strMetricImp) Serialize(log *protocol.Log) {
 func (s *strMetricImp) Export() map[string]string {
 	metricValue := s.Collect()
 	return s.Series.Export(metricValue.Name, metricValue.Value)
+}
+
+func (s *strMetricImp) Type() pipeline.SelfMetricType {
+	return pipeline.GaugeType
 }
 
 type Series struct {
@@ -440,9 +468,14 @@ func (e *errorNumericMetric) Export() map[string]string {
 	return nil
 }
 
+func (e *errorNumericMetric) Type() pipeline.SelfMetricType {
+	return pipeline.CounterType
+}
+
 func (e *errorNumericMetric) Collect() pipeline.MetricValue[float64] {
 	return pipeline.MetricValue[float64]{Name: "", Value: 0}
 }
+
 func (e *errorNumericMetric) Clear() {}
 
 func newErrorNumericMetric(err error) *errorNumericMetric {

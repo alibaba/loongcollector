@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "PluginRegistry.h"
 #include "app_config/AppConfig.h"
@@ -50,9 +50,7 @@ protected:
         ctx.SetConfigName("test_config");
         ctx.SetPipeline(p);
     }
-    static void TearDownTestCase() {
-        PluginRegistry::GetInstance()->UnloadPlugins();
-    }
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
 private:
     Pipeline p;

@@ -21,9 +21,7 @@
 #include <mutex>
 #include <string>
 
-#include "LogtailMetric.h"
-#include "MetricConstants.h"
-#include "MetricStore.h"
+#include "MetricManager.h"
 
 #if defined(_MSC_VER)
 #include <Windows.h>
@@ -78,7 +76,7 @@ struct OsCpuStat {
     }
 };
 
-class LogtailMonitor : public MetricStore {
+class LogtailMonitor {
 public:
     LogtailMonitor(const LogtailMonitor&) = delete;
     LogtailMonitor& operator=(const LogtailMonitor&) = delete;
@@ -124,9 +122,6 @@ private:
     //   several seconds after calling this method and before _exit(1).
     bool SendStatusProfile(bool suicide);
 
-    // DumpToLocal dumps the @logGroup to local status log.
-    void DumpToLocal(const sls_logs::LogGroup& logGroup);
-
     // DumpMonitorInfo dumps simple monitor information to local.
     bool DumpMonitorInfo(time_t monitorTime);
 
@@ -162,10 +157,8 @@ private:
     CpuStat mRealtimeCpuStat;
     // Use to calculate CPU limit, updated regularly (30s by default).
     CpuStat mCpuStat;
-    DoubleGaugePtr mAgentCpuGauge;
     // Memory usage statistics.
     MemStat mMemStat;
-    IntGaugePtr mAgentMemoryGauge;
 
     // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
     float mScaledCpuUsageUpLimit;
@@ -194,17 +187,41 @@ public:
     void Init();
     void Stop();
 
-    CounterPtr GetCounter(std::string key);
-    IntGaugePtr GetIntGauge(std::string key);
-    DoubleGaugePtr GetDoubleGauge(std::string key);
+    void SetAgentCpu(double cpu) { mAgentCpu->Set(cpu); }
+    void SetAgentMemory(uint64_t mem) { mAgentMemory->Set(mem); }
+    void SetAgentGoMemory(uint64_t mem) { mAgentGoMemory->Set(mem); }
+    void SetAgentGoRoutinesTotal(uint64_t total) { mAgentGoRoutinesTotal->Set(total); }
+    void SetAgentOpenFdTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentOpenFdTotal->Set(total);
+#endif
+    }
+    void SetAgentConfigTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentConfigTotal->Set(total);
+#endif
+    }
+
+    static std::string mHostname;
+    static std::string mIpAddr;
+    static std::string mOsDetail;
+    static std::string mUsername;
+    static int32_t mSystemBootTime;
+    static std::string mStartTime;
 
 private:
+    LoongCollectorMonitor();
+    ~LoongCollectorMonitor();
+
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;
-    // metrics
-    std::unordered_map<std::string, CounterPtr> mCounters;
-    std::unordered_map<std::string, IntGaugePtr> mIntGauges;
-    std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
+
+    DoubleGaugePtr mAgentCpu;
+    IntGaugePtr mAgentMemory;
+    IntGaugePtr mAgentGoMemory;
+    IntGaugePtr mAgentGoRoutinesTotal;
+    IntGaugePtr mAgentOpenFdTotal;
+    IntGaugePtr mAgentConfigTotal;
 };
 
 } // namespace logtail

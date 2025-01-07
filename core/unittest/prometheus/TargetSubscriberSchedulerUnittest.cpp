@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include <json/json.h>
-
 #include <iostream>
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "common/JsonUtil.h"
 #include "prometheus/labels/Labels.h"
@@ -34,6 +34,7 @@ public:
     void OnInitScrapeJobEvent();
     void TestProcess();
     void TestParseTargetGroups();
+    void TestBuildScrapeSchedulerSet();
 
 protected:
     void SetUp() override {
@@ -73,9 +74,9 @@ protected:
             std::cerr << "JSON parsing failed." << std::endl;
         }
 
-        mHttpResponse.mStatusCode = 200;
+        mHttpResponse.SetStatusCode(200);
         {
-            mHttpResponse.mBody = R"JSON([
+            *mHttpResponse.GetBody<string>() = R"JSON([
         {
             "targets": [
                 "192.168.22.7:8080"
@@ -125,6 +126,25 @@ protected:
                 "__meta_kubernetes_service_labelpresent_component": "true",
                 "__meta_kubernetes_endpoint_ready": "true"
             }
+        },
+        {
+            "targets": [
+                "192.168.22.33:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.33:6443",
+                "__meta_kubernetes_endpoint_port_protocol": "TCP",
+                "__meta_kubernetes_service_label_provider": "kubernetes",
+                "__meta_kubernetes_endpoints_name": "kubernetes",
+                "__meta_kubernetes_service_name": "kubernetes",
+                "__meta_kubernetes_endpoints_labelpresent_endpointslice_kubernetes_io_skip_mirror": "true",
+                "__meta_kubernetes_service_labelpresent_provider": "true",
+                "__meta_kubernetes_endpoint_port_name": "https",
+                "__meta_kubernetes_namespace": "default",
+                "__meta_kubernetes_service_label_component": "apiserver",
+                "__meta_kubernetes_service_labelpresent_component": "true",
+                "__meta_kubernetes_endpoint_ready": "true"
+            }
         }
     ])JSON";
         }
@@ -153,14 +173,14 @@ void TargetSubscriberSchedulerUnittest::TestProcess() {
     targetSubscriber->InitSelfMonitor(metricLabels);
 
     // if status code is not 200
-    mHttpResponse.mStatusCode = 404;
+    mHttpResponse.SetStatusCode(404);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(0UL, targetSubscriber->mScrapeSchedulerMap.size());
 
     // if status code is 200
-    mHttpResponse.mStatusCode = 200;
+    mHttpResponse.SetStatusCode(200);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
-    APSARA_TEST_EQUAL(2UL, targetSubscriber->mScrapeSchedulerMap.size());
+    APSARA_TEST_EQUAL(3UL, targetSubscriber->mScrapeSchedulerMap.size());
 }
 
 void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
@@ -168,13 +188,37 @@ void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
 
     std::vector<Labels> newScrapeSchedulerSet;
-    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(mHttpResponse.mBody, newScrapeSchedulerSet));
-    APSARA_TEST_EQUAL(2UL, newScrapeSchedulerSet.size());
+    APSARA_TEST_TRUE(
+        targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
+    APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
+}
+
+void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
+    // prepare data
+    std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
+    std::vector<Labels> newScrapeSchedulerSet;
+    APSARA_TEST_TRUE(
+        targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
+    APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
+
+    auto result = targetSubscriber->BuildScrapeSchedulerSet(newScrapeSchedulerSet);
+
+    vector<pair<string, chrono::steady_clock::time_point>> startTimeList;
+    startTimeList.reserve(result.size());
+    for (auto& it : result) {
+        startTimeList.emplace_back(it.second->GetId(), it.second->GetNextExecTime());
+    }
+    APSARA_TEST_EQUAL(3UL, startTimeList.size());
+    APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[1].second);
+    APSARA_TEST_NOT_EQUAL(startTimeList[1].second, startTimeList[2].second);
+    APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[2].second);
 }
 
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, OnInitScrapeJobEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestParseTargetGroups)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
 
 } // namespace logtail
 

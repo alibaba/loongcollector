@@ -14,11 +14,26 @@
 package trigger
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/alibaba/ilogtail/test/config"
 )
 
-const commandTemplate = "/usr/local/go/bin/go test -count=1 -v -run ^%s$ github.com/alibaba/ilogtail/test/engine/trigger/generator"
+const commandTemplate = "python3 %s.py %s"
 
-func getRunTriggerCommand(triggerName string) string {
-	return fmt.Sprintf(commandTemplate, triggerName)
+func BeginTrigger(ctx context.Context) (context.Context, error) {
+	startTime := time.Now().Unix()
+	return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
+}
+
+func GetRunTriggerCommand(scenrio, triggerName string, kvs ...string) string {
+	args := make([]string, 0)
+	for i := 0; i < len(kvs); i += 2 {
+		args = append(args, fmt.Sprintf("--%s", kvs[i]), kvs[i+1])
+	}
+	return fmt.Sprintf(commandTemplate, filepath.Join(config.TestConfig.WorkDir, "engine", "trigger", scenrio, "remote_"+triggerName), strings.Join(args, " "))
 }

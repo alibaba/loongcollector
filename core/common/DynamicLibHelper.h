@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <string>
 #include <cstdlib>
+
+#include <string>
 
 namespace logtail {
 
@@ -29,11 +30,11 @@ typedef int (*glibc_setns_func)(int __fd, int __nstype);
 
 // For logtail running with centos 6, use dlopen to load some glibc functions.
 namespace glibc {
-    // setns function first appear in kernel 3 and glibc 1.14.
-    typedef int (*glibc_setns_func)(int __fd, int __nstype);
-    extern glibc_setns_func g_setns_func;
-    extern DynamicLibLoader* g_loader;
-    bool LoadGlibcFunc();
+// setns function first appear in kernel 3 and glibc 1.14.
+typedef int (*glibc_setns_func)(int __fd, int __nstype);
+extern glibc_setns_func g_setns_func;
+extern DynamicLibLoader* g_loader;
+bool LoadGlibcFunc();
 
 } // namespace glibc
 

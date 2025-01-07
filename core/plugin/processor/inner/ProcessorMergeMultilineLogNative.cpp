@@ -16,8 +16,9 @@
 
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 
-#include <boost/regex.hpp>
 #include <string>
+
+#include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
@@ -73,11 +74,8 @@ bool ProcessorMergeMultilineLogNative::Init(const Json::Value& config) {
                            mContext->GetRegion());
     }
 
-    mSplitLines = &(GetContext().GetProcessProfile().splitLines);
-
     mMergedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MERGED_EVENTS_TOTAL);
-    mUnmatchedEventsTotal
-        = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL);
+    mUnmatchedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL);
 
     return true;
 }
@@ -93,7 +91,6 @@ void ProcessorMergeMultilineLogNative::Process(PipelineEventGroup& logGroup) {
         MergeLogsByFlag(logGroup);
         logGroup.DelMetadata(EventGroupMetaKey::HAS_PART_LOG);
     }
-    *mSplitLines = logGroup.GetEvents().size();
 }
 
 bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& e) const {
@@ -359,7 +356,7 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
         return;
     }
     for (size_t i = begin; i <= end; i++) {
-        if (!mMultiline.mIgnoringUnmatchWarning && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (!mMultiline.mIgnoringUnmatchWarning && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             StringView sourceVal = logEvents[i].Cast<LogEvent>().GetContent(mSourceKey);
             LOG_WARNING(
                 GetContext().GetLogger(),

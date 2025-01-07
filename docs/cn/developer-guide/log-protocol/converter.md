@@ -1,6 +1,6 @@
 # 协议转换
 
-在开发Flusher插件时，用户往往需要将日志数据从sls协议转换成其他协议。在扩展Metric数据模型后，v2版本的Flusher插件还需要支持从PipelineGroupEvents数据转换成其他协议的场景。为了加快开发插件流程，iLogtail提供了通用协议转换模块，用户只需要指定目标协议的名称和编码方式即可获得编码后的字节流。
+在开发Flusher插件时，用户往往需要将日志数据从sls协议转换成其他协议。在扩展Metric数据模型后，v2版本的Flusher插件还需要支持从PipelineGroupEvents数据转换成其他协议的场景。为了加快开发插件流程，LoongCollector 提供了通用协议转换模块，用户只需要指定目标协议的名称和编码方式即可获得编码后的字节流。
 
 ## Converter结构
 
@@ -61,7 +61,7 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 1. 在当前文件中引入`protocol`包：
 
     ```Go
-    import "github.com/alibaba/ilogtail/pkg/protocol"
+    import "github.com/alibaba/loongcollector/pkg/protocol"
     ```
 
 2. 使用选定的转换参数创建`Converter`对象实例：

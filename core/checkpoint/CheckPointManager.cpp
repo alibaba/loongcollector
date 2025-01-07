@@ -28,7 +28,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 
 using namespace std;
 DECLARE_FLAG_STRING(check_point_filename);
@@ -71,10 +71,18 @@ bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& conf
     return false;
 }
 
-void CheckPointManager::DeleteDirCheckPoint(const std::string& filename) {
-    std::unordered_map<std::string, DirCheckPointPtr>::iterator it = mDirNameMap.find(filename);
-    if (it != mDirNameMap.end())
+void CheckPointManager::DeleteDirCheckPoint(const std::string& dirname) {
+    std::unordered_map<std::string, DirCheckPointPtr>::iterator it = mDirNameMap.find(dirname);
+    if (it != mDirNameMap.end()) {
         mDirNameMap.erase(it);
+    }
+    auto parentpos = dirname.find_last_of(PATH_SEPARATOR);
+    if (parentpos != std::string::npos) {
+        auto parentDirCheckpoint = mDirNameMap.find(dirname.substr(0, parentpos));
+        if (parentDirCheckpoint != mDirNameMap.end()) {
+            parentDirCheckpoint->second->mSubDir.erase(dirname);
+        }
+    }
 }
 
 bool CheckPointManager::GetDirCheckPoint(const std::string& dirname, DirCheckPointPtr& dirCheckPointPtr) {
@@ -123,8 +131,7 @@ void CheckPointManager::LoadCheckPoint() {
     Json::Value root;
     ParseConfResult cptRes = ParseConfig(AppConfig::GetInstance()->GetCheckPointFilePath(), root);
     // if new checkpoint file not exist, check old checkpoint file.
-    if (cptRes == CONFIG_NOT_EXIST
-        && AppConfig::GetInstance()->GetCheckPointFilePath() != GetCheckPointFileName()) {
+    if (cptRes == CONFIG_NOT_EXIST && AppConfig::GetInstance()->GetCheckPointFilePath() != GetCheckPointFileName()) {
         cptRes = ParseConfig(GetCheckPointFileName(), root);
     }
     if (cptRes != CONFIG_OK) {
@@ -134,7 +141,7 @@ void CheckPointManager::LoadCheckPoint() {
             LOG_ERROR(sLogger,
                       ("load check point file fail, file content is not valid json",
                        AppConfig::GetInstance()->GetCheckPointFilePath()));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "content of check point file is not valid json");
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "content of check point file is not valid json");
         }
         return;
     }
@@ -171,11 +178,11 @@ void CheckPointManager::LoadDirCheckPoint(const Json::Value& root) {
             }
         } catch (const exception& e) {
             LOG_ERROR(sLogger, ("failed to parse dir checkpoint", e.what()));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                    "failed to parse dir checkpoint:" + string(e.what()));
         } catch (...) {
             LOG_ERROR(sLogger, ("failed to parse dir checkpoint", "unknown exception"));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                    "failed to parse dir checkpoint, unkonw exception");
         }
     }
@@ -301,11 +308,11 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             }
         } catch (const exception& e) {
             LOG_ERROR(sLogger, ("failed to parse file checkpoint", e.what()));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                    "failed to parse file checkpoint:" + string(e.what()));
         } catch (...) {
             LOG_ERROR(sLogger, ("failed to parse file checkpoint", "unknown exception"));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                    "failed to parse file checkpoint, unkonw exception");
         }
     }
@@ -317,7 +324,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
 
     if (!Mkdirs(ParentPath(checkPointFile))) {
         LOG_ERROR(sLogger, ("open check point file dir error", checkPointFile));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file dir failed");
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file dir failed");
         return false;
     }
 
@@ -379,7 +386,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
                 = leaf;
         }
         LOG_WARNING(sLogger, ("Too many check point", mDevInodeCheckPointPtrMap.size()));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                "Too many check point:" + ToString(mDevInodeCheckPointPtrMap.size()));
     }
 
@@ -400,7 +407,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
     std::ofstream fout(checkPointTempFile.c_str());
     if (!fout) {
         LOG_ERROR(sLogger, ("open check point file error", checkPointFile));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file failed");
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file failed");
         return false;
     }
     Json::Value result;
@@ -408,9 +415,9 @@ bool CheckPointManager::DumpCheckPointToLocal() {
     result["dir_check_point"] = dirJson;
     result["version"] = Json::Value(Json::UInt(INT32_FLAG(check_point_version)));
     fout << result.toStyledString();
-    if (!fout.good()) {
+    if (!fout) {
         LOG_ERROR(sLogger, ("dump check point to file failed", checkPointFile));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "dump check point to file failed");
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "dump check point to file failed");
         fout.close();
         return false;
     }
@@ -422,7 +429,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
 #endif
     if (rename(checkPointTempFile.c_str(), checkPointFile.c_str()) == -1) {
         LOG_ERROR(sLogger, ("rename check point file fail, errno", errno));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
                                                std::string("rename check point file fail, errno ") + ToString(errno));
         return false;
     }
@@ -494,7 +501,7 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
 
         fsutil::Dir dir(dirPath);
         if (!dir.Open()) {
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 CHECKPOINT_ALARM, string("Failed to open dir : ") + dirPath + ";\terrno : " + ToString(GetErrno()));
             LOG_ERROR(sLogger, METHOD_LOG_PATTERN("message", "open dir error")("dir", dirPath));
             continue;

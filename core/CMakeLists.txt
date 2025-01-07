@@ -30,11 +30,13 @@ option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library")
 option(ENABLE_ENTERPRISE "enable enterprise feature")
 cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
+cmake_dependent_option(ENABLE_CORP_FEATURE "Enable corp feature" OFF "ENABLE_ENTERPRISE" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
-set(PROVIDER_PATH "provider" CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
-set(UNITTEST_PATH "unittest" CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
+cmake_dependent_option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" ON "CMAKE_BUILD_TYPE STREQUAL Debug;NOT ANDROID" OFF)
+set(PROVIDER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/provider CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
+set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
     message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
@@ -45,6 +47,10 @@ if (ENABLE_ENTERPRISE)
     message(STATUS "Enable Enterprise Feature.")
     add_definitions(-D__ENTERPRISE__)
     include(${CMAKE_CURRENT_SOURCE_DIR}/enterprise_options.cmake)
+    if (ENABLE_CORP_FEATURE)
+        message(STATUS "Enable Corp Feature.")
+        add_definitions(-D__CORP__)
+    endif ()
 else ()
     include(${CMAKE_CURRENT_SOURCE_DIR}/options.cmake)
 endif ()
@@ -61,8 +67,8 @@ if (UNIX)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -ggdb")
     endif ()
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
@@ -113,15 +119,16 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 
 # Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
-        application app_config checkpoint container_manager logger go_pipeline monitor monitor/metric_constants profile_sender models
-        config config/watcher
+        application app_config checkpoint container_manager metadata logger go_pipeline monitor monitor/metric_constants monitor/metric_models monitor/profile_sender models
+        config config/watcher constants
         pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
+        task_pipeline
         runner runner/sink/http
-        protobuf/sls
+        protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
-        prometheus prometheus/labels prometheus/schedulers prometheus/async
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         ebpf ebpf/observer ebpf/security ebpf/handler
-        parser sls_control sdk
+        parser
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
@@ -138,13 +145,6 @@ endif()
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories("/opt/logtail_spl/include")
-if (LINUX)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/observer)
-    if (WITHSPL)
-        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/spl)
-    endif()
-endif()
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
@@ -163,10 +163,6 @@ endif()
 # remove several files in go_pipeline
 list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.cpp ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.h)
 
-
-# add provider
-add_subdirectory("${PROVIDER_PATH}" "${CMAKE_BINARY_DIR}/provider")
-
 if(MSVC)
     # remove linux event listener
     file(GLOB REMOVE_EVENT_LISTENER_SOURCES file_server/event_listener/*_Linux.cpp file_server/event_listener/*_Linux.h)
@@ -176,9 +172,6 @@ elseif(UNIX)
     file(GLOB REMOVE_EVENT_LISTENER_SOURCES file_server/event_listener/*_Windows.cpp file_server/event_listener/*_Windows.h)
     list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${REMOVE_EVENT_LISTENER_SOURCES})
     if (LINUX)
-        # observer
-        file(GLOB_RECURSE APPEND_OBSERVER_SOURCES observer/*)
-        list(APPEND FRAMEWORK_SOURCE_FILES ${APPEND_OBSERVER_SOURCES})
         if (WITHSPL)
             set(SRC_FILES ${PLUGIN_SOURCE_FILES_SPL})
         endif()
@@ -186,15 +179,11 @@ elseif(UNIX)
 endif()
 set(SRC_FILES ${SRC_FILES} ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE})
 
-# Generate SPL library.
-if (LINUX)
-    if (WITHSPL)
-        add_subdirectory(spl)
-    endif()
-endif()
-
 # Logtail executable or shared library.
 if (BUILD_LOGTAIL)
+    # add provider
+    set(PROVIDER_BASE_TARGET "provider")
+    add_subdirectory("${PROVIDER_PATH}" ${CMAKE_BINARY_DIR}/${PROVIDER_BASE_TARGET})
     if (ENABLE_ENTERPRISE)
         if (UNIX)
             add_executable(${LOGTAIL_TARGET} enterprise_logtail.cpp ${SRC_FILES})
@@ -211,6 +200,9 @@ if (BUILD_LOGTAIL)
 endif()
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY)  
+    # add provider
+    set(PROVIDER_BASE_TARGET "provider")
+    add_subdirectory("${PROVIDER_PATH}" ${CMAKE_BINARY_DIR}/${PROVIDER_BASE_TARGET})
     if (ENABLE_ENTERPRISE)
         if (UNIX)
             add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp ${SRC_FILES})

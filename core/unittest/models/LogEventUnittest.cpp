@@ -29,7 +29,9 @@ public:
     void TestIterateContent();
     void TestMeta();
     void TestSize();
+    void TestReset();
     void TestFromJsonToJson();
+    void TestLevel();
 
 protected:
     void SetUp() override {
@@ -176,6 +178,18 @@ void LogEventUnittest::TestSize() {
     APSARA_TEST_EQUAL(basicSize, mLogEvent->DataSize());
 }
 
+void LogEventUnittest::TestReset() {
+    mLogEvent->SetTimestamp(12345678901);
+    mLogEvent->SetContent(string("key1"), string("value1"));
+    mLogEvent->SetPosition(1U, 2U);
+    mLogEvent->Reset();
+    APSARA_TEST_EQUAL(0, mLogEvent->GetTimestamp());
+    APSARA_TEST_FALSE(mLogEvent->GetTimestampNanosecond().has_value());
+    APSARA_TEST_TRUE(mLogEvent->Empty());
+    APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().first);
+    APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().second);
+}
+
 void LogEventUnittest::TestFromJsonToJson() {
     string inJson = R"({
         "contents" :
@@ -202,6 +216,11 @@ void LogEventUnittest::TestFromJsonToJson() {
     APSARA_TEST_STREQ(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
 }
 
+void LogEventUnittest::TestLevel() {
+    mLogEvent->SetLevel("level");
+    APSARA_TEST_EQUAL("level", mLogEvent->GetLevel().to_string());
+}
+
 UNIT_TEST_CASE(LogEventUnittest, TestTimestampOp)
 UNIT_TEST_CASE(LogEventUnittest, TestSetContent)
 UNIT_TEST_CASE(LogEventUnittest, TestDelContent)
@@ -209,7 +228,9 @@ UNIT_TEST_CASE(LogEventUnittest, TestReadContentOp)
 UNIT_TEST_CASE(LogEventUnittest, TestIterateContent)
 UNIT_TEST_CASE(LogEventUnittest, TestMeta)
 UNIT_TEST_CASE(LogEventUnittest, TestSize)
+UNIT_TEST_CASE(LogEventUnittest, TestReset)
 UNIT_TEST_CASE(LogEventUnittest, TestFromJsonToJson)
+UNIT_TEST_CASE(LogEventUnittest, TestLevel)
 
 } // namespace logtail
 

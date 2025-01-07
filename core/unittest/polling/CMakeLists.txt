@@ -17,3 +17,9 @@ project(polling_unittest)
 
 # add_executable(polling_unittest PollingUnittest.cpp)
 # target_link_libraries(polling_unittest ${UT_BASE_TARGET})
+
+add_executable(polling_preserved_dir_depth_unittest PollingPreservedDirDepthUnittest.cpp)
+target_link_libraries(polling_preserved_dir_depth_unittest ${UT_BASE_TARGET})
+
+include(GoogleTest)
+gtest_discover_tests(polling_preserved_dir_depth_unittest)

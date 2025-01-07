@@ -16,8 +16,9 @@
 
 #include "plugin/processor/ProcessorParseJsonNative.h"
 
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
@@ -25,6 +26,32 @@
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
+
+static std::string RapidjsonValueToString(const rapidjson::Value& value) {
+    if (value.IsString())
+        return std::string(value.GetString(), value.GetStringLength());
+    else if (value.IsBool())
+        return ToString(value.GetBool());
+    else if (value.IsInt())
+        return ToString(value.GetInt());
+    else if (value.IsUint())
+        return ToString(value.GetUint());
+    else if (value.IsInt64())
+        return ToString(value.GetInt64());
+    else if (value.IsUint64())
+        return ToString(value.GetUint64());
+    else if (value.IsDouble())
+        return ToString(value.GetDouble());
+    else if (value.IsNull())
+        return "";
+    else // if (value.IsObject() || value.IsArray())
+    {
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        value.Accept(writer);
+        return std::string(buffer.GetString(), buffer.GetLength());
+    }
+}
 
 const std::string ProcessorParseJsonNative::sName = "processor_parse_json_native";
 
@@ -46,9 +73,6 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
     if (!mCommonParserOptions.Init(config, *mContext, sName)) {
         return false;
     }
-
-    mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
-    mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
 
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
@@ -126,32 +150,30 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
     rapidjson::Document doc;
     doc.Parse(buffer.data(), buffer.size());
     if (doc.HasParseError()) {
-        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             LOG_WARNING(sLogger,
                         ("parse json log fail, log", buffer)("rapidjson offset", doc.GetErrorOffset())(
                             "rapidjson error", doc.GetParseError())("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse json fail:") + buffer.to_string(),
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mParseFailures);
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     } else if (!doc.IsObject()) {
-        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             LOG_WARNING(sLogger,
                         ("invalid json object, log", buffer)("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("invalid json object:") + buffer.to_string(),
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mParseFailures);
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     }
@@ -177,32 +199,6 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
     return true;
 }
 
-std::string ProcessorParseJsonNative::RapidjsonValueToString(const rapidjson::Value& value) {
-    if (value.IsString())
-        return std::string(value.GetString(), value.GetStringLength());
-    else if (value.IsBool())
-        return ToString(value.GetBool());
-    else if (value.IsInt())
-        return ToString(value.GetInt());
-    else if (value.IsUint())
-        return ToString(value.GetUint());
-    else if (value.IsInt64())
-        return ToString(value.GetInt64());
-    else if (value.IsUint64())
-        return ToString(value.GetUint64());
-    else if (value.IsDouble())
-        return ToString(value.GetDouble());
-    else if (value.IsNull())
-        return "";
-    else // if (value.IsObject() || value.IsArray())
-    {
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        value.Accept(writer);
-        return std::string(buffer.GetString(), buffer.GetLength());
-    }
-}
-
 void ProcessorParseJsonNative::AddLog(const StringView& key,
                                       const StringView& value,
                                       LogEvent& targetEvent,
@@ -211,7 +207,6 @@ void ProcessorParseJsonNative::AddLog(const StringView& key,
         return;
     }
     targetEvent.SetContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
 }
 
 bool ProcessorParseJsonNative::IsSupportedEvent(const PipelineEventPtr& e) const {

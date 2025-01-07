@@ -16,17 +16,20 @@
 
 #pragma once
 
-#include <curl/curl.h>
-
 #include <cstdint>
+
 #include <map>
-#include <string>
 #include <memory>
+#include <string>
+
+#include "curl/curl.h"
 
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 
 namespace logtail {
+
+NetworkCode GetNetworkStatus(CURLcode code);
 
 CURL* CreateCurlHandler(const std::string& method,
                         bool httpsFlag,
@@ -40,8 +43,14 @@ CURL* CreateCurlHandler(const std::string& method,
                         curl_slist*& headers,
                         uint32_t timeout,
                         bool replaceHostWithIp = true,
-                        const std::string& intf = "");
+                        const std::string& intf = "",
+                        bool followRedirects = false,
+                        std::optional<CurlTLS> tls = std::nullopt);
 
 bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response);
+
+bool AddRequestToMultiCurlHandler(CURLM* multiCurl, std::unique_ptr<AsynHttpRequest>&& request);
+void SendAsynRequests(CURLM* multiCurl);
+void HandleCompletedAsynRequests(CURLM* multiCurl, int& runningHandlers);
 
 } // namespace logtail

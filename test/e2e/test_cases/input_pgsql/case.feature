@@ -28,7 +28,7 @@ Feature: input pgsql
         Password: postgres
         StateMent: "select * from specialalarmtest where id > $1"
     """
-    Given iLogtail depends on containers {["pgsql"]}
+    Given loongcollector depends on containers {["pgsql"]}
     When start docker-compose {input_pgsql}
     Then there is at least {10} logs
     Then the log fields match as below

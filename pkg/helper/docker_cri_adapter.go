@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -92,7 +91,8 @@ func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 		logger.Debug(context.Background(), "Dial", addr, "failed", err)
 		return false
 	}
-
+	// must close，otherwise connections will leak and case mem increase
+	defer conn.Close()
 	client := cri.NewRuntimeServiceClient(conn)
 	// check cri status
 	_, err = client.Status(ctx, &cri.StatusRequest{})
@@ -156,7 +156,6 @@ func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return cri.NewRuntimeServiceClient(conn), nil
 }
 
@@ -243,17 +242,14 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	if state == cri.ContainerState_CONTAINER_RUNNING && ContainerProcessAlive(int(ci.Pid)) {
 		stateStatus = ContainerStatusRunning
 	}
-	finishedTime := status.GetStatus().GetFinishedAt()
-	finishedAt := time.Unix(0, finishedTime).Format(time.RFC3339Nano)
 	dockerContainer := types.ContainerJSON{
 		ContainerJSONBase: &types.ContainerJSONBase{
 			ID:      containerID,
 			Created: time.Unix(0, status.GetStatus().CreatedAt).Format(time.RFC3339Nano),
 			LogPath: status.GetStatus().GetLogPath(),
 			State: &types.ContainerState{
-				Status:     stateStatus,
-				Pid:        int(ci.Pid),
-				FinishedAt: finishedAt,
+				Status: stateStatus,
+				Pid:    int(ci.Pid),
 			},
 			HostConfig: &container.HostConfig{
 				VolumeDriver: ci.Snapshotter,
@@ -364,13 +360,7 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 			continue
 		}
 		if dockerContainer.Status() != ContainerStatusRunning {
-			finishedAt := dockerContainer.FinishedAt()
-			finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
-			now := time.Now()
-			duration := now.Sub(finishedAtTime)
-			if duration >= ContainerInfoDeletedTimeout {
-				continue
-			}
+			continue
 		}
 		cw.containers[c.GetId()] = &innerContainerInfo{
 			State:  c.State,

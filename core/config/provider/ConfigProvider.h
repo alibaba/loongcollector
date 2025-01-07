@@ -34,9 +34,9 @@ protected:
     ConfigProvider() = default;
     virtual ~ConfigProvider() = default;
 
-    std::filesystem::path mPipelineSourceDir;
+    std::filesystem::path mContinuousPipelineConfigDir;
     std::filesystem::path mInstanceSourceDir;
-    mutable std::mutex mPipelineMux;
+    mutable std::mutex mContinuousPipelineMux;
     mutable std::mutex mInstanceMux;
 };
 

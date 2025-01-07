@@ -34,15 +34,26 @@ namespace logtail {
 
 FileServer::FileServer() {
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef, {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER}});
+        mMetricsRecordRef,
+        MetricCategory::METRIC_CATEGORY_RUNNER,
+        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER}});
 }
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等
 void FileServer::Start() {
     ConfigManager::GetInstance()->LoadDockerConfig();
     CheckPointManager::Instance()->LoadCheckPoint();
+    LOG_INFO(sLogger, ("watch dirs", "start"));
+    auto start = GetCurrentTimeInMilliSeconds();
     ConfigManager::GetInstance()->RegisterHandlers();
-    LOG_INFO(sLogger, ("watch dirs", "succeeded"));
+    auto costMs = GetCurrentTimeInMilliSeconds() - start;
+    if (costMs >= 60 * 1000) {
+        AlarmManager::GetInstance()->SendAlarm(REGISTER_HANDLERS_TOO_SLOW_ALARM,
+                                               "Registering handlers took " + ToString(costMs) + " ms");
+        LOG_WARNING(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
+    } else {
+        LOG_INFO(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
+    }
     EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
     // the dump time must be reset after dir registration, since it may take long on NFS.
     CheckPointManager::Instance()->ResetLastDumpTime();
@@ -78,7 +89,7 @@ void FileServer::PauseInner() {
     LogInput::GetInstance()->HoldOn();
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
-        LogtailAlarm::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
                                                "Pausing file server took " + ToString(holdOnCost) + "ms");
     }
     LOG_INFO(sLogger, ("file server pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));

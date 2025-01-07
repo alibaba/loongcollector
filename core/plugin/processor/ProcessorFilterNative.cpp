@@ -218,7 +218,7 @@ bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
     }
     if (res && mDiscardingNonUTF8) {
         std::vector<std::pair<StringView, StringView> > newContents;
-        for (auto &content: sourceEvent) {
+        for (auto& content : sourceEvent) {
             if (CheckNoneUtf8(content.second)) {
                 auto value = content.second.to_string();
                 FilterNoneUtf8(value);
@@ -233,7 +233,7 @@ bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
 
                 newContents.emplace_back(StringView(keyBuffer.data, keyBuffer.size), content.second);
                 sourceEvent.DelContent(content.first);
-                        }
+            }
         }
         for (auto& newContent : newContents) {
             sourceEvent.SetContentNoCopy(newContent.first, newContent.second);

@@ -15,28 +15,27 @@
  */
 
 #pragma once
+
 #include <memory>
 #include <typeinfo>
 
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEvent.h"
+#include "models/RawEvent.h"
 #include "models/SpanEvent.h"
 
 namespace logtail {
+class EventPool;
 
 // only movable
 class PipelineEventPtr {
 public:
     PipelineEventPtr() = default;
-    PipelineEventPtr(PipelineEvent* ptr) : mData(std::unique_ptr<PipelineEvent>(ptr)) {}
-    PipelineEventPtr(std::unique_ptr<PipelineEvent>&& ptr) : mData(std::move(ptr)) {}
-
-    void Reset(std::unique_ptr<PipelineEvent>&& ptr) { mData.reset(ptr.release()); }
-    PipelineEventPtr& operator=(std::unique_ptr<PipelineEvent>&& ptr) {
-        mData = std::move(ptr);
-        return *this;
-    }
+    PipelineEventPtr(PipelineEvent* ptr, bool fromPool, EventPool* pool)
+        : mData(std::unique_ptr<PipelineEvent>(ptr)), mFromEventPool(fromPool), mEventPool(pool) {}
+    PipelineEventPtr(std::unique_ptr<PipelineEvent>&& ptr, bool fromPool, EventPool* pool)
+        : mData(std::move(ptr)), mFromEventPool(fromPool), mEventPool(pool) {}
 
     template <typename T>
     bool Is() const {
@@ -48,6 +47,9 @@ public:
         }
         if (typeid(T) == typeid(SpanEvent)) {
             return mData->GetType() == PipelineEvent::Type::SPAN;
+        }
+        if (typeid(T) == typeid(RawEvent)) {
+            return mData->GetType() == PipelineEvent::Type::RAW;
         }
         return false;
     }
@@ -67,15 +69,20 @@ public:
     const T* Get() const {
         return Is<T>() ? static_cast<const T*>(mData.get()) : nullptr;
     }
+    PipelineEvent* Release() { return mData.release(); }
 
     operator bool() const { return static_cast<bool>(mData); }
     PipelineEvent* operator->() { return mData.operator->(); }
     const PipelineEvent* operator->() const { return mData.operator->(); }
 
-    PipelineEventPtr Copy() const { return PipelineEventPtr(mData->Copy()); }
+    PipelineEventPtr Copy() const { return PipelineEventPtr(mData->Copy(), mFromEventPool, mEventPool); }
+    bool IsFromEventPool() const { return mFromEventPool; }
+    EventPool* GetEventPool() const { return mEventPool; }
 
 private:
     std::unique_ptr<PipelineEvent> mData;
+    bool mFromEventPool = false;
+    EventPool* mEventPool = nullptr; // null means using processor runner threaded pool
 };
 
 } // namespace logtail

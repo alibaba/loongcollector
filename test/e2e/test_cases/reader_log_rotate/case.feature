@@ -17,6 +17,6 @@ Feature: reader log rotate
           - /root/test/simple.log
         FlushTimeoutSecs: 2
     """
-    Given iLogtail container mount {./volume} to {/root/test}
+    Given loongcollector container mount {./volume} to {/root/test}
     When start docker-compose {reader_log_rotate}
     Then there is at least {6} logs

@@ -20,8 +20,9 @@
 #elif defined(__linux__)
 #include <fnmatch.h>
 #endif
-#include <boost/filesystem.hpp>
 #include <fstream>
+
+#include "boost/filesystem.hpp"
 
 #include "RuntimeUtil.h"
 #include "StringTools.h"
@@ -350,345 +351,345 @@ bool IsValidSuffix(const std::string& filename) {
 
 namespace fsutil {
 
-    Dir::Dir(const std::string& dirPath) : mDirPath(dirPath) {
+Dir::Dir(const std::string& dirPath) : mDirPath(dirPath) {
 #if defined(__linux__)
-        mDir = nullptr;
+    mDir = nullptr;
 #elif defined(_MSC_VER)
-        mFind = INVALID_HANDLE_VALUE;
+    mFind = INVALID_HANDLE_VALUE;
 #endif
-    }
+}
 
-    Dir::~Dir() {
-        Close();
-    }
+Dir::~Dir() {
+    Close();
+}
 
 #if defined(_MSC_VER)
-    // Invalid entry is returned if fileName starts with ., such as ., .., hidden files.
-    static Entry ConstructEntry(const WIN32_FIND_DATA& findData) {
-        std::string fileName(findData.cFileName);
-        if (0 == fileName.find("."))
+// Invalid entry is returned if fileName starts with ., such as ., .., hidden files.
+static Entry ConstructEntry(const WIN32_FIND_DATA& findData) {
+    std::string fileName(findData.cFileName);
+    if (0 == fileName.find("."))
+        return Entry();
+
+    // NOTE: We assume there are only two types: DIR and REG_FILE, ignore symbolic.
+    // In fact, for symbolic path, both boost::filesystem::status and Windows stat
+    // will return FILE...
+    return Entry(fileName,
+                 (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? Entry::Type::DIR : Entry::Type::REG_FILE,
+                 false);
+}
+#endif
+
+bool Dir::IsOpened() const {
+#if defined(__linux__)
+    return mDir != nullptr;
+#elif defined(_MSC_VER)
+    return mFind != INVALID_HANDLE_VALUE;
+#endif
+}
+
+bool Dir::Open() {
+    if (IsOpened())
+        return true;
+    if (mDirPath.empty()) {
+        // Log it but don't return, let following call to generate errno.
+        LOG_WARNING(sLogger, ("Empty dir path", mDirPath));
+    }
+
+#if defined(__linux__)
+    DIR* dir = opendir(mDirPath.c_str());
+    if (NULL == dir) {
+        // TODO: Record errno
+        return false;
+    }
+
+    mDir = dir;
+    return true;
+#elif defined(_MSC_VER)
+    auto findPath = PathJoin(mDirPath, "*");
+    WIN32_FIND_DATA ffd;
+    mFind = FindFirstFile(findPath.c_str(), &ffd);
+    if (INVALID_HANDLE_VALUE == mFind) {
+        // TODO: Record errno.
+        return false;
+    }
+    // Cache first entry.
+    mCachedEntry = ConstructEntry(ffd);
+    return true;
+#endif
+}
+
+Entry Dir::ReadNext(bool resolveWithStat) {
+    if (!IsOpened())
+        return Entry();
+
+#if defined(__linux__)
+    // Call readdir until it returns nullptr or non-dot entry.
+    while (true) {
+        struct dirent* ent = readdir(mDir);
+        if (nullptr == ent)
             return Entry();
 
-        // NOTE: We assume there are only two types: DIR and REG_FILE, ignore symbolic.
-        // In fact, for symbolic path, both boost::filesystem::status and Windows stat
-        // will return FILE...
-        return Entry(fileName,
-                     (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? Entry::Type::DIR : Entry::Type::REG_FILE,
-                     false);
-    }
-#endif
-
-    bool Dir::IsOpened() const {
-#if defined(__linux__)
-        return mDir != nullptr;
-#elif defined(_MSC_VER)
-        return mFind != INVALID_HANDLE_VALUE;
-#endif
-    }
-
-    bool Dir::Open() {
-        if (IsOpened())
-            return true;
-        if (mDirPath.empty()) {
-            // Log it but don't return, let following call to generate errno.
-            LOG_WARNING(sLogger, ("Empty dir path", mDirPath));
+        std::string fileName(ent->d_name);
+        if (0 == fileName.find('.')) {
+            continue;
         }
 
-#if defined(__linux__)
-        DIR* dir = opendir(mDirPath.c_str());
-        if (NULL == dir) {
-            // TODO: Record errno
-            return false;
-        }
+        Entry::Type type;
+        bool isSymbolic = false;
+        switch (ent->d_type) {
+            case DT_FIFO:
+            case DT_CHR:
+            case DT_BLK:
+            case DT_SOCK:
+            case DT_WHT:
+                // Known types that should be ignored.
+                type = Entry::Type::UNKNOWN;
+                break;
+            case DT_DIR:
+                type = Entry::Type::DIR;
+                break;
+            case DT_REG:
+                type = Entry::Type::REG_FILE;
+                break;
 
-        mDir = dir;
-        return true;
-#elif defined(_MSC_VER)
-        auto findPath = PathJoin(mDirPath, "*");
-        WIN32_FIND_DATA ffd;
-        mFind = FindFirstFile(findPath.c_str(), &ffd);
-        if (INVALID_HANDLE_VALUE == mFind) {
-            // TODO: Record errno.
-            return false;
-        }
-        // Cache first entry.
-        mCachedEntry = ConstructEntry(ffd);
-        return true;
-#endif
-    }
-
-    Entry Dir::ReadNext(bool resolveWithStat) {
-        if (!IsOpened())
-            return Entry();
-
-#if defined(__linux__)
-        // Call readdir until it returns nullptr or non-dot entry.
-        while (true) {
-            struct dirent* ent = readdir(mDir);
-            if (nullptr == ent)
-                return Entry();
-
-            std::string fileName(ent->d_name);
-            if (0 == fileName.find('.')) {
-                continue;
-            }
-
-            Entry::Type type;
-            bool isSymbolic = false;
-            switch (ent->d_type) {
-                case DT_FIFO:
-                case DT_CHR:
-                case DT_BLK:
-                case DT_SOCK:
-                case DT_WHT:
-                    // Known types that should be ignored.
-                    type = Entry::Type::UNKNOWN;
+            case DT_LNK:
+            // DT_UNKNOWN should also be resolved by stat again to against inaccurate
+            //   meta info from file system, eg. expect DT_LNK, return DT_UNKNOWN.
+            // Ref: https://aone.alibaba-inc.com/issue/36979148.
+            case DT_UNKNOWN:
+            // All known types have already been enumerated at above, stat for unknown
+            //   new types for better compatibility.
+            default: {
+                type = Entry::Type::UNKNOWN;
+                isSymbolic = (DT_LNK == ent->d_type);
+                if (!resolveWithStat) {
                     break;
-                case DT_DIR:
+                }
+
+                // Try to get target type by stat, if failed, return UNKNONW to remind
+                // caller that maybe the symbolic is invalid.
+                auto fullPath = PathJoin(mDirPath, fileName);
+                struct stat fileStat;
+                if (stat(fullPath.c_str(), &fileStat) != 0) {
+                    LOG_WARNING(sLogger,
+                                ("Get file info fail",
+                                 fullPath)("errno", errno)("strerror", strerror(errno))("d_type", ent->d_type));
+                    break;
+                }
+                if (S_ISDIR(fileStat.st_mode)) {
                     type = Entry::Type::DIR;
-                    break;
-                case DT_REG:
+                } else if (S_ISREG(fileStat.st_mode)) {
                     type = Entry::Type::REG_FILE;
-                    break;
-
-                case DT_LNK:
-                // DT_UNKNOWN should also be resolved by stat again to against inaccurate
-                //   meta info from file system, eg. expect DT_LNK, return DT_UNKNOWN.
-                // Ref: https://aone.alibaba-inc.com/issue/36979148.
-                case DT_UNKNOWN:
-                // All known types have already been enumerated at above, stat for unknown
-                //   new types for better compatibility.
-                default: {
-                    type = Entry::Type::UNKNOWN;
-                    isSymbolic = (DT_LNK == ent->d_type);
-                    if (!resolveWithStat) {
-                        break;
-                    }
-
-                    // Try to get target type by stat, if failed, return UNKNONW to remind
-                    // caller that maybe the symbolic is invalid.
-                    auto fullPath = PathJoin(mDirPath, fileName);
-                    struct stat fileStat;
-                    if (stat(fullPath.c_str(), &fileStat) != 0) {
-                        LOG_WARNING(sLogger,
-                                    ("Get file info fail",
-                                     fullPath)("errno", errno)("strerror", strerror(errno))("d_type", ent->d_type));
-                        break;
-                    }
-                    if (S_ISDIR(fileStat.st_mode)) {
-                        type = Entry::Type::DIR;
-                    } else if (S_ISREG(fileStat.st_mode)) {
-                        type = Entry::Type::REG_FILE;
-                    }
-                    break;
                 }
-            };
-
-            return Entry(fileName, type, isSymbolic);
-        }
-#elif defined(_MSC_VER)
-        if (mCachedEntry) {
-            Entry entry = mCachedEntry;
-            mCachedEntry = Entry();
-            return entry;
-        }
-
-        WIN32_FIND_DATA ffd;
-        while (true) {
-            if (0 == FindNextFile(mFind, &ffd)) {
-                auto err = GetLastError();
-                if (err != ERROR_NO_MORE_FILES) {
-                    LOG_WARNING(sLogger, ("Unexpected error when call FindNextFile", err)("dir path", mDirPath));
-                }
-                return Entry();
+                break;
             }
-            auto entry = ConstructEntry(ffd);
-            if (entry)
-                return entry;
+        };
+
+        return Entry(fileName, type, isSymbolic);
+    }
+#elif defined(_MSC_VER)
+    if (mCachedEntry) {
+        Entry entry = mCachedEntry;
+        mCachedEntry = Entry();
+        return entry;
+    }
+
+    WIN32_FIND_DATA ffd;
+    while (true) {
+        if (0 == FindNextFile(mFind, &ffd)) {
+            auto err = GetLastError();
+            if (err != ERROR_NO_MORE_FILES) {
+                LOG_WARNING(sLogger, ("Unexpected error when call FindNextFile", err)("dir path", mDirPath));
+            }
+            return Entry();
         }
-#endif
+        auto entry = ConstructEntry(ffd);
+        if (entry)
+            return entry;
     }
+#endif
+}
 
-    void Dir::Close() {
-        if (!IsOpened())
-            return;
+void Dir::Close() {
+    if (!IsOpened())
+        return;
 
 #if defined(__linux__)
-        if (closedir(mDir) != 0) {
-            LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", errno));
-            return;
-        }
-        mDir = nullptr;
+    if (closedir(mDir) != 0) {
+        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", errno));
+        return;
+    }
+    mDir = nullptr;
 #elif defined(_MSC_VER)
-        if (!FindClose(mFind)) {
-            LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", GetLastError()));
-            return;
-        }
-        mFind = INVALID_HANDLE_VALUE;
+    if (!FindClose(mFind)) {
+        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", GetLastError()));
+        return;
+    }
+    mFind = INVALID_HANDLE_VALUE;
 #endif
-    }
+}
 
-    PathStat::PathStat() {
-    }
+PathStat::PathStat() {
+}
 
-    PathStat::~PathStat() {
-    }
+PathStat::~PathStat() {
+}
 
-    bool PathStat::stat(const std::string& path, PathStat& ps) {
-        ps.mPath = path;
+bool PathStat::stat(const std::string& path, PathStat& ps) {
+    ps.mPath = path;
 #if defined(__linux__)
-        return (0 == ::stat(path.c_str(), &(ps.mRawStat)));
+    return (0 == ::stat(path.c_str(), &(ps.mRawStat)));
 #elif defined(_MSC_VER)
-        // For backward performance compatibility, check the path only
-        //   when the flag is enabled by user configuration.
-        if (!BOOL_FLAG(enable_root_path_collection) || path.back() != ':') {
-            return 0 == ::_stat64(path.c_str(), &(ps.mRawStat));
-        }
-        // _stat64("D:") returns non-zero.
-        return 0 == ::_stat64((path + PATH_SEPARATOR).c_str(), &(ps.mRawStat));
-#endif
+    // For backward performance compatibility, check the path only
+    //   when the flag is enabled by user configuration.
+    if (!BOOL_FLAG(enable_root_path_collection) || path.back() != ':') {
+        return 0 == ::_stat64(path.c_str(), &(ps.mRawStat));
     }
+    // _stat64("D:") returns non-zero.
+    return 0 == ::_stat64((path + PATH_SEPARATOR).c_str(), &(ps.mRawStat));
+#endif
+}
 
-    bool PathStat::IsDir() const {
+bool PathStat::IsDir() const {
 #if defined(__linux__)
-        return S_ISDIR(mRawStat.st_mode);
+    return S_ISDIR(mRawStat.st_mode);
 #elif defined(_MSC_VER)
-        return mRawStat.st_mode & S_IFDIR;
+    return mRawStat.st_mode & S_IFDIR;
 #endif
-    }
+}
 
-    bool PathStat::IsRegFile() const {
+bool PathStat::IsRegFile() const {
 #if defined(__linux__)
-        return S_ISREG(mRawStat.st_mode);
+    return S_ISREG(mRawStat.st_mode);
 #elif defined(_MSC_VER)
-        return mRawStat.st_mode & S_IFREG;
+    return mRawStat.st_mode & S_IFREG;
 #endif
-    }
+}
 
-    bool PathStat::lstat(const std::string& path, PathStat& ps) {
-        ps.mPath = path;
+bool PathStat::lstat(const std::string& path, PathStat& ps) {
+    ps.mPath = path;
 #if defined(__linux__)
-        return (0 == ::lstat(path.c_str(), &(ps.mRawStat)));
+    return (0 == ::lstat(path.c_str(), &(ps.mRawStat)));
 #elif defined(_MSC_VER)
-        return (0 == ::_stat64(path.c_str(), &(ps.mRawStat)));
+    return (0 == ::_stat64(path.c_str(), &(ps.mRawStat)));
 #endif
-    }
+}
 
-    bool PathStat::IsLink() const {
+bool PathStat::IsLink() const {
 #if defined(__linux__)
-        return S_ISLNK(mRawStat.st_mode);
+    return S_ISLNK(mRawStat.st_mode);
 #elif defined(_MSC_VER)
-        return false; // Windows shortcut is not symbolic link.
+    return false; // Windows shortcut is not symbolic link.
 #endif
-    }
+}
 
-    bool PathStat::fstat(FILE* file, PathStat& ps, bool resolvePath) {
+bool PathStat::fstat(FILE* file, PathStat& ps, bool resolvePath) {
 #if defined(__linux__)
-        return (0 == ::fstat(fileno(file), &(ps.mRawStat)));
+    return (0 == ::fstat(fileno(file), &(ps.mRawStat)));
 #elif defined(_MSC_VER)
-        return fstat(_fileno(file), ps, resolvePath);
+    return fstat(_fileno(file), ps, resolvePath);
 #endif
-    }
+}
 
-    bool PathStat::fstat(int fd, PathStat& ps, bool resolvePath) {
+bool PathStat::fstat(int fd, PathStat& ps, bool resolvePath) {
 #if defined(__linux__)
-        return (0 == ::fstat(fd, &(ps.mRawStat)));
+    return (0 == ::fstat(fd, &(ps.mRawStat)));
 #elif defined(_MSC_VER)
-        auto fstatRet = ::_fstat64(fd, &(ps.mRawStat));
-        if (fstatRet != 0)
-            return false;
-        if (!resolvePath)
-            return true;
+    auto fstatRet = ::_fstat64(fd, &(ps.mRawStat));
+    if (fstatRet != 0)
+        return false;
+    if (!resolvePath)
+        return true;
 
-        ps.mPath = GetFdPath(fd);
-        return !ps.mPath.empty();
+    ps.mPath = GetFdPath(fd);
+    return !ps.mPath.empty();
 #endif
-    }
+}
 
 #if defined(_MSC_VER)
-    // FILETIME2Time converts ft to time_t.
-    // @return second part.
-    static int64_t FILETIME2Time(const FILETIME ft, int64_t* nsec = nullptr) {
-        ULARGE_INTEGER ui;
-        ui.LowPart = ft.dwLowDateTime;
-        ui.HighPart = ft.dwHighDateTime;
-        int64_t sec = static_cast<int64_t>(ui.QuadPart / 10000000 - 11644473600);
-        if (nsec != nullptr) {
-            *nsec = static_cast<int64_t>(ui.QuadPart % 10000000) * 100;
-        }
-        return sec;
+// FILETIME2Time converts ft to time_t.
+// @return second part.
+static int64_t FILETIME2Time(const FILETIME ft, int64_t* nsec = nullptr) {
+    ULARGE_INTEGER ui;
+    ui.LowPart = ft.dwLowDateTime;
+    ui.HighPart = ft.dwHighDateTime;
+    int64_t sec = static_cast<int64_t>(ui.QuadPart / 10000000 - 11644473600);
+    if (nsec != nullptr) {
+        *nsec = static_cast<int64_t>(ui.QuadPart % 10000000) * 100;
     }
+    return sec;
+}
 
-    bool PathStat::fstat(HANDLE hFile, PathStat& ps, bool resolvePath) {
-        // st_mtime.
-        FILETIME mtim;
-        if (FALSE == GetFileTime(hFile, NULL, NULL, &mtim)) {
-            return false;
-        }
-        ps.mRawStat.st_mtime = static_cast<time_t>(FILETIME2Time(mtim));
-        // st_size.
-        LARGE_INTEGER liSize;
-        if (FALSE == GetFileSizeEx(hFile, &liSize)) {
-            return false;
-        }
-        ps.mRawStat.st_size = liSize.QuadPart;
-        if (!resolvePath) {
-            return true;
-        }
-
-        // ps.mPath.
-        char filePath[MAX_PATH + 1];
-        auto ret = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH + 1, VOLUME_NAME_DOS);
-        if (ret > MAX_PATH || ret <= 0) {
-            return false;
-        }
-        if (0 == memcmp(filePath, "\\\\?\\", 4)) {
-            ps.mPath.assign(filePath + 4);
-        } else {
-            ps.mPath = filePath;
-        }
+bool PathStat::fstat(HANDLE hFile, PathStat& ps, bool resolvePath) {
+    // st_mtime.
+    FILETIME mtim;
+    if (FALSE == GetFileTime(hFile, NULL, NULL, &mtim)) {
+        return false;
+    }
+    ps.mRawStat.st_mtime = static_cast<time_t>(FILETIME2Time(mtim));
+    // st_size.
+    LARGE_INTEGER liSize;
+    if (FALSE == GetFileSizeEx(hFile, &liSize)) {
+        return false;
+    }
+    ps.mRawStat.st_size = liSize.QuadPart;
+    if (!resolvePath) {
         return true;
     }
+
+    // ps.mPath.
+    char filePath[MAX_PATH + 1];
+    auto ret = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH + 1, VOLUME_NAME_DOS);
+    if (ret > MAX_PATH || ret <= 0) {
+        return false;
+    }
+    if (0 == memcmp(filePath, "\\\\?\\", 4)) {
+        ps.mPath.assign(filePath + 4);
+    } else {
+        ps.mPath = filePath;
+    }
+    return true;
+}
 #endif
 
-    time_t PathStat::GetMtime() const {
-        return mRawStat.st_mtime;
-    }
+time_t PathStat::GetMtime() const {
+    return mRawStat.st_mtime;
+}
 
-    void PathStat::GetLastWriteTime(int64_t& sec, int64_t& nsec) const {
+void PathStat::GetLastWriteTime(int64_t& sec, int64_t& nsec) const {
 #if defined(__linux__)
-        sec = mRawStat.st_mtim.tv_sec;
-        nsec = mRawStat.st_mtim.tv_nsec;
+    sec = mRawStat.st_mtim.tv_sec;
+    nsec = mRawStat.st_mtim.tv_nsec;
 #elif defined(_MSC_VER)
-        HANDLE hFile = CreateFile(mPath.c_str(),
-                                  GENERIC_READ,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                  NULL,
-                                  OPEN_EXISTING,
-                                  FILE_FLAG_BACKUP_SEMANTICS,
-                                  NULL);
-        if (INVALID_HANDLE_VALUE == hFile)
-            return;
-        FILETIME mtim;
-        auto ret = GetFileTime(hFile, NULL, NULL, &mtim);
-        CloseHandle(hFile);
-        if (!ret)
-            return;
-        sec = FILETIME2Time(mtim, &nsec);
+    HANDLE hFile = CreateFile(mPath.c_str(),
+                              GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL,
+                              OPEN_EXISTING,
+                              FILE_FLAG_BACKUP_SEMANTICS,
+                              NULL);
+    if (INVALID_HANDLE_VALUE == hFile)
+        return;
+    FILETIME mtim;
+    auto ret = GetFileTime(hFile, NULL, NULL, &mtim);
+    CloseHandle(hFile);
+    if (!ret)
+        return;
+    sec = FILETIME2Time(mtim, &nsec);
 #endif
-    }
+}
 
-    DevInode PathStat::GetDevInode() const {
+DevInode PathStat::GetDevInode() const {
 #if defined(__linux__)
-        return DevInode(mRawStat.st_dev, mRawStat.st_ino);
+    return DevInode(mRawStat.st_dev, mRawStat.st_ino);
 #elif defined(_MSC_VER)
-        return GetFileDevInode(mPath);
+    return GetFileDevInode(mPath);
 #endif
-    }
+}
 
-    int64_t PathStat::GetFileSize() const {
-        return mRawStat.st_size;
-    }
+int64_t PathStat::GetFileSize() const {
+    return mRawStat.st_size;
+}
 
 } // namespace fsutil
 

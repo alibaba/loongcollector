@@ -28,21 +28,30 @@ StringView gEmptyStringView;
 const string& PipelineEventTypeToString(PipelineEvent::Type t) {
     switch (t) {
         case PipelineEvent::Type::LOG:
-            static string logname = "Log";
-            return logname;
+            static string logName = "Log";
+            return logName;
         case PipelineEvent::Type::METRIC:
-            static string metricname = "Metric";
-            return metricname;
+            static string metricName = "Metric";
+            return metricName;
         case PipelineEvent::Type::SPAN:
-            static string spanname = "Span";
-            return spanname;
+            static string spanName = "Span";
+            return spanName;
+        case PipelineEvent::Type::RAW:
+            static string rawName = "Raw";
+            return rawName;
         default:
-            static string voidname = "";
-            return voidname;
+            static string voidName = "";
+            return voidName;
     }
 }
 
 PipelineEvent::PipelineEvent(Type type, PipelineEventGroup* ptr) : mType(type), mPipelineEventGroupPtr(ptr) {
+}
+
+void PipelineEvent::Reset() {
+    mTimestamp = 0;
+    mTimestampNanosecond = nullopt;
+    mPipelineEventGroupPtr = nullptr;
 }
 
 shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {

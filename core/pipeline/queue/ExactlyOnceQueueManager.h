@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <list>
 #include <memory>
 #include <mutex>
@@ -70,10 +71,6 @@ public:
     void SetPipelineForSenderItems(QueueKey key, const std::shared_ptr<Pipeline>& p);
 
     void ClearTimeoutQueues();
-
-    // TODO: should be removed when self-telemetry is refactored
-    uint32_t GetInvalidProcessQueueCnt() const;
-    uint32_t GetProcessQueueCnt() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();

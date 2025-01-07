@@ -1,6 +1,6 @@
 # 增加新的日志协议
 
-如果iLogtail暂时不支持您所需的日志协议，您可以为iLogtail增加该协议并添加相应的协议转换函数，具体步骤如下：
+如果 LoongCollector 暂时不支持您所需的日志协议，您可以为 LoongCollector 增加该协议并添加相应的协议转换函数，具体步骤如下：
 
 1. 如果您的协议支持Protobuf或其它可通过模式定义生成相应内存结构的编码方式，您需要首先在`./pkg/protocol`目录下新建一个以协议名为命名的文件夹，然后在该文件夹中增加一个以编码方式为命名的子文件夹，在该文件中存放相应的模式定义文件，然后将由代码生成工具生成的与该模式定义文件相对应的Go代码文件放置在父目录中。目录组织结构如下：
 
@@ -32,7 +32,7 @@
     3. 能够根据`targetFields`找到对应字段的值
     4. 对于部分编码格式，能够根据`c.ProtocolKeyRenameMap`重命名协议字段的Key
 
-    为了完成上述第2和第3点，iLogtail提供了下列帮助函数：
+    为了完成上述第2和第3点，LoongCollector 提供了下列帮助函数：
 
     ```Go
     func convertLogToMap(log *sls.Log, logTags []*sls.LogTag, src, topic string, tagKeyRenameMap map[string]string) (contents map[string]string, tags map[string]string)
@@ -52,4 +52,4 @@
     - 在`c.DoWithSelectedFields`方法的`switch`语句中新增一个`case`子句，`case`名为协议名，子句内容为`return c.ConvertToXXXProtocolLogs(logGroup, targetFields)`，其中涉及的函数即为第2步中编写的函数
     - 在`c.ToByteStreamWithSelectedFields`方法的`switch`语句中新增一个`case`子句，`case`名为协议名，子句内容为`return c.ConvertToXXXProtocolStream(logGroup, targetFields)`，其中涉及的函数即为第2步中编写的函数
 
-4. 在`./doc/cn/developer-guide/log-protocol/converter.md`的附录、`README.md`中增加协议相关内容，并在`./doc/cn/developer-guide/log-protocol/protocol-spec`文件夹下新增`<protocol>.md`文件描述具体的协议形式。
+4. 在`./doc/cn/developer-guide/log-protocol/converter.md`的附录、`log-protocol.md`中增加协议相关内容，并在`./doc/cn/developer-guide/log-protocol/protocol-spec`文件夹下新增`<protocol>.md`文件描述具体的协议形式。

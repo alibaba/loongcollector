@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -24,8 +25,8 @@
 
 #include "common/Lock.h"
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
-#include "file_server/event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/event/Event.h"
 
 namespace logtail {
 
@@ -510,7 +511,10 @@ private:
      * @param path is the current dir that being registered
      * @depth is the num of sub dir layers that should be registered
      */
-    bool RegisterHandlersWithinDepth(const std::string& path, const FileDiscoveryConfig& config, int depth);
+    bool RegisterHandlersWithinDepth(const std::string& path,
+                                     const FileDiscoveryConfig& config,
+                                     int preservedDirDepth,
+                                     int maxDepth);
     bool RegisterDescendants(const std::string& path, const FileDiscoveryConfig& config, int withinDepth);
     // bool CheckLogType(const std::string& logTypeStr, LogType& logType);
     // 废弃

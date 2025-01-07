@@ -20,7 +20,7 @@
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 
-DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 15);
+DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 5);
 
 DECLARE_FLAG_INT32(process_thread_count);
 
@@ -327,23 +327,6 @@ void ProcessQueueManager::DeleteQueueEntity(const ProcessQueueIterator& iter) {
 void ProcessQueueManager::ResetCurrentQueueIndex() {
     mCurrentQueueIndex.first = 0;
     mCurrentQueueIndex.second = mPriorityQueue[0].begin();
-}
-
-uint32_t ProcessQueueManager::GetInvalidCnt() const {
-    uint32_t res = 0;
-    lock_guard<mutex> lock(mQueueMux);
-    for (const auto& q : mQueues) {
-        if (q.second.second == QueueType::BOUNDED
-            && static_cast<BoundedProcessQueue*>(q.second.first->get())->IsValidToPush()) {
-            ++res;
-        }
-    }
-    return res;
-}
-
-uint32_t ProcessQueueManager::GetCnt() const {
-    lock_guard<mutex> lock(mQueueMux);
-    return mQueues.size();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

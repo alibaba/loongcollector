@@ -15,7 +15,7 @@
 #include "application/Application.h"
 
 #ifndef LOGTAIL_NO_TC_MALLOC
-#include <gperftools/malloc_extension.h>
+#include "gperftools/malloc_extension.h"
 #endif
 
 #include <thread>
@@ -31,26 +31,28 @@
 #include "common/UUIDUtil.h"
 #include "common/version.h"
 #include "config/ConfigDiff.h"
-#include "config/watcher/ConfigWatcher.h"
+#include "config/InstanceConfigManager.h"
+#include "config/watcher/InstanceConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/MetricExportor.h"
 #include "monitor/Monitor.h"
-#include "pipeline/InstanceConfigManager.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
+#include "prometheus/PrometheusInputRunner.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "runner/sink/http/HttpSink.h"
+#include "task_pipeline/TaskPipelineManager.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #include "config/provider/LegacyConfigProvider.h"
@@ -65,17 +67,12 @@
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
 DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
-DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
 DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
-DEFINE_FLAG_BOOL(enable_cgroup, "", true);
+DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
-
-
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
-DECLARE_FLAG_BOOL(global_network_success);
 
 using namespace std;
 
@@ -85,16 +82,6 @@ Application::Application() : mStartTime(time(nullptr)) {
 }
 
 void Application::Init() {
-    // get last crash info
-    string backTraceStr = GetCrashBackTrace();
-    if (!backTraceStr.empty()) {
-        LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
-    }
-    if (BOOL_FLAG(ilogtail_disable_core)) {
-        InitCrashBackTrace();
-    }
-
     // change working dir to ./${ILOGTAIL_VERSION}/
     string processExecutionDir = GetProcessExecutionDir();
     AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
@@ -121,32 +108,45 @@ void Application::Init() {
     AppConfig::GetInstance()->LoadAppConfig(GetAgentConfigFile());
 
     // Initialize basic information: IP, hostname, etc.
-    LogFileProfiler::GetInstance();
-
+    LoongCollectorMonitor::GetInstance();
+#ifdef __ENTERPRISE__
+    EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+    EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
+    if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
+        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
+    }
+    // get last crash info
+    string backTraceStr = GetCrashBackTrace();
+    if (!backTraceStr.empty()) {
+        LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
+        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
+    }
+    if (BOOL_FLAG(ilogtail_disable_core)) {
+        InitCrashBackTrace();
+    }
+#endif
     // override process related params if designated by user explicitly
     const string& interface = AppConfig::GetInstance()->GetBindInterface();
     const string& configIP = AppConfig::GetInstance()->GetConfigIP();
     if (!configIP.empty()) {
-        LogFileProfiler::mIpAddr = configIP;
-        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_ip", GetHostIp());
+        LoongCollectorMonitor::mIpAddr = configIP;
     } else if (!interface.empty()) {
-        LogFileProfiler::mIpAddr = GetHostIp(interface);
-        if (LogFileProfiler::mIpAddr.empty()) {
+        LoongCollectorMonitor::mIpAddr = GetHostIp(interface);
+        if (LoongCollectorMonitor::mIpAddr.empty()) {
             LOG_WARNING(sLogger,
                         ("failed to get ip from interface", "try to get any available ip")("interface", interface));
         }
-    } else if (LogFileProfiler::mIpAddr.empty()) {
+    } else if (LoongCollectorMonitor::mIpAddr.empty()) {
         LOG_WARNING(sLogger, ("failed to get ip from hostname or eth0 or bond0", "try to get any available ip"));
     }
-    if (LogFileProfiler::mIpAddr.empty()) {
-        LogFileProfiler::mIpAddr = GetAnyAvailableIP();
-        LOG_INFO(sLogger, ("get available ip succeeded", LogFileProfiler::mIpAddr));
+    if (LoongCollectorMonitor::mIpAddr.empty()) {
+        LoongCollectorMonitor::mIpAddr = GetAnyAvailableIP();
+        LOG_INFO(sLogger, ("get available ip succeeded", LoongCollectorMonitor::mIpAddr));
     }
 
     const string& configHostName = AppConfig::GetInstance()->GetConfigHostName();
     if (!configHostName.empty()) {
-        LogFileProfiler::mHostname = configHostName;
-        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_hostname", GetHostName());
+        LoongCollectorMonitor::mHostname = configHostName;
     }
 
     GenerateInstanceId();
@@ -159,18 +159,19 @@ void Application::Init() {
 #endif
 
     int32_t systemBootTime = AppConfig::GetInstance()->GetSystemBootTime();
-    LogFileProfiler::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
+    LoongCollectorMonitor::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
 
     // generate app_info.json
     Json::Value appInfoJson;
-    appInfoJson["ip"] = Json::Value(LogFileProfiler::mIpAddr);
-    appInfoJson["hostname"] = Json::Value(LogFileProfiler::mHostname);
+    appInfoJson["ip"] = Json::Value(LoongCollectorMonitor::mIpAddr);
+    appInfoJson["hostname"] = Json::Value(LoongCollectorMonitor::mHostname);
     appInfoJson["UUID"] = Json::Value(Application::GetInstance()->GetUUID());
     appInfoJson["instance_id"] = Json::Value(Application::GetInstance()->GetInstanceId());
 #ifdef __ENTERPRISE__
-    appInfoJson["loongcollector_version"] = Json::Value(ILOGTAIL_VERSION);
+    appInfoJson["host_id"] = Json::Value(HostIdentifier::Instance()->GetHostId().id);
+    appInfoJson[GetVersionTag()] = Json::Value(ILOGTAIL_VERSION);
 #else
-    appInfoJson["loongcollector_version"] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
+    appInfoJson[GetVersionTag()] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
     appInfoJson["git_hash"] = Json::Value(ILOGTAIL_GIT_HASH);
     appInfoJson["build_date"] = Json::Value(ILOGTAIL_BUILD_DATE);
 #endif
@@ -183,7 +184,7 @@ void Application::Init() {
 #define ILOGTAIL_COMPILER VERSION_STR(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
 #endif
     appInfoJson["compiler"] = Json::Value(ILOGTAIL_COMPILER);
-    appInfoJson["os"] = Json::Value(LogFileProfiler::mOsDetail);
+    appInfoJson["os"] = Json::Value(LoongCollectorMonitor::mOsDetail);
     appInfoJson["update_time"] = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     string appInfo = appInfoJson.toStyledString();
     OverwriteFile(GetAgentAppInfoFile(), appInfo);
@@ -191,54 +192,48 @@ void Application::Init() {
 }
 
 void Application::Start() { // GCOVR_EXCL_START
-    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S"));
+    LoongCollectorMonitor::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();
 #endif
-    BoundedSenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
 
-    HttpSink::GetInstance()->Init();
-    FlusherRunner::GetInstance()->Init();
+    // resource monitor
+    // TODO: move metric related initialization to input Init
+    LoongCollectorMonitor::GetInstance()->Init();
+    LogtailMonitor::GetInstance()->Init();
 
+    // config provider
     {
         // add local config dir
-        filesystem::path localConfigPath
-            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "pipeline_config" / "local";
+        filesystem::path localConfigPath = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
+            / GetContinuousPipelineConfigDir() / "local";
         error_code ec;
         filesystem::create_directories(localConfigPath, ec);
         if (ec) {
             LOG_WARNING(sLogger,
-                        ("failed to create dir for local pipeline_config",
+                        ("failed to create dir for local continuous_pipeline_config",
                          "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
         }
-        ConfigWatcher::GetInstance()->AddPipelineSource(localConfigPath.string());
+        PipelineConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
     }
-    {
-        // add local config dir
-        filesystem::path localConfigPath
-            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "instance_config" / "local";
-        error_code ec;
-        filesystem::create_directories(localConfigPath, ec);
-        if (ec) {
-            LOG_WARNING(sLogger,
-                        ("failed to create dir for local instance_config",
-                         "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
-        }
-        ConfigWatcher::GetInstance()->AddInstanceSource(localConfigPath.string());
-    }
-
 #ifdef __ENTERPRISE__
-    EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+    EnterpriseConfigProvider::GetInstance()->Start();
     LegacyConfigProvider::GetInstance()->Init("legacy");
 #else
     InitRemoteConfigProviders();
 #endif
 
-    LogtailAlarm::GetInstance()->Init();
-    LoongCollectorMonitor::GetInstance()->Init();
-    LogtailMonitor::GetInstance()->Init();
+    // runner
+    BoundedSenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
+    HttpSink::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    ProcessorRunner::GetInstance()->Init();
 
+    // flusher_sls resource should be explicitly initialized to allow internal metrics and alarms to be sent
+    FlusherSLS::InitResource();
+
+    // plugin registration
     PluginRegistry::GetInstance()->LoadPlugins();
     InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
 
@@ -268,10 +263,10 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    ProcessorRunner::GetInstance()->Init();
+    // TODO: this should be refactored to internal pipeline
+    AlarmManager::GetInstance()->Init();
 
-    time_t curTime = 0, lastProfilingCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0;
+    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
@@ -282,20 +277,18 @@ void Application::Start() { // GCOVR_EXCL_START
             lastCheckTagsTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
-            PipelineConfigDiff pipelineConfigDiff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
-            if (!pipelineConfigDiff.IsEmpty()) {
-                PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff);
+            auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+            if (!configDiff.first.IsEmpty()) {
+                PipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
             }
-            InstanceConfigDiff instanceConfigDiff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
+            if (!configDiff.second.IsEmpty()) {
+                TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
+            }
+            InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!instanceConfigDiff.IsEmpty()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
             }
             lastConfigCheckTime = curTime;
-        }
-        if (curTime - lastProfilingCheckTime >= INT32_FLAG(profiling_check_interval)) {
-            LogFileProfiler::GetInstance()->SendProfileData();
-            MetricExportor::GetInstance()->PushMetrics(false);
-            lastProfilingCheckTime = curTime;
         }
 #ifndef LOGTAIL_NO_TC_MALLOC
         if (curTime - lastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
@@ -330,13 +323,14 @@ void Application::Start() { // GCOVR_EXCL_START
 
         // destruct event handlers here so that it will not block file reading task
         ConfigManager::GetInstance()->DeleteHandlers();
+        PrometheusInputRunner::GetInstance()->CheckGC();
 
         this_thread::sleep_for(chrono::seconds(1));
     }
 } // GCOVR_EXCL_STOP
 
 void Application::GenerateInstanceId() {
-    mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(mStartTime);
+    mInstanceId = CalculateRandomUUID() + "_" + LoongCollectorMonitor::mIpAddr + "_" + ToString(mStartTime);
 }
 
 bool Application::TryGetUUID() {
@@ -374,7 +368,7 @@ void Application::Exit() {
 
     LogtailMonitor::GetInstance()->Stop();
     LoongCollectorMonitor::GetInstance()->Stop();
-    LogtailAlarm::GetInstance()->Stop();
+    AlarmManager::GetInstance()->Stop();
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
@@ -397,23 +391,13 @@ void Application::CheckCriticalCondition(int32_t curTime) {
     // force to exit if config update thread is block more than 1 hour
     if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > 3600) {
         LOG_ERROR(sLogger, ("last config get time is too old", lastGetConfigTime)("prepare force exit", ""));
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             LOGTAIL_CRASH_ALARM, "last config get time is too old: " + ToString(lastGetConfigTime) + " force exit");
-        LogtailAlarm::GetInstance()->ForceToSend();
+        AlarmManager::GetInstance()->ForceToSend();
         sleep(10);
         _exit(1);
     }
 #endif
-    // if network is fail in 2 hours, force exit (for ant only)
-    // work around for no network when docker start
-    if (BOOL_FLAG(send_prefer_real_ip) && !BOOL_FLAG(global_network_success) && curTime - mStartTime > 7200) {
-        LOG_ERROR(sLogger, ("network is fail", "prepare force exit"));
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
-                                               "network is fail since " + ToString(mStartTime) + " force exit");
-        LogtailAlarm::GetInstance()->ForceToSend();
-        sleep(10);
-        _exit(1);
-    }
 }
 
 bool Application::GetUUIDThread() {

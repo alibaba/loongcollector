@@ -17,6 +17,7 @@
 #include "PrometheusInputRunner.h"
 
 #include <chrono>
+
 #include <memory>
 #include <string>
 
@@ -26,14 +27,14 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
+#include "common/http/Constant.h"
+#include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
-#include "sdk/Common.h"
-#include "sdk/Exception.h"
 
 using namespace std;
 
@@ -47,8 +48,8 @@ PrometheusInputRunner::PrometheusInputRunner()
     : mServiceHost(STRING_FLAG(loong_collector_operator_service)),
       mServicePort(INT32_FLAG(loong_collector_operator_service_port)),
       mPodName(STRING_FLAG(_pod_name_)),
+      mEventPool(true),
       mUnRegisterMs(0) {
-    mClient = std::make_unique<sdk::CurlClient>();
     mTimer = std::make_shared<Timer>();
 
     // self monitor
@@ -63,10 +64,10 @@ PrometheusInputRunner::PrometheusInputRunner()
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels), std::move(dynamicLabels));
 
     mPromRegisterState = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CLIENT_REGISTER_STATE);
-    mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOB_NUM);
+    mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOBS_TOTAL);
     mPromRegisterRetryTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL);
 }
 
@@ -83,11 +84,15 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->InitSelfMonitor(defaultLabels);
 
     targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
-    targetSubscriber->SetTimer(mTimer);
-    auto randSleepMilliSec = GetRandSleepMilliSec(
-        targetSubscriber->GetId(), prometheus::RefeshIntervalSeconds, GetCurrentTimeInMilliSeconds());
-    auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
-    targetSubscriber->SetFirstExecTime(firstExecTime);
+    targetSubscriber->SetComponent(mTimer, &mEventPool);
+    auto currSystemTime = chrono::system_clock::now();
+    auto randSleepMilliSec
+        = GetRandSleepMilliSec(targetSubscriber->GetId(),
+                               prometheus::RefeshIntervalSeconds,
+                               chrono::duration_cast<chrono::milliseconds>(currSystemTime.time_since_epoch()).count());
+    auto firstExecTime = chrono::steady_clock::now() + chrono::milliseconds(randSleepMilliSec);
+    auto firstSubscribeTime = currSystemTime + chrono::milliseconds(randSleepMilliSec);
+    targetSubscriber->SetFirstExecTime(firstExecTime, firstSubscribeTime);
     // 1. add subscriber to mTargetSubscriberSchedulerMap
     {
         WriteLock lock(mSubscriberMapRWLock);
@@ -141,22 +146,23 @@ void PrometheusInputRunner::Init() {
     // only register when operator exist
     if (!mServiceHost.empty()) {
         mIsThreadRunning.store(true);
-        auto res = std::async(launch::async, [this]() {
+        mThreadRes = std::async(launch::async, [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             int retry = 0;
             while (mIsThreadRunning.load()) {
                 ++retry;
-                sdk::HttpMessage httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
-                if (httpResponse.statusCode != 200) {
+                auto httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
+                if (httpResponse.GetStatusCode() != 200) {
                     mPromRegisterRetryTotal->Add(1);
                     if (retry % 10 == 0) {
-                        LOG_INFO(sLogger, ("register failed, retried", retry)("statusCode", httpResponse.statusCode));
+                        LOG_INFO(sLogger,
+                                 ("register failed, retried", retry)("statusCode", httpResponse.GetStatusCode()));
                     }
                 } else {
                     // register success
                     // response will be { "unRegisterMs": 30000 }
-                    if (!httpResponse.content.empty()) {
-                        string responseStr = httpResponse.content;
+                    if (!httpResponse.GetBody<string>()->empty()) {
+                        string responseStr = *httpResponse.GetBody<string>();
                         string errMsg;
                         Json::Value responseJson;
                         if (!ParseJsonTable(responseStr, responseJson, errMsg)) {
@@ -194,6 +200,9 @@ void PrometheusInputRunner::Stop() {
 
     mIsStarted = false;
     mIsThreadRunning.store(false);
+    if (mThreadRes.valid()) {
+        mThreadRes.wait_for(chrono::seconds(1));
+    }
 
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Stop();
@@ -214,9 +223,9 @@ void PrometheusInputRunner::Stop() {
         auto res = std::async(launch::async, [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             for (int retry = 0; retry < 3; ++retry) {
-                sdk::HttpMessage httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
-                if (httpResponse.statusCode != 200) {
-                    LOG_ERROR(sLogger, ("unregister failed, statusCode", httpResponse.statusCode));
+                auto httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
+                if (httpResponse.GetStatusCode() != 200) {
+                    LOG_ERROR(sLogger, ("unregister failed, statusCode", httpResponse.GetStatusCode()));
                 } else {
                     LOG_INFO(sLogger, ("Unregister Success", mPodName));
                     mPromRegisterState->Set(0);
@@ -234,29 +243,18 @@ bool PrometheusInputRunner::HasRegisteredPlugins() const {
     return !mTargetSubscriberSchedulerMap.empty();
 }
 
-sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) const {
-    map<string, string> httpHeader;
-    httpHeader[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
-    sdk::HttpMessage httpResponse;
-    httpResponse.header[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
+HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
+    HttpResponse httpResponse;
 #ifdef APSARA_UNIT_TEST_MAIN
-    httpResponse.statusCode = 200;
+    httpResponse.SetStatusCode(200);
     return httpResponse;
 #endif
-    try {
-        mClient->Send(sdk::HTTP_GET,
-                      mServiceHost,
-                      mServicePort,
-                      url,
-                      "pod_name=" + mPodName,
-                      httpHeader,
-                      "",
-                      10,
-                      httpResponse,
-                      "",
-                      false);
-    } catch (const sdk::LOGException& e) {
-        LOG_ERROR(sLogger, ("curl error", e.what())("url", url)("pod_name", mPodName));
+    map<string, string> httpHeader;
+    if (!SendHttpRequest(
+            make_unique<HttpRequest>(
+                HTTP_GET, false, mServiceHost, mServicePort, url, "pod_name=" + mPodName, httpHeader, "", 10),
+            httpResponse)) {
+        LOG_ERROR(sLogger, ("curl error", "")("url", url)("pod_name", mPodName));
     }
     return httpResponse;
 }
@@ -290,5 +288,9 @@ string PrometheusInputRunner::GetAllProjects() {
         }
     }
     return result;
+}
+
+void PrometheusInputRunner::CheckGC() {
+    mEventPool.CheckGC();
 }
 }; // namespace logtail

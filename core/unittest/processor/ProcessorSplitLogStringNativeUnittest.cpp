@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include <cstdlib>
+
 #include <sstream>
 
 #include "common/JsonUtil.h"
 #include "common/TagConstants.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
@@ -31,6 +33,7 @@ public:
     void TestInit();
     void TestProcessJson();
     void TestProcessCommon();
+    void TestEnableRawContent();
 
     PipelineContext mContext;
 };
@@ -38,6 +41,7 @@ public:
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestInit)
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessJson)
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessCommon)
+UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestEnableRawContent)
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
@@ -81,11 +85,12 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     })";
     APSARA_TEST_TRUE_FATAL(eventGroup.FromJsonString(inJson.str()));
     // run function
-    ProcessorSplitLogStringNative processor;
-    processor.SetContext(mContext);
-
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
-    processor.Process(eventGroup);
+    ProcessorSplitLogStringNative& processor = *(new ProcessorSplitLogStringNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<logtail::PipelineEventGroup> logGroupList;
+    logGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(logGroupList);
     // judge result
     std::stringstream expectJson;
     expectJson << R"({
@@ -124,10 +129,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             "log.file.offset": "log.file.offset"
         }
     })";
-    std::string outJson = eventGroup.ToJsonString(true);
+    std::string outJson = logGroupList[0].ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     // check observability
-    APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().splitLines);
+    APSARA_TEST_EQUAL_FATAL(2, processorInstance.mOutEventsTotal->GetValue());
 }
 
 void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
@@ -165,10 +170,12 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
     })";
     eventGroup.FromJsonString(inJson);
     // run function
-    ProcessorSplitLogStringNative processor;
-    processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
-    processor.Process(eventGroup);
+    ProcessorSplitLogStringNative& processor = *(new ProcessorSplitLogStringNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<logtail::PipelineEventGroup> logGroupList;
+    logGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(logGroupList);
     // judge result
     std::string expectJson = R"({
         "events" :
@@ -219,10 +226,85 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             }
         ]
     })";
-    std::string outJson = eventGroup.ToJsonString(true);
+    std::string outJson = logGroupList[0].ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observability
-    APSARA_TEST_EQUAL_FATAL(4, processor.GetContext().GetProcessProfile().splitLines);
+    APSARA_TEST_EQUAL_FATAL(4, processorInstance.mOutEventsTotal->GetValue());
+}
+
+void ProcessorSplitLogStringNativeUnittest::TestEnableRawContent() {
+    // make config
+    Json::Value config;
+    config["AppendingLogPositionMeta"] = false;
+    config["EnableRawContent"] = true;
+    // make events
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "line1\nline2"
+                },
+                "fileOffset": 1,
+                "rawSize": 12,
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "line3\nline4"
+                },
+                "fileOffset": 0,
+                "rawSize": 11,
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+    // run function
+    ProcessorSplitLogStringNative processor;
+    processor.SetContext(mContext);
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.Process(eventGroup);
+    // judge result
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "content" : "line1",
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 4
+            },
+            {
+                "content" : "line2",
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 4
+            },
+            {
+                "content" : "line3",
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 4
+            },
+            {
+                "content" : "line4",
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 4
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString(true);
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
 }
 
 } // namespace logtail

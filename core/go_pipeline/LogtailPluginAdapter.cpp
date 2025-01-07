@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "LogtailPluginAdapter.h"
+
 #include <stdio.h>
 
 IsValidToSendFun gAdapterIsValidToSendFun = NULL;

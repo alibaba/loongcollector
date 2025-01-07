@@ -14,7 +14,7 @@
 
 #include "pipeline/GlobalConfig.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"
@@ -24,13 +24,8 @@ using namespace std;
 
 namespace logtail {
 
-const unordered_set<string> GlobalConfig::sNativeParam = {"TopicType",
-                                                          "TopicFormat",
-                                                          "ProcessPriority",
-                                                          "EnableTimestampNanosecond",
-                                                          "UsingOldContentTag",
-                                                          "PipelineMetaTagKey",
-                                                          "AgentEnvMetaTagKey"};
+const unordered_set<string> GlobalConfig::sNativeParam
+    = {"TopicType", "TopicFormat", "Priority", "EnableTimestampNanosecond", "UsingOldContentTag"};
 
 bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, Json::Value& extendedParams) {
     const string moduleName = "global";
@@ -98,13 +93,13 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
         }
     }
 
-    // ProcessPriority
-    uint32_t priority = 0;
-    if (!GetOptionalUIntParam(config, "ProcessPriority", priority, errorMsg)) {
+    // Priority
+    uint32_t priority = 1;
+    if (!GetOptionalUIntParam(config, "Priority", priority, errorMsg)) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),
                               errorMsg,
-                              mProcessPriority,
+                              mPriority,
                               moduleName,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
@@ -113,15 +108,16 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
     } else if (priority > ProcessQueueManager::sMaxPriority) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),
-                              errorMsg,
-                              mProcessPriority,
+                              "param Priority is out of range",
+                              ProcessQueueManager::sMaxPriority,
                               moduleName,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
                               ctx.GetRegion());
+        mPriority = ProcessQueueManager::sMaxPriority;
     } else {
-        mProcessPriority = priority;
+        mPriority = priority;
     }
 
     // EnableTimestampNanosecond

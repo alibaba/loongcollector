@@ -21,13 +21,8 @@ file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/input/*.c ${CMAKE_SOURCE_
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 
 if(MSVC)
-    # remove observer related files in input
-    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.h)
+# TODO: remote ebpf related source files
 elseif(UNIX)
-    if (NOT LINUX)
-        # remove observer related files in input
-        list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.h)
-    endif()
 endif()
 
 # Set source files to parent

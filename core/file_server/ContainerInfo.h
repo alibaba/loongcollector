@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
-#include <memory>
+
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "common/TagConstants.h"
+#include "json/json.h"
+
+#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {

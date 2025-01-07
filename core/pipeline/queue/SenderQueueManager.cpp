@@ -19,27 +19,28 @@
 #include "pipeline/queue/QueueKeyManager.h"
 
 DEFINE_FLAG_INT32(sender_queue_gc_threshold_sec, "30s", 30);
-DEFINE_FLAG_INT32(sender_queue_capacity, "", 10);
+DEFINE_FLAG_INT32(sender_queue_capacity, "", 15);
 
 using namespace std;
 
 namespace logtail {
 
-SenderQueueManager::SenderQueueManager() : mQueueParam(INT32_FLAG(sender_queue_capacity)) {
+SenderQueueManager::SenderQueueManager() : mDefaultQueueParam(INT32_FLAG(sender_queue_capacity), 1.0) {
 }
 
-bool SenderQueueManager::CreateQueue(QueueKey key,
-                                     const string& flusherId,
-                                     const PipelineContext& ctx,
-                                     std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap,
-                                     uint32_t maxRate) {
+bool SenderQueueManager::CreateQueue(
+    QueueKey key,
+    const string& flusherId,
+    const PipelineContext& ctx,
+    std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap,
+    uint32_t maxRate) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
         mQueues.try_emplace(key,
-                            mQueueParam.GetCapacity(),
-                            mQueueParam.GetLowWatermark(),
-                            mQueueParam.GetHighWatermark(),
+                            mDefaultQueueParam.GetCapacity(),
+                            mDefaultQueueParam.GetLowWatermark(),
+                            mDefaultQueueParam.GetHighWatermark(),
                             key,
                             flusherId,
                             ctx);
@@ -113,11 +114,12 @@ void SenderQueueManager::GetAvailableItems(vector<SenderQueueItem*>& items, int3
             return;
         }
         if (itemsCntLimit == -1) {
-            for (auto iter = mQueues.begin(); iter != mQueues.end(); ++iter) {         
+            for (auto iter = mQueues.begin(); iter != mQueues.end(); ++iter) {
                 iter->second.GetAvailableItems(items, -1);
             }
         } else {
-            int cntLimitPerQueue = std::max((int)(mQueueParam.GetCapacity() * 0.3), (int)(itemsCntLimit/mQueues.size()));
+            int cntLimitPerQueue
+                = std::max((int)(mDefaultQueueParam.GetCapacity() * 0.3), (int)(itemsCntLimit / mQueues.size()));
             // must check index before moving iterator
             mSenderQueueBeginIndex = mSenderQueueBeginIndex % mQueues.size();
             // here we set sender queue begin index, let the sender order be different each time
@@ -127,7 +129,7 @@ void SenderQueueManager::GetAvailableItems(vector<SenderQueueItem*>& items, int3
             for (auto iter = beginIter; iter != mQueues.end(); ++iter) {
                 iter->second.GetAvailableItems(items, cntLimitPerQueue);
             }
-            for (auto iter = mQueues.begin(); iter != beginIter; ++iter) {        
+            for (auto iter = mQueues.begin(); iter != beginIter; ++iter) {
                 iter->second.GetAvailableItems(items, cntLimitPerQueue);
             }
         }

@@ -28,6 +28,7 @@ on:
     branches:
       - main
       - 1.*
+      - benchmark
 jobs:
   CI:
     env:
@@ -82,7 +83,15 @@ jobs:
         if: matrix.runner == 'ubuntu'
         run: make check-dependency-licenses
 
-      - name: Lint
+      - name: C++ Core Lint
+        uses: jidicula/clang-format-action@v4.14.0
+        with:
+          clang-format-version: '18'
+          check-path: 'core'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp'
+          include-regex: '.*\.(cpp|h)$'
+
+      - name: Go Plugin Lint
         run: make lint
 
       - name: UnitTest

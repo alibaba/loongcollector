@@ -17,6 +17,7 @@
 #pragma once
 #include <queue>
 #include <unordered_set>
+
 #include "checkpoint/AdhocCheckpointManager.h"
 #include "file_server/event/Event.h"
 
@@ -45,6 +46,7 @@ private:
     std::queue<Event*> mEventQueue;
     std::unordered_set<std::string> mDeletedJobSet;
     std::unordered_map<std::string, std::vector<StaticFile> > mJobFileLists;
+
 public:
     static AdhocFileManager* GetInstance() {
         static AdhocFileManager* ptr = new AdhocFileManager();
@@ -56,4 +58,4 @@ public:
     void DeleteJob(std::string jobName);
 };
 
-}
+} // namespace logtail

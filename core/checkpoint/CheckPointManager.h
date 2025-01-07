@@ -15,14 +15,15 @@
  */
 
 #pragma once
-#include <json/json.h>
-
-#include <boost/optional.hpp>
 #include <ctime>
+
 #include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
+
+#include "boost/optional.hpp"
+#include "json/json.h"
 
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
@@ -126,7 +127,7 @@ public:
     void AddCheckPoint(CheckPoint* checkPointPtr);
     void AddDirCheckPoint(const std::string& dirname);
     void DeleteCheckPoint(DevInode devInode, const std::string& configName);
-    void DeleteDirCheckPoint(const std::string& filename);
+    void DeleteDirCheckPoint(const std::string& dirname);
     void LoadCheckPoint();
     void LoadDirCheckPoint(const Json::Value& root);
     void LoadFileCheckPoint(const Json::Value& root);

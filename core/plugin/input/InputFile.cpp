@@ -170,8 +170,8 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
         {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
     };
-    mPluginMetricManager
-        = std::make_shared<PluginMetricManager>(GetMetricsRecordRef()->GetLabels(), inputFileMetricKeys);
+    mPluginMetricManager = std::make_shared<PluginMetricManager>(
+        GetMetricsRecordRef()->GetLabels(), inputFileMetricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     mPluginMetricManager->RegisterSizeGauge(mMonitorFileTotal);
 
     return CreateInnerProcessors();
@@ -231,6 +231,9 @@ bool InputFile::CreateInnerProcessors() {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
         }
+        detail["EnableRawContent"]
+            = Json::Value(!mContext->HasNativeProcessors() && !mContext->IsExactlyOnceEnabled()
+                          && !mContext->IsFlushingThroughGoPipeline() && !mFileReader.mAppendingLogPositionMeta);
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

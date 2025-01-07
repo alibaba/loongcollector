@@ -26,7 +26,7 @@ BoundedProcessQueue::BoundedProcessQueue(
       BoundedQueueInterface(key, cap, low, high, ctx),
       ProcessQueueInterface(key, cap, priority, ctx) {
     if (ctx.IsExactlyOnceEnabled()) {
-        mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_FLAG, "true"}});
+        mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
     }
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
@@ -49,6 +49,11 @@ bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
 }
 
 bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
+    mFetchTimesCnt->Add(1);
+    if (Empty()) {
+        return false;
+    }
+    mValidFetchTimesCnt->Add(1);
     if (!IsValidToPop()) {
         return false;
     }
@@ -60,8 +65,7 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     }
 
     mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(
-        chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - item->mEnqueTime).count());
+    mTotalDelayMs->Add(chrono::system_clock::now() - item->mEnqueTime);
     mQueueSizeTotal->Set(Size());
     mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
     mValidToPushFlag->Set(IsValidToPush());

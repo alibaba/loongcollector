@@ -66,4 +66,3 @@ gtest_discover_tests(safe_queue_unittest)
 gtest_discover_tests(http_request_timer_event_unittest)
 gtest_discover_tests(timer_unittest)
 gtest_discover_tests(curl_unittest)
-

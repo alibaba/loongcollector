@@ -30,11 +30,17 @@ target_link_libraries(metric_event_unittest ${UT_BASE_TARGET})
 add_executable(span_event_unittest SpanEventUnittest.cpp)
 target_link_libraries(span_event_unittest ${UT_BASE_TARGET})
 
+add_executable(raw_event_unittest RawEventUnittest.cpp)
+target_link_libraries(raw_event_unittest ${UT_BASE_TARGET})
+
 add_executable(pipeline_event_ptr_unittest PipelineEventPtrUnittest.cpp)
 target_link_libraries(pipeline_event_ptr_unittest ${UT_BASE_TARGET})
 
 add_executable(pipeline_event_group_unittest PipelineEventGroupUnittest.cpp)
 target_link_libraries(pipeline_event_group_unittest ${UT_BASE_TARGET})
+
+add_executable(event_pool_unittest EventPoolUnittest.cpp)
+target_link_libraries(event_pool_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(pipeline_event_unittest)
@@ -42,8 +48,10 @@ gtest_discover_tests(log_event_unittest)
 gtest_discover_tests(metric_value_unittest)
 gtest_discover_tests(metric_event_unittest)
 gtest_discover_tests(span_event_unittest)
+gtest_discover_tests(raw_event_unittest)
 gtest_discover_tests(pipeline_event_ptr_unittest)
 gtest_discover_tests(pipeline_event_group_unittest)
+gtest_discover_tests(event_pool_unittest)
 
 add_executable(event_group_benchmark EventGroupBenchmark.cpp)
 target_link_libraries(event_group_benchmark ${UT_BASE_TARGET})

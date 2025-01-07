@@ -15,6 +15,7 @@
  */
 
 #include <cstdint>
+
 #include <string>
 
 #include "prometheus/Constants.h"
@@ -111,8 +112,6 @@ void LabelsUnittest::TestRange() {
 
     APSARA_TEST_EQUAL(testMap, resMap);
 }
-
-
 
 
 UNIT_TEST_CASE(LabelsUnittest, TestGet)

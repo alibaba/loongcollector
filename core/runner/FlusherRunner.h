@@ -16,11 +16,12 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstdint>
+
+#include <atomic>
 #include <future>
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/plugin/interface/Flusher.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/sink/SinkType.h"
@@ -45,7 +46,7 @@ public:
     // TODO: should be private
     void PushToHttpSink(SenderQueueItem* item, bool withLimit = true);
 
-    int32_t GetSendingBufferCount() { return mHttpSendingCnt; }
+    int32_t GetSendingBufferCount() { return mHttpSendingCnt.load(); }
 
 private:
     FlusherRunner() = default;
@@ -53,29 +54,37 @@ private:
 
     void Run();
     void Dispatch(SenderQueueItem* item);
+    bool LoadModuleConfig(bool isInit);
+    void UpdateSendFlowControl();
+
+    std::function<bool()> mCallback;
 
     std::future<void> mThreadRes;
     std::atomic_bool mIsFlush = false;
 
-    std::atomic_int mHttpSendingCnt{0};
+    std::atomic_int32_t mHttpSendingCnt{0};
 
     // TODO: temporarily here
     int32_t mLastCheckSendClientTime = 0;
     int64_t mSendLastTime = 0;
     int32_t mSendLastByte = 0;
 
+    bool mEnableRateLimiter = true;
+
     mutable MetricsRecordRef mMetricsRecordRef;
     CounterPtr mInItemsTotal;
     CounterPtr mInItemDataSizeBytes;
     CounterPtr mInItemRawDataSizeBytes;
     CounterPtr mOutItemsTotal;
-    CounterPtr mTotalDelayMs;
+    TimeCounterPtr mTotalDelayMs;
     IntGaugePtr mWaitingItemsTotal;
     IntGaugePtr mLastRunTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;
     friend class FlusherRunnerUnittest;
+    friend class InstanceConfigManagerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

@@ -17,9 +17,10 @@
 #pragma once
 
 #include <cstdint>
+
 #include <vector>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "file_server/MultilineOptions.h"
 #include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
@@ -32,6 +33,8 @@ public:
 
     std::string mSourceKey = DEFAULT_CONTENT_KEY;
     MultilineOptions mMultiline;
+    bool mAppendingLogPositionMeta = false;
+    bool mEnableRawContent = false;
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override;
@@ -62,8 +65,6 @@ private:
                            StringView logPath,
                            int* unmatchLines);
     StringView GetNextLine(StringView log, size_t begin);
-
-    int* mSplitLines = nullptr;
 
     CounterPtr mMatchedEventsTotal;
     CounterPtr mMatchedLinesTotal;

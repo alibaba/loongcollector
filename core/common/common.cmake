@@ -28,7 +28,7 @@ endif ()
 list(APPEND THIS_SOURCE_FILES_LIST ${XX_HASH_SOURCE_FILES})
 # add memory in common
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/memory/SourceBuffer.h)
-list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/http/AsynCurlRunner.cpp ${CMAKE_SOURCE_DIR}/common/http/Curl.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpResponse.cpp)
+list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/http/AsynCurlRunner.cpp ${CMAKE_SOURCE_DIR}/common/http/Curl.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpResponse.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpRequest.cpp ${CMAKE_SOURCE_DIR}/common/http/Constant.cpp)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/timer/Timer.cpp ${CMAKE_SOURCE_DIR}/common/timer/HttpRequestTimerEvent.cpp)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/compression/Compressor.cpp ${CMAKE_SOURCE_DIR}/common/compression/CompressorFactory.cpp ${CMAKE_SOURCE_DIR}/common/compression/LZ4Compressor.cpp ${CMAKE_SOURCE_DIR}/common/compression/ZstdCompressor.cpp)
 # remove several files in common
@@ -38,12 +38,6 @@ if(MSVC)
     # remove LinuxDaemonUtil in common
     if (ENABLE_ENTERPRISE)
         list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
-    endif()
-elseif(UNIX)
-    if (LINUX)
-        # needed by observer in common
-        file(GLOB PICOHTTPPARSER_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/protocol/picohttpparser/*.c ${CMAKE_SOURCE_DIR}/common/protocol/picohttpparser/*.h)
-        list(APPEND THIS_SOURCE_FILES_LIST ${PICOHTTPPARSER_SOURCE_FILES})
     endif()
 endif()
 

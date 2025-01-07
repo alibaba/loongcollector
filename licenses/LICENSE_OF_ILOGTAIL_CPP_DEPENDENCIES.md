@@ -32,7 +32,6 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/Tencent/rapidjson](https://github.com/Tencent/rapidjson/blob/master/license.txt)
 - [https://github.com/gabime/spdlog](https://github.com/gabime/spdlog/blob/v1.x/LICENSE)
 - [https://github.com/jbeder/yaml-cpp](https://github.com/jbeder/yaml-cpp/blob/master/LICENSE)
-- [https://github.com/h2o/picohttpparser](https://github.com/h2o/picohttpparser/blob/master/picohttpparser.c)
 - [https://github.com/duckdb/duckdb](https://github.com/duckdb/duckdb/blob/main/LICENSE)
 - [https://github.com/jupp0r/prometheus-cpp](https://github.com/jupp0r/prometheus-cpp/blob/master/LICENSE)
 

@@ -18,6 +18,7 @@
 #define _LOG_SPLITED_FILE_PATH_H__
 
 #include <string>
+
 #include "FileSystemUtil.h"
 
 namespace logtail {

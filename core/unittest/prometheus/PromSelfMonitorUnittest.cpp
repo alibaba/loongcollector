@@ -23,7 +23,7 @@ void PromSelfMonitorUnittest::TestCounterAdd() {
 
     // check result
     auto metric = selfMonitor->mPromStatusMap["2XX"]->GetCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL);
-    APSARA_TEST_EQUAL("plugin_prom_subscribe_total", metric->GetName());
+    APSARA_TEST_EQUAL("prom_subscribe_total", metric->GetName());
     APSARA_TEST_EQUAL(999ULL, metric->GetValue());
     selfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, 200);
     APSARA_TEST_EQUAL(1000ULL, metric->GetValue());
@@ -41,7 +41,7 @@ void PromSelfMonitorUnittest::TestIntGaugeSet() {
 
     // check result
     auto metric = selfMonitor->mPromStatusMap["2XX"]->GetIntGauge(METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS);
-    APSARA_TEST_EQUAL("plugin_prom_subscribe_targets", metric->GetName());
+    APSARA_TEST_EQUAL("prom_subscribe_targets", metric->GetName());
     APSARA_TEST_EQUAL(999ULL, metric->GetValue());
     selfMonitor->SetIntGauge(METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS, 200, 0);
     APSARA_TEST_EQUAL(0ULL, metric->GetValue());

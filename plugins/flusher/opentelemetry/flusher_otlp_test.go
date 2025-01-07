@@ -50,6 +50,13 @@ func (t *TestOtlpLogService) Export(ctx context.Context, request *otlpv1.ExportL
 }
 
 func Test_Flusher_Init(t *testing.T) {
+	convey.Convey("When config is invalid", t, func() {
+		convey.Convey("When FlusherOTLP is not initialized", func() {
+			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: ":8080"}}
+			err := f.Stop()
+			convey.So(err, convey.ShouldBeNil)
+		})
+	})
 	convey.Convey("When init grpc service", t, func() {
 		_, server := newTestGrpcService(t, ":8080", time.Nanosecond)
 		defer func() {
@@ -60,6 +67,8 @@ func Test_Flusher_Init(t *testing.T) {
 		convey.Convey("When FlusherOTLP init", func() {
 			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: ":8080"}}
 			err := f.Init(logCtx)
+			convey.So(err, convey.ShouldBeNil)
+			err = f.Stop()
 			convey.So(err, convey.ShouldBeNil)
 		})
 	})

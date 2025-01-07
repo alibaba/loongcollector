@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <functional>
 #include <map>
 #include <string>
@@ -47,10 +48,9 @@ public:
 
     void Reset(MetricEvent*);
 
-    void Range(const std::function<void(const std::string&, const std::string&)>&);
+    void Range(const std::function<void(const std::string&, const std::string&)>&) const;
 
 private:
-
     LabelMap mLabels;
 
     MetricEvent* mMetricEventPtr = nullptr;

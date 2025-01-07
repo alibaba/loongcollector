@@ -18,8 +18,10 @@
 
 #include <chrono>
 #include <cstdint>
+
 #include <utility>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "go_pipeline/LogtailPlugin.h"
@@ -69,10 +71,13 @@ void AddExtendedGlobalParamToGoPipeline(const Json::Value& extendedParams, Json:
 bool Pipeline::Init(PipelineConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
+    mSingletonInput = config.mSingletonInput;
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
     mContext.SetPipeline(*this);
     mContext.SetIsFirstProcessorJsonFlag(config.mIsFirstProcessorJson);
+    mContext.SetHasNativeProcessorsFlag(config.mHasNativeProcessor);
+    mContext.SetIsFlushingThroughGoPipelineFlag(config.IsFlushingThroughGoPipelineExisted());
 
     // for special treatment below
     const InputFile* inputFile = nullptr;
@@ -80,12 +85,12 @@ bool Pipeline::Init(PipelineConfig&& config) {
     bool hasFlusherSLS = false;
 
     // to send alarm and init MetricsRecord before flusherSLS is built, a temporary object is made, which will be
-    unique_ptr<FlusherSLS> SLSTmp = make_unique<FlusherSLS>();
+    FlusherSLS SLSTmp;
     if (!config.mProject.empty()) {
-        SLSTmp->mProject = config.mProject;
-        SLSTmp->mLogstore = config.mLogstore;
-        SLSTmp->mRegion = config.mRegion;
-        mContext.SetSLSInfo(SLSTmp.get());
+        SLSTmp.mProject = config.mProject;
+        SLSTmp.mLogstore = config.mLogstore;
+        SLSTmp.mRegion = config.mRegion;
+        mContext.SetSLSInfo(&SLSTmp);
     }
 
     mPluginID.store(0);
@@ -164,7 +169,7 @@ bool Pipeline::Init(PipelineConfig&& config) {
             = PluginRegistry::GetInstance()->CreateFlusher(pluginType, GenNextPluginMeta(false));
         if (flusher) {
             Json::Value optionalGoPipeline;
-            if (!flusher->Init(detail, mContext, optionalGoPipeline)) {
+            if (!flusher->Init(detail, mContext, i, optionalGoPipeline)) {
                 return false;
             }
             mFlushers.emplace_back(std::move(flusher));
@@ -286,15 +291,12 @@ bool Pipeline::Init(PipelineConfig&& config) {
                                    mContext.GetRegion());
             }
         }
-        uint32_t priority = mContext.GetGlobalConfig().mProcessPriority == 0
-            ? ProcessQueueManager::sMaxPriority
-            : mContext.GetGlobalConfig().mProcessPriority - 1;
         if (isInputSupportAck) {
             ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(
-                mContext.GetProcessQueueKey(), priority, mContext);
+                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, mContext);
         } else {
             ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
-                mContext.GetProcessQueueKey(), priority, 1024, mContext);
+                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, 1024, mContext);
         }
 
 
@@ -316,21 +318,28 @@ bool Pipeline::Init(PipelineConfig&& config) {
         ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef,
-        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
+                                                         MetricCategory::METRIC_CATEGORY_PIPELINE,
+                                                         {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
+                                                          {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
+                                                          {METRIC_LABEL_KEY_LOGSTORE, mContext.GetLogstoreName()}});
     mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
     mProcessorsInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     mProcessorsInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);
     mProcessorsInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES);
-    mProcessorsTotalProcessTimeMs = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
+    mProcessorsTotalProcessTimeMs
+        = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
+    mFlushersInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
+    mFlushersInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
+    mFlushersInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
+    mFlushersTotalPackageTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
 
     return true;
 }
 
 void Pipeline::Start() {
-#ifndef APSARA_UNIT_TEST_MAIN
-    // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
+    // #ifndef APSARA_UNIT_TEST_MAIN
+    //  TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
     for (const auto& flusher : mFlushers) {
         flusher->Start();
     }
@@ -350,7 +359,7 @@ void Pipeline::Start() {
     }
 
     mStartTime->Set(chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
-#endif
+    // #endif
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
@@ -368,29 +377,35 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
-    mProcessorsTotalProcessTimeMs->Add(
-        chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
+    mProcessorsTotalProcessTimeMs->Add(chrono::system_clock::now() - before);
 }
 
 bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
+    for (const auto& group : groupList) {
+        mFlushersInEventsTotal->Add(group.GetEvents().size());
+        mFlushersInSizeBytes->Add(group.DataSize());
+    }
+    mFlushersInGroupsTotal->Add(groupList.size());
+
+    auto before = chrono::system_clock::now();
     bool allSucceeded = true;
     for (auto& group : groupList) {
-        auto flusherIdx = mRouter.Route(group);
-        for (size_t i = 0; i < flusherIdx.size(); ++i) {
-            if (flusherIdx[i] >= mFlushers.size()) {
-                LOG_ERROR(
-                    sLogger,
-                    ("unexpected error", "invalid flusher index")("flusher index", flusherIdx[i])("config", mName));
+        if (group.GetEvents().empty()) {
+            LOG_DEBUG(sLogger, ("empty event group", "discard")("config", mName));
+            continue;
+        }
+        auto res = mRouter.Route(group);
+        for (auto& item : res) {
+            if (item.first >= mFlushers.size()) {
+                LOG_ERROR(sLogger,
+                          ("unexpected error", "invalid flusher index")("flusher index", item.first)("config", mName));
                 allSucceeded = false;
                 continue;
             }
-            if (i + 1 != flusherIdx.size()) {
-                allSucceeded = mFlushers[flusherIdx[i]]->Send(group.Copy()) && allSucceeded;
-            } else {
-                allSucceeded = mFlushers[flusherIdx[i]]->Send(std::move(group)) && allSucceeded;
-            }
+            allSucceeded = mFlushers[item.first]->Send(std::move(item.second)) && allSucceeded;
         }
     }
+    mFlushersTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
     return allSucceeded;
 }
 
@@ -404,7 +419,6 @@ bool Pipeline::FlushBatch() {
 }
 
 void Pipeline::Stop(bool isRemoving) {
-#ifndef APSARA_UNIT_TEST_MAIN
     // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入stopDisabled里
     for (const auto& input : mInputs) {
         input->Stop(isRemoving);
@@ -418,9 +432,7 @@ void Pipeline::Stop(bool isRemoving) {
     ProcessQueueManager::GetInstance()->DisablePop(mName, isRemoving);
     WaitAllItemsInProcessFinished();
 
-    if (!isRemoving) {
-        FlushBatch();
-    }
+    FlushBatch();
 
     if (!mGoPipelineWithoutInput.isNull()) {
         // Go pipeline `Stop` will stop and delete
@@ -430,7 +442,6 @@ void Pipeline::Stop(bool isRemoving) {
     for (const auto& flusher : mFlushers) {
         flusher->Stop(isRemoving);
     }
-#endif
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
 }
 
@@ -493,9 +504,9 @@ bool Pipeline::LoadGoPipelines() const {
                                                         mContext.GetRegion(),
                                                         mContext.GetLogstoreKey())) {
             LOG_ERROR(mContext.GetLogger(),
-                      ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
+                      ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
-            LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
                                                    mContext.GetProjectName(),
                                                    mContext.GetLogstoreName(),
@@ -512,9 +523,9 @@ bool Pipeline::LoadGoPipelines() const {
                                                         mContext.GetRegion(),
                                                         mContext.GetLogstoreKey())) {
             LOG_ERROR(mContext.GetLogger(),
-                      ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
+                      ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
-            LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
                                                    mContext.GetProjectName(),
                                                    mContext.GetLogstoreName(),
@@ -545,7 +556,7 @@ void Pipeline::WaitAllItemsInProcessFinished() {
         uint64_t duration = GetCurrentTimeInMilliSeconds() - startTime;
         if (!alarmOnce && duration > 10000) { // 10s
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
-            LogtailAlarm::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
                                                    string("pipeline stop too slow, config: ") + mName
                                                        + "; cost:" + std::to_string(duration),
                                                    mContext.GetProjectName(),

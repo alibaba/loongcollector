@@ -14,18 +14,15 @@
 
 #include "ConfigManager.h"
 
-#include <curl/curl.h>
+#include <cctype>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include <cctype>
 #if defined(__linux__)
 #include <fnmatch.h>
 #include <unistd.h>
 #endif
 #include <limits.h>
-#include <re2/re2.h>
 
 #include <fstream>
 #include <set>
@@ -36,7 +33,6 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "common/CompressTools.h"
-#include "common/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/ExceptionBase.h"
 #include "common/FileSystemUtil.h"
@@ -46,11 +42,11 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
+#include "constants/Constants.h"
 #include "file_server/EventDispatcher.h"
-#include "file_server/event_handler/EventHandler.h"
 #include "file_server/FileServer.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "file_server/event_handler/EventHandler.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
 
@@ -101,7 +97,7 @@ DEFINE_FLAG_INT32(docker_config_update_interval, "interval between docker config
 
 namespace logtail {
 
-// 
+//
 ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot) {
     // Get full path, if it is a relative path, prepend process execution dir.
     std::string fullPath = configName;
@@ -111,10 +107,15 @@ ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot
 
     ifstream is;
     is.open(fullPath.c_str());
-    if (!is.good()) {
+    if (!is) { // https://horstmann.com/cpp/pitfalls.html
         return CONFIG_NOT_EXIST;
     }
-    std::string buffer((std::istreambuf_iterator<char>(is)), (std::istreambuf_iterator<char>()));
+    std::string buffer;
+    try {
+        buffer.assign(std::istreambuf_iterator<char>(is), std::istreambuf_iterator<char>());
+    } catch (const std::ios_base::failure& e) {
+        return CONFIG_NOT_EXIST;
+    }
     if (!IsValidJson(buffer.c_str(), buffer.length())) {
         return CONFIG_INVALID_FORMAT;
     }
@@ -145,7 +146,7 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
         return result;
 
     if (!config.first->IsDirectoryInBlacklist(path))
-        result = EventDispatcher::GetInstance()->RegisterEventHandler(path.c_str(), config, mSharedHandler);
+        result = EventDispatcher::GetInstance()->RegisterEventHandler(path, config, mSharedHandler);
 
     if (!result)
         return result;
@@ -153,7 +154,7 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -200,7 +201,7 @@ ConfigManager::ConfigManager() {
     // CorrectionLogtailSysConfDir(); // first create dir then rewrite system-uuid file in GetSystemUUID
     // use a thread to get uuid, work around for CalculateDmiUUID hang
     // mUUID = CalculateDmiUUID();
-    // mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(time(NULL));
+    // mInstanceId = CalculateRandomUUID() + "_" + LoongCollectorMonitor::mIpAddr + "_" + ToString(time(NULL));
     // ReloadMappingConfig();
 }
 
@@ -306,9 +307,16 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
             if (registerStatus == GET_REGISTER_STATUS_ERROR) {
                 return;
             }
-            if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler)) {
+            if (config.first->mPreservedDirDepth < 0)
                 RegisterDescendants(
                     item, config, config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
+            else {
+                // preserve_depth register
+                RegisterHandlersWithinDepth(item,
+                                            config,
+                                            config.first->mPreservedDirDepth,
+                                            config.first->mMaxDirSearchDepth < 0 ? 100
+                                                                                 : config.first->mMaxDirSearchDepth);
             }
         } else {
             RegisterWildcardPath(config, item, depth + 1);
@@ -319,7 +327,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -334,7 +342,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
             LOG_WARNING(sLogger,
                         ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
                                                                                           config.first->GetBasePath()));
-            LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
                                                    string("too many sub directoried for path:" + path
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + config.first->GetBasePath()),
@@ -382,9 +390,16 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
                 if (registerStatus == GET_REGISTER_STATUS_ERROR) {
                     return;
                 }
-                if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler)) {
+                if (config.first->mPreservedDirDepth < 0)
                     RegisterDescendants(
                         item, config, config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
+                else {
+                    // preserve_depth register
+                    RegisterHandlersWithinDepth(
+                        item,
+                        config,
+                        config.first->mPreservedDirDepth,
+                        config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
                 }
             } else {
                 RegisterWildcardPath(config, item, depth + 1);
@@ -421,57 +436,62 @@ bool ConfigManager::RegisterHandlers(const string& basePath, const FileDiscovery
     DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(basePath);
     if (registerStatus == GET_REGISTER_STATUS_ERROR)
         return result;
-    // dir in config is valid by default, do not call pathValidator
-    result = EventDispatcher::GetInstance()->RegisterEventHandler(basePath.c_str(), config, mSharedHandler);
-    // if we come into a failure, do not try to register others, there must be something wrong!
-    if (!result)
-        return result;
 
     if (config.first->mPreservedDirDepth < 0)
         result = RegisterDescendants(
             basePath, config, config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
     else {
         // preserve_depth register
-        int depth = config.first->mPreservedDirDepth;
-        result = RegisterHandlersWithinDepth(basePath, config, depth);
+        result = RegisterHandlersWithinDepth(basePath,
+                                             config,
+                                             config.first->mPreservedDirDepth,
+                                             config.first->mMaxDirSearchDepth < 0 ? 100
+                                                                                  : config.first->mMaxDirSearchDepth);
     }
     return result;
 }
 
 bool ConfigManager::RegisterDirectory(const std::string& source, const std::string& object) {
-    // TODO��A potential bug: FindBestMatch will test @object with filePattern, which has very
+    // TODO: A potential bug: FindBestMatch will test @object with filePattern, which has very
     // low possibility to match a sub directory name, so here will return false in most cases.
     // e.g.: source: /path/to/monitor, file pattern: *.log, object: subdir.
     // Match(subdir, *.log) = false.
     FileDiscoveryConfig config = FindBestMatch(source, object);
-    if (config.first && !config.first->IsDirectoryInBlacklist(source))
-        return EventDispatcher::GetInstance()->RegisterEventHandler(source.c_str(), config, mSharedHandler);
+    if (config.first && !config.first->IsDirectoryInBlacklist(source)) {
+        return EventDispatcher::GetInstance()->RegisterEventHandler(source, config, mSharedHandler);
+    }
     return false;
 }
 
-bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path, const FileDiscoveryConfig& config, int depth) {
+bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
+                                                const FileDiscoveryConfig& config,
+                                                int preservedDirDepth,
+                                                int maxDepth) {
+    if (maxDepth < 0) {
+        return true;
+    }
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(path)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", path));
         return false;
     }
-    if (depth <= 0) {
-        DirCheckPointPtr dirCheckPoint;
-        if (CheckPointManager::Instance()->GetDirCheckPoint(path, dirCheckPoint) == false)
+    if (preservedDirDepth < 0) {
+        fsutil::PathStat statBuf;
+        if (!fsutil::PathStat::stat(path, statBuf)) {
             return true;
-        // path had dircheckpoint means it was watched before, so it is valid
-        const set<string>& subdir = dirCheckPoint.get()->mSubDir;
-        for (set<string>::iterator it = subdir.begin(); it != subdir.end(); it++) {
-            if (EventDispatcher::GetInstance()->RegisterEventHandler((*it).c_str(), config, mSharedHandler))
-                RegisterHandlersWithinDepth(*it, config, depth - 1);
         }
-        return true;
+        int64_t sec = 0;
+        int64_t nsec = 0;
+        statBuf.GetLastWriteTime(sec, nsec);
+        auto curTime = time(nullptr);
+        if (curTime - sec > INT32_FLAG(timeout_interval)) {
+            return true;
+        }
     }
-    bool result = true;
 
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         int err = GetErrno();
-        LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -480,35 +500,49 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path, const F
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
     }
+    if (!(EventDispatcher::GetInstance()->RegisterEventHandler(path, config, mSharedHandler))) {
+        // break;// fail early, do not try to register others
+        return false;
+    }
+    if (maxDepth == 0) {
+        return true;
+    }
+
+    if (preservedDirDepth == 0) {
+        DirCheckPointPtr dirCheckPoint;
+        if (CheckPointManager::Instance()->GetDirCheckPoint(path, dirCheckPoint)) {
+            // path had dircheckpoint means it was watched before, so it is valid
+            const set<string>& subdir = dirCheckPoint.get()->mSubDir;
+            for (const auto& it : subdir) {
+                RegisterHandlersWithinDepth(it, config, 0, maxDepth - 1);
+            }
+            return true;
+        }
+    }
     fsutil::Entry ent;
     while ((ent = dir.ReadNext())) {
         string item = PathJoin(path, ent.Name());
         if (ent.IsDir() && !config.first->IsDirectoryInBlacklist(item)) {
-            if (!(EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler))) {
-                // break;// fail early, do not try to register others
-                result = false;
-            } else // sub dir will not be registered if parent dir fails
-                RegisterHandlersWithinDepth(item, config, depth - 1);
+            RegisterHandlersWithinDepth(item, config, preservedDirDepth - 1, maxDepth - 1);
         }
     }
-
-    return result;
+    return true;
 }
 
 // path not terminated by '/', path already registered
 bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryConfig& config, int withinDepth) {
+    if (withinDepth < 0) {
+        return true;
+    }
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(path)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", path));
         return false;
-    }
-    if (withinDepth <= 0) {
-        return true;
     }
 
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -516,14 +550,20 @@ bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryC
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
     }
+    if (!EventDispatcher::GetInstance()->RegisterEventHandler(path, config, mSharedHandler)) {
+        // break;// fail early, do not try to register others
+        return false;
+    }
+    if (withinDepth == 0) {
+        return true;
+    }
+
     fsutil::Entry ent;
     bool result = true;
     while ((ent = dir.ReadNext())) {
         string item = PathJoin(path, ent.Name());
         if (ent.IsDir() && !config.first->IsDirectoryInBlacklist(item)) {
-            result = EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler);
-            if (result)
-                RegisterDescendants(item, config, withinDepth - 1);
+            RegisterDescendants(item, config, withinDepth - 1);
         }
     }
     return result;
@@ -615,7 +655,7 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -759,7 +799,7 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -798,7 +838,7 @@ void ConfigManager::SendAllMatchAlarm(const string& path,
               ("file", path + '/' + name)("include in too many configs", allConfig.size())(
                   "max multi config size", maxMultiConfigSize)("allconfigs", allConfigNames));
     for (auto iter = allConfig.begin(); iter != allConfig.end(); ++iter)
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             TOO_MANY_CONFIG_ALARM,
             path + '/' + name + " include in too many configs:" + ToString(allConfig.size())
                 + ", max multi config size : " + ToString(maxMultiConfigSize) + ", allmatch: " + allConfigNames,

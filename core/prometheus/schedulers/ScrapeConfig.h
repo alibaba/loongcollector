@@ -1,12 +1,14 @@
 #pragma once
 
-#include <json/value.h>
-
 #include <cstdint>
+
 #include <map>
 #include <string>
 #include <vector>
 
+#include "json/value.h"
+
+#include "common/http/HttpRequest.h"
 #include "prometheus/labels/Relabel.h"
 
 
@@ -28,6 +30,10 @@ public:
     // enable_compression Accept-Encoding header: gzip, identity
     std::map<std::string, std::string> mRequestHeaders;
 
+    bool mFollowRedirects;
+    bool mEnableTLS;
+    CurlTLS mTLS;
+
     uint64_t mMaxScrapeSizeBytes;
     uint64_t mSampleLimit;
     uint64_t mSeriesLimit;
@@ -47,6 +53,7 @@ private:
     bool InitAuthorization(const Json::Value& authorization);
     bool InitScrapeProtocols(const Json::Value& scrapeProtocols);
     void InitEnableCompression(bool enableCompression);
+    bool InitTLSConfig(const Json::Value& tlsConfig);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ScrapeConfigUnittest;

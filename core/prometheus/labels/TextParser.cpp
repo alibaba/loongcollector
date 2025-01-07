@@ -16,17 +16,16 @@
 
 #include "prometheus/labels/TextParser.h"
 
-#include <boost/algorithm/string.hpp>
-#include <charconv>
 #include <cmath>
+
 #include <string>
 
-#include "common/StringTools.h"
+#include "boost/algorithm/string.hpp"
+
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/StringView.h"
-#include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
 using namespace std;
@@ -61,26 +60,8 @@ PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTime
         }
         auto metricEvent = eGroup.CreateMetricEvent();
         if (ParseLine(line, *metricEvent)) {
-            eGroup.MutableEvents().emplace_back(std::move(metricEvent));
+            eGroup.MutableEvents().emplace_back(std::move(metricEvent), false, nullptr);
         }
-    }
-
-    return eGroup;
-}
-
-PipelineEventGroup TextParser::BuildLogGroup(const string& content) {
-    PipelineEventGroup eGroup(std::make_shared<SourceBuffer>());
-
-    vector<StringView> lines;
-    // pre-reserve vector size by 1024 which is experience value per line
-    lines.reserve(content.size() / 1024);
-    SplitStringView(content, '\n', lines);
-    for (const auto& line : lines) {
-        if (!IsValidMetric(line)) {
-            continue;
-        }
-        auto* logEvent = eGroup.AddLogEvent();
-        logEvent->SetContent(prometheus::PROMETHEUS, line);
     }
 
     return eGroup;

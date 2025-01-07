@@ -177,25 +177,6 @@ func (m *metaCollector) processConfigMapEntity(data *k8smeta.ObjectWrapper, meth
 	return nil
 }
 
-func (m *metaCollector) processSecretEntity(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*v1.Secret); ok {
-		log := &models.Log{}
-		log.Contents = models.NewLogContents()
-		log.Timestamp = uint64(time.Now().Unix())
-		m.processEntityCommonPart(log.Contents, obj.Kind, obj.Namespace, obj.Name, method, data.FirstObservedTime, data.LastObservedTime, obj.CreationTimestamp)
-
-		// custom fields
-		log.Contents.Add("api_version", obj.APIVersion)
-		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("type", string(obj.Type))
-
-		return []models.PipelineEvent{log}
-	}
-	return nil
-}
-
 func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	if obj, ok := data.Raw.(*v1.Namespace); ok {
 		log := &models.Log{}
@@ -288,18 +269,6 @@ func (m *metaCollector) processPodConfigMapLink(data *k8smeta.ObjectWrapper, met
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.ConfigMap.Kind, obj.ConfigMap.Namespace, obj.ConfigMap.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
-		log.Timestamp = uint64(time.Now().Unix())
-		return []models.PipelineEvent{log}
-	}
-	return nil
-}
-
-func (m *metaCollector) processPodSecretLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*k8smeta.PodSecret); ok {
-		log := &models.Log{}
-		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Secret.Kind, obj.Secret.Namespace, obj.Secret.Name, method, data.FirstObservedTime, data.LastObservedTime)
 		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}

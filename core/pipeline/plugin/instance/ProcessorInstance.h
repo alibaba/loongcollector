@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 
+#include "json/json.h"
+
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/PluginInstance.h"
 #include "pipeline/plugin/interface/Processor.h"
@@ -44,7 +44,7 @@ private:
     CounterPtr mOutEventsTotal;
     CounterPtr mInSizeBytes;
     CounterPtr mOutSizeBytes;
-    CounterPtr mTotalProcessTimeMs;
+    TimeCounterPtr mTotalProcessTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorInstanceUnittest;
@@ -55,9 +55,11 @@ private:
     friend class ProcessorParseDelimiterNativeUnittest;
     friend class ProcessorFilterNativeUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
+    friend class ProcessorSplitLogStringNativeUnittest;
     friend class InputFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

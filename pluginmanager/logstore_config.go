@@ -93,7 +93,7 @@ type LogstoreConfig struct {
 	LogstoreKey          int64
 	FlushOutFlag         atomic.Bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
-	//   is offered in configuration, see build-in StatisticsConfig and AlarmConfig.
+	//   is offered in configuration, see build-in AlarmConfig.
 	GlobalConfig *config.GlobalConfig
 
 	Version      ConfigVersion
@@ -111,7 +111,7 @@ type LogstoreConfig struct {
 }
 
 func (p *LogstoreStatistics) Init(context pipeline.Context) {
-	labels := helper.GetCommonLabels(context, &pipeline.PluginMeta{})
+	labels := helper.GetPluginCommonLabels(context, &pipeline.PluginMeta{})
 	metricsRecord := context.RegisterLogstoreConfigMetricRecord(labels)
 	p.CollecLatencytMetric = helper.NewLatencyMetricAndRegister(metricsRecord, "collect_latency")
 	p.RawLogMetric = helper.NewCounterMetricAndRegister(metricsRecord, "raw_log")

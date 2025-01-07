@@ -29,14 +29,14 @@
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
 using namespace sls_logs;
 
-DEFINE_FLAG_INT64(read_file_time_slice, "microseconds", 50 * 1000);
+DEFINE_FLAG_INT64(read_file_time_slice, "microseconds", 25 * 1000);
 DEFINE_FLAG_INT32(logreader_timeout_interval,
                   "reader hasn't updated for a long time will be removed, seconds",
                   86400 * 20000); // roughly equivalent to not releasing logReader when timed out
@@ -82,7 +82,7 @@ void NormalEventHandler::Handle(const Event& event) {
                 mCreateHandlerPtr->Handle(event);
             } else if (!buf.IsRegFile()) {
                 LOG_INFO(sLogger, ("path is not file or directory, ignore it", fullPath)("stat mode", buf.GetMode()));
-                LogtailAlarm::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
                                                        string("found unexpected type mode: ") + ToString(buf.GetMode())
                                                            + ", file path: " + fullPath);
                 return;
@@ -119,7 +119,7 @@ void NormalEventHandler::Handle(const Event& event) {
                           "max depth", config.first->mMaxDirSearchDepth));
             EventHandler* newHandler = new CreateModifyHandler(mCreateHandlerPtr);
             EventHandler* handler = newHandler;
-            if (EventDispatcher::GetInstance()->RegisterEventHandler(path.c_str(), config, handler)) {
+            if (EventDispatcher::GetInstance()->RegisterEventHandler(path, config, handler)) {
                 if (handler != newHandler)
                     delete newHandler;
                 else
@@ -157,11 +157,13 @@ void CreateHandler::Handle(const Event& event) {
     if (!config.first)
         return;
     else if (event.IsDir())
-        ConfigManager::GetInstance()->RegisterHandlersRecursively(path, config, false);
+        ConfigManager::GetInstance()->RegisterHandlers(path, config);
     else {
         // symbolic link
-        if (EventDispatcher::GetInstance()->IsDirRegistered(path) == PATH_INODE_NOT_REGISTERED)
+        if (EventDispatcher::GetInstance()->IsDirRegistered(path) == PATH_INODE_NOT_REGISTERED) {
+            // TODO: why not use RegisterHandlers
             ConfigManager::GetInstance()->RegisterHandlersRecursively(path, config, true);
+        }
     }
 }
 
@@ -173,8 +175,9 @@ void CreateHandler::HandleTimeOut() {
 // TimeoutHandler implementation
 void TimeoutHandler::Handle(const Event& ev) {
     const string& dir = ev.GetSource();
-    EventDispatcher::GetInstance()->UnregisterEventHandler(dir.c_str());
+    EventDispatcher::GetInstance()->UnregisterEventHandler(dir);
     ConfigManager::GetInstance()->RemoveHandler(dir);
+    CheckPointManager::Instance()->DeleteDirCheckPoint(dir);
 }
 
 
@@ -231,7 +234,7 @@ void CreateModifyHandler::Handle(const Event& event) {
             isDir = true;
         else if (!buf.IsRegFile()) {
             LOG_INFO(sLogger, ("path is not file or directory, ignore it", path)("stat mode", buf.GetMode()));
-            LogtailAlarm::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
                                                    std::string("found unexpected type mode: ") + ToString(buf.GetMode())
                                                        + ", file path: " + path);
             return;
@@ -286,14 +289,9 @@ void CreateModifyHandler::HandleTimeOut() {
 // implementation for ModifyHandler
 ModifyHandler::ModifyHandler(const std::string& configName, const FileDiscoveryConfig& pConfig)
     : mConfigName(configName) {
-    if (pConfig.first && pConfig.second->GetGlobalConfig().mProcessPriority > 0
-        && pConfig.second->GetGlobalConfig().mProcessPriority <= ProcessQueueManager::sMaxPriority) {
-        mReadFileTimeSlice
-            = (1 << (ProcessQueueManager::sMaxPriority - pConfig.second->GetGlobalConfig().mProcessPriority + 1))
+    // default is 2 * INT64_FLAG(read_file_time_slice)
+    mReadFileTimeSlice = 1 << (ProcessQueueManager::sMaxPriority - pConfig.second->GetGlobalConfig().mPriority)
             * INT64_FLAG(read_file_time_slice);
-    } else {
-        mReadFileTimeSlice = INT64_FLAG(read_file_time_slice);
-    }
     mLastOverflowErrorTime = 0;
 }
 
@@ -336,7 +334,7 @@ void ModifyHandler::MakeSpaceForNewReader() {
                  "total log reader count exceeds upper limit")("reader count after clean", mDevInodeReaderMap.size()));
     // randomly choose one project to send alarm
     LogFileReaderPtr oneReader = mDevInodeReaderMap.begin()->second;
-    LogtailAlarm::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarm(
         FILE_READER_EXCEED_ALARM,
         string("total log reader count exceeds upper limit, delete some of the old readers, reader count after clean:")
             + ToString(mDevInodeReaderMap.size()),
@@ -388,7 +386,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
                     "logstore", readerConfig.second->GetLogstoreName())("config", readerConfig.second->GetConfigName())(
                     "log reader queue name", PathJoin(path, name))("max queue length",
                                                                    readerConfig.first->mRotatorQueueSize));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 DROP_LOG_ALARM,
                 string("log reader queue length excceeds upper limit, stop creating new reader, config: ")
                     + readerConfig.second->GetConfigName() + ", log reader queue name: " + PathJoin(path, name)
@@ -711,7 +709,7 @@ void ModifyHandler::Handle(const Event& event) {
                              ToString(reader->GetDevInode().inode),
                              reader->GetLastFilePos())("DevInode map size", mDevInodeReaderMap.size()));
                 recreateReaderFlag = true;
-                LogtailAlarm::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarm(
                     INNER_PROFILE_ALARM,
                     string("file dev inode changed, create new reader. new path:") + reader->GetHostLogPath()
                         + " ,project:" + reader->GetProject() + " ,logstore:" + reader->GetLogstore());
@@ -764,7 +762,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 ("logprocess queue is full, put modify event to event queue again",
                                  reader->GetHostLogPath())(reader->GetProject(), reader->GetLogstore()));
 
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         PROCESS_QUEUE_BUSY_ALARM,
                         string("logprocess queue is full, put modify event to event queue again, file:")
                             + reader->GetHostLogPath(),
@@ -777,7 +775,7 @@ void ModifyHandler::Handle(const Event& event) {
                     reader->GetQueueKey(), mConfigName, event, reader->GetDevInode(), curTime);
                 return;
             }
-            unique_ptr<LogBuffer> logBuffer(new LogBuffer);
+            auto logBuffer = make_unique<LogBuffer>();
             hasMoreData = reader->ReadLog(*logBuffer, &event);
             int32_t pushRetry = PushLogToProcessor(reader, logBuffer.get());
             if (!hasMoreData) {
@@ -1070,28 +1068,16 @@ void ModifyHandler::DeleteRollbackReader() {
 }
 
 void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
-    LogBuffer* logBuffer = new LogBuffer;
+    auto logBuffer = make_unique<LogBuffer>();
     auto pEvent = reader->CreateFlushTimeoutEvent();
     reader->ReadLog(*logBuffer, pEvent.get());
-    PushLogToProcessor(reader, logBuffer);
+    PushLogToProcessor(reader, logBuffer.get());
 }
 
 int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer) {
     int32_t pushRetry = 0;
     if (!logBuffer->rawBuffer.empty()) {
         reader->ReportMetrics(logBuffer->readLength);
-        LogFileProfiler::GetInstance()->AddProfilingReadBytes(reader->GetConfigName(),
-                                                              reader->GetRegion(),
-                                                              reader->GetProject(),
-                                                              reader->GetLogstore(),
-                                                              reader->GetConvertedPath(),
-                                                              reader->GetHostLogPath(),
-                                                              reader->GetContainerExtraTags(),
-                                                              reader->GetDevInode().dev,
-                                                              reader->GetDevInode().inode,
-                                                              reader->GetFileSize(),
-                                                              reader->GetLastFilePos(),
-                                                              time(NULL));
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
 
         while (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group))) // 10ms

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "monitor/metric_constants/MetricConstants.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -28,11 +28,13 @@ public:
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, "default_config");
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_TYPE, "default_plugin");
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_ID, "default_id");
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(*defaultLabels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(*defaultLabels));
         std::unordered_map<std::string, MetricType> metricKeys;
         metricKeys.emplace("default_counter", MetricType::METRIC_TYPE_COUNTER);
         metricKeys.emplace("default_gauge", MetricType::METRIC_TYPE_INT_GAUGE);
-        pluginMetricManager = std::make_shared<PluginMetricManager>(mMetricsRecordRef->GetLabels(), metricKeys);
+        pluginMetricManager = std::make_shared<PluginMetricManager>(
+            mMetricsRecordRef->GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     }
 
     void TearDown() {}

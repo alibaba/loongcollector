@@ -29,7 +29,7 @@ protected:
     static void SetUpTestCase() {
         sSourceBuffer.reset(new SourceBuffer);
         sEventGroup.reset(new PipelineEventGroup(sSourceBuffer));
-        sEvent = sEventGroup->CreateLogEvent();
+        sEvent = PipelineEventPtr(sEventGroup->CreateLogEvent(), false, nullptr);
     }
 
     void SetUp() override { mStatus.Reset(); }
@@ -98,7 +98,7 @@ void SLSEventBatchStatusUnittest::TestReset() {
 }
 
 void SLSEventBatchStatusUnittest::TestUpdate() {
-    PipelineEventPtr e1(sEventGroup->CreateLogEvent());
+    PipelineEventPtr e1(sEventGroup->CreateLogEvent(), false, nullptr);
     e1->SetTimestamp(1717398001);
     mStatus.Update(e1);
     time_t createTime = mStatus.GetCreateTime();
@@ -106,7 +106,7 @@ void SLSEventBatchStatusUnittest::TestUpdate() {
     APSARA_TEST_EQUAL(e1->DataSize(), mStatus.GetSize());
     APSARA_TEST_EQUAL(1717398001 / 60, mStatus.GetCreateTimeMinute());
 
-    PipelineEventPtr e2(sEventGroup->CreateLogEvent());
+    PipelineEventPtr e2(sEventGroup->CreateLogEvent(), false, nullptr);
     e2->SetTimestamp(1717398030);
     mStatus.Update(e2);
     APSARA_TEST_EQUAL(2U, mStatus.GetCnt());

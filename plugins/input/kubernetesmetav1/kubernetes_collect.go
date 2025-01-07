@@ -40,7 +40,6 @@ const (
 	StorageClass          = "StorageClass"
 	Ingress               = "Ingress"
 	Configmap             = "ConfigMap"
-	Secret                = "Secret"
 )
 
 // Keys used in meta node.

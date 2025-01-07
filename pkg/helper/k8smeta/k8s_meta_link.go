@@ -41,8 +41,6 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getPodPVCLink(events)
 	case POD_CONFIGMAP:
 		return g.getPodConfigMapLink(events)
-	case POD_SECRET:
-		return g.getPodSecretLink(events)
 	case POD_SERVICE:
 		return g.getPodServiceLink(events)
 	case POD_CONTAINER:
@@ -278,39 +276,6 @@ func (g *LinkGenerator) getPodConfigMapLink(podList []*K8sMetaEvent) []*K8sMetaE
 								Raw: &PodConfigMap{
 									Pod:       pod,
 									ConfigMap: c.Raw.(*v1.ConfigMap),
-								},
-								FirstObservedTime: data.Object.FirstObservedTime,
-								LastObservedTime:  data.Object.LastObservedTime,
-							},
-						})
-					}
-				}
-			}
-		}
-	}
-	return result
-}
-
-func (g *LinkGenerator) getPodSecretLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
-	result := make([]*K8sMetaEvent, 0)
-	for _, data := range podList {
-		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok {
-			continue
-		}
-		for _, volume := range pod.Spec.Volumes {
-			if volume.Secret != nil {
-				secretName := volume.Secret.SecretName
-				secretList := g.metaCache[SECRET].Get([]string{generateNameWithNamespaceKey(pod.Namespace, secretName)})
-				for _, secret := range secretList {
-					for _, s := range secret {
-						result = append(result, &K8sMetaEvent{
-							EventType: data.EventType,
-							Object: &ObjectWrapper{
-								ResourceType: POD_SECRET,
-								Raw: &PodSecret{
-									Pod:    pod,
-									Secret: s.Raw.(*v1.Secret),
 								},
 								FirstObservedTime: data.Object.FirstObservedTime,
 								LastObservedTime:  data.Object.LastObservedTime,

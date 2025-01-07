@@ -18,8 +18,9 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "protobuf/sls/checkpoint.pb.h"
+
 #include "pipeline/queue/QueueKey.h"
+#include "protobuf/sls/checkpoint.pb.h"
 
 namespace logtail {
 
@@ -29,10 +30,8 @@ public:
     std::string key;
     QueueKey fbKey;
     RangeCheckpointPB data;
-    std::vector<std::pair<uint64_t, size_t>> positions;
 
     inline void Prepare() {
-        positions.clear();
         data.set_committed(false);
         save();
     }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -12,12 +13,25 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/controller"
+	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
 
 const dependencyHome = "test_cases"
 
 type DockerComposeEnv struct {
 	BootController *controller.BootController
+	BootType       dockercompose.BootType
+}
+
+func SetDockerComposeBootType(t dockercompose.BootType) error {
+	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
+		if t != dockercompose.DockerComposeBootTypeE2E && t != dockercompose.DockerComposeBootTypeBenchmark {
+			return fmt.Errorf("invalid docker compose boot type, not e2e or benchmark")
+		}
+		dockerComposeEnv.BootType = t
+		return nil
+	}
+	return fmt.Errorf("env is not docker-compose")
 }
 
 func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.Context, error) {
@@ -28,7 +42,7 @@ func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.
 			return ctx, err
 		}
 		dockerComposeEnv.BootController = new(controller.BootController)
-		if err = dockerComposeEnv.BootController.Init(); err != nil {
+		if err = dockerComposeEnv.BootController.Init(dockerComposeEnv.BootType); err != nil {
 			return ctx, err
 		}
 
@@ -93,6 +107,7 @@ func NewDockerComposeEnv() *DockerComposeEnv {
 	reportDir := root + "/report/"
 	_ = os.Mkdir(reportDir, 0750)
 	config.ConfigDir = reportDir + "config"
+	env.BootType = dockercompose.DockerComposeBootTypeE2E
 	return env
 }
 
@@ -109,10 +124,20 @@ func (d *DockerComposeEnv) Clean() error {
 	return nil
 }
 
-func (d *DockerComposeEnv) ExecOnLogtail(command string) error {
-	return fmt.Errorf("not implemented")
+func (d *DockerComposeEnv) ExecOnLoongCollector(command string) (string, error) {
+	// exec on host of docker compose
+	fmt.Println(command)
+	cmd := exec.Command("sh", "-c", command)
+	output, err := cmd.CombinedOutput()
+	fmt.Println(string(output))
+	return string(output), err
 }
 
-func (d *DockerComposeEnv) ExecOnSource(ctx context.Context, command string) error {
-	return fmt.Errorf("not implemented")
+func (d *DockerComposeEnv) ExecOnSource(ctx context.Context, command string) (string, error) {
+	// exec on host of docker compose
+	fmt.Println(command)
+	cmd := exec.Command("sh", "-c", command)
+	output, err := cmd.CombinedOutput()
+	fmt.Println(string(output))
+	return string(output), err
 }

@@ -14,11 +14,6 @@
 
 #include "plugin/flusher/sls/FlusherSLS.h"
 
-#include "sls_logs.pb.h"
-
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "app_config/AppConfig.h"
 #include "common/EndpointUtil.h"
 #include "common/HashUtil.h"
@@ -26,28 +21,31 @@
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
+#include "common/http/Constant.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/batch/FlushStrategy.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
+#include "plugin/flusher/sls/SLSConstant.h"
 #include "plugin/flusher/sls/SLSResponse.h"
+#include "plugin/flusher/sls/SLSUtil.h"
 #include "plugin/flusher/sls/SendResult.h"
 #include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
-#include "sdk/Common.h"
-#include "sls_control/SLSControl.h"
-// TODO: temporarily used here
-#include "pipeline/PipelineManager.h"
-#include "plugin/flusher/sls/DiskBufferWriter.h"
+#include "sls_logs.pb.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 using namespace std;
 
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
 DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
-DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
+DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 512KB)", 512 * 1024);
 DEFINE_FLAG_INT32(send_check_real_ip_interval, "seconds", 2);
 
 DEFINE_FLAG_INT32(unauthorized_send_retrytimes,
@@ -57,8 +55,9 @@ DEFINE_FLAG_INT32(unauthorized_allowed_delay_after_reset, "allowed delay to retr
 DEFINE_FLAG_INT32(discard_send_fail_interval, "discard data when send fail after 6 * 3600 seconds", 6 * 3600);
 DEFINE_FLAG_INT32(profile_data_send_retrytimes, "how many times should retry if profile data send fail", 5);
 DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this value", 5);
-DEFINE_FLAG_BOOL(global_network_success, "global network success flag, default false", false);
 DEFINE_FLAG_BOOL(enable_metricstore_channel, "only works for metrics data for enhance metrics query performance", true);
+DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
+DEFINE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio, "", 1.2);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
@@ -67,6 +66,8 @@ namespace logtail {
 enum class OperationOnFail { RETRY_IMMEDIATELY, RETRY_LATER, DISCARD };
 
 static const int ON_FAIL_LOG_WARNING_INTERVAL_SECOND = 10;
+
+static constexpr int64_t kInvalidHashKeySeqID = 0;
 
 static const char* GetOperationString(OperationOnFail op) {
     switch (op) {
@@ -81,9 +82,7 @@ static const char* GetOperationString(OperationOnFail op) {
 }
 
 static OperationOnFail DefaultOperation(uint32_t retryTimes) {
-    if (retryTimes == 1) {
-        return OperationOnFail::RETRY_IMMEDIATELY;
-    } else if (retryTimes > static_cast<uint32_t>(INT32_FLAG(unknow_error_try_max))) {
+    if (retryTimes > static_cast<uint32_t>(INT32_FLAG(unknow_error_try_max))) {
         return OperationOnFail::DISCARD;
     } else {
         return OperationOnFail::RETRY_LATER;
@@ -93,7 +92,6 @@ static OperationOnFail DefaultOperation(uint32_t retryTimes) {
 void FlusherSLS::InitResource() {
 #ifndef APSARA_UNIT_TEST_MAIN
     if (!sIsResourceInited) {
-        SLSControl::GetInstance()->Init();
         SLSClientManager::GetInstance()->Init();
         DiskBufferWriter::GetInstance()->Init();
         sIsResourceInited = true;
@@ -115,9 +113,8 @@ unordered_map<string, weak_ptr<ConcurrencyLimiter>> FlusherSLS::sProjectConcurre
 unordered_map<string, weak_ptr<ConcurrencyLimiter>> FlusherSLS::sRegionConcurrencyLimiterMap;
 unordered_map<string, weak_ptr<ConcurrencyLimiter>> FlusherSLS::sLogstoreConcurrencyLimiterMap;
 
-
-shared_ptr<ConcurrencyLimiter> GetConcurrencyLimiter() {
-    return make_shared<ConcurrencyLimiter>(AppConfig::GetInstance()->GetSendRequestConcurrency());
+shared_ptr<ConcurrencyLimiter> GetConcurrencyLimiter(const std::string& description) {
+    return make_shared<ConcurrencyLimiter>(description, AppConfig::GetInstance()->GetSendRequestConcurrency());
 }
 
 shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const std::string& project,
@@ -127,12 +124,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
 
     auto iter = sLogstoreConcurrencyLimiterMap.find(key);
     if (iter == sLogstoreConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sLogstoreConcurrencyLimiterMap.try_emplace(key, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -143,12 +142,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     lock_guard<mutex> lock(sMux);
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -159,12 +160,20 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
     lock_guard<mutex> lock(sMux);
     auto iter = sRegionConcurrencyLimiterMap.find(region);
     if (iter == sRegionConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter();
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
         return limiter;
     }
@@ -212,75 +221,42 @@ void FlusherSLS::SetDefaultRegion(const string& region) {
     sDefaultRegion = region;
 }
 
-mutex FlusherSLS::sProjectRefCntMapLock;
+mutex FlusherSLS::sProjectRegionMapLock;
 unordered_map<string, int32_t> FlusherSLS::sProjectRefCntMap;
-mutex FlusherSLS::sRegionRefCntMapLock;
-unordered_map<string, int32_t> FlusherSLS::sRegionRefCntMap;
+unordered_map<string, string> FlusherSLS::sProjectRegionMap;
 
 string FlusherSLS::GetAllProjects() {
     string result;
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
+    lock_guard<mutex> lock(sProjectRegionMapLock);
     for (auto iter = sProjectRefCntMap.cbegin(); iter != sProjectRefCntMap.cend(); ++iter) {
         result.append(iter->first).append(" ");
     }
     return result;
 }
 
-void FlusherSLS::IncreaseProjectReferenceCnt(const string& project) {
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
+std::string FlusherSLS::GetProjectRegion(const std::string& project) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
+    auto iter = sProjectRegionMap.find(project);
+    if (iter == sProjectRegionMap.end()) {
+        return "";
+    }
+    return iter->second;
+}
+
+void FlusherSLS::IncreaseProjectRegionReferenceCnt(const string& project, const string& region) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
     ++sProjectRefCntMap[project];
+    sProjectRegionMap[project] = region;
 }
 
-void FlusherSLS::DecreaseProjectReferenceCnt(const string& project) {
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
-    auto iter = sProjectRefCntMap.find(project);
-    if (iter == sProjectRefCntMap.end()) {
-        // should not happen
-        return;
-    }
-    if (--iter->second == 0) {
-        sProjectRefCntMap.erase(iter);
-    }
-}
-
-bool FlusherSLS::IsRegionContainingConfig(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
-    return sRegionRefCntMap.find(region) != sRegionRefCntMap.end();
-}
-
-void FlusherSLS::IncreaseRegionReferenceCnt(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
-    ++sRegionRefCntMap[region];
-}
-
-void FlusherSLS::DecreaseRegionReferenceCnt(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
-    auto iter = sRegionRefCntMap.find(region);
-    if (iter == sRegionRefCntMap.end()) {
-        // should not happen
-        return;
-    }
-    if (--iter->second == 0) {
-        sRegionRefCntMap.erase(iter);
-    }
-}
-
-mutex FlusherSLS::sRegionStatusLock;
-unordered_map<string, bool> FlusherSLS::sAllRegionStatus;
-
-void FlusherSLS::UpdateRegionStatus(const string& region, bool status) {
-    LOG_DEBUG(sLogger, ("update region status, region", region)("is network in good condition", ToString(status)));
-    lock_guard<mutex> lock(sRegionStatusLock);
-    sAllRegionStatus[region] = status;
-}
-
-bool FlusherSLS::GetRegionStatus(const string& region) {
-    lock_guard<mutex> lock(sRegionStatusLock);
-    auto rst = sAllRegionStatus.find(region);
-    if (rst == sAllRegionStatus.end()) {
-        return true;
-    } else {
-        return rst->second;
+void FlusherSLS::DecreaseProjectRegionReferenceCnt(const string& project, const string& region) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
+    auto projectRefCnt = sProjectRefCntMap.find(project);
+    if (projectRefCnt != sProjectRefCntMap.end()) {
+        if (--projectRefCnt->second == 0) {
+            sProjectRefCntMap.erase(projectRefCnt);
+            sProjectRegionMap.erase(project);
+        }
     }
 }
 
@@ -292,10 +268,10 @@ const unordered_set<string> FlusherSLS::sNativeParam = {"Project",
                                                         "Logstore",
                                                         "Region",
                                                         "Endpoint",
+                                                        "EndpointMode",
                                                         "Aliuid",
                                                         "CompressType",
                                                         "TelemetryType",
-                                                        "FlowControlExpireTime",
                                                         "MaxSendRate",
                                                         "ShardHashKeys",
                                                         "Batch"};
@@ -330,56 +306,24 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // Region
+    if (
 #ifdef __ENTERPRISE__
-    if (EnterpriseConfigProvider::GetInstance()->IsDataServerPrivateCloud()) {
-        mRegion = STRING_FLAG(default_region_name);
-    } else {
+        !EnterpriseConfigProvider::GetInstance()->IsDataServerPrivateCloud() &&
 #endif
-        // Region
-        if (!GetOptionalStringParam(config, "Region", mRegion, errorMsg)) {
-            PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                  mContext->GetAlarm(),
-                                  errorMsg,
-                                  mRegion,
-                                  sName,
-                                  mContext->GetConfigName(),
-                                  mContext->GetProjectName(),
-                                  mContext->GetLogstoreName(),
-                                  mContext->GetRegion());
-        }
-
-        // Endpoint
-#ifdef __ENTERPRISE__
-        if (!GetOptionalStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
-        } else {
-#else
-    if (!GetMandatoryStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
-    } else {
-#endif
-            mEndpoint = TrimString(mEndpoint);
-            if (!mEndpoint.empty()) {
-                SLSClientManager::GetInstance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
-            }
-        }
-#ifdef __ENTERPRISE__
+        !GetOptionalStringParam(config, "Region", mRegion, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mRegion,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
     }
 
+#ifdef __ENTERPRISE__
     // Aliuid
     if (!GetOptionalStringParam(config, "Aliuid", mAliuid, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
@@ -391,11 +335,82 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
+
+    // EndpointMode
+    string endpointMode = "default";
+    if (!GetOptionalStringParam(config, "EndpointMode", endpointMode, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              endpointMode,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+    if (endpointMode == "accelerate") {
+        mEndpointMode = EndpointMode::ACCELERATE;
+    } else if (endpointMode != "default") {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "string param EndpointMode is not valid",
+                              "default",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+    if (mEndpointMode == EndpointMode::DEFAULT) {
+        // for local pipeline whose flusher region is neither specified in local info nor included by config provider,
+        // param Endpoint should be used, and the mode is set to default.
+        // warning: if inconsistency exists among configs, only the first config would be considered in this situation.
+        if (!GetOptionalStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
+            mRegion, {mEndpoint}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::CREATE);
+    }
+    mCandidateHostsInfo
+        = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
+    LOG_INFO(mContext->GetLogger(),
+             ("get candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
+                 "endpoint mode", EndpointModeToString(mCandidateHostsInfo->GetMode())));
+#else
+    // Endpoint
+    if (!GetMandatoryStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    mEndpoint = TrimString(mEndpoint);
+    if (mEndpoint.empty()) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "param Endpoint is empty",
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 #endif
 
     // TelemetryType
     string telemetryType;
-
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -471,9 +486,11 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                              mContext->GetRegion());
     }
 
-    DefaultFlushStrategyOptions strategy{static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
-                                         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
-                                         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
+    DefaultFlushStrategyOptions strategy{
+        static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / DOUBLE_FLAG(sls_serialize_size_expansion_ratio)),
+        static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+        static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
+        static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
     if (!mBatcher.Init(
             itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
         // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
@@ -515,24 +532,12 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
             mMaxSendRate);
     }
 
-    // (Deprecated) FlowControlExpireTime
-    if (!GetOptionalUIntParam(config, "FlowControlExpireTime", mFlowControlExpireTime, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mFlowControlExpireTime,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
-
     GenerateGoPlugin(config, optionalGoPipeline);
 
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     mSendDoneCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL);
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);
+    mDiscardCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL);
     mNetworkErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL);
     mServerErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL);
     mShardWriteQuotaErrorCnt
@@ -550,22 +555,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
 bool FlusherSLS::Start() {
     Flusher::Start();
-    InitResource();
 
-    IncreaseProjectReferenceCnt(mProject);
-    IncreaseRegionReferenceCnt(mRegion);
-    SLSClientManager::GetInstance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    IncreaseProjectRegionReferenceCnt(mProject, mRegion);
     return true;
 }
 
 bool FlusherSLS::Stop(bool isPipelineRemoving) {
     Flusher::Stop(isPipelineRemoving);
 
-    DecreaseProjectReferenceCnt(mProject);
-    DecreaseRegionReferenceCnt(mRegion);
-    SLSClientManager::GetInstance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    DecreaseProjectRegionReferenceCnt(mProject, mRegion);
     return true;
 }
+
 
 bool FlusherSLS::Send(PipelineEventGroup&& g) {
     if (g.IsReplay()) {
@@ -589,124 +590,126 @@ bool FlusherSLS::FlushAll() {
     return SerializeAndPush(std::move(res));
 }
 
-unique_ptr<HttpSinkRequest> FlusherSLS::BuildRequest(SenderQueueItem* item) const {
-    auto data = static_cast<SLSSenderQueueItem*>(item);
-    static int32_t lastResetEndpointTime = 0;
-    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(mRegion, mAliuid);
-    int32_t curTime = time(NULL);
-
-    data->mCurrentEndpoint = sendClient->GetRawSlsHost();
-    if (data->mCurrentEndpoint.empty()) {
-        if (curTime - lastResetEndpointTime >= 30) {
-            SLSClientManager::GetInstance()->ResetClientEndpoint(mAliuid, mRegion, curTime);
-            data->mCurrentEndpoint = sendClient->GetRawSlsHost();
-            lastResetEndpointTime = curTime;
-        }
-    }
+bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem, string* errMsg) {
     if (mSendCnt) {
         mSendCnt->Add(1);
     }
-    if (BOOL_FLAG(send_prefer_real_ip)) {
-        if (curTime - sendClient->GetSlsRealIpUpdateTime() >= INT32_FLAG(send_check_real_ip_interval)) {
-            SLSClientManager::GetInstance()->UpdateSendClientRealIp(sendClient, mRegion);
+
+    SLSClientManager::AuthType type;
+    string accessKeyId, accessKeySecret;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(mAliuid, type, accessKeyId, accessKeySecret)) {
+#ifdef __ENTERPRISE__
+        if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
+                mProject, type, accessKeyId, accessKeySecret)) {
+            *keepItem = true;
+            *errMsg = "failed to get access key";
+            return false;
         }
-        data->mRealIpFlag = sendClient->GetRawSlsHostFlag();
+#endif
     }
 
-    if (data->mType == RawDataType::EVENT_GROUP) {
-        if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
-            return sendClient->CreatePostMetricStoreLogsRequest(
-                mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, data->mRawSize, item);
-        } else {
-            if (data->mShardHashKey.empty()) {
-                return sendClient->CreatePostLogStoreLogsRequest(mProject,
-                                                                 data->mLogstore,
-                                                                 ConvertCompressType(GetCompressType()),
-                                                                 data->mData,
-                                                                 data->mRawSize,
-                                                                 item);
-            } else {
-                auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
-                int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
-                return sendClient->CreatePostLogStoreLogsRequest(mProject,
-                                                                 data->mLogstore,
-                                                                 ConvertCompressType(GetCompressType()),
-                                                                 data->mData,
-                                                                 data->mRawSize,
-                                                                 item,
-                                                                 data->mShardHashKey,
-                                                                 hashKeySeqID);
+    auto data = static_cast<SLSSenderQueueItem*>(item);
+#ifdef __ENTERPRISE__
+    if (BOOL_FLAG(send_prefer_real_ip)) {
+        data->mCurrentHost = EnterpriseSLSClientManager::GetInstance()->GetRealIp(mRegion);
+        if (data->mCurrentHost.empty()) {
+            auto info
+                = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
+            if (mCandidateHostsInfo.get() != info.get()) {
+                LOG_INFO(sLogger,
+                         ("update candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
+                             "from", EndpointModeToString(mCandidateHostsInfo->GetMode()))(
+                             "to", EndpointModeToString(info->GetMode())));
+                mCandidateHostsInfo = info;
             }
+            data->mCurrentHost = mCandidateHostsInfo->GetCurrentHost();
+            data->mRealIpFlag = false;
+        } else {
+            data->mRealIpFlag = true;
         }
     } else {
-        if (data->mShardHashKey.empty())
-            return sendClient->CreatePostLogStoreLogPackageListRequest(
-                mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, item);
-        else
-            return sendClient->CreatePostLogStoreLogPackageListRequest(mProject,
-                                                                       data->mLogstore,
-                                                                       ConvertCompressType(GetCompressType()),
-                                                                       data->mData,
-                                                                       item,
-                                                                       data->mShardHashKey);
+        // in case local region endpoint mode is changed, we should always check before sending
+        auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
+        if (mCandidateHostsInfo == nullptr) {
+            // TODO: temporarily used here, for send logtail alarm only, should be removed after alarm is refactored
+            mCandidateHostsInfo = info;
+        }
+        if (mCandidateHostsInfo.get() != info.get()) {
+            LOG_INFO(sLogger,
+                     ("update candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
+                         "from", EndpointModeToString(mCandidateHostsInfo->GetMode()))(
+                         "to", EndpointModeToString(info->GetMode())));
+            mCandidateHostsInfo = info;
+        }
+        data->mCurrentHost = mCandidateHostsInfo->GetCurrentHost();
     }
+    if (data->mCurrentHost.empty()) {
+        if (mCandidateHostsInfo->IsInitialized()) {
+            GetRegionConcurrencyLimiter(mRegion)->OnFail(chrono::system_clock::now());
+        }
+        *errMsg = "failed to get available host";
+        *keepItem = true;
+        return false;
+    }
+#else
+    static string host = mProject + "." + mEndpoint;
+    data->mCurrentHost = host;
+#endif
+
+    switch (mTelemetryType) {
+        case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+            req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            break;
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
+            req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            break;
+        default:
+            break;
+    }
+    return true;
 }
 
 void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item) {
     if (mSendDoneCnt) {
         mSendDoneCnt->Add(1);
     }
-    SLSResponse slsResponse;
-    if (AppConfig::GetInstance()->IsResponseVerificationEnabled() && !IsSLSResponse(response)) {
-        slsResponse.mStatusCode = 0;
-        slsResponse.mErrorCode = sdk::LOGE_REQUEST_ERROR;
-        slsResponse.mErrorMsg = "invalid response body";
-    } else {
-        slsResponse.Parse(response);
-
-        if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
-            static uint32_t sCount = 0;
-            if (sCount++ % 10000 == 0 || slsResponse.mErrorCode == sdk::LOGE_REQUEST_TIME_EXPIRED) {
-                time_t serverTime = GetServerTime(response);
-                if (serverTime > 0) {
-                    UpdateTimeDelta(serverTime);
-                }
-            }
-        }
-    }
+    SLSResponse slsResponse = ParseHttpResponse(response);
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
+    SendResult sendResult = SEND_OK;
     if (slsResponse.mStatusCode == 200) {
         auto& cpt = data->mExactlyOnceCheckpoint;
         if (cpt) {
             cpt->Commit();
             cpt->IncreaseSequenceID();
         }
-        LOG_DEBUG(sLogger,
-                  ("send data to sls succeeded, item address",
-                   item)("request id", slsResponse.mRequestId)("config", configName)("region", mRegion)(
-                      "project", mProject)("logstore", data->mLogstore)("response time", curTime - data->mLastSendTime)(
-                      "total send time",
-                      ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mEnqueTime).count())
-                          + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
-                                                                                                isProfileData));
-        GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-        GetProjectConcurrencyLimiter(mProject)->OnSuccess();
-        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+        LOG_DEBUG(
+            sLogger,
+            ("send data to sls succeeded, item address", item)("request id", slsResponse.mRequestId)(
+                "config", configName)("region", mRegion)("project", mProject)("logstore", data->mLogstore)(
+                "response time",
+                ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mLastSendTime).count())
+                    + "ms")(
+                "total send time",
+                ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
+                    + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentHost)("is profile data",
+                                                                                      isProfileData));
+        GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+        GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
+        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
         SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
-        DealSenderQueueItemAfterSend(item, false);
         if (mSuccessCnt) {
             mSuccessCnt->Add(1);
         }
+        DealSenderQueueItemAfterSend(item, false);
     } else {
         OperationOnFail operation;
-        SendResult sendResult = ConvertErrorCode(slsResponse.mErrorCode);
+        sendResult = ConvertErrorCode(slsResponse.mErrorCode);
         ostringstream failDetail, suggestion;
-        string failEndpoint = data->mCurrentEndpoint;
         if (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR) {
             if (sendResult == SEND_NETWORK_ERROR) {
                 failDetail << "network error";
@@ -720,34 +723,24 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 }
             }
             suggestion << "check network connection to endpoint";
-            if (BOOL_FLAG(send_prefer_real_ip) && data->mRealIpFlag) {
+#ifdef __ENTERPRISE__
+            if (data->mRealIpFlag) {
                 // connect refused, use vip directly
                 failDetail << ", real ip may be stale, force update";
-                // just set force update flag
-                SLSClientManager::GetInstance()->ForceUpdateRealIp(mRegion);
+                EnterpriseSLSClientManager::GetInstance()->UpdateOutdatedRealIpRegions(mRegion);
             }
-            if (sendResult == SEND_NETWORK_ERROR) {
-                // only set network stat when no real ip
-                if (!BOOL_FLAG(send_prefer_real_ip) || !data->mRealIpFlag) {
-                    SLSClientManager::GetInstance()->UpdateEndpointStatus(mRegion, data->mCurrentEndpoint, false);
-                    if (SLSClientManager::GetInstance()->GetServerSwitchPolicy()
-                        == SLSClientManager::EndpointSwitchPolicy::DESIGNATED_FIRST) {
-                        SLSClientManager::GetInstance()->ResetClientEndpoint(mAliuid, mRegion, curTime);
-                    }
-                }
-            }
+#endif
             operation = data->mBufferOrNot ? OperationOnFail::RETRY_LATER : OperationOnFail::DISCARD;
-            GetRegionConcurrencyLimiter(mRegion)->OnFail();
-            GetProjectConcurrencyLimiter(mProject)->OnSuccess();
-            GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+            GetRegionConcurrencyLimiter(mRegion)->OnFail(curSystemTime);
+            GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
+            GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
         } else if (sendResult == SEND_QUOTA_EXCEED) {
-            BOOL_FLAG(global_network_success) = true;
-            if (slsResponse.mErrorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
+            if (slsResponse.mErrorCode == LOGE_SHARD_WRITE_QUOTA_EXCEED) {
                 failDetail << "shard write quota exceed";
                 suggestion << "Split logstore shards. https://help.aliyun.com/zh/sls/user-guide/expansion-of-resources";
-                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnFail();
-                GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-                GetProjectConcurrencyLimiter(mProject)->OnSuccess();
+                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnFail(curSystemTime);
+                GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+                GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
                 if (mShardWriteQuotaErrorCnt) {
                     mShardWriteQuotaErrorCnt->Add(1);
                 }
@@ -755,14 +748,14 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << "project write quota exceed";
                 suggestion << "Submit quota modification request. "
                               "https://help.aliyun.com/zh/sls/user-guide/expansion-of-resources";
-                GetProjectConcurrencyLimiter(mProject)->OnFail();
-                GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+                GetProjectConcurrencyLimiter(mProject)->OnFail(curSystemTime);
+                GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
                 if (mProjectQuotaErrorCnt) {
                     mProjectQuotaErrorCnt->Add(1);
                 }
             }
-            LogtailAlarm::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
                                                    "error_code: " + slsResponse.mErrorCode
                                                        + ", error_message: " + slsResponse.mErrorMsg
                                                        + ", request_id:" + slsResponse.mRequestId,
@@ -772,28 +765,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             operation = OperationOnFail::RETRY_LATER;
         } else if (sendResult == SEND_UNAUTHORIZED) {
             failDetail << "write unauthorized";
-            suggestion << "check https connection to endpoint or access keys provided";
-            if (data->mTryCnt > static_cast<uint32_t>(INT32_FLAG(unauthorized_send_retrytimes))) {
-                operation = OperationOnFail::DISCARD;
-            } else {
-                BOOL_FLAG(global_network_success) = true;
-#ifdef __ENTERPRISE__
-                if (mAliuid.empty() && !EnterpriseConfigProvider::GetInstance()->IsPubRegion()) {
-                    operation = OperationOnFail::RETRY_IMMEDIATELY;
-                } else {
-#endif
-                    int32_t lastUpdateTime;
-                    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(mRegion, mAliuid);
-                    if (SLSControl::GetInstance()->SetSlsSendClientAuth(mAliuid, false, sendClient, lastUpdateTime))
-                        operation = OperationOnFail::RETRY_IMMEDIATELY;
-                    else if (curTime - lastUpdateTime < INT32_FLAG(unauthorized_allowed_delay_after_reset))
-                        operation = OperationOnFail::RETRY_LATER;
-                    else
-                        operation = OperationOnFail::DISCARD;
-#ifdef __ENTERPRISE__
-                }
-#endif
-            }
+            suggestion << "check access keys provided";
+            operation = OperationOnFail::RETRY_LATER;
             if (mUnauthErrorCnt) {
                 mUnauthErrorCnt->Add(1);
             }
@@ -814,7 +787,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 if (!cpt) {
                     failDetail << ", unexpected result when exactly once checkpoint is not found";
                     suggestion << "report bug";
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         EXACTLY_ONCE_ALARM,
                         "drop exactly once log group because of invalid sequence ID, request id:"
                             + slsResponse.mRequestId,
@@ -832,7 +805,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << ", drop exactly once log group and commit checkpoint"
                            << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
-                LogtailAlarm::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,
                     "drop exactly once log group because of invalid sequence ID, cpt:" + cpt->key
                         + ", data:" + cpt->data.DebugString() + "request id:" + slsResponse.mRequestId,
@@ -843,7 +816,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 cpt->IncreaseSequenceID();
             } while (0);
         } else if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()
-                   && sdk::LOGE_REQUEST_TIME_EXPIRED == slsResponse.mErrorCode) {
+                   && LOGE_REQUEST_TIME_EXPIRED == slsResponse.mErrorCode) {
             failDetail << "write request expired, will retry";
             suggestion << "check local system time";
             operation = OperationOnFail::RETRY_IMMEDIATELY;
@@ -862,7 +835,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 mOtherErrorCnt->Add(1);
             }
         }
-        if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mEnqueTime).count()
+        if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mFirstEnqueTime).count()
             > INT32_FLAG(discard_send_fail_interval)) {
             operation = OperationOnFail::DISCARD;
         }
@@ -871,14 +844,16 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
 
 #define LOG_PATTERN \
-    ("failed to send request", failDetail.str())("operation", GetOperationString(operation))( \
-        "suggestion", suggestion.str())("item address", item)("request id", slsResponse.mRequestId)( \
-        "status code", slsResponse.mStatusCode)("error code", slsResponse.mErrorCode)( \
-        "errMsg", slsResponse.mErrorMsg)("config", configName)("region", mRegion)("project", mProject)( \
-        "logstore", data->mLogstore)("try cnt", data->mTryCnt)("response time", curTime - data->mLastSendTime)( \
-        "total send time", \
-        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mEnqueTime).count()) \
-            + "ms")("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData)
+    ("failed to send request", failDetail.str())("operation", GetOperationString(operation))("suggestion", \
+                                                                                             suggestion.str())( \
+        "item address", item)("request id", slsResponse.mRequestId)("status code", slsResponse.mStatusCode)( \
+        "error code", slsResponse.mErrorCode)("errMsg", slsResponse.mErrorMsg)("config", configName)( \
+        "region", mRegion)("project", mProject)("logstore", data->mLogstore)("try cnt", data->mTryCnt)( \
+        "response time", \
+        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mLastSendTime).count()) \
+            + "ms")("total send time", \
+                    ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
+                        + "ms")("endpoint", data->mCurrentHost)("is profile data", isProfileData)
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
@@ -886,7 +861,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 FlusherRunner::GetInstance()->PushToHttpSink(item, false);
                 break;
             case OperationOnFail::RETRY_LATER:
-                if (slsResponse.mErrorCode == sdk::LOGE_REQUEST_TIMEOUT
+                if (slsResponse.mErrorCode == LOGE_REQUEST_TIMEOUT
                     || curTime - data->mLastLogWarningTime > ON_FAIL_LOG_WARNING_INTERVAL_SECOND) {
                     LOG_WARNING(sLogger, LOG_PATTERN);
                     data->mLastLogWarningTime = curTime;
@@ -895,16 +870,19 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 DealSenderQueueItemAfterSend(item, true);
                 break;
             case OperationOnFail::DISCARD:
+                if (mDiscardCnt) {
+                    mDiscardCnt->Add(1);
+                }
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         SEND_DATA_FAIL_ALARM,
                         "failed to send request: " + failDetail.str() + "\toperation: " + GetOperationString(operation)
                             + "\trequestId: " + slsResponse.mRequestId
                             + "\tstatusCode: " + ToString(slsResponse.mStatusCode)
                             + "\terrorCode: " + slsResponse.mErrorCode + "\terrorMessage: " + slsResponse.mErrorMsg
-                            + "\tconfig: " + configName + "\tendpoint: " + data->mCurrentEndpoint,
+                            + "\tconfig: " + configName + "\tendpoint: " + data->mCurrentHost,
                         mProject,
                         data->mLogstore,
                         mRegion);
@@ -914,6 +892,18 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 break;
         }
     }
+#ifdef __ENTERPRISE__
+    bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
+    EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
+        mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
+    mCandidateHostsInfo->SelectBestHost();
+
+    if (!hasNetworkError) {
+        bool hasAuthError = sendResult == SEND_UNAUTHORIZED;
+        EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
+        EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(mProject, !hasAuthError);
+    }
+#endif
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
@@ -961,7 +951,7 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
             detail[itr.name()] = *itr;
         }
     }
-    if (!detail.empty()) {
+    if (mContext->IsFlushingThroughGoPipeline()) {
         Json::Value plugin(Json::objectValue);
         plugin["type"] = Pipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
         plugin["detail"] = detail;
@@ -1133,7 +1123,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 DISCARD_DATA_ALARM,
                 "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
             return false;
@@ -1148,7 +1138,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     LOG_WARNING(
         sLogger,
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    LogtailAlarm::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarm(
         DISCARD_DATA_ALARM,
         "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
     return false;
@@ -1168,7 +1158,7 @@ string FlusherSLS::GetShardHashKey(const BatchedEvents& g) const {
             key += "_";
         }
     }
-    return sdk::CalcMD5(key);
+    return CalcMD5(key);
 }
 
 void FlusherSLS::AddPackId(BatchedEvents& g) const {
@@ -1178,6 +1168,78 @@ void FlusherSLS::AddPackId(BatchedEvents& g) const {
         HashString(packIdPrefixStr + "_" + mProject + "_" + mLogstore));
     auto packId = g.mSourceBuffers[0]->CopyString(ToHexString(packidPrefix) + "-" + ToHexString(packSeq));
     g.mTags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, StringView(packId.data, packId.size));
+}
+
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const string& accessKeyId,
+                                                                      const string& accessKeySecret,
+                                                                      SLSClientManager::AuthType type,
+                                                                      SLSSenderQueueItem* item) const {
+    optional<uint64_t> seqId;
+    if (item->mExactlyOnceCheckpoint) {
+        seqId = item->mExactlyOnceCheckpoint->data.sequence_id();
+    }
+    string path, query;
+    map<string, string> header;
+    PreparePostLogStoreLogsRequest(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   item->mCurrentHost,
+                                   item->mRealIpFlag,
+                                   mProject,
+                                   item->mLogstore,
+                                   CompressTypeToString(mCompressor->GetCompressType()),
+                                   item->mType,
+                                   item->mData,
+                                   item->mRawSize,
+                                   item->mShardHashKey,
+                                   seqId,
+                                   path,
+                                   query,
+                                   header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        query,
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
+}
+
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
+                                                                         const string& accessKeySecret,
+                                                                         SLSClientManager::AuthType type,
+                                                                         SLSSenderQueueItem* item) const {
+    string path;
+    map<string, string> header;
+    PreparePostMetricStoreLogsRequest(accessKeyId,
+                                      accessKeySecret,
+                                      type,
+                                      item->mCurrentHost,
+                                      item->mRealIpFlag,
+                                      mProject,
+                                      item->mLogstore,
+                                      CompressTypeToString(mCompressor->GetCompressType()),
+                                      item->mData,
+                                      item->mRawSize,
+                                      path,
+                                      header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        "",
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

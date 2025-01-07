@@ -17,6 +17,7 @@
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEvent.h"
+#include "models/RawEvent.h"
 #include "models/SpanEvent.h"
 #include "unittest/Unittest.h"
 
@@ -41,9 +42,11 @@ void PipelineEventUnittest::TestGetType() {
     std::unique_ptr<LogEvent> logEvent = mEventGroup->CreateLogEvent();
     std::unique_ptr<MetricEvent> metricEvent = mEventGroup->CreateMetricEvent();
     std::unique_ptr<SpanEvent> spanEvent = mEventGroup->CreateSpanEvent();
+    std::unique_ptr<RawEvent> rawEvent = mEventGroup->CreateRawEvent();
     APSARA_TEST_STREQ_FATAL("Log", PipelineEventTypeToString(logEvent->GetType()).c_str());
     APSARA_TEST_STREQ_FATAL("Metric", PipelineEventTypeToString(metricEvent->GetType()).c_str());
     APSARA_TEST_STREQ_FATAL("Span", PipelineEventTypeToString(spanEvent->GetType()).c_str());
+    APSARA_TEST_STREQ_FATAL("Raw", PipelineEventTypeToString(rawEvent->GetType()).c_str());
 }
 
 UNIT_TEST_CASE(PipelineEventUnittest, TestGetType)

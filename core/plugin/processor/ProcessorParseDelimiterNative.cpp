@@ -175,9 +175,6 @@ bool ProcessorParseDelimiterNative::Init(const Json::Value& config) {
         return false;
     }
 
-    mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
-    mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
-
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -299,21 +296,19 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
                                                   GetContext().GetProjectName(),
                                                   GetContext().GetLogstoreName(),
                                                   GetContext().GetRegion());
-                ++(*mParseFailures);
                 parseSuccess = false;
             }
         } else {
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse delimiter log fail")
                                                        + ", logs:" + buffer.to_string(),
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
-            ++(*mParseFailures);
             parseSuccess = false;
         }
     } else {
-        LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                "no column keys defined",
                                                GetContext().GetProjectName(),
                                                GetContext().GetLogstoreName(),
@@ -321,7 +316,6 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
         LOG_WARNING(sLogger,
                     ("parse delimiter log fail", "no column keys defined")("project", GetContext().GetProjectName())(
                         "logstore", GetContext().GetLogstoreName())("file", logPath));
-        ++(*mParseFailures);
         parseSuccess = false;
     }
 
@@ -419,7 +413,6 @@ void ProcessorParseDelimiterNative::AddLog(const StringView& key,
         return;
     }
     targetEvent.SetContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
 }
 
 bool ProcessorParseDelimiterNative::IsSupportedEvent(const PipelineEventPtr& e) const {

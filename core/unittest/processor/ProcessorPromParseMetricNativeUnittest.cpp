@@ -85,8 +85,8 @@ void ProcessorParsePrometheusMetricUnittest::TestProcess() {
             if (newLine.empty() || newLine[0] == '#') {
                 continue;
             }
-            auto* MetricEvent = eGroup.AddLogEvent();
-            MetricEvent->SetContent(prometheus::PROMETHEUS, newLine);
+            auto* metricEvent = eGroup.AddRawEvent();
+            metricEvent->SetContent(newLine);
         }
 
         return eGroup;

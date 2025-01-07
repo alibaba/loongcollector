@@ -16,30 +16,33 @@
 #if defined(__linux__)
 #include <unistd.h>
 #endif
-#include <fcntl.h>
 #include <cstdlib>
+#include <fcntl.h>
 #include <string.h>
-#include <thread>
-#include <memory>
+
 #include <fstream>
-#include <json/json.h>
-#include "file_server/event_handler/EventHandler.h"
-#include "file_server/ConfigManager.h"
-#include "file_server/reader/LogFileReader.h"
+#include <memory>
+#include <thread>
+
+#include "json/json.h"
+
+#include "AlarmManager.h"
 #include "AppConfig.h"
-#include "Monitor.h"
-#include "EventDispatcher.h"
 #include "CheckPointManager.h"
-#include "file_server/event_handler/LogInput.h"
+#include "EventDispatcher.h"
+#include "Monitor.h"
 #include "Sender.h"
-#include "sls_logs.pb.h"
-#include "LogtailAlarm.h"
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/Lock.h"
-#include "common/Constants.h"
-#include "common/FileSystemUtil.h"
+#include "constants/Constants.h"
+#include "file_server/ConfigManager.h"
+#include "file_server/event_handler/EventHandler.h"
+#include "file_server/event_handler/LogInput.h"
+#include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "sdk/Common.h"
+#include "sls_logs.pb.h"
 
 using namespace std;
 using namespace logtail::sdk;
@@ -55,7 +58,6 @@ DECLARE_FLAG_INT32(mem_check_point_time_out);
 DECLARE_FLAG_INT32(file_check_point_time_out);
 DECLARE_FLAG_INT32(check_point_check_interval);
 DECLARE_FLAG_STRING(default_global_topic);
-DECLARE_FLAG_INT32(default_max_send_byte_per_sec);
 DECLARE_FLAG_INT32(default_send_byte_per_sec);
 DECLARE_FLAG_INT32(default_buffer_file_num);
 DECLARE_FLAG_INT32(default_local_file_size);
@@ -1705,7 +1707,7 @@ void ConfigUpdatorUnittest::GetLogContent(LogType logType, char* buffer) {
 
     if (logType == REGEX_LOG) {
         strftime(timeBuffer, sizeof(timeBuffer), " - - [%d/%b/%Y:%R:%S +0800] ", &timeInfo);
-        sprintf(buffer, "%s%s%s", LogFileProfiler::GetInstance()->mIpAddr.c_str(), timeBuffer, buffer2);
+        sprintf(buffer, "%s%s%s", LoongCollectorMonitor::GetInstance()->mIpAddr.c_str(), timeBuffer, buffer2);
         if ((rand()) % 2 == 0)
             strcat(buffer, buffer3);
         strcat(buffer, "\n");
@@ -2157,7 +2159,7 @@ void ConfigUpdatorUnittest::TestLoadIlogtailConfig() {
     AppConfig::GetInstance()->LoadAppConfig(ilogtailConfig);
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->mCpuUsageUpLimit, DOUBLE_FLAG(cpu_usage_up_limit));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->mMemUsageUpLimit, INT64_FLAG(memory_usage_up_limit));
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), INT32_FLAG(default_max_send_byte_per_sec));
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), kDefaultMaxSendBytePerSec);
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetBytePerSec(), INT32_FLAG(default_send_byte_per_sec));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetNumOfBufferFile(), INT32_FLAG(default_buffer_file_num));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetLocalFileSize(), INT32_FLAG(default_local_file_size));
@@ -2638,16 +2640,16 @@ void ConfigUpdatorUnittest::TestValidWildcardPath2() {
 
 void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // No wildcard.
-    PipelineConfig* cfg_1
-        = new PipelineConfig(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
+    PipelineConfig* cfg_1 = new PipelineConfig(
+        PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), false);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi"), false);
     delete cfg_1;
     // To be compatible with old settings
-    PipelineConfig* cfg_2
-        = new PipelineConfig(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat");
+    PipelineConfig* cfg_2 = new PipelineConfig(
+        PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat");
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), true);
@@ -2655,8 +2657,8 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi" + PS + "agec" + PS + "egegt"), true);
     delete cfg_2;
 
-    PipelineConfig* cfg_3
-        = new PipelineConfig(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
+    PipelineConfig* cfg_3 = new PipelineConfig(
+        PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), false);
@@ -2672,16 +2674,27 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_3;
 
     // Wildcard.
-    PipelineConfig* cfg_4
-        = new PipelineConfig(PS + "ab?" + PS + "de" + PS + "*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
+    PipelineConfig* cfg_4 = new PipelineConfig(
+        PS + "ab?" + PS + "de" + PS + "*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "xyz"), true);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi"), false);
     delete cfg_4;
     // To be compatible with old settings.
-    PipelineConfig* cfg_5 = new PipelineConfig(
-        PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat", "");
+    PipelineConfig* cfg_5 = new PipelineConfig(PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz",
+                                               "x.log",
+                                               REGEX_LOG,
+                                               "a",
+                                               "",
+                                               "",
+                                               "",
+                                               "prj",
+                                               true,
+                                               0,
+                                               -1,
+                                               "cat",
+                                               "");
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz" + PS + "xyz0"), true);
@@ -2692,8 +2705,8 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
               true);
     delete cfg_5;
 
-    PipelineConfig* cfg_6
-        = new PipelineConfig(PS + "abc" + PS + "d?" + PS + "f*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
+    PipelineConfig* cfg_6 = new PipelineConfig(
+        PS + "abc" + PS + "d?" + PS + "f*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc" + PS + "de"), false);
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);

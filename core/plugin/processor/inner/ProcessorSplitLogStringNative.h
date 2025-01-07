@@ -17,9 +17,10 @@
 #pragma once
 
 #include <cstdint>
+
 #include <vector>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
@@ -30,6 +31,8 @@ public:
 
     std::string mSourceKey = DEFAULT_CONTENT_KEY;
     char mSplitChar = '\n';
+    bool mAppendingLogPositionMeta = false;
+    bool mEnableRawContent = false;
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override;
@@ -41,8 +44,6 @@ protected:
 private:
     void ProcessEvent(PipelineEventGroup& logGroup, PipelineEventPtr&& e, EventsContainer& newEvents);
     StringView GetNextLine(StringView log, size_t begin);
-
-    int* mSplitLines = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorRegexStringNativeUnittest;

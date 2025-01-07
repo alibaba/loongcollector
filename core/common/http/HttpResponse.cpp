@@ -26,4 +26,15 @@ bool compareHeader(const std::string& lhs, const std::string& rhs) {
     return lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), caseInsensitiveComp);
 }
 
+size_t DefaultWriteCallback(char* buffer, size_t size, size_t nmemb, void* data) {
+    unsigned long sizes = size * nmemb;
+
+    if (buffer == NULL) {
+        return 0;
+    }
+
+    static_cast<string*>(data)->append(buffer, sizes);
+    return sizes;
+}
+
 } // namespace logtail

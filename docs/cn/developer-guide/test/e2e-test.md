@@ -1,11 +1,13 @@
 # E2E测试
 
-iLogtail提供了一个完整的E2E测试引擎，方便您快速开展集成测试，从而进一步保证代码质量。在大部分情况下，您只需要编写一个配置文件来定义测试行为，即可轻松完成测试。
+LoongCollector 提供了一个完整的E2E测试引擎，方便您快速开展集成测试，从而进一步保证代码质量。在大部分情况下，您只需要编写一个配置文件来定义测试行为，即可轻松完成测试。
 
 ## 工作原理
 
-E2E测试采用行为驱动开发（Behavior-Driven Development）的设计思路，通过定义一系列测试行为，并通过配置文件的方式来描述测试场景，从而实现对插件的集成测试。测试引擎会根据配置文件中的内容，正则匹配对应的函数，并解析配置文件中的参数，传递给对应的函数。从而完成自动创建测试环境、启动iLogtail、触发日志生成、验证日志内容等一系列操作，最终输出测试报告。
+E2E测试采用行为驱动开发（Behavior-Driven Development）的设计思路，通过定义一系列测试行为，并通过配置文件的方式来描述测试场景，从而实现对插件的集成测试。测试引擎会根据配置文件中的内容，正则匹配对应的函数，并解析配置文件中的参数，传递给对应的函数。从而完成自动创建测试环境、启动 LoongCollector、触发日志生成、验证日志内容等一系列操作，最终输出测试报告。
+
 相关参考：
+
 - [https://cucumber.io/docs/bdd/](https://cucumber.io/docs/bdd/)
 - [https://github.com/cucumber/godog](https://github.com/cucumber/godog)
 
@@ -16,7 +18,7 @@ E2E测试采用行为驱动开发（Behavior-Driven Development）的设计思�
 在准备开始进行集成测试前，您首先需要准备以下内容：
 
 - 测试环境：主机（可通过SSH访问）、K8s集群（可通过kubeconfig访问）、Docker-Compose环境（需在本地安装docker-compose）
-- 部署 iLogtail
+- 部署 LoongCollector
 
 ### 配置文件
 
@@ -47,7 +49,7 @@ Feature: input static file
           - "/root/test/**/a*.log"
         MaxDirSearchDepth: 10
     """
-    Given iLogtail container mount {./a.log} to {/root/test/1/2/3/axxxx.log}
+    Given LoongCollector container mount {./a.log} to {/root/test/1/2/3/axxxx.log}
     When start docker-compose {input_static_file}
     Then there is at least {1000} logs
     Then the log fields match kv
@@ -84,4 +86,4 @@ TEST_CASE=input_canal go test -v -timeout 30m -run ^TestE2EOnDockerCompose$ gith
 
 ### 拓展
 
-如果目前engine中已有的测试行为无法满足您的需求，您可以参考以下[添加指南](./e2e-test-step.md)，自行拓展测试行为。
+如果目前engine中已有的测试行为无法满足您的需求，您可以参考以下[添加指南](e2e-test-step.md)，自行拓展测试行为。

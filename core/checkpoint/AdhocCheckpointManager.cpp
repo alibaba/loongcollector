@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#include "app_config/AppConfig.h"
 #include "AdhocCheckpointManager.h"
+
+#include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
-#include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
-#include "common/Thread.h"
 #include "common/HashUtil.h"
+#include "common/Thread.h"
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 
 DEFINE_FLAG_INT32(adhoc_checkpoint_dump_thread_wait_interval, "microseconds", 5 * 1000);
 
@@ -149,7 +150,7 @@ void AdhocCheckpointManager::LoadAdhocCheckpoint() {
         std::vector<std::string> jobList;
         if (!GetAllFiles(adhocCheckpointDir, "*", jobList)) {
             LOG_WARNING(sLogger, ("get all adhoc checkpoint files", "failed"));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Load adhoc check point files failed");
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Load adhoc check point files failed");
             return;
         }
 
@@ -161,7 +162,7 @@ void AdhocCheckpointManager::LoadAdhocCheckpoint() {
         }
     } else if (!Mkdir(adhocCheckpointDir)) {
         LOG_WARNING(sLogger, ("Create adhoc checkpoint dir", "failed"));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Create adhoc check point dir failed");
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Create adhoc check point dir failed");
     }
 }
 

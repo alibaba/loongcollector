@@ -46,7 +46,7 @@ void FlusherInstanceUnittest::TestInit() const {
         = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0"));
     Json::Value config, opt;
     PipelineContext context;
-    APSARA_TEST_TRUE(flusher->Init(config, context, opt));
+    APSARA_TEST_TRUE(flusher->Init(config, context, 0, opt));
     APSARA_TEST_EQUAL(&context, &flusher->GetPlugin()->GetContext());
 }
 

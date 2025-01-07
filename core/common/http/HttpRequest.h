@@ -18,15 +18,25 @@
 
 #include <chrono>
 #include <cstdint>
+
 #include <map>
 #include <string>
+#include <utility>
 
+#include "common/Flags.h"
 #include "common/http/HttpResponse.h"
+
+DECLARE_FLAG_INT32(default_http_request_timeout_sec);
+DECLARE_FLAG_INT32(default_http_request_max_try_cnt);
 
 namespace logtail {
 
-static constexpr uint32_t sDefaultTimeoutSec = 15;
-static constexpr uint32_t sDefaultMaxTryCnt = 3;
+struct CurlTLS {
+    std::string mCaFile;
+    std::string mCertFile;
+    std::string mKeyFile;
+    bool mInsecureSkipVerify = true;
+};
 
 struct HttpRequest {
     std::string mMethod;
@@ -40,8 +50,10 @@ struct HttpRequest {
     std::string mBody;
     std::string mHost;
     int32_t mPort;
-    uint32_t mTimeout = sDefaultTimeoutSec;
-    uint32_t mMaxTryCnt = sDefaultMaxTryCnt;
+    uint32_t mTimeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec));
+    uint32_t mMaxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt));
+    bool mFollowRedirects = false;
+    std::optional<CurlTLS> mTls = std::nullopt;
 
     uint32_t mTryCnt = 1;
     std::chrono::system_clock::time_point mLastSendTime;
@@ -54,8 +66,10 @@ struct HttpRequest {
                 const std::string& query,
                 const std::map<std::string, std::string>& header,
                 const std::string& body,
-                uint32_t timeout = sDefaultTimeoutSec,
-                uint32_t maxTryCnt = sDefaultMaxTryCnt)
+                uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
+                uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                bool followRedirects = false,
+                std::optional<CurlTLS> tls = std::nullopt)
         : mMethod(method),
           mHTTPSFlag(httpsFlag),
           mUrl(url),
@@ -65,14 +79,16 @@ struct HttpRequest {
           mHost(host),
           mPort(port),
           mTimeout(timeout),
-          mMaxTryCnt(maxTryCnt) {}
+          mMaxTryCnt(maxTryCnt),
+          mFollowRedirects(followRedirects),
+          mTls(std::move(tls)) {}
     virtual ~HttpRequest() = default;
 };
 
 struct AsynHttpRequest : public HttpRequest {
     HttpResponse mResponse;
     void* mPrivateData = nullptr;
-    time_t mEnqueTime = 0;
+    std::chrono::system_clock::time_point mEnqueTime;
 
     AsynHttpRequest(const std::string& method,
                     bool httpsFlag,
@@ -82,13 +98,29 @@ struct AsynHttpRequest : public HttpRequest {
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
-                    uint32_t timeout = sDefaultTimeoutSec,
-                    uint32_t maxTryCnt = sDefaultMaxTryCnt)
-        : HttpRequest(method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt) {}
+                    HttpResponse&& response = HttpResponse(),
+                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
+                    uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                    bool followRedirects = false,
+                    std::optional<CurlTLS> tls = std::nullopt)
+        : HttpRequest(method,
+                      httpsFlag,
+                      host,
+                      port,
+                      url,
+                      query,
+                      header,
+                      body,
+                      timeout,
+                      maxTryCnt,
+                      followRedirects,
+                      std::move(tls)),
+          mResponse(std::move(response)) {}
 
     virtual bool IsContextValid() const = 0;
-    virtual void OnSendDone(const HttpResponse& response) = 0;
+    virtual void OnSendDone(HttpResponse& response) = 0;
 };
 
+std::string GetQueryString(const std::map<std::string, std::string>& parameters);
 
 } // namespace logtail

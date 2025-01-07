@@ -13,12 +13,14 @@
 // limitations under the License.
 
 #include <sys/stat.h>
-#include <random>
+
 #include <map>
-#include "unittest/Unittest.h"
+#include <random>
+
+#include "AppConfig.h"
 #include "checkpoint/AdhocCheckpointManager.h"
 #include "common/FileSystemUtil.h"
-#include "AppConfig.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 

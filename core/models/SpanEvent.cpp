@@ -16,6 +16,8 @@
 
 #include "models/SpanEvent.h"
 
+#include "constants/SpanConstants.h"
+
 using namespace std;
 
 namespace logtail {
@@ -75,16 +77,15 @@ size_t SpanEvent::SpanLink::DataSize() const {
     return mTraceId.size() + mSpanId.size() + mTraceState.size() + mTags.DataSize();
 }
 
-#ifdef APSARA_UNIT_TEST_MAIN
 Json::Value SpanEvent::SpanLink::ToJson() const {
     Json::Value root;
-    root["traceId"] = mTraceId.to_string();
-    root["spanId"] = mSpanId.to_string();
+    root[DEFAULT_TRACE_TAG_TRACE_ID] = mTraceId.to_string();
+    root[DEFAULT_TRACE_TAG_SPAN_ID] = mSpanId.to_string();
     if (!mTraceState.empty()) {
-        root["traceState"] = mTraceState.to_string();
+        root[DEFAULT_TRACE_TAG_TRACE_STATE] = mTraceState.to_string();
     }
     if (!mTags.mInner.empty()) {
-        Json::Value& tags = root["tags"];
+        Json::Value& tags = root[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
@@ -92,17 +93,18 @@ Json::Value SpanEvent::SpanLink::ToJson() const {
     return root;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
 void SpanEvent::SpanLink::FromJson(const Json::Value& value) {
-    SetTraceId(value["traceId"].asString());
-    SetSpanId(value["spanId"].asString());
-    if (value.isMember("traceState")) {
-        string s = value["traceState"].asString();
+    SetTraceId(value[DEFAULT_TRACE_TAG_TRACE_ID].asString());
+    SetSpanId(value[DEFAULT_TRACE_TAG_SPAN_ID].asString());
+    if (value.isMember(DEFAULT_TRACE_TAG_TRACE_STATE)) {
+        string s = value[DEFAULT_TRACE_TAG_TRACE_STATE].asString();
         if (!s.empty()) {
             SetTraceState(s);
         }
     }
-    if (value.isMember("tags")) {
-        Json::Value tags = value["tags"];
+    if (value.isMember(DEFAULT_TRACE_TAG_ATTRIBUTES)) {
+        Json::Value tags = value[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& key : tags.getMemberNames()) {
             SetTag(key, tags[key].asString());
         }
@@ -155,13 +157,12 @@ size_t SpanEvent::InnerEvent::DataSize() const {
     return sizeof(decltype(mTimestampNs)) + mName.size() + mTags.DataSize();
 }
 
-#ifdef APSARA_UNIT_TEST_MAIN
 Json::Value SpanEvent::InnerEvent::ToJson() const {
     Json::Value root;
-    root["name"] = mName.to_string();
-    root["timestampNs"] = static_cast<int64_t>(mTimestampNs);
+    root[DEFAULT_TRACE_TAG_SPAN_EVENT_NAME] = mName.to_string();
+    root[DEFAULT_TRACE_TAG_TIMESTAMP] = static_cast<int64_t>(mTimestampNs);
     if (!mTags.mInner.empty()) {
-        Json::Value& tags = root["tags"];
+        Json::Value& tags = root[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
@@ -169,11 +170,12 @@ Json::Value SpanEvent::InnerEvent::ToJson() const {
     return root;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
 void SpanEvent::InnerEvent::FromJson(const Json::Value& value) {
-    SetName(value["name"].asString());
-    SetTimestampNs(value["timestampNs"].asUInt64());
-    if (value.isMember("tags")) {
-        Json::Value tags = value["tags"];
+    SetName(value[DEFAULT_TRACE_TAG_SPAN_EVENT_NAME].asString());
+    SetTimestampNs(value[DEFAULT_TRACE_TAG_TIMESTAMP].asUInt64());
+    if (value.isMember(DEFAULT_TRACE_TAG_ATTRIBUTES)) {
+        Json::Value tags = value[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& key : tags.getMemberNames()) {
             SetTag(key, tags[key].asString());
         }
@@ -189,6 +191,23 @@ SpanEvent::SpanEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::SPAN, ptr) {
 
 unique_ptr<PipelineEvent> SpanEvent::Copy() const {
     return make_unique<SpanEvent>(*this);
+}
+
+void SpanEvent::Reset() {
+    PipelineEvent::Reset();
+    mTraceId = gEmptyStringView;
+    mSpanId = gEmptyStringView;
+    mTraceState = gEmptyStringView;
+    mParentSpanId = gEmptyStringView;
+    mName = gEmptyStringView;
+    mKind = Kind::Unspecified;
+    mStartTimeNs = 0;
+    mEndTimeNs = 0;
+    mTags.Clear();
+    mEvents.clear();
+    mLinks.clear();
+    mStatus = StatusCode::Unset;
+    mScopeTags.Clear();
 }
 
 void SpanEvent::SetTraceId(const string& traceId) {
@@ -333,19 +352,19 @@ Json::Value SpanEvent::ToJson(bool enableEventMeta) const {
     root["startTimeNs"] = static_cast<int64_t>(mStartTimeNs);
     root["endTimeNs"] = static_cast<int64_t>(mEndTimeNs);
     if (!mTags.mInner.empty()) {
-        Json::Value& tags = root["tags"];
+        Json::Value& tags = root[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
     }
     if (!mEvents.empty()) {
-        Json::Value& events = root["events"];
+        Json::Value& events = root[DEFAULT_TRACE_TAG_EVENTS];
         for (const auto& event : mEvents) {
             events.append(event.ToJson());
         }
     }
     if (!mLinks.empty()) {
-        Json::Value& links = root["links"];
+        Json::Value& links = root[DEFAULT_TRACE_TAG_LINKS];
         for (const auto& link : mLinks) {
             links.append(link.ToJson());
         }
@@ -388,21 +407,21 @@ bool SpanEvent::FromJson(const Json::Value& root) {
     }
     SetStartTimeNs(root["startTimeNs"].asUInt64());
     SetEndTimeNs(root["endTimeNs"].asUInt64());
-    if (root.isMember("tags")) {
-        Json::Value tags = root["tags"];
+    if (root.isMember(DEFAULT_TRACE_TAG_ATTRIBUTES)) {
+        Json::Value tags = root[DEFAULT_TRACE_TAG_ATTRIBUTES];
         for (const auto& key : tags.getMemberNames()) {
             SetTag(key, tags[key].asString());
         }
     }
-    if (root.isMember("events")) {
-        Json::Value events = root["events"];
+    if (root.isMember(DEFAULT_TRACE_TAG_EVENTS)) {
+        Json::Value events = root[DEFAULT_TRACE_TAG_EVENTS];
         for (const auto& event : events) {
             InnerEvent* e = AddEvent();
             e->FromJson(event);
         }
     }
-    if (root.isMember("links")) {
-        Json::Value links = root["links"];
+    if (root.isMember(DEFAULT_TRACE_TAG_LINKS)) {
+        Json::Value links = root[DEFAULT_TRACE_TAG_LINKS];
         for (const auto& link : links) {
             SpanLink* l = AddLink();
             l->FromJson(link);
@@ -420,5 +439,49 @@ bool SpanEvent::FromJson(const Json::Value& root) {
     return true;
 }
 #endif
+
+const static std::string sSpanStatusCodeUnSet = "UNSET";
+const static std::string sSpanStatusCodeOk = "OK";
+const static std::string sSpanStatusCodeError = "ERROR";
+
+const std::string& GetStatusString(SpanEvent::StatusCode status) {
+    switch (status) {
+        case SpanEvent::StatusCode::Unset:
+            return sSpanStatusCodeUnSet;
+        case SpanEvent::StatusCode::Ok:
+            return sSpanStatusCodeOk;
+        case SpanEvent::StatusCode::Error:
+            return sSpanStatusCodeError;
+        default:
+            return sSpanStatusCodeUnSet;
+    }
+}
+
+const static std::string sSpanKindUnspecified = "unspecified";
+const static std::string sSpanKindInternal = "internal";
+const static std::string sSpanKindServer = "server";
+const static std::string sSpanKindClient = "client";
+const static std::string sSpanKindProducer = "producer";
+const static std::string sSpanKindConsumer = "consumer";
+const static std::string sSpanKindUnknown = "unknown";
+
+const std::string& GetKindString(SpanEvent::Kind kind) {
+    switch (kind) {
+        case SpanEvent::Kind::Unspecified:
+            return sSpanKindUnspecified;
+        case SpanEvent::Kind::Internal:
+            return sSpanKindInternal;
+        case SpanEvent::Kind::Server:
+            return sSpanKindServer;
+        case SpanEvent::Kind::Client:
+            return sSpanKindClient;
+        case SpanEvent::Kind::Producer:
+            return sSpanKindProducer;
+        case SpanEvent::Kind::Consumer:
+            return sSpanKindConsumer;
+        default:
+            return sSpanKindUnknown;
+    }
+}
 
 } // namespace logtail

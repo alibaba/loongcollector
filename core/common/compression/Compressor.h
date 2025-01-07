@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "monitor/LogtailMetric.h"
 #include "common/compression/CompressType.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail {
 
@@ -46,7 +46,7 @@ protected:
     CounterPtr mOutItemSizeBytes;
     CounterPtr mDiscardedItemsTotal;
     CounterPtr mDiscardedItemSizeBytes;
-    CounterPtr mTotalProcessMs;
+    TimeCounterPtr mTotalProcessMs;
 
 private:
     virtual bool Compress(const std::string& input, std::string& output, std::string& errorMsg) = 0;

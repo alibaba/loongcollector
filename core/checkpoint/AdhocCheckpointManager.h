@@ -16,6 +16,7 @@
 
 #pragma once
 #include <unordered_map>
+
 #include "AdhocJobCheckpoint.h"
 
 namespace logtail {

@@ -1,0 +1,52 @@
+{
+  "global": {
+    "InputIntervalMs": 10000,
+    "AggregatIntervalMs": 300,
+    "FlushIntervalMs": 300,
+    "DefaultLogQueueSize": 2,
+    "DefaultLogGroupQueueSize": 3
+  },
+  "inputs": [],
+  "processors": [
+    {
+      "type": "processor_anchor",
+      "detail": {
+        "SourceKey": "content",
+        "NoAnchorError": true,
+        "Anchors": [
+          {
+            "Start": "time",
+            "Stop": "\t",
+            "FieldName": "time",
+            "FieldType": "string",
+            "ExpondJson": false
+          },
+          {
+            "Start": "json:",
+            "Stop": "\n",
+            "FieldName": "val",
+            "FieldType": "json",
+            "ExpondJson": true,
+            "MaxExpondDepth": 2,
+            "ExpondConnecter": "#"
+          }
+        ]
+      }
+    }
+  ],
+  "aggregators": [
+    {
+      "type": "aggregator_base",
+      "detail": {
+        "MaxLogGroupCount": 1,
+        "MaxLogCount": 100
+      }
+    }
+  ],
+  "flushers": [
+    {
+      "type": "flusher_checker",
+      "detail": {}
+    }
+  ]
+}

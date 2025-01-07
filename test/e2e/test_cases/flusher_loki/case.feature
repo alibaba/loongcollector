@@ -8,10 +8,10 @@ Feature: flusher loki
     Given subcribe data from {loki} with config
     """
     address: http://loki:3100
-    tenant_id: ilogtail
+    tenant_id: loongcollector
     target_labels:
-      name: hello
-      source: ilogtail
+      loki_name: hello
+      source: loongcollector
     """
     Given {flusher-loki-case} local config as below
     """
@@ -26,7 +26,7 @@ Feature: flusher loki
     flushers:
       - Type: flusher_loki
         URL: http://loki:3100/loki/api/v1/push
-        TenantID: ilogtail
+        TenantID: loongcollector
         MaxMessageWait: 100000000
         MaxMessageBytes: 1024
         Timeout: 1000000000000
@@ -36,9 +36,9 @@ Feature: flusher loki
         DynamicLabels:
           - tag.name
         StaticLabels:
-          source: ilogtail
+          source: loongcollector
     """
-    Given iLogtail depends on containers {["loki"]}
+    Given loongcollector depends on containers {["loki"]}
     When start docker-compose {flusher_loki}
     Then there is at least {10} logs
     Then the log fields match kv

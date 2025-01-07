@@ -80,7 +80,7 @@ private:
     SenderQueueManager();
     ~SenderQueueManager() = default;
 
-    BoundedQueueParam mQueueParam;
+    BoundedQueueParam mDefaultQueueParam;
 
     mutable std::mutex mQueueMux;
     std::unordered_map<QueueKey, SenderQueue> mQueues;
@@ -98,6 +98,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderQueueManagerUnittest;
     friend class FlusherRunnerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

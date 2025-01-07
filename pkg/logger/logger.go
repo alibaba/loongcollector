@@ -42,7 +42,7 @@ const (
 	asyncPattern = `
 <seelog type="asynctimer" asyncinterval="500000" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%sgo_plugin.LOG" maxsize="20000000" maxrolls="10"/>
+	 <rollingfile type="size" filename="%s%s" maxsize="20000000" maxrolls="10"/>
 	 %s
      %s
  </outputs>
@@ -54,7 +54,7 @@ const (
 	syncPattern = `
 <seelog type="sync" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%sgo_plugin.LOG" maxsize="20000000" maxrolls="10"/>
+	 <rollingfile type="size" filename="%s%s" maxsize="20000000" maxrolls="10"/>
 	 %s
 	 %s
  </outputs>
@@ -111,6 +111,7 @@ func InitTestLogger(options ...ConfigOption) {
 	once.Do(func() {
 		config.LoongcollectorGlobalConfig.LoongcollectorLogDir = "./"
 		config.LoongcollectorGlobalConfig.LoongcollectorConfDir = "./"
+		config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir = "./"
 		initTestLogger(options...)
 		catchStandardOutput()
 	})
@@ -123,7 +124,11 @@ func initNormalLogger() {
 	for _, option := range defaultProductionOptions {
 		option()
 	}
-	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "plugin_logger.xml"))
+	confDir := config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir
+	if _, err := os.Stat(confDir); os.IsNotExist(err) {
+		_ = os.MkdirAll(confDir, os.ModePerm)
+	}
+	setLogConf(path.Join(confDir, "plugin_logger.xml"))
 }
 
 // initTestLogger extracted from Init method for unit test.
@@ -136,7 +141,7 @@ func initTestLogger(options ...ConfigOption) {
 	for _, option := range options {
 		option()
 	}
-	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "plugin_logger.xml"))
+	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir, "plugin_logger.xml"))
 }
 
 func Debug(ctx context.Context, kvPairs ...interface{}) {
@@ -266,7 +271,7 @@ func Flush() {
 
 func setLogConf(logConfig string) {
 	if !retainFlag {
-		_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "plugin_logger.xml"))
+		_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir, "plugin_logger.xml"))
 	}
 	debugFlag = 0
 	logtailLogger = seelog.Disabled
@@ -325,7 +330,7 @@ func generateDefaultConfig() string {
 	if memoryReceiverFlag {
 		memoryReceiverFlagStr = "<custom name=\"memory\" />"
 	}
-	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongcollectorLogDir, consoleStr, memoryReceiverFlagStr)
+	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName, consoleStr, memoryReceiverFlagStr)
 }
 
 // Close the logger and recover the stdout and stderr

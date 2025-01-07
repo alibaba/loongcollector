@@ -13,15 +13,17 @@
 // limitations under the License.
 
 #include "EventListener_Linux.h"
+
 #include <sys/inotify.h>
-#include <unistd.h>
 #include <sys/ioctl.h>
-#include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include <unistd.h>
+
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 
 DEFINE_FLAG_BOOL(fs_events_inotify_enable, "", true);
 
@@ -41,7 +43,6 @@ bool logtail::EventListener::Init() {
 
 int logtail::EventListener::AddWatch(const char* dir) {
     return inotify_add_watch(mInotifyFd, dir, mWatchEventMask);
-    ;
 }
 
 bool logtail::EventListener::RemoveWatch(int wd) {
@@ -101,7 +102,7 @@ int32_t logtail::EventListener::ReadEvents(std::vector<logtail::Event*>& eventVe
             EventType etype = 0;
             if (event->mask & IN_Q_OVERFLOW) {
                 LOG_INFO(sLogger, ("inotify event queue overflow", "miss inotify events"));
-                LogtailAlarm::GetInstance()->SendAlarm(INOTIFY_EVENT_OVERFLOW_ALARM, "inotify event queue overflow");
+                AlarmManager::GetInstance()->SendAlarm(INOTIFY_EVENT_OVERFLOW_ALARM, "inotify event queue overflow");
             } else {
                 etype |= event->mask & IN_DELETE_SELF ? EVENT_TIMEOUT : 0;
                 etype |= event->mask & IN_CREATE ? EVENT_CREATE : 0;

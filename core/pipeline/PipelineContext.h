@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <string>
+
+#include "json/json.h"
 
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/GlobalConfig.h"
 #include "pipeline/queue/QueueKey.h"
 
@@ -32,21 +32,6 @@ namespace logtail {
 
 class Pipeline;
 class FlusherSLS;
-
-// for compatiblity with shennong profile
-struct ProcessProfile {
-    int readBytes = 0;
-    int skipBytes = 0;
-    int feedLines = 0;
-    int splitLines = 0;
-    int parseFailures = 0;
-    int regexMatchFailures = 0;
-    int parseTimeFailures = 0;
-    int historyFailures = 0;
-    int logGroupSize = 0;
-
-    void Reset() { memset(this, 0, sizeof(ProcessProfile)); }
-};
 
 class PipelineContext {
 public:
@@ -76,19 +61,22 @@ public:
     QueueKey GetLogstoreKey() const;
     const FlusherSLS* GetSLSInfo() const { return mSLSInfo; }
     void SetSLSInfo(const FlusherSLS* flusherSLS) { mSLSInfo = flusherSLS; }
+
     bool RequiringJsonReader() const { return mRequiringJsonReader; }
     void SetRequiringJsonReaderFlag(bool flag) { mRequiringJsonReader = flag; }
     bool IsFirstProcessorApsara() const { return mIsFirstProcessorApsara; }
     void SetIsFirstProcessorApsaraFlag(bool flag) { mIsFirstProcessorApsara = flag; }
     bool IsFirstProcessorJson() const { return mIsFirstProcessorJson; }
     void SetIsFirstProcessorJsonFlag(bool flag) { mIsFirstProcessorJson = flag; }
-    bool IsExactlyOnceEnabled() const {return mEnableExactlyOnce; }
+    bool IsExactlyOnceEnabled() const { return mEnableExactlyOnce; }
     void SetExactlyOnceFlag(bool flag) { mEnableExactlyOnce = flag; }
+    bool HasNativeProcessors() const { return mHasNativeProcessors; }
+    void SetHasNativeProcessorsFlag(bool flag) { mHasNativeProcessors = flag; }
+    bool IsFlushingThroughGoPipeline() const { return mIsFlushingThroughGoPipeline; }
+    void SetIsFlushingThroughGoPipelineFlag(bool flag) { mIsFlushingThroughGoPipeline = flag; }
 
-    ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
-    // LogFileProfiler& GetProfiler() { return *mProfiler; }
     const Logger::logger& GetLogger() const { return mLogger; }
-    LogtailAlarm& GetAlarm() const { return *mAlarm; };
+    AlarmManager& GetAlarm() const { return *mAlarm; };
 
 private:
     static const std::string sEmptyString;
@@ -99,17 +87,17 @@ private:
     QueueKey mProcessQueueKey = -1;
     Pipeline* mPipeline = nullptr;
 
-    // special members for compatability
     const FlusherSLS* mSLSInfo = nullptr;
+    // for input_file only
     bool mRequiringJsonReader = false;
     bool mIsFirstProcessorApsara = false;
     bool mIsFirstProcessorJson = false;
     bool mEnableExactlyOnce = false;
+    bool mHasNativeProcessors = false;
+    bool mIsFlushingThroughGoPipeline = false;
 
-    mutable ProcessProfile mProcessProfile;
-    // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();
     Logger::logger mLogger = sLogger;
-    LogtailAlarm* mAlarm = LogtailAlarm::GetInstance();
+    AlarmManager* mAlarm = AlarmManager::GetInstance();
 };
 
 } // namespace logtail

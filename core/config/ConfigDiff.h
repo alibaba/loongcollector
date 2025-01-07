@@ -21,23 +21,23 @@
 
 #include "config/InstanceConfig.h"
 #include "config/PipelineConfig.h"
+#include "config/TaskConfig.h"
 
 namespace logtail {
 
-class PipelineConfigDiff {
-public:
-    std::vector<PipelineConfig> mAdded;
-    std::vector<PipelineConfig> mModified;
+template <class T>
+struct ConfigDiff {
+    std::vector<T> mAdded;
+    std::vector<T> mModified;
     std::vector<std::string> mRemoved;
+
     bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
 };
 
-class InstanceConfigDiff {
-public:
-    std::vector<InstanceConfig> mAdded;
-    std::vector<InstanceConfig> mModified;
-    std::vector<std::string> mRemoved;
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
-};
+using PipelineConfigDiff = ConfigDiff<PipelineConfig>;
+using TaskConfigDiff = ConfigDiff<TaskConfig>;
+using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
+
+enum ConfigDiffEnum { Added, Modified, Removed, Unchanged };
 
 } // namespace logtail

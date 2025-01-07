@@ -92,10 +92,6 @@ bool ProcessorParseRegexNative::Init(const Json::Value& config) {
         return false;
     }
 
-    mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
-    mRegexMatchFailures = &(GetContext().GetProcessProfile().regexMatchFailures);
-    mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
-
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -180,7 +176,6 @@ void ProcessorParseRegexNative::AddLog(const StringView& key,
         return;
     }
     targetEvent.SetContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
 }
 
 bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
@@ -220,8 +215,6 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                                   GetContext().GetRegion());
             }
         }
-        ++(*mRegexMatchFailures);
-        ++(*mParseFailures);
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     } else if (what.size() <= keys.size()) {
@@ -239,8 +232,6 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                               GetContext().GetLogstoreName(),
                                               GetContext().GetRegion());
         }
-        ++(*mRegexMatchFailures);
-        ++(*mParseFailures);
         parseSuccess = false;
     }
     if (!parseSuccess) {

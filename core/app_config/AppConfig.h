@@ -16,17 +16,29 @@
 
 #pragma once
 
-#include <json/json.h>
-
+#include <functional>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include "common/Lock.h"
+#include "json/json.h"
+
+#include "InstanceConfig.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
+extern const int32_t kDefaultMaxSendBytePerSec;
+
+extern const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+extern const int32_t MIN_SEND_REQUEST_CONCURRENCY;
+extern const int32_t MAX_SEND_REQUEST_CONCURRENCY;
+extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
+extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;
+extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
+extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
+
 void CreateAgentDir();
 
 std::string GetAgentLogDir();
@@ -35,6 +47,9 @@ std::string GetAgentConfDir();
 std::string GetAgentRunDir();
 std::string GetAgentThirdPartyDir();
 
+std::string GetAgentGoCheckpointDir();
+std::string GetAgentGoLogConfDir();
+std::string GetAgentPrometheusAuthorizationPath();
 std::string GetAgentConfigFile();
 std::string GetAgentAppInfoFile();
 std::string GetAdhocCheckpointDirPath();
@@ -44,14 +59,19 @@ std::string GetLocalEventDataFileName();
 std::string GetInotifyWatcherDirsDumpFileName();
 std::string GetAgentLoggersPrefix();
 std::string GetAgentLogName();
-std::string GetAgentSnapshotDir();
-std::string GetAgentProfileLogName();
-std::string GetAgentStatusLogName();
-std::string GetProfileSnapshotDumpFileName();
 std::string GetObserverEbpfHostPath();
 std::string GetSendBufferFileNamePrefix();
 std::string GetLegacyUserLocalConfigFilePath();
-std::string GetExactlyOnceCheckpoint(); 
+std::string GetExactlyOnceCheckpoint();
+std::string GetContinuousPipelineConfigDir();
+std::string GetPipelineConfigDir();
+std::string GetPluginLogName();
+std::string GetVersionTag();
+std::string GetGoPluginCheckpoint();
+std::string GetAgentName();
+std::string GetMonitorInfoFileName();
+std::string GetSymLinkName();
+std::string GetAgentPrefix();
 
 template <class T>
 class DoubleBuffer {
@@ -71,8 +91,25 @@ private:
 
 class AppConfig {
 private:
-    Json::Value mConfJson;
-    mutable SpinLock mAppConfigLock;
+    static std::string sLocalConfigDir;
+    void loadAppConfigLogtailMode(const std::string& ilogtailConfigFile);
+    Json::Value mergeAllConfigs();
+
+    Json::Value mLocalInstanceConfig;
+    Json::Value mEnvConfig;
+    Json::Value mRemoteInstanceConfig;
+    std::unordered_map<std::string, std::string> mLocalInstanceConfigKeyToConfigName;
+    std::unordered_map<std::string, std::string> mEnvConfigKeyToConfigName;
+    std::unordered_map<std::string, std::string> mRemoteInstanceConfigKeyToConfigName;
+
+    std::map<std::string, std::function<bool()>*> mCallbacks;
+
+    DoubleBuffer<std::vector<sls_logs::LogTag>> mFileTags;
+    DoubleBuffer<std::map<std::string, std::string>> mAgentAttrs;
+
+    Json::Value mFileTagsJson;
+
+    mutable std::mutex mAppConfigLock;
 
     // loongcollector_config.json content for rebuild
     std::string mIlogtailConfigJson;
@@ -105,6 +142,7 @@ private:
     int32_t mNumOfBufferFile;
     int32_t mLocalFileSize;
     int32_t mSendRequestConcurrency;
+    int32_t mSendRequestGlobalConcurrency;
     std::string mBufferFilePath;
 
     // checkpoint
@@ -113,8 +151,6 @@ private:
     // local config
     // std::string mMappingConfigPath;
 
-    bool mSendRandomSleep;
-    bool mSendFlowControl;
 
     int32_t mMaxMultiConfigSize;
     bool mAcceptMultiConfigFlag;
@@ -181,10 +217,8 @@ private:
     std::set<std::string> mDynamicPlugins;
     std::vector<std::string> mHostPathBlacklist;
 
-    Json::Value mFileTagsJson;
-    DoubleBuffer<std::vector<sls_logs::LogTag>> mFileTags;
-
     std::string mBindInterface;
+
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -208,6 +242,10 @@ private:
      */
     void CheckAndAdjustParameters();
     void MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson);
+    void MergeJson(Json::Value& mainConfJson,
+                   const Json::Value& subConfJson,
+                   std::unordered_map<std::string, std::string>& keyToConfigName,
+                   const std::string& configName);
     /**
      * @brief Load *.json from config.d dir
      *
@@ -246,7 +284,7 @@ private:
     void LoadOtherConf(const Json::Value& confJson);
     // void LoadGlobalFuseConf(const Json::Value& confJson);
     void SetIlogtailConfigJson(const std::string& configJson) {
-        ScopedSpinLock lock(mAppConfigLock);
+        std::lock_guard<std::mutex> lock(mAppConfigLock);
         mIlogtailConfigJson = configJson;
     }
     // LoadEnvTags loads env tags from environment.
@@ -275,28 +313,89 @@ private:
     bool CheckAndResetProxyAddress(const char* envKey, std::string& address);
 
     static void InitEnvMapping(const std::string& envStr, std::map<std::string, std::string>& envMapping);
+    static void InitEnvMapping(const std::string& envStr, Json::Value& envJson);
     static void SetConfigFlag(const std::string& flagName, const std::string& value);
 
 public:
     AppConfig();
-    ~AppConfig(){};
+    ~AppConfig() {}
+
+    void LoadInstanceConfig(const std::map<std::string, std::shared_ptr<InstanceConfig>>&);
 
     static AppConfig* GetInstance() {
         static AppConfig singleton;
         return &singleton;
     }
 
+    // 初始化配置
     void LoadAppConfig(const std::string& ilogtailConfigFile);
+    void LoadLocalInstanceConfig();
 
+    // 获取全局参数方法
+    const Json::Value& GetLocalInstanceConfig() { return mLocalInstanceConfig; };
+    const Json::Value& GetEnvConfig() { return mEnvConfig; };
+    const Json::Value& GetRemoteInstanceConfig() { return mRemoteInstanceConfig; };
+
+    template <typename T>
+    T MergeConfig(const T& defaultValue,
+                  const T& currentValue,
+                  const std::string& name,
+                  const std::function<bool(const std::string&, const T&)>& validateFn);
+    int32_t MergeInt32(int32_t defaultValue,
+                       int32_t currentValue,
+                       const std::string& name,
+                       const std::function<bool(const std::string&, const int32_t)>& validateFn);
+
+    int64_t MergeInt64(int64_t defaultValue,
+                       int64_t currentValue,
+                       const std::string& name,
+                       const std::function<bool(const std::string&, const int64_t)>& validateFn);
+    bool MergeBool(bool defaultValue,
+                   bool currentValue,
+                   const std::string& name,
+                   const std::function<bool(const std::string&, const bool)>& validateFn);
+    std::string MergeString(const std::string& defaultValue,
+                            const std::string& currentValue,
+                            const std::string& name,
+                            const std::function<bool(const std::string&, const std::string&)>& validateFn);
+    double MergeDouble(double defaultValue,
+                       double currentValue,
+                       const std::string& name,
+                       const std::function<bool(const std::string&, const double)>& validateFn);
+
+
+    // 注册回调
+    void RegisterCallback(const std::string& key, std::function<bool()>* callback);
+
+    // 合并配置
+    std::string Merge(Json::Value& localConf,
+                      Json::Value& envConfig,
+                      Json::Value& remoteConf,
+                      std::string& name,
+                      std::function<bool(const std::string&, const std::string&)> validateFn);
+
+    // 获取特定配置
+    // CPU限制参数等仅与框架相关的参数，计算逻辑可以放在AppConfig
+    float GetMachineCpuUsageThreshold() const { return mMachineCpuUsageThreshold; }
+    float GetScaledCpuUsageUpLimit() const { return mScaledCpuUsageUpLimit; }
+    float GetCpuUsageUpLimit() const { return mCpuUsageUpLimit; }
+
+    // 文件标签相关，获取从文件中来的tags
+    std::vector<sls_logs::LogTag>& GetFileTags() { return mFileTags.getReadBuffer(); }
+    // 更新从文件中来的tags
+    void UpdateFileTags();
+
+    // Agent属性相关，获取从文件中来的attrs
+    std::map<std::string, std::string>& GetAgentAttrs() { return mAgentAttrs.getReadBuffer(); }
+    // 更新从文件中来的attrs
+    void UpdateAgentAttrs();
+
+    // Legacy:获取各种参数
     bool NoInotify() const { return mNoInotify; }
 
     bool IsInInotifyBlackList(const std::string& path) const;
 
     bool IsLogParseAlarmValid() const { return mLogParseAlarmFlag; }
-
-    bool IsSendRandomSleep() const { return mSendRandomSleep; }
-
-    bool IsSendFlowControl() const { return mSendFlowControl; }
 
     // std::string GetDefaultRegion() const;
 
@@ -313,7 +412,7 @@ public:
     // bool GetOpenStreamLog() const { return mOpenStreamLog; }
 
     std::string GetIlogtailConfigJson() {
-        ScopedSpinLock lock(mAppConfigLock);
+        std::lock_guard<std::mutex> lock(mAppConfigLock);
         return mIlogtailConfigJson;
     }
 
@@ -331,12 +430,6 @@ public:
 
     bool IsResourceAutoScale() const { return mResourceAutoScale; }
 
-    float GetMachineCpuUsageThreshold() const { return mMachineCpuUsageThreshold; }
-
-    float GetScaledCpuUsageUpLimit() const { return mScaledCpuUsageUpLimit; }
-
-    float GetCpuUsageUpLimit() const { return mCpuUsageUpLimit; }
-
     int64_t GetMemUsageUpLimit() const { return mMemUsageUpLimit; }
 
     int32_t GetMaxHoldedDataSize() const { return mMaxHoldedDataSize; }
@@ -345,6 +438,8 @@ public:
 
     int32_t GetMaxBytePerSec() const { return mMaxBytePerSec; }
 
+    void SetMaxBytePerSec(int32_t maxBytePerSec) { mMaxBytePerSec = maxBytePerSec; }
+
     int32_t GetBytePerSec() const { return mBytePerSec; }
 
     int32_t GetNumOfBufferFile() const { return mNumOfBufferFile; }
@@ -352,8 +447,14 @@ public:
     int32_t GetLocalFileSize() const { return mLocalFileSize; }
 
     const std::string& GetBufferFilePath() const { return mBufferFilePath; }
-
+    // 单地域并发度
     int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
+    // 全局并发度
+    int32_t GetSendRequestGlobalConcurrency() const { return mSendRequestGlobalConcurrency; }
+
+    double GetGlobalConcurrencyFreePercentageForOneRegion() const {
+        return GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+    }
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 
@@ -421,13 +522,9 @@ public:
     inline const std::set<std::string>& GetDynamicPlugins() const { return mDynamicPlugins; }
     bool IsHostPathMatchBlacklist(const std::string& dirPath) const;
 
-    const Json::Value& GetConfig() const { return mConfJson; }
+    const Json::Value& GetConfig() const { return mLocalInstanceConfig; }
 
     const std::string& GetBindInterface() const { return mBindInterface; }
-
-    std::vector<sls_logs::LogTag>& GetFileTags() { return mFileTags.getReadBuffer(); }
-
-    void UpdateFileTags();
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
@@ -440,6 +537,9 @@ public:
     friend class InputPrometheusUnittest;
     friend class InputContainerStdioUnittest;
     friend class BatcherUnittest;
+    friend class EnterpriseSLSClientManagerUnittest;
+    friend class FlusherRunnerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

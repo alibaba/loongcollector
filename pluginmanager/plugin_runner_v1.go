@@ -208,7 +208,18 @@ func (p *pluginv1Runner) runInput() {
 func (p *pluginv1Runner) runMetricInput(async *pipeline.AsyncControl) {
 	for _, metric := range p.MetricPlugins {
 		m := metric
-		async.Run(m.Run)
+		runner := &timerRunner{
+			initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
+			state:           m.Input,
+			interval:        m.Interval,
+			context:         m.Config.Context,
+			latencyMetric:   m.Config.Statistics.CollecLatencytMetric,
+		}
+		async.Run(func(ac *pipeline.AsyncControl) {
+			runner.Run(func(state interface{}) error {
+				return m.Input.Collect(m)
+			}, ac)
+		})
 	}
 }
 
@@ -373,6 +384,8 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	for _, flusher := range p.FlusherPlugins {
 		flusher.Flusher.SetUrgent(exit)
 	}
+	p.LogstoreConfig.FlushOutFlag.Store(true)
+
 	for _, service := range p.ServicePlugins {
 		_ = service.Stop()
 	}
@@ -385,7 +398,6 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	p.AggregateControl.WaitCancel()
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "aggregator plugins stop", "done")
 
-	p.LogstoreConfig.FlushOutFlag.Store(true)
 	p.FlushControl.WaitCancel()
 
 	if exit && p.FlushOutStore.Len() > 0 {

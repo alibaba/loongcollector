@@ -16,12 +16,20 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 
 	"github.com/alibaba/ilogtail/test/config"
 )
@@ -39,6 +47,15 @@ type DeploymentController struct {
 	k8sClient *kubernetes.Clientset
 }
 
+type DaemonSetController struct {
+	k8sClient *kubernetes.Clientset
+}
+
+type DynamicController struct {
+	discoveryClient discovery.DiscoveryInterface
+	dynamicClient   dynamic.Interface
+}
+
 func NewDeploymentController(k8sClient *kubernetes.Clientset) *DeploymentController {
 	return &DeploymentController{k8sClient: k8sClient}
 }
@@ -48,10 +65,7 @@ func (c *DeploymentController) GetDeploymentPods(deploymentName, deploymentNames
 	if err != nil {
 		return nil, err
 	}
-	labels := map[string]string{
-		"app": deployment.Spec.Template.Labels["app"],
-	}
-	selector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: labels})
+	selector := metav1.FormatLabelSelector(deployment.Spec.Selector)
 	listOptions := metav1.ListOptions{LabelSelector: selector}
 
 	pods, err := c.k8sClient.CoreV1().Pods(deploymentNamespace).List(context.TODO(), listOptions)
@@ -139,6 +153,20 @@ func (c *DeploymentController) RemoveFilter(deploymentName string, filter Contai
 	return c.waitDeploymentAvailable(deploymentName, filter.K8sNamespace)
 }
 
+func (c *DeploymentController) Scale(deploymentName, deploymentNamespace string, replicas int) error {
+	deployment, err := c.k8sClient.AppsV1().Deployments(deploymentNamespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	replicaInt32 := int32(replicas)
+	deployment.Spec.Replicas = &replicaInt32
+	_, err = c.k8sClient.AppsV1().Deployments(deploymentNamespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return c.waitDeploymentAvailable(deploymentName, deploymentNamespace)
+}
+
 func (c *DeploymentController) waitDeploymentAvailable(deploymentName, deploymentNamespace string) error {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
@@ -182,10 +210,6 @@ func (c *DeploymentController) DeleteDeployment(deploymentName, deploymentNamesp
 	return c.k8sClient.AppsV1().Deployments(deploymentNamespace).Delete(context.TODO(), deploymentName, metav1.DeleteOptions{})
 }
 
-type DaemonSetController struct {
-	k8sClient *kubernetes.Clientset
-}
-
 func NewDaemonSetController(k8sClient *kubernetes.Clientset) *DaemonSetController {
 	return &DaemonSetController{k8sClient: k8sClient}
 }
@@ -203,4 +227,86 @@ func (c *DaemonSetController) GetDaemonSetPods(dsName, dsNamespace string) (*cor
 		return nil, err
 	}
 	return pods, nil
+}
+
+func NewDynamicController(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *DynamicController {
+	return &DynamicController{dynamicClient: dynamicClient, discoveryClient: discoveryClient}
+}
+
+func (c *DynamicController) Apply(filePath string) error {
+	// Parse the object from the YAML file
+	mapping, obj, err := c.parseObjFromYaml(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Apply the object to the Kubernetes cluster
+	var resourceInterface dynamic.ResourceInterface
+	if obj.GetNamespace() == "" {
+		resourceInterface = c.dynamicClient.Resource(mapping.Resource)
+	} else {
+		resourceInterface = c.dynamicClient.Resource(mapping.Resource).Namespace(obj.GetNamespace())
+	}
+	if oldObj, err := resourceInterface.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); err != nil {
+		// Object does not exist, create it
+		if _, err := resourceInterface.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	} else {
+		// Object exists, update it
+		obj.SetResourceVersion(oldObj.GetResourceVersion())
+		if _, err := resourceInterface.Update(context.TODO(), obj, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *DynamicController) Delete(filePath string) error {
+	// Parse the object from the YAML file
+	mapping, obj, err := c.parseObjFromYaml(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Delete the object from the Kubernetes cluster
+	var resourceInterface dynamic.ResourceInterface
+	if obj.GetNamespace() == "" {
+		resourceInterface = c.dynamicClient.Resource(mapping.Resource)
+	} else {
+		resourceInterface = c.dynamicClient.Resource(mapping.Resource).Namespace(obj.GetNamespace())
+	}
+	if err := resourceInterface.Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *DynamicController) parseObjFromYaml(filePath string) (*meta.RESTMapping, *unstructured.Unstructured, error) {
+	// Read the YAML file
+	basePath := "test_cases"
+	yamlFile, err := os.ReadFile(filepath.Join(basePath, filePath)) // #nosec G304
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Decode the YAML file into an unstructured.Unstructured object
+	decUnstructured := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	obj := &unstructured.Unstructured{}
+	_, gvk, err := decUnstructured.Decode(yamlFile, nil, obj)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	apiGroupResources, err := restmapper.GetAPIGroupResources(c.discoveryClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	restMapper := restmapper.NewDiscoveryRESTMapper(apiGroupResources)
+	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mapping, obj, nil
 }

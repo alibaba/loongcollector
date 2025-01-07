@@ -23,14 +23,14 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "ebpf/eBPFServer.h"
 #endif
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
 #endif
-#include "config/feedbacker/ConfigFeedbackReceiver.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
 
 using namespace std;
 
@@ -45,30 +45,23 @@ PipelineManager::PipelineManager()
       }) {
 }
 
+static shared_ptr<Pipeline> sEmptyPipeline;
+
 void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
-#ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
     static bool isFileServerStarted = false;
-    bool isFileServerInputChanged = false;
-    for (const auto& name : diff.mRemoved) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]);
-    }
-    for (const auto& config : diff.mModified) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
-    }
-    for (const auto& config : diff.mAdded) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
-    }
+    bool isFileServerInputChanged = CheckIfFileServerUpdated(diff);
 
+#ifndef APSARA_UNIT_TEST_MAIN
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Pause();
     }
 #endif
+#endif
     if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-#endif
 
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
@@ -76,7 +69,8 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
         mPipelineNameEntityMap.erase(iter);
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(name, ConfigFeedbackStatus::DELETED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                     ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
@@ -84,14 +78,14 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for existing config",
                          "keep current pipeline running")("config", config.mName));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
                 config.mProject,
                 config.mLogstore,
                 config.mRegion);
-            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName,
-                                                                               ConfigFeedbackStatus::FAILED);
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                         ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger,
@@ -104,21 +98,22 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                     ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for new config", "skip current object")("config", config.mName));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
                 config.mProject,
                 config.mLogstore,
                 config.mRegion);
-            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName,
-                                                                               ConfigFeedbackStatus::FAILED);
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                         ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger,
@@ -126,10 +121,10 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                     ConfigFeedbackStatus::APPLIED);
     }
 
-#ifndef APSARA_UNIT_TEST_MAIN
     // 在Flusher改造完成前，先不执行如下步骤，不会造成太大影响
     // Sender::CleanUnusedAk();
 
@@ -142,6 +137,7 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         }
     }
 
+#ifndef APSARA_UNIT_TEST_MAIN
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Resume();
@@ -156,12 +152,12 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
     }
 }
 
-shared_ptr<Pipeline> PipelineManager::FindConfigByName(const string& configName) const {
+const shared_ptr<Pipeline>& PipelineManager::FindConfigByName(const string& configName) const {
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
     }
-    return nullptr;
+    return sEmptyPipeline;
 }
 
 vector<string> PipelineManager::GetAllConfigNames() const {
@@ -198,9 +194,6 @@ void PipelineManager::StopAllPipelines() {
 
     LogtailPlugin::GetInstance()->StopAllPipelines(false);
 
-    // TODO: make it common
-    FlusherSLS::RecycleResourceIfNotUsed();
-
     // Sender should be stopped after profiling threads are stopped.
     LOG_INFO(sLogger, ("stop all pipelines", "succeeded"));
 }
@@ -236,9 +229,26 @@ void PipelineManager::DecreasePluginUsageCnt(const unordered_map<string, unorder
     }
 }
 
-bool PipelineManager::CheckIfFileServerUpdated(const Json::Value& config) {
-    string inputType = config["Type"].asString();
-    return inputType == "input_file" || inputType == "input_container_stdio";
+bool PipelineManager::CheckIfFileServerUpdated(PipelineConfigDiff& diff) {
+    for (const auto& name : diff.mRemoved) {
+        string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    for (const auto& config : diff.mModified) {
+        string inputType = (*config.mInputs[0])["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    for (const auto& config : diff.mAdded) {
+        string inputType = (*config.mInputs[0])["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace logtail

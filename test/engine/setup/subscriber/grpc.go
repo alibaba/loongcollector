@@ -44,7 +44,7 @@ type GrpcSubscriber struct {
 }
 
 func (g *GrpcSubscriber) Description() string {
-	return "this a gRPC subscriber, which is the default mock backend for Ilogtail."
+	return "this a gRPC subscriber, which is the default mock backend for loongcollector."
 }
 
 type GRPCService struct {

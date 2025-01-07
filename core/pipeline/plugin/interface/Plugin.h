@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineContext.h"
 
@@ -39,8 +39,10 @@ public:
     void SetMetricsRecordRef(const std::string& name, const std::string& id) {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             mMetricsRecordRef,
+            MetricCategory::METRIC_CATEGORY_PLUGIN,
             {{METRIC_LABEL_KEY_PROJECT, mContext->GetProjectName()},
              {METRIC_LABEL_KEY_PIPELINE_NAME, mContext->GetConfigName()},
+             {METRIC_LABEL_KEY_LOGSTORE, mContext->GetLogstoreName()},
              {METRIC_LABEL_KEY_PLUGIN_TYPE, name},
              {METRIC_LABEL_KEY_PLUGIN_ID, id}});
     }

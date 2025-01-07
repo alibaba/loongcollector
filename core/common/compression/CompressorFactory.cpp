@@ -15,9 +15,9 @@
 #include "common/compression/CompressorFactory.h"
 
 #include "common/ParamExtractor.h"
-#include "monitor/metric_constants/MetricConstants.h"
 #include "common/compression/LZ4Compressor.h"
 #include "common/compression/ZstdCompressor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 

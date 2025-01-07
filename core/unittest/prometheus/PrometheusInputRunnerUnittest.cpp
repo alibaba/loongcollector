@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <json/json.h>
-#include <json/value.h>
+#include "json/json.h"
+#include "json/value.h"
 
 #include "common/JsonUtil.h"
 #include "prometheus/PrometheusInputRunner.h"

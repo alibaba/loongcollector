@@ -14,13 +14,13 @@
 
 #include "Logger.h"
 
-#include <json/json.h>
-#include <spdlog/async.h>
-#include <spdlog/sinks/rotating_file_sink.h>
-#include <spdlog/sinks/stdout_sinks.h>
-
-#include <boost/filesystem.hpp>
 #include <set>
+
+#include "boost/filesystem.hpp"
+#include "json/json.h"
+#include "spdlog/async.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_sinks.h"
 
 #include "app_config/AppConfig.h"
 #include "common/ErrorUtil.h"
@@ -195,7 +195,7 @@ void Logger::LoadConfig(const std::string& filePath) {
     // Load config file, check if it is valid or not.
     do {
         std::ifstream in(filePath);
-        if (!in.good())
+        if (!in)
             break;
 
         in.seekg(0, std::ios::end);
@@ -405,8 +405,8 @@ void Logger::LoadDefaultConfig(std::map<std::string, LoggerConfig>& loggerCfgs,
     loggerCfgs.insert({DEFAULT_LOGGER_NAME, LoggerConfig{"AsyncFileSink", level::warn}});
     if (sinkCfgs.find("AsyncFileSink") != sinkCfgs.end())
         return;
-    sinkCfgs.insert({"AsyncFileSink",
-                     SinkConfig{"AsyncFile", 10, 20000000, 300, GetAgentLogDir() + GetAgentLogName(), "Gzip"}});
+    sinkCfgs.insert(
+        {"AsyncFileSink", SinkConfig{"AsyncFile", 10, 20000000, 300, GetAgentLogDir() + GetAgentLogName(), "Gzip"}});
 }
 
 void Logger::LoadAllDefaultConfigs(std::map<std::string, LoggerConfig>& loggerCfgs,
@@ -414,17 +414,6 @@ void Logger::LoadAllDefaultConfigs(std::map<std::string, LoggerConfig>& loggerCf
     LoadDefaultConfig(loggerCfgs, sinkCfgs);
 
     loggerCfgs.insert({GetAgentLoggersPrefix(), LoggerConfig{"AsyncFileSink", level::info}});
-    loggerCfgs.insert({GetAgentLoggersPrefix() + "/profile", LoggerConfig{"AsyncFileSinkProfile", level::info}});
-    loggerCfgs.insert({GetAgentLoggersPrefix() + "/status", LoggerConfig{"AsyncFileSinkStatus", level::info}});
-
-    std::string dirPath = GetAgentSnapshotDir();
-    if (!Mkdir(dirPath)) {
-        LogMsg(std::string("Create snapshot dir error ") + dirPath + ", error" + ErrnoToString(GetErrno()));
-    }
-    sinkCfgs.insert(
-        {"AsyncFileSinkProfile", SinkConfig{"AsyncFile", 61, 1, 1, dirPath + PATH_SEPARATOR + GetAgentProfileLogName()}});
-    sinkCfgs.insert(
-        {"AsyncFileSinkStatus", SinkConfig{"AsyncFile", 61, 1, 1, dirPath + PATH_SEPARATOR + GetAgentStatusLogName()}});
 }
 
 void Logger::EnsureSnapshotDirExist(std::map<std::string, SinkConfig>& sinkCfgs) {

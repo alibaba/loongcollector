@@ -38,7 +38,7 @@ BUILD_LOGTAIL=${BUILD_LOGTAIL:-ON}
 BUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT:-OFF}
 ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-OFF}
 ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-OFF}
-WITHOUTGDB==${WITHOUTGDB:-OFF}
+WITHOUTGDB=${WITHOUTGDB:-OFF}
 WITHSPL=${WITHSPL:-ON}
 BUILD_SCRIPT_FILE=$GENERATED_HOME/gen_build.sh
 COPY_SCRIPT_FILE=$GENERATED_HOME/gen_copy_docker.sh
@@ -108,6 +108,7 @@ function generateCopyScript() {
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
     fi
   else
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libGoPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
@@ -116,10 +117,12 @@ function generateCopyScript() {
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
     fi
   fi
-  echo 'echo -e "{\n}" > $BINDIR/loongcollector_config.json' >>$COPY_SCRIPT_FILE
-  echo 'mkdir -p $BINDIR/config/local' >>$COPY_SCRIPT_FILE
+  echo 'mkdir -p $BINDIR/conf/instance_config/local/' >>$COPY_SCRIPT_FILE
+  echo 'echo -e "{\n}" > $BINDIR/conf/instance_config/local/loongcollector_config.json' >>$COPY_SCRIPT_FILE
+  echo 'mkdir -p $BINDIR/conf/continuous_pipeline_config/local' >>$COPY_SCRIPT_FILE
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
 }
 

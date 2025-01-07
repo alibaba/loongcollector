@@ -173,8 +173,8 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
         {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
         {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
     };
-    mPluginMetricManager
-        = std::make_shared<PluginMetricManager>(GetMetricsRecordRef()->GetLabels(), inputFileMetricKeys);
+    mPluginMetricManager = std::make_shared<PluginMetricManager>(
+        GetMetricsRecordRef()->GetLabels(), inputFileMetricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     // Register a Gauge metric to record PluginMetricManager‘s map size
     mMonitorFileTotal = GetMetricsRecordRef().CreateIntGauge(METRIC_PLUGIN_MONITOR_FILE_TOTAL);
     mPluginMetricManager->RegisterSizeGauge(mMonitorFileTotal);

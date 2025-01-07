@@ -2,18 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch iLogtail",
+            "name": "(gdb) Launch LoongCollector",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/output/ilogtail",
+            "program": "${workspaceFolder}/build/loongcollector",
             "args": [
                 "-ilogtail_disable_core=false"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/output",
+            "cwd": "${workspaceFolder}/build",
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerPath": "/opt/rh/devtoolset-9/root/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -58,13 +58,13 @@
             "name": "(gdb) Launch memory dump",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/output/ilogtail",
+            "program": "${workspaceFolder}/build/loongcollector",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/output",
+            "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
-            "coreDumpPath": "${workspaceFolder}/output/core",
+            "coreDumpPath": "${workspaceFolder}/build",
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [

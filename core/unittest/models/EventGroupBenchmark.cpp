@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdlib>
+
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"

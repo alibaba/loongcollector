@@ -60,10 +60,12 @@ public:
 
     int32_t GetLastReadEventTime() { return mLastReadEventTime; }
 
+    void Trigger() { mFeedbackCV.notify_one(); }
+
 private:
     LogInput();
     ~LogInput();
-    void* ProcessLoop();
+    void ProcessLoop();
     void ProcessEvent(EventDispatcher* dispatcher, Event* ev);
     Event* PopEventQueue();
     void UpdateCriticalMetric(int32_t curTime);
@@ -81,14 +83,16 @@ private:
     int32_t mLastUpdateMetricTime;
 
     IntGaugePtr mLastRunTime;
-    IntGaugePtr mAgentOpenFdTotal;
     IntGaugePtr mRegisterdHandlersTotal;
     IntGaugePtr mActiveReadersTotal;
     IntGaugePtr mEnableFileIncludedByMultiConfigs;
 
     std::atomic_int mLastReadEventTime{0};
+    std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;
-    mutable std::condition_variable mStopCV;
+
+    mutable std::mutex mFeedbackMux;
+    mutable std::condition_variable mFeedbackCV;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogInputUnittest;
@@ -99,6 +103,7 @@ private:
     friend class FuxiSceneUnittest;
     friend class ConfigMatchUnittest;
     friend class FuseFileUnittest;
+    friend class PipelineUpdateUnittest;
 
     void CleanEnviroments();
 #endif

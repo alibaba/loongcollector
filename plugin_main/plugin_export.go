@@ -342,9 +342,6 @@ func initPluginBase(cfgStr string) int {
 			logger.Error(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
 			rst = 1
 		}
-		if pluginmanager.StatisticsConfig != nil {
-			pluginmanager.StatisticsConfig.Start()
-		}
 		if pluginmanager.AlarmConfig != nil {
 			pluginmanager.AlarmConfig.Start()
 		}

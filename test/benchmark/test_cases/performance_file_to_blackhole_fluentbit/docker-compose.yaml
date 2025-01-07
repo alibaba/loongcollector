@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+
+  fluent-bit:
+    image: cr.fluentbit.io/fluent/fluent-bit
+    command: ["-c", "/tmp/main.conf"]
+    volumes:
+      - ./main.conf:/tmp/main.conf
+      - ./parsers.conf:/tmp/parsers.conf
+      - .:/home/fluentbit
+    restart: always
+
+

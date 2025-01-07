@@ -85,18 +85,18 @@ void Labels::Set(const string& k, const string& v) {
 
 void Labels::Del(const string& k) {
     if (mMetricEventPtr) {
-        if(mMetricEventPtr->HasTag(k)){
+        if (mMetricEventPtr->HasTag(k)) {
             mMetricEventPtr->DelTag(k);
         }
         return;
     }
-    if(mLabels.count(k)){
+    if (mLabels.count(k)) {
         mLabels.erase(k);
     }
 }
 
 
-void Labels::Range(const std::function<void(const string& k, const string& v)>& f) {
+void Labels::Range(const std::function<void(const string& k, const string& v)>& f) const {
     if (mMetricEventPtr) {
         for (auto l = mMetricEventPtr->TagsBegin(); l != mMetricEventPtr->TagsEnd(); l++) {
             f(l->first.to_string(), l->second.to_string());

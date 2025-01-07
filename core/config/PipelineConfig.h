@@ -16,14 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-#include <re2/re2.h>
-
 #include <cstdint>
+
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "json/json.h"
 
 namespace logtail {
 
@@ -33,6 +33,7 @@ struct PipelineConfig {
     uint32_t mCreateTime = 0;
     const Json::Value* mGlobal = nullptr;
     std::vector<const Json::Value*> mInputs;
+    std::optional<std::string> mSingletonInput;
     std::vector<const Json::Value*> mProcessors;
     std::vector<const Json::Value*> mAggregators;
     std::vector<const Json::Value*> mFlushers;
@@ -50,7 +51,8 @@ struct PipelineConfig {
     std::string mLogstore;
     std::string mRegion;
 
-    PipelineConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail) : mName(name), mDetail(std::move(detail)) {}
+    PipelineConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
+        : mName(name), mDetail(std::move(detail)) {}
 
     bool Parse();
 
@@ -68,7 +70,8 @@ struct PipelineConfig {
     // bool IsProcessRunnerInvolved() const {
     //     // 长期过渡使用，待C++部分的时序聚合能力与Go持平后恢复下面的正式版
     //     return !(mHasGoInput && !mHasNativeProcessor);
-    //     // return !(mHasGoInput && !mHasNativeProcessor && (mHasGoProcessor || (mHasGoFlusher && !mHasNativeFlusher)));
+    //     // return !(mHasGoInput && !mHasNativeProcessor && (mHasGoProcessor || (mHasGoFlusher &&
+    //     !mHasNativeFlusher)));
     // }
 
     bool HasGoPlugin() const { return mHasGoFlusher || mHasGoProcessor || mHasGoInput; }
@@ -83,12 +86,5 @@ inline bool operator==(const PipelineConfig& lhs, const PipelineConfig& rhs) {
 inline bool operator!=(const PipelineConfig& lhs, const PipelineConfig& rhs) {
     return !(lhs == rhs);
 }
-
-bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
-bool ParseConfigDetail(const std::string& content,
-                       const std::string& extenstion,
-                       Json::Value& detail,
-                       std::string& errorMsg);
-bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
 
 } // namespace logtail

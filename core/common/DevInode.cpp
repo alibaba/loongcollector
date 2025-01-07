@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "DevInode.h"
+
 #include <errno.h>
 #if defined(__linux__)
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #endif
 #include "logger/Logger.h"

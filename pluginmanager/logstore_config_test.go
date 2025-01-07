@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -442,7 +441,7 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	l.PluginRunner = &pluginv1Runner{
 		LogsChan: make(chan *pipeline.LogWithContext, 10),
 	}
-	l.GlobalConfig = &config.LoongcollectorGlobalConfig
+	l.GlobalConfig = &global_config.LoongcollectorGlobalConfig
 	l.GlobalConfig.UsingOldContentTag = true
 	{
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))

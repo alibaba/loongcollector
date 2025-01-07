@@ -8,7 +8,7 @@ ip 和 port 为 ConfigServer 的 ip 和接收端口，默认为127.0.0.1和8899�
 
 ## API 响应规范
 
-数据的发送及接收均为 protocol buffer 格式，参见源代码中的 [config_server/protocol](https://github.com/alibaba/ilogtail/tree/main/config_server/protocol) 文件夹（v1.0）。
+数据的发送及接收均为 protocol buffer 格式，参见源代码中的 [config_server/protocol](https://github.com/alibaba/loongcollector/tree/main/config_server/protocol) 文件夹（v1.0）。
 
 在调用API接口过程中，若返回HTTP状态码为 200，则表示请求成功，若返回HTTP状态码为其他，例如404等，则表示调用API接口失败。服务端会返回请求响应信息如下。code为响应码，表示请求成功/失败的类型；message 是响应信息，包含详细的请求成功信息/失败说明。
 

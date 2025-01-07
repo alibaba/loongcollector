@@ -18,9 +18,10 @@
 
 #include <string>
 
-#include "ebpf/config.h"
-#include "pipeline/plugin/interface/Input.h"
+#include "ebpf/Config.h"
 #include "ebpf/include/export.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
@@ -35,6 +36,7 @@ public:
     bool SupportAck() const override { return false; }
 
     nami::ObserverNetworkOption mNetworkOption;
+    PluginMetricManagerPtr mPluginMgr;
 };
 
 } // namespace logtail

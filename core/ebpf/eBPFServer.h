@@ -14,24 +14,43 @@
 
 #pragma once
 
-#include <variant>
+#include <array>
 #include <atomic>
 #include <map>
-#include <array>
 #include <memory>
 #include <mutex>
+#include <variant>
 
-#include "runner/InputRunner.h"
-#include "pipeline/PipelineContext.h"
+#include "ebpf/Config.h"
+#include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
-#include "ebpf/config.h"
-#include "ebpf/include/export.h"
 #include "ebpf/handler/AbstractHandler.h"
 #include "ebpf/handler/ObserveHandler.h"
 #include "ebpf/handler/SecurityHandler.h"
+#include "ebpf/include/export.h"
+#include "monitor/metric_models/MetricTypes.h"
+#include "pipeline/PipelineContext.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 namespace ebpf {
+
+class EnvManager {
+public:
+    void InitEnvInfo();
+    bool IsSupportedEnv(nami::PluginType type);
+    bool AbleToLoadDyLib();
+
+private:
+    volatile bool mInited = false;
+
+    std::atomic_bool mArchSupport = false;
+    std::atomic_bool mBTFSupport = false;
+    std::atomic_bool m310Support = false;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class eBPFServerUnittest;
+#endif
+};
 
 class eBPFServer : public InputRunner {
 public:
@@ -48,12 +67,15 @@ public:
     void Stop() override;
 
     std::string CheckLoadedPipelineName(nami::PluginType type);
-    void UpdatePipelineName(nami::PluginType type, const std::string& name);
 
-    bool EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
-                        nami::PluginType type, 
-                        const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options);
+    void UpdatePipelineName(nami::PluginType type, const std::string& name, const std::string& project);
+
+    bool EnablePlugin(const std::string& pipeline_name,
+                      uint32_t plugin_index,
+                      nami::PluginType type,
+                      const logtail::PipelineContext* ctx,
+                      const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                      PluginMetricManagerPtr mgr);
 
     bool DisablePlugin(const std::string& pipeline_name, nami::PluginType type);
 
@@ -61,11 +83,17 @@ public:
 
     bool HasRegisteredPlugins() const override;
 
+    bool IsSupportedEnv(nami::PluginType type);
+
+    std::string GetAllProjects();
+
 private:
-    bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
-                        nami::PluginType type, 
-                        const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options);
+    bool StartPluginInternal(const std::string& pipeline_name,
+                             uint32_t plugin_index,
+                             nami::PluginType type,
+                             const logtail::PipelineContext* ctx,
+                             const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                             PluginMetricManagerPtr mgr);
     eBPFServer() = default;
     ~eBPFServer() = default;
 
@@ -82,9 +110,18 @@ private:
 
     mutable std::mutex mMtx;
     std::array<std::string, (int)nami::PluginType::MAX> mLoadedPipeline = {};
+    std::array<std::string, (int)nami::PluginType::MAX> mPluginProject = {};
 
     eBPFAdminConfig mAdminConfig;
     volatile bool mInited = false;
+
+    EnvManager mEnvMgr;
+    std::unique_ptr<eBPFSelfMonitorMgr> mMonitorMgr;
+    MetricsRecordRef mRef;
+
+    CounterPtr mStartPluginTotal;
+    CounterPtr mStopPluginTotal;
+    CounterPtr mSuspendPluginTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

@@ -20,7 +20,7 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 
 using namespace logtail;
 

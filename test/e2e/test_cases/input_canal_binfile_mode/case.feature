@@ -22,7 +22,7 @@ Feature: input canal binfile mode
         TextToString: true
         EnableDDL: true
     """
-    Given iLogtail depends on containers {["mysql"]}
+    Given loongcollector depends on containers {["mysql"]}
     When start docker-compose {input_canal}
     When generate {10} http logs, with interval {10}ms, url: {http://client:10999/add/data}, method: {GET}, body:
     """

@@ -14,50 +14,48 @@
 
 #pragma once
 
-#include <dlfcn.h>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <thread>
 #include <chrono>
 #include <cstring>
-#include <atomic>
-#include <array>
+#include <dlfcn.h>
 
-#include "ebpf/include/export.h"
-#include "ebpf/include/SysAkApi.h"
+#include <array>
+#include <atomic>
+#include <iostream>
+#include <map>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include "common/DynamicLibHelper.h"
+#include "ebpf/include/SysAkApi.h"
+#include "ebpf/include/export.h"
 
 namespace logtail {
 namespace ebpf {
 
 enum class eBPFPluginType {
-  SOCKETTRACE = 0,
-  PROCESS = 1,
-  MAX = 2,
+    SOCKETTRACE = 0,
+    PROCESS = 1,
+    MAX = 2,
 };
 
 class SourceManager {
 public:
     const std::string m_lib_name_ = "network_observer";
-    
+
     SourceManager(const SourceManager&) = delete;
     SourceManager& operator=(const SourceManager&) = delete;
 
     void Init();
 
-    bool StartPlugin(nami::PluginType plugin_type,
-                std::variant<nami::NetworkObserveConfig, nami::ProcessConfig, nami::NetworkSecurityConfig, nami::FileSecurityConfig> config);
-    
+    bool StartPlugin(nami::PluginType plugin_type, std::unique_ptr<nami::eBPFConfig> conf);
+
     bool StopPlugin(nami::PluginType plugin_type);
 
     bool SuspendPlugin(nami::PluginType plugin_type);
 
-    bool StopAll();
-
     bool CheckPluginRunning(nami::PluginType plugin_type);
-        
+
     SourceManager();
     ~SourceManager();
 
@@ -65,8 +63,7 @@ private:
     void FillCommonConf(std::unique_ptr<nami::eBPFConfig>& conf);
     bool LoadDynamicLib(const std::string& lib_name);
     bool DynamicLibSuccess();
-    bool UpdatePlugin(nami::PluginType plugin_type, 
-                std::variant<nami::NetworkObserveConfig, nami::ProcessConfig, nami::NetworkSecurityConfig, nami::FileSecurityConfig> config);
+    bool UpdatePlugin(nami::PluginType plugin_type, std::unique_ptr<nami::eBPFConfig> conf);
 
     enum class ebpf_func {
         EBPF_INIT,
@@ -97,5 +94,5 @@ private:
 #endif
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

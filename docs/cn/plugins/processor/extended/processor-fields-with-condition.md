@@ -2,11 +2,11 @@
 
 ## 简介
 
-`processor_fields_with_condition`插件支持根据日志部分字段的取值，动态进行字段扩展或删除。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/processor/fieldswithcondition/processor_fields_with_condition.go)
+`processor_fields_with_condition`插件支持根据日志部分字段的取值，动态进行字段扩展或删除。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/processor/fieldswithcondition/processor_fields_with_condition.go)
 
 ## 版本
 
-[Stable](../stability-level.md)
+[Stable](../../stability-level.md)
 
 ### 条件判断
 

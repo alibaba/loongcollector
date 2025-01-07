@@ -16,12 +16,13 @@
 
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 
-#include <boost/regex.hpp>
 #include <string>
 
+#include "boost/regex.hpp"
+
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
 #include "common/ParamExtractor.h"
+#include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -51,11 +52,35 @@ bool ProcessorSplitMultilineLogStringNative::Init(const Json::Value& config) {
         return false;
     }
 
+    // AppendingLogPositionMeta
+    if (!GetOptionalBoolParam(config, "AppendingLogPositionMeta", mAppendingLogPositionMeta, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mAppendingLogPositionMeta,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // EnableRawContent
+    if (!GetOptionalBoolParam(config, "EnableRawContent", mEnableRawContent, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mEnableRawContent,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
     mMatchedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MATCHED_EVENTS_TOTAL);
     mMatchedLinesTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MATCHED_LINES_TOTAL);
     mUnmatchedLinesTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_LINES_TOTAL);
-
-    mSplitLines = &(mContext->GetProcessProfile().splitLines);
 
     return true;
 }
@@ -79,7 +104,6 @@ void ProcessorSplitMultilineLogStringNative::Process(PipelineEventGroup& logGrou
     }
     mMatchedLinesTotal->Add(inputLines - unmatchLines);
     mUnmatchedLinesTotal->Add(unmatchLines);
-    *mSplitLines = newEvents.size();
     logGroup.SwapEvents(newEvents);
 }
 
@@ -290,27 +314,28 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
                                                             const LogEvent& sourceEvent,
                                                             PipelineEventGroup& logGroup,
                                                             EventsContainer& newEvents) {
-    StringView sourceVal = sourceEvent.GetContent(mSourceKey);
-    std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent();
-    targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
-    targetEvent->SetTimestamp(
-        sourceEvent.GetTimestamp(),
-        sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
-    auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
-    auto const length
-        = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
-    targetEvent->SetPosition(offset, length);
-    // offset tag
-    if (logGroup.HasMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY)) {
-        StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
-        targetEvent->SetContentNoCopy(logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
-                                      StringView(offsetStr.data, offsetStr.size));
+    if (mEnableRawContent) {
+        std::unique_ptr<RawEvent> targetEvent = logGroup.CreateRawEvent(true);
+        targetEvent->SetContentNoCopy(content);
+        targetEvent->SetTimestamp(sourceEvent.GetTimestamp(), sourceEvent.GetTimestampNanosecond());
+        newEvents.emplace_back(std::move(targetEvent), true, nullptr);
+    } else {
+        StringView sourceVal = sourceEvent.GetContent(mSourceKey);
+        std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent(true);
+        targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
+        targetEvent->SetTimestamp(
+            sourceEvent.GetTimestamp(),
+            sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
+        auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
+        auto const length
+            = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
+        targetEvent->SetPosition(offset, length);
+        if (mAppendingLogPositionMeta) {
+            StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
+            targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+        }
+        newEvents.emplace_back(std::move(targetEvent), true, nullptr);
     }
-    // TODO: remove the following code after the flusher refactorization
-    if (logGroup.GetExactlyOnceCheckpoint() != nullptr) {
-        logGroup.GetExactlyOnceCheckpoint()->positions.emplace_back(offset, content.size());
-    }
-    newEvents.emplace_back(std::move(targetEvent));
 }
 
 void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView& sourceVal,
@@ -334,7 +359,7 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
             fisrtLogSize = content.size();
         }
     }
-    if (!mMultiline.mIgnoringUnmatchWarning && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+    if (!mMultiline.mIgnoringUnmatchWarning && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
         LOG_WARNING(mContext->GetLogger(),
                     ("unmatched log string", "please check regex")(
                         "action", UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment))(

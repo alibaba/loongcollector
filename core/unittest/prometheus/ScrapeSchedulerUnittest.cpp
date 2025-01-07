@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-
 #include <memory>
 #include <string>
 
 #include "common/StringTools.h"
+#include "common/http/Curl.h"
+#include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
+#include "models/RawEvent.h"
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
@@ -30,16 +32,16 @@
 using namespace std;
 
 namespace logtail {
-
 class ScrapeSchedulerUnittest : public testing::Test {
 public:
     void TestInitscrapeScheduler();
     void TestProcess();
-    void TestSplitByLines();
+    void TestStreamMetricWriteCallback();
     void TestReceiveMessage();
 
     void TestScheduler();
     void TestQueueIsFull();
+    void TestExactlyScrape();
 
 protected:
     void SetUp() override {
@@ -50,36 +52,10 @@ protected:
         mScrapeConfig->mScrapeTimeoutSeconds = 10;
         mScrapeConfig->mMetricsPath = "/metrics";
         mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
-
-        mHttpResponse.mBody
-            = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
-              "# TYPE go_gc_duration_seconds summary\n"
-              "go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05\n"
-              "go_gc_duration_seconds{quantile=\"0.25\"} 3.9357e-05\n"
-              "go_gc_duration_seconds{quantile=\"0.5\"} 4.1114e-05\n"
-              "go_gc_duration_seconds{quantile=\"0.75\"} 4.3372e-05\n"
-              "go_gc_duration_seconds{quantile=\"1\"} 0.000112326\n"
-              "go_gc_duration_seconds_sum 0.034885631\n"
-              "go_gc_duration_seconds_count 850\n"
-              "# HELP go_goroutines Number of goroutines that currently exist.\n"
-              "# TYPE go_goroutines gauge\n"
-              "go_goroutines 7\n"
-              "# HELP go_info Information about the Go environment.\n"
-              "# TYPE go_info gauge\n"
-              "go_info{version=\"go1.22.3\"} 1\n"
-              "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n"
-              "# TYPE go_memstats_alloc_bytes gauge\n"
-              "go_memstats_alloc_bytes 6.742688e+06\n"
-              "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n"
-              "# TYPE go_memstats_alloc_bytes_total counter\n"
-              "go_memstats_alloc_bytes_total 1.5159292e+08";
-
-        mHttpResponse.mStatusCode = 200;
     }
 
 private:
     std::shared_ptr<ScrapeConfig> mScrapeConfig;
-    HttpResponse mHttpResponse;
 };
 
 void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
@@ -90,56 +66,125 @@ void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
 }
 
 void ScrapeSchedulerUnittest::TestProcess() {
+    EventPool eventPool{true};
+
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
     // if status code is not 200, no data will be processed
     // but will continue running, sending self-monitoring metrics
-    mHttpResponse.mStatusCode = 503;
-    event.OnMetricResult(mHttpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mItem.size());
-    event.mItem.clear();
+    httpResponse.SetStatusCode(503);
+    httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
+    event.OnMetricResult(httpResponse, 0);
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    event.mPromStreamScraper.mItem.clear();
 
-    mHttpResponse.mStatusCode = 200;
-    event.OnMetricResult(mHttpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mItem.size());
-    APSARA_TEST_EQUAL(11UL, event.mItem[0]->mEventGroup.GetEvents().size());
+    httpResponse.SetStatusCode(503);
+    httpResponse.SetNetworkStatus(GetNetworkStatus(CURLE_COULDNT_CONNECT), "");
+    event.OnMetricResult(httpResponse, 0);
+    APSARA_TEST_EQUAL(event.mPromStreamScraper.mItem[0]
+                          ->mEventGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE)
+                          .to_string(),
+                      "ERR_CONN_FAILED");
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    event.mPromStreamScraper.mItem.clear();
+
+    httpResponse.SetStatusCode(200);
+    httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
+    string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
+                   "# TYPE go_gc_duration_seconds summary\n"
+                   "go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.25\"} 3.9357e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.5\"} 4.1114e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.75\"} 4.3372e-05\n"
+                   "go_gc_duration_seconds{quantile=\"1\"} 0.000112326\n"
+                   "go_gc_duration_seconds_sum 0.034885631\n"
+                   "go_gc_duration_seconds_count 850\n"
+                   "# HELP go_goroutines Number of goroutines that currently exist.\n"
+                   "# TYPE go_goroutines gauge\n"
+                   "go_goroutines 7\n"
+                   "# HELP go_info Information about the Go environment.\n"
+                   "# TYPE go_info gauge\n"
+                   "go_info{version=\"go1.22.3\"} 1\n"
+                   "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n"
+                   "# TYPE go_memstats_alloc_bytes gauge\n"
+                   "go_memstats_alloc_bytes 6.742688e+06\n"
+                   "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n"
+                   "# TYPE go_memstats_alloc_bytes_total counter\n"
+                   "go_memstats_alloc_bytes_total 1.5159292e+08";
+    prom::StreamScraper::MetricWriteCallback(
+        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
+    event.OnMetricResult(httpResponse, 0);
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    APSARA_TEST_EQUAL(11UL, event.mPromStreamScraper.mItem[0]->mEventGroup.GetEvents().size());
 }
 
-void ScrapeSchedulerUnittest::TestSplitByLines() {
+void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
+    EventPool eventPool{true};
+
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
-    auto res = event.BuildPipelineEventGroup(mHttpResponse.mBody);
-    APSARA_TEST_EQUAL(11UL, res.GetEvents().size());
+
+    string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
+                   "# TYPE go_gc_duration_seconds summary\n"
+                   "go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.25\"} 3.9357e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.5\"} 4.1114e-05\n"
+                   "go_gc_duration_seconds{quantile=\"0.75\"} 4.3372e-05\n"
+                   "go_gc_duration_seconds{quantile=\"1\"} 0.000112326\n"
+                   "go_gc_duration_seconds_sum 0.034885631\n"
+                   "go_gc_duration_seconds_count 850\n"
+                   "# HELP go_goroutines Number of goroutines t"
+                   "hat currently exist.\n"
+                   "# TYPE go_goroutines gauge\n"
+                   "go_go";
+    string body2 = "routines 7\n"
+                   "# HELP go_info Information about the Go environment.\n"
+                   "# TYPE go_info gauge\n"
+                   "go_info{version=\"go1.22.3\"} 1\n"
+                   "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n"
+                   "# TYPE go_memstats_alloc_bytes gauge\n"
+                   "go_memstats_alloc_bytes 6.742688e+06\n"
+                   "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n"
+                   "# TYPE go_memstats_alloc_bytes_total counter\n"
+                   "go_memstats_alloc_bytes_total 1.5159292e+08";
+    prom::StreamScraper::MetricWriteCallback(
+        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
+    auto& res = httpResponse.GetBody<prom::StreamScraper>()->mEventGroup;
+    APSARA_TEST_EQUAL(7UL, res.GetEvents().size());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05",
-                      res.GetEvents()[0].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[0].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.25\"} 3.9357e-05",
-                      res.GetEvents()[1].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[1].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.5\"} 4.1114e-05",
-                      res.GetEvents()[2].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[2].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.75\"} 4.3372e-05",
-                      res.GetEvents()[3].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[3].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"1\"} 0.000112326",
-                      res.GetEvents()[4].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_gc_duration_seconds_sum 0.034885631",
-                      res.GetEvents()[5].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_gc_duration_seconds_count 850",
-                      res.GetEvents()[6].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_goroutines 7",
-                      res.GetEvents()[7].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_info{version=\"go1.22.3\"} 1",
-                      res.GetEvents()[8].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_memstats_alloc_bytes 6.742688e+06",
-                      res.GetEvents()[9].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_memstats_alloc_bytes_total 1.5159292e+08",
-                      res.GetEvents()[10].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[4].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_gc_duration_seconds_sum 0.034885631", res.GetEvents()[5].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_gc_duration_seconds_count 850", res.GetEvents()[6].Cast<RawEvent>().GetContent());
+    // httpResponse.GetBody<MetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+    prom::StreamScraper::MetricWriteCallback(
+        body2.data(), (size_t)1, (size_t)body2.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
+    httpResponse.GetBody<prom::StreamScraper>()->FlushCache();
+    APSARA_TEST_EQUAL(11UL, res.GetEvents().size());
+
+    APSARA_TEST_EQUAL("go_goroutines 7", res.GetEvents()[7].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_info{version=\"go1.22.3\"} 1", res.GetEvents()[8].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_memstats_alloc_bytes 6.742688e+06", res.GetEvents()[9].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_memstats_alloc_bytes_total 1.5159292e+08", res.GetEvents()[10].Cast<RawEvent>().GetContent());
 }
 
 void ScrapeSchedulerUnittest::TestReceiveMessage() {
@@ -162,7 +207,8 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
     auto timer = make_shared<Timer>();
-    event.SetTimer(timer);
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(timer->mQueue.size() == 1);
@@ -180,9 +226,11 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     auto timer = make_shared<Timer>();
-    event.SetTimer(timer);
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
     auto now = std::chrono::steady_clock::now();
-    event.SetFirstExecTime(now);
+    auto nowScrape = std::chrono::system_clock::now();
+    event.SetFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(timer->mQueue.size() == 1);
@@ -197,11 +245,41 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     APSARA_TEST_EQUAL(now + std::chrono::seconds(1), next->GetExecTime());
 }
 
+void ScrapeSchedulerUnittest::TestExactlyScrape() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    auto timer = make_shared<Timer>();
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
+    auto execTime = std::chrono::steady_clock::now();
+    auto scrapeTime = std::chrono::system_clock::now();
+    event.SetFirstExecTime(execTime, scrapeTime);
+
+    auto firstScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto secondScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    event.DelayExecTime(1);
+    auto thirdScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto fourthScrapeTime = event.mLatestScrapeTime;
+    APSARA_TEST_EQUAL(firstScrapeTime, scrapeTime);
+    APSARA_TEST_EQUAL(secondScrapeTime - firstScrapeTime, std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds));
+    APSARA_TEST_EQUAL(thirdScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 2 + 1));
+    APSARA_TEST_EQUAL(fourthScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 3));
+}
+
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
-UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestSplitByLines)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestStreamMetricWriteCallback)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestExactlyScrape)
 
 
 } // namespace logtail

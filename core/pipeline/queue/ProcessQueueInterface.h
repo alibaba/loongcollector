@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -51,6 +52,9 @@ public:
 
 protected:
     bool IsValidToPop() const;
+
+    CounterPtr mFetchTimesCnt;
+    CounterPtr mValidFetchTimesCnt;
 
 private:
     bool IsDownStreamQueuesValidToPush() const;

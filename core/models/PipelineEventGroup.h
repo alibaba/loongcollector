@@ -20,11 +20,12 @@
 #include <string>
 
 #include "checkpoint/RangeCheckpoint.h"
-#include "common/Constants.h"
 #include "common/memory/SourceBuffer.h"
+#include "constants/Constants.h"
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
+class EventPool;
 
 // referrences
 // https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
@@ -41,11 +42,25 @@ enum class EventGroupMetaKey {
     LOG_FILE_OFFSET_KEY,
     HAS_PART_LOG,
 
+    K8S_CLUSTER_ID,
+    K8S_NODE_NAME,
+    K8S_NODE_IP,
+    K8S_NAMESPACE,
+    K8S_POD_UID,
+    K8S_POD_NAME,
+    CONTAINER_NAME,
+    CONTAINER_IP,
+    CONTAINER_IMAGE_NAME,
+    CONTAINER_IMAGE_ID,
+
+    PROMETHEUS_SCRAPE_STATE,
     PROMETHEUS_SCRAPE_DURATION,
     PROMETHEUS_SCRAPE_RESPONSE_SIZE,
     PROMETHEUS_SAMPLES_SCRAPED,
     PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC,
     PROMETHEUS_UP_STATE,
+    PROMETHEUS_STREAM_ID,
+    PROMETHEUS_STREAM_TOTAL,
 
     SOURCE_ID,
     TOPIC,
@@ -64,21 +79,26 @@ using EventsContainer = std::vector<PipelineEventPtr>;
 class PipelineEventGroup {
 public:
     PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
+    ~PipelineEventGroup();
     PipelineEventGroup(PipelineEventGroup&&) noexcept;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
     PipelineEventGroup Copy() const;
 
-    std::unique_ptr<LogEvent> CreateLogEvent();
-    std::unique_ptr<MetricEvent> CreateMetricEvent();
-    std::unique_ptr<SpanEvent> CreateSpanEvent();
+    std::unique_ptr<LogEvent> CreateLogEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<MetricEvent> CreateMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<SpanEvent> CreateSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<RawEvent> CreateRawEvent(bool fromPool = false, EventPool* pool = nullptr);
 
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
-    LogEvent* AddLogEvent();
-    MetricEvent* AddMetricEvent();
-    SpanEvent* AddSpanEvent();
+    LogEvent* AddLogEvent(bool fromPool = false, EventPool* pool = nullptr);
+    MetricEvent* AddMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
+    SpanEvent* AddSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
+    RawEvent* AddRawEvent(bool fromPool = false, EventPool* pool = nullptr);
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
+    void ReserveEvents(size_t size) { mEvents.reserve(size); }
+
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
 
     void SetMetadata(EventGroupMetaKey key, StringView val);

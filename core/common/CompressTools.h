@@ -15,36 +15,14 @@
  */
 
 #pragma once
-#include <string>
+
 #include <cstdint>
-#include "protobuf/sls/sls_logs.pb.h"
+
+#include <string>
 
 namespace logtail {
 
-extern const int32_t ZSTD_DEFAULT_LEVEL;
-
-bool UncompressData(sls_logs::SlsCompressType compressType, const std::string& src, uint32_t rawSize, std::string& dst);
-
-bool CompressData(sls_logs::SlsCompressType compressType, const std::string& src, std::string& dst);
-bool CompressData(sls_logs::SlsCompressType compressType, const char* src, uint32_t size, std::string& dst);
-
-bool UncompressDeflate(const std::string& src, const int64_t rawSize, std::string& dst);
-bool UncompressDeflate(const char* srcPtr, const uint32_t srcSize, const int64_t rawSize, std::string& dst);
-
-bool CompressDeflate(const std::string& src, std::string& dst);
-bool CompressDeflate(const char* srcPtr, const uint32_t srcSize, std::string& dst);
-
-bool UncompressLz4(const std::string& src, const uint32_t rawSize, std::string& dst);
-bool UncompressLz4(const std::string& src, const uint32_t rawSize, char* dst);
-bool UncompressLz4(const char* srcPtr, const uint32_t srcSize, const uint32_t rawSize, std::string& dst);
-
 bool CompressLz4(const std::string& src, std::string& dst);
 bool CompressLz4(const char* srcPtr, const uint32_t srcSize, std::string& dest);
-
-bool UncompressZstd(const std::string& src, const uint32_t rawSize, std::string& dst);
-bool UncompressZstd(const char* srcPtr, const uint32_t srcSize, const uint32_t rawSize, std::string& dst);
-
-bool CompressZstd(const char* srcPtr, const uint32_t srcSize, std::string& dst, int32_t level);
-bool CompressZstd(const std::string& src, std::string& dst, int32_t level);
 
 } // namespace logtail

@@ -19,8 +19,8 @@
 #include <memory>
 #include <optional>
 #include <queue>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "common/FeedbackInterface.h"
 #include "pipeline/limiter/ConcurrencyLimiter.h"
@@ -44,18 +44,20 @@ public:
     bool Pop(std::unique_ptr<SenderQueueItem>& item) override { return false; }
 
     virtual bool Remove(SenderQueueItem* item) = 0;
-    
+
     virtual void GetAvailableItems(std::vector<SenderQueueItem*>& items, int32_t limit) = 0;
 
     void DecreaseSendingCnt();
-    void OnSendingSuccess();
     void SetRateLimiter(uint32_t maxRate);
-    void SetConcurrencyLimiters(std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap);
+    void SetConcurrencyLimiters(
+        std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap);
     virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     std::optional<RateLimiter>& GetRateLimiter() { return mRateLimiter; }
-    std::vector<std::pair<std::shared_ptr<ConcurrencyLimiter>, CounterPtr>>& GetConcurrencyLimiters() { return mConcurrencyLimiters; }
+    std::vector<std::pair<std::shared_ptr<ConcurrencyLimiter>, CounterPtr>>& GetConcurrencyLimiters() {
+        return mConcurrencyLimiters;
+    }
 #endif
 
 protected:
@@ -71,7 +73,10 @@ protected:
 
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
-    CounterPtr mRejectedByRateLimiterCnt;
+    CounterPtr mFetchRejectedByRateLimiterTimesCnt;
+
+private:
+    virtual void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherUnittest;

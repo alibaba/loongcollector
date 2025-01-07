@@ -16,11 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
@@ -40,8 +41,7 @@ public:
     bool Init(const Json::Value& scrapeConfig);
     bool operator<(const TargetSubscriberScheduler& other) const;
 
-    void OnSubscription(const HttpResponse&, uint64_t);
-    void SetTimer(std::shared_ptr<Timer> timer);
+    void OnSubscription(HttpResponse&, uint64_t);
     void SubscribeOnce(std::chrono::steady_clock::time_point execTime);
 
     std::string GetId() const;
@@ -79,7 +79,6 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> mScrapeSchedulerMap;
 
     std::string mJobName;
-    std::shared_ptr<Timer> mTimer;
 
     std::string mETag;
 

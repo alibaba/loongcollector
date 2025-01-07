@@ -181,12 +181,12 @@ e2e-core: clean gocdocker e2edocker
 	./scripts/e2e.sh e2e core
 
 .PHONY: e2e-performance
-e2e-performance: clean docker gocdocker
+e2e-performance: clean docker
 	./scripts/e2e.sh e2e performance
 
 .PHONY: unittest_e2e_engine
 unittest_e2e_engine: clean gocdocker
-	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
+	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e|benchmark") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins
@@ -209,6 +209,13 @@ unittest_pluginmanager: clean import_plugins
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
+
+# benchmark
+.PHONY: benchmark
+benchmark: clean e2edocker
+	./scripts/e2e.sh benchmark performance
+	./scripts/benchmark_collect_result.sh
+
 
 .PHONY: all
 all: clean import_plugins

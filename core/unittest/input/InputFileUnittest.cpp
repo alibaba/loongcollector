@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <filesystem>
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
@@ -255,6 +255,8 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\n', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
     {
@@ -289,6 +291,8 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         APSARA_TEST_TRUE(plugin->mMultiline.mIgnoringUnmatchWarning);
         APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::DISCARD,
                           plugin->mMultiline.mUnmatchedContentTreatment);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
     {
@@ -312,6 +316,8 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
     }
@@ -339,8 +345,92 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
+    }
+    {
+        // disable raw content: has native processor
+        ctx.SetHasNativeProcessorsFlag(true);
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
+        ctx.SetHasNativeProcessorsFlag(false);
+    }
+    {
+        // disable raw content: exactly once
+        ctx.SetExactlyOnceFlag(true);
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
+        ctx.SetExactlyOnceFlag(false);
+    }
+    {
+        // disable raw content: flushing through go pipeline
+        ctx.SetIsFlushingThroughGoPipelineFlag(true);
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_FALSE(plugin->mEnableRawContent);
+        ctx.SetIsFlushingThroughGoPipelineFlag(false);
+    }
+    {
+        // enable raw content
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_TRUE(plugin->mEnableRawContent);
     }
 }
 

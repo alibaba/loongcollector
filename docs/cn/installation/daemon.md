@@ -1,29 +1,29 @@
-# ilogtail守护进程
+# LoongCollector 守护进程
 
-当ilogtail因为各种原因异常退出，需要有一个守护来保证ilogtail进程的可用性。
+当 LoongCollector 因为各种原因异常退出，需要有一个守护来保证 LoongCollector 进程的可用性。
 
-## 安装ilogtail
+## 安装 LoongCollector
 
-参考快速开始，下载并安装ilogtail：
+参考快速开始，下载并安装 LoongCollector：
 [快速开始](quick-start.md)
 
 ## linux环境
 
 1. 执行生成systemd文件
 
-    其中ExecStart中路径根据ilogtail安装路径自行修改。
+    其中`ExecStart`中路径根据 LoongCollector 安装路径自行修改。
 
     ```text
-    cat>/etc/systemd/system/ilogtaild.service<<EOF
+    cat>/etc/systemd/system/loongcollectord.service<<EOF
     [Unit]
-    Description=ilogtail
+    Description=loongcollector
 
     [Service]
     Type=simple
     User=root
     Restart=always
     RestartSec=60
-    ExecStart=/usr/local/ilogtail/ilogtail
+    ExecStart=/usr/local/loongcollector/loongcollector
 
     [Install]
     WantedBy=multi-user.target
@@ -39,19 +39,19 @@
 3. 启动服务
 
     ```bash
-    systemctl restart ilogtaild
+    systemctl restart loongcollectord
     ```
 
 4. 查看服务状态
 
     ```bash
-    systemctl status ilogtaild
+    systemctl status loongcollectord
     ```
 
-    在服务启动后，可以在ilogtail-<version>目录下查看ilogtail.LOG。
+    在服务启动后，可以在`loongcollector/log`目录下查看loongcollector.LOG。
 
 5. 停止服务
 
     ```bash
-    systemctl stop ilogtaild
+    systemctl stop loongcollectord
     ```

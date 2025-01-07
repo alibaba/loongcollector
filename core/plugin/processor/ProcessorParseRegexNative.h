@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <boost/regex.hpp>
 #include <vector>
+
+#include "boost/regex.hpp"
 
 #include "models/LogEvent.h"
 #include "pipeline/plugin/interface/Processor.h"
@@ -57,10 +58,6 @@ private:
     bool mSourceKeyOverwritten = false;
     bool mIsWholeLineMode = false;
     boost::regex mReg;
-
-    int* mParseFailures = nullptr;
-    int* mRegexMatchFailures = nullptr;
-    int* mLogGroupSize = nullptr;
 
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;

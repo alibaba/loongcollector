@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
+
+#include <condition_variable>
 #include <filesystem>
 #include <future>
 #include <string>
@@ -26,7 +27,7 @@
 
 #include "config/feedbacker/ConfigFeedbackable.h"
 #include "config/provider/ConfigProvider.h"
-#include "protobuf/config_server/v2/agent.pb.h"
+#include "protobuf/config_server/v2/agentV2.pb.h"
 
 namespace logtail {
 
@@ -36,13 +37,6 @@ struct ConfigInfo {
     ConfigFeedbackStatus status;
     std::string message;
     std::string detail;
-};
-
-struct CommandInfo {
-    std::string type;
-    std::string name;
-    ConfigFeedbackStatus status;
-    std::string message;
 };
 
 class CommonConfigProvider : public ConfigProvider, ConfigFeedbackable {
@@ -61,10 +55,11 @@ public:
     void Init(const std::string& dir) override;
     void Stop() override;
 
-    void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
+    void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
-    void
-    FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status) override;
+    void FeedbackOnetimePipelineConfigStatus(const std::string& type,
+                                             const std::string& name,
+                                             ConfigFeedbackStatus status) override;
     CommonConfigProvider() = default;
     ~CommonConfigProvider() = default;
 
@@ -74,7 +69,7 @@ protected:
                                configserver::proto::v2::HeartbeatResponse&);
 
     virtual bool FetchInstanceConfig(::configserver::proto::v2::HeartbeatResponse&,
-                                    ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
+                                     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
 
     virtual bool FetchPipelineConfig(::configserver::proto::v2::HeartbeatResponse&,
                                      ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
@@ -83,12 +78,12 @@ protected:
     virtual void FillAttributes(::configserver::proto::v2::AgentAttributes& attributes);
     void UpdateRemotePipelineConfig(
         const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
-    void
-    UpdateRemoteInstanceConfig(const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
+    void UpdateRemoteInstanceConfig(
+        const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
 
     virtual bool
     FetchInstanceConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
-                                 ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
+                                  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
     virtual bool
     FetchPipelineConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
                                   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
@@ -105,12 +100,12 @@ protected:
     bool mConfigServerAvailable = false;
 
     mutable std::mutex mInstanceInfoMapMux;
-    mutable std::mutex mPipelineInfoMapMux;
-    mutable std::mutex mCommondInfoMapMux;
+    mutable std::mutex mContinuousPipelineInfoMapMux;
+    mutable std::mutex mOnetimePipelineInfoMapMux;
 
-    std::unordered_map<std::string, ConfigInfo> mPipelineConfigInfoMap;
+    std::unordered_map<std::string, ConfigInfo> mContinuousPipelineConfigInfoMap;
     std::unordered_map<std::string, ConfigInfo> mInstanceConfigInfoMap;
-    std::unordered_map<std::string, CommandInfo> mCommandInfoMap;
+    std::unordered_map<std::string, ConfigInfo> mOnetimePipelineConfigInfoMap;
 
 private:
     static std::string configVersion;

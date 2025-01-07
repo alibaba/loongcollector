@@ -10,16 +10,18 @@ C++部分单测基于 gtest 实现，具体编写方法可以参考已有测试�
 
 1. 进入开发容器中，参考[开发环境](../development-environment.md)。
 2. CMake 设置参数 BUILD_LOGTAIL_UT=ON，编译单测
-```
-cmake -DBUILD_LOGTAIL_UT=ON <其他编译参数> ..
-```
+
+    ```shell
+    cmake -DBUILD_LOGTAIL_UT=ON <其他编译参数> ..
+    ```
+
 3. 运行脚本 `./scripts/run_core_ut.sh`，运行单测
 4. 生成覆盖率报告
 
 ```shell
 mkdir -p coverage-report
 # 生成详细的报告
-gcovr -r ./core --txt coverage-report/index.txt --html-details --html coverage-report/index.html -e ".*sdk.*" -e ".*observer.*" -e ".*protobuf.*" -e ".*unittest.*" -e ".*config_server.*" -e ".*fuse.*" -e ".*go_pipeline.*"
+gcovr -r ./core --txt coverage-report/index.txt --html-details --html coverage-report/index.html -e ".*\.pb\.cc" -e ".*\.pb\.h" -e ".*unittest.*" -e ".*config_server.*" -e ".*go_pipeline.*" -e ".*sdk.*"
 # 生成本次commit diff的报告
 python3 tools/coverage-diff/main.py coverage-report/index.txt
 ```
@@ -32,7 +34,7 @@ python3 tools/coverage-diff/main.py coverage-report/index.txt
 
 ### 测试工具
 
-从插件开发以及 [日志打印](How-to-use-logger.md) 篇幅可以看到，ilogtail.Context 接口包含了iLogtail 的元配置信息，因此提供了Mock Context 以及Mock Collector 实现进行单元测试。
+从插件开发以及 [日志打印](How-to-use-logger.md) 篇幅可以看到，ilogtail.Context 接口包含了 LoongCollector 的元配置信息，因此提供了Mock Context 以及Mock Collector 实现进行单元测试。
 
 ```go
 import (
@@ -68,4 +70,4 @@ func TestInputSystem_CollectOpenFD(t *testing.T) {
 
 ### 测试插件行为
 
-如果需要日志的方式进行验证插件具体行为，可以参加[日志功能高级用法](../plugin-development/logger-api.md)
+如果需要日志的方式进行验证插件具体行为，可以参加[日志功能高级用法](../plugin-development/plugin-debug/logger-api.md)

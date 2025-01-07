@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <ctime>
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -27,7 +28,7 @@
 #include "models/StringView.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
-#include <json/json.h>
+#include "json/json.h"
 #endif
 
 namespace logtail {
@@ -36,11 +37,12 @@ class PipelineEventGroup;
 
 class PipelineEvent {
 public:
-    enum class Type { NONE, LOG, METRIC, SPAN };
+    enum class Type { NONE, LOG, METRIC, SPAN, RAW };
 
     virtual ~PipelineEvent() = default;
 
     virtual std::unique_ptr<PipelineEvent> Copy() const = 0;
+    virtual void Reset();
 
     Type GetType() const { return mType; }
     time_t GetTimestamp() const { return mTimestamp; }
@@ -64,6 +66,7 @@ public:
     virtual bool FromJson(const Json::Value&) = 0;
     std::string ToJsonString(bool enableEventMeta = false) const;
     bool FromJsonString(const std::string&);
+    PipelineEventGroup* GetPipelineEventGroupPtr() { return mPipelineEventGroupPtr; }
 #endif
 
 protected:

@@ -24,6 +24,7 @@ class ConditionUnittest : public testing::Test {
 public:
     void TestInit();
     void TestCheck();
+    void TestGetResult();
 
 private:
     PipelineContext ctx;
@@ -167,8 +168,32 @@ void ConditionUnittest::TestCheck() {
     }
 }
 
+void ConditionUnittest::TestGetResult() {
+    string errorMsg;
+    {
+        Json::Value configJson;
+        string configStr = R"(
+            {
+                "Type": "tag",
+                "Key": "level",
+                "Value": "INFO",
+                "DiscardingTag": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        Condition cond;
+        cond.Init(configJson, ctx);
+
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        g.SetTag(string("level"), string("INFO"));
+        cond.GetResult(g);
+        APSARA_TEST_FALSE(g.HasTag("level"));
+    }
+}
+
 UNIT_TEST_CASE(ConditionUnittest, TestInit)
 UNIT_TEST_CASE(ConditionUnittest, TestCheck)
+UNIT_TEST_CASE(ConditionUnittest, TestGetResult)
 
 class EventTypeConditionUnittest : public testing::Test {
 public:
@@ -273,6 +298,7 @@ class TagConditionUnittest : public testing::Test {
 public:
     void TestInit();
     void TestCheck();
+    void TestDiscardTag();
 
 private:
     PipelineContext ctx;
@@ -293,6 +319,33 @@ void TagConditionUnittest::TestInit() {
         APSARA_TEST_TRUE(cond.Init(configJson, ctx));
         APSARA_TEST_EQUAL("level", cond.mKey);
         APSARA_TEST_EQUAL("INFO", cond.mValue);
+        APSARA_TEST_FALSE(cond.mDiscardingTag);
+    }
+    {
+        configStr = R"(
+            {
+                "Key": "level",
+                "Value": "INFO",
+                "DiscardingTag": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        TagCondition cond;
+        APSARA_TEST_TRUE(cond.Init(configJson, ctx));
+        APSARA_TEST_TRUE(cond.mDiscardingTag);
+    }
+    {
+        configStr = R"(
+            {
+                "Key": "level",
+                "Value": "INFO",
+                "DiscardingTag": "true"
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        TagCondition cond;
+        APSARA_TEST_TRUE(cond.Init(configJson, ctx));
+        APSARA_TEST_FALSE(cond.mDiscardingTag);
     }
     {
         configStr = R"(
@@ -347,8 +400,45 @@ void TagConditionUnittest::TestCheck() {
     }
 }
 
+void TagConditionUnittest::TestDiscardTag() {
+    Json::Value configJson;
+    string errorMsg;
+    {
+        string configStr = R"(
+            {
+                "Key": "level",
+                "Value": "INFO",
+                "DiscardingTag": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        TagCondition cond;
+        APSARA_TEST_TRUE(cond.Init(configJson, ctx));
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        g.SetTag(string("level"), string("INFO"));
+        cond.DiscardTagIfRequired(g);
+        APSARA_TEST_FALSE(g.HasTag("level"));
+    }
+    {
+        string configStr = R"(
+            {
+                "Key": "level",
+                "Value": "INFO"
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        TagCondition cond;
+        APSARA_TEST_TRUE(cond.Init(configJson, ctx));
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        g.SetTag(string("level"), string("INFO"));
+        cond.DiscardTagIfRequired(g);
+        APSARA_TEST_TRUE(g.HasTag("level"));
+    }
+}
+
 UNIT_TEST_CASE(TagConditionUnittest, TestInit)
 UNIT_TEST_CASE(TagConditionUnittest, TestCheck)
+UNIT_TEST_CASE(TagConditionUnittest, TestDiscardTag)
 
 } // namespace logtail
 

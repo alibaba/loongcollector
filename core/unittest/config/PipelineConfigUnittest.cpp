@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
+
+#include "json/json.h"
 
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
@@ -80,7 +80,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ],
             "extensions": [
@@ -496,7 +496,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -533,7 +533,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -566,7 +566,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -591,7 +591,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -623,7 +623,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -663,7 +663,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -691,7 +691,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -731,7 +731,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -767,7 +767,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -787,7 +787,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -814,7 +814,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -849,7 +849,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -877,7 +877,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -917,7 +917,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -953,7 +953,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -981,7 +981,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1016,7 +1016,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1059,7 +1059,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1090,7 +1090,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1133,7 +1133,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1172,7 +1172,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1195,7 +1195,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1225,7 +1225,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1263,7 +1263,7 @@ void PipelineConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1744,26 +1744,6 @@ void PipelineConfigUnittest::HandleInvalidProcessors() const {
     config.reset(new PipelineConfig(configName, std::move(configJson)));
     APSARA_TEST_FALSE(config->Parse());
 
-    // native processor plugins coexist with input_observer_network
-    configStr = R"(
-        {
-            "inputs": [
-                {
-                    "Type": "input_observer_network"
-                }
-            ],
-            "processors": [
-                {
-                    "Type": "processor_parse_regex_native"
-                }
-            ]
-        }
-    )";
-    configJson.reset(new Json::Value());
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new PipelineConfig(configName, std::move(configJson)));
-    APSARA_TEST_FALSE(config->Parse());
-
     // native processor plugins coexist with processor_spl
     configStr = R"(
         {
@@ -1952,7 +1932,7 @@ void PipelineConfigUnittest::HandleInvalidAggregators() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }

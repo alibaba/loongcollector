@@ -38,7 +38,7 @@ type InputWrapper struct {
 }
 
 func (wrapper *InputWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
-	labels := helper.GetCommonLabels(wrapper.Config.Context, pluginMeta)
+	labels := helper.GetPluginCommonLabels(wrapper.Config.Context, pluginMeta)
 	wrapper.MetricRecord = wrapper.Config.Context.RegisterMetricRecord(labels)
 
 	wrapper.outEventsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginOutEventsTotal)
@@ -74,7 +74,7 @@ type ProcessorWrapper struct {
 }
 
 func (wrapper *ProcessorWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
-	labels := helper.GetCommonLabels(wrapper.Config.Context, pluginMeta)
+	labels := helper.GetPluginCommonLabels(wrapper.Config.Context, pluginMeta)
 	wrapper.MetricRecord = wrapper.Config.Context.RegisterMetricRecord(labels)
 
 	wrapper.inEventsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginInEventsTotal)
@@ -100,7 +100,7 @@ type AggregatorWrapper struct {
 }
 
 func (wrapper *AggregatorWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
-	labels := helper.GetCommonLabels(wrapper.Config.Context, pluginMeta)
+	labels := helper.GetPluginCommonLabels(wrapper.Config.Context, pluginMeta)
 	wrapper.MetricRecord = wrapper.Config.Context.RegisterMetricRecord(labels)
 
 	wrapper.outEventsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginOutEventsTotal)
@@ -130,7 +130,7 @@ type FlusherWrapper struct {
 }
 
 func (wrapper *FlusherWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
-	labels := helper.GetCommonLabels(wrapper.Config.Context, pluginMeta)
+	labels := helper.GetPluginCommonLabels(wrapper.Config.Context, pluginMeta)
 	wrapper.MetricRecord = wrapper.Config.Context.RegisterMetricRecord(labels)
 
 	wrapper.inEventsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginInEventsTotal)

@@ -16,6 +16,7 @@ package verify
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -70,7 +71,51 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
-func MetricCount(ctx context.Context, expect int, duration int64) (context.Context, error) {
+func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
+	var from int32
+	value := ctx.Value(config.StartTimeContextKey)
+	if value != nil {
+		from = value.(int32)
+	} else {
+		return ctx, fmt.Errorf("no start time")
+	}
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var groups []*protocol.LogGroup
+	var err error
+	var count int
+	err = retry.Do(
+		func() error {
+			count = 0
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
+			if err != nil {
+				return err
+			}
+			for _, group := range groups {
+				count += len(group.Logs)
+			}
+			if count != expect {
+				return fmt.Errorf("log count not match, expect %d, got %d, from %d", expect, count, from)
+			}
+			if expect == 0 {
+				return fmt.Errorf("log count is 0")
+			}
+			return nil
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if count > 0 && count < expect {
+		return ctx, nil
+	}
+	if err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
+func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*protocol.LogGroup) error) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var groups []*protocol.LogGroup
@@ -94,6 +139,9 @@ func MetricCount(ctx context.Context, expect int, duration int64) (context.Conte
 			if expect == 0 {
 				return fmt.Errorf("metric count is 0")
 			}
+			if err = checker(groups); err != nil {
+				return err
+			}
 			return nil
 		},
 		retry.Context(timeoutCtx),
@@ -107,6 +155,66 @@ func MetricCount(ctx context.Context, expect int, duration int64) (context.Conte
 		return ctx, err
 	}
 	return ctx, nil
+}
+
+func MetricCount(ctx context.Context, expect int, duration int64) (context.Context, error) {
+	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+		return nil
+	})
+}
+
+func MetricCountAndValueCompare(ctx context.Context, expect int, duration int64, minValue int64, maxValue int64) (context.Context, error) {
+	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+		lessCount := 0
+		greaterCount := 0
+		for _, group := range groups {
+			for _, log := range group.Logs {
+				for _, content := range log.Contents {
+					if content.Key == "value" {
+						value, err := strconv.ParseFloat(content.Value, 64)
+						if err != nil {
+							return fmt.Errorf("parse value failed: %v", err)
+						}
+						if value < float64(minValue) {
+							lessCount++
+						}
+						if value > float64(maxValue) {
+							greaterCount++
+						}
+					}
+				}
+			}
+		}
+		if lessCount > 0 || greaterCount > 0 {
+			return fmt.Errorf("metric value not match, lessCount %d, greaterCount %d", lessCount, greaterCount)
+		}
+		return nil
+	})
+}
+
+func MetricCountAndValueEqual(ctx context.Context, expect int, duration int64, expectValue int64) (context.Context, error) {
+	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+		notEqualCount := 0
+		for _, group := range groups {
+			for _, log := range group.Logs {
+				for _, content := range log.Contents {
+					if content.Key == "value" {
+						value, err := strconv.ParseFloat(content.Value, 64)
+						if err != nil {
+							return fmt.Errorf("parse value failed: %v", err)
+						}
+						if value != float64(expectValue) {
+							notEqualCount++
+						}
+					}
+				}
+			}
+		}
+		if notEqualCount > 0 {
+			return fmt.Errorf("metric value not match, not equal count %d", notEqualCount)
+		}
+		return nil
+	})
 }
 
 func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {

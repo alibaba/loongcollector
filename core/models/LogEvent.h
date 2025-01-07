@@ -63,12 +63,14 @@ private:
 
 class LogEvent : public PipelineEvent {
     friend class PipelineEventGroup;
+    friend class EventPool;
 
 public:
     using ConstContentIterator = BaseContentIterator<ContentsContainer::const_iterator, const LogContent>;
     using ContentIterator = BaseContentIterator<ContentsContainer::iterator, LogContent>;
 
     std::unique_ptr<PipelineEvent> Copy() const override;
+    void Reset() override;
 
     StringView GetContent(StringView key) const;
     bool HasContent(StringView key) const;
@@ -81,11 +83,14 @@ public:
     void SetContentNoCopy(StringView key, StringView val);
     void DelContent(StringView key);
 
-    void SetPosition(uint32_t offset, uint32_t size) {
+    void SetPosition(uint64_t offset, uint64_t size) {
         mFileOffset = offset;
         mRawSize = size;
     }
-    std::pair<uint32_t, uint32_t> GetPosition() const { return {mFileOffset, mRawSize}; }
+    std::pair<uint64_t, uint64_t> GetPosition() const { return {mFileOffset, mRawSize}; }
+
+    StringView GetLevel() const { return mLevel; }
+    void SetLevel(const std::string& level);
 
     bool Empty() const { return mIndex.empty(); }
     size_t Size() const { return mIndex.size(); }
@@ -117,8 +122,9 @@ private:
     ContentsContainer mContents;
     size_t mAllocatedContentSize = 0;
     std::map<StringView, size_t> mIndex;
-    uint32_t mFileOffset = 0;
-    uint32_t mRawSize = 0;
+    uint64_t mFileOffset = 0;
+    uint64_t mRawSize = 0;
+    StringView mLevel;
 };
 
 } // namespace logtail

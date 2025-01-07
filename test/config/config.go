@@ -15,7 +15,9 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -25,6 +27,7 @@ var TestConfig Config
 
 type Config struct {
 	// Log
+	LocalConfigDir  string `mapstructure:"local_config_dir" yaml:"local_config_dir"`
 	GeneratedLogDir string `mapstructure:"generated_log_dir" yaml:"generated_log_dir"`
 	WorkDir         string `mapstructure:"work_dir" yaml:"work_dir"`
 	// Host
@@ -43,8 +46,8 @@ type Config struct {
 	AccessKeyID     string        `mapstructure:"access_key_id" yaml:"access_key_id"`
 	AccessKeySecret string        `mapstructure:"access_key_secret" yaml:"access_key_secret"`
 	Endpoint        string        `mapstructure:"endpoint" yaml:"endpoint"`
-	Aliuid          string        `mapstructure:"aliuid" yaml:"aliuid"`
 	QueryEndpoint   string        `mapstructure:"query_endpoint" yaml:"query_endpoint"`
+	Aliuid          string        `mapstructure:"aliuid" yaml:"aliuid"`
 	Region          string        `mapstructure:"region" yaml:"region"`
 	RetryTimeout    time.Duration `mapstructure:"retry_timeout" yaml:"retry_timeout"`
 }
@@ -65,11 +68,16 @@ func ParseConfig() {
 
 	TestConfig = Config{}
 	// Log
+	TestConfig.LocalConfigDir = os.Getenv("LOCAL_CONFIG_DIR")
 	TestConfig.GeneratedLogDir = os.Getenv("GENERATED_LOG_DIR")
 	if len(TestConfig.GeneratedLogDir) == 0 {
-		TestConfig.GeneratedLogDir = "/tmp/ilogtail"
+		TestConfig.GeneratedLogDir = "/tmp/loongcollector"
 	}
 	TestConfig.WorkDir = os.Getenv("WORK_DIR")
+	if len(TestConfig.WorkDir) == 0 {
+		testFileDir, _ := os.Getwd()
+		TestConfig.WorkDir = filepath.Dir(testFileDir)
+	}
 
 	// SSH
 	TestConfig.SSHUsername = os.Getenv("SSH_USERNAME")
@@ -86,12 +94,20 @@ func ParseConfig() {
 	TestConfig.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
 	TestConfig.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
 	TestConfig.Endpoint = os.Getenv("ENDPOINT")
-	TestConfig.Aliuid = os.Getenv("ALIUID")
 	TestConfig.QueryEndpoint = os.Getenv("QUERY_ENDPOINT")
+	TestConfig.Aliuid = os.Getenv("ALIUID")
 	TestConfig.Region = os.Getenv("REGION")
 	timeout, err := strconv.ParseInt(os.Getenv("RETRY_TIMEOUT"), 10, 64)
 	if err != nil {
 		timeout = 60
 	}
 	TestConfig.RetryTimeout = time.Duration(timeout) * time.Second
+}
+
+func GetQueryEndpoint() string {
+	idx := strings.Index(TestConfig.Endpoint, "-intranet")
+	if idx == -1 {
+		return TestConfig.Endpoint
+	}
+	return TestConfig.Endpoint[:idx] + TestConfig.Endpoint[idx+9:]
 }

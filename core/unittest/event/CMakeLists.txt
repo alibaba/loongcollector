@@ -18,5 +18,9 @@ project(event_unittest)
 add_executable(event_unittest EventUnittest.cpp)
 target_link_libraries(event_unittest ${UT_BASE_TARGET})
 
+add_executable(blocked_event_manager_unittest BlockedEventManagerUnittest.cpp)
+target_link_libraries(blocked_event_manager_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(event_unittest)
+gtest_discover_tests(blocked_event_manager_unittest)

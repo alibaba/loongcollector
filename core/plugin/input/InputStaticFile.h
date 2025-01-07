@@ -28,14 +28,14 @@ private:
     std::string mJobName;
     AdhocFileManager* mAdhocFileManager;
     std::vector<StaticFile> mFileList;
-    
+
 public:
     InputStaticFile(/* args */);
     ~InputStaticFile();
 
-    void Init(PipelineConfig &&config);
+    void Init(PipelineConfig&& config);
     void Start();
     void Stop(bool isRemoving);
 };
 
-}
+} // namespace logtail

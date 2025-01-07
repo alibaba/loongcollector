@@ -38,7 +38,7 @@ public:
     }
 
     void UpdatePipelines(PipelineConfigDiff& diff);
-    std::shared_ptr<Pipeline> FindConfigByName(const std::string& configName) const;
+    const std::shared_ptr<Pipeline>& FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
     // for shennong only
@@ -59,7 +59,7 @@ private:
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void FlushAllBatch();
     // TODO: 长期过渡使用
-    bool CheckIfFileServerUpdated(const Json::Value& config);
+    bool CheckIfFileServerUpdated(PipelineConfigDiff& diff);
 
     std::unordered_map<std::string, std::shared_ptr<Pipeline>> mPipelineNameEntityMap;
     mutable SpinLock mPluginCntMapLock;
@@ -76,6 +76,7 @@ private:
     friend class CircularProcessQueueUnittest;
     friend class CommonConfigProviderUnittest;
     friend class FlusherUnittest;
+    friend class PipelineUnittest;
 #endif
 };
 

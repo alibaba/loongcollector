@@ -34,6 +34,7 @@ public:
     void TestParseMultipleLines() const;
     void TestParseMetricWithTagsAndTimestamp() const;
     void TestParseMetricWithManyTags() const;
+    void TestParseUnicodeLabelValue();
 
     void TestParseFaliure();
     void TestParseSuccess();
@@ -359,6 +360,33 @@ void TextParserUnittest::TestHonorTimestamps() {
 }
 
 UNIT_TEST_CASE(TextParserUnittest, TestHonorTimestamps)
+
+void TextParserUnittest::TestParseUnicodeLabelValue() {
+    auto parser = TextParser();
+    string rawData
+        = R"""(container_blkio_device_usage_total{container="",device="/dev/nvme0n1中文",id="/😀",image="",major="259",minor="0",name="",namespace="",operation="Async",pod=""} 9.9410452992e+10 1715829785083)""";
+    const auto eGroup = parser.Parse(rawData, 1715829785, 83000000);
+    const auto& events = &eGroup.GetEvents();
+    APSARA_TEST_EQUAL(1UL, events->size());
+    const auto& event = events->front();
+    const auto& metric = event.Get<MetricEvent>();
+    APSARA_TEST_EQUAL("container_blkio_device_usage_total", metric->GetName().to_string());
+    APSARA_TEST_EQUAL(1715829785, metric->GetTimestamp());
+    APSARA_TEST_TRUE(IsDoubleEqual(9.9410452992e+10, metric->GetValue<UntypedSingleValue>()->mValue));
+
+    APSARA_TEST_EQUAL("", metric->GetTag("container").to_string());
+    APSARA_TEST_EQUAL("/dev/nvme0n1中文", metric->GetTag("device").to_string());
+    APSARA_TEST_EQUAL("/😀", metric->GetTag("id").to_string());
+    APSARA_TEST_EQUAL("", metric->GetTag("image").to_string());
+    APSARA_TEST_EQUAL("259", metric->GetTag("major").to_string());
+    APSARA_TEST_EQUAL("0", metric->GetTag("minor").to_string());
+    APSARA_TEST_EQUAL("", metric->GetTag("name").to_string());
+    APSARA_TEST_EQUAL("", metric->GetTag("namespace").to_string());
+    APSARA_TEST_EQUAL("Async", metric->GetTag("operation").to_string());
+    APSARA_TEST_EQUAL("", metric->GetTag("pod").to_string());
+}
+
+UNIT_TEST_CASE(TextParserUnittest, TestParseUnicodeLabelValue)
 
 } // namespace logtail
 

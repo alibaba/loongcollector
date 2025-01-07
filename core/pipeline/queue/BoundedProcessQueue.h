@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <memory>
 #include <queue>
 #include <vector>
@@ -53,6 +54,7 @@ private:
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

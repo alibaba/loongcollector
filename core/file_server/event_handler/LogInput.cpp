@@ -27,6 +27,7 @@
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"
@@ -37,17 +38,14 @@
 #include "file_server/reader/GloablFileDescriptorManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
-#include "file_server/FileServer.h"
 
 using namespace std;
 
 DEFINE_FLAG_INT32(check_symbolic_link_interval, "seconds", 120);
 DEFINE_FLAG_INT32(check_base_dir_interval, "seconds", 60);
+DEFINE_FLAG_INT32(check_timeout_interval, "seconds", 600);
 DEFINE_FLAG_INT32(log_input_thread_wait_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT64(read_fs_events_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT32(check_handler_timeout_interval, "seconds", 180);
@@ -58,8 +56,6 @@ DEFINE_FLAG_INT32(read_local_event_interval, "seconds", 60);
 DEFINE_FLAG_BOOL(force_close_file_on_container_stopped,
                  "whether close file handler immediately when associate container stopped",
                  false);
-
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 
 namespace logtail {
@@ -88,12 +84,14 @@ void LogInput::Start() {
     mInteruptFlag = false;
 
     mLastRunTime = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mAgentOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
-    mRegisterdHandlersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
-    mActiveReadersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
-    mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
+    mRegisterdHandlersTotal
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
+    mActiveReadersTotal
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
+    mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(
+        METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
 
-    new Thread([this]() { ProcessLoop(); });
+    mThreadRes = async(launch::async, &LogInput::ProcessLoop, this);
 }
 
 void LogInput::Resume() {
@@ -104,34 +102,40 @@ void LogInput::Resume() {
 }
 
 void LogInput::HoldOn() {
-    LOG_INFO(sLogger, ("event handle daemon pause", "starts"));
-    if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()) {
+    if (Application::GetInstance()->IsExiting()) {
+        LOG_INFO(sLogger, ("input event handle daemon", "stop starts"));
         unique_lock<mutex> lock(mThreadRunningMux);
-        mStopCV.wait(lock, [this]() { return mInteruptFlag; });
+        if (!mThreadRes.valid()) {
+            return;
+        }
+        mThreadRes.wait(); // should we set a timeout here? what it network outrage for an hour?
+        LOG_INFO(sLogger, ("input event handle daemon", "stopped successfully"));
     } else {
+        LOG_INFO(sLogger, ("input event handle daemon pause", "starts"));
         mInteruptFlag = true;
         mAccessMainThreadRWL.lock();
+        LOG_INFO(sLogger, ("input event handle daemon pause", "succeeded"));
     }
-    LOG_INFO(sLogger, ("event handle daemon pause", "succeeded"));
 }
 
 void LogInput::TryReadEvents(bool forceRead) {
     if (mInteruptFlag)
         return;
 
-    if (!forceRead) {
-        int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
-        if (curMicroSeconds - mLastReadEventMicroSeconds >= INT64_FLAG(read_fs_events_interval))
-            mLastReadEventMicroSeconds = curMicroSeconds;
-        else
-            return;
-    } else
-        mLastReadEventMicroSeconds = GetCurrentTimeInMicroSeconds();
+    int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
+    if (forceRead || curMicroSeconds - mLastReadEventMicroSeconds >= INT64_FLAG(read_fs_events_interval)) {
+        vector<Event*> inotifyEvents;
+        EventDispatcher::GetInstance()->ReadInotifyEvents(inotifyEvents);
+        if (inotifyEvents.size() > 0) {
+            PushEventQueue(inotifyEvents);
+        }
+        mLastReadEventMicroSeconds = curMicroSeconds;
+    }
 
-    vector<Event*> inotifyEvents;
-    EventDispatcher::GetInstance()->ReadInotifyEvents(inotifyEvents);
-    if (inotifyEvents.size() > 0) {
-        PushEventQueue(inotifyEvents);
+    vector<Event*> feedbackEvents;
+    BlockedEventManager::GetInstance()->GetFeedbackEvent(feedbackEvents);
+    if (feedbackEvents.size() > 0) {
+        PushEventQueue(feedbackEvents);
     }
 
     vector<Event*> pollingEvents;
@@ -207,8 +211,7 @@ bool LogInput::ReadLocalEvents() {
     }
     // set discard old data flag, so that history data will not be dropped.
     BOOL_FLAG(ilogtail_discard_old_data) = false;
-    LOG_INFO(sLogger,
-             ("load local events", GetLocalEventDataFileName())("event count", localEventJson.size()));
+    LOG_INFO(sLogger, ("load local events", GetLocalEventDataFileName())("event count", localEventJson.size()));
     for (Json::ValueIterator iter = localEventJson.begin(); iter != localEventJson.end(); ++iter) {
         const Json::Value& eventItem = *iter;
         if (!eventItem.isObject()) {
@@ -277,7 +280,7 @@ bool LogInput::ReadLocalEvents() {
             sLogger,
             ("process local event, dir", source)("file name", object)("config", configName)(
                 "project", readerConfig.second->GetProjectName())("logstore", readerConfig.second->GetLogstoreName()));
-        LogtailAlarm::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
                                                string("process local event, dir:") + source + ", file name:" + object
                                                    + ", config:" + configName
                                                    + ", file count:" + ToString(objList.size()),
@@ -341,32 +344,22 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 }
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
-    LogtailMonitor::GetInstance()->UpdateMetric("last_read_event_time",
-                                                GetTimeStamp(mLastReadEventTime, "%Y-%m-%d %H:%M:%S"));
     mLastRunTime->Set(mLastReadEventTime.load());
-
-    LogtailMonitor::GetInstance()->UpdateMetric("event_tps",
-                                                1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
-    int32_t openFdTotal = GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize();
-    LogtailMonitor::GetInstance()->UpdateMetric("open_fd", openFdTotal);
-    mAgentOpenFdTotal->Set(openFdTotal);
-    size_t handlerCount = EventDispatcher::GetInstance()->GetHandlerCount();
-    LogtailMonitor::GetInstance()->UpdateMetric("register_handler", handlerCount);
-    mRegisterdHandlersTotal->Set(handlerCount);
-    LogtailMonitor::GetInstance()->UpdateMetric("reader_count", CheckPointManager::Instance()->GetReaderCount());
+    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(
+        GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+    mRegisterdHandlersTotal->Set(EventDispatcher::GetInstance()->GetHandlerCount());
     mActiveReadersTotal->Set(CheckPointManager::Instance()->GetReaderCount());
-    LogtailMonitor::GetInstance()->UpdateMetric("multi_config", AppConfig::GetInstance()->IsAcceptMultiConfig());
     mEventProcessCount = 0;
 }
 
-void* LogInput::ProcessLoop() {
+void LogInput::ProcessLoop() {
     LOG_INFO(sLogger, ("event handle daemon", "started"));
     EventDispatcher* dispatcher = EventDispatcher::GetInstance();
     dispatcher->StartTimeCount();
     int32_t prevTime = time(NULL);
     mLastReadEventTime = prevTime;
     int32_t curTime = prevTime;
-    srand(prevTime);
+    srand(0); // avoid random failures in unit tests
     int32_t lastCheckDir = prevTime - rand() % 60;
     int32_t lastCheckSymbolicLink = prevTime - rand() % 60;
     time_t lastCheckHandlerTimeOut = prevTime - rand() % 60;
@@ -390,8 +383,11 @@ void* LogInput::ProcessLoop() {
                 delete ev;
             else
                 ProcessEvent(dispatcher, ev);
-        } else
-            usleep(INT32_FLAG(log_input_thread_wait_interval));
+        } else {
+            unique_lock<mutex> lock(mFeedbackMux);
+            mFeedbackCV.wait_for(lock, chrono::microseconds(INT32_FLAG(log_input_thread_wait_interval)));
+        }
+
         if (mIdleFlag)
             continue;
 
@@ -423,7 +419,7 @@ void* LogInput::ProcessLoop() {
             lastCheckSymbolicLink = 0;
         }
 
-        if (curTime - prevTime >= INT32_FLAG(timeout_interval)) {
+        if (curTime - prevTime >= INT32_FLAG(check_timeout_interval)) {
             dispatcher->HandleTimeout();
             prevTime = curTime;
         }
@@ -457,19 +453,13 @@ void* LogInput::ProcessLoop() {
             lastClearConfigCache = curTime;
         }
 
-        if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()
-            && EventDispatcher::GetInstance()->IsAllFileRead()) {
+        if (Application::GetInstance()->IsExiting()
+            && (!BOOL_FLAG(enable_full_drain_mode) || EventDispatcher::GetInstance()->IsAllFileRead())) {
             break;
         }
     }
 
     mInteruptFlag = true;
-    mStopCV.notify_one();
-
-    if (!BOOL_FLAG(enable_full_drain_mode)) {
-        LOG_WARNING(sLogger, ("LogInputThread", "Exit"));
-    }
-    return NULL;
 }
 
 void LogInput::PushEventQueue(std::vector<Event*>& eventVec) {
@@ -535,6 +525,7 @@ Event* LogInput::PopEventQueue() {
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogInput::CleanEnviroments() {
     mIdleFlag = true;
+    mInteruptFlag = true;
     usleep(100 * 1000);
     while (true) {
         Event* ev = PopEventQueue();

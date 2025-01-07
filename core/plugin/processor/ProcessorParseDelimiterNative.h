@@ -74,9 +74,6 @@ private:
     bool mSourceKeyOverwritten = false;
     std::unique_ptr<DelimiterModeFsmParser> mDelimiterModeFsmParserPtr;
 
-    int* mLogGroupSize = nullptr;
-    int* mParseFailures = nullptr;
-
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;
     CounterPtr mOutKeyNotFoundEventsTotal;

@@ -12,25 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "app_config/AppConfig.h"
 #include "RuntimeUtil.h"
+
+#include "Flags.h"
+#include "app_config/AppConfig.h"
 #if defined(__linux__)
-#include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <unistd.h>
 #elif defined(_MSC_VER)
-#include <Windows.h>
 #include <Psapi.h>
+#include <Windows.h>
 #endif
-#include <errno.h>
 #include <cstdio>
+#include <errno.h>
+
 #include <sstream>
-#include "logger/Logger.h"
-#include "LogtailCommonFlags.h"
+
 #include "FileSystemUtil.h"
+#include "LogtailCommonFlags.h"
+#include "logger/Logger.h"
 
 DECLARE_FLAG_STRING(logtail_sys_conf_dir);
+DECLARE_FLAG_BOOL(logtail_mode);
 
 namespace logtail {
 
@@ -76,40 +81,41 @@ std::string GetBinaryName(void) {
 bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
                          std::string& errorMessage,
                          const std::string& executionDir) {
-    std::string path = GetAgentDataDir();
-    if (CheckExistance(path))
-        return true;
-    if (!Mkdirs(path)) {
-        std::stringstream ss;
-        ss << "create data dir failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
-    }
-    #if defined(__RUN_LOGTAIL__) 
-    path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
-    if (CheckExistance(path))
-        return true;
-    if (!Mkdir(path)) {
-        std::stringstream ss;
-        ss << "create execution dir failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
-    }
+    if (BOOL_FLAG(logtail_mode)) {
+        std::string path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
+        if (CheckExistance(path))
+            return true;
+        if (!Mkdir(path)) {
+            std::stringstream ss;
+            ss << "create execution dir failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
 
-    if (ilogtailConfigJson.empty())
-        return true;
+        if (ilogtailConfigJson.empty())
+            return true;
 
-    FILE* pFile = fopen((path + STRING_FLAG(ilogtail_config)).c_str(), "w");
-    if (pFile == NULL) {
-        std::stringstream ss;
-        ss << "open " << STRING_FLAG(ilogtail_config) << " to write failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
+        FILE* pFile = fopen((path + STRING_FLAG(ilogtail_config)).c_str(), "w");
+        if (pFile == NULL) {
+            std::stringstream ss;
+            ss << "open " << STRING_FLAG(ilogtail_config) << " to write failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
+
+        fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
+        fclose(pFile);
+    } else {
+        std::string path = GetAgentDataDir();
+        if (CheckExistance(path))
+            return true;
+        if (!Mkdirs(path)) {
+            std::stringstream ss;
+            ss << "create data dir failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
     }
-
-    fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
-    fclose(pFile);
-    #endif
     return true;
 }
 

@@ -8,7 +8,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/pingcap/failpoint](https://pkg.go.dev/github.com/pingcap/failpoint?tab=licenses)
 - [github.com/pingcap/tidb/pkg/parser](https://pkg.go.dev/github.com/pingcap/tidb/pkg/parser?tab=licenses)
 - [sigs.k8s.io/gateway-api](https://pkg.go.dev/sigs.k8s.io/gateway-api?tab=licenses)
-- [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
 - [github.com/containerd/containerd](https://pkg.go.dev/github.com/containerd/containerd?tab=licenses)
 - [github.com/containerd/continuity](https://pkg.go.dev/github.com/containerd/continuity?tab=licenses)
@@ -60,7 +59,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/prometheus/prometheus](https://pkg.go.dev/github.com/prometheus/prometheus?tab=licenses)
 - [github.com/stefanberger/go-pkcs11uri](https://pkg.go.dev/github.com/stefanberger/go-pkcs11uri?tab=licenses)
 - [github.com/tklauser/numcpus](https://pkg.go.dev/github.com/tklauser/numcpus?tab=licenses)
-- [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
 - [github.com/vishvananda/netlink](https://pkg.go.dev/github.com/vishvananda/netlink?tab=licenses)
 - [github.com/vishvananda/netns](https://pkg.go.dev/github.com/vishvananda/netns?tab=licenses)
 - [github.com/xdg-go/pbkdf2](https://pkg.go.dev/github.com/xdg-go/pbkdf2?tab=licenses)
@@ -102,6 +100,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [go.opencensus.io](https://pkg.go.dev/go.opencensus.io?tab=licenses)
 - [github.com/golang/groupcache](https://pkg.go.dev/github.com/golang/groupcache?tab=licenses)
 - [sigs.k8s.io/controller-runtime](https://pkg.go.dev/sigs.k8s.io/controller-runtime?tab=licenses)
+- [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
+- [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
+- [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
 
 ## BSD licenses
 
@@ -155,7 +156,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## MIT licenses
 
-- [github.com/valyala/gozstd](https://pkg.go.dev/github.com/valyala/gozstd?tab=licenses)
 - [github.com/goccy/go-json](https://pkg.go.dev/github.com/goccy/go-json?tab=licenses)
 - [github.com/gofrs/uuid](https://pkg.go.dev/github.com/gofrs/uuid?tab=licenses)
 - [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
@@ -166,7 +166,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/IBM/sarama](https://pkg.go.dev/github.com/IBM/sarama?tab=licenses)
-- [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
 - [github.com/buger/jsonparser](https://pkg.go.dev/github.com/buger/jsonparser?tab=licenses)
 - [github.com/cespare/xxhash](https://pkg.go.dev/github.com/cespare/xxhash?tab=licenses)
 - [github.com/eapache/go-resiliency](https://pkg.go.dev/github.com/eapache/go-resiliency?tab=licenses)
@@ -201,11 +200,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/sirupsen/logrus](https://pkg.go.dev/github.com/sirupsen/logrus?tab=licenses)
 - [github.com/tchap/go-patricia](https://pkg.go.dev/github.com/tchap/go-patricia?tab=licenses)
 - [github.com/valyala/bytebufferpool](https://pkg.go.dev/github.com/valyala/bytebufferpool?tab=licenses)
-- [github.com/valyala/fastjson](https://pkg.go.dev/github.com/valyala/fastjson?tab=licenses)
-- [github.com/valyala/fastrand](https://pkg.go.dev/github.com/valyala/fastrand?tab=licenses)
-- [github.com/valyala/fasttemplate](https://pkg.go.dev/github.com/valyala/fasttemplate?tab=licenses)
-- [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
-- [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
 - [github.com/99designs/keyring](https://pkg.go.dev/github.com/99designs/keyring?tab=licenses)
 - [github.com/danieljoos/wincred](https://pkg.go.dev/github.com/danieljoos/wincred?tab=licenses)
 - [github.com/dvsekhvalnov/jose2go](https://pkg.go.dev/github.com/dvsekhvalnov/jose2go?tab=licenses)
@@ -237,6 +231,13 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/stretchr/testify](https://pkg.go.dev/github.com/stretchr/testify?tab=licenses)
 - [go.uber.org/goleak](https://pkg.go.dev/go.uber.org/goleak?tab=licenses)
 - [github.com/influxdata/telegraf](https://pkg.go.dev/github.com/influxdata/telegraf?tab=licenses)
+- [github.com/valyala/fastjson](https://pkg.go.dev/github.com/valyala/fastjson?tab=licenses)
+- [github.com/valyala/fastrand](https://pkg.go.dev/github.com/valyala/fastrand?tab=licenses)
+- [github.com/valyala/fasttemplate](https://pkg.go.dev/github.com/valyala/fasttemplate?tab=licenses)
+- [github.com/valyala/gozstd](https://pkg.go.dev/github.com/valyala/gozstd?tab=licenses)
+- [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
+- [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
+- [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
 
 ## ISC licenses
 
@@ -258,9 +259,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## iLogtail used or modified source code from these projects
 
-- [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
 - [github.com/iLogtail/jfr-parser fork from github.com/pyroscope-io/jfr-parser](http://github.com/iLogtail/jfr-parser) based on Apache-2.0
-- [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT
 - [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
 - [github.com/iLogtail/gonvml fork from github.com/mindprince/gonvml](https://github.com/iLogtail/gonvml) based on Apache-2.0
 - [github.com/iLogtail/handy fork from github.com/streadway/handy](http://github.com/iLogtail/handy) based on BSD-2-Clause
+- [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT

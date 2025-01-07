@@ -17,13 +17,14 @@
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 
 #include <cstdlib>
+
 #include <memory>
 #include <string>
 
-#include "Common.h"
-#include "TimeUtil.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
@@ -57,21 +58,22 @@ bool TargetSubscriberScheduler::operator<(const TargetSubscriberScheduler& other
     return mJobName < other.mJobName;
 }
 
-void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uint64_t timestampMilliSec) {
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.mStatusCode);
-    mSelfMonitor->AddCounter(
-        METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, response.mStatusCode, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
-    if (response.mStatusCode == 304) {
+void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t timestampMilliSec) {
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.GetStatusCode());
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS,
+                             response.GetStatusCode(),
+                             GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    if (response.GetStatusCode() == 304) {
         // not modified
         return;
     }
-    if (response.mStatusCode != 200) {
+    if (response.GetStatusCode() != 200) {
         return;
     }
-    if (response.mHeader.count(prometheus::ETAG)) {
-        mETag = response.mHeader.at(prometheus::ETAG);
+    if (response.GetHeader().count(prometheus::ETAG)) {
+        mETag = response.GetHeader().at(prometheus::ETAG);
     }
-    const string& content = response.mBody;
+    const string& content = *response.GetBody<string>();
     vector<Labels> targetGroup;
     if (!ParseScrapeSchedulerGroup(content, targetGroup)) {
         return;
@@ -120,7 +122,7 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                             < mUnRegisterMs)) {
                         // scrape once just now
                         LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->ScrapeOnce(std::chrono::steady_clock::now());
+                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
                     }
                     v->ScheduleNext();
                 }
@@ -166,7 +168,6 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         // Parse labels
         Labels labels;
         labels.Set(prometheus::JOB, mJobName);
-        labels.Set(prometheus::INSTANCE, targets[0]);
         labels.Set(prometheus::ADDRESS_LABEL_NAME, targets[0]);
         labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
         labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
@@ -194,11 +195,8 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
     for (const auto& labels : targetGroups) {
         // Relabel Config
         Labels resultLabel = labels;
-        // bool keep = prometheus::Process(labels, mScrapeConfigPtr->mRelabelConfigs, resultLabel);
-        // if (!keep) {
-        //     continue;
-        // }
-        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel)) {
+        vector<string> toDelete;
+        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel, toDelete)) {
             continue;
         }
         resultLabel.RemoveMetaLabels();
@@ -207,6 +205,10 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         }
 
         string address = resultLabel.Get(prometheus::ADDRESS_LABEL_NAME);
+        if (resultLabel.Get(prometheus::INSTANCE).empty()) {
+            resultLabel.Set(prometheus::INSTANCE, address);
+        }
+
         auto m = address.find(':');
         if (m == string::npos) {
             continue;
@@ -222,12 +224,13 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         auto scrapeScheduler
             = std::make_shared<ScrapeScheduler>(mScrapeConfigPtr, host, port, resultLabel, mQueueKey, mInputIndex);
 
-        scrapeScheduler->SetTimer(mTimer);
+        scrapeScheduler->SetComponent(mTimer, mEventPool);
 
         auto randSleepMilliSec = GetRandSleepMilliSec(
             scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
         auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
-        scrapeScheduler->SetFirstExecTime(firstExecTime);
+        auto firstScrapeTIme = std::chrono::system_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
+        scrapeScheduler->SetFirstExecTime(firstExecTime, firstScrapeTIme);
         scrapeScheduler->InitSelfMonitor(mDefaultLabels);
 
         scrapeSchedulerMap[scrapeScheduler->GetId()] = scrapeScheduler;
@@ -235,17 +238,14 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
     return scrapeSchedulerMap;
 }
 
-void TargetSubscriberScheduler::SetTimer(shared_ptr<Timer> timer) {
-    mTimer = std::move(timer);
-}
 
 string TargetSubscriberScheduler::GetId() const {
     return mJobName;
 }
 
 void TargetSubscriberScheduler::ScheduleNext() {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnSubscription(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
@@ -275,8 +275,8 @@ void TargetSubscriberScheduler::Cancel() {
 }
 
 void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_point execTime) {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampNanoSec) {
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampNanoSec) {
         this->OnSubscription(response, timestampNanoSec);
         return true;
     });
@@ -296,7 +296,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
-    auto request = std::make_unique<PromHttpRequest>(sdk::HTTP_GET,
+    auto request = std::make_unique<PromHttpRequest>(HTTP_GET,
                                                      false,
                                                      mServiceHost,
                                                      mServicePort,
@@ -304,6 +304,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
                                                      "collector_id=" + mPodName,
                                                      httpHeader,
                                                      "",
+                                                     HttpResponse(),
                                                      prometheus::RefeshIntervalSeconds,
                                                      1,
                                                      this->mFuture);
@@ -334,7 +335,8 @@ void TargetSubscriberScheduler::InitSelfMonitor(const MetricLabels& defaultLabel
     mSelfMonitor = std::make_shared<PromSelfMonitorUnsafe>();
     mSelfMonitor->InitMetricManager(sSubscriberMetricKeys, mDefaultLabels);
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(mDefaultLabels));
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE, std::move(mDefaultLabels));
     mPromSubscriberTargets = mMetricsRecordRef.CreateIntGauge(METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS);
     mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
 }

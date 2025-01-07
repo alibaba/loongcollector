@@ -15,9 +15,9 @@
  */
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 
-#include <json/json.h>
-
 #include <cstddef>
+
+#include "json/json.h"
 
 #include "common/Flags.h"
 #include "common/StringTools.h"
@@ -27,7 +27,9 @@
 #include "prometheus/Constants.h"
 
 using namespace std;
+
 DECLARE_FLAG_STRING(_pod_name_);
+
 namespace logtail {
 
 const string ProcessorPromRelabelMetricNative::sName = "processor_prom_relabel_metric_native";
@@ -48,11 +50,13 @@ bool ProcessorPromRelabelMetricNative::Init(const Json::Value& config) {
 void ProcessorPromRelabelMetricNative::Process(PipelineEventGroup& metricGroup) {
     // if mMetricRelabelConfigs is empty and honor_labels is true, skip it
     auto targetTags = metricGroup.GetTags();
+    auto toDelete = GetToDeleteTargetLabels(targetTags);
+
     if (!mScrapeConfigPtr->mMetricRelabelConfigs.Empty() || !targetTags.empty()) {
         EventsContainer& events = metricGroup.MutableEvents();
         size_t wIdx = 0;
         for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-            if (ProcessEvent(events[rIdx], targetTags)) {
+            if (ProcessEvent(events[rIdx], targetTags, toDelete)) {
                 if (wIdx != rIdx) {
                     events[wIdx] = std::move(events[rIdx]);
                 }
@@ -63,13 +67,16 @@ void ProcessorPromRelabelMetricNative::Process(PipelineEventGroup& metricGroup) 
     }
 
     // delete mTags when key starts with __
-    for (const auto& [k, v] : targetTags) {
-        if (k.starts_with("__")) {
-            metricGroup.DelTag(k);
-        }
+    for (const auto& k : toDelete) {
+        metricGroup.DelTag(k);
     }
 
-    AddAutoMetrics(metricGroup);
+    if (metricGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_TOTAL)) {
+        auto autoMetric = prom::AutoMetric();
+        UpdateAutoMetrics(metricGroup, autoMetric);
+        AddAutoMetrics(metricGroup, autoMetric);
+    }
+
 
     // delete all tags
     for (const auto& [k, v] : targetTags) {
@@ -81,114 +88,136 @@ bool ProcessorPromRelabelMetricNative::IsSupportedEvent(const PipelineEventPtr& 
     return e.Is<MetricEvent>();
 }
 
-bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags) {
+bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e,
+                                                    const GroupTags& targetTags,
+                                                    const vector<StringView>& toDelete) {
     if (!IsSupportedEvent(e)) {
         return false;
     }
     auto& sourceEvent = e.Cast<MetricEvent>();
-    if (!mScrapeConfigPtr->mHonorLabels) {
-        // metric event labels is secondary
-        // if confiliction, then rename it exported_<label_name>
-        for (const auto& [k, v] : targetTags) {
-            if (sourceEvent.HasTag(k)) {
+
+    for (const auto& [k, v] : targetTags) {
+        if (sourceEvent.HasTag(k)) {
+            if (!mScrapeConfigPtr->mHonorLabels) {
+                // metric event labels is secondary
+                // if confiliction, then rename it exported_<label_name>
                 auto key = prometheus::EXPORTED_PREFIX + k.to_string();
-                sourceEvent.SetTag(key, sourceEvent.GetTag(k).to_string());
-                sourceEvent.DelTag(k);
-            } else {
-                sourceEvent.SetTag(k, v);
+                auto b = sourceEvent.GetSourceBuffer()->CopyString(key);
+                sourceEvent.SetTagNoCopy(StringView(b.data, b.size), sourceEvent.GetTag(k));
+                sourceEvent.SetTagNoCopy(k, v);
             }
-        }
-    } else {
-        // if mHonorLabels is true, then keep sourceEvent labels
-        for (const auto& [k, v] : targetTags) {
-            if (!sourceEvent.HasTag(k)) {
-                sourceEvent.SetTag(k, v);
-            }
+        } else {
+            sourceEvent.SetTagNoCopy(k, v);
         }
     }
 
+    vector<string> toDeleteInRelabel;
     if (!mScrapeConfigPtr->mMetricRelabelConfigs.Empty()
-        && !mScrapeConfigPtr->mMetricRelabelConfigs.Process(sourceEvent)) {
+        && !mScrapeConfigPtr->mMetricRelabelConfigs.Process(sourceEvent, toDeleteInRelabel)) {
         return false;
     }
     // set metricEvent name
     sourceEvent.SetNameNoCopy(sourceEvent.GetTag(prometheus::NAME));
 
-
-    // delete tag __<label_name>
-    vector<StringView> toDelete;
-    for (auto it = sourceEvent.TagsBegin(); it != sourceEvent.TagsEnd(); ++it) {
-        if (it->first.starts_with("__")) {
-            toDelete.push_back(it->first);
-        }
-    }
     for (const auto& k : toDelete) {
+        sourceEvent.DelTag(k);
+    }
+    for (const auto& k : toDeleteInRelabel) {
         sourceEvent.DelTag(k);
     }
 
     // set metricEvent name
-    sourceEvent.SetTag(prometheus::NAME, sourceEvent.GetName());
+    sourceEvent.SetTagNoCopy(prometheus::NAME, sourceEvent.GetName());
 
     return true;
 }
 
-void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metricGroup) {
-    // if up is set, then add self monitor metrics
-    if (metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).empty()) {
+vector<StringView> ProcessorPromRelabelMetricNative::GetToDeleteTargetLabels(const GroupTags& targetTags) const {
+    // delete tag which starts with __
+    vector<StringView> toDelete;
+    for (const auto& [k, v] : targetTags) {
+        if (k.starts_with("__")) {
+            toDelete.push_back(k);
+        }
+    }
+    return toDelete;
+}
+
+void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGroup& eGroup,
+                                                         prom::AutoMetric& autoMetric) const {
+    if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION)) {
+        autoMetric.mScrapeDurationSeconds
+            = StringTo<double>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION).to_string());
+    }
+    if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE)) {
+        autoMetric.mScrapeResponseSizeBytes
+            = StringTo<uint64_t>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE).to_string());
+    }
+    autoMetric.mScrapeSamplesLimit = mScrapeConfigPtr->mSampleLimit;
+    if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED)) {
+        autoMetric.mScrapeSamplesScraped
+            = StringTo<uint64_t>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED).to_string());
+    }
+    autoMetric.mScrapeTimeoutSeconds = mScrapeConfigPtr->mScrapeTimeoutSeconds;
+
+    if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE)) {
+        autoMetric.mScrapeState = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE).to_string();
+    }
+
+    if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE)) {
+        autoMetric.mUp = StringTo<bool>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
+    }
+}
+
+void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup,
+                                                      const prom::AutoMetric& autoMetric) const {
+    auto targetTags = eGroup.GetTags();
+    if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC)) {
+        LOG_ERROR(sLogger, ("scrape_timestamp_milliseconds is not set", ""));
         return;
     }
 
-    auto targetTags = metricGroup.GetTags();
-
-    StringView scrapeTimestampMilliSecStr
-        = metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
+    StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
 
-    uint64_t samplesPostMetricRelabel = metricGroup.GetEvents().size();
 
-    auto scrapeDurationSeconds
-        = StringTo<double>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION).to_string());
+    AddMetric(
+        eGroup, prometheus::SCRAPE_DURATION_SECONDS, autoMetric.mScrapeDurationSeconds, timestamp, nanoSec, targetTags);
 
-    AddMetric(metricGroup, prometheus::SCRAPE_DURATION_SECONDS, scrapeDurationSeconds, timestamp, nanoSec, targetTags);
+    AddMetric(eGroup,
+              prometheus::SCRAPE_RESPONSE_SIZE_BYTES,
+              autoMetric.mScrapeResponseSizeBytes,
+              timestamp,
+              nanoSec,
+              targetTags);
 
-    auto scrapeResponseSize
-        = StringTo<uint64_t>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE).to_string());
-    AddMetric(metricGroup, prometheus::SCRAPE_RESPONSE_SIZE_BYTES, scrapeResponseSize, timestamp, nanoSec, targetTags);
-
-    if (mScrapeConfigPtr->mSampleLimit > 0) {
-        AddMetric(metricGroup,
-                  prometheus::SCRAPE_SAMPLES_LIMIT,
-                  mScrapeConfigPtr->mSampleLimit,
-                  timestamp,
-                  nanoSec,
-                  targetTags);
+    if (autoMetric.mScrapeSamplesLimit > 0) {
+        AddMetric(
+            eGroup, prometheus::SCRAPE_SAMPLES_LIMIT, autoMetric.mScrapeSamplesLimit, timestamp, nanoSec, targetTags);
     }
 
-    AddMetric(metricGroup,
-              prometheus::SCRAPE_SAMPLES_POST_METRIC_RELABELING,
-              samplesPostMetricRelabel,
-              timestamp,
-              nanoSec,
-              targetTags);
+    // AddMetric(eGroup,
+    //           prometheus::SCRAPE_SAMPLES_POST_METRIC_RELABELING,
+    //           autoMetric.mPostRelabel,
+    //           timestamp,
+    //           nanoSec,
+    //           targetTags);
 
-    auto samplesScraped
-        = StringTo<uint64_t>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED).to_string());
+    AddMetric(
+        eGroup, prometheus::SCRAPE_SAMPLES_SCRAPED, autoMetric.mScrapeSamplesScraped, timestamp, nanoSec, targetTags);
 
-    AddMetric(metricGroup, prometheus::SCRAPE_SAMPLES_SCRAPED, samplesScraped, timestamp, nanoSec, targetTags);
+    AddMetric(
+        eGroup, prometheus::SCRAPE_TIMEOUT_SECONDS, autoMetric.mScrapeTimeoutSeconds, timestamp, nanoSec, targetTags);
 
-    AddMetric(metricGroup,
-              prometheus::SCRAPE_TIMEOUT_SECONDS,
-              mScrapeConfigPtr->mScrapeTimeoutSeconds,
-              timestamp,
-              nanoSec,
-              targetTags);
+    AddMetric(eGroup, prometheus::SCRAPE_STATE, 1.0 * autoMetric.mUp, timestamp, nanoSec, targetTags);
+    auto& last = eGroup.MutableEvents()[eGroup.GetEvents().size() - 1];
+    auto scrapeState = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE);
+    last.Cast<MetricEvent>().SetTag(METRIC_LABEL_KEY_STATUS, scrapeState);
 
     // up metric must be the last one
-    bool upState = StringTo<bool>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
-
-    AddMetric(metricGroup, prometheus::UP, 1.0 * upState, timestamp, nanoSec, targetTags);
+    AddMetric(eGroup, prometheus::UP, 1.0 * autoMetric.mUp, timestamp, nanoSec, targetTags);
 }
 
 void ProcessorPromRelabelMetricNative::AddMetric(PipelineEventGroup& metricGroup,
@@ -196,13 +225,12 @@ void ProcessorPromRelabelMetricNative::AddMetric(PipelineEventGroup& metricGroup
                                                  double value,
                                                  time_t timestamp,
                                                  uint32_t nanoSec,
-                                                 const GroupTags& targetTags) {
-    auto* metricEvent = metricGroup.AddMetricEvent();
+                                                 const GroupTags& targetTags) const {
+    auto* metricEvent = metricGroup.AddMetricEvent(true);
     metricEvent->SetName(name);
     metricEvent->SetValue<UntypedSingleValue>(value);
     metricEvent->SetTimestamp(timestamp, nanoSec);
     metricEvent->SetTag(prometheus::NAME, name);
-    metricEvent->SetTag(prometheus::LC_SCRAPER, mLoongCollectorScraper);
     for (const auto& [k, v] : targetTags) {
         metricEvent->SetTag(k, v);
     }

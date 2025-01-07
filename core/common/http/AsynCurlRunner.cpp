@@ -16,7 +16,6 @@
 
 #include <chrono>
 
-#include "app_config/AppConfig.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
@@ -27,6 +26,7 @@ namespace logtail {
 
 bool AsynCurlRunner::Init() {
     mClient = curl_multi_init();
+    mIsFlush = false;
     if (mClient == nullptr) {
         LOG_ERROR(sLogger, ("failed to init async curl runner", "failed to init curl client"));
         return false;
@@ -38,6 +38,9 @@ bool AsynCurlRunner::Init() {
 void AsynCurlRunner::Stop() {
     mIsFlush = true;
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
+    if (!mThreadRes.valid()) {
+        return;
+    }
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("async curl runner", "stopped successfully"));
     } else {
@@ -57,7 +60,7 @@ void AsynCurlRunner::Run() {
             LOG_DEBUG(
                 sLogger,
                 ("got request from queue, request address", request.get())("try cnt", ToString(request->mTryCnt)));
-            if (!AddRequestToClient(std::move(request))) {
+            if (!AddRequestToMultiCurlHandler(mClient, std::move(request))) {
                 continue;
             }
         } else if (mIsFlush && mQueue.Empty()) {
@@ -73,44 +76,6 @@ void AsynCurlRunner::Run() {
     }
 }
 
-bool AsynCurlRunner::AddRequestToClient(unique_ptr<AsynHttpRequest>&& request) {
-    curl_slist* headers = nullptr;
-    CURL* curl = CreateCurlHandler(request->mMethod,
-                                   request->mHTTPSFlag,
-                                   request->mHost,
-                                   request->mPort,
-                                   request->mUrl,
-                                   request->mQueryString,
-                                   request->mHeader,
-                                   request->mBody,
-                                   request->mResponse,
-                                   headers,
-                                   request->mTimeout,
-                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
-                                   AppConfig::GetInstance()->GetBindInterface());
-    if (curl == nullptr) {
-        LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
-        request->OnSendDone(request->mResponse);
-        return false;
-    }
-
-    request->mPrivateData = headers;
-    curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
-    request->mLastSendTime = std::chrono::system_clock::now();
-    auto res = curl_multi_add_handle(mClient, curl);
-    if (res != CURLM_OK) {
-        LOG_ERROR(sLogger,
-                  ("failed to send request", "failed to add the easy curl handle to multi_handle")(
-                      "errMsg", curl_multi_strerror(res))("request address", request.get()));
-        request->OnSendDone(request->mResponse);
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    // let runner destruct the request
-    request.release();
-    return true;
-}
-
 void AsynCurlRunner::DoRun() {
     CURLMcode mc;
     int runningHandlers = 1;
@@ -122,14 +87,14 @@ void AsynCurlRunner::DoRun() {
             this_thread::sleep_for(chrono::milliseconds(100));
             continue;
         }
-        HandleCompletedRequests();
+        HandleCompletedAsynRequests(mClient, runningHandlers);
 
         unique_ptr<AsynHttpRequest> request;
         if (mQueue.TryPop(request)) {
             LOG_DEBUG(sLogger,
                       ("got item from flusher runner, request address", request.get())("try cnt",
                                                                                        ToString(request->mTryCnt)));
-            if (AddRequestToClient(std::move(request))) {
+            if (AddRequestToMultiCurlHandler(mClient, std::move(request))) {
                 ++runningHandlers;
             }
         }
@@ -169,59 +134,6 @@ void AsynCurlRunner::DoRun() {
         } else {
             select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
         }
-    }
-}
-
-void AsynCurlRunner::HandleCompletedRequests() {
-    int msgsLeft = 0;
-    CURLMsg* msg = curl_multi_info_read(mClient, &msgsLeft);
-    while (msg) {
-        if (msg->msg == CURLMSG_DONE) {
-            bool requestReused = false;
-            CURL* handler = msg->easy_handle;
-            AsynHttpRequest* request = nullptr;
-            curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
-            LOG_DEBUG(sLogger,
-                      ("send http request completed, request address",
-                       request)("response time",ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()- request->mLastSendTime).count()) + "ms")
-                      ("try cnt", ToString(request->mTryCnt)));
-            switch (msg->data.result) {
-                case CURLE_OK: {
-                    long statusCode = 0;
-                    curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
-                    request->mResponse.mStatusCode = (int32_t)statusCode;
-                    request->OnSendDone(request->mResponse);
-                    break;
-                }
-                default:
-                    // considered as network error
-                    if (request->mTryCnt <= request->mMaxTryCnt) {
-                        LOG_WARNING(sLogger,
-                                    ("failed to send request", "retry immediately")("retryCnt", request->mTryCnt++)(
-                                        "errMsg", curl_easy_strerror(msg->data.result)));
-                        // free first，becase mPrivateData will be reset in AddRequestToClient
-                        if (request->mPrivateData) {
-                            curl_slist_free_all((curl_slist*)request->mPrivateData);
-                            request->mPrivateData = nullptr;
-                        }
-                        AddRequestToClient(unique_ptr<AsynHttpRequest>(request));
-                        requestReused = true;
-                    } else {
-                        request->OnSendDone(request->mResponse);
-                    }
-                    break;
-            }
-
-            curl_multi_remove_handle(mClient, handler);
-            curl_easy_cleanup(handler);
-            if (!requestReused) {
-                if (request->mPrivateData) {
-                    curl_slist_free_all((curl_slist*)request->mPrivateData);
-                }
-                delete request;
-            }
-        }
-        msg = curl_multi_info_read(mClient, &msgsLeft);
     }
 }
 

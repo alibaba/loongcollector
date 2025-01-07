@@ -42,7 +42,6 @@ func (m *metaCollector) Start() error {
 		k8smeta.DAEMONSET:                m.processDaemonSetEntity,
 		k8smeta.STATEFULSET:              m.processStatefulSetEntity,
 		k8smeta.CONFIGMAP:                m.processConfigMapEntity,
-		k8smeta.SECRET:                   m.processSecretEntity,
 		k8smeta.JOB:                      m.processJobEntity,
 		k8smeta.CRONJOB:                  m.processCronJobEntity,
 		k8smeta.NAMESPACE:                m.processNamespaceEntity,
@@ -59,7 +58,6 @@ func (m *metaCollector) Start() error {
 		k8smeta.POD_JOB:                  m.processPodJobLink,
 		k8smeta.POD_PERSISENTVOLUMECLAIN: m.processPodPVCLink,
 		k8smeta.POD_CONFIGMAP:            m.processPodConfigMapLink,
-		k8smeta.POD_SECRET:               m.processPodSecretLink,
 		k8smeta.POD_SERVICE:              m.processPodServiceLink,
 		k8smeta.POD_CONTAINER:            m.processPodContainerLink,
 	}
@@ -87,9 +85,6 @@ func (m *metaCollector) Start() error {
 	}
 	if m.serviceK8sMeta.Configmap {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
-	}
-	if m.serviceK8sMeta.Secret {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SECRET, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Job {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB, m.handleEvent, m.serviceK8sMeta.Interval)
@@ -139,9 +134,6 @@ func (m *metaCollector) Start() error {
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Configmap {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Secret {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_SECRET, m.handleEvent, m.serviceK8sMeta.Interval)
-	}
 	if m.serviceK8sMeta.Service && m.serviceK8sMeta.Pod {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
@@ -176,9 +168,6 @@ func (m *metaCollector) Stop() error {
 	}
 	if m.serviceK8sMeta.Configmap {
 		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP)
-	}
-	if m.serviceK8sMeta.Secret {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SECRET)
 	}
 	if m.serviceK8sMeta.Job {
 		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB)
@@ -316,7 +305,11 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	} else {
 		buffer = m.entityLinkBuffer
 	}
-	buffer <- event
+	select {
+	case buffer <- event:
+	case <-time.After(3 * time.Second):
+		logger.Error(context.Background(), "SEND_EVENT_TIMEOUT", "send event timeout, isEntity", entity)
+	}
 }
 
 func (m *metaCollector) sendInBackground() {

@@ -14,7 +14,7 @@
 
 #include "go_pipeline/LogtailPlugin.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "common/DynamicLibHelper.h"
@@ -26,11 +26,14 @@
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
+#include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/pipeline/LogtailPluginMock.h"
+#endif
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
@@ -64,10 +67,15 @@ LogtailPlugin::LogtailPlugin() {
 
     mPluginCfg["LoongcollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
     mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
-    mPluginCfg["LoongcollectorDataDir"] = GetAgentDataDir();
+    mPluginCfg["LoongcollectorDataDir"] = GetAgentGoCheckpointDir();
+    mPluginCfg["LoongcollectorLogConfDir"] = GetAgentGoLogConfDir();
+    mPluginCfg["LoongcollectorPluginLogName"] = GetPluginLogName();
+    mPluginCfg["LoongcollectorVersionTag"] = GetVersionTag();
+    mPluginCfg["LoongcollectorCheckPointFile"] = GetGoPluginCheckpoint();
     mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
-    mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
-    mPluginCfg["Hostname"] = LogFileProfiler::mHostname;
+    mPluginCfg["LoongcollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
+    mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
+    mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
 }
@@ -83,6 +91,7 @@ bool LogtailPlugin::LoadPipeline(const std::string& pipelineName,
                                  const std::string& logstore,
                                  const std::string& region,
                                  logtail::QueueKey logstoreKey) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (!mPluginValid) {
         LoadPluginBase();
     }
@@ -107,9 +116,14 @@ bool LogtailPlugin::LoadPipeline(const std::string& pipelineName,
     }
 
     return false;
+#else
+    return LogtailPluginMock::GetInstance()->LoadPipeline(
+        pipelineName, pipeline, project, logstore, region, logstoreKey);
+#endif
 }
 
 bool LogtailPlugin::UnloadPipeline(const std::string& pipelineName) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (!mPluginValid) {
         LOG_ERROR(sLogger, ("UnloadPipeline", "plugin not valid"));
         return false;
@@ -125,9 +139,13 @@ bool LogtailPlugin::UnloadPipeline(const std::string& pipelineName) {
     }
 
     return false;
+#else
+    return LogtailPluginMock::GetInstance()->UnloadPipeline(pipelineName);
+#endif
 }
 
 void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStopAllPipelinesFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines stop all", "starts"));
         auto stopAllStart = GetCurrentTimeInMilliSeconds();
@@ -135,13 +153,17 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
         auto stopAllCost = GetCurrentTimeInMilliSeconds() - stopAllStart;
         LOG_INFO(sLogger, ("Go pipelines stop all", "succeeded")("cost", ToString(stopAllCost) + "ms"));
         if (stopAllCost >= 10 * 1000) {
-            LogtailAlarm::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
                                                    "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
         }
     }
+#else
+    LogtailPluginMock::GetInstance()->StopAllPipelines(withInputFlag);
+#endif
 }
 
 void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStopFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines stop", "starts")("config", configName));
         auto stopStart = GetCurrentTimeInMilliSeconds();
@@ -152,10 +174,13 @@ void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
         auto stopCost = GetCurrentTimeInMilliSeconds() - stopStart;
         LOG_INFO(sLogger, ("Go pipelines stop", "succeeded")("config", configName)("cost", ToString(stopCost) + "ms"));
         if (stopCost >= 10 * 1000) {
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 HOLD_ON_TOO_SLOW_ALARM, "Stopping Go pipeline " + configName + " took " + ToString(stopCost) + "ms");
         }
     }
+#else
+    LogtailPluginMock::GetInstance()->Stop(configName, removedFlag);
+#endif
 }
 
 void LogtailPlugin::StopBuiltInModules() {
@@ -167,6 +192,7 @@ void LogtailPlugin::StopBuiltInModules() {
 }
 
 void LogtailPlugin::Start(const std::string& configName) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStartFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines start", "starts")("config name", configName));
         GoString goConfigName;
@@ -175,6 +201,9 @@ void LogtailPlugin::Start(const std::string& configName) {
         mStartFun(goConfigName);
         LOG_INFO(sLogger, ("Go pipelines start", "succeeded")("config name", configName));
     }
+#else
+    LogtailPluginMock::GetInstance()->Start(configName);
+#endif
 }
 
 int LogtailPlugin::IsValidToSend(long long logstoreKey) {
@@ -500,6 +529,7 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
 void LogtailPlugin::ProcessLogGroup(const std::string& configName,
                                     const std::string& logGroup,
                                     const std::string& packId) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (logGroup.empty() || !(mPluginValid && mProcessLogsFun != NULL)) {
         return;
     }
@@ -518,6 +548,9 @@ void LogtailPlugin::ProcessLogGroup(const std::string& configName,
     if (rst != (GoInt)0) {
         LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
     }
+#else
+    LogtailPluginMock::GetInstance()->ProcessLogGroup(configName, logGroup, packId);
+#endif
 }
 
 void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList,

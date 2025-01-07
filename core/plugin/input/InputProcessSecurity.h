@@ -18,9 +18,9 @@
 
 #include <string>
 
-#include "ebpf/config.h"
+#include "ebpf/Config.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "pipeline/plugin/interface/Input.h"
-
 
 namespace logtail {
 
@@ -35,6 +35,7 @@ public:
     bool SupportAck() const override { return false; }
 
     ebpf::SecurityOptions mSecurityOptions;
+    PluginMetricManagerPtr mPluginMgr;
 };
 
 } // namespace logtail

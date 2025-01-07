@@ -18,21 +18,21 @@
 #include <fcntl.h>
 #include <io.h>
 #endif
-#include <cityhash/city.h>
 #include <time.h>
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
 #include <limits>
 #include <numeric>
 #include <random>
+
+#include "boost/filesystem.hpp"
+#include "boost/regex.hpp"
+#include "rapidjson/document.h"
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "common/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -40,6 +40,7 @@
 #include "common/RandomUtil.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
+#include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
@@ -47,15 +48,12 @@
 #include "file_server/reader/GloablFileDescriptorManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
-#include "rapidjson/document.h"
-#include "sdk/Common.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -74,6 +72,12 @@ DEFINE_FLAG_INT32(max_fix_pos_bytes, "", 128 * 1024);
 DEFINE_FLAG_INT32(force_release_deleted_file_fd_timeout,
                   "force release fd if file is deleted after specified seconds, no matter read to end or not",
                   -1);
+#if defined(_MSC_VER)
+// On Windows, if Chinese config base path is used, the log path will be converted to GBK,
+// so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
+// Note: enable this will spend CPU to do transformation.
+DEFINE_FLAG_BOOL(enable_chinese_tag_path, "Enable Chinese __tag__.__path__", true);
+#endif
 DECLARE_FLAG_INT32(reader_close_unused_file_time);
 DECLARE_FLAG_INT32(logtail_alarm_interval);
 
@@ -85,6 +89,8 @@ namespace logtail {
         "file device", mDevInode.dev)("file inode", mDevInode.inode)("file signature", mLastFileSignatureHash)
 
 size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
+
+const int64_t kFirstHashKeySeqID = 1;
 
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
@@ -288,7 +294,7 @@ bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
-    mSourceId = LogFileProfiler::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
+    mSourceId = LoongCollectorMonitor::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
         + CalculateRandomUUID();
 
     if (!tailExisted) {
@@ -342,26 +348,25 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
 
 namespace detail {
 
-    void updatePrimaryCheckpoint(const std::string& key, PrimaryCheckpointPB& cpt, const std::string& field) {
-        cpt.set_update_time(time(NULL));
-        if (CheckpointManagerV2::GetInstance()->SetPB(key, cpt)) {
-            LOG_INFO(sLogger, ("update primary checkpoint", key)("field", field)("checkpoint", cpt.DebugString()));
-        } else {
-            LOG_WARNING(sLogger,
-                        ("update primary checkpoint error", key)("field", field)("checkpoint", cpt.DebugString()));
-        }
+void updatePrimaryCheckpoint(const std::string& key, PrimaryCheckpointPB& cpt, const std::string& field) {
+    cpt.set_update_time(time(NULL));
+    if (CheckpointManagerV2::GetInstance()->SetPB(key, cpt)) {
+        LOG_INFO(sLogger, ("update primary checkpoint", key)("field", field)("checkpoint", cpt.DebugString()));
+    } else {
+        LOG_WARNING(sLogger, ("update primary checkpoint error", key)("field", field)("checkpoint", cpt.DebugString()));
     }
+}
 
-    std::pair<size_t, size_t> getPartitionRange(size_t idx, size_t concurrency, size_t totalPartitionCount) {
-        auto base = totalPartitionCount / concurrency;
-        auto extra = totalPartitionCount % concurrency;
-        if (extra == 0) {
-            return std::make_pair(idx * base, (idx + 1) * base - 1);
-        }
-        size_t min = idx <= extra ? idx * (base + 1) : extra * (base + 1) + (idx - extra) * base;
-        size_t max = idx < extra ? min + base : min + base - 1;
-        return std::make_pair(min, max);
+std::pair<size_t, size_t> getPartitionRange(size_t idx, size_t concurrency, size_t totalPartitionCount) {
+    auto base = totalPartitionCount / concurrency;
+    auto extra = totalPartitionCount % concurrency;
+    if (extra == 0) {
+        return std::make_pair(idx * base, (idx + 1) * base - 1);
     }
+    size_t min = idx <= extra ? idx * (base + 1) : extra * (base + 1) + (idx - extra) * base;
+    size_t max = idx < extra ? min + base : min + base - 1;
+    return std::make_pair(min, max);
+}
 
 } // namespace detail
 
@@ -432,7 +437,7 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
             auto partitionRange = detail::getPartitionRange(partIdx, mEOOption->concurrency, kPartitionCount);
             auto partitionID = partitionRange.first + rand() % (partitionRange.second - partitionRange.first + 1);
             rangeCpt->data.set_hash_key(GenerateHashKey(baseHashKey, partitionID, kPartitionCount));
-            rangeCpt->data.set_sequence_id(sdk::kFirstHashKeySeqID);
+            rangeCpt->data.set_sequence_id(kFirstHashKeySeqID);
             rangeCpt->data.set_committed(false);
         }
         LOG_DEBUG(sLogger,
@@ -635,7 +640,7 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
             return true;
         else {
             LOG_ERROR(sLogger, ("open log file fail", mHostLogPath)("errno", ErrnoToString(error)));
-            LogtailAlarm::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + "; errono:" + ErrnoToString(error),
                                                    GetProject(),
@@ -822,7 +827,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                             ("extract topic by regex", "fail")("project", GetProject())("logstore", GetLogstore())(
                                 "path", finalPath)("regx", topicConfig));
 
-            LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    string("extract topic by regex fail, exception:") + exception
                                                        + ", path:" + finalPath + ", regex:" + topicConfig,
                                                    GetProject(),
@@ -833,7 +838,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
         LOG_ERROR(sLogger,
                   ("extract topic by regex", "fail")("exception", exception)("project", GetProject())(
                       "logstore", GetLogstore())("path", finalPath)("regx", topicConfig));
-        LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                string("extract topic by regex fail, exception:") + exception
                                                    + ", path:" + finalPath + ", regex:" + topicConfig,
                                                GetProject(),
@@ -986,7 +991,7 @@ void LogFileReader::OnOpenFileError() {
                           "log path", mRealLogPath)("file device", ToString(mDevInode.dev))(
                           "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
                           "file signature size", mLastFileSignatureSize)("last file position", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(LOGFILE_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGFILE_PERMINSSION_ALARM,
                                                    string("Failed to open log file because of permission: ")
                                                        + mHostLogPath,
                                                    GetProject(),
@@ -1000,7 +1005,7 @@ void LogFileReader::OnOpenFileError() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file because of : Too many open files")
                                                        + mHostLogPath,
                                                    GetProject(),
@@ -1014,7 +1019,7 @@ void LogFileReader::OnOpenFileError() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + "; errono:" + ErrnoToString(GetErrno()),
                                                    GetProject(),
@@ -1046,7 +1051,7 @@ bool LogFileReader::UpdateFilePtr() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(OPEN_FILE_LIMIT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(OPEN_FILE_LIMIT_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + " limit:" + ToString(INT32_FLAG(max_reader_open_files)),
                                                    GetProject(),
@@ -1190,7 +1195,7 @@ void LogFileReader::CloseFilePtr() {
                     "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                     "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                     "file size", mLastFileSize)("last file position", mLastFilePos)("reader id", long(this)));
-            LogtailAlarm::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("close file error because of ") + strerror(errno)
                                                        + ", file path: " + mHostLogPath + ", inode: "
                                                        + ToString(mDevInode.inode) + ", inode: " + ToString(fd),
@@ -1251,7 +1256,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
             sLogger,
             ("tell error", mHostLogPath)("inode", mDevInode.inode)("error", strerror(lastErrNo))("reopen", reopenFlag)(
                 "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
-        LogtailAlarm::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                string("tell error because of ") + strerror(lastErrNo) + " file path: "
                                                    + mHostLogPath + ", inode : " + ToString(mDevInode.inode),
                                                GetProject(),
@@ -1304,7 +1309,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
                   mHostLogPath)(ToString(endSize), ToString(mLastFilePos))("project", GetProject())(
                      "logstore", GetLogstore())("config", GetConfigName()));
 
-        LogtailAlarm::GetInstance()->SendAlarm(LOG_TRUNCATE_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOG_TRUNCATE_ALARM,
                                                mHostLogPath
                                                    + " signature is same but size decrease, read from now fileSize "
                                                    + ToString(endSize) + " last read pos " + ToString(mLastFilePos),
@@ -1382,12 +1387,12 @@ bool LogFileReader::ParseLogTime(const char* buffer,
         }
     }
     if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             LOG_ERROR(sLogger,
                       ("parse regex log fail, exception",
                        exception)("buffer", buffer)("project", project)("logstore", logStore)("file", logPath));
         }
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             REGEX_MATCH_ALARM, "parse regex log fail:" + exception, project, logStore, region);
     }
     return false;
@@ -1407,12 +1412,12 @@ bool LogFileReader::GetLogTimeByOffset(const char* buffer,
     int nanosecondLength = 0;
     if (strptime_ns(buffer + pos, timeFormat.c_str(), &t, &nanosecond, &nanosecondLength) == NULL) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-            if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+            if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(sLogger,
                             ("get time by offset fail, region", region)("project", project)("logstore",
                                                                                             logStore)("file", logPath));
             }
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 PARSE_TIME_FAIL_ALARM, "errorlog:" + string(buffer), project, logStore, region);
         }
         return false;
@@ -1474,7 +1479,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             LOG_WARNING(sLogger,
                         ("read log delay", mHostLogPath)("fall behind bytes",
                                                          delta)("file size", fileSize)("read pos", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 READ_LOG_DELAY_ALARM,
                 std::string("fall behind ") + ToString(delta) + " bytes, file size:" + ToString(fileSize)
                     + ", now position:" + ToString(mLastFilePos) + ", path:" + mHostLogPath
@@ -1493,7 +1498,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
                     ("read log delay and force set file pos to file size", mHostLogPath)("fall behind bytes", delta)(
                         "skip bytes config", mReaderConfig.first->mReadDelaySkipThresholdBytes)("file size", fileSize)(
                         "read pos", mLastFilePos));
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             READ_LOG_DELAY_ALARM,
             string("force set file pos to file size, fall behind ") + ToString(delta)
                 + " bytes, file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos)
@@ -1527,7 +1532,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             LOG_WARNING(sLogger,
                         ("read stopped container file", mHostLogPath)("stopped time", mContainerStoppedTime)(
                             "file size", fileSize)("read pos", mLastFilePos));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 READ_STOPPED_CONTAINER_ALARM,
                 string("path: ") + mHostLogPath + ", stopped time:" + ToString(mContainerStoppedTime)
                     + ", file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos),
@@ -1663,7 +1668,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
                 oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
                     << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
                     << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-                LogtailAlarm::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarm(
                     SPLIT_LOG_FAIL_ALARM, oss.str(), GetProject(), GetLogstore(), GetRegion());
             } else {
                 // line is not finished yet nor more data, put all data in cache
@@ -1868,7 +1873,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos)
             << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
             << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             SPLIT_LOG_FAIL_ALARM, oss.str(), GetProject(), GetLogstore(), GetRegion());
     }
     LOG_DEBUG(sLogger,
@@ -1897,7 +1902,7 @@ LogFileReader::ReadFile(LogFileOperator& op, void* buf, size_t size, int64_t& of
     //         LOG_INFO(sLogger,
     //                  ("read fuse file with a hole, size",
     //                   offset - oriOffset)("filename", mHostLogPath)("dev", mDevInode.dev)("inode", mDevInode.inode));
-    //         LogtailAlarm::GetInstance()->SendAlarm(
+    //         AlarmManager::GetInstance()->SendAlarm(
     //             FUSE_FILE_TRUNCATE_ALARM,
     //             string("read fuse file with a hole, size: ") + ToString(offset - oriOffset) + " filename: "
     //                 + mHostLogPath + " dev: " + ToString(mDevInode.dev) + " inode: " + ToString(mDevInode.inode),
@@ -1984,7 +1989,8 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
         3. continue\nend\ncontinue\nend\n -> continue\nxxx\nend
     5. mLogEndRegPtr != NULL
         1. xxx\nend\n -> xxx\nend
-        1. xxx\nend\nxxx\n -> xxx\nend
+        2. xxx\nend\nxxx\n -> xxx\nend
+        3. xxx\nend -> ""
 */
 /*
     return: the number of bytes left, including \n
@@ -2002,6 +2008,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     }
     rollbackLineFeedCount = 0;
     // Multiline rollback
+    bool foundEnd = false;
     if (mMultilineConfig.first->IsMultiline()) {
         std::string exception;
         while (endPs >= 0) {
@@ -2012,6 +2019,8 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
                                      content.data.size(),
                                      *mMultilineConfig.first->GetEndPatternReg(),
                                      exception)) {
+                    rollbackLineFeedCount += content.forceRollbackLineFeedCount;
+                    foundEnd = true;
                     // Ensure the end line is complete
                     if (buffer[content.lineEnd] == '\n') {
                         return content.lineEnd + 1;
@@ -2023,13 +2032,18 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
                                            *mMultilineConfig.first->GetStartPatternReg(),
                                            exception)) {
                 // start + continue, start
+                rollbackLineFeedCount += content.forceRollbackLineFeedCount;
                 rollbackLineFeedCount += content.rollbackLineFeedCount;
                 // Keep all the buffer if rollback all
                 return content.lineBegin;
             }
+            rollbackLineFeedCount += content.forceRollbackLineFeedCount;
             rollbackLineFeedCount += content.rollbackLineFeedCount;
             endPs = content.lineBegin - 1;
         }
+    }
+    if (mMultilineConfig.first->GetEndPatternReg() && foundEnd) {
+        return 0;
     }
     // Single line rollback or all unmatch rollback
     rollbackLineFeedCount = 0;
@@ -2040,11 +2054,13 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     }
     LineInfo content = GetLastLine(StringView(buffer, size), endPs, true);
     // 最后一行是完整行,且以 \n 结尾
-    if (content.fullLine && buffer[endPs] == '\n') {
-        return size;
+    if (content.fullLine && buffer[content.lineEnd] == '\n') {
+        rollbackLineFeedCount += content.forceRollbackLineFeedCount;
+        return content.lineEnd + 1;
     }
     content = GetLastLine(StringView(buffer, size), endPs, false);
-    rollbackLineFeedCount = content.rollbackLineFeedCount;
+    rollbackLineFeedCount += content.forceRollbackLineFeedCount;
+    rollbackLineFeedCount += content.rollbackLineFeedCount;
     return content.lineBegin;
 }
 
@@ -2178,32 +2194,31 @@ StringBuffer* BaseLineParse::GetStringBuffer() {
     return &mStringBuffer;
 }
 
+/*
+    params:
+        buffer: all read logs
+        end: the end position of current line, \n or \0
+    return:
+        last line (backward), without \n or \0
+*/
 LineInfo RawTextParser::GetLastLine(StringView buffer,
                                     int32_t end,
                                     size_t protocolFunctionIndex,
                                     bool needSingleLine,
                                     std::vector<BaseLineParse*>* lineParsers) {
     if (end == 0) {
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
     if (protocolFunctionIndex != 0) {
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
 
     for (int32_t begin = end; begin > 0; --begin) {
-        if (begin == 0 || buffer[begin - 1] == '\n') {
-            return {.data = StringView(buffer.data() + begin, end - begin),
-                    .lineBegin = begin,
-                    .lineEnd = end,
-                    .rollbackLineFeedCount = 1,
-                    .fullLine = true};
+        if (buffer[begin - 1] == '\n') {
+            return LineInfo(StringView(buffer.data() + begin, end - begin), begin, end, 1, true, 0);
         }
     }
-    return {.data = StringView(buffer.data(), end),
-            .lineBegin = 0,
-            .lineEnd = end,
-            .rollbackLineFeedCount = 1,
-            .fullLine = true};
+    return LineInfo(StringView(buffer.data(), end), 0, end, 1, true, 0);
 }
 
 LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
@@ -2212,38 +2227,41 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
                                            bool needSingleLine,
                                            std::vector<BaseLineParse*>* lineParsers) {
     if (end == 0) {
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
     if (protocolFunctionIndex == 0) {
         // 异常情况, DockerJsonFileParse不允许在最后一个解析器
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
 
     size_t nextProtocolFunctionIndex = protocolFunctionIndex - 1;
-    LineInfo finalLine
-        = {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+    LineInfo finalLine;
     while (!finalLine.fullLine) {
         LineInfo rawLine = (*lineParsers)[nextProtocolFunctionIndex]->GetLastLine(
             buffer, end, nextProtocolFunctionIndex, needSingleLine, lineParsers);
-        if (rawLine.data.back() == '\n') {
+        if (rawLine.data.size() > 0 && rawLine.data.back() == '\n') {
             rawLine.data = StringView(rawLine.data.data(), rawLine.data.size() - 1);
         }
 
-        LineInfo line
-            = {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        LineInfo line;
         parseLine(rawLine, line);
-        finalLine.data = line.data;
-        finalLine.fullLine = line.fullLine;
-        finalLine.lineBegin = line.lineBegin;
-        finalLine.rollbackLineFeedCount += line.rollbackLineFeedCount;
-        finalLine.dataRaw = line.dataRaw;
-        if (finalLine.lineEnd == 0) {
-            finalLine.lineEnd = line.lineEnd;
+        int32_t rollbackLineFeedCount = 0;
+        int32_t forceRollbackLineFeedCount = 0;
+        if (line.fullLine) {
+            rollbackLineFeedCount = line.rollbackLineFeedCount;
+            forceRollbackLineFeedCount = finalLine.forceRollbackLineFeedCount;
+        } else {
+            forceRollbackLineFeedCount
+                = finalLine.forceRollbackLineFeedCount + line.forceRollbackLineFeedCount + line.rollbackLineFeedCount;
+            rollbackLineFeedCount = 0;
         }
+        finalLine = std::move(line);
+        finalLine.rollbackLineFeedCount = rollbackLineFeedCount;
+        finalLine.forceRollbackLineFeedCount = forceRollbackLineFeedCount;
         if (!finalLine.fullLine) {
             if (finalLine.lineBegin == 0) {
-                finalLine.data = StringView();
-                return finalLine;
+                return LineInfo(
+                    StringView(), 0, 0, finalLine.rollbackLineFeedCount, false, finalLine.forceRollbackLineFeedCount);
             }
             end = finalLine.lineBegin - 1;
         }
@@ -2254,7 +2272,9 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
 bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
     paseLine = rawLine;
     paseLine.fullLine = false;
-
+    if (rawLine.data.size() == 0) {
+        return false;
+    }
     rapidjson::Document doc;
     doc.Parse(rawLine.data.data(), rawLine.data.size());
 
@@ -2292,40 +2312,44 @@ LineInfo ContainerdTextParser::GetLastLine(StringView buffer,
                                            bool needSingleLine,
                                            std::vector<BaseLineParse*>* lineParsers) {
     if (end == 0) {
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
     if (protocolFunctionIndex == 0) {
-        // 异常情况, DockerJsonFileParse不允许在最后一个解析器
-        return {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        // 异常情况, ContainerdTextParser不允许在最后一个解析器
+        return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
-    LineInfo finalLine
-        = {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
-    // 跳过最后的连续P
+    LineInfo finalLine;
+    finalLine.fullLine = false;
     size_t nextProtocolFunctionIndex = protocolFunctionIndex - 1;
 
+    // 跳过最后的连续P
     while (!finalLine.fullLine) {
         LineInfo rawLine = (*lineParsers)[nextProtocolFunctionIndex]->GetLastLine(
             buffer, end, nextProtocolFunctionIndex, needSingleLine, lineParsers);
-        if (rawLine.data.back() == '\n') {
+        if (rawLine.data.size() > 0 && rawLine.data.back() == '\n') {
             rawLine.data = StringView(rawLine.data.data(), rawLine.data.size() - 1);
         }
 
-        LineInfo line
-            = {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        LineInfo line;
         parseLine(rawLine, line);
-        // containerd 不需要外层协议的 dataRaw
-        finalLine.data = line.data;
-        finalLine.fullLine = line.fullLine;
-        finalLine.lineBegin = line.lineBegin;
-        finalLine.rollbackLineFeedCount += line.rollbackLineFeedCount;
-        mergeLines(finalLine, finalLine, true);
-        if (finalLine.lineEnd == 0) {
-            finalLine.lineEnd = line.lineEnd;
+        int32_t rollbackLineFeedCount = 0;
+        int32_t forceRollbackLineFeedCount = 0;
+        if (line.fullLine) {
+            rollbackLineFeedCount = line.rollbackLineFeedCount;
+            forceRollbackLineFeedCount = finalLine.forceRollbackLineFeedCount;
+        } else {
+            forceRollbackLineFeedCount
+                = finalLine.forceRollbackLineFeedCount + line.forceRollbackLineFeedCount + line.rollbackLineFeedCount;
+            rollbackLineFeedCount = 0;
         }
+        finalLine = std::move(line);
+        finalLine.rollbackLineFeedCount = rollbackLineFeedCount;
+        finalLine.forceRollbackLineFeedCount = forceRollbackLineFeedCount;
+        mergeLines(finalLine, finalLine, true);
         if (!finalLine.fullLine) {
             if (finalLine.lineBegin == 0) {
-                finalLine.data = StringView();
-                return finalLine;
+                return LineInfo(
+                    StringView(), 0, 0, finalLine.rollbackLineFeedCount, false, finalLine.forceRollbackLineFeedCount);
             }
             end = finalLine.lineBegin - 1;
         }
@@ -2345,11 +2369,10 @@ LineInfo ContainerdTextParser::GetLastLine(StringView buffer,
             break;
         }
 
-        LineInfo previousLine
-            = {.data = StringView(), .lineBegin = 0, .lineEnd = 0, .rollbackLineFeedCount = 0, .fullLine = false};
+        LineInfo previousLine;
         LineInfo rawLine = (*lineParsers)[nextProtocolFunctionIndex]->GetLastLine(
             buffer, finalLine.lineBegin - 1, nextProtocolFunctionIndex, needSingleLine, lineParsers);
-        if (rawLine.data.back() == '\n') {
+        if (rawLine.data.size() > 0 && rawLine.data.back() == '\n') {
             rawLine.data = StringView(rawLine.data.data(), rawLine.data.size() - 1);
         }
 
@@ -2386,9 +2409,10 @@ void ContainerdTextParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
     const char* lineEnd = rawLine.data.data() + rawLine.data.size();
     paseLine = rawLine;
     paseLine.fullLine = true;
-
+    if (rawLine.data.size() == 0) {
+        return;
+    }
     // 寻找第一个分隔符位置 time
-    StringView timeValue;
     const char* pch1 = std::find(rawLine.data.data(), lineEnd, ProcessorParseContainerLogNative::CONTAINERD_DELIMITER);
     if (pch1 == lineEnd) {
         return;
@@ -2404,6 +2428,10 @@ void ContainerdTextParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
         return;
     }
     // 如果既不以 P 开头,也不以 F 开头
+    if (pch2 + 1 >= lineEnd) {
+        paseLine.data = StringView(pch2 + 1, lineEnd - pch2 - 1);
+        return;
+    }
     if (*(pch2 + 1) != ProcessorParseContainerLogNative::CONTAINERD_PART_TAG
         && *(pch2 + 1) != ProcessorParseContainerLogNative::CONTAINERD_FULL_TAG) {
         paseLine.data = StringView(pch2 + 1, lineEnd - pch2 - 1);
@@ -2516,6 +2544,19 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
 
     return group;
+}
+
+const std::string& LogFileReader::GetConvertedPath() const {
+    const std::string& path = mDockerPath.empty() ? mHostLogPath : mDockerPath;
+#if defined(_MSC_VER)
+    if (BOOL_FLAG(enable_chinese_tag_path)) {
+        static std::string newPath = EncodingConverter::GetInstance()->FromACPToUTF8(path);
+        return newPath;
+    }
+    return path;
+#else
+    return path;
+#endif
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

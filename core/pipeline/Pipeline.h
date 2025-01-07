@@ -16,16 +16,16 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "json/json.h"
+
 #include "config/PipelineConfig.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/FlusherInstance.h"
 #include "pipeline/plugin/instance/InputInstance.h"
@@ -61,13 +61,14 @@ public:
     const std::string& Name() const { return mName; }
     PipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
+    const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
     const std::vector<std::unique_ptr<FlusherInstance>>& GetFlushers() const { return mFlushers; }
     bool IsFlushingThroughGoPipeline() const { return !mGoPipelineWithoutInput.isNull(); }
     const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& GetPluginStatistics() const {
         return mPluginCntMap;
     }
 
-    // only for input_observer_network for compatability
+    // only for input_file
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
     std::string GetNowPluginID();
@@ -100,6 +101,7 @@ private:
     mutable PipelineContext mContext;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
     std::unique_ptr<Json::Value> mConfig;
+    std::optional<std::string> mSingletonInput;
     std::atomic_uint16_t mPluginID;
     std::atomic_int16_t mInProcessCnt;
 
@@ -108,13 +110,18 @@ private:
     CounterPtr mProcessorsInEventsTotal;
     CounterPtr mProcessorsInGroupsTotal;
     CounterPtr mProcessorsInSizeBytes;
-    CounterPtr mProcessorsTotalProcessTimeMs;
+    TimeCounterPtr mProcessorsTotalProcessTimeMs;
+    CounterPtr mFlushersInGroupsTotal;
+    CounterPtr mFlushersInEventsTotal;
+    CounterPtr mFlushersInSizeBytes;
+    TimeCounterPtr mFlushersTotalPackageTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineMock;
     friend class PipelineUnittest;
     friend class InputContainerStdioUnittest;
     friend class InputFileUnittest;
+    friend class InputInternalMetricsUnittest;
     friend class InputPrometheusUnittest;
     friend class ProcessorTagNativeUnittest;
     friend class FlusherSLSUnittest;
@@ -122,6 +129,7 @@ private:
     friend class InputProcessSecurityUnittest;
     friend class InputNetworkSecurityUnittest;
     friend class InputNetworkObserverUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

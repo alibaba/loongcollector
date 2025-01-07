@@ -43,6 +43,7 @@ public:
 
 private:
     size_t Size() const override { return mSize; }
+    void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) override;
 
     std::vector<std::unique_ptr<SenderQueueItem>> mQueue;
     size_t mWrite = 0;

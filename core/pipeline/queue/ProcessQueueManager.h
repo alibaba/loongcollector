@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
+
+#include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -40,7 +41,7 @@ public:
 
     enum class QueueType { BOUNDED, CIRCULAR };
 
-    static constexpr uint32_t sMaxPriority = 3;
+    static constexpr uint32_t sMaxPriority = 2;
 
     ProcessQueueManager(const ProcessQueueManager&) = delete;
     ProcessQueueManager& operator=(const ProcessQueueManager&) = delete;
@@ -68,10 +69,6 @@ public:
     bool Wait(uint64_t ms);
     void Trigger();
 
-    // TODO: should be removed when self-telemetry is refactored
-    uint32_t GetInvalidCnt() const;
-    uint32_t GetCnt() const;
-
 private:
     ProcessQueueManager();
     ~ProcessQueueManager() = default;
@@ -97,6 +94,7 @@ private:
     void Clear();
     friend class ProcessQueueManagerUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

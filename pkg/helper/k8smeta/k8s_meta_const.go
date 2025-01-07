@@ -19,7 +19,6 @@ const (
 	NODE                  = "node"
 	NAMESPACE             = "namespace"
 	CONFIGMAP             = "configmap"
-	SECRET                = "secret"
 	PERSISTENTVOLUME      = "persistentvolume"
 	PERSISTENTVOLUMECLAIM = "persistentvolumeclaim"
 	STORAGECLASS          = "storageclass"
@@ -37,7 +36,6 @@ const (
 	POD_JOB                  = "pod->job"
 	POD_PERSISENTVOLUMECLAIN = "pod->persistentvolumeclaim"
 	POD_CONFIGMAP            = "pod->configmap"
-	POD_SECRET               = "pod->secret"
 	POD_SERVICE              = "pod->service"
 	POD_CONTAINER            = "pod->container"
 	POD_PROCESS              = "pod->process"
@@ -56,7 +54,6 @@ var AllResources = []string{
 	NODE,
 	NAMESPACE,
 	CONFIGMAP,
-	SECRET,
 	PERSISTENTVOLUME,
 	PERSISTENTVOLUMECLAIM,
 	STORAGECLASS,
@@ -108,11 +105,6 @@ type PodConfigMap struct {
 	ConfigMap *v1.ConfigMap
 }
 
-type PodSecret struct {
-	Pod    *v1.Pod
-	Secret *v1.Secret
-}
-
 type PodService struct {
 	Service *v1.Service
 	Pod     *v1.Pod
@@ -132,12 +124,17 @@ const (
 )
 
 type PodMetadata struct {
+	PodName      string            `json:"podName"`
+	StartTime    int64             `json:"startTime"`
 	Namespace    string            `json:"namespace"`
 	WorkloadName string            `json:"workloadName"`
 	WorkloadKind string            `json:"workloadKind"`
-	ServiceName  string            `json:"serviceName"`
 	Labels       map[string]string `json:"labels"`
 	Envs         map[string]string `json:"envs"`
 	Images       map[string]string `json:"images"`
-	IsDeleted    bool              `json:"-"`
+
+	ServiceName  string   `json:"serviceName,omitempty"`
+	ContainerIDs []string `json:"containerIDs,omitempty"`
+	PodIP        string   `json:"podIP,omitempty"`
+	IsDeleted    bool     `json:"-"`
 }

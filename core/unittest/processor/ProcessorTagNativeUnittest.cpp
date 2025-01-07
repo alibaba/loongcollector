@@ -14,10 +14,10 @@
 
 #include <cstdlib>
 
-#include "application/Application.h"
-#include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
+#include "monitor/Monitor.h"
 #include "pipeline/Pipeline.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
@@ -34,7 +34,8 @@ public:
 
 protected:
     void SetUp() override {
-        LogFileProfiler::GetInstance();
+        mContext.SetConfigName("project##config_0");
+        LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
         EnterpriseConfigProvider::GetInstance()->SetUserDefinedIdSet(std::vector<std::string>{"machine_group"});
 #endif
@@ -259,6 +260,11 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
 
         processor.Process(eventGroup);
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_PATH));
+        APSARA_TEST_EQUAL_FATAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH),
+                                eventGroup.GetTag(LOG_RESERVED_KEY_PATH));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_HOSTNAME));
+        APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::mHostname, eventGroup.GetTag(LOG_RESERVED_KEY_HOSTNAME));
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE_FATAL(eventGroup.HasTag("test_agent_tag"));
 #else

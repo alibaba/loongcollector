@@ -17,6 +17,8 @@
 #include <memory>
 #include <string>
 
+#include "json/json.h"
+
 #include "common/JsonUtil.h"
 #include "pipeline/GlobalConfig.h"
 #include "unittest/Unittest.h"
@@ -43,9 +45,11 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
 
     // only mandatory param
     config.reset(new GlobalConfig());
+    APSARA_TEST_TRUE(config->Init(Json::Value(Json::ValueType::objectValue), ctx, extendedParams));
+    APSARA_TEST_TRUE(extendedParams.isNull());
     APSARA_TEST_EQUAL(GlobalConfig::TopicType::NONE, config->mTopicType);
     APSARA_TEST_EQUAL("", config->mTopicFormat);
-    APSARA_TEST_EQUAL(0U, config->mProcessPriority);
+    APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_FALSE(config->mEnableTimestampNanosecond);
     APSARA_TEST_FALSE(config->mUsingOldContentTag);
     APSARA_TEST_EQUAL(config->mPipelineMetaTagKey.size(), 0);
@@ -58,7 +62,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
         {
             "TopicType": "custom",
             "TopicFormat": "test_topic",
-            "ProcessPriority": 1,
+            "Priority": 1,
             "EnableTimestampNanosecond": true,
             "UsingOldContentTag": true,
             "PipelineMetaTagKey": {
@@ -77,7 +81,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(extendedParams.isNull());
     APSARA_TEST_EQUAL(GlobalConfig::TopicType::CUSTOM, config->mTopicType);
     APSARA_TEST_EQUAL("test_topic", config->mTopicFormat);
-    APSARA_TEST_EQUAL(1U, config->mProcessPriority);
+    APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_TRUE(config->mEnableTimestampNanosecond);
     APSARA_TEST_TRUE(config->mUsingOldContentTag);
     APSARA_TEST_EQUAL(config->mPipelineMetaTagKey.size(), 2);
@@ -94,7 +98,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
         {
             "TopicType": true,
             "TopicFormat": true,
-            "ProcessPriority": "1",
+            "Priority": "1",
             "EnableTimestampNanosecond": "true",
             "UsingOldContentTag": "true",
             "PipelineMetaTagKey": "key1",
@@ -107,7 +111,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(extendedParams.isNull());
     APSARA_TEST_EQUAL(GlobalConfig::TopicType::NONE, config->mTopicType);
     APSARA_TEST_EQUAL("", config->mTopicFormat);
-    APSARA_TEST_EQUAL(0U, config->mProcessPriority);
+    APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_FALSE(config->mEnableTimestampNanosecond);
     APSARA_TEST_FALSE(config->mUsingOldContentTag);
     APSARA_TEST_EQUAL(config->mPipelineMetaTagKey.size(), 0);
@@ -209,16 +213,16 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(GlobalConfig::TopicType::NONE, config->mTopicType);
     APSARA_TEST_EQUAL("", config->mTopicFormat);
 
-    // ProcessPriority
+    // Priority
     configStr = R"(
         {
-            "ProcessPriority": 5
+            "Priority": 5
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new GlobalConfig());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, extendedParams));
-    APSARA_TEST_EQUAL(0U, config->mProcessPriority);
+    APSARA_TEST_EQUAL(2U, config->mPriority);
 
     // extendedParam
     configStr = R"(
