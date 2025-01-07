@@ -127,9 +127,9 @@ func (f *FlusherOTLP) Flush(projectName string, logstoreName string, configName 
 	}
 	request := f.convertLogGroupToRequest(logGroupList)
 	if !f.logClient.grpcConfig.Retry.Enable {
-		return timeoutFlush[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.metadata, f.logClient.grpcConfig)
+		return timeoutFlush[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.logClient.metadata, f.logClient.grpcConfig)
 	}
-	return flushWithRetry[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.metadata, f.logClient.grpcConfig)
+	return flushWithRetry[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.logClient.metadata, f.logClient.grpcConfig)
 }
 
 // Export data to destination, such as gRPC, console, file, etc.
@@ -240,9 +240,9 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			defer wg.Done()
 			var err error
 			if f.logClient.grpcConfig.Retry.Enable {
-				err = flushWithRetry[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, log, f.metadata, f.logClient.grpcConfig)
+				err = flushWithRetry[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, log, f.logClient.metadata, f.logClient.grpcConfig)
 			} else {
-				err = timeoutFlush[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, log, f.metadata, f.logClient.grpcConfig)
+				err = timeoutFlush[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, log, f.logClient.metadata, f.logClient.grpcConfig)
 			}
 
 			if err != nil {
@@ -258,9 +258,9 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			defer wg.Done()
 			var err error
 			if f.metricClient.grpcConfig.Retry.Enable {
-				err = flushWithRetry[pmetricotlp.ExportRequest, pmetricotlp.ExportResponse](f.metricClient.client, metric, f.metadata, f.metricClient.grpcConfig)
+				err = flushWithRetry[pmetricotlp.ExportRequest, pmetricotlp.ExportResponse](f.metricClient.client, metric, f.metricClient.metadata, f.metricClient.grpcConfig)
 			} else {
-				err = timeoutFlush[pmetricotlp.ExportRequest, pmetricotlp.ExportResponse](f.metricClient.client, metric, f.metadata, f.metricClient.grpcConfig)
+				err = timeoutFlush[pmetricotlp.ExportRequest, pmetricotlp.ExportResponse](f.metricClient.client, metric, f.metricClient.metadata, f.metricClient.grpcConfig)
 			}
 
 			if err != nil {
@@ -276,9 +276,9 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			defer wg.Done()
 			var err error
 			if f.traceClient.grpcConfig.Retry.Enable {
-				err = flushWithRetry[ptraceotlp.ExportRequest, ptraceotlp.ExportResponse](f.traceClient.client, trace, f.metadata, f.traceClient.grpcConfig)
+				err = flushWithRetry[ptraceotlp.ExportRequest, ptraceotlp.ExportResponse](f.traceClient.client, trace, f.traceClient.metadata, f.traceClient.grpcConfig)
 			} else {
-				err = timeoutFlush[ptraceotlp.ExportRequest, ptraceotlp.ExportResponse](f.traceClient.client, trace, f.metadata, f.traceClient.grpcConfig)
+				err = timeoutFlush[ptraceotlp.ExportRequest, ptraceotlp.ExportResponse](f.traceClient.client, trace, f.traceClient.metadata, f.traceClient.grpcConfig)
 			}
 
 			if err != nil {
