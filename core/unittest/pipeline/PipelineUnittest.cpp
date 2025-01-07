@@ -1111,7 +1111,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_EQUAL(goPipelineWithoutInput.toStyledString(), pipeline->mGoPipelineWithoutInput.toStyledString());
-    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 14: extended -> native -> extended
