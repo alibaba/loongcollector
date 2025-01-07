@@ -109,7 +109,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -148,7 +148,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ],
             "extensions": [
@@ -195,7 +195,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
             },
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ],
@@ -363,6 +363,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
 
     // topology 2: extended -> native -> native
     configStr = R"(
@@ -508,6 +509,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 5: extended -> extended -> native
@@ -586,6 +588,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 6: (native, extended) -> extended -> native
@@ -709,6 +712,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 8: extended -> (native -> extended) -> native
@@ -832,6 +836,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
 
     // topology 11: extended -> none -> native (future changes maybe applied)
     configStr = R"(
@@ -898,6 +903,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 12: (native, extended) -> none -> native
@@ -962,7 +968,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -982,7 +988,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1000,6 +1006,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 14: extended -> native -> extended
@@ -1025,7 +1032,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1064,7 +1071,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1097,7 +1104,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1123,7 +1130,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1141,6 +1148,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 17: extended -> extended -> extended
@@ -1163,7 +1171,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1194,7 +1202,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1212,6 +1220,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 18: (native, extended) -> extended -> extended
@@ -1240,7 +1249,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1279,7 +1288,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1305,7 +1314,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1323,6 +1332,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 20: extended -> (native -> extended) -> extended
@@ -1351,7 +1361,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1393,7 +1403,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1421,7 +1431,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1441,7 +1451,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1459,6 +1469,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 23: extended -> none -> extended
@@ -1476,7 +1487,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1501,7 +1512,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1519,6 +1530,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 24: (native, extended) -> none -> extended
@@ -1542,7 +1554,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1586,7 +1598,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1612,7 +1624,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1630,6 +1642,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 26: extended -> native -> (native, extended)
@@ -1663,7 +1676,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1710,7 +1723,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1751,7 +1764,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1783,7 +1796,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1801,6 +1814,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 29: extended -> extended -> (native, extended)
@@ -1831,7 +1845,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1868,7 +1882,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -1886,6 +1900,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 30: (native, extended) -> extended -> (native, extended)
@@ -1922,7 +1937,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1969,7 +1984,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -2001,7 +2016,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -2019,6 +2034,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 32: extended -> (native -> extended) -> (native, extended)
@@ -2055,7 +2071,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -2105,7 +2121,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -2141,7 +2157,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -2167,7 +2183,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -2185,6 +2201,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithoutInput.clear();
 
     // topology 35: extended -> none -> (native, extended)
@@ -2210,7 +2227,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -2241,7 +2258,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     }
                 },
                 {
-                    "type": "flusher_kafka_v2",
+                    "type": "flusher_http",
                     "detail": {}
                 }
             ]
@@ -2259,6 +2276,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    APSARA_TEST_NOT_EQUAL(nullptr, pipeline->GetContext().GetSLSInfo());
     goPipelineWithInput.clear();
 
     // topology 36: (native, extended) -> none -> (native, extended)
@@ -2290,7 +2308,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
                     "EnableShardHash": false
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }

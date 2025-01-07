@@ -316,7 +316,7 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
             detail[itr.name()] = *itr;
         }
     }
-    if (!detail.empty()) {
+    if (mContext->IsFlushingThroughGoPipeline()) {
         Json::Value plugin(Json::objectValue);
         plugin["type"] = "flusher_sls";
         plugin["detail"] = detail;

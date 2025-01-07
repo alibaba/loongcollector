@@ -80,7 +80,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ],
             "extensions": [
@@ -486,7 +486,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -523,7 +523,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -556,7 +556,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -581,7 +581,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -613,7 +613,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -653,7 +653,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -681,7 +681,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -721,7 +721,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -757,7 +757,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -777,7 +777,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -804,7 +804,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -839,7 +839,7 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -867,7 +867,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -907,7 +907,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -943,7 +943,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -971,7 +971,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1006,7 +1006,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1049,7 +1049,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1080,7 +1080,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1123,7 +1123,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1162,7 +1162,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1185,7 +1185,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1215,7 +1215,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1253,7 +1253,7 @@ void ConfigUnittest::HandleValidConfig() const {
                     "Type": "flusher_sls"
                 },
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }
@@ -1942,7 +1942,7 @@ void ConfigUnittest::HandleInvalidAggregators() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_kafka_v2"
+                    "Type": "flusher_http"
                 }
             ]
         }

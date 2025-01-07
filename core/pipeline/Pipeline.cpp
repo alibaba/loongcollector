@@ -55,17 +55,20 @@ bool Pipeline::Init(Config&& config) {
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
     mContext.SetPipeline(*this);
+    mContext.SetIsFlushingThroughGoPipelineFlag(config.IsFlushingThroughGoPipelineExisted());
 
     // for special treatment below
     const InputFile* inputFile = nullptr;
 
 #ifdef __ENTERPRISE__
     // to send alarm before flusherSLS is built, a temporary object is made, which will be overriden shortly after.
-    unique_ptr<FlusherSLS> SLSTmp = unique_ptr<FlusherSLS>(new FlusherSLS());
-    SLSTmp->mProject = config.mProject;
-    SLSTmp->mLogstore = config.mLogstore;
-    SLSTmp->mRegion = config.mRegion;
-    mContext.SetSLSInfo(SLSTmp.get());
+    FlusherSLS SLSTmp;
+    if (!config.mProject.empty()) {
+        SLSTmp.mProject = config.mProject;
+        SLSTmp.mLogstore = config.mLogstore;
+        SLSTmp.mRegion = config.mRegion;
+        mContext.SetSLSInfo(&SLSTmp);
+    }
 #endif
 
     int16_t pluginIndex = 0;
@@ -249,8 +252,7 @@ bool Pipeline::Init(Config&& config) {
                                mContext.GetLogstoreName(),
                                mContext.GetRegion());
         }
-        // flusher_sls is guaranteed to exist here.
-        if (mContext.GetSLSInfo()->mBatch.mMergeType != FlusherSLS::Batch::MergeType::TOPIC) {
+        if (mContext.GetSLSInfo() && mContext.GetSLSInfo()->mBatch.mMergeType != FlusherSLS::Batch::MergeType::TOPIC) {
             PARAM_ERROR_RETURN(mContext.GetLogger(),
                                mContext.GetAlarm(),
                                "exactly once enabled when flusher_sls.MergeType is not topic",

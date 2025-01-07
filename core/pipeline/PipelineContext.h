@@ -78,6 +78,8 @@ public:
     void SetRequiringJsonReaderFlag(bool flag) { mRequiringJsonReader = flag; }
     bool IsFirstProcessorApsara() const { return mIsFirstProcessorApsara; }
     void SetIsFirstProcessorApsaraFlag(bool flag) { mIsFirstProcessorApsara = flag; }
+    bool IsFlushingThroughGoPipeline() const { return mIsFlushingThroughGoPipeline; }
+    void SetIsFlushingThroughGoPipelineFlag(bool flag) { mIsFlushingThroughGoPipeline = flag; }
 
     ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
     // LogFileProfiler& GetProfiler() { return *mProfiler; }
@@ -95,6 +97,7 @@ private:
     const FlusherSLS* mSLSInfo = nullptr;
     bool mRequiringJsonReader = false;
     bool mIsFirstProcessorApsara = false;
+    bool mIsFlushingThroughGoPipeline = false;
 
     mutable ProcessProfile mProcessProfile;
     // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();
