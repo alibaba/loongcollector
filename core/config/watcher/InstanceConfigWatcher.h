@@ -36,9 +36,7 @@ public:
     InstanceConfigDiff CheckConfigDiff();
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void SetInstanceConfigManager(const InstanceConfigManager* m) {
-        mInstanceConfigManager = m;
-    }
+    void SetInstanceConfigManager(const InstanceConfigManager* m) { mInstanceConfigManager = m; }
 #endif
 
 private:

@@ -35,9 +35,7 @@ public:
     const Json::Value& GetConfig() const { return *mConfig; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    Task* GetPlugin() const {
-        return mPlugin.get();
-    }
+    Task* GetPlugin() const { return mPlugin.get(); }
 #endif
 
 private:

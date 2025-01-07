@@ -32,11 +32,9 @@
 
 using namespace std;
 
-#define ENUM_TO_STRING_CASE(EnumValue) \
-    { Action::EnumValue, ToLowerCaseString(#EnumValue) }
+#define ENUM_TO_STRING_CASE(EnumValue) {Action::EnumValue, ToLowerCaseString(#EnumValue)}
 
-#define STRING_TO_ENUM_CASE(EnumValue) \
-    { ToLowerCaseString(#EnumValue), Action::EnumValue }
+#define STRING_TO_ENUM_CASE(EnumValue) {ToLowerCaseString(#EnumValue), Action::EnumValue}
 
 namespace logtail {
 

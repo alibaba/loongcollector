@@ -66,9 +66,7 @@ public:
     virtual bool FromJson(const Json::Value&) = 0;
     std::string ToJsonString(bool enableEventMeta = false) const;
     bool FromJsonString(const std::string&);
-    PipelineEventGroup* GetPipelineEventGroupPtr() {
-        return mPipelineEventGroupPtr;
-    }
+    PipelineEventGroup* GetPipelineEventGroupPtr() { return mPipelineEventGroupPtr; }
 #endif
 
 protected:
