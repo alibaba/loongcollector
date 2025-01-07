@@ -439,7 +439,37 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     ctx.SetExactlyOnceFlag(false);
     SenderQueueManager::GetInstance()->Clear();
 
-    // additional param
+    // go param
+    ctx.SetIsFlushingThroughGoPipelineFlag(true);
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+        }
+    )";
+    optionalGoPipelineStr = R"(
+        {
+            "flushers": [
+                {
+                    "type": "flusher_sls/4",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
+    pipeline.mPluginID.store(4);
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
+    optionalGoPipeline.clear();
+
     configStr = R"(
         {
             "Type": "flusher_sls",
@@ -470,6 +500,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
+    ctx.SetIsFlushingThroughGoPipelineFlag(false);
     SenderQueueManager::GetInstance()->Clear();
 }
 

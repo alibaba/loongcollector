@@ -85,12 +85,12 @@ bool Pipeline::Init(PipelineConfig&& config) {
     bool hasFlusherSLS = false;
 
     // to send alarm and init MetricsRecord before flusherSLS is built, a temporary object is made, which will be
-    unique_ptr<FlusherSLS> SLSTmp = make_unique<FlusherSLS>();
+    FlusherSLS SLSTmp;
     if (!config.mProject.empty()) {
-        SLSTmp->mProject = config.mProject;
-        SLSTmp->mLogstore = config.mLogstore;
-        SLSTmp->mRegion = config.mRegion;
-        mContext.SetSLSInfo(SLSTmp.get());
+        SLSTmp.mProject = config.mProject;
+        SLSTmp.mLogstore = config.mLogstore;
+        SLSTmp.mRegion = config.mRegion;
+        mContext.SetSLSInfo(&SLSTmp);
     }
 
     mPluginID.store(0);
