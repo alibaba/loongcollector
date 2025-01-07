@@ -244,12 +244,10 @@ void CreateModifyHandler::Handle(const Event& event) {
         mCreateHandlerPtr->Handle(event);
     } else if (event.IsContainerStopped() && isDir) {
         for (auto& pair : mModifyHandlerPtrMap) {
-            if (pair.second->GetConfigName() == event.GetConfigName()) {
-                LOG_DEBUG(sLogger,
-                          ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
-                              "Object", event.GetObject())("Dev", event.GetDev())("Inode", event.GetInode()));
-                pair.second->Handle(event);
-            }
+            LOG_DEBUG(sLogger,
+                      ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
+                          "Object", event.GetObject())("Dev", event.GetDev())("Inode", event.GetInode()));
+            pair.second->Handle(event);
         }
     } else if (event.IsCreate() || event.IsModify() || event.IsMoveFrom() || event.IsMoveTo() || event.IsDeleted()) {
         if (!event.GetConfigName().empty()) {

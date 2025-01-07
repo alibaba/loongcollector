@@ -186,11 +186,6 @@ void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
     event2.SetConfigName(mConfigName);
     createModifyHandler.Handle(event2);
     APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 2);
-
-    Event event3(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
-    event3.SetConfigName(mConfigName + "_test");
-    createModifyHandler.Handle(event3);
-    APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 2);
 }
 
 std::string CreateModifyHandlerUnittest::gRootDir;
