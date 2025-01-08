@@ -8,6 +8,7 @@
 
 #include "Flags.h"
 #include "Labels.h"
+#include "Logger.h"
 #include "common/StringTools.h"
 #include "models/PipelineEventGroup.h"
 #include "pipeline/queue/ProcessQueueItem.h"
@@ -85,7 +86,12 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
     return;
 #endif
     while (true) {
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) == 0) {
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res == 0) {
+            break;
+        }
+        if (res == 2) {
+            LOG_ERROR(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
         usleep(10 * 1000);
@@ -126,8 +132,5 @@ void StreamScraper::SetAutoMetricMeta(double scrapeDurationSeconds, bool upState
 std::string StreamScraper::GetId() {
     return mHash;
 }
-void StreamScraper::SetScrapeTime(std::chrono::system_clock::time_point scrapeTime) {
-    mScrapeTimestampMilliSec
-        = std::chrono::duration_cast<std::chrono::milliseconds>(scrapeTime.time_since_epoch()).count();
-}
+
 } // namespace logtail::prom
