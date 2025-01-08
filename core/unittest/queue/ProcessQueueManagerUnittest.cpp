@@ -240,24 +240,24 @@ void ProcessQueueManagerUnittest::TestPushQueue() {
 
     // queue belongs to normal process queue
     APSARA_TEST_TRUE(sProcessQueueManager->IsValidToPush(0));
-    APSARA_TEST_EQUAL(0, sProcessQueueManager->PushQueue(0, GenerateItem()));
+    APSARA_TEST_EQUAL(QueueStatus::OK, sProcessQueueManager->PushQueue(0, GenerateItem()));
 
     // queue belongs to exactly once process queue
     APSARA_TEST_TRUE(sProcessQueueManager->IsValidToPush(1));
-    APSARA_TEST_EQUAL(0, sProcessQueueManager->PushQueue(1, GenerateItem()));
+    APSARA_TEST_EQUAL(QueueStatus::OK, sProcessQueueManager->PushQueue(1, GenerateItem()));
 
     // no queue exists
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(2));
-    APSARA_TEST_EQUAL(2, sProcessQueueManager->PushQueue(2, GenerateItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_NOT_EXIST, sProcessQueueManager->PushQueue(2, GenerateItem()));
 
     // invalid to push
     static_cast<BoundedProcessQueue*>(sProcessQueueManager->mQueues[0].first->get())->mValidToPush = false;
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(0));
-    APSARA_TEST_EQUAL(1, sProcessQueueManager->PushQueue(0, GenerateItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sProcessQueueManager->PushQueue(0, GenerateItem()));
 
     ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPush = false;
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(1));
-    APSARA_TEST_EQUAL(1, sProcessQueueManager->PushQueue(1, GenerateItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sProcessQueueManager->PushQueue(1, GenerateItem()));
 }
 
 void ProcessQueueManagerUnittest::TestPopItem() {
