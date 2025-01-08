@@ -18,12 +18,11 @@
 
 #include <openssl/md5.h>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/regex.hpp>
 #include <string>
 #include <vector>
-
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/join.hpp"
-#include "boost/regex.hpp"
 
 #include "common/ParamExtractor.h"
 #include "common/StringTools.h"
@@ -49,7 +48,8 @@ Action StringToAction(const string& action) {
                                                    STRING_TO_ENUM_CASE(LABELDROP),
                                                    STRING_TO_ENUM_CASE(LABELKEEP),
                                                    STRING_TO_ENUM_CASE(LOWERCASE),
-                                                   STRING_TO_ENUM_CASE(UPPERCASE)};
+                                                   STRING_TO_ENUM_CASE(UPPERCASE),
+                                                   STRING_TO_ENUM_CASE(DROPMETRIC)};
 
     auto it = sActionStrings.find(action);
     if (it != sActionStrings.end()) {
@@ -69,7 +69,9 @@ const std::string& ActionToString(Action action) {
                                                         ENUM_TO_STRING_CASE(LABELDROP),
                                                         ENUM_TO_STRING_CASE(LABELKEEP),
                                                         ENUM_TO_STRING_CASE(LOWERCASE),
-                                                        ENUM_TO_STRING_CASE(UPPERCASE)};
+                                                        ENUM_TO_STRING_CASE(UPPERCASE),
+                                                        ENUM_TO_STRING_CASE(DROPMETRIC)};
+
     static string sUndefined = prometheus::UNDEFINED;
     auto it = sActionStrings.find(action);
     if (it != sActionStrings.end()) {
@@ -107,6 +109,26 @@ bool RelabelConfig::Init(const Json::Value& config) {
     if (config.isMember(prometheus::ACTION) && config[prometheus::ACTION].isString()) {
         string actionString = config[prometheus::ACTION].asString();
         mAction = StringToAction(actionString);
+    } else {
+        LOG_ERROR(sLogger, ("no action specified", ""));
+        return false;
+    }
+
+    if (mAction == Action::DROPMETRIC) {
+        mSourceLabels.emplace_back(prometheus::NAME);
+        if (config.isMember(prometheus::MATCH_LIST) && config[prometheus::MATCH_LIST].isArray()) {
+            for (const auto& item : config[prometheus::MATCH_LIST]) {
+                if (item.isString()) {
+                    mMatchList.insert(item.asString());
+                } else {
+                    LOG_ERROR(sLogger, ("invalid match_list item", ""));
+                    return false;
+                }
+            }
+        } else {
+            LOG_ERROR(sLogger, ("no match_list specified", ""));
+            return false;
+        }
     }
 
     if (config.isMember(prometheus::MODULUS) && config[prometheus::MODULUS].isUInt64()) {
@@ -216,6 +238,12 @@ bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
             });
             for (const auto& item : toDel) {
                 l.Del(item);
+            }
+            break;
+        }
+        case Action::DROPMETRIC: {
+            if (mMatchList.find(val) != mMatchList.end()) {
+                return false;
             }
             break;
         }
