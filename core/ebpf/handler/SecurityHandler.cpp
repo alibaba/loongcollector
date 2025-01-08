@@ -64,7 +64,7 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
     std::unique_ptr<ProcessQueueItem> item
         = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(event_group), mPluginIdx));
 
-    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
         LOG_WARNING(
             sLogger,
             ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("Push queue failed!", events.size()));

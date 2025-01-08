@@ -109,23 +109,23 @@ bool ProcessQueueManager::IsValidToPush(QueueKey key) const {
     return ExactlyOnceQueueManager::GetInstance()->IsValidToPushProcessQueue(key);
 }
 
-int ProcessQueueManager::PushQueue(QueueKey key, unique_ptr<ProcessQueueItem>&& item) {
+QueueStatus ProcessQueueManager::PushQueue(QueueKey key, unique_ptr<ProcessQueueItem>&& item) {
     {
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
             if (!(*iter->second.first)->Push(std::move(item))) {
-                return 1;
+                return QueueStatus::QUEUE_FULL;
             }
         } else {
-            int res = ExactlyOnceQueueManager::GetInstance()->PushProcessQueue(key, std::move(item));
-            if (res != 0) {
+            auto res = ExactlyOnceQueueManager::GetInstance()->PushProcessQueue(key, std::move(item));
+            if (res != QueueStatus::OK) {
                 return res;
             }
         }
     }
     Trigger();
-    return 0;
+    return QueueStatus::OK;
 }
 
 bool ProcessQueueManager::PopItem(int64_t threadNo, unique_ptr<ProcessQueueItem>& item, string& configName) {

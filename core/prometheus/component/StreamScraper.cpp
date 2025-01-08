@@ -88,10 +88,10 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
 #endif
     while (true) {
         auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
-        if (res == 0) {
+        if (res == QueueStatus::OK) {
             break;
         }
-        if (res == 2) {
+        if (res == QueueStatus::QUEUE_NOT_EXIST) {
             LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
