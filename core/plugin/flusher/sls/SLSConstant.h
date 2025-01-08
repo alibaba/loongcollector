@@ -24,6 +24,11 @@ extern const std::string LOGSTORES;
 extern const std::string METRICSTORES;
 extern const std::string HEALTH;
 
+extern const std::string ARMS_METRICS_URL;
+extern const std::string ARMS_TRACES_URL;
+extern const std::string ARMS_AGENTINFOS_URL;
+extern const std::string DUMMY_LOG_STORE;
+
 extern const std::string CONTENT_MD5;
 
 extern const std::string LOGTAIL_USER_AGENT;

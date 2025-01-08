@@ -424,19 +424,19 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     } else if (telemetryType == "metrics") {
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
-    }if (telemetryType == "arms_agentinfo") {
-        mSubpath = "/apm/meta/arms/v1/meta_log/AgentInfo";
-        mLogstore = "__arms_default_agentinfo__";
+    } else if (telemetryType == "arms_agentinfo") {
+        mSubpath = ARMS_AGENTINFOS_URL;
+        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
         LOG_DEBUG(sLogger, ("successfully set agentinfo subpath", mSubpath) ("logstore", mLogstore));
     } else if (telemetryType == "arms_metrics") {
-        mSubpath = "/apm/metric/arms/v1/metric_log";
-        mLogstore = "__arms_default_metric__";
+        mSubpath = ARMS_METRICS_URL;
+        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS;
         LOG_DEBUG(sLogger, ("successfully set metric subpath", mSubpath) ("logstore", mLogstore));
     } else if (telemetryType == "arms_traces") {
-        mSubpath = "/apm/trace/arms/v1/trace_log";
-        mLogstore = "__arms_default_trace__";
+        mSubpath = ARMS_TRACES_URL;
+        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES;
         LOG_DEBUG(sLogger, ("successfully set trace subpath", mSubpath) ("logstore", mLogstore));
     } else if (!telemetryType.empty() && telemetryType != "logs") {
@@ -1271,7 +1271,6 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostArmsBackendRequest(const strin
                                                                          SLSSenderQueueItem* item,
                                                                          const std::string& subPath) const {
     
-    // string path;
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
                                       accessKeySecret,
