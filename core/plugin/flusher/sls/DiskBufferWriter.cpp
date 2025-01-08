@@ -80,6 +80,8 @@ static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
 static const string kAKErrorMsg = "can not get valid access key";
 #endif
 
+static const string kNoSubpathErrorMsg = "subpath not set";
+
 static const string kNoHostErrorMsg = "can not get available host";
 
 static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {
@@ -770,6 +772,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_shardhashkey(data->mShardHashKey);
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
+    bufferMeta.set_subpath(flusher->mSubpath);
 #ifdef __ENTERPRISE__
     bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
 #endif
@@ -877,6 +880,29 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                    GetSLSCompressTypeString(bufferMeta.compresstype()),
                                    logData,
                                    bufferMeta.rawsize());
+    } else if (bufferMeta.has_telemetrytype() && 
+        (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS || 
+        bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES || 
+        bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS)) {
+        if (!bufferMeta.has_subpath() || bufferMeta.subpath().empty()) {
+            LOG_ERROR(sLogger, ("don't set supath, telemetry type", static_cast<int>(bufferMeta.telemetrytype())));
+            SLSResponse response;
+            response.mErrorCode = LOGE_PARAMETER_INVALID;
+            response.mErrorMsg = kNoSubpathErrorMsg;
+            return response;
+        }
+        LOG_DEBUG(sLogger, ("subpath", bufferMeta.subpath()) ("telemetry type", static_cast<int>(bufferMeta.telemetrytype())));
+        return PostARMSBackendLogs(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   host,
+                                   httpsFlag,
+                                   bufferMeta.project(),
+                                   bufferMeta.logstore(),
+                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                   logData,
+                                   bufferMeta.rawsize(),
+                                   bufferMeta.subpath());
     } else {
         return PostLogStoreLogs(accessKeyId,
                                 accessKeySecret,

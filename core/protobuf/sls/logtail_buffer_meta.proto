@@ -37,4 +37,5 @@ message LogtailBufferMeta
     optional SlsTelemetryType telemetrytype = 9;
     optional EndpointMode endpointmode = 10;
     optional string endpoint = 11;
+    optional string subpath = 12;
 }

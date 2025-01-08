@@ -81,6 +81,7 @@ public:
 
     std::string mProject;
     std::string mLogstore;
+    std::string mSubpath;
     std::string mRegion;
     std::string mAliuid;
 #ifdef __ENTERPRISE__
@@ -130,6 +131,11 @@ private:
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
                                                                       SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostArmsBackendRequest(const std::string& accessKeyId,
+                                                                      const std::string& accessKeySecret,
+                                                                      SLSClientManager::AuthType type,
+                                                                      SLSSenderQueueItem* item,
+                                                                      const std::string& subPath) const;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
