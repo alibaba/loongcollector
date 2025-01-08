@@ -94,8 +94,8 @@ if __name__ == '__main__':
 
     coverage_rate = ((satified_count) / (not_satified_count + satified_count) ) * 100
     print('='*20)
-    if coverage_rate < 50:
-        print(f'{ERROR_COLOR}Diff coverage rate is less than 50%: {coverage_rate:.1f}%{RESET_COLOR}', flush=True)
+    if coverage_rate < 60:
+        print(f'{ERROR_COLOR}Diff coverage rate is less than 60%: {coverage_rate:.1f}%{RESET_COLOR}', flush=True)
         print('='*20)
         sys.exit(1)
     else:
