@@ -14,6 +14,7 @@
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "prometheus/Utils.h"
+#include "runner/ProcessorRunner.h"
 
 DEFINE_FLAG_INT64(prom_stream_bytes_size, "stream bytes size", 1024 * 1024);
 
@@ -91,7 +92,7 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
             break;
         }
         if (res == 2) {
-            LOG_ERROR(sLogger, ("prometheus stream scraper", "queue not exist"));
+            LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
         usleep(10 * 1000);
