@@ -1,30 +1,33 @@
-// // Copyright 2023 iLogtail Authors
-// //
-// // Licensed under the Apache License, Version 2.0 (the "License");
-// // you may not use this file except in compliance with the License.
-// // You may obtain a copy of the License at
-// //
-// //     http://www.apache.org/licenses/LICENSE-2.0
-// //
-// // Unless required by applicable law or agreed to in writing, software
-// // distributed under the License is distributed on an "AS IS" BASIS,
-// // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// // See the License for the specific language governing permissions and
-// // limitations under the License.
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-// #pragma once
+#pragma once
 
-// #include <vector>
-// #include <memory>
+#include <vector>
+#include <memory>
 
-// #include "type/ebpf_type.h"
-// #include "type/abstract_record.h"
+#include "ebpf/type/NetworkObserverEvent.h"
 
-// namespace logtail {
-// class AbstractProtocolParser {
-// public:
-//   virtual ~AbstractProtocolParser() = default;
-//   virtual std::shared_ptr<AbstractProtocolParser> Create() = 0;
-//   virtual std::vector<std::unique_ptr<AbstractRecord>> Parse(std::unique_ptr<NetDataEvent> data_event) = 0;
-// };
-// }
+namespace logtail {
+namespace ebpf {
+
+class AbstractProtocolParser {
+public:
+  virtual ~AbstractProtocolParser() = default;
+  virtual std::shared_ptr<AbstractProtocolParser> Create() = 0;
+  virtual std::vector<std::unique_ptr<AbstractRecord>> Parse(std::unique_ptr<NetDataEvent> data_event) = 0;
+};
+
+}
+}

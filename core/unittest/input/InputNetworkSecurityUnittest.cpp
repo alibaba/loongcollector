@@ -88,8 +88,8 @@ void InputNetworkSecurityUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
-    nami::SecurityNetworkFilter thisFilter1
-        = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityNetworkFilter thisFilter1
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
     APSARA_TEST_EQUAL(1, thisFilter1.mDestPortList.size());
@@ -123,8 +123,8 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
-    nami::SecurityNetworkFilter thisFilter1
-        = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityNetworkFilter thisFilter1
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
     APSARA_TEST_EQUAL(0, thisFilter1.mDestPortList.size());
@@ -149,8 +149,8 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    nami::SecurityNetworkFilter thisFilter5
-        = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityNetworkFilter thisFilter5
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(thisFilter5.mDestAddrList.size(), 0);
     APSARA_TEST_EQUAL(thisFilter5.mDestPortList.size(), 0);
     APSARA_TEST_EQUAL(thisFilter5.mSourceAddrBlackList.size(), 0);
@@ -177,8 +177,8 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    nami::SecurityNetworkFilter thisFilter6
-        = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityNetworkFilter thisFilter6
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(2, thisFilter6.mDestAddrList.size());
 }
 
@@ -208,7 +208,7 @@ void InputNetworkSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
 }
@@ -239,14 +239,14 @@ void InputNetworkSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
+    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
+    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 

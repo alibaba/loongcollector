@@ -6,15 +6,6 @@
 
 extern "C" {
 
-#ifdef LOG_DEBUG
-#undef LOG_TRACE
-#undef LOG_DEBUG
-#undef LOG_INFO
-#undef LOG_WARN
-#undef LOG_ERROR
-#undef LOG_FATAL
-#endif
-
 #include <coolbpf/coolbpf.h>
 #include <bpf/libbpf.h>
 };
@@ -32,8 +23,8 @@ extern "C" {
 #include "BPFMapTraits.h"
 #include "NetworkObserver.h"
 
-namespace nami {
-
+namespace logtail {
+namespace ebpf {
 struct PerfBufferOps {
 public:
   PerfBufferOps(const std::string& name, ssize_t size, perf_buffer_sample_fn scb, perf_buffer_lost_fn lcb):
@@ -42,7 +33,6 @@ public:
   ssize_t size_;
   perf_buffer_sample_fn sample_cb;
   perf_buffer_lost_fn lost_cb;
-  bool dedicated_thread = false;
 };
 
 struct AttachProgOps {
@@ -391,16 +381,16 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
       //     goto cleanup;
   }
 
-  void* CreatePerfBuffer(const std::string& name, int page_cnt, void* ctx, perf_process_event_fn data_cb, perf_loss_event_fn loss_cb) {
+  void* CreatePerfBuffer(const std::string& name, int page_cnt, void* ctx, perf_buffer_sample_fn data_cb, perf_buffer_lost_fn loss_cb) {
     int mapFd = SearchMapFd(name);
     if (mapFd < 0) {
       return nullptr;
     }
 
     struct perf_buffer_opts pb_opts = {};
-    pb_opts.sample_cb = static_cast<perf_buffer_sample_fn>(data_cb);
+    pb_opts.sample_cb = data_cb;
     pb_opts.ctx = ctx;
-    pb_opts.lost_cb = static_cast<perf_buffer_lost_fn>(loss_cb);
+    pb_opts.lost_cb = loss_cb;
 
     struct perf_buffer *pb = NULL;
     pb = perf_buffer__new(mapFd, page_cnt == 0 ? 128 : page_cnt, &pb_opts);
@@ -543,5 +533,5 @@ int SetTailCall(const std::string& map_name, const std::vector<std::string>& fun
   // links, used for strore bpf programs
   friend class NetworkSecurityManager;
 };
-
+}
 }

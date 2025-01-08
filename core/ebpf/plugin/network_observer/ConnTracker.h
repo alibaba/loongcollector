@@ -7,12 +7,14 @@
 #include <unordered_map>
 #include <mutex>
 #include <regex>
-#include <shared_mutex>
 #include <string_view>
 #include <string>
 
+#include "common/Lock.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/table/AppTable.h"
+#include "metadata/ContainerInfo.h"
+
 extern "C" {
 #include <net.h>
 };
@@ -38,7 +40,7 @@ public:
       epoch_(5),
       close_(false),
       last_update_timestamp(0),
-      last_active_timestamp(UINT64_MAX),
+      last_active_timestamp(INT64_MAX),
       conn_id_(conn_id),
       role(support_role_e::IsUnknown),
       curr_conn_stats_record_(std::make_shared<ConnStatsRecord>(conn_id)),
@@ -59,12 +61,12 @@ public:
   std::array<std::string, kConnTrackerElementsTableSize> GetConnTrackerAttrs();
 
   const ConnId GetConnId() const {
-    std::shared_lock<std::shared_mutex> lk(mtx_);
+    ReadLock lock(mReadWriteLock);
     return conn_id_;
   };
 
   bool ReadyToDestroy(const std::chrono::time_point<std::chrono::steady_clock>& now) {
-    std::shared_lock<std::shared_mutex> lk(mtx_);
+    ReadLock lock(mReadWriteLock);
     if (close_ && this->epoch_ < 0) {
       return true;
     }
@@ -87,11 +89,11 @@ public:
   }
 
   uint64_t GetLastUpdateTs() const { 
-    std::shared_lock<std::shared_mutex> lk(mtx_);
+    ReadLock lock(mReadWriteLock);
     return last_update_timestamp;
   }
   uint64_t GetLastActiveTs() const { 
-    std::shared_lock<std::shared_mutex> lk(mtx_);
+    ReadLock lock(mReadWriteLock);
     return last_active_timestamp;
   }
 
@@ -99,17 +101,17 @@ public:
   bool MetaAttachReadyForNet();
 
   void RecordActive() {
-    std::unique_lock<std::shared_mutex> lk(mtx_);
+    WriteLock lock(mReadWriteLock);
     this->epoch_ = 5;
     auto now = std::chrono::steady_clock::now();
     last_active_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
   }
 
-//   void UpdateSelfPodMeta(std::unique_ptr<PodMeta>& pod);
+  void UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
   void MarkPodMetaAttached() {
     k8s_meta_attached_ = true;
   }
-//   void UpdatePeerPodMeta(std::unique_ptr<PodMeta>& pod);
+  void UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
   void MarkPeerPodMetaAttached() {
     k8s_peer_meta_attached_ = true;
   }
@@ -132,7 +134,10 @@ public:
   std::string GetSourceAddr();
   std::string GetRemoteAddr();
 
-  mutable std::shared_mutex mtx_;
+  mutable ReadWriteLock mReadWriteLock;
+
+  ProtocolType protocol_;
+  std::string aggregate_key_;
   volatile bool net_meta_attached_ = false;
   volatile bool k8s_meta_attached_ = false;
   volatile bool k8s_peer_meta_attached_ = false;
@@ -164,9 +169,6 @@ private:
   void RecordLastUpdateTs(uint64_t ts) {
     last_update_timestamp = ts;
   }
-
-  ProtocolType protocol_;
-  std::string aggregate_key_;
 
   enum class EventCommonAttrKeyTab {
     FD,
@@ -203,19 +205,12 @@ private:
   std::array<std::string, kConnTrackerElementsTableSize> attrs_;
   volatile int epoch_;
   volatile bool close_;
-  std::chrono::time_point<std::chrono::steady_clock> mark_close_time_;
+  int64_t last_update_timestamp;
+  int64_t last_active_timestamp;
+  ConnId conn_id_;
+  enum support_role_e role;
 
-  uint64_t last_active_timestamp;
-  uint64_t last_update_timestamp;
-  // int64_t wr_bytes;
-  // int64_t rd_bytes;
-  // int32_t wr_pkts;
-  // int32_t rd_pkts;
-  // int64_t last_output_wr_bytes;
-  // int64_t last_output_rd_bytes;
-  // int32_t last_output_wr_pkts;
-  // int32_t last_output_rd_pkts;
-  // uint32_t conn_events;
+  std::chrono::time_point<std::chrono::steady_clock> mark_close_time_;
   
   std::string pod_ip_;
   std::string pod_name_;
@@ -233,11 +228,11 @@ private:
   std::string peer_arms_app_name_;
   
   // conn tracker attrs
-  ConnId conn_id_;
+  
   uint32_t saddr_ori_;
   uint32_t daddr_ori_;
   // struct socket_info si;
-  enum support_role_e role;
+  
 
   static std::regex rgx_;
 

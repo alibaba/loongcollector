@@ -15,17 +15,36 @@
 #pragma once
 
 #include <cstddef>
-// TODO @qianlu.kk include from source files or from install dir??
-// if we include from install dir, maybe we need to add depedencies 
 #include <coolbpf/net.h>
 #include <string>
 #include <unordered_map>
+#include <map>
 #include <vector>
 #include <list>
+
+#include "ebpf/type/table/AppTable.h"
+#include "ebpf/type/table/NetTable.h"
+#include "ebpf/type/table/HttpTable.h"
+
 
 namespace logtail {
 namespace ebpf {
 
+struct CaseInsensitiveLess {
+  struct NoCaseCompare {
+    bool operator()(const unsigned char c1, const unsigned char c2) const {
+      return std::tolower(c1) < std::tolower(c2);
+    }
+  };
+
+  template <typename TStringType>
+  bool operator()(const TStringType& s1, const TStringType& s2) const {
+    return std::lexicographical_compare(s1.begin(), s1.end(), s2.begin(), s2.end(),
+                                        NoCaseCompare());
+  }
+};
+
+using HeadersMap = std::multimap<std::string, std::string, CaseInsensitiveLess>;
 
 enum class CallType {
   UNKNOWN,
@@ -79,7 +98,6 @@ inline ProtocolType& operator++(ProtocolType &pt) {
   return pt;
 }
 
-// 后置递增
 inline ProtocolType operator++(ProtocolType &pt, int) {
   ProtocolType old = pt;
   pt = static_cast<ProtocolType>(static_cast<int>(pt) + 1);
@@ -153,12 +171,6 @@ struct ConnIdHash {
     }
 };
 
-
-inline std::string ConnIdToStringHash(const ConnId& conn_id) {
-  size_t hash_value = std::hash<ConnId>()(conn_id);
-  return std::to_string(hash_value);
-}
-
 class NetDataEvent
 {
 public:
@@ -167,8 +179,6 @@ public:
   uint64_t end_ts;
   ProtocolType protocol;
   enum support_role_e role;
-//  uint16_t request_len;
-//  uint16_t response_len;
   std::string req_msg;
   std::string resp_msg;
 
@@ -183,11 +193,215 @@ public:
   }
 };
 
-class AbstractRecord {
+/// record ///
 
+class AbstractRecord {
+public:
+  virtual ~AbstractRecord() {}
+
+  virtual AggregateType GetAggregateType() const = 0;
+  virtual EventType GetEventType() const = 0;
+
+  virtual std::string GetSpanName() = 0;
+
+  uint64_t GetStartTimeStamp() { return start_ts_; }
+  uint64_t GetEndTimeStamp() { return end_ts_; }
+  double GetLatencyNs() const  { return end_ts_ - start_ts_; }
+  double GetLatencyMs() const  { return (end_ts_ - start_ts_) / 1000; }
+  void SetStartTs(uint64_t start_ts_ns) { start_ts_ = start_ts_ns; }
+  void SetEndTs(uint64_t end_ts_ns) { end_ts_ = end_ts_ns;}
+  int RollbackCount() const {return rollback_cnt_;}
+  int Rollback() {return rollback_cnt_++; }
+
+  virtual bool IsError() const = 0;
+  virtual bool IsSlow()const  = 0;
+  virtual int GetStatusCode() const = 0;
+
+  virtual DataTableSchema GetMetricsTableSchema() const = 0;
+
+  virtual DataTableSchema GetTableSchema() const = 0;
+
+  // virtual std::string GetMetricAttribute(size_t col) const =0;
+  
+protected:
+  uint64_t start_ts_;
+  uint64_t end_ts_;
+  std::string span_name_;
+  std::string span_kind_;
+  int rollback_cnt_ = 0;
 };
 
-class ConnStatsRecord : public AbstractRecord {};
+
+
+class AbstractNetRecord : public AbstractRecord {
+public:
+  ~AbstractNetRecord() override {}
+  AggregateType GetAggregateType() const override {
+    return AggregateType::NETWORK;
+  }
+
+  const ConnId GetConnId() const { return conn_id_; }
+
+  std::string GetSpanName() override {
+    return "xx";
+  }
+  AbstractNetRecord(ConnId&& conn_id) : conn_id_(conn_id) {
+  }
+
+  AbstractNetRecord(const ConnId& conn_id) : conn_id_(conn_id) {}
+
+  bool IsError() const override {return false;}
+  bool IsSlow() const override {return false;}
+  int GetStatusCode() const override {return 0;}
+
+protected:
+  ConnId conn_id_;
+};
+
+class ConnStatsRecord : public AbstractNetRecord {
+public:
+  ~ConnStatsRecord() override {}
+  ConnStatsRecord(ConnId&& conn_id) :AbstractNetRecord(std::move(conn_id)) {}
+  ConnStatsRecord(const ConnId& conn_id) : AbstractNetRecord(conn_id) {}
+  EventType GetEventType() const override {
+    return EventType::CONN_STATS_EVENT;
+  }
+
+  bool IsError() const override {return false;}
+  bool IsSlow() const override {return false;}
+  int GetStatusCode()const override {return 0;}
+
+  std::string GetSpanName() override {
+    return "CONN_STATS";
+  }
+
+  DataTableSchema GetMetricsTableSchema() const override { return kNetMetricsTable; }
+
+  DataTableSchema GetTableSchema() const override { return kNetTable; }
+
+  uint64_t drop_count_;
+  uint64_t connect_sum_;
+  uint64_t rtt_var_;
+  uint64_t rtt_;
+  uint64_t retrans_count_;
+  uint64_t recv_packets_;
+  uint64_t send_packets_;
+  uint64_t recv_bytes_;
+  uint64_t send_bytes_;
+  std::array<std::string, kNetMetricsNum> metric_attributes_;
+};
+
+// AbstractAppRecord is intentionally designed to distinguish L5 and L7 Record of AbstractNetRecord. AbstractAppRecord is L7, while ConnStatsRecord is L5.
+class AbstractAppRecord : public AbstractNetRecord {
+   public:
+    AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {};
+
+    DataTableSchema GetMetricsTableSchema() const override { return kAppMetricsTable; }
+
+    // std::string GetMetricAttribute(size_t col) const override {
+    //   if (col >= std::size(metric_attributes_)) {
+    //       return "";
+    //   }
+    //   return metric_attributes_[col];
+    // }
+
+    // std::string GetMetricAttributeByName(const std::string& key) const {
+      
+    // }
+
+    void InitMetricAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
+      // generate http dedicated attributes ... 
+      
+    }
+
+    void InitSpanAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
+      // generate http dedicated attributes ... 
+    }
+
+    void InitLogAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
+      // generate http dedicated attributes ... 
+    }
+
+    std::array<std::string, kAppMetricsNum> metric_attributes_;
+    std::array<std::string, kAppTraceNum> trace_attributes_;
+    ArrayView<std::string> conn_tracker_attributes_;
+};
+
+
+class HttpRecord : public AbstractAppRecord {
+public:
+    ~HttpRecord() override {}
+    HttpRecord(ConnId&& conn_id):AbstractAppRecord(std::move(conn_id)) {}
+
+    EventType GetEventType() const override {
+      return EventType::HTTP_EVENT;
+    }
+
+    DataTableSchema GetTableSchema() const override { return kHTTPTable; }
+
+    void SetPath(const std::string& path) {
+      path_ = path;
+    }
+
+    void SetReqBody(const std::string& body) {
+      req_body = body;
+    }
+
+    void SetRespBody(const std::string& body) {
+      resp_body = body;
+    }
+
+    void SetMethod(const std::string& method) {
+      http_method = method;
+    }
+
+    void SetProtocolVersion(const std::string& version) {
+      protocol_version = version;
+    }
+
+    void SetStatusCode(const std::string& code) {
+      code_ = std::stoi(code);
+      status_code = code;
+    }
+
+    void SetReqHeaderMap(HeadersMap& headerMap) {
+      req_header_map = headerMap;
+    }
+
+    void SetRespHeaderMap(HeadersMap& headerMap) {
+      resp_header_map = headerMap;
+    }
+
+    bool IsError() const override {return code_>=400;}
+
+    // TODO @qianlu.kk 
+    bool IsSlow() const override {return GetLatencyMs() > 500;}
+    int GetStatusCode() const override {return code_;}
+    std::string GetReqBody() {return req_body;}
+    std::string GetRespBody() {return resp_body;}
+    std::string GetMethod() {return http_method;}
+    HeadersMap GetReqHeaderMap() {return req_header_map;}
+    HeadersMap GetRespHeaderMap() {return resp_header_map;}
+    std::string GetProtocolVersion() {return protocol_version;}
+    std::string GetPath() {return path_;}
+
+
+    std::string GetSpanName() override {
+      return path_;
+    }
+
+private:
+    std::string status_code;
+    int code_;
+    std::string path_;
+    std::string conv_path_;
+    std::string req_body;
+    std::string resp_body;
+    std::string http_method;
+    std::string protocol_version;
+    HeadersMap  req_header_map;
+    HeadersMap  resp_header_map;
+};
 
 class AppRecord : public AbstractRecord {};
 

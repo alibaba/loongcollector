@@ -6,8 +6,8 @@ extern "C" {
 };
 #include <coolbpf/security/type.h>
 
-namespace nami {
-
+namespace logtail {
+namespace ebpf {
 /**
  * Get information about a particular ValueType. For example: mapping back to the
  * enum type.
@@ -154,4 +154,5 @@ struct BPFMapTraits<IntMap> {
   static constexpr int map_flag = -1;
 };
 
+}
 }

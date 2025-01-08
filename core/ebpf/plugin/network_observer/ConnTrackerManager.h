@@ -14,8 +14,10 @@
 #include <string>
 #include <string_view>
 
+#include "common/Lock.h"
 #include "ebpf/plugin/BaseManager.h"
 #include "ConnTracker.h"
+#include "Worker.h"
 extern "C" {
 #include <net.h>
 };
@@ -58,13 +60,13 @@ public:
 
   void Start();
 
-  enum class DetechStatus {
+  enum class AttachStatus {
     WAIT_FOR_EVENT,
     SUCCESS,
     NEED_REMOTE,
   };
-  DetechStatus TryAttachPodMeta(std::shared_ptr<ConnTracker> ct);
-  DetechStatus TryAttachPeerPodMeta(std::shared_ptr<ConnTracker> ct);
+  AttachStatus TryAttachPodMeta(std::shared_ptr<ConnTracker> ct);
+  AttachStatus TryAttachPeerPodMeta(std::shared_ptr<ConnTracker> ct);
 
 //  void update_conn_stats();
 
@@ -89,10 +91,12 @@ private:
   // object pool, used for cache some conn_tracker objects
   // lock used to protect conn_trackers map
   //  std::mutex mutex_;
-  std::shared_mutex mtx_;
+  mutable ReadWriteLock mReadWriteLock;
   std::unordered_map<ConnId, std::shared_ptr<ConnTracker>> conn_trackers_;
   
   int64_t last_report_ts_ = INT64_MIN;
+
+  std::unique_ptr<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>> mWorkerPool;
 };
 
 }

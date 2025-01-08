@@ -88,7 +88,7 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
-    nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
+    logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
     APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
@@ -122,7 +122,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
-    nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
+    logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
     APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
@@ -174,7 +174,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
 }
@@ -205,14 +205,14 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 

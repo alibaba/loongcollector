@@ -20,10 +20,12 @@
 #include <set>
 #include <queue>
 
+#include "ebpf/SourceManager.h"
 #include "BaseManager.h"
 #include "ebpf/include/export.h"
 #include "ebpf/util/AggregateTree.h"
 #include "ebpf/type/SecurityEvent.h"
+
 // #include "driver/bpf_wrapper.h"
 // #include "common/agg_tree.h"
 // #include "type/security_event.h"
@@ -33,11 +35,13 @@ namespace ebpf {
 
 class AbstractManager {
 public:
-    using configType = std::variant<std::monostate, nami::SecurityFileFilter,
-                     nami::SecurityNetworkFilter>;
-    AbstractManager(std::unique_ptr<BaseManager>&);
-    virtual ~AbstractManager();
-    virtual int Init(std::shared_ptr<nami::eBPFConfig>) = 0;
+    using configType = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter,
+                     logtail::ebpf::SecurityNetworkFilter>;
+    AbstractManager() = delete;
+    explicit AbstractManager(std::unique_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager) : mSourceManager(sourceManager) {}
+    virtual ~AbstractManager() {}
+
+    virtual int Init(std::unique_ptr<logtail::ebpf::PluginConfig>) = 0;
 
     virtual int Destroy() = 0;
 
@@ -49,7 +53,7 @@ public:
 
     int GetCallNameIdx(const std::string& call_name);
 
-    virtual nami::PluginType GetPluginType() = 0;
+    virtual logtail::ebpf::PluginType GetPluginType() = 0;
 
     // virtual void InitAggregateTree() {
     //     aggregate_tree_ = nullptr;
@@ -72,6 +76,7 @@ public:
     std::atomic<bool> flag_ = false;
     std::atomic<bool> suspend_flag_ = false;
 protected:
+    std::shared_ptr<SourceManager> mSourceManager;
     // int InitOrGetCallNameIdx(const std::string& call_name);
     // int ReleaseCallNameIdx(const std::string& call_name);
     // int GetCallNameIdx(const std::string& call_name);

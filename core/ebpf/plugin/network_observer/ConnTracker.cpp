@@ -1,6 +1,9 @@
 #include "ConnTracker.h"
 #include "logger/Logger.h"
 #include "common/magic_enum.hpp"
+extern "C" {
+#include <net.h>
+}
 
 namespace logtail {
 namespace ebpf {
@@ -36,15 +39,12 @@ bool ConnTracker::MetaAttachReadyForNet() {
             ("start", conn_id_.start)
             ("dip", dip_) ("daddr", daddr_));
     }
-    // if (!res) LOG(WARNING) << "net meta not ready!! containerid" << container_id_trim_ 
-    // << " k8s_meta_attached_: " << k8s_meta_attached_ << " k8s_peer_meta_attached_: "<< k8s_peer_meta_attached_
-    // << " protocol_set_: " << protocol_set_ << " net_meta_attached_: "<< net_meta_attached_ << " pid:" << conn_id_.tgid  << " dip:" << dip_ << " daddr:" << daddr_;
     return res;
 }
 
 
 std::array<std::string, kConnTrackerElementsTableSize> ConnTracker::GetConnTrackerAttrs() {
-    std::shared_lock<std::shared_mutex> lk(mtx_);
+    ReadLock lock(mReadWriteLock);
     if (k8s_meta_attached_ && k8s_peer_meta_attached_ && protocol_set_ && net_meta_attached_) return attrs_;
     LOG_WARNING(sLogger, ("not attach, containerid", container_id_trim_) 
                 ("k8s_meta_attached", k8s_meta_attached_)
@@ -60,7 +60,7 @@ std::array<std::string, kConnTrackerElementsTableSize> ConnTracker::GetConnTrack
 }
 
 void ConnTracker::SafeUpdateRole(enum support_role_e role) {
-    std::unique_lock<std::shared_mutex> lk(mtx_);
+    WriteLock lock(mReadWriteLock);
     UpdateRole(role);
 }
 
@@ -71,14 +71,14 @@ void ConnTracker::UpdateRole(enum support_role_e role) {
     }
     
     if (this->role != role) {
-        LOG_WARNING(sLogger, ("role change!! last role", magic_enum::enum_name(this->role)) ("new role", magic_enum::enum_name(role)));
+        LOG_WARNING(sLogger, ("role change!! last role", int(this->role)) ("new role", int(role)));
         this->role = role;
     }
     return;
 }
 
 void ConnTracker::SafeUpdateProtocol(ProtocolType protocol) {
-    std::unique_lock<std::shared_mutex> lk(mtx_);
+    WriteLock lock(mReadWriteLock);
     UpdateProtocol(protocol);
 }
 
@@ -87,7 +87,7 @@ void ConnTracker::UpdateProtocol(ProtocolType protocol) {
         return;
     }
     if (protocol_ != ProtocolType::UNKNOWN && int(protocol_) != int(protocol)) {
-        LOG_WARNING(sLogger, ("protocol change!! last protocol", magic_enum::enum_name(this->protocol_)) ("new protocol", magic_enum::enum_name(protocol)));
+        LOG_WARNING(sLogger, ("protocol change!! last protocol", int(this->protocol_)) ("new protocol", int(protocol)));
     }
     
     {
@@ -109,34 +109,34 @@ void ConnTracker::UpdateProtocol(ProtocolType protocol) {
     }
 }
 
-// void ConnTracker::UpdateSelfPodMeta(std::unique_ptr<PodMeta>& pod) {
-//   std::unique_lock<std::shared_mutex> lk(mtx_);
-//   if (!pod) {
-//     // no meta info ...
-//     LOG(WARNING) << "no pod info ... cid:" << container_id_trim_;
-//     return;
-//   }
-//   arms_app_id_ = pod->app_id_;
-//   arms_app_name_ = pod->app_name_;
-//   pod_ip_ = pod->pod_ip_;
-//   pod_name_ = pod->pod_name_;
-//   workload_kind_ = pod->workload_kind_;
-//   workload_name_ = pod->workload_name_;
-//   namespace_ = pod->namespace_;
+void ConnTracker::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod) {
+  WriteLock lock(mReadWriteLock);
+  if (!pod) {
+    // no meta info ...
+    LOG_WARNING(sLogger, ("no pod info ... cid:", container_id_trim_));
+    return;
+  }
+  arms_app_id_ = pod->appId;
+  arms_app_name_ = pod->appName;
+  pod_ip_ = pod->podIp;
+  pod_name_ = pod->podName;
+  workload_kind_ = pod->workloadKind;
+  workload_name_ = pod->workloadName;
+  namespace_ = pod->k8sNamespace;
 
-//   attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = arms_app_id_;
-//   attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = arms_app_name_;
-//   attrs_[kConnTrackerTable.ColIndex(kPodName.name())] = pod_name_;
-//   attrs_[kConnTrackerTable.ColIndex(kPodIp.name())] = pod_ip_;
-//   attrs_[kConnTrackerTable.ColIndex(kWorkloadName.name())] = workload_name_;
-//   attrs_[kConnTrackerTable.ColIndex(kWorkloadKind.name())] = workload_kind_;
-//   attrs_[kConnTrackerTable.ColIndex(kNamespace.name())] = namespace_;
-//   attrs_[kConnTrackerTable.ColIndex(kHost.name())] = pod_name_;
-//   MarkPodMetaAttached();
-// }
+  attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = arms_app_id_;
+  attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = arms_app_name_;
+  attrs_[kConnTrackerTable.ColIndex(kPodName.name())] = pod_name_;
+  attrs_[kConnTrackerTable.ColIndex(kPodIp.name())] = pod_ip_;
+  attrs_[kConnTrackerTable.ColIndex(kWorkloadName.name())] = workload_name_;
+  attrs_[kConnTrackerTable.ColIndex(kWorkloadKind.name())] = workload_kind_;
+  attrs_[kConnTrackerTable.ColIndex(kNamespace.name())] = namespace_;
+  attrs_[kConnTrackerTable.ColIndex(kHost.name())] = pod_name_;
+  MarkPodMetaAttached();
+}
 
 void ConnTracker::UpdatePeerPodMetaForExternal() {
-  std::unique_lock<std::shared_mutex> lk(mtx_);
+  WriteLock lock(mReadWriteLock);
   attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
   attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
   attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
@@ -151,7 +151,7 @@ void ConnTracker::UpdatePeerPodMetaForExternal() {
   MarkPeerPodMetaAttached();
 }
 void ConnTracker::UpdatePeerPodMetaForLocalhost() {
-  std::unique_lock<std::shared_mutex> lk(mtx_);
+  WriteLock lock(mReadWriteLock);
   attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "localhost";
   attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "localhost";
   attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "localhost";
@@ -164,7 +164,7 @@ void ConnTracker::UpdatePeerPodMetaForLocalhost() {
   MarkPeerPodMetaAttached();
 }
 void ConnTracker::UpdateSelfPodMetaForUnknown() {
-  std::unique_lock<std::shared_mutex> lk(mtx_);
+  WriteLock lock(mReadWriteLock);
   attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = "unknown";
   attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = "unknown";
   attrs_[kConnTrackerTable.ColIndex(kPodIp.name())] = "unknown";
@@ -175,53 +175,53 @@ void ConnTracker::UpdateSelfPodMetaForUnknown() {
   MarkPodMetaAttached();
 }
 
-// void ConnTracker::UpdatePeerPodMeta(std::unique_ptr<PodMeta>& pod) {
-//   std::unique_lock<std::shared_mutex> lk(mtx_);
-//   if (!pod) {
-//     // no meta info ...
-//     attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = "external";
-//     attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = "external";
-//     MarkPeerPodMetaAttached();
-//     return;
-//   }
-//   // set workloadKind
-//   peer_service_name_ = pod->service_name_;
-//   peer_arms_app_name_ = pod->app_name_;
-//   peer_pod_ip_ = pod->pod_ip_;
-//   peer_pod_name_ = pod->pod_name_;
-//   peer_workload_kind_ = pod->workload_kind_;
-//   peer_workload_name_ = pod->workload_name_;
-//   peer_namespace_ = pod->namespace_;
+void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod) {
+  WriteLock lock(mReadWriteLock);
+  if (!pod) {
+    // no meta info ...
+    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = "external";
+    MarkPeerPodMetaAttached();
+    return;
+  }
+  // set workloadKind
+  peer_service_name_ = pod->serviceName;
+  peer_arms_app_name_ = pod->appName;
+  peer_pod_ip_ = pod->podIp;
+  peer_pod_name_ = pod->podName;
+  peer_workload_kind_ = pod->workloadKind;
+  peer_workload_name_ = pod->workloadName;
+  peer_namespace_ = pod->k8sNamespace;
 
-//   attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = peer_arms_app_name_.size() ? peer_workload_name_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_workload_name_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_workload_name_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_workload_name_ : "unknown";
-//   attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = peer_service_name_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = peer_arms_app_name_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = peer_service_name_.size() ? peer_workload_name_ : "unknown";
 
-//   if (role == IsClient) {
-//     if (peer_arms_app_name_.size()) {
-//       attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_arms_app_name_;
-//     } else if (peer_workload_name_.size()) {
-//       attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_workload_name_;
-//     } else if (peer_service_name_.size()) {
-//       attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_service_name_;
-//     } else {
-//       attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = "unknown";
-//     }
+  if (role == IsClient) {
+    if (peer_arms_app_name_.size()) {
+      attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_arms_app_name_;
+    } else if (peer_workload_name_.size()) {
+      attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_workload_name_;
+    } else if (peer_service_name_.size()) {
+      attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_service_name_;
+    } else {
+      attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = "unknown";
+    }
 
-//     attrs_[kConnTrackerTable.ColIndex(kEndpoint.name())] = dip_;
-//   }
+    attrs_[kConnTrackerTable.ColIndex(kEndpoint.name())] = dip_;
+  }
 
-//   MarkPeerPodMetaAttached();
-// }
+  MarkPeerPodMetaAttached();
+}
 
 /**
  * TODO @qianlu.kk
@@ -229,7 +229,7 @@ void ConnTracker::UpdateSelfPodMetaForUnknown() {
  */
 
 void ConnTracker::UpdateConnState(struct conn_ctrl_event_t *event) {
-  std::unique_lock<std::shared_mutex> lk(mtx_);
+  WriteLock lock(mReadWriteLock);
   if (EventClose == event->type) {
     this->MarkClose();
   } else if (EventConnect == event->type) {
@@ -239,19 +239,20 @@ void ConnTracker::UpdateConnState(struct conn_ctrl_event_t *event) {
 }
 
 void ConnTracker::UpdateConnStats(struct conn_stats_event_t *event) {
-  std::unique_lock<std::shared_mutex> lk(mtx_);
+  WriteLock lock(mReadWriteLock);
   if (event->conn_events == StatusClose) {
     MarkClose();
   }
 
-  if (event->ts <= this->last_update_timestamp) {
+  int64_t tt = static_cast<int64_t>(event->ts);
+  if (tt <= this->last_update_timestamp) {
     return;
   }
 
-  this->last_update_timestamp = event->ts;
+  this->last_update_timestamp = tt;
 
   if (this->role != IsUnknown && this->role != event->role) {
-    LOG_WARNING(sLogger, ("role change!! last role", magic_enum::enum_name(this->role)) ("new role", magic_enum::enum_name(event->role)));
+    LOG_WARNING(sLogger, ("role change!! last role", int(this->role)) ("new role", int(event->role)));
   } else {
     // set role
     this->role = event->role;
@@ -260,7 +261,7 @@ void ConnTracker::UpdateConnStats(struct conn_stats_event_t *event) {
 
   if (event->protocol != support_proto_e::ProtoUnknown) {
     if (this->protocol_ != ProtocolType::UNKNOWN && int(protocol_) != int(event->protocol)) {
-        LOG_WARNING(sLogger, ("protocol change!! last protocol", magic_enum::enum_name(this->protocol_)) ("new protocol", magic_enum::enum_name(event->protocol)));
+        LOG_WARNING(sLogger, ("protocol change!! last protocol", int(this->protocol_)) ("new protocol", int(event->protocol)));
     } else {
       // LOG(WARNING) << " last protocol:" << int(protocol_) << " new role:" << int(event->protocol) << " tgid:" << this->conn_id_.tgid << " fd:" << this->conn_id_.fd << " start:" << this->conn_id_.start;
       UpdateProtocol(ProtocolType(event->protocol));
@@ -295,22 +296,22 @@ std::string AddrString(int family, uint32_t addr) {
 }
 
 std::string ConnTracker::GetSourceIp() {
-  std::shared_lock<std::shared_mutex> lk(mtx_);
+  ReadLock lock(mReadWriteLock);
   return sip_;
 }
 
 std::string ConnTracker::GetRemoteIp() {
-  std::shared_lock<std::shared_mutex> lk(mtx_);
+  ReadLock lock(mReadWriteLock);
   return dip_;
 }
 
 std::string ConnTracker::GetSourceAddr() {
-  std::shared_lock<std::shared_mutex> lk(mtx_);
+  ReadLock lock(mReadWriteLock);
   return saddr_;
 }
 
 std::string ConnTracker::GetRemoteAddr() {
-  std::shared_lock<std::shared_mutex> lk(mtx_);
+  ReadLock lock(mReadWriteLock);
   return daddr_;
 }
 

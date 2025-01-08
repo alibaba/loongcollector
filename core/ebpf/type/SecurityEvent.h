@@ -222,5 +222,45 @@ public:
   // uint64_t bytes;
 };
 
+class FileSecurityNode : public BaseSecurityNode {
+public:
+  FileSecurityNode(uint32_t _pid, uint64_t ktime,
+      uint16_t& protocol, uint16_t& family, uint32_t& saddr, 
+      uint32_t& daddr, uint16_t& sport, uint16_t& dport, uint32_t& net_ns) 
+      : BaseSecurityNode(_pid, ktime), protocol_(protocol), family_(family), saddr_(saddr), daddr_(daddr), sport_(sport), dport_(dport), net_ns_(net_ns) {}
+  // network attributes ...
+  uint16_t protocol_;
+  uint16_t family_;
+  uint32_t saddr_; // Source address
+  uint32_t daddr_; // Destination address
+  uint16_t sport_; // Source port
+  uint16_t dport_; // Destination port
+  uint32_t net_ns_; // Network namespace
+  // set in inner events ...
+  // uint64_t timestamp;
+  // uint16_t state;
+  // uint64_t bytes;
+};
+
+class ProcessSecurityNode : public BaseSecurityNode {
+public:
+  ProcessSecurityNode(uint32_t _pid, uint64_t ktime,
+      uint16_t& protocol, uint16_t& family, uint32_t& saddr, 
+      uint32_t& daddr, uint16_t& sport, uint16_t& dport, uint32_t& net_ns) 
+      : BaseSecurityNode(_pid, ktime), protocol_(protocol), family_(family), saddr_(saddr), daddr_(daddr), sport_(sport), dport_(dport), net_ns_(net_ns) {}
+  // network attributes ...
+  uint16_t protocol_;
+  uint16_t family_;
+  uint32_t saddr_; // Source address
+  uint32_t daddr_; // Destination address
+  uint16_t sport_; // Source port
+  uint16_t dport_; // Destination port
+  uint32_t net_ns_; // Network namespace
+  // set in inner events ...
+  // uint64_t timestamp;
+  // uint16_t state;
+  // uint64_t bytes;
+};
+
 }
 }

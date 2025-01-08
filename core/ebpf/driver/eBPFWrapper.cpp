@@ -9,7 +9,8 @@ extern "C" {
 #include <iostream>
 #include <atomic>
 
-namespace nami {
+namespace logtail {
+namespace ebpf {
 
 void* PerfThreadWoker(void *ctx, const std::string& name, std::atomic<bool>& flag) {
   int err;
@@ -58,5 +59,5 @@ cleanup:
   perf_buffer__free(pb);
   return nullptr;
 }
-
+}
 }

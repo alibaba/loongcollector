@@ -27,114 +27,114 @@
 namespace logtail {
 namespace ebpf {
 
-class BaseBPFMonitor {
-public:
-    virtual void HandleStatistic(nami::eBPFStatistics& stats);
-    virtual void InitMetric();
-    virtual void ReleaseMetric();
-    virtual ~BaseBPFMonitor() = default;
+// class BaseBPFMonitor {
+// public:
+//     virtual void HandleStatistic(nami::eBPFStatistics& stats);
+//     virtual void InitMetric();
+//     virtual void ReleaseMetric();
+//     virtual ~BaseBPFMonitor() = default;
 
-protected:
-    BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) : mPipelineName(name), mPluginMetricMgr(mgr) {}
+// protected:
+//     BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) : mPipelineName(name), mPluginMetricMgr(mgr) {}
 
-    // attention: not thread safe!!
-    void InitMetricInner();
+//     // attention: not thread safe!!
+//     void InitMetricInner();
 
-    // attention: not thread safe!!
-    void UpdateMetricInner(nami::eBPFStatistics& currStat);
+//     // attention: not thread safe!!
+//     void UpdateMetricInner(nami::eBPFStatistics& currStat);
 
-    std::string mPipelineName;
-    PluginMetricManagerPtr mPluginMetricMgr;
-    // MetricsRecordRef& mRef;
-    std::vector<std::pair<ReentrantMetricsRecordRef, MetricLabels>> mRefAndLabels;
+//     std::string mPipelineName;
+//     PluginMetricManagerPtr mPluginMetricMgr;
+//     // MetricsRecordRef& mRef;
+//     std::vector<std::pair<ReentrantMetricsRecordRef, MetricLabels>> mRefAndLabels;
 
-    std::atomic_bool mMetricInited = false;
+//     std::atomic_bool mMetricInited = false;
 
-    CounterPtr mRecvKernelEventsTotal;
-    CounterPtr mLossKernelEventsTotal;
-    CounterPtr mPushEventsTotal;
-    CounterPtr mPushSpansTotal;
-    CounterPtr mPushMetricsTotal;
-    IntGaugePtr mProcessCacheEntitiesNum;
-    CounterPtr mProcessCacheMissTotal;
+//     CounterPtr mRecvKernelEventsTotal;
+//     CounterPtr mLossKernelEventsTotal;
+//     CounterPtr mPushEventsTotal;
+//     CounterPtr mPushSpansTotal;
+//     CounterPtr mPushMetricsTotal;
+//     IntGaugePtr mProcessCacheEntitiesNum;
+//     CounterPtr mProcessCacheMissTotal;
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class eBPFServerUnittest;
-#endif
-};
+// #ifdef APSARA_UNIT_TEST_MAIN
+//     friend class eBPFServerUnittest;
+// #endif
+// };
 
-class NetworkObserverSelfMonitor : public BaseBPFMonitor {
-public:
-    NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr /**/) : BaseBPFMonitor(name, mgr) {}
+// class NetworkObserverSelfMonitor : public BaseBPFMonitor {
+// public:
+//     NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr /**/) : BaseBPFMonitor(name, mgr) {}
 
-    void InitMetric() override;
+//     void InitMetric() override;
 
-    void HandleStatistic(nami::eBPFStatistics& stats) override;
+//     void HandleStatistic(nami::eBPFStatistics& stats) override;
 
-private:
-    // recv kernel events metric
-    CounterPtr mRecvConnStatsTotal;
-    CounterPtr mRecvCtrlEventsTotal;
-    CounterPtr mRecvHTTPDataEventsTotal;
+// private:
+//     // recv kernel events metric
+//     CounterPtr mRecvConnStatsTotal;
+//     CounterPtr mRecvCtrlEventsTotal;
+//     CounterPtr mRecvHTTPDataEventsTotal;
 
-    // cache relative metric
-    IntGaugePtr mConnTrackerNum;
+//     // cache relative metric
+//     IntGaugePtr mConnTrackerNum;
 
-    // protocol parsing metric
-    CounterPtr mParseHTTPEventsSuccessTotal;
-    CounterPtr mParseHTTPEventsFailTotal;
+//     // protocol parsing metric
+//     CounterPtr mParseHTTPEventsSuccessTotal;
+//     CounterPtr mParseHTTPEventsFailTotal;
 
-    // aggregation relative metric
-    IntGaugePtr mAggMapEntitiesNum;
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class eBPFServerUnittest;
-#endif
-};
+//     // aggregation relative metric
+//     IntGaugePtr mAggMapEntitiesNum;
+// #ifdef APSARA_UNIT_TEST_MAIN
+//     friend class eBPFServerUnittest;
+// #endif
+// };
 
-class NetworkSecuritySelfMonitor : public BaseBPFMonitor {
-public:
-    NetworkSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
+// class NetworkSecuritySelfMonitor : public BaseBPFMonitor {
+// public:
+//     NetworkSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
 
-    void HandleStatistic(nami::eBPFStatistics& stats) override {
-        if (!stats.updated_)
-            return;
-        UpdateMetricInner(stats);
-    }
-};
+//     void HandleStatistic(nami::eBPFStatistics& stats) override {
+//         if (!stats.updated_)
+//             return;
+//         UpdateMetricInner(stats);
+//     }
+// };
 
-class ProcessSecuritySelfMonitor : public BaseBPFMonitor {
-public:
-    ProcessSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
-};
+// class ProcessSecuritySelfMonitor : public BaseBPFMonitor {
+// public:
+//     ProcessSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
+// };
 
-class FileSecuritySelfMonitor : public BaseBPFMonitor {
-public:
-    FileSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
-};
+// class FileSecuritySelfMonitor : public BaseBPFMonitor {
+// public:
+//     FileSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
+// };
 
-/**
- * eBPFSelfMonitorMgr is only used to manage the self-monitoring data in libnetwork_observer.so, updating the
- * statistics through callbacks.
- */
-class eBPFSelfMonitorMgr {
-public:
-    eBPFSelfMonitorMgr();
-    void
-    Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
-    void Release(const nami::PluginType type);
-    void Suspend(const nami::PluginType type);
-    void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
+// /**
+//  * eBPFSelfMonitorMgr is only used to manage the self-monitoring data in libnetwork_observer.so, updating the
+//  * statistics through callbacks.
+//  */
+// class eBPFSelfMonitorMgr {
+// public:
+//     eBPFSelfMonitorMgr();
+//     void
+//     Init(const logtail::ebpf::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
+//     void Release(const logtail::ebpf::PluginType type);
+//     void Suspend(const logtail::ebpf::PluginType type);
+//     void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
 
-private:
-    // `mLock` is used to protect mSelfMonitors
-    ReadWriteLock mLock;
-    std::array<std::unique_ptr<BaseBPFMonitor>, int(nami::PluginType::MAX)> mSelfMonitors = {};
-    std::array<std::atomic_bool, int(nami::PluginType::MAX)> mInited = {};
+// private:
+//     // `mLock` is used to protect mSelfMonitors
+//     ReadWriteLock mLock;
+//     std::array<std::unique_ptr<BaseBPFMonitor>, int(logtail::ebpf::PluginType::MAX)> mSelfMonitors = {};
+//     std::array<std::atomic_bool, int(logtail::ebpf::PluginType::MAX)> mInited = {};
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class eBPFServerUnittest;
-#endif
-};
+// #ifdef APSARA_UNIT_TEST_MAIN
+//     friend class eBPFServerUnittest;
+// #endif
+// };
 
 } // namespace ebpf
 } // namespace logtail

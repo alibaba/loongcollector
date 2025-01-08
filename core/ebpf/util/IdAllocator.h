@@ -10,7 +10,7 @@ namespace ebpf {
 template<typename BPFMap>
 class IdManager {
 public:
-    IdManager() : mIdMax(nami::BPFMapTraits<BPFMap>::outter_max_entries) {}
+    IdManager() : mIdMax(logtail::ebpf::BPFMapTraits<BPFMap>::outter_max_entries) {}
     int GetMaxId() { return mIdMax; }
     int GetNextId() {
         std::lock_guard<std::mutex> lock(mMtx);

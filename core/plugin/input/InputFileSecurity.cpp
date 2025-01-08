@@ -27,11 +27,11 @@ const std::string InputFileSecurity::sName = "input_file_security";
 
 bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY)) {
+    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -53,16 +53,16 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
 
 bool InputFileSecurity::Start() {
     return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, nami::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+        mContext->GetConfigName(), mIndex, logtail::ebpf::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
 }
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::FILE_SECURITY);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
     // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
-    ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), nami::PluginType::FILE_SECURITY);
+    ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
     return true;
 }
 

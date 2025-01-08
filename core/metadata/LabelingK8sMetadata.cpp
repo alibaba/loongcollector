@@ -16,17 +16,19 @@
 
 #include "LabelingK8sMetadata.h"
 
-#include <string>
 #include <vector>
-
-#include "K8sMetadata.h"
+#include <string>
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/SpanEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include <boost/utility/string_view.hpp>
+#include "K8sMetadata.h"
 
-using logtail::StringView;
+#include "constants/TagConstants.h"
+
+using logtail::StringView; 
 
 namespace logtail {
 
@@ -37,17 +39,19 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     EventsContainer& events = logGroup.MutableEvents();
     std::vector<std::string> containerVec;
     std::vector<std::string> remoteIpVec;
-    std::vector<size_t> cotainerNotTag;
+    std::vector<size_t>  cotainerNotTag;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
         if (!ProcessEvent(events[rIdx], containerVec, remoteIpVec)) {
             cotainerNotTag.push_back(rIdx);
         }
     }
+    bool remoteStatus;
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (!k8sMetadata.GetByContainerIdsFromServer(containerVec))) {
+    if (containerVec.empty() || (k8sMetadata.GetByContainerIdsFromServer(containerVec, remoteStatus).size() != containerVec.size())) {
         return;
     }
-    if (remoteIpVec.empty() || (!k8sMetadata.GetByIpsFromServer(remoteIpVec))) {
+
+    if (remoteIpVec.empty() || (k8sMetadata.GetByIpsFromServer(remoteIpVec, remoteStatus).size() != remoteIpVec.size())) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
@@ -56,9 +60,7 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     return;
 }
 
-bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e,
-                                       std::vector<std::string>& containerVec,
-                                       std::vector<std::string>& remoteIpVec) {
+bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec) {
     if (!IsSupportedEvent(e)) {
         return true;
     }
@@ -73,13 +75,11 @@ bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e,
 }
 
 template <typename Event>
-bool LabelingK8sMetadata::AddLabels(Event& e,
-                                    std::vector<std::string>& containerVec,
-                                    std::vector<std::string>& remoteIpVec) {
+bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec) {
     bool res = true;
-
+    
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    StringView containerIdViewKey(containerIdKey);
+    StringView containerIdViewKey(containerIdKeyFromTags);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
@@ -88,14 +88,13 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
             containerVec.push_back(containerId);
             res = false;
         } else {
-            e.SetTag(workloadNameKey, containerInfo->workloadName);
-            e.SetTag(workloadKindKey, containerInfo->workloadKind);
-            e.SetTag(namespaceKey, containerInfo->k8sNamespace);
-            e.SetTag(serviceNameKey, containerInfo->serviceName);
-            e.SetTag(pidKey, containerInfo->appId);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME, containerInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND, containerInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_NAMESPACE, containerInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_SERVICE_NAME, containerInfo->serviceName);
         }
     }
-    StringView ipView(remoteIpKey);
+    StringView ipView(remoteIpKeyFromTag);
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
@@ -104,9 +103,9 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
             remoteIpVec.push_back(remoteIp);
             res = false;
         } else {
-            e.SetTag(peerWorkloadNameKey, ipInfo->workloadName);
-            e.SetTag(peerWorkloadKindKey, ipInfo->workloadKind);
-            e.SetTag(peerNamespaceKey, ipInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME, ipInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND, ipInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE, ipInfo->k8sNamespace);
         }
     }
     return res;

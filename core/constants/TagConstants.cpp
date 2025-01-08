@@ -86,6 +86,25 @@ const string DEFAULT_METRIC_TAG_CONTAINER_IP = "container_ip";
 const string DEFAULT_METRIC_TAG_IMAGE_NAME = "image_name";
 
 ////////////////////////// TRACE ////////////////////////
+    const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE = "k8s.namespace.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE = "k8s.peer.namespace.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME = "k8s.pod.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME = "k8s.pod.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_UID = "k8s.pod.uid";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_IP = "k8s.pod.ip";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_IP = "k8s.peer.pod.ip";
+    const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND = "k8s.workload.kind";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND = "k8s.peer.workload.kind";
+    const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME = "k8s.workload.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME = "k8s.peer.workload.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_SERVICE_NAME = "k8s.service.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_SERVICE_NAME = "k8s.peer.service.name";
+    const std::string DEFAULT_TRACE_TAG_HOST_NAME = "host.name";
+    const std::string DEFAULT_TRACE_TAG_HOST_IP = "host.ip";
+    const std::string DEFAULT_TRACE_TAG_PROCESS_PID = "process.pid";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_NAME = "container.name";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_ID = "container.id";
+    const std::string DEFAULT_TRACE_TAG_IMAGE_NAME = "container.image.name";
 
 
 } // namespace logtail
