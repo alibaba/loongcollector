@@ -180,7 +180,7 @@ void ExactlyOnceQueueManagerUnittest::TestPushProcessQueue() {
     // invalid to push
     sManager->mProcessQueues[0]->mValidToPush = false;
     APSARA_TEST_FALSE(sManager->IsValidToPushProcessQueue(0));
-    APSARA_TEST_EQUAL(QueueStatus::OK, sManager->PushProcessQueue(0, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sManager->PushProcessQueue(0, GenerateProcessItem()));
 }
 
 void ExactlyOnceQueueManagerUnittest::TestIsAllProcessQueueEmpty() {
