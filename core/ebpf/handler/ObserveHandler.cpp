@@ -195,8 +195,8 @@ const static std::string service_name_key = "service.name";
 const static std::string host_ip_key = "host.ip";
 const static std::string host_name_key = "host.name";
 
-const static std::string app_id_key = "arms.appId";
-const static std::string ip_key = "ip";
+// const static std::string app_id_key = "arms.appId";
+// const static std::string ip_key = "ip";
 
 const static std::string rpc_request_total_count = "arms_rpc_requests_count";
 const static std::string rpc_request_slow_count = "arms_rpc_requests_slow_count";
