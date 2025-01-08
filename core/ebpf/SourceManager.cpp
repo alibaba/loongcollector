@@ -173,12 +173,8 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     mFuncs[static_cast<int>(ebpf_func::EBPF_SUSPEND_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(suspend_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_RESUME_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(resume_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)] = LOAD_EBPF_FUNC_ADDR(poll_plugin_pbs);
-
-    // load address 
-    // mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_cleanup_dog);
-    // mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_role);
-    // mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_disable_process);
-    // mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_addr);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)] = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)] = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
@@ -187,13 +183,14 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
 
     // load offset ...
     if (!LoadCoolBPF()) {
+        LOG_ERROR(sLogger, ("failed to load coolbpf", ""));
         return false;
     }
 
     // set global logger ...
     auto eBPFSetLogger = (set_logger_func)mFuncs[static_cast<int>(ebpf_func::EBPF_SET_LOGGER)];
     if (!eBPFSetLogger) {
-        LOG_WARNING(sLogger, ("cannot set logger for ebpf driver, case set_logger func was load incorrectly ... ", "please check"));
+        LOG_WARNING(sLogger, ("cannot set logger for ebpf driver, because set_logger func was load incorrectly ... ", "please check"));
     } else {
         eBPFSetLogger(mLogPrinter);
     }
@@ -226,6 +223,8 @@ bool SourceManager::LoadCoolBPF() {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf funcs addr, path", mBinaryPath));
         return false;
     }
+
+    mCoolbpfLib = std::move(tmp_lib);
     
     return true;
 }
@@ -249,6 +248,36 @@ bool SourceManager::CheckPluginRunning(logtail::ebpf::PluginType plugin_type) {
     }
 
     return mRunning[int(plugin_type)];
+}
+
+bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
+    if (!DynamicLibSuccess()) {
+        return false;
+    }
+    void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)];
+    if (!f) {
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, set networkobserver config func ptr is null", ""));
+        return false;
+    }
+
+    auto func = (set_networkobserver_config_func)f;
+    func(key, value);
+    return true;
+}
+
+bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
+    if (!DynamicLibSuccess()) {
+        return false;
+    }
+    void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)];
+    if (!f) {
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, set networkobserver config func ptr is null", ""));
+        return false;
+    }
+
+    auto func = (set_networkobserver_cid_filter_func)f;
+    func(cid.c_str(), cid.size(), update);
+    return true;
 }
 
 int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents, int32_t * flag, int timeoutMs) {

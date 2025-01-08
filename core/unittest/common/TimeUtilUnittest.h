@@ -33,6 +33,7 @@ public:
     void TestNativeStrptimeFormat();
     void TestStrptimeNanosecond();
     void TestGetPreciseTimestampFromLogtailTime();
+    void TestBootTimeDiff();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
@@ -40,6 +41,13 @@ APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestBootTimeDiff, 0);
+
+void TimeUtilUnittest::TestBootTimeDiff() {
+    auto diff =GetTimeDiffFromBoot();
+    uint64_t num = static_cast<uint64_t>(diff.count());
+    APSARA_TEST_GE(num, (uint64_t)0);
+}
 
 void TimeUtilUnittest::TestDeduceYear() {
     struct Case {

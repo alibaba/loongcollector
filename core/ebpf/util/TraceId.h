@@ -21,7 +21,12 @@
 namespace logtail {
 namespace ebpf {
 
-// static std::array<uint8_t, 16> GenerateSpanID();
+std::array<uint8_t, 32> GenerateTraceID();
+std::string FromTraceId(const std::array<uint8_t, 32>&);
+
+std::array<uint8_t, 16> GenerateSpanID();
+std::string FromSpanId(const std::array<uint8_t, 16>&);
+
 
 }
 }

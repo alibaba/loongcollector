@@ -1,13 +1,14 @@
 #include "FileSecurityManager.h"
 #include "logger/Logger.h"
 #include "ebpf/util/IdAllocator.h"
+#include "ebpf/Config.h"
 
 namespace logtail {
 namespace ebpf {
 
-int FileSecurityManager::Init(std::unique_ptr<logtail::ebpf::PluginConfig> cfg) {
+int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
     // set init flag ...
-    flag_ = true;
+    mFlag = true;
 
     int ret = 0;
     // step1. setup tail call

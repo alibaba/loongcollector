@@ -129,7 +129,7 @@ private:
 
     // hold some managers ...
     std::unique_ptr<BaseManager> mBaseManager;
-    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins;
+    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

@@ -94,4 +94,7 @@ bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond);
 bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffsetSecond);
 
 std::string NumberToDigitString(uint32_t number, uint8_t length);
+
+std::chrono::nanoseconds GetTimeDiffFromBoot();
+
 } // namespace logtail

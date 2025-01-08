@@ -29,6 +29,7 @@
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
+#include "metadata/K8sMetadata.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -207,6 +208,7 @@ void eBPFServer::Stop() {
         mFileSecureCB->UpdateContext(nullptr, -1, -1);
 }
 
+// maybe update or create 
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                                      uint32_t plugin_index,
                                      PluginType type,
@@ -230,8 +232,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     bool ret = false;
     auto eBPFConfig = std::make_unique<logtail::ebpf::PluginConfig>();
     eBPFConfig->mPluginType = type;
-    // TODO 
-    // eBPFConfig->stats_handler_ = [this](auto& stats) { return mMonitorMgr->HandleStatistic(stats); };
     // call update function
     // step2: call init function
     switch (type) {
@@ -254,48 +254,19 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
         case logtail::ebpf::PluginType::NETWORK_OBSERVE: {
             logtail::ebpf::NetworkObserveConfig nconfig;
 
+            // TODO @qianlu.kk register k8s metadata callback for metric ??
+            
+            mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             auto idx = static_cast<int>(PluginType::NETWORK_OBSERVE);
             mPlugins[idx] = NetworkObserverManager::Create(
                 mBaseManager, 
-                mSourceManager,
-                [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events){
+                mSourceManager, 
+                [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
                     mEventCB->handle(events);
                 }
             );
 
-            eBPFConfig->mConfig = std::move(nconfig);
-            ret = (mPlugins[idx]->Init(std::move(eBPFConfig)) == 0);
-            // TODO @qianlu.kk set new handler ...
-
-            // nconfig.enable_cid_filter = false;
-            // logtail::ebpf::ObserverNetworkOption* opts = std::get<logtail::ebpf::ObserverNetworkOption*>(options);
-            // if (opts->mEnableMetric) {
-            //     nconfig.enable_metric_ = true;
-            //     nconfig.measure_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchMeasure>>& events, auto ts) {
-            //         return mMeterCB->handle(events, ts);
-            //     };
-            //     nconfig.enable_metric_ = true;
-            //     mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // }
-            // if (opts->mEnableSpan) {
-            //     nconfig.enable_span_ = true;
-            //     nconfig.span_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchSpan>>& events) {
-            //         return mSpanCB->handle(events);
-            //     };
-            //     nconfig.enable_span_ = true;
-            //     mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // }
-            // if (opts->mEnableLog) {
-            //     nconfig.enable_event_ = true;
-            //     nconfig.event_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
-            //         return mEventCB->handle(events);
-            //     };
-            //     nconfig.enable_event_ = true;
-            //     mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // }
-
-            
-            // ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            ret = (mPlugins[idx]->Init(options) == 0);
             break;
         }
 
@@ -306,12 +277,12 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             // nconfig.network_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
             //     return mNetworkSecureCB->handle(events);
             // };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            nconfig.options_ = opts->mOptionList;
-            eBPFConfig->mConfig = std::move(nconfig);
-            // UpdateContext must ahead of StartPlugin
-            mNetworkSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            // SecurityOptions* opts = std::get<SecurityOptions*>(options);
+            // nconfig.options_ = opts->mOptionList;
+            // eBPFConfig->mConfig = std::move(nconfig);
+            // // UpdateContext must ahead of StartPlugin
+            // mNetworkSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            // ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
             break;
         }
 
@@ -322,12 +293,12 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             // fconfig.file_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
             //     return mFileSecureCB->handle(events);
             // };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            fconfig.options_ = opts->mOptionList;
-            eBPFConfig->mConfig = std::move(fconfig);
-            // UpdateContext must ahead of StartPlugin
-            mFileSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            // SecurityOptions* opts = std::get<SecurityOptions*>(options);
+            // fconfig.options_ = opts->mOptionList;
+            // eBPFConfig->mConfig = std::move(fconfig);
+            // // UpdateContext must ahead of StartPlugin
+            // mFileSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            // ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
             break;
         }
         default:

@@ -198,13 +198,13 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
   peer_workload_name_ = pod->workloadName;
   peer_namespace_ = pod->k8sNamespace;
 
-  attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = peer_arms_app_name_.size() ? peer_workload_name_ : "unknown";
-  attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_workload_name_ : "unknown";
-  attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = peer_arms_app_name_.size() ? peer_arms_app_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_pod_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_pod_ip_ : "unknown";
   attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
   attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
-  attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_workload_name_ : "unknown";
-  attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = peer_service_name_.size() ? peer_workload_name_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_namespace_ : "unknown";
+  attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = peer_service_name_.size() ? peer_service_name_ : "unknown";
 
   if (role == IsClient) {
     if (peer_arms_app_name_.size()) {
@@ -345,7 +345,7 @@ void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t *event) {
     if (std::regex_search(container_id_, match, rgx_)) {
         container_id_trim_ = match.str(0);
     }
-    // LOG(INFO) << "origin container_id:" << container_id_ << " trim:" << container_id_trim_ << " match pos:" << match.position();
+    LOG_DEBUG(sLogger, ("origin container_id", container_id_) ("trim", container_id_trim_) ("match pos", match.position()));
   }
 
   if (si.family == 0 && si.netns == 0 && si.ap.sport == 0 && si.ap.dport == 0) {

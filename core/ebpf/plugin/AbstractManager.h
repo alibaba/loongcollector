@@ -22,6 +22,8 @@
 
 #include "ebpf/SourceManager.h"
 #include "BaseManager.h"
+#include "ebpf/Config.h"
+#include "common/Lock.h"
 #include "ebpf/include/export.h"
 #include "ebpf/util/AggregateTree.h"
 #include "ebpf/type/SecurityEvent.h"
@@ -38,10 +40,10 @@ public:
     using configType = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter,
                      logtail::ebpf::SecurityNetworkFilter>;
     AbstractManager() = delete;
-    explicit AbstractManager(std::unique_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager) : mSourceManager(sourceManager) {}
+    explicit AbstractManager(std::unique_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager);
     virtual ~AbstractManager() {}
 
-    virtual int Init(std::unique_ptr<logtail::ebpf::PluginConfig>) = 0;
+    virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
 
     virtual int Destroy() = 0;
 
@@ -60,21 +62,22 @@ public:
     // }
 
     virtual void Suspend() {
-        std::lock_guard<std::mutex> lk(mtx_);
+        WriteLock lock(mMtx);
         // flag_ = false;
-        suspend_flag_ = true;
+        mSuspendFlag = true;
         return;
     }
 
     virtual void Resume() {
-        std::lock_guard<std::mutex> lk(mtx_);
-        suspend_flag_ = false;
+        WriteLock lock(mMtx);
+        mSuspendFlag = false;
         return;
     }
 
-    std::mutex mtx_;
-    std::atomic<bool> flag_ = false;
-    std::atomic<bool> suspend_flag_ = false;
+
+    mutable ReadWriteLock mMtx;
+    std::atomic<bool> mFlag = false;
+    std::atomic<bool> mSuspendFlag = false;
 protected:
     std::shared_ptr<SourceManager> mSourceManager;
     // int InitOrGetCallNameIdx(const std::string& call_name);
@@ -99,10 +102,10 @@ protected:
     //     call_name_indexes_[int(call_name)].clear();
     // }
 
-    BaseManager *base_mgr_;
-    std::chrono::nanoseconds time_diff_;
+    BaseManager *mBaseManager;
+    std::chrono::nanoseconds mTimeDiff;
     // call name to idx
-    std::unordered_map<std::string, int> call_name_2_idx_;
+    // std::unordered_map<std::string, int> call_name_2_idx_;
     // std::array<std::set<int>, SECURE_FUNCS_MAX> call_name_indexes_;
 
     // std::queue<std::string> enable_callnames_;

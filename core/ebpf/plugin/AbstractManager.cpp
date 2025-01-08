@@ -15,9 +15,13 @@
 #include "logger/Logger.h"
 #include "AbstractManager.h"
 #include <security/type.h>
+#include "common/TimeUtil.h"
 
 namespace logtail {
 namespace ebpf {
+
+AbstractManager::AbstractManager(std::unique_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager) 
+    : mSourceManager(sourceManager) { mTimeDiff = GetTimeDiffFromBoot();}
 
 int AbstractManager::GetCallNameIdx(const std::string& callName) {
     if (callName == "security_file_permission") return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION;

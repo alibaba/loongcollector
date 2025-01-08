@@ -8,6 +8,7 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/plugin/BaseManager.h"
+#include "ebpf/Config.h"
 
 #include <security/type.h>
 
@@ -22,7 +23,7 @@ public:
     FileSecurityManager(std::unique_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager) : AbstractManager(baseMgr, sourceManager) {}
 
     ~FileSecurityManager();
-    int Init(std::unique_ptr<logtail::ebpf::PluginConfig>) override;
+    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
 
     void RecordFileEvent(file_data_t *event);

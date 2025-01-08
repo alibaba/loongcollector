@@ -17,10 +17,13 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <metadata/K8sMetadata.h>
+#include <unordered_set>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/Lock.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
 #include "logger/Logger.h"
@@ -47,7 +50,7 @@ namespace ebpf {
     }
 
 #define GENERATE_METRICS(FUNC_NAME, MEASURE_TYPE, INNER_TYPE, METRIC_NAME, FIELD_NAME) \
-    void FUNC_NAME(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t ts) { \
+    void FUNC_NAME(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t tsSec, uint64_t tsNano) { \
         if (measure->type_ != (MEASURE_TYPE)) { \
             return; \
         } \
@@ -60,7 +63,7 @@ namespace ebpf {
             event->SetTag(tag.first, tag.second); \
         } \
         event->SetName(METRIC_NAME); \
-        event->SetTimestamp(ts); \
+        event->SetTimestamp(tsSec, tsNano); \
         event->SetValue(UntypedSingleValue{(double)inner->FIELD_NAME}); \
     }
 
@@ -88,11 +91,17 @@ void OtelMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
-            LOG_WARNING(sLogger,
-                        ("configName", mCtx->GetConfigName())("pluginIdx",
-                                                              mPluginIdx)("[Otel Metrics] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(
+                    sLogger,
+                    ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
+            }
         }
     }
 }
@@ -130,6 +139,7 @@ void OtelSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
 }
 
 void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
+    LOG_DEBUG(sLogger, ("enter", "handler") ("size", events.size()) ("ctx null", (mCtx == nullptr)) ("mQueueKey", static_cast<int64_t>(mQueueKey)) ("mPluginIdx", mPluginIdx));
     if (events.empty()) {
         return;
     }
@@ -158,16 +168,32 @@ void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEven
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
-            LOG_WARNING(
-                sLogger,
-                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
+            } else {
+                LOG_DEBUG(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue success!", ""));
+            }
         }
     }
 }
 
 #ifdef __ENTERPRISE__
+
+const static std::string app_name_key = "service";
+const static std::string app_id_key = "pid";
+const static std::string ip_key = "serverIp";
+const static std::string host_key = "host";
+
+const static std::string app_id_key_span = "arms.appId";
+const static std::string service_name_key = "service.name";
+const static std::string host_ip_key = "host.ip";
+const static std::string host_name_key = "host.name";
 
 const static std::string app_id_key = "arms.appId";
 const static std::string ip_key = "ip";
@@ -198,7 +224,7 @@ GENERATE_METRICS(GenerateRequestsDurationSumMetrics,
                  rpc_request_status_count,
                  duration_ms_sum_)
 
-void GenerateRequestsStatusMetrics(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t ts) {
+void GenerateRequestsStatusMetrics(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t ts, uint64_t tsNano) {
     if (measure->type_ != MeasureType::MEASURE_TYPE_APP) {
         return;
     }
@@ -258,6 +284,12 @@ void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
     for (const auto& span : spans) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
+        eventGroup.SetTag(app_id_key_span, span->app_id_);
+        eventGroup.SetTag(service_name_key, span->app_name_);
+        eventGroup.SetTag(host_ip_key, span->host_ip_);
+        eventGroup.SetTag(host_name_key, span->host_name_);
+        eventGroup.SetTagNoCopy("data_type", "trace");
+        eventGroup.SetTagNoCopy("arms.app.type", "ebpf");
         eventGroup.SetTag(app_id_key, span->app_id_);
         for (const auto& x : span->single_spans_) {
             auto* spanEvent = eventGroup.AddSpanEvent();
@@ -275,17 +307,21 @@ void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
-            LOG_WARNING(
-                sLogger,
-                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+            }
         }
     }
 }
 
 void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures,
-                              uint64_t timestamp) {
+                              uint64_t tsSec) {
     if (measures.empty()) {
         return;
     }
@@ -293,26 +329,33 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         ;
         PipelineEventGroup eventGroup(sourceBuffer);
-
-        // source_ip
-        eventGroup.SetTag(std::string(app_id_key), appBatchMeasures->app_id_);
-        eventGroup.SetTag(std::string(ip_key), appBatchMeasures->ip_);
+        LOG_DEBUG(sLogger, ("receive measures size", measures.size()) ("second", tsSec) 
+            ("app name", appBatchMeasures->app_name_)
+            ("app id", appBatchMeasures->app_id_)
+            ("ip", appBatchMeasures->ip_)
+            ("host", appBatchMeasures->host_));
+        eventGroup.SetTag(app_name_key, appBatchMeasures->app_name_);
+        eventGroup.SetTag(app_id_key, appBatchMeasures->app_id_);
+        eventGroup.SetTag(ip_key, appBatchMeasures->ip_);
+        eventGroup.SetTag(host_key, appBatchMeasures->host_);
+        eventGroup.SetTagNoCopy("source", "ebpf");
+        eventGroup.SetTagNoCopy("data_type", "metric");
         for (const auto& measure : appBatchMeasures->measures_) {
             auto type = measure->type_;
             if (type == MeasureType::MEASURE_TYPE_APP) {
-                GenerateRequestsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsSlowMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsErrorMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsDurationSumMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsStatusMetrics(eventGroup, measure, timestamp);
+                GenerateRequestsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsSlowMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsErrorMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsDurationSumMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsStatusMetrics(eventGroup, measure, tsSec, 0);
             } else if (type == MeasureType::MEASURE_TYPE_NET) {
-                GenerateTcpDropTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRetransTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpConnectionTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRecvPktsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRecvBytesTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpSendPktsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpSendBytesTotalMetrics(eventGroup, measure, timestamp);
+                GenerateTcpDropTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRetransTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpConnectionTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRecvPktsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRecvBytesTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpSendPktsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpSendBytesTotalMetrics(eventGroup, measure, tsSec, 0);
             }
             mProcessTotalCnt++;
         }
@@ -320,11 +363,15 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
-            LOG_WARNING(
-                sLogger,
-                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Metrics] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Metrics] push queue failed!", ""));
+            }
         }
     }
 }

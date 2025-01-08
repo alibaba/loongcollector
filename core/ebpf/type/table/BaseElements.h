@@ -182,7 +182,7 @@ constexpr DataElement kStartTsNs = {
     "startTsNs",
     "startTsNs", // metric
     "startTsNs", // span
-    "startTsNs", // log
+    "start.ts.ns", // log
     "Request-response latency."
 };
 
@@ -190,7 +190,7 @@ constexpr DataElement kEndTsNs = {
     "endTsNs",
     "", // metric
     "endTsNs", // span
-    "endTsNs", // log
+    "end.ts.ns", // log
     "Request-response latency."
 };
 
@@ -198,7 +198,7 @@ constexpr DataElement kRegionId = {
     "region_id",
     "regionId", // metric
     "regionId", // span
-    "regionId", // log
+    "region.id", // log
     "region id",
     AggregationType::Level0
 };
@@ -216,7 +216,7 @@ constexpr DataElement kAppId = {
     "app_id",
     "pid", // metric
     "app.id", // span
-    "", // log
+    "arms.app.id", // log
     "arms app id",
     AggregationType::Level0
 };
@@ -299,8 +299,8 @@ constexpr DataElement kProtocol = {
 constexpr DataElement kRpcType = {
     "rpcType",
     "rpcType", // metric
-    "k8s.workload.kind", // span
-    "k8s.workload.kind", // log
+    "rpcType", // span
+    "rpcType", // log
     "arms rpc type",
     AggregationType::Level1,
 };
@@ -308,8 +308,8 @@ constexpr DataElement kRpcType = {
 constexpr DataElement kCallType = {
     "callType",
     "callType", // metric
-    "k8s.workload.kind", // span
-    "k8s.workload.kind", // log
+    "callType", // span
+    "call.type", // log
     "arms call type",
     AggregationType::NoAggregate,
 };

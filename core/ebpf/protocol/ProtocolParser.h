@@ -43,7 +43,8 @@ public:
         return instance;
     }
 
-    void Init();
+    bool AddParser(ProtocolType type);
+    bool RemoveParser(ProtocolType type);
 
     std::vector<std::unique_ptr<AbstractRecord>> Parse(ProtocolType type, std::unique_ptr<NetDataEvent> data);
 

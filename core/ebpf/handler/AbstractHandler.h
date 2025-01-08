@@ -29,6 +29,7 @@ public:
     AbstractHandler(const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
         : mCtx(ctx), mQueueKey(key), mPluginIdx(idx) {}
     void UpdateContext(const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
+        WriteLock lk(mCtxLock);
         mCtx = ctx;
         mQueueKey = key;
         mPluginIdx = index;
@@ -39,6 +40,7 @@ protected:
     logtail::QueueKey mQueueKey = 0;
     uint64_t mProcessTotalCnt = 0;
     uint32_t mPluginIdx = 0;
+    ReadWriteLock mCtxLock;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

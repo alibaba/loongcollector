@@ -31,8 +31,8 @@ struct ObserverNetworkOption {
     bool mEnableConnTrackerDump = false;
     bool mEnableSpan = false;
     bool mEnableMetric = false;
-    bool mEnableLog = true;
-    bool mEnableCidFilter = true;
+    bool mEnableLog = false;
+    bool mEnableCidFilter = false;
     std::vector<std::string> mEnableCids;
     std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;
@@ -112,8 +112,8 @@ struct NetworkObserveConfig {
 
     bool mEnableCidFilter = false;
 
-    std::vector<std::string> enable_container_ids_;
-    std::vector<std::string> disable_container_ids_;
+    std::vector<std::string> mEnableContainerIds;
+    std::vector<std::string> mDisableContainerIds;
 };
 
 struct ProcessConfig {
@@ -261,8 +261,8 @@ struct ApplicationBatchSpan {
 
 class SingleEvent {
 public:
-  explicit __attribute__((visibility("default"))) SingleEvent(){}
-  explicit __attribute__((visibility("default"))) SingleEvent(std::vector<std::pair<std::string, std::string>>&& tags, uint64_t ts)
+  explicit SingleEvent(){}
+  explicit SingleEvent(std::vector<std::pair<std::string, std::string>>&& tags, uint64_t ts)
     : tags_(tags), timestamp_(ts) {}
   std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
   uint64_t GetTimestamp() { return timestamp_; }
@@ -278,9 +278,9 @@ private:
 
 class ApplicationBatchEvent {
 public:
-  explicit __attribute__((visibility("default"))) ApplicationBatchEvent(){}
-  explicit __attribute__((visibility("default"))) ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags) : app_id_(app_id), tags_(tags) {}
-  explicit __attribute__((visibility("default"))) ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags, std::vector<std::unique_ptr<SingleEvent>>&& events) 
+  explicit ApplicationBatchEvent(){}
+  explicit ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags) : app_id_(app_id), tags_(tags) {}
+  explicit ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags, std::vector<std::unique_ptr<SingleEvent>>&& events) 
     : app_id_(app_id), tags_(std::move(tags)), events_(std::move(events)) {}
   void SetEvents(std::vector<std::unique_ptr<SingleEvent>>&& events) { events_ = std::move(events); }
   void AppendEvent(std::unique_ptr<SingleEvent>&& event) { events_.emplace_back(std::move(event)); }

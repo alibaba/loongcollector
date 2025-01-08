@@ -13,6 +13,7 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ConnTrackerManager.h"
 #include "Worker.h"
+#include "ebpf/Config.h"
 #include "ebpf/plugin/BaseManager.h"
 #include "ebpf/util/FrequencyManager.h"
 
@@ -24,17 +25,22 @@ template class WorkerFunc<std::unique_ptr<NetDataEvent>, std::unique_ptr<Abstrac
 
 class NetworkObserverManager : public AbstractManager {
 public:
+    using LogHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)>;
+    using MeterHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>&)>;
+    using SpanHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&)>;
+
     static std::shared_ptr<NetworkObserverManager> Create(std::unique_ptr<BaseManager>& mgr, std::shared_ptr<SourceManager> sourceManager, 
         std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> flusher) {
         return std::make_shared<NetworkObserverManager>(mgr, sourceManager, flusher);
     }
+
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() {}
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     explicit NetworkObserverManager(std::unique_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)> flusher) 
         : AbstractManager(baseMgr, sourceManager), mFlusher(flusher) {}
     
-    int Init(std::unique_ptr<logtail::ebpf::PluginConfig>) override;
+    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
     int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
     int DisableCallName(const std::string& call_name) override { return 0; }
@@ -58,6 +64,11 @@ private:
     void ConsumeRecordsAsEvent(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
     
     void RunInThread();
+
+    bool UpdateParsers(const std::vector<std::string>& protocols);
+
+    int StartAggregator();
+    int StopAggregator();
 
     std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> mFlusher;
 
@@ -107,6 +118,16 @@ private:
 
     FrequencyManager mPollKernelFreqMgr;
     FrequencyManager mConsumerFreqMgr;
+
+    std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
+
+    template <typename T, typename Func>
+    void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {
+        if (oldValue != newValue) {
+            LOG_INFO(sLogger, ("config change!, fieldName", fieldName));
+            onUpdate(oldValue, newValue);
+        }
+    }
 
   // TODO @qianlu.kk 
 //   std::unique_ptr<Aggregator> metric_aggregator_ = nullptr;

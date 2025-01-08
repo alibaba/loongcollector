@@ -29,20 +29,20 @@ extern "C" {
 #include "Log.h"
 
 int set_logger(logtail::ebpf::eBPFLogHandler fn) {
-  set_log_handler(fn);
-  return 0;
+    set_log_handler(fn);
+    return 0;
 }
 
 void bump_memlock_rlimit(void){
-  struct rlimit rlim_new = {
-    .rlim_cur = RLIM_INFINITY,
-    .rlim_max = RLIM_INFINITY,
-  };
+    struct rlimit rlim_new = {
+      .rlim_cur = RLIM_INFINITY,
+      .rlim_max = RLIM_INFINITY,
+    };
 
-  if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-    fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
-    exit(1);
-  }
+    if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
+      fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+      exit(1);
+    }
 }
 
 std::array<std::vector<void*>, size_t(logtail::ebpf::PluginType::MAX)> gPluginPbs;
@@ -54,6 +54,14 @@ void SetCoolBpfConfig(int32_t opt, int32_t value) {
     int32_t *params[] = {&value};
     int32_t paramsLen[] = {4};
     ebpf_config(opt, 0, 1, (void **)params, paramsLen);
+}
+
+void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update) {
+  ebpf_set_cid_filter(container_id, length, update);
+}
+
+void set_networkobserver_config(int32_t opt, int32_t value) {
+    SetCoolBpfConfig(opt, value);
 }
 
 int start_plugin(logtail::ebpf::PluginConfig *arg) {
@@ -145,26 +153,26 @@ int start_plugin(logtail::ebpf::PluginConfig *arg) {
 }
 
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t *stop_flag, int timeout_ms) {
-  if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
-    return ebpf_poll_events(max_events, stop_flag, timeout_ms);
-  }
-  
-  // find pbs
-  auto& pbs = gPluginPbs[int(type)];
-  if (pbs.empty()) {
-    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "no pbs registered for type:%d \n", type);
-    return -1;
-  }
-  int cnt = 0;
-  for (auto& x : pbs) {
-    int ret = wrapper->PollPerfBuffer(x, max_events, timeout_ms);
-    if (ret < 0 && errno != EINTR) {
-      ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "poll perf buffer failed ... ");
-    } else {
-      cnt += ret;
+    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
+      return ebpf_poll_events(max_events, stop_flag, timeout_ms);
     }
-  }
-  return cnt;
+    
+    // find pbs
+    auto& pbs = gPluginPbs[int(type)];
+    if (pbs.empty()) {
+      ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "no pbs registered for type:%d \n", type);
+      return -1;
+    }
+    int cnt = 0;
+    for (auto& x : pbs) {
+      int ret = wrapper->PollPerfBuffer(x, max_events, timeout_ms);
+      if (ret < 0 && errno != EINTR) {
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "poll perf buffer failed ... ");
+      } else {
+        cnt += ret;
+      }
+    }
+    return cnt;
 }
 
 int update_plugin(logtail::ebpf::PluginConfig *arg) {

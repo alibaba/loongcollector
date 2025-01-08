@@ -15,16 +15,16 @@ namespace logtail {
 namespace ebpf {
 
 const std::shared_ptr<ConnTracker> ConnTrackerManager::GetConntracker(const ConnId& conn_id) {
-  {
-    ReadLock lock(mReadWriteLock);
-    auto it = conn_trackers_.find(conn_id);
-    if (it == conn_trackers_.end()) {
-      return nullptr;
-    } else {
-      it->second->RecordActive();
-      return it->second;
+    {
+        ReadLock lock(mReadWriteLock);
+        auto it = conn_trackers_.find(conn_id);
+        if (it == conn_trackers_.end()) {
+            return nullptr;
+        } else {
+          it->second->RecordActive();
+            return it->second;
+        }
     }
-  }
 }
 
 std::shared_ptr <ConnTracker> ConnTrackerManager::GetOrCreateConntracker(const ConnId& conn_id) {
@@ -32,16 +32,16 @@ std::shared_ptr <ConnTracker> ConnTrackerManager::GetOrCreateConntracker(const C
     {
         ReadLock lock(mReadWriteLock);
         if (conn_trackers_.count(conn_id)) {
-        conn_trackers_[conn_id]->RecordActive();
-        return conn_trackers_[conn_id];
+            conn_trackers_[conn_id]->RecordActive();
+            return conn_trackers_[conn_id];
         }
     }
 
     {
         WriteLock lock(mReadWriteLock);
         if (conn_trackers_.count(conn_id)) {
-        conn_trackers_[conn_id]->RecordActive();
-        return conn_trackers_[conn_id];
+            conn_trackers_[conn_id]->RecordActive();
+            return conn_trackers_[conn_id];
         }
         conn_tracker_total_.fetch_add(1);
         conn_trackers_.insert(std::make_pair(conn_id, std::make_shared<ConnTracker>(conn_id)));
@@ -62,71 +62,71 @@ void ConnTrackerManager::AcceptNetDataEvent(struct conn_data_event_t *event) {
 }
 
 void ConnTrackerManager::AcceptNetStatsEvent(struct conn_stats_event_t *event) {
-  if (AF_INET != event->si.family && AF_INET6 != event->si.family) return;
-  // udpate conn tracker stats
-  ConnId conn_id = ConnId(event->conn_id.fd, event->conn_id.tgid, event->conn_id.start);
-  auto conn_tracker = GetOrCreateConntracker(conn_id);
-  if (conn_tracker == nullptr) {
-    // log error
-    LOG_WARNING(sLogger, ("GetOrCreateConntracker get null. pid", event->conn_id.tgid) ("fd", event->conn_id.fd) ("start", event->conn_id.start));
-    return;
-  }
+    if (AF_INET != event->si.family && AF_INET6 != event->si.family) return;
+    // udpate conn tracker stats
+    ConnId conn_id = ConnId(event->conn_id.fd, event->conn_id.tgid, event->conn_id.start);
+    auto conn_tracker = GetOrCreateConntracker(conn_id);
+    if (conn_tracker == nullptr) {
+      // log error
+        LOG_WARNING(sLogger, ("GetOrCreateConntracker get null. pid", event->conn_id.tgid) ("fd", event->conn_id.fd) ("start", event->conn_id.start));
+        return;
+    }
 
-  // update conn tracker stats
-  conn_tracker->UpdateConnStats(event);
-  conn_tracker->RecordActive();
-  TryAttachPeerPodMeta(conn_tracker);
-  TryAttachPodMeta(conn_tracker);
+    // update conn tracker stats
+    conn_tracker->UpdateConnStats(event);
+    conn_tracker->RecordActive();
+    TryAttachPeerPodMeta(conn_tracker);
+    TryAttachPodMeta(conn_tracker);
 }
 
 
 ConnTrackerManager::AttachStatus ConnTrackerManager::TryAttachPodMeta(std::shared_ptr<ConnTracker> ct) {
-  if (ct->k8s_meta_attached_) return ConnTrackerManager::AttachStatus::SUCCESS;
-  if (!ct->net_meta_attached_) return ConnTrackerManager::AttachStatus::WAIT_FOR_EVENT;
-  if (ct->container_id_trim_.empty()) {
-    ct->UpdateSelfPodMetaForUnknown();
-    return ConnTrackerManager::AttachStatus::SUCCESS;
-  }
+    if (ct->k8s_meta_attached_) return ConnTrackerManager::AttachStatus::SUCCESS;
+    if (!ct->net_meta_attached_) return ConnTrackerManager::AttachStatus::WAIT_FOR_EVENT;
+    if (ct->container_id_trim_.empty()) {
+        ct->UpdateSelfPodMetaForUnknown();
+        return ConnTrackerManager::AttachStatus::SUCCESS;
+    }
 
-  // 
-  if (!K8sMetadata::GetInstance().Enable()) {
-    ct->UpdateSelfPodMetaForUnknown();
-    return ConnTrackerManager::AttachStatus::SUCCESS;
-  }
+    // 
+    if (!K8sMetadata::GetInstance().Enable()) {
+        ct->UpdateSelfPodMetaForUnknown();
+        return ConnTrackerManager::AttachStatus::SUCCESS;
+    }
 
-  auto meta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(ct->container_id_trim_);
+    auto meta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(ct->container_id_trim_);
 
-  if (meta) {
-    ct->UpdateSelfPodMeta(meta);
-    return ConnTrackerManager::AttachStatus::SUCCESS;
-  }
-  return ConnTrackerManager::AttachStatus::NEED_REMOTE;
+    if (meta) {
+        ct->UpdateSelfPodMeta(meta);
+        return ConnTrackerManager::AttachStatus::SUCCESS;
+    }
+    return ConnTrackerManager::AttachStatus::NEED_REMOTE;
 }
 
 ConnTrackerManager::AttachStatus ConnTrackerManager::TryAttachPeerPodMeta(std::shared_ptr<ConnTracker> ct) {
-  if (ct->k8s_peer_meta_attached_) return ConnTrackerManager::AttachStatus::SUCCESS;
-  if (!ct->net_meta_attached_) return ConnTrackerManager::AttachStatus::WAIT_FOR_EVENT;
-  if (ct->dip_ == "127.0.0.1" || ct->dip_ == "localhost" || ct->dip_ == "0.0.0.0") {
-    ct->UpdatePeerPodMetaForLocalhost();
-    // auto conn_id = ct->GetConnId();
-    // LOG(INFO) << "attached peer localhost for conntracker===>" 
-    //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << ct->dip_ << " daddr:" << ct->daddr_ << " query dip:" << ct->dip_;
-  }
+    if (ct->k8s_peer_meta_attached_) return ConnTrackerManager::AttachStatus::SUCCESS;
+    if (!ct->net_meta_attached_) return ConnTrackerManager::AttachStatus::WAIT_FOR_EVENT;
+    if (ct->dip_ == "127.0.0.1" || ct->dip_ == "localhost" || ct->dip_ == "0.0.0.0") {
+        ct->UpdatePeerPodMetaForLocalhost();
+        // auto conn_id = ct->GetConnId();
+        // LOG(INFO) << "attached peer localhost for conntracker===>" 
+        //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << ct->dip_ << " daddr:" << ct->daddr_ << " query dip:" << ct->dip_;
+    }
 
-  if (!K8sMetadata::GetInstance().Enable()) {
-    ct->UpdateSelfPodMetaForUnknown();
-    return ConnTrackerManager::AttachStatus::SUCCESS;
-  }
+    if (!K8sMetadata::GetInstance().Enable()) {
+        ct->UpdateSelfPodMetaForUnknown();
+        return ConnTrackerManager::AttachStatus::SUCCESS;
+    }
 
-  auto meta = K8sMetadata::GetInstance().GetInfoByIpFromCache(ct->dip_);
-  if (meta) {
-    ct->UpdatePeerPodMeta(meta);
-    // auto conn_id = ct->GetConnId();
-    // LOG(INFO) << "attached peer podmeta for conntracker===>" 
-    //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << ct->dip_ << " daddr:" << ct->daddr_ << " query dip:" << ct->dip_;
-    return ConnTrackerManager::AttachStatus::SUCCESS;
-  }
-  return ConnTrackerManager::AttachStatus::NEED_REMOTE;
+    auto meta = K8sMetadata::GetInstance().GetInfoByIpFromCache(ct->dip_);
+    if (meta) {
+        ct->UpdatePeerPodMeta(meta);
+        // auto conn_id = ct->GetConnId();
+        // LOG(INFO) << "attached peer podmeta for conntracker===>" 
+        //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << ct->dip_ << " daddr:" << ct->daddr_ << " query dip:" << ct->dip_;
+        return ConnTrackerManager::AttachStatus::SUCCESS;
+    }
+    return ConnTrackerManager::AttachStatus::NEED_REMOTE;
 }
 
 std::array<std::string, kConnTrackerElementsTableSize> ConnTrackerManager::GetConnTrackerAttrs(const ConnId& conn_id) {
@@ -194,9 +194,9 @@ void ConnTrackerManager::IterationsInternal(int count_) {
     for (const auto& it : conn_trackers_) {
         auto conn_id = it.first;
         if (!it.second) {
-          LOG_WARNING(sLogger, ("no conn tracker??? pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
-          tmp.push(it.first);
-          continue;
+            LOG_WARNING(sLogger, ("no conn tracker??? pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
+            tmp.push(it.first);
+            continue;
         }
         // LOG(INFO) << "Iterations:" << count_ << " conntracker pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start 
         //     << " is_close:" << it.second->IsClose() << " epoch:" << it.second->GetEpoch() << " readyToDestroy:" 
@@ -205,34 +205,34 @@ void ConnTrackerManager::IterationsInternal(int count_) {
         //     << " containerid:" << it.second->container_id_trim_ 
         //     << " k8s_meta_attached_: " << it.second->k8s_meta_attached_ << " k8s_peer_meta_attached_: "<< it.second->k8s_peer_meta_attached_
         //     << " protocol_set_: " << it.second->protocol_set_ << " net_meta_attached_: "<< it.second->net_meta_attached_;
-        // TODO @qianlu.kk report conn stats metric ...
+
         if (it.second && it.second->ReadyToDestroy(now)) {
-          // force update
-          // Aggregator::GetInstance().Aggregate(it.second->GetConnStatsRecord());
-          it.second->UpdateReportTs(now_ts);
-          tmp.push(it.first);
-          n++;
-          continue;
+            // force update
+            // Aggregator::GetInstance().Aggregate(it.second->GetConnStatsRecord());
+            it.second->UpdateReportTs(now_ts);
+            tmp.push(it.first);
+            n++;
+            continue;
         }
 
         auto status = TryAttachPodMeta(it.second);
         if (status == ConnTrackerManager::AttachStatus::NEED_REMOTE) {
-        if (!selfs.count(it.second->container_id_trim_)) {
-            cids.push_back(it.second->container_id_trim_);
-            selfs[it.second->container_id_trim_] = std::vector<std::shared_ptr<ConnTracker>>();
-        }
-        selfs[it.second->container_id_trim_].push_back(it.second);
+            if (!selfs.count(it.second->container_id_trim_)) {
+                cids.push_back(it.second->container_id_trim_);
+                selfs[it.second->container_id_trim_] = std::vector<std::shared_ptr<ConnTracker>>();
+            }
+            selfs[it.second->container_id_trim_].push_back(it.second);
         }
         status = TryAttachPeerPodMeta(it.second);
         if (status == ConnTrackerManager::AttachStatus::NEED_REMOTE) {
-        // LOG(INFO) << "insert dip to query list ===>" 
-        //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << it.second->dip_ << " daddr:" << it.second->daddr_ << " query dip:" << it.second->dip_;
-        // insert into peer
-        if (!peers.count(it.second->dip_)) {
-            dips.push_back(it.second->dip_);
-            peers[it.second->dip_] = std::vector<std::shared_ptr<ConnTracker>>();
-        }
-        peers[it.second->dip_].push_back(it.second);
+            // LOG(INFO) << "insert dip to query list ===>" 
+            //   << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " dip:" << it.second->dip_ << " daddr:" << it.second->daddr_ << " query dip:" << it.second->dip_;
+            // insert into peer
+            if (!peers.count(it.second->dip_)) {
+                dips.push_back(it.second->dip_);
+                peers[it.second->dip_] = std::vector<std::shared_ptr<ConnTracker>>();
+            }
+            peers[it.second->dip_].push_back(it.second);
         }
 
         // if (it.second->MetaAttachReadyForNet() && (now_ts - it.second->GetLastReportTs()) > 15000) {
@@ -255,24 +255,26 @@ void ConnTrackerManager::IterationsInternal(int count_) {
         // ret = container_id_cb_(cids, meta);
         // LOG(INFO) << "begin to call cid cb, cid size:" << cids.size() << " meta size:" << meta.size();
         for (size_t i = 0; i < cids.size(); i ++) {
-          auto cid = cids[i];
-          auto cts = selfs[cid];
-          if (meta[i]) {
-              for (auto ct : cts) {
-              ct->UpdateSelfPodMeta(meta[i]);
-              // auto conn_id = ct->GetConnId();
-              // LOG(INFO) << "attached self pod meta for conntracker===>" << " pid:" << conn_id.tgid 
-              //   << " fd:" << conn_id.fd << " start:" << conn_id.start 
-              //   << " containerid:" << ct->container_id_trim_ << " workloadName:" << meta[i]->workload_name_
-              //   << " arms_appname:" << meta[i]->app_name_ << " arms_appid:" << meta[i]->app_id_;
-              }
-          } else if (status) {
-              for (auto ct : cts) {
-              ct->UpdateSelfPodMetaForUnknown();
-              // auto conn_id = ct->GetConnId();
-              // LOG(INFO) << "attached unkown for conntracker===>" << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " containerid:" << ct->container_id_trim_;
-              }
-          }
+            auto cid = cids[i];
+            auto cts = selfs[cid];
+            if (meta[i]) {
+                for (auto ct : cts) {
+                ct->UpdateSelfPodMeta(meta[i]);
+                // auto conn_id = ct->GetConnId();
+                // LOG(INFO) << "attached self pod meta for conntracker===>" << " pid:" << conn_id.tgid 
+                //   << " fd:" << conn_id.fd << " start:" << conn_id.start 
+                //   << " containerid:" << ct->container_id_trim_ << " workloadName:" << meta[i]->workload_name_
+                //   << " arms_appname:" << meta[i]->app_name_ << " arms_appid:" << meta[i]->app_id_;
+                }
+            } else if (status) {
+                for (auto ct : cts) {
+                    ct->UpdateSelfPodMetaForUnknown();
+                    // auto conn_id = ct->GetConnId();
+                    // LOG(INFO) << "attached unkown for conntracker===>" << " pid:" << conn_id.tgid << " fd:" << conn_id.fd << " start:" << conn_id.start << " containerid:" << ct->container_id_trim_;
+                }
+            } else {
+                // failed to attach , ++ retry count ...
+            }
         }
         meta.clear();
     }
@@ -281,7 +283,8 @@ void ConnTrackerManager::IterationsInternal(int count_) {
     for (auto& dip : dips) {
         dipStr += dip + ",";
     }
-    if (K8sMetadata::GetInstance().Enable()) { // TODO @qianlu.kk judge env
+
+    if (K8sMetadata::GetInstance().Enable()) {
         // meta.resize(dips.size());
         auto meta = K8sMetadata::GetInstance().SyncGetPodMetadataByIps(dips, status);
         // LOG(INFO) << "begin to call ip cb, dip size:" << dips.size() << " dips:" << dipStr << " meta size:" << meta.size();
@@ -302,6 +305,7 @@ void ConnTrackerManager::IterationsInternal(int count_) {
               }
           } else {
               // retry ... @qianlu.kk
+
               // for (auto ct : cts) {
               //   auto conn_id = ct->GetConnId();
               // }

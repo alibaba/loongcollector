@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#include "common/Lock.h"
 #include "ebpf/handler/SecurityHandler.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
@@ -41,10 +43,16 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
 
     std::shared_ptr<SourceBuffer> source_buffer = std::make_shared<SourceBuffer>();
     ;
-    PipelineEventGroup event_group(source_buffer);
+    PipelineEventGroup eventGroup(source_buffer);
     // aggregate to pipeline event group
+    // set host ips
+    // TODO 后续这两个 key 需要移到 group 的 metadata 里，在 processortagnative 中转成tag
+    const static std::string host_ip_key = "host.ip";
+    const static std::string host_name_key = "host.name";
+    eventGroup.SetTag(host_ip_key, mHostIp);
+    eventGroup.SetTag(host_name_key, mHostName);
     for (const auto& x : events) {
-        auto* event = event_group.AddLogEvent();
+        auto* event = eventGroup.AddLogEvent();
         for (const auto& tag : x->GetAllTags()) {
             event->SetContent(tag.first, tag.second);
         }
@@ -55,13 +63,15 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
 #ifdef APSARA_UNIT_TEST_MAIN
     return;
 #endif
-    std::unique_ptr<ProcessQueueItem> item
-        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(event_group), mPluginIdx));
-
-    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
-        LOG_WARNING(
-            sLogger,
-            ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("Push queue failed!", events.size()));
+    {
+        ReadLock lk(mCtxLock);
+        if (!mCtx) {
+            return;
+        }
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[SecurityEvent] push queue failed!", ""));
+        }
     }
 }
 

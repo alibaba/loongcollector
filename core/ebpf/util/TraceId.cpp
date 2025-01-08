@@ -18,29 +18,68 @@
 #include <random>
 #include <memory>
 #include <cstring>
+#include <iomanip>
+#include <sstream>
 
 namespace logtail {
 namespace ebpf {
 
-// std::array<uint8_t, 16> GenerateSpanID() {
-//     std::random_device rd;
-//     std::mt19937_64 generator(rd());
-//     std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
+std::string BytesToHexString(const uint8_t* bytes, size_t length) {
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0');
+    for (size_t i = 0; i < length; ++i) {
+        oss << std::setw(2) << static_cast<int>(bytes[i]);
+    }
+    return oss.str();
+}
 
-//     auto result = std::array<uint8_t, 16>();
-//     auto buf_size = result.size();
+std::array<uint8_t, 32> GenerateTraceID() {
+    std::random_device rd;
+    std::mt19937_64 generator(rd());
+    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
 
-//     for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
-//         uint64_t value = distribution(generator);
+    auto result = std::array<uint8_t, 32>();
+    auto buf_size = result.size();
 
-//         if (i + sizeof(uint64_t) <= buf_size) {
-//             memcpy(&result[i], &value, sizeof(uint64_t));
-//         } else {
-//             memcpy(&result[i], &value, buf_size - i);
-//         }
-//     }
-//     return result;
-// }
+    for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
+        uint64_t value = distribution(generator);
+
+        if (i + sizeof(uint64_t) <= buf_size) {
+            memcpy(&result[i], &value, sizeof(uint64_t));
+        } else {
+            memcpy(&result[i], &value, buf_size - i);
+        }
+    }
+    return result;
+}
+
+std::string FromSpanId(const std::array<uint8_t, 16>& spanId) {
+    return BytesToHexString(spanId.data(), spanId.size());
+}
+
+std::string FromTraceId(const std::array<uint8_t, 32>& traceId) {
+    return BytesToHexString(traceId.data(), traceId.size());
+}
+
+std::array<uint8_t, 16> GenerateSpanID() {
+    std::random_device rd;
+    std::mt19937_64 generator(rd());
+    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
+
+    auto result = std::array<uint8_t, 16>();
+    auto buf_size = result.size();
+
+    for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
+        uint64_t value = distribution(generator);
+
+        if (i + sizeof(uint64_t) <= buf_size) {
+            memcpy(&result[i], &value, sizeof(uint64_t));
+        } else {
+            memcpy(&result[i], &value, buf_size - i);
+        }
+    }
+    return result;
+}
 
 }
 }
