@@ -71,7 +71,10 @@ private:
     Labels mTargetLabels;
 
     // auto metrics
-    std::atomic_uint64_t mScrapeResponseSizeBytes;
+    uint64_t mScrapeTimestampMilliSec = 0;
+    double mScrapeDurationSeconds = 0;
+    uint64_t mScrapeResponseSizeBytes = 0;
+    bool mUpState = true;
 
     // self monitor
     std::shared_ptr<PromSelfMonitorUnsafe> mSelfMonitor;

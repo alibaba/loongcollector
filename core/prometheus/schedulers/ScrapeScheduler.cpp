@@ -84,6 +84,8 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
         scrapeState = prom::NetworkCodeToState(NetworkCode::Ok);
     }
 
+    mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
+    mUpState = response.GetStatusCode() == 200;
     if (response.GetStatusCode() != 200) {
         LOG_WARNING(sLogger,
                     ("scrape failed, status code",
@@ -96,7 +98,6 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     streamScraper->FlushCache();
     streamScraper->SetAutoMetricMeta(scrapeDurationSeconds, upState, scrapeState);
     streamScraper->SendMetrics();
-    mScrapeResponseSizeBytes = streamScraper->mRawSize;
     streamScraper->Reset();
 
     mPluginTotalDelayMs->Add(scrapeDurationMilliSeconds);
