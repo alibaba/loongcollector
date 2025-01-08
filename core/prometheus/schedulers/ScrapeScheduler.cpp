@@ -51,7 +51,6 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
       mQueueKey(queueKey),
       mInputIndex(inputIndex),
       mTargetLabels(labels),
-      mScrapeResponseSizeBytes(0) {
     string tmpTargetURL = mScrapeConfigPtr->mScheme + "://" + mHost + ":" + ToString(mPort)
         + mScrapeConfigPtr->mMetricsPath
         + (mScrapeConfigPtr->mQueryString.empty() ? "" : "?" + mScrapeConfigPtr->mQueryString);
@@ -92,11 +91,11 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
                      response.GetStatusCode())("target", mHash)("curl msg", response.GetNetworkStatus().mMessage));
     }
 
-    auto scrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
-    auto upState = response.GetStatusCode() == 200;
+    auto mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
+    auto mUpState = response.GetStatusCode() == 200;
     streamScraper->mStreamIndex++;
     streamScraper->FlushCache();
-    streamScraper->SetAutoMetricMeta(scrapeDurationSeconds, upState, scrapeState);
+    streamScraper->SetAutoMetricMeta(mScrapeDurationSeconds, mUpState, scrapeState);
     streamScraper->SendMetrics();
     streamScraper->Reset();
 
