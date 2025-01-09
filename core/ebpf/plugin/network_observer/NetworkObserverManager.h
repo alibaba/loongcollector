@@ -62,6 +62,8 @@ private:
     //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
     //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
     void ConsumeRecordsAsEvent(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
+    void ConsumeRecordsAsMetric(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
+    void ConsumeRecordsAsTrace(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
     
     void RunInThread();
 

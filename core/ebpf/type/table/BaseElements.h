@@ -311,7 +311,7 @@ constexpr DataElement kCallType = {
     "callType", // span
     "call.type", // log
     "arms call type",
-    AggregationType::NoAggregate,
+    AggregationType::Level1,
 };
 
 constexpr DataElement kCallKind = {
@@ -320,7 +320,7 @@ constexpr DataElement kCallKind = {
     "callKind", // span
     "call.kind", // log
     "arms call kind",
-    AggregationType::NoAggregate,
+    AggregationType::Level1,
 };
 
 constexpr DataElement kRpc = {

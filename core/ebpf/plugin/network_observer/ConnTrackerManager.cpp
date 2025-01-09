@@ -114,7 +114,7 @@ ConnTrackerManager::AttachStatus ConnTrackerManager::TryAttachPeerPodMeta(std::s
     }
 
     if (!K8sMetadata::GetInstance().Enable()) {
-        ct->UpdateSelfPodMetaForUnknown();
+        ct->UpdatePeerPodMetaForExternal();
         return ConnTrackerManager::AttachStatus::SUCCESS;
     }
 

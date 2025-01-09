@@ -69,6 +69,8 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     // TODO @qianlu.kk init converger
 
+    // TODO @qianlu.kk init aggregator ... 
+
     // init sampler
     mSampler = std::make_unique<HashRatioSampler>(0.01);
 
@@ -192,6 +194,117 @@ void NetworkObserverManager::RunInThread() {
     LOG_INFO(sLogger, ("network observer plugin installed.", ""));
 }
 
+void NetworkObserverManager::ConsumeRecordsAsTrace(
+    const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count) {
+
+    for (size_t i = 0 ; i < count; i ++ ) {
+        auto record = records[i];
+        // handle app record ...
+        std::shared_ptr<AbstractAppRecord> appRecord =
+            std::dynamic_pointer_cast<AbstractAppRecord>(record);
+        if (appRecord != nullptr) {
+            // generate traceId
+            auto spanId = GenerateSpanID();
+            if (!mSampler->ShouldSample(spanId)) {
+                LOG_DEBUG(sLogger, ("sampler", "reject"));
+                continue;
+            }
+            auto traceId = GenerateTraceID();
+            LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId)) ("traceId", FromTraceId(traceId)));
+
+            auto conn_id = appRecord->GetConnId();
+            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            if (conn_tracker && !conn_tracker->MetaAttachReadyForApp()) {
+                LOG_WARNING(sLogger, ("app meta not ready, rollback app record, times", record->Rollback()) ("pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
+                // TODO @qianlu.kk we need rollback logic ...
+                // mRecordQueue.enqueue(std::move(record));
+                continue;
+            }
+
+            // Aggregator::GetInstance().Aggregate(appRecord);
+            
+            continue;
+        }
+    }
+}
+
+void NetworkObserverManager::ConsumeRecordsAsMetric(
+    const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count) {
+    for (size_t i = 0 ; i < count; i ++ ) {
+        auto record = records[i];
+        // handle app record ...
+        std::shared_ptr<AbstractAppRecord> appRecord =
+            std::dynamic_pointer_cast<AbstractAppRecord>(record);
+        if (appRecord != nullptr) {
+            auto conn_id = appRecord->GetConnId();
+            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            if (conn_tracker && !conn_tracker->MetaAttachReadyForApp()) {
+                LOG_WARNING(sLogger, ("app meta not ready, rollback app record, times", record->Rollback()) ("pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
+                // TODO @qianlu.kk we need rollback logic ...
+                // mRecordQueue.enqueue(std::move(record));
+                continue;
+            }
+
+            LOG_WARNING(sLogger, ("app meta ready, rollback:", record->Rollback()) ("pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
+
+            // TODO @qianlu.kk we need converge logic ...
+            // ConvergeAbstractRecord(appRecord);
+            std::array<size_t, logtail::ebpf::MaxAggregationLevel> hash_result;
+            hash_result.fill(0UL);
+
+            auto elements = logtail::ebpf::kAppMetricsTable.elements();
+            std::hash<std::string> hasher;
+            
+            for (size_t j = 0; j < elements.size(); j++) {
+                int agg_level = static_cast<int>(elements[j].agg_type());
+                if (agg_level >= logtail::ebpf::MinAggregationLevel &&
+                    agg_level <= logtail::ebpf::MaxAggregationLevel) {
+                        // 这里估计就两级，一级是 appid、host 之类的，另一级是 rpc 之类的
+                        // 因为 appid host 都是 agg level 0，对应1
+                        // rpc 之类是 agg level 1，对应2
+                        // callKind callType 这些不用参与聚合，直接是 no agg
+                        // 
+                        // 对于 app 指标，我们只需要
+                        // 对于 span 类型，或许我们也需要一个滑动窗口。。。也就是按秒上报数据，只需要一级聚合即可。或者直接写个简单的 map
+                    int hash_result_index = agg_level - logtail::ebpf::MinAggregationLevel;
+                    // TODO @qianlu.kk we should not to use record->GetMetricAttribute(j)
+                    // because we already have entity relative attributes in conn tracker, and we already get these attributes
+                    // hash_result[hash_result_index] ^= hasher(record->GetMetricAttribute(j)) +
+                    //                                     0x9e3779b9 +
+                    //                                     (hash_result[hash_result_index] << 6) +
+                    //                                     (hash_result[hash_result_index] >> 2);
+                }
+            }
+            // {
+            //     std::unique_lock<std::shared_mutex> lock_app(app_tree_mtx_);
+            //     app_metrics_tree_.Aggregate(*record, hash_result);
+            // }
+
+            
+            continue;
+        }
+
+        std::shared_ptr<ConnStatsRecord> netRecord =
+            std::dynamic_pointer_cast<ConnStatsRecord>(record);
+        if (netRecord != nullptr) {
+            auto conn_id = appRecord->GetConnId();
+            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            if (conn_tracker && !conn_tracker->MetaAttachReadyForNet()) {
+            // roll back
+            LOG_WARNING(sLogger, ("net meta not ready, rollback app record, times", record->Rollback()) ("pid", conn_id.tgid) ("fd", conn_id.fd) ("start", conn_id.start));
+            mRecordQueue.enqueue(std::move(record));
+            continue;
+            }
+            // TODO @qianlu.kk we need converge logic ...
+            // ConvergeAbstractRecord(netRecord);
+            // Aggregator::GetInstance().Aggregate(netRecord);
+            continue;
+        }
+    }
+
+    // flush ...
+}
+
 void NetworkObserverManager::ConsumeRecordsAsEvent(
     const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count) {
     if (count == 0) return;
@@ -288,12 +401,16 @@ void NetworkObserverManager::ConsumeRecords() {
             continue;
         }
 
+        // ConvergeAbstractRecord(appRecord);
+
         if (mEnableLog) {
             ConsumeRecordsAsEvent(items, count);
         }
         if (mEnableMetric) {
             // do converge ...
             // aggregate ...
+            ConsumeRecordsAsMetric(items, count);
+            
         }
         if (mEnableSpan) {
             // generate traceId
@@ -307,6 +424,7 @@ void NetworkObserverManager::ConsumeRecords() {
             // set trace id to 
             // do sample
             // aggregate ...
+            ConsumeRecordsAsTrace(items, count);
         }
 
         items.clear();

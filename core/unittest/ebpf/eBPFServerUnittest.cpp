@@ -110,7 +110,7 @@ void eBPFServerUnittest::TestStartNO() {
             "ProbeConfig": 
             {
                 "EnableLog": true,
-                "EnableMetric": false,
+                "EnableMetric": true,
                 "EnableSpan": false,
                 "EnableProtocols": [
                     "http"

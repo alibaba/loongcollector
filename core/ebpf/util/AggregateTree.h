@@ -150,7 +150,6 @@ private:
             GetNodes(depth + 1, c.second, target_depth, ans);
         }
     }
-
 };
 
 template<typename T, typename U>

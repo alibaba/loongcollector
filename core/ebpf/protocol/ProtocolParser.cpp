@@ -34,7 +34,7 @@ bool ProtocolParserManager::RemoveParser(ProtocolType type) {
 
 std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(ProtocolType type, std::unique_ptr<NetDataEvent> data) {
     if (parsers_.find(type) != parsers_.end()) {
-    return parsers_[type]->Parse(std::move(data));
+        return parsers_[type]->Parse(std::move(data));
     } else {
         LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
         return std::vector<std::unique_ptr<AbstractRecord>>();
