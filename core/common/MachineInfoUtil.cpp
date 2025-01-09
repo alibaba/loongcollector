@@ -26,6 +26,7 @@
 #include "FileSystemUtil.h"
 #include "StringTools.h"
 #include "common/FileSystemUtil.h"
+#include "common/JsonUtil.h"
 #include "common/UUIDUtil.h"
 #include "logger/Logger.h"
 #if defined(__linux__)
@@ -47,6 +48,13 @@
 #endif
 
 DEFINE_FLAG_STRING(agent_host_id, "", "");
+
+const std::string sInstanceIdKey = "instance-id";
+const std::string sOwnerAccountIdKey = "owner-account-id";
+const std::string sRegionIdKey = "region-id";
+const std::string sRandomHostIdKey = "random-hostid";
+const std::string sECSAssistMachineIdKey = "ecs-assist-machine-id";
+
 
 #if defined(_MSC_VER)
 typedef LONG NTSTATUS, *PNTSTATUS;
@@ -501,114 +509,163 @@ size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string
     return sizes;
 }
 
-HostIdentifier::HostIdentifier() {
-#ifdef __ENTERPRISE__
-    getECSMetaFromFile();
-    updateHostId();
-#else
-    ECSMeta ecsMeta;
-    if (FetchECSMeta(ecsMeta)) {
-        UpdateECSMetaAndHostid(ecsMeta);
+bool ParseECSMeta(const std::string& meta, ECSMeta& metaObj) {
+    Json::Value doc;
+    std::string errMsg;
+    if (!ParseJsonTable(meta, doc, errMsg)) {
+        LOG_WARNING(sLogger, ("parse ecs meta fail, errMsg", errMsg)("meta", meta));
+        return false;
     }
-#endif
+
+    if (doc.isMember(sInstanceIdKey) && doc[sInstanceIdKey].isString()) {
+        metaObj.SetInstanceID(doc[sInstanceIdKey].asString());
+    }
+
+    if (doc.isMember(sOwnerAccountIdKey) && doc[sOwnerAccountIdKey].isString()) {
+        metaObj.SetUserID(doc[sOwnerAccountIdKey].asString());
+    }
+
+    if (doc.isMember(sRegionIdKey) && doc[sRegionIdKey].isString()) {
+        metaObj.SetRegionID(doc[sRegionIdKey].asString());
+    }
+    return metaObj.IsValid();
 }
 
-bool HostIdentifier::UpdateECSMetaAndHostid(const ECSMeta& meta) {
-    // 如果 instanceID 发生变化，则更新ecs元数据
-    if (mMetadata.instanceID != meta.instanceID) {
-        LOG_INFO(sLogger,
-                 ("ecs instanceID changed, old instanceID", mMetadata.instanceID)("new instanceID", meta.instanceID));
-        {
-            std::unique_lock<std::shared_mutex> lock(mMutex); // 写锁
-            mMetadata = meta;
+InstanceIdentity::InstanceIdentity() {
+    mEntity.getWriteBuffer().SetHostID({STRING_FLAG(agent_host_id), Hostid::Type::CUSTOM});
+    mEntity.swap();
+}
+
+void InstanceIdentity::DumpInstanceIdentity() {
+    if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::ECS) {
+        mInstanceIdentityJson.clear();
+        mInstanceIdentityJson[sInstanceIdKey] = mEntity.getReadBuffer().GetEcsInstanceID().to_string();
+        mInstanceIdentityJson[sOwnerAccountIdKey] = mEntity.getReadBuffer().GetEcsUserID().to_string();
+        mInstanceIdentityJson[sRegionIdKey] = mEntity.getReadBuffer().GetEcsRegionID().to_string();
+        dumpInstanceIdentityToFile();
+    } else if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::LOCAL && mHasGeneratedLocalHostId) {
+        mInstanceIdentityJson.clear();
+        mInstanceIdentityJson[sRandomHostIdKey] = mLocalHostId;
+        dumpInstanceIdentityToFile();
+    } else if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::ECS_ASSIST && !mSerialNumber.empty()) {
+        mInstanceIdentityJson.clear();
+        mInstanceIdentityJson[sECSAssistMachineIdKey] = mSerialNumber;
+        dumpInstanceIdentityToFile();
+    }
+}
+
+void InstanceIdentity::InitFromNetwork() {
+    ECSMeta ecsMeta;
+    if (FetchECSMeta(ecsMeta)) {
+        InstanceIdentity::Instance()->UpdateInstanceIdentity(ecsMeta);
+    }
+}
+
+bool InstanceIdentity::InitFromFile() {
+    mInstanceIdentityFile = GetAgentDataDir() + PATH_SEPARATOR + "instance_identity";
+    bool initSuccess = false;
+    ECSMeta meta;
+    if (CheckExistance(mInstanceIdentityFile)) {
+        std::string instanceIdentityStr;
+        if (ReadFileContent(mInstanceIdentityFile, instanceIdentityStr)) {
+            Json::Value doc;
+            std::string errMsg;
+            if (!ParseJsonTable(instanceIdentityStr, doc, errMsg)) {
+                LOG_WARNING(sLogger,
+                            ("parse instanceIdentity from file fail",
+                             errMsg)("instanceIdentity", instanceIdentityStr)("file", mInstanceIdentityFile));
+            } else {
+                mInstanceIdentityJson = std::move(doc);
+                if (ParseECSMeta(instanceIdentityStr, meta)) {
+                    // 存在 ecs meta信息，则认为instanceIdentity是ready的
+                    initSuccess = true;
+                } else if (mInstanceIdentityJson.isMember(sRandomHostIdKey)
+                           && mInstanceIdentityJson[sRandomHostIdKey].isString()) {
+                    // 不存在ecs meta信息， 则尝试读取下 random-hostid
+                    mLocalHostId = mInstanceIdentityJson[sRandomHostIdKey].asString();
+                    // 存在 random-hostid，则认为instanceIdentity是ready的
+                    initSuccess = true;
+                } else if (mInstanceIdentityJson.isMember(sECSAssistMachineIdKey)
+                           && mInstanceIdentityJson[sECSAssistMachineIdKey].isString()) {
+                    // 存在 ecs-assist-machine-id，则认为instanceIdentity是ready的
+                    initSuccess = true;
+                } else {
+                    LOG_ERROR(sLogger,
+                              ("instanceIdentity is ready, but no random-hostid and ecs meta found, file",
+                               mInstanceIdentityFile)("instanceIdentity", instanceIdentityStr));
+                }
+            }
+        } else {
+            LOG_ERROR(sLogger,
+                      ("read instanceIdentity from file fail, file", mInstanceIdentityFile)("instanceIdentity",
+                                                                                            instanceIdentityStr));
         }
-        updateHostId();
+    }
+    // 计算hostid
+    if (meta.IsValid()) {
+        mEntity.getWriteBuffer().SetECSMeta(meta);
+    }
+    updateHostId(meta);
+    mEntity.swap();
+    return initSuccess;
+}
+
+bool InstanceIdentity::UpdateInstanceIdentity(const ECSMeta& meta) {
+    // 如果 meta合法 且 mInstanceID 发生变化，则更新ecs元数据
+    if (meta.IsValid() && mEntity.getReadBuffer().GetEcsInstanceID() != meta.GetInstanceID()) {
+        LOG_INFO(sLogger,
+                 ("ecs mInstanceID changed, old mInstanceID",
+                  mEntity.getReadBuffer().GetEcsInstanceID())("new mInstanceID", meta.GetInstanceID()));
+        mEntity.getWriteBuffer().SetECSMeta(meta);
+        updateHostId(meta);
+        mEntity.swap();
         return true;
     }
     return false;
 }
 
-void HostIdentifier::DumpECSMeta() {
-    std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "instance_identity";
+void InstanceIdentity::dumpInstanceIdentityToFile() {
     std::string errMsg;
-    if (!WriteFile(fileName, mMetadataStr, errMsg)) {
-        LOG_WARNING(sLogger, ("failed to write ecs meta to file", fileName)("error", errMsg));
+    if (!WriteFile(mInstanceIdentityFile, mInstanceIdentityJson.toStyledString(), errMsg)) {
+        LOG_ERROR(sLogger, ("failed to write instanceIdentity to file", mInstanceIdentityFile)("error", errMsg));
     } else {
-        LOG_INFO(sLogger, ("write ecs meta to file success, fileName", fileName)("mMetadataStr", mMetadataStr));
+        LOG_INFO(sLogger,
+                 ("write instanceIdentity to file success, fileName",
+                  mInstanceIdentityFile)("instanceIdentity", mInstanceIdentityJson.toStyledString()));
     }
 }
 
-void HostIdentifier::updateHostId() {
-    if (!STRING_FLAG(agent_host_id).empty()) {
-        setHostId(Hostid{STRING_FLAG(agent_host_id), Type::CUSTOM});
-        return;
-    }
-    if (mMetadata.isValid && !mMetadata.instanceID.empty()) {
-        setHostId(Hostid{mMetadata.instanceID, Type::ECS});
-        return;
-    }
-    getSerialNumberFromEcsAssist();
-    if (!mSerialNumber.empty()) {
-        setHostId(Hostid{mSerialNumber, Type::ECS_ASSIST});
-        return;
-    }
-    getLocalHostId();
-    setHostId(Hostid{mLocalHostId, Type::LOCAL});
-}
-
-void HostIdentifier::setHostId(const Hostid& hostid) {
-    if (mHostid.id == hostid.id && mHostid.type == hostid.type) {
-        return;
-    }
-    LOG_INFO(sLogger,
-             ("change hostId, id from", mHostid.id)("to", hostid.id)("type from", mHostid.type)("to", hostid.type));
-    std::unique_lock<std::shared_mutex> lock(mMutex); // 写锁
-    mHostid = hostid;
-}
-
-bool ParseECSMeta(const std::string& meta, ECSMeta& metaObj) {
-    rapidjson::Document doc;
-    doc.Parse(meta.c_str());
-    if (doc.HasParseError() || !doc.IsObject()) {
-        LOG_WARNING(sLogger, ("fetch ecs meta fail", meta));
-        return false;
-    }
-
-    if (const auto instanceItr = doc.FindMember("instance-id");
-        instanceItr != doc.MemberEnd() && instanceItr->value.IsString()) {
-        metaObj.instanceID = instanceItr->value.GetString();
-    }
-
-    if (const auto userItr = doc.FindMember("owner-account-id");
-        userItr != doc.MemberEnd() && userItr->value.IsString()) {
-        metaObj.userID = userItr->value.GetString();
-    }
-
-    if (const auto regionItr = doc.FindMember("region-id");
-        regionItr != doc.MemberEnd() && regionItr->value.IsString()) {
-        metaObj.regionID = regionItr->value.GetString();
-    }
-    if (!metaObj.instanceID.empty() && !metaObj.userID.empty() && !metaObj.regionID.empty()) {
-        metaObj.isValid = true;
-    }
-    return true;
-}
-
-void HostIdentifier::getECSMetaFromFile() {
-    std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "instance_identity";
-    if (!CheckExistance(fileName)) {
-        return;
-    }
-    std::string ecsMetaStr;
-    if (ReadFileContent(fileName, ecsMetaStr) && ParseECSMeta(ecsMetaStr, mMetadata)) {
-        return;
+void InstanceIdentity::updateHostId(const ECSMeta& meta) {
+    Hostid newId;
+    if (meta.IsValid()) {
+        newId = {meta.GetInstanceID().to_string(), Hostid::Type::ECS};
     } else {
-        LOG_ERROR(sLogger, ("read ecs meta from file fail", fileName)("ecs meta", ecsMetaStr));
+        getSerialNumberFromEcsAssist();
+        if (!mSerialNumber.empty()) {
+            newId = {mSerialNumber, Hostid::Type::ECS_ASSIST};
+        } else if (!STRING_FLAG(agent_host_id).empty()) {
+            newId = {STRING_FLAG(agent_host_id), Hostid::Type::CUSTOM};
+        } else {
+            getLocalHostId();
+            newId = {mLocalHostId, Hostid::Type::LOCAL};
+        }
+    }
+    // 只在ID发生变化时更新并记录日志
+    if (mEntity.getReadBuffer().GetHostID() != newId.GetHostID()
+        || mEntity.getReadBuffer().GetHostIdType() != newId.GetType()) {
+        LOG_INFO(sLogger,
+                 ("change hostId, id from", mEntity.getReadBuffer().GetHostID())("to", newId.GetHostID())(
+                     "type from", Hostid::TypeToString(mEntity.getReadBuffer().GetHostIdType()))(
+                     "to", Hostid::TypeToString(newId.GetType())));
+        mEntity.getWriteBuffer().SetHostID(newId);
+    } else {
+        // 没有变化时，WriteBuffer的host id维持原状
+        Hostid hostId(mEntity.getReadBuffer().GetHostID().to_string(), mEntity.getReadBuffer().GetHostIdType());
+        mEntity.getWriteBuffer().SetHostID(hostId);
     }
 }
 
-bool HostIdentifier::FetchECSMeta(ECSMeta& metaObj) {
-    metaObj.isValid = false;
+bool FetchECSMeta(ECSMeta& metaObj) {
     CURL* curl = nullptr;
     for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
         curl = curl_easy_init();
@@ -629,7 +686,8 @@ bool HostIdentifier::FetchECSMeta(ECSMeta& metaObj) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, tokenHeaders);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
+        // 超时1秒
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
 
@@ -655,7 +713,8 @@ bool HostIdentifier::FetchECSMeta(ECSMeta& metaObj) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, metaHeaders);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
+        // 超时1秒
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &meta);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
 
@@ -671,9 +730,8 @@ bool HostIdentifier::FetchECSMeta(ECSMeta& metaObj) {
             curl_easy_cleanup(curl);
             return false;
         }
-        mMetadataStr = meta;
         curl_easy_cleanup(curl);
-        return metaObj.isValid;
+        return metaObj.IsValid();
     }
     LOG_WARNING(
         sLogger,
@@ -682,7 +740,7 @@ bool HostIdentifier::FetchECSMeta(ECSMeta& metaObj) {
 }
 
 // 从云助手获取序列号
-void HostIdentifier::getSerialNumberFromEcsAssist() {
+void InstanceIdentity::getSerialNumberFromEcsAssist() {
     if (mHasTriedToGetSerialNumber) {
         return;
     }
@@ -694,39 +752,12 @@ void HostIdentifier::getSerialNumberFromEcsAssist() {
     mHasTriedToGetSerialNumber = true;
 }
 
-void HostIdentifier::getLocalHostId() {
-    std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "host_id";
+void InstanceIdentity::getLocalHostId() {
     if (!mLocalHostId.empty()) {
         return;
     }
-    if (CheckExistance(fileName)) {
-        if (!ReadFileContent(fileName, mLocalHostId)) {
-            mLocalHostId = "";
-        }
-    }
-    if (mLocalHostId.empty()) {
-        // 随机生成hostid
-        mLocalHostId = CalculateRandomUUID();
-
-        LOG_INFO(sLogger, ("save hostId file to local file system, hostId", mLocalHostId));
-        int fd = open(fileName.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0755);
-        if (fd == -1) {
-            int savedErrno = errno;
-            if (savedErrno != EEXIST) {
-                LOG_ERROR(sLogger, ("save hostId file fail", fileName)("errno", strerror(savedErrno)));
-            }
-        } else {
-            // 文件成功创建,现在写入hostId
-            ssize_t written = write(fd, mLocalHostId.c_str(), mLocalHostId.length());
-            if (written == static_cast<ssize_t>(mLocalHostId.length())) {
-                LOG_INFO(sLogger, ("hostId saved successfully to", fileName));
-            } else {
-                int writeErrno = errno;
-                LOG_ERROR(sLogger, ("Failed to write hostId to file", fileName)("errno", strerror(writeErrno)));
-            }
-            close(fd);
-        }
-    }
+    mHasGeneratedLocalHostId = true;
+    mLocalHostId = CalculateRandomUUID();
 }
 
 } // namespace logtail

@@ -24,6 +24,9 @@ target_link_libraries(common_simple_utils_unittest ${UT_BASE_TARGET})
 add_executable(common_logfileoperator_unittest LogFileOperatorUnittest.cpp)
 target_link_libraries(common_logfileoperator_unittest ${UT_BASE_TARGET})
 
+add_executable(instance_identity_unittest InstanceIdentityUnittest.cpp)
+target_link_libraries(instance_identity_unittest ${UT_BASE_TARGET})
+
 add_executable(common_sliding_window_counter_unittest SlidingWindowCounterUnittest.cpp)
 target_link_libraries(common_sliding_window_counter_unittest ${UT_BASE_TARGET})
 

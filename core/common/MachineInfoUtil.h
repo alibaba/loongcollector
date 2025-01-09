@@ -16,20 +16,118 @@
 
 #pragma once
 
-#include <cstdint>
-
-#include <shared_mutex>
+#include <array>
 #include <string>
 #include <unordered_set>
 
+#include "json/value.h"
+
+#include "AppConfig.h"
+#include "models/StringView.h"
+
 namespace logtail {
 
+static const size_t ID_MAX_LENGTH = 128;
+template <size_t N>
+inline void SetID(const std::string& id, std::array<char, N>& target, size_t& targetLen) {
+    if (id.empty()) {
+        target[0] = '\0';
+        targetLen = 0;
+        return;
+    }
+    targetLen = std::min(id.size(), N - 1);
+    std::memcpy(target.data(), id.data(), targetLen);
+    target[targetLen] = '\0';
+}
 struct ECSMeta {
-    bool isValid = false;
-    std::string instanceID;
-    std::string userID;
-    std::string regionID;
+    ECSMeta() = default;
+
+    void SetInstanceID(const std::string& id) { SetID(id, mInstanceID, mInstanceIDLen); }
+
+    void SetUserID(const std::string& id) { SetID(id, mUserID, mUserIDLen); }
+
+    void SetRegionID(const std::string& id) { SetID(id, mRegionID, mRegionIDLen); }
+
+    [[nodiscard]] StringView GetInstanceID() const { return StringView(mInstanceID.data(), mInstanceIDLen); }
+    [[nodiscard]] StringView GetUserID() const { return StringView(mUserID.data(), mUserIDLen); }
+    [[nodiscard]] StringView GetRegionID() const { return StringView(mRegionID.data(), mRegionIDLen); }
+
+    [[nodiscard]] bool IsValid() const {
+        return !GetInstanceID().empty() && !GetUserID().empty() && !GetRegionID().empty();
+    }
+
+private:
+    std::array<char, ID_MAX_LENGTH> mInstanceID{};
+    size_t mInstanceIDLen = 0UL;
+
+    std::array<char, ID_MAX_LENGTH> mUserID{};
+    size_t mUserIDLen = 0UL;
+
+    std::array<char, ID_MAX_LENGTH> mRegionID{};
+    size_t mRegionIDLen = 0UL;
+
+    friend class InstanceIdentityUnittest;
 };
+struct Hostid {
+    enum Type {
+        CUSTOM,
+        ECS,
+        ECS_ASSIST,
+        LOCAL,
+    };
+    static std::string TypeToString(Type type) {
+        switch (type) {
+            case Type::CUSTOM:
+                return "CUSTOM";
+            case Type::ECS:
+                return "ECS";
+            case Type::ECS_ASSIST:
+                return "ECS_ASSIST";
+            case Type::LOCAL:
+                return "LOCAL";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    Hostid() = default;
+    Hostid(const std::string& id, const Type& type) { SetHostID(id, type); }
+
+    void SetHostID(const std::string& id, const Type& type) {
+        SetID(id, mId, mIdLen);
+        mType = type;
+    }
+
+    [[nodiscard]] StringView GetHostID() const { return StringView(mId.data(), mIdLen); }
+
+    [[nodiscard]] Type GetType() const { return mType; }
+
+private:
+    std::array<char, ID_MAX_LENGTH> mId{};
+    size_t mIdLen = 0UL;
+
+    Type mType;
+
+    friend class InstanceIdentityUnittest;
+};
+class Entity {
+public:
+    bool IsECSValid() const { return mECSMeta.IsValid(); }
+    StringView GetEcsInstanceID() const { return mECSMeta.GetInstanceID(); }
+    StringView GetEcsUserID() const { return mECSMeta.GetUserID(); }
+    StringView GetEcsRegionID() const { return mECSMeta.GetRegionID(); }
+    StringView GetHostID() const { return mHostid.GetHostID(); }
+    Hostid::Type GetHostIdType() const { return mHostid.GetType(); }
+    [[nodiscard]] const ECSMeta& GetECSMeta() const { return mECSMeta; }
+
+    void SetECSMeta(const ECSMeta& meta) { mECSMeta = meta; }
+    void SetHostID(const Hostid& hostid) { mHostid = hostid; }
+
+private:
+    ECSMeta mECSMeta;
+    Hostid mHostid;
+};
+
 std::string GetOsDetail();
 std::string GetUsername();
 std::string GetHostName();
@@ -49,67 +147,54 @@ bool IsDigitsDotsHostname(const char* hostname);
 // NOTE: logger must be initialized before calling this.
 std::string GetAnyAvailableIP();
 
-class HostIdentifier {
+bool FetchECSMeta(ECSMeta& metaObj);
+
+class InstanceIdentity {
 public:
-    enum Type {
-        CUSTOM,
-        ECS,
-        ECS_ASSIST,
-        LOCAL,
-    };
-    struct Hostid {
-        std::string id;
-        Type type;
-    };
-    HostIdentifier();
-    static HostIdentifier* Instance() {
-        static HostIdentifier sInstance;
+    InstanceIdentity();
+    static InstanceIdentity* Instance() {
+        static InstanceIdentity sInstance;
         return &sInstance;
     }
-    // 注意: 不要在类初始化时调用并缓存结果，因为此时ECS元数据可能尚未就绪
-    // 建议在实际使用时再调用此方法
-    HostIdentifier::Hostid GetHostId() {
-        std::shared_lock<std::shared_mutex> lock(mMutex); // 获取读锁
-        return mHostid;
-    }
 
     // 注意: 不要在类初始化时调用并缓存结果，因为此时ECS元数据可能尚未就绪
     // 建议在实际使用时再调用此方法
-    ECSMeta GetECSMeta() {
-        std::shared_lock<std::shared_mutex> lock(mMutex); // 获取读锁
-        return mMetadata;
-    }
+    const Entity* GetEntity() { return &mEntity.getReadBuffer(); }
 
-    bool UpdateECSMetaAndHostid(const ECSMeta& meta);
-    bool FetchECSMeta(ECSMeta& metaObj);
-    void DumpECSMeta();
+    bool UpdateInstanceIdentity(const ECSMeta& meta);
+    void DumpInstanceIdentity();
+
+    bool InitFromFile();
+
+    void InitFromNetwork();
 
 private:
-    void getECSMetaFromFile();
     // 从云助手获取序列号
     void getSerialNumberFromEcsAssist();
     // 从本地文件获取hostid
     void getLocalHostId();
 
-    void updateHostId();
-    void setHostId(const Hostid& hostid);
-
-    std::shared_mutex mMutex;
+    void updateHostId(const ECSMeta& meta);
+    void dumpInstanceIdentityToFile();
 
 #if defined(_MSC_VER)
     std::string mEcsAssistMachineIdFile = "C:\\ProgramData\\aliyun\\assist\\hybrid\\machine-id";
 #else
     std::string mEcsAssistMachineIdFile = "/usr/local/share/aliyun-assist/hybrid/machine-id";
 #endif
+
     bool mHasTriedToGetSerialNumber = false;
     std::string mSerialNumber;
 
-    Hostid mHostid;
+    DoubleBuffer<Entity> mEntity;
 
-    ECSMeta mMetadata;
-    std::string mMetadataStr;
-
+    Json::Value mInstanceIdentityJson;
+    std::string mInstanceIdentityFile;
+    bool mHasGeneratedLocalHostId = false;
     std::string mLocalHostId;
+#ifdef __ENTERPRISE__
+    friend class EnterpriseConfigProvider;
+#endif
 };
 
 } // namespace logtail
