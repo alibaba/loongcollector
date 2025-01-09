@@ -5,7 +5,7 @@
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
-#include "ebpf/util/IdAllocator.h"
+#include "ebpf/driver/IdAllocator.h"
 #include "ebpf/driver/BPFMapTraits.h"
 
 DECLARE_FLAG_BOOL(logtail_mode);

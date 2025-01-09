@@ -1,13 +1,14 @@
 #pragma once
 
-#include <queue>
 #include <mutex>
-#include "ebpf/driver/BPFMapTraits.h"
+#include <queue>
+
+#include "BPFMapTraits.h"
 
 namespace logtail {
 namespace ebpf {
 
-template<typename BPFMap>
+template <typename BPFMap>
 class IdManager {
 public:
     IdManager() : mIdMax(logtail::ebpf::BPFMapTraits<BPFMap>::outter_max_entries) {}
@@ -34,6 +35,7 @@ public:
 
         mReleasedIds.push(id);
     }
+
 private:
     int mIdMax;
     int mNextId = 0;
@@ -48,29 +50,30 @@ public:
         return &instance;
     }
 
-    template<typename BPFMap>
+    template <typename BPFMap>
     int GetNextId() {
         return GetIdManager<BPFMap>().GetNextId();
     }
 
-    template<typename BPFMap>
+    template <typename BPFMap>
     void ReleaseId(int id) {
         return GetIdManager<BPFMap>().ReleaseId(id);
     }
 
-    template<typename BPFMap>
+    template <typename BPFMap>
     int GetMaxId() {
         return GetIdManager<BPFMap>().GetMaxId();
     }
+
 private:
     IdAllocator() {}
 
-    template<typename BPFMap>
+    template <typename BPFMap>
     IdManager<BPFMap>& GetIdManager() {
         static IdManager<BPFMap> manager;
         return manager;
     }
 };
 
-}// namespace ebpf
-}// namespace logtail
+} // namespace ebpf
+} // namespace logtail

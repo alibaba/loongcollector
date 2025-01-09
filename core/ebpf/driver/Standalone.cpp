@@ -1,28 +1,29 @@
-#include <dlfcn.h>
-#include <iostream>
-#include <string>
-#include <thread>
+#include <assert.h>
 #include <chrono>
 #include <cstring>
-#include <vector>
-#include <memory>
-#include <variant>
-#include <sstream>
-#include <assert.h>
-
-#include "ebpf/include/export.h"
-#include "NetworkObserver.h"
-#include "Log.h"
+#include <dlfcn.h>
 #include <net.h>
+
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <variant>
+#include <vector>
+
+#include "Log.h"
+#include "NetworkObserver.h"
+#include "ebpf/include/export.h"
 // #include "eBPFWrapper.h"
 // #include <security.skel.h>
 
-using init_func = int (*)(void *);
+using init_func = int (*)(void*);
 using deinit_func = void (*)();
-using remove_func = int(*)(void*);
-using update_func=void(*)(void*);
-using suspend_func=int(*)(void*);
-using ebpf_poll_events_func = int32_t(*)(int32_t, int32_t *, int);
+using remove_func = int (*)(void*);
+using update_func = void (*)(void*);
+using suspend_func = int (*)(void*);
+using ebpf_poll_events_func = int32_t (*)(int32_t, int32_t*, int);
 
 std::vector<std::string> split(const std::string& str, char delimiter) {
     std::vector<std::string> tokens;
@@ -39,63 +40,61 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
 
 class source_manager {
 public:
-    source_manager() : handle(nullptr)/*, initPluginFunc(nullptr), deinitPluginFunc(nullptr)*/ {}
+    source_manager() : handle(nullptr) /*, initPluginFunc(nullptr), deinitPluginFunc(nullptr)*/ {}
 
     ~source_manager() {
         // clearPlugin();
     }
 
     bool init() {
-      // load libsockettrace.so
-      handle = dlopen("./libebpf_driver.so", RTLD_NOW);
-      if (!handle) {
-        std::cerr << "dlopen error: " << dlerror()  << std::endl;
-        return false;
-      }
-      std::cout << "successfully open" ;
+        // load libsockettrace.so
+        handle = dlopen("./libebpf_driver.so", RTLD_NOW);
+        if (!handle) {
+            std::cerr << "dlopen error: " << dlerror() << std::endl;
+            return false;
+        }
+        std::cout << "successfully open";
 
-      initPluginFunc = (init_func)dlsym(handle, "start_plugin");
-      noPollFunc = (ebpf_poll_events_func)dlsym(handle, "ebpf_poll_events");
-      pollPbsFunc = (poll_plugin_pbs_func)dlsym(handle, "poll_plugin_pbs");
-      setLoggerFunc = (set_logger_func)dlsym(handle, "set_logger");
+        initPluginFunc = (init_func)dlsym(handle, "start_plugin");
+        noPollFunc = (ebpf_poll_events_func)dlsym(handle, "ebpf_poll_events");
+        pollPbsFunc = (poll_plugin_pbs_func)dlsym(handle, "poll_plugin_pbs");
+        setLoggerFunc = (set_logger_func)dlsym(handle, "set_logger");
 
-      setLoggerFunc([](int16_t level, const char *format, va_list args){
-            
-          char buffer[1024] = {0};
-          vsnprintf(buffer, 1023, format, args);
-          std::cout << buffer;
-          std::cout << std::endl;
-          return 0;
-      });
+        setLoggerFunc([](int16_t level, const char* format, va_list args) {
+            char buffer[1024] = {0};
+            vsnprintf(buffer, 1023, format, args);
+            std::cout << buffer;
+            std::cout << std::endl;
+            return 0;
+        });
 
-    //   removePluginFunc = (remove_func)dlsym(handle, "removep");
-    //   deinitPluginFunc = (deinit_func)dlsym(handle, "deinit");
-    //   updatePluginFunc = (update_func)dlsym(handle, "update");
-    //   suspendPluginFunc = (suspend_func)dlsym(handle, "suspend");
-      
+        //   removePluginFunc = (remove_func)dlsym(handle, "removep");
+        //   deinitPluginFunc = (deinit_func)dlsym(handle, "deinit");
+        //   updatePluginFunc = (update_func)dlsym(handle, "update");
+        //   suspendPluginFunc = (suspend_func)dlsym(handle, "suspend");
 
-      if (!initPluginFunc/* || !deinitPluginFunc || !removePluginFunc*/) {
-        std::cerr << "dlsym error: " << dlerror() ;
-        dlclose(handle);
-        return false;
-      } else {
-        std::cout << "succesfully get init/call/deinit func address" ;
-      }
-      return true;
+
+        if (!initPluginFunc /* || !deinitPluginFunc || !removePluginFunc*/) {
+            std::cerr << "dlsym error: " << dlerror();
+            dlclose(handle);
+            return false;
+        } else {
+            std::cout << "succesfully get init/call/deinit func address";
+        }
+        return true;
     }
 
     bool startProcessPlugin() {
         auto ebpf_config = std::make_unique<logtail::ebpf::PluginConfig>();
         logtail::ebpf::ProcessConfig config;
-        config.mPerfBufferSpec = {
-          {"tcpmon_map", 128, nullptr, 
-          [](void *ctx, int cpu, void *data, uint32_t size) {
-            std::cout << "receive event ... " << std::endl;
-          },
-          [](void *ctx, int cpu, unsigned long long cnt){
-            std::cout << "lost " << cnt << " events on CPU:" << cpu << std::endl;
-          }}
-        };
+        config.mPerfBufferSpec
+            = {{"tcpmon_map",
+                128,
+                nullptr,
+                [](void* ctx, int cpu, void* data, uint32_t size) { std::cout << "receive event ... " << std::endl; },
+                [](void* ctx, int cpu, unsigned long long cnt) {
+                    std::cout << "lost " << cnt << " events on CPU:" << cpu << std::endl;
+                }}};
         ebpf_config->mPluginType = logtail::ebpf::PluginType::PROCESS_SECURITY;
         ebpf_config->mConfig = config;
 
@@ -103,25 +102,23 @@ public:
         initPluginFunc(ebpf_config.get());
         std::cout << "after call init func" << std::endl;
 
-        noPerfWorker = std::thread([&](){
-          int32_t flag = 0;
-          while(true) {
-            auto ret = pollPbsFunc(logtail::ebpf::PluginType::PROCESS_SECURITY, 4096, &flag, 200);
-            if (ret < 0) {
-              std::cout << "poll event err, ret:" << ret << std::endl;
-            } else {
-              std::cout << "poll event number:" << ret << std::endl;
+        noPerfWorker = std::thread([&]() {
+            int32_t flag = 0;
+            while (true) {
+                auto ret = pollPbsFunc(logtail::ebpf::PluginType::PROCESS_SECURITY, 4096, &flag, 200);
+                if (ret < 0) {
+                    std::cout << "poll event err, ret:" << ret << std::endl;
+                } else {
+                    std::cout << "poll event number:" << ret << std::endl;
+                }
             }
-          }
         });
         return true;
     }
 
     bool startNetworkPlugin() {
-      
-
-      // void* init_param = nullptr;
-      auto ebpf_config = std::make_unique<logtail::ebpf::PluginConfig>();
+        // void* init_param = nullptr;
+        auto ebpf_config = std::make_unique<logtail::ebpf::PluginConfig>();
 
         // compose param
         logtail::ebpf::NetworkObserveConfig config;
@@ -131,80 +128,76 @@ public:
         int err;
         void* cleanup_dog_ptr = dlsym(handle, "ebpf_cleanup_dog");
         if (nullptr == cleanup_dog_ptr) {
-          std::cout << "[SourceManager] get ebpf_cleanup_dog address failed!"<< std::endl ;
+            std::cout << "[SourceManager] get ebpf_cleanup_dog address failed!" << std::endl;
         } else {
-          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog address" << std::endl ;
+            std::cout << "[SourceManager] successfully get ebpf_cleanup_dog address" << std::endl;
         }
 
         err = dladdr(cleanup_dog_ptr, &dlinfo);
-        if (!err)
-        {
-          std::cout << "[SourceManager] ebpf_cleanup_dog laddr failed, err:" << strerror(err);
-          // printf(:%s\n", strerror(err));
+        if (!err) {
+            std::cout << "[SourceManager] ebpf_cleanup_dog laddr failed, err:" << strerror(err);
+            // printf(:%s\n", strerror(err));
         } else {
-          config.mUprobeOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog dlinfo, uprobe_offset:" << config.mUprobeOffset<< std::endl;
+            config.mUprobeOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+            std::cout << "[SourceManager] successfully get ebpf_cleanup_dog dlinfo, uprobe_offset:"
+                      << config.mUprobeOffset << std::endl;
         }
 
         void* ebpf_update_conn_addr_ptr = dlsym(handle, "ebpf_update_conn_addr");
         if (nullptr == ebpf_update_conn_addr_ptr) {
-          std::cout << "[SourceManager] get ebpf_update_conn_addr address failed!" << std::endl;
+            std::cout << "[SourceManager] get ebpf_update_conn_addr address failed!" << std::endl;
         } else {
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr address" << std::endl;
+            std::cout << "[SourceManager] successfully get ebpf_update_conn_addr address" << std::endl;
         }
         err = dladdr(ebpf_update_conn_addr_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_update_conn_addr laddr failed, err:%s\n", strerror(err));
+        if (!err) {
+            printf("[SourceManager] ebpf_update_conn_addr laddr failed, err:%s\n", strerror(err));
         } else {
-          config.mUpcaOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr dlinfo, upca_offset" << config.mUpcaOffset << std::endl;
+            config.mUpcaOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+            std::cout << "[SourceManager] successfully get ebpf_update_conn_addr dlinfo, upca_offset"
+                      << config.mUpcaOffset << std::endl;
         }
 
         void* ebpf_disable_process_ptr = dlsym(handle, "ebpf_disable_process");
         if (nullptr == ebpf_disable_process_ptr) {
-          std::cout << "[SourceManager] get ebpf_disable_process address failed!" ;
+            std::cout << "[SourceManager] get ebpf_disable_process address failed!";
         } else {
-          std::cout << "[SourceManager] successfully get ebpf_disable_process address" ;
+            std::cout << "[SourceManager] successfully get ebpf_disable_process address";
         }
         err = dladdr(ebpf_disable_process_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_disable_process laddr failed, err:%s\n", strerror(err));
+        if (!err) {
+            printf("[SourceManager] ebpf_disable_process laddr failed, err:%s\n", strerror(err));
         } else {
-          config.mUppsOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_disable_process dlinfo, upps_offset:" << config.mUppsOffset ;
+            config.mUppsOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+            std::cout << "[SourceManager] successfully get ebpf_disable_process dlinfo, upps_offset:"
+                      << config.mUppsOffset;
         }
 
         void* ebpf_update_conn_role_ptr = dlsym(handle, "ebpf_update_conn_role");
         if (nullptr == ebpf_update_conn_role_ptr) {
-          std::cout << "[SourceManager] get ebpf_update_conn_role address failed!" ;
+            std::cout << "[SourceManager] get ebpf_update_conn_role address failed!";
         } else {
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_role address" ;
+            std::cout << "[SourceManager] successfully get ebpf_update_conn_role address";
         }
         err = dladdr(ebpf_update_conn_role_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_update_conn_role laddr failed, err:%s\n", strerror(err));
+        if (!err) {
+            printf("[SourceManager] ebpf_update_conn_role laddr failed, err:%s\n", strerror(err));
         } else {
-          config.mUpcrOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_role dlinfo, upcr_offset:" << config.mUpcrOffset ;
+            config.mUpcrOffset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+            std::cout << "[SourceManager] successfully get ebpf_update_conn_role dlinfo, upcr_offset:"
+                      << config.mUpcrOffset;
         }
         // config.enable_cid_filter = false;
-        config.mCtrlHandler = [](void *custom_data, struct conn_ctrl_event_t *event){
-            std::cout << "recv ctrl event" << std::endl;
-        };
-        config.mDataHandler = [](void *custom_data, struct conn_data_event_t *event){
-            std::cout << "recv data event" << std::endl;
-        };
-        config.mStatsHandler = [](void *custom_data, struct conn_stats_event_t *event){
-            std::cout << "recv stats event" << std::endl;
-        };
-        config.mLostHandler = [](void *custom_data, enum callback_type_e type, uint64_t lost_count){
+        config.mCtrlHandler
+            = [](void* custom_data, struct conn_ctrl_event_t* event) { std::cout << "recv ctrl event" << std::endl; };
+        config.mDataHandler
+            = [](void* custom_data, struct conn_data_event_t* event) { std::cout << "recv data event" << std::endl; };
+        config.mStatsHandler
+            = [](void* custom_data, struct conn_stats_event_t* event) { std::cout << "recv stats event" << std::endl; };
+        config.mLostHandler = [](void* custom_data, enum callback_type_e type, uint64_t lost_count) {
             std::cout << "lost events ..." << std::endl;
         };
-        config.mLogHandler = [](int16_t level, const char *format, va_list args){
-            
+        config.mLogHandler = [](int16_t level, const char* format, va_list args) {
             char buffer[1024] = {0};
             vsnprintf(buffer, 1023, format, args);
             std::cout << buffer;
@@ -213,24 +206,23 @@ public:
         };
         // config.enable_container_ids_ = {"5cb30fc9cfc3d30a2b561a20760d69a191bcd710dda5e258e1be05a0af1a5ed1"};
         ebpf_config->mPluginType = logtail::ebpf::PluginType::NETWORK_OBSERVE;
-        ebpf_config->mConfig = config;        
+        ebpf_config->mConfig = config;
 
-      std::cout << "begin to call init func" << std::endl;
+        std::cout << "begin to call init func" << std::endl;
 
-      initPluginFunc(ebpf_config.get());
+        initPluginFunc(ebpf_config.get());
 
-      noPerfWorker = std::thread([&](){
-        int32_t flag = 0;
-        while(true) {
-          auto ret = noPollFunc(4096, &flag, 200);
-          if (ret < 0) {
-            std::cout << "poll event err, ret:" << ret << std::endl;
-          }
-        }
-        
-      });
+        noPerfWorker = std::thread([&]() {
+            int32_t flag = 0;
+            while (true) {
+                auto ret = noPollFunc(4096, &flag, 200);
+                if (ret < 0) {
+                    std::cout << "poll event err, ret:" << ret << std::endl;
+                }
+            }
+        });
 
-      return true;
+        return true;
     }
 
     // void removePlugin() {
@@ -307,7 +299,7 @@ public:
     //   delete config;
     // }
 private:
-    void *handle;
+    void* handle;
     init_func initPluginFunc;
     ebpf_poll_events_func noPollFunc;
     poll_plugin_pbs_func pollPbsFunc;
@@ -321,7 +313,7 @@ private:
     // suspend_func suspendPluginFunc;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     auto sm = std::make_unique<source_manager>();
     std::cout << "begin init" << std::endl;
     sm->init();
@@ -334,4 +326,3 @@ int main(int argc, char *argv[]) {
     std::cout << "begin shutdown ... " << std::endl;
     return 0;
 }
-

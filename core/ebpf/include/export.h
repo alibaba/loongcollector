@@ -111,6 +111,7 @@ struct NetworkObserveConfig {
     net_lost_func_t mLostHandler = nullptr;
 
     bool mEnableCidFilter = false;
+    int mCidOffset = -1;
 
     std::vector<std::string> mEnableContainerIds;
     std::vector<std::string> mDisableContainerIds;
