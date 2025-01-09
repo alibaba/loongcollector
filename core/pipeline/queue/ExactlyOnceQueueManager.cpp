@@ -126,16 +126,16 @@ bool ExactlyOnceQueueManager::IsValidToPushProcessQueue(QueueKey key) const {
     return iter->second->IsValidToPush();
 }
 
-int ExactlyOnceQueueManager::PushProcessQueue(QueueKey key, unique_ptr<ProcessQueueItem>&& item) {
+QueueStatus ExactlyOnceQueueManager::PushProcessQueue(QueueKey key, unique_ptr<ProcessQueueItem>&& item) {
     lock_guard<mutex> lock(mProcessQueueMux);
     auto iter = mProcessQueues.find(key);
     if (iter == mProcessQueues.end()) {
-        return 2;
+        return QueueStatus::QUEUE_NOT_EXIST;
     }
     if (!iter->second->Push(std::move(item))) {
-        return 1;
+        return QueueStatus::QUEUE_FULL;
     }
-    return 0;
+    return QueueStatus::OK;
 }
 
 bool ExactlyOnceQueueManager::IsAllProcessQueueEmpty() const {

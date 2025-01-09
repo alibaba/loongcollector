@@ -171,16 +171,16 @@ void ExactlyOnceQueueManagerUnittest::TestPushProcessQueue() {
 
     // queue exists
     APSARA_TEST_TRUE(sManager->IsValidToPushProcessQueue(0));
-    APSARA_TEST_EQUAL(0, sManager->PushProcessQueue(0, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::OK, sManager->PushProcessQueue(0, GenerateProcessItem()));
 
     // no queue exists
     APSARA_TEST_FALSE(sManager->IsValidToPushProcessQueue(1));
-    APSARA_TEST_EQUAL(2, sManager->PushProcessQueue(1, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_NOT_EXIST, sManager->PushProcessQueue(1, GenerateProcessItem()));
 
     // invalid to push
     sManager->mProcessQueues[0]->mValidToPush = false;
     APSARA_TEST_FALSE(sManager->IsValidToPushProcessQueue(0));
-    APSARA_TEST_EQUAL(1, sManager->PushProcessQueue(0, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sManager->PushProcessQueue(0, GenerateProcessItem()));
 }
 
 void ExactlyOnceQueueManagerUnittest::TestIsAllProcessQueueEmpty() {

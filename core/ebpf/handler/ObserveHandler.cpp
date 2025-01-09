@@ -89,7 +89,7 @@ void OtelMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
             LOG_WARNING(sLogger,
                         ("configName", mCtx->GetConfigName())("pluginIdx",
                                                               mPluginIdx)("[Otel Metrics] push queue failed!", ""));
@@ -121,7 +121,7 @@ void OtelSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
             LOG_WARNING(
                 sLogger,
                 ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
@@ -159,7 +159,7 @@ void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEven
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
             LOG_WARNING(
                 sLogger,
                 ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
@@ -276,7 +276,7 @@ void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
             LOG_WARNING(
                 sLogger,
                 ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
@@ -321,7 +321,7 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) != QueueStatus::OK) {
             LOG_WARNING(
                 sLogger,
                 ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Metrics] push queue failed!", ""));

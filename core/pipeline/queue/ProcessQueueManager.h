@@ -35,6 +35,8 @@
 
 namespace logtail {
 
+enum class QueueStatus { OK, QUEUE_FULL, QUEUE_NOT_EXIST };
+
 class ProcessQueueManager : public FeedbackInterface {
 public:
     using ProcessQueueIterator = std::list<std::unique_ptr<ProcessQueueInterface>>::iterator;
@@ -58,7 +60,7 @@ public:
     bool DeleteQueue(QueueKey key);
     bool IsValidToPush(QueueKey key) const;
     // 0: success, 1: queue is full, 2: queue not found
-    int PushQueue(QueueKey key, std::unique_ptr<ProcessQueueItem>&& item);
+    QueueStatus PushQueue(QueueKey key, std::unique_ptr<ProcessQueueItem>&& item);
     bool PopItem(int64_t threadNo, std::unique_ptr<ProcessQueueItem>& item, std::string& configName);
     bool IsAllQueueEmpty() const;
     bool SetDownStreamQueues(QueueKey key, std::vector<BoundedSenderQueueInterface*>&& ques);

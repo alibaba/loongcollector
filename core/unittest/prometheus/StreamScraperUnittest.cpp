@@ -58,7 +58,7 @@ void StreamScraperUnittest::TestStreamMetricWriteCallback() {
 
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    auto streamScraper = make_shared<StreamScraper>(labels, 0, 0);
+    auto streamScraper = make_shared<StreamScraper>(labels, 0, 0, "id", nullptr, std::chrono::system_clock::now());
     streamScraper->mEventPool = &eventPool;
     streamScraper->mHash = "test_jobhttp://localhost:8080/metrics";
 
@@ -117,7 +117,7 @@ void StreamScraperUnittest::TestStreamSendMetric() {
 
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    auto streamScraper = make_shared<StreamScraper>(labels, 0, 0);
+    auto streamScraper = make_shared<StreamScraper>(labels, 0, 0, "id", nullptr, std::chrono::system_clock::now());
     streamScraper->mEventPool = &eventPool;
     streamScraper->mHash = "test_jobhttp://localhost:8080/metrics";
 
