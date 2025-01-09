@@ -237,19 +237,22 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
 }
 
 void PreparePostAPMBackendRequest(const string& accessKeyId,
-                                       const string& accessKeySecret,
-                                       SLSClientManager::AuthType type,
-                                       const string& host,
-                                       bool isHostIp,
-                                       const string& project,
-                                       const string& logstore,
-                                       const string& compressType,
-                                       const string& body,
-                                       size_t rawSize,
-                                       const string& path,
-                                       map<string, string>& header) {
+                                    const string& accessKeySecret,
+                                    SLSClientManager::AuthType type,
+                                    const string& host,
+                                    bool isHostIp,
+                                    const string& project,
+                                    const string& logstore,
+                                    const string& compressType,
+                                    RawDataType dataType,
+                                    const string& body,
+                                    size_t rawSize,
+                                    const string& shardHashKey,
+                                    optional<uint64_t> seqId,
+                                    const string& path,
+                                    string& query,
+                                    map<string, string>& header) {
 
-    LOG_DEBUG(sLogger, ("entering, subpath", path) ("project", project));
     if (isHostIp) {
         header[HOST] = project + "." + host;
     } else {
@@ -265,12 +268,25 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
     if (!compressType.empty()) {
         header[X_LOG_COMPRESSTYPE] = compressType;
     }
-    header[X_LOG_BODYRAWSIZE] = to_string(rawSize);
+    if (dataType == RawDataType::EVENT_GROUP) {
+        header[X_LOG_BODYRAWSIZE] = to_string(rawSize);
+    } else {
+        header[X_LOG_BODYRAWSIZE] = to_string(body.size());
+        header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
+    }
     if (type == SLSClientManager::AuthType::ANONYMOUS) {
         header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
     }
 
     map<string, string> parameterList;
+    if (!shardHashKey.empty()) {
+        parameterList["key"] = shardHashKey;
+        if (seqId.has_value()) {
+            parameterList["seqid"] = to_string(seqId.value());
+        }
+    }
+    query = GetQueryString(parameterList);
+
     string signature = GetUrlSignature(HTTP_POST, path, header, parameterList, body, accessKeySecret);
     header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
 }
@@ -342,30 +358,37 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
     return ParseHttpResponse(response);
 }
 
-SLSResponse PostARMSBackendLogs(const std::string& accessKeyId,
-                                const std::string& accessKeySecret,
-                                SLSClientManager::AuthType type,
-                                const std::string& host,
-                                bool httpsFlag,
-                                const std::string& project,
-                                const std::string& logstore,
-                                const std::string& compressType,
-                                const std::string& body,
-                                size_t rawSize,
-                                const std::string& subpath) {
+SLSResponse PostAPMBackendLogs(const string& accessKeyId,
+                             const string& accessKeySecret,
+                             SLSClientManager::AuthType type,
+                             const string& host,
+                             bool httpsFlag,
+                             const string& project,
+                             const string& logstore,
+                             const string& compressType,
+                             RawDataType dataType,
+                             const string& body,
+                             size_t rawSize,
+                             const string& shardHashKey,
+                             const std::string& subpath) {
+    string query;
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
-                                      accessKeySecret,
-                                      type,
-                                      host,
-                                      false, // sync request always uses vip
-                                      project,
-                                      logstore,
-                                      compressType,
-                                      body,
-                                      rawSize,
-                                      subpath,
-                                      header);
+                                   accessKeySecret,
+                                   type,
+                                   host,
+                                   false, // sync request always uses vip
+                                   project,
+                                   logstore,
+                                   compressType,
+                                   dataType,
+                                   body,
+                                   rawSize,
+                                   shardHashKey,
+                                   nullopt, // sync request does not support exactly-once
+                                   subpath,
+                                   query,
+                                   header);
     HttpResponse response;
     SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, subpath, "", header, body),
                     response);

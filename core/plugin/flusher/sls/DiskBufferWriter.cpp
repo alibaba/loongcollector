@@ -772,7 +772,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_shardhashkey(data->mShardHashKey);
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
-    bufferMeta.set_subpath(flusher->mSubpath);
+    bufferMeta.set_subpath(flusher->GetSubpath());
 #ifdef __ENTERPRISE__
     bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
 #endif
@@ -892,17 +892,19 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
             return response;
         }
         LOG_DEBUG(sLogger, ("subpath", bufferMeta.subpath()) ("telemetry type", static_cast<int>(bufferMeta.telemetrytype())));
-        return PostARMSBackendLogs(accessKeyId,
-                                   accessKeySecret,
-                                   type,
-                                   host,
-                                   httpsFlag,
-                                   bufferMeta.project(),
-                                   bufferMeta.logstore(),
-                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                   logData,
-                                   bufferMeta.rawsize(),
-                                   bufferMeta.subpath());
+        return PostAPMBackendLogs(accessKeyId,
+                                accessKeySecret,
+                                type,
+                                host,
+                                httpsFlag,
+                                bufferMeta.project(),
+                                bufferMeta.logstore(),
+                                GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                dataType,
+                                logData,
+                                bufferMeta.rawsize(),
+                                bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
+                                bufferMeta.subpath());
     } else {
         return PostLogStoreLogs(accessKeyId,
                                 accessKeySecret,
