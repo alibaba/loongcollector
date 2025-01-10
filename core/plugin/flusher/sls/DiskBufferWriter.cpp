@@ -870,8 +870,10 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         dataType = RawDataType::EVENT_GROUP;
     }
 
-    if (!bufferMeta.has_telemetrytype() || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_LOGS) {
-        // process logs
+    auto telemetryType = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    switch (telemetryType)
+    {
+    case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
         return PostLogStoreLogs(accessKeyId,
                                 accessKeySecret,
                                 type,
@@ -884,8 +886,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                 logData,
                                 bufferMeta.rawsize(),
                                 bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "");
-    } else if (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
-        // process apm
+    case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
         return PostMetricStoreLogs(accessKeyId,
                                    accessKeySecret,
                                    type,
@@ -896,10 +897,9 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                    GetSLSCompressTypeString(bufferMeta.compresstype()),
                                    logData,
                                    bufferMeta.rawsize());
-    } else if (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS
-               || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES
-               || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS) {
-        // process apm
+    case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
+    case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
+    case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         return PostAPMBackendLogs(accessKeyId,
                                   accessKeySecret,
                                   type,
@@ -913,6 +913,13 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                   bufferMeta.rawsize(),
                                   bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
                                   bufferMeta.subpath());
+    default:
+        // should not happen
+        LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));
+        SLSResponse response;
+        response.mErrorCode = LOGE_REQUEST_ERROR;
+        response.mErrorMsg = "Unhandled telemetry type";
+        return response;
     }
 }
 
