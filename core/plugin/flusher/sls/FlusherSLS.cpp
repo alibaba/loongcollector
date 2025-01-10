@@ -496,7 +496,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                        strategy,
                        !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
                            && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS)) {
-        // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is not metrics, we don't
+        // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
         // enable group batch
         return false;
     }
