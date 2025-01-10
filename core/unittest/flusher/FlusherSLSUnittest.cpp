@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include <memory>
-#include <string>
 #include <random>
+#include <string>
 
 #include "json/json.h"
 
@@ -1714,7 +1714,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
 std::string GenerateRandomString(size_t length) {
     const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     std::random_device rd;
-    std::mt19937 generator(rd()); 
+    std::mt19937 generator(rd());
     std::uniform_int_distribution<> distribution(0, chars.size() - 1);
     std::string result;
     for (size_t i = 0; i < length; ++i) {
@@ -1758,22 +1758,16 @@ void FlusherSLSUnittest::TestSendAPMTraces() {
         std::vector<std::unique_ptr<ProcessQueueItem>> items;
         // construct vector<PipelineEventGroup>
         // 1000 timeseries for app
-        std::vector<std::string> app_ids = {
-            "eeeb8df999f59f569da84d27fa408a94", 
-            "deddf8ef215107d8fd37540ac4e3291b", 
-            "52abe1564d8ee3fea66e9302fc21d80d", 
-            "87f79be5ab74d72b4a10b62c02dc7f34", 
-            "1796627f8e0b7fbba042c145820311f9"
-        };
-        std::vector<std::string> service_name = {
-            "test-service-1", 
-            "test-service-2", 
-            "test-service-3", 
-            "test-service-4", 
-            "test-service-5"
-        };
-        for (size_t i = 0; i < app_ids.size(); i ++) {
-            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+        std::vector<std::string> app_ids = {"eeeb8df999f59f569da84d27fa408a94",
+                                            "deddf8ef215107d8fd37540ac4e3291b",
+                                            "52abe1564d8ee3fea66e9302fc21d80d",
+                                            "87f79be5ab74d72b4a10b62c02dc7f34",
+                                            "1796627f8e0b7fbba042c145820311f9"};
+        std::vector<std::string> service_name
+            = {"test-service-1", "test-service-2", "test-service-3", "test-service-4", "test-service-5"};
+        for (size_t i = 0; i < app_ids.size(); i++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();
+            ;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("serviceName"), service_name[i]);
             mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
@@ -1781,7 +1775,7 @@ void FlusherSLSUnittest::TestSendAPMTraces() {
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
-            for (size_t j = 0 ; j < 25; j ++) {
+            for (size_t j = 0; j < 25; j++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
                 // spanEvent->SetScopeTag();
                 spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
@@ -1803,7 +1797,7 @@ void FlusherSLSUnittest::TestSendAPMTraces() {
                 spanEvent->SetEndTimeNs(nano);
                 spanEvent->SetTimestamp(seconds);
             }
-            for (size_t j = 0 ; j < 25; j ++) {
+            for (size_t j = 0; j < 25; j++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
                 spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
                 spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
@@ -1859,22 +1853,22 @@ void FlusherSLSUnittest::TestSendAPMMetrics() {
     // generate apm metrics
     {
         const std::vector<std::string> app_metric_names = {
-                                "arms_rpc_requests_count", 
-                                "arms_rpc_requests_slow_count", 
-                                "arms_rpc_requests_error_count",
-                                "arms_rpc_requests_seconds",
-                                "arms_rpc_requests_by_status_count",
-                            };
+            "arms_rpc_requests_count",
+            "arms_rpc_requests_slow_count",
+            "arms_rpc_requests_error_count",
+            "arms_rpc_requests_seconds",
+            "arms_rpc_requests_by_status_count",
+        };
         const std::vector<std::string> tcp_metrics_names = {
-                                "arms_npm_tcp_rtt_avg", 
-                                "arms_npm_tcp_count_by_state", 
-                                "arms_npm_tcp_conn_stats_count",
-                                "arms_npm_tcp_drop_count",
-                                "arms_npm_tcp_retrans_total",
-                                "arms_npm_recv_packets_total",
-                                "arms_npm_sent_packets_total",
-                                "arms_npm_recv_bytes_total",
-                                "arms_npm_sent_bytes_total",
+            "arms_npm_tcp_rtt_avg",
+            "arms_npm_tcp_count_by_state",
+            "arms_npm_tcp_conn_stats_count",
+            "arms_npm_tcp_drop_count",
+            "arms_npm_tcp_retrans_total",
+            "arms_npm_recv_packets_total",
+            "arms_npm_sent_packets_total",
+            "arms_npm_recv_bytes_total",
+            "arms_npm_sent_bytes_total",
         };
         auto now = std::chrono::system_clock::now();
         auto duration = now.time_since_epoch();
@@ -1882,15 +1876,14 @@ void FlusherSLSUnittest::TestSendAPMMetrics() {
         std::vector<std::unique_ptr<ProcessQueueItem>> items;
         // construct vector<PipelineEventGroup>
         // 1000 timeseries for app
-        std::vector<std::string> app_ids = {
-            "eeeb8df999f59f569da84d27fa408a94", 
-            "deddf8ef215107d8fd37540ac4e3291b", 
-            "52abe1564d8ee3fea66e9302fc21d80d", 
-            "87f79be5ab74d72b4a10b62c02dc7f34", 
-            "1796627f8e0b7fbba042c145820311f9"
-        };
-        for (size_t i = 0; i < app_ids.size(); i ++) {
-            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+        std::vector<std::string> app_ids = {"eeeb8df999f59f569da84d27fa408a94",
+                                            "deddf8ef215107d8fd37540ac4e3291b",
+                                            "52abe1564d8ee3fea66e9302fc21d80d",
+                                            "87f79be5ab74d72b4a10b62c02dc7f34",
+                                            "1796627f8e0b7fbba042c145820311f9"};
+        for (size_t i = 0; i < app_ids.size(); i++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();
+            ;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
             mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
@@ -1898,8 +1891,8 @@ void FlusherSLSUnittest::TestSendAPMMetrics() {
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
-            for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
-                for (size_t z = 0; z < 10; z ++ ) {
+            for (size_t j = 0; j < app_metric_names.size(); j++) {
+                for (size_t z = 0; z < 10; z++) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
                     metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
                     metricsEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
@@ -1918,8 +1911,9 @@ void FlusherSLSUnittest::TestSendAPMMetrics() {
             APSARA_TEST_TRUE(flusher.Send(std::move(mTestEventGroup)));
         }
         // tcp_metrics
-        for (size_t i = 0; i < app_ids.size(); i ++)  {
-            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+        for (size_t i = 0; i < app_ids.size(); i++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();
+            ;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
             mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
@@ -1927,8 +1921,8 @@ void FlusherSLSUnittest::TestSendAPMMetrics() {
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
-            for (size_t j = 0 ; j < tcp_metrics_names.size(); j ++) {
-                for (size_t z = 0; z < 20; z ++ ) {
+            for (size_t j = 0; j < tcp_metrics_names.size(); j++) {
+                for (size_t z = 0; z < 20; z++) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
                     metricsEvent->SetName(tcp_metrics_names[j]);
                     metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
@@ -1987,7 +1981,7 @@ void FlusherSLSUnittest::TestSendAPMAgentInfos() {
     const std::string ipKey = "ip";
     const std::string ip_prefix = "30.221.146.";
     const std::string agentVersionKey = "agentVersion";
-    for (int i = 0; i < 50; i ++) {
+    for (int i = 0; i < 50; i++) {
         std::string app = app_prefix + std::to_string(i);
         std::string ip = ip_prefix + std::to_string(i);
         auto logEvent = eventGroup.AddLogEvent();
@@ -1998,7 +1992,9 @@ void FlusherSLSUnittest::TestSendAPMAgentInfos() {
         logEvent->SetContent(startTimestampKey, startTimestamp);
         logEvent->SetContent(agentVersionKey, "0.0.1");
         // auto now = std::chrono::steady_clock::now();
-        logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+        logEvent->SetTimestamp(
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count());
     }
     APSARA_TEST_TRUE(flusher.Send(std::move(eventGroup)));
     flusher.FlushAll();
