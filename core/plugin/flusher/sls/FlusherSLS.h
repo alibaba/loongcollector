@@ -132,11 +132,11 @@ private:
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
                                                                       SLSSenderQueueItem* item) const;
-    std::unique_ptr<HttpSinkRequest> CreatePostArmsBackendRequest(const std::string& accessKeyId,
-                                                                      const std::string& accessKeySecret,
-                                                                      SLSClientManager::AuthType type,
-                                                                      SLSSenderQueueItem* item,
-                                                                      const std::string& subPath) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
+                                                                 const std::string& accessKeySecret,
+                                                                 SLSClientManager::AuthType type,
+                                                                 SLSSenderQueueItem* item,
+                                                                 const std::string& subPath) const;
 
     std::string mSubpath;
 

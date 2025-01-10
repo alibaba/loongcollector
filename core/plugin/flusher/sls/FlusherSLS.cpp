@@ -297,6 +297,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
+        // TelemetryType not set (for log scenarios)
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
                               errorMsg,
@@ -307,21 +308,20 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     } else if (telemetryType == "metrics") {
+        // TelemetryType set to metrics
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     } else if (telemetryType == "arms_agentinfo") {
         mSubpath = APM_AGENTINFOS_URL;
-        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
     } else if (telemetryType == "arms_metrics") {
         mSubpath = APM_METRICS_URL;
-        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS;
     } else if (telemetryType == "arms_traces") {
         mSubpath = APM_TRACES_URL;
-        mLogstore = DUMMY_LOG_STORE;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES;
     } else if (!telemetryType.empty() && telemetryType != "logs") {
+        // TelemetryType invalid
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
                               "string param TelemetryType is not valid",
@@ -334,7 +334,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // Logstore
-    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS) {
+    if (telemetryType.empty() || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+        // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
                             mContext->GetAlarm(),
@@ -345,6 +346,10 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                             mContext->GetLogstoreName(),
                             mContext->GetRegion());
         }
+    } else if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS || 
+        mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES){
+        // apm
+        mLogstore = DUMMY_LOG_STORE;
     }
 
     // Region
@@ -686,7 +691,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-            req = CreatePostArmsBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
             break;
         default:
             break;
@@ -1266,16 +1271,12 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         1);
 }
 
-unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostArmsBackendRequest(const string& accessKeyId,
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
                                                                          const string& accessKeySecret,
                                                                          SLSClientManager::AuthType type,
                                                                          SLSSenderQueueItem* item,
                                                                          const std::string& subPath) const {
     
-    optional<uint64_t> seqId;
-    if (item->mExactlyOnceCheckpoint) {
-        seqId = item->mExactlyOnceCheckpoint->data.sequence_id();
-    }
     string query;
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
@@ -1290,7 +1291,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostArmsBackendRequest(const strin
                                    item->mData,
                                    item->mRawSize,
                                    item->mShardHashKey,
-                                   seqId,
+                                   nullopt,
                                    mSubpath,
                                    query,
                                    header);

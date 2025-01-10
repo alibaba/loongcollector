@@ -869,43 +869,9 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     } else {
         dataType = RawDataType::EVENT_GROUP;
     }
-    if (bufferMeta.has_telemetrytype() && bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
-        return PostMetricStoreLogs(accessKeyId,
-                                   accessKeySecret,
-                                   type,
-                                   host,
-                                   httpsFlag,
-                                   bufferMeta.project(),
-                                   bufferMeta.logstore(),
-                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                   logData,
-                                   bufferMeta.rawsize());
-    } else if (bufferMeta.has_telemetrytype() && 
-        (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS || 
-        bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES || 
-        bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS)) {
-        if (!bufferMeta.has_subpath() || bufferMeta.subpath().empty()) {
-            LOG_ERROR(sLogger, ("don't set supath, telemetry type", static_cast<int>(bufferMeta.telemetrytype())));
-            SLSResponse response;
-            response.mErrorCode = LOGE_PARAMETER_INVALID;
-            response.mErrorMsg = kNoSubpathErrorMsg;
-            return response;
-        }
-        LOG_DEBUG(sLogger, ("subpath", bufferMeta.subpath()) ("telemetry type", static_cast<int>(bufferMeta.telemetrytype())));
-        return PostAPMBackendLogs(accessKeyId,
-                                accessKeySecret,
-                                type,
-                                host,
-                                httpsFlag,
-                                bufferMeta.project(),
-                                bufferMeta.logstore(),
-                                GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                dataType,
-                                logData,
-                                bufferMeta.rawsize(),
-                                bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
-                                bufferMeta.subpath());
-    } else {
+
+    if (!bufferMeta.has_telemetrytype() || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_LOGS) {
+        // process logs
         return PostLogStoreLogs(accessKeyId,
                                 accessKeySecret,
                                 type,
@@ -918,6 +884,35 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                 logData,
                                 bufferMeta.rawsize(),
                                 bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "");
+    } else if (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+        // process apm
+        return PostMetricStoreLogs(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   host,
+                                   httpsFlag,
+                                   bufferMeta.project(),
+                                   bufferMeta.logstore(),
+                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                   logData,
+                                   bufferMeta.rawsize());
+    } else if (bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS
+               || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES
+               || bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS) {
+        // process apm
+        return PostAPMBackendLogs(accessKeyId,
+                                  accessKeySecret,
+                                  type,
+                                  host,
+                                  httpsFlag,
+                                  bufferMeta.project(),
+                                  bufferMeta.logstore(),
+                                  GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                  dataType,
+                                  logData,
+                                  bufferMeta.rawsize(),
+                                  bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
+                                  bufferMeta.subpath());
     }
 }
 
