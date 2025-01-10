@@ -17,16 +17,17 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
-	hostNameDefaultTagKey    = "__hostname__"
-	agentTagDefaultTagKey    = "__user_defined_id__"
-	defaultConfigTagKeyValue = "__default__"
+	hostNameDefaultTagKey      = "__hostname__"
+	hostIDDefaultTagKey        = "host_id"
+	cloudProviderDefaultTagKey = "cloud_provider"
+	defaultConfigTagKeyValue   = "__default__"
 )
 
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
@@ -45,7 +46,9 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	if !ok {
 		return
 	}
-	p.addTagIfRequired("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
+	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
@@ -55,7 +58,9 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
-	p.addTagIfRequired("HOST_NAME", util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
+	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
@@ -75,7 +80,7 @@ func (p *ProcessorTag) addDefaultAddedTag(configKey, defaultKey, value string, t
 				tags[key] = value
 			}
 		}
-		// emtpy value means delete
+		// empty value means delete
 	} else {
 		tags[defaultKey] = value
 	}
@@ -90,6 +95,6 @@ func (p *ProcessorTag) addOptionalTag(configKey, defaultKey, value string, tags 
 				tags[key] = value
 			}
 		}
-		// emtpy value means delete
+		// empty value means delete
 	}
 }

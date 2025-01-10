@@ -318,6 +318,32 @@ std::string GetAgentGoLogConfDir() {
     return dir;
 }
 
+std::string GetBufferFileDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = GetAgentDataDir();
+    }
+    return dir;
+}
+
+std::string GetHistoryDataPath() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = GetAgentDataDir();
+    }
+    return dir;
+}
+
 std::string GetAgentGoCheckpointDir() {
     static std::string dir;
     if (!dir.empty()) {
@@ -344,11 +370,18 @@ std::string GetAgentDataDir() {
     dir = GetProcessExecutionDir();
 #else
     if (BOOL_FLAG(logtail_mode)) {
-        dir = GetProcessExecutionDir();
+        dir = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "checkpoint";
     } else {
         dir = STRING_FLAG(loongcollector_data_dir) + PATH_SEPARATOR;
     }
 #endif
+    if (!CheckExistance(dir)) {
+        if (Mkdirs(dir)) {
+            LOG_INFO(sLogger, ("create data dir success", dir));
+        } else {
+            LOG_ERROR(sLogger, ("create data dir failed", dir));
+        }
+    }
     return dir;
 }
 
@@ -392,7 +425,7 @@ std::string GetAgentDockerPathConfig() {
         return file_path;
     }
     if (BOOL_FLAG(logtail_mode)) {
-        file_path = GetAgentDataDir() + STRING_FLAG(ilogtail_docker_file_path_config);
+        file_path = GetProcessExecutionDir() + STRING_FLAG(ilogtail_docker_file_path_config);
     } else {
         file_path = GetAgentDataDir() + "docker_path_config.json";
     }

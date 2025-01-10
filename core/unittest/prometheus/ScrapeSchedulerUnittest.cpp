@@ -72,8 +72,8 @@ void ScrapeSchedulerUnittest::TestProcess() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-    HttpResponse httpResponse
-        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -82,18 +82,17 @@ void ScrapeSchedulerUnittest::TestProcess() {
     httpResponse.SetStatusCode(503);
     httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
-    event.mPromStreamScraper.mItem.clear();
+    APSARA_TEST_EQUAL(1UL, streamScraper.mItem.size());
+    streamScraper.mItem.clear();
 
     httpResponse.SetStatusCode(503);
     httpResponse.SetNetworkStatus(GetNetworkStatus(CURLE_COULDNT_CONNECT), "");
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(event.mPromStreamScraper.mItem[0]
-                          ->mEventGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE)
-                          .to_string(),
-                      "ERR_CONN_FAILED");
-    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
-    event.mPromStreamScraper.mItem.clear();
+    APSARA_TEST_EQUAL(
+        streamScraper.mItem[0]->mEventGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE).to_string(),
+        "ERR_CONN_FAILED");
+    APSARA_TEST_EQUAL(1UL, streamScraper.mItem.size());
+    streamScraper.mItem.clear();
 
     httpResponse.SetStatusCode(200);
     httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
@@ -121,8 +120,8 @@ void ScrapeSchedulerUnittest::TestProcess() {
     prom::StreamScraper::MetricWriteCallback(
         body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
-    APSARA_TEST_EQUAL(11UL, event.mPromStreamScraper.mItem[0]->mEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL(1UL, streamScraper.mItem.size());
+    APSARA_TEST_EQUAL(11UL, streamScraper.mItem[0]->mEventGroup.GetEvents().size());
 }
 
 void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
@@ -132,8 +131,8 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-    HttpResponse httpResponse
-        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
 
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"

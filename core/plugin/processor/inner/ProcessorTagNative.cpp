@@ -18,10 +18,12 @@
 
 #include <vector>
 
-#include "TagConstants.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
+#include "common/MachineInfoUtil.h"
+#include "constants/EntityConstants.h"
+#include "constants/TagConstants.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/Monitor.h"
 #include "pipeline/Pipeline.h"
@@ -67,6 +69,19 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     addDefaultAddedTag(logGroup, TagKey::HOST_NAME, LoongCollectorMonitor::GetInstance()->mHostname);
     addDefaultAddedTag(logGroup, TagKey::HOST_IP, LoongCollectorMonitor::GetInstance()->mIpAddr);
 
+    auto entity = InstanceIdentity::Instance()->GetEntity();
+    if (entity != nullptr) {
+        addOptionalTag(logGroup, TagKey::HOST_ID, entity->GetHostID());
+#ifdef __ENTERPRISE__
+        ECSMeta meta = entity->GetECSMeta();
+        const string cloudProvider
+            = meta.GetInstanceID().empty() ? DEFAULT_VALUE_DOMAIN_INFRA : DEFAULT_VALUE_DOMAIN_ACS;
+#else
+        const string cloudProvider = DEFAULT_VALUE_DOMAIN_INFRA;
+#endif
+        addOptionalTag(logGroup, TagKey::CLOUD_PROVIDER, cloudProvider);
+    }
+
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
@@ -103,7 +118,7 @@ void ProcessorTagNative::addDefaultAddedTag(PipelineEventGroup& logGroup, TagKey
                 logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
             }
         }
-        // emtpy value means delete
+        // empty value means delete
     } else {
         logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
     }
@@ -120,7 +135,21 @@ void ProcessorTagNative::addOptionalTag(PipelineEventGroup& logGroup, TagKey tag
                 logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
             }
         }
-        // emtpy value means delete
+        // empty value means delete
+    }
+}
+
+void ProcessorTagNative::addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const {
+    auto it = mPipelineMetaTagKey.find(tagKey);
+    if (it != mPipelineMetaTagKey.end()) {
+        if (!it->second.empty()) {
+            if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+                logGroup.SetTagNoCopy(TagKeyToString(tagKey), value);
+            } else {
+                logGroup.SetTagNoCopy(it->second, value);
+            }
+        }
+        // empty value means delete
     }
 }
 

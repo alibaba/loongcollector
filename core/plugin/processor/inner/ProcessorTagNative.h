@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "StringView.h"
 #include "TagConstants.h"
 #include "pipeline/plugin/interface/Processor.h"
 
@@ -35,6 +36,7 @@ protected:
 private:
     void addDefaultAddedTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
     void addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
+    void addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
     std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
 #ifdef __ENTERPRISE__
     bool mEnableAgentEnvMetaTagControl = false;

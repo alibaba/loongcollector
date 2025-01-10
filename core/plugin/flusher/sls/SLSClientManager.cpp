@@ -21,6 +21,7 @@
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
+#include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
@@ -108,7 +109,7 @@ string SLSClientManager::GetRunningEnvironment() {
         // containers in K8S will possess the above env
         if (AppConfig::GetInstance()->IsPurageContainerMode()) {
             env = "K8S-Daemonset";
-        } else if (PingEndpoint("100.100.100.200", "/latest/meta-data")) {
+        } else if (InstanceIdentity::Instance()->GetEntity()->IsECSValid()) {
             // containers in ACK can be connected to the above address, see
             // https://help.aliyun.com/document_detail/108460.html#section-akf-lwh-1gb.
             // Note: we can not distinguish ACK from K8S built on ECS
@@ -118,7 +119,7 @@ string SLSClientManager::GetRunningEnvironment() {
         }
     } else if (AppConfig::GetInstance()->IsPurageContainerMode() || getenv("ALIYUN_LOGTAIL_CONFIG")) {
         env = "Docker";
-    } else if (PingEndpoint("100.100.100.200", "/latest/meta-data")) {
+    } else if (InstanceIdentity::Instance()->GetEntity()->IsECSValid()) {
         env = "ECS";
     } else {
         env = "Others";

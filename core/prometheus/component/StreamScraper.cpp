@@ -8,11 +8,13 @@
 
 #include "Flags.h"
 #include "Labels.h"
+#include "Logger.h"
 #include "common/StringTools.h"
 #include "models/PipelineEventGroup.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "prometheus/Utils.h"
+#include "runner/ProcessorRunner.h"
 
 DEFINE_FLAG_INT64(prom_stream_bytes_size, "stream bytes size", 1024 * 1024);
 
@@ -85,7 +87,12 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
     return;
 #endif
     while (true) {
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) == 0) {
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res == QueueStatus::OK) {
+            break;
+        }
+        if (res == QueueStatus::QUEUE_NOT_EXIST) {
+            LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
         usleep(10 * 1000);
@@ -126,8 +133,5 @@ void StreamScraper::SetAutoMetricMeta(double scrapeDurationSeconds, bool upState
 std::string StreamScraper::GetId() {
     return mHash;
 }
-void StreamScraper::SetScrapeTime(std::chrono::system_clock::time_point scrapeTime) {
-    mScrapeTimestampMilliSec
-        = std::chrono::duration_cast<std::chrono::milliseconds>(scrapeTime.time_since_epoch()).count();
-}
+
 } // namespace logtail::prom

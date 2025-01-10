@@ -110,7 +110,11 @@ void ProcessorPromRelabelMetricNativeUnittest::TestProcess() {
                     ],
                     "target_label": "__address__"
                 }
-            ]
+            ],
+            "external_labels": {
+                "test_key1": "test_value1",
+                "test_key2": "test_value2"
+            }
         }
     )";
 
@@ -151,6 +155,10 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     APSARA_TEST_EQUAL("test_metric6", eventGroup.GetEvents().at(5).Cast<MetricEvent>().GetName());
     APSARA_TEST_EQUAL("test_metric7", eventGroup.GetEvents().at(6).Cast<MetricEvent>().GetName());
     // test_metric8 is dropped by relabel config
+
+    // check external labels
+    APSARA_TEST_EQUAL("test_value1", eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTag("test_key1"));
+    APSARA_TEST_EQUAL("test_value2", eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTag("test_key2"));
 }
 
 void ProcessorPromRelabelMetricNativeUnittest::TestAddAutoMetrics() {

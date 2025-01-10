@@ -258,7 +258,7 @@ void DiskBufferWriter::BufferSenderThread() {
 void DiskBufferWriter::SetBufferFilePath(const std::string& bufferfilepath) {
     lock_guard<mutex> lock(mBufferFileLock);
     if (bufferfilepath == "") {
-        mBufferFilePath = GetAgentDataDir();
+        mBufferFilePath = GetBufferFileDir();
     } else
         mBufferFilePath = bufferfilepath;
 
@@ -285,7 +285,7 @@ std::string DiskBufferWriter::GetBufferFileName() {
 bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSend) {
     string bufferFilePath = GetBufferFilePath();
     if (!CheckExistance(bufferFilePath)) {
-        if (GetAgentDataDir().find(bufferFilePath) != 0) {
+        if (GetBufferFileDir().find(bufferFilePath) != 0) {
             LOG_WARNING(sLogger,
                         ("buffer file path not exist", bufferFilePath)("logtail will not recreate external path",
                                                                        "local secondary does not work"));

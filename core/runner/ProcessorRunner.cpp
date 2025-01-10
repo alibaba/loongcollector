@@ -70,7 +70,7 @@ void ProcessorRunner::Stop() {
 bool ProcessorRunner::PushQueue(QueueKey key, size_t inputIndex, PipelineEventGroup&& group, uint32_t retryTimes) {
     unique_ptr<ProcessQueueItem> item = make_unique<ProcessQueueItem>(std::move(group), inputIndex);
     for (size_t i = 0; i < retryTimes; ++i) {
-        if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == 0) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == QueueStatus::OK) {
             return true;
         }
         if (i % 100 == 0) {

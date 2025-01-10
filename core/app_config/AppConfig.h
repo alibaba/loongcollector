@@ -47,6 +47,8 @@ std::string GetAgentConfDir();
 std::string GetAgentRunDir();
 std::string GetAgentThirdPartyDir();
 
+std::string GetBufferFileDir();
+std::string GetHistoryDataPath();
 std::string GetAgentGoCheckpointDir();
 std::string GetAgentGoLogConfDir();
 std::string GetAgentPrometheusAuthorizationPath();

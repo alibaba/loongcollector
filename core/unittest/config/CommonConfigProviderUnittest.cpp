@@ -470,14 +470,22 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         APSARA_TEST_TRUE(!instanceConfigDiff.IsEmpty());
         APSARA_TEST_EQUAL(1U, instanceConfigDiff.mAdded.size());
         APSARA_TEST_EQUAL(instanceConfigDiff.mAdded[0].mConfigName, "instanceconfig1");
-        APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 2);
+        if (BOOL_FLAG(logtail_mode)) {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 1);
+        } else {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 2);
+        }
         APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames()[0], "instanceconfig1");
         // 再次处理 instanceconfig
         instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
         APSARA_TEST_TRUE(instanceConfigDiff.IsEmpty());
         APSARA_TEST_TRUE(instanceConfigDiff.mAdded.empty());
-        APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 2);
+        if (BOOL_FLAG(logtail_mode)) {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 1);
+        } else {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 2);
+        }
         APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames()[0], "instanceconfig1");
 
         provider.Stop();
@@ -681,14 +689,24 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         // 处理instanceConfigDiff
         InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
-        APSARA_TEST_TRUE(!InstanceConfigManager::GetInstance()->GetAllConfigNames().empty());
+        if (BOOL_FLAG(logtail_mode)) {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 0);
+        } else {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 1);
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames()[0], "loongcollector_config");
+        }
         APSARA_TEST_EQUAL(1U, instanceConfigDiff.mRemoved.size());
         APSARA_TEST_EQUAL(instanceConfigDiff.mRemoved[0], "instanceconfig1");
 
         // 再次处理instanceConfigDiff
         instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
-        APSARA_TEST_TRUE(!InstanceConfigManager::GetInstance()->GetAllConfigNames().empty());
+        if (BOOL_FLAG(logtail_mode)) {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 0);
+        } else {
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames().size(), 1);
+            APSARA_TEST_EQUAL(InstanceConfigManager::GetInstance()->GetAllConfigNames()[0], "loongcollector_config");
+        }
         APSARA_TEST_TRUE(instanceConfigDiff.IsEmpty());
         APSARA_TEST_TRUE(instanceConfigDiff.mRemoved.empty());
 

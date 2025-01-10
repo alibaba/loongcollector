@@ -616,6 +616,9 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 			containerNameTag["_container_name_"] = info.Name
 		}
 	}
+	if len(ip) > 0 {
+		containerNameTag["_container_ip_"] = ip
+	}
 
 	did := &DockerInfoDetail{
 		StdoutPath:       info.LogPath,

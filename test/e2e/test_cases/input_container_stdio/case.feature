@@ -23,9 +23,9 @@ Feature: input container stdio
     Then there is at least {1} logs
     Then the log tags match kv
     """
-    container.image.name: ".*_container:latest$"
-    container.name: ".*[-_]container[-_]1$"
-    container.ip: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
+    image_name: ".*_container:latest$"
+    container_name: ".*[-_]container[-_]1$"
+    container_ip: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
     """
     Then the log fields match kv
     """

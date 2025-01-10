@@ -254,7 +254,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case logCtx = <-p.LogsChan:
-			processorTag.ProcessV1(logCtx, p.LogstoreConfig.GlobalConfig)
+			processorTag.ProcessV1(logCtx)
 			logs := []*protocol.Log{logCtx.Log}
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(logs)))
 			for _, processor := range p.ProcessorPlugins {

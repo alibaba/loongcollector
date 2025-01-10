@@ -28,11 +28,10 @@
 
     该函数必须支持以下功能：
     1. 对输入日志进行相应的转换
-    2. 能够根据`c.TagKeyRenameMap`重命名sls协议中LogTag字段的Key
-    3. 能够根据`targetFields`找到对应字段的值
-    4. 对于部分编码格式，能够根据`c.ProtocolKeyRenameMap`重命名协议字段的Key
+    2. 能够根据`targetFields`找到对应字段的值
+    3. 对于部分编码格式，能够根据`c.ProtocolKeyRenameMap`重命名协议字段的Key
 
-    为了完成上述第2和第3点，LoongCollector 提供了下列帮助函数：
+    为了完成上述第3点，LoongCollector 提供了下列帮助函数：
 
     ```Go
     func convertLogToMap(log *sls.Log, logTags []*sls.LogTag, src, topic string, tagKeyRenameMap map[string]string) (contents map[string]string, tags map[string]string)
@@ -41,8 +40,8 @@
     ```
 
     各函数的用途如下：
-    - `convertLogToMap`：将符合sls协议的日志以及对应logGroup中的其他元信息转换成以map形式存储的`contents`和`tags`，同时根据`tagKeyRenameMap`重命名sls协议中LogTag字段的Key。
-    - `findTargetValues`：在`convertLogToMap`获得的`contents`和`tags`中寻找`targetFields`字段对应的值，如果`targetFields`中包含被更名的默认tag键，则寻找过程还需要借助`tagKeyRenameMap`。
+    - `convertLogToMap`：将符合sls协议的日志以及对应logGroup中的其他元信息转换成以map形式存储的`contents`和`tags`。
+    - `findTargetValues`：在`convertLogToMap`获得的`contents`和`tags`中寻找`targetFields`字段对应的值。
 
 3. 在`./pkg/protocol/converter/converter.go`中，依次做出如下改变：
 

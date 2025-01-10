@@ -49,6 +49,8 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	}
 	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
 	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
+	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
+	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
@@ -60,6 +62,8 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
 	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
 	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
+	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
+	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
@@ -79,7 +83,7 @@ func (p *ProcessorTag) addDefaultAddedTag(configKey, defaultKey, value string, t
 				tags[key] = value
 			}
 		}
-		// emtpy value means delete
+		// empty value means delete
 	} else {
 		tags[defaultKey] = value
 	}
@@ -94,6 +98,6 @@ func (p *ProcessorTag) addOptionalTag(configKey, defaultKey, value string, tags 
 				tags[key] = value
 			}
 		}
-		// emtpy value means delete
+		// empty value means delete
 	}
 }

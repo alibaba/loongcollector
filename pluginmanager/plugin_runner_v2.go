@@ -269,7 +269,7 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case group := <-pipeChan:
-			processorTag.ProcessV2(group, p.LogstoreConfig.GlobalConfig)
+			processorTag.ProcessV2(group)
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(group.Events)))
 			pipeEvents := []*models.PipelineGroupEvents{group}
 			for _, processor := range p.ProcessorPlugins {

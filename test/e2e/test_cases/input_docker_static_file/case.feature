@@ -25,7 +25,7 @@ Feature: input docker static file
     Then there is at least {1000} logs
     Then the log tags match kv
     """
-    "log.file.path": "^/root/test/a/b/c/d/axxxxxxx.log$"
+    "file_path": "^/root/test/a/b/c/d/axxxxxxx.log$"
     """
     Then the log fields match kv
     """

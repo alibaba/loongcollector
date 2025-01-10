@@ -19,6 +19,7 @@ const char* const SOURCE_LABELS = "source_labels";
 const char* const SEPARATOR = "separator";
 const char* const TARGET_LABEL = "target_label";
 const char* const REGEX = "regex";
+const char* const MATCH_LIST = "match_list";
 const char* const REPLACEMENT = "replacement";
 const char* const ACTION = "action";
 const char* const MODULUS = "modulus";
@@ -78,6 +79,7 @@ const char* const KEY_FILE = "key_file";
 const char* const SERVER_NAME = "server_name";
 const char* const HOST = "Host";
 const char* const INSECURE_SKIP_VERIFY = "insecure_skip_verify";
+const char* const EXTERNAL_LABELS = "external_labels";
 
 // scrape protocols, from https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
 // text/plain, application/openmetrics-text will be used
