@@ -147,6 +147,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
 
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
+    request->mLastSendTime = chrono::system_clock::now();
 
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
@@ -291,6 +292,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                         ++request->mTryCnt;
                         AddRequestToClient(unique_ptr<HttpSinkRequest>(request));
                         ++runningHandlers;
+                        mSendingItemsTotal->Add(1);
                         requestReused = true;
                     } else {
                         auto errMsg = curl_easy_strerror(msg->data.result);
