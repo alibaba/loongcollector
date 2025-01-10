@@ -569,6 +569,7 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 	k8sInfo := K8SInfo{}
 	ip := dc.getIPAddress(info)
 
+	containerNameTag["_image_name_"] = dc.getImageName(info.Image, info.Config.Image)
 	if strings.HasPrefix(info.Name, "/k8s_") || strings.HasPrefix(info.Name, "k8s_") || strings.Count(info.Name, "_") >= 4 {
 		// 1. container name is k8s
 		// k8s_php-redis_frontend-2337258262-154p7_default_d8a2e2dd-3617-11e7-a4b0-ecf4bbe5d414_0
@@ -587,8 +588,7 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 		if len(tags) == 6 {
 			baseIndex = 1
 		}
-		containerNameTag["_k8s_image_name_"] = dc.getImageName(info.Image, info.Config.Image)
-		containerNameTag["_k8s_container_name_"] = tags[baseIndex]
+		containerNameTag["_container_name_"] = tags[baseIndex]
 		containerNameTag["_pod_name_"] = tags[baseIndex+1]
 		containerNameTag["_namespace_"] = tags[baseIndex+2]
 		containerNameTag["_pod_uid_"] = tags[baseIndex+3]
@@ -596,13 +596,9 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 		k8sInfo.Pod = tags[baseIndex+1]
 		k8sInfo.Namespace = tags[baseIndex+2]
 		k8sInfo.ExtractK8sLabels(info)
-		if len(ip) > 0 {
-			containerNameTag["_k8s_container_ip_"] = ip
-		}
 	} else if _, ok := info.Config.Labels[k8sPodNameLabel]; ok {
 		// 2. container labels has k8sPodNameLabel
-		containerNameTag["_k8s_image_name_"] = dc.getImageName(info.Image, info.Config.Image)
-		containerNameTag["_k8s_container_name_"] = info.Name
+		containerNameTag["_container_name_"] = info.Name
 		containerNameTag["_pod_name_"] = info.Config.Labels[k8sPodNameLabel]
 		containerNameTag["_namespace_"] = info.Config.Labels[k8sPodNameSpaceLabel]
 		containerNameTag["_pod_uid_"] = info.Config.Labels[k8sPodUUIDLabel]
@@ -612,19 +608,12 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 		// the following method is couped with the CRI adapter, only the original docker container labels
 		// would be added to the labels of the k8s info.
 		k8sInfo.ExtractK8sLabels(info)
-		if len(ip) > 0 {
-			containerNameTag["_k8s_container_ip_"] = ip
-		}
 	} else {
 		// 3. treat as normal container
-		containerNameTag["_image_name_"] = dc.getImageName(info.Image, info.Config.Image)
 		if strings.HasPrefix(info.Name, "/") {
 			containerNameTag["_container_name_"] = info.Name[1:]
 		} else {
 			containerNameTag["_container_name_"] = info.Name
-		}
-		if len(ip) > 0 {
-			containerNameTag["_container_ip_"] = ip
 		}
 	}
 

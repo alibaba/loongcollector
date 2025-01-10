@@ -35,9 +35,7 @@ class EventPool;
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/container.md
 enum class EventGroupMetaKey {
     UNKNOWN,
-    LOG_FILE_PATH,
     LOG_FILE_PATH_RESOLVED,
-    LOG_FILE_INODE,
     LOG_FORMAT,
     LOG_FILE_OFFSET_KEY,
     HAS_PART_LOG,
@@ -62,10 +60,7 @@ enum class EventGroupMetaKey {
     PROMETHEUS_STREAM_ID,
     PROMETHEUS_STREAM_TOTAL,
 
-    SOURCE_ID,
-    TOPIC,
-    SOURCE,
-    MACHINE_UUID,
+    SOURCE_ID
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;

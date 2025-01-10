@@ -210,13 +210,14 @@ bool ProcessorRunner::Serialize(
             return false;
         }
     }
-    if (group.HasMetadata(EventGroupMetaKey::TOPIC)) {
-        logGroup.set_topic(group.GetMetadata(EventGroupMetaKey::TOPIC).to_string());
-    }
     for (const auto& tag : group.GetTags()) {
-        auto logTag = logGroup.add_logtags();
-        logTag->set_key(tag.first.to_string());
-        logTag->set_value(tag.second.to_string());
+        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
+            logGroup.set_topic(tag.second.to_string());
+        } else {
+            auto logTag = logGroup.add_logtags();
+            logTag->set_key(tag.first.to_string());
+            logTag->set_value(tag.second.to_string());
+        }
     }
     logGroup.set_category(logstore);
     size_t size = logGroup.ByteSizeLong();

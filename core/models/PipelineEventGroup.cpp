@@ -326,7 +326,6 @@ bool PipelineEventGroup::IsReplay() const {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-const string EVENT_GROUP_META_LOG_FILE_PATH = "log.file.path";
 const string EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED = "log.file.path_resolved";
 const string EVENT_GROUP_META_LOG_FILE_INODE = "log.file.inode";
 const string EVENT_GROUP_META_CONTAINER_TYPE = "container.type";
@@ -350,12 +349,8 @@ const string EVENT_GROUP_META_SOURCE_ID = "source.id";
 
 const string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
     switch (key) {
-        case EventGroupMetaKey::LOG_FILE_PATH:
-            return EVENT_GROUP_META_LOG_FILE_PATH;
         case EventGroupMetaKey::LOG_FILE_PATH_RESOLVED:
             return EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED;
-        case EventGroupMetaKey::LOG_FILE_INODE:
-            return EVENT_GROUP_META_LOG_FILE_INODE;
         case EventGroupMetaKey::SOURCE_ID:
             return EVENT_GROUP_META_SOURCE_ID;
         case EventGroupMetaKey::LOG_FORMAT:
@@ -381,9 +376,7 @@ const string EventGroupMetaValueToString(string value) {
 
 EventGroupMetaKey StringToEventGroupMetaKey(const string& key) {
     static unordered_map<string, EventGroupMetaKey> sStringToEnum{
-        {EVENT_GROUP_META_LOG_FILE_PATH, EventGroupMetaKey::LOG_FILE_PATH},
         {EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED, EventGroupMetaKey::LOG_FILE_PATH_RESOLVED},
-        {EVENT_GROUP_META_LOG_FILE_INODE, EventGroupMetaKey::LOG_FILE_INODE},
         {EVENT_GROUP_META_SOURCE_ID, EventGroupMetaKey::SOURCE_ID},
         {EVENT_GROUP_META_HAS_PART_LOG, EventGroupMetaKey::HAS_PART_LOG}};
     auto it = sStringToEnum.find(key);

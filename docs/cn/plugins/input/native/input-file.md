@@ -58,14 +58,14 @@
 * 表3：Tag配置项以及默认值
 |  **配置项**  | **是否默认添加** |  **默认值**  |
 | --- | --- | --- |
-| FileInodeTagKey | 否 | log.file.inode |
-| FilePathTagKey | 是 | log.file.path |
-| K8sNamespaceTagKey | 是（当EnableContainerDiscovery为true时） | k8s.namespace.name |
-| K8sPodNameTagKey | 是（当EnableContainerDiscovery为true时） | k8s.pod.name |
-| K8sPodUidTagKey | 是（当EnableContainerDiscovery为true时） | k8s.pod.uid |
-| ContainerNameTagKey | 是（当EnableContainerDiscovery为true时） | 普通：container.name，K8s：k8s.container.name |
-| ContainerIpTagKey | 是（当EnableContainerDiscovery为true时） | 普通：container.ip，K8s：k8s.container.ip |
-| ContainerImageTagKey | 是（当EnableContainerDiscovery为true时） | 普通：container.image，K8s：k8s.container.image |
+| FileInodeTagKey | 否 | file_offset |
+| FilePathTagKey | 是 | file_path |
+| K8sNamespaceTagKey | 是（当EnableContainerDiscovery为true时） | namespace |
+| K8sPodNameTagKey | 是（当EnableContainerDiscovery为true时） | pod_name |
+| K8sPodUidTagKey | 是（当EnableContainerDiscovery为true时） | pod_uid |
+| ContainerNameTagKey | 是（当EnableContainerDiscovery为true时） | container_name |
+| ContainerIpTagKey | 是（当EnableContainerDiscovery为true时） | container_ip |
+| ContainerImageTagKey | 是（当EnableContainerDiscovery为true时） | image_name |
 
 ## 样例
 

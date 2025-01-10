@@ -27,7 +27,6 @@ type GlobalConfig struct {
 	FlushIntervalMs             int
 	DefaultLogQueueSize         int
 	DefaultLogGroupQueueSize    int
-	Tags                        map[string]string
 	// Directory to store prometheus configuration file.
 	LoongcollectorPrometheusAuthorizationPath string
 	// Directory to store loongcollector data, such as checkpoint, etc.

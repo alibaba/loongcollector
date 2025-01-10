@@ -19,10 +19,12 @@
 #include <atomic>
 #include <deque>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "TagConstants.h"
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
@@ -395,14 +397,18 @@ public:
 
     void SetDockerPath(const std::string& dockerBasePath, size_t dockerReplaceSize);
 
-    const std::vector<sls_logs::LogTag>& GetTopicExtraTags() const { return mTopicExtraTags; }
+    const std::vector<std::pair<std::string, std::string>>& GetTopicExtraTags() const { return mTopicExtraTags; }
 
-    void SetTopicExtraTags(const std::vector<sls_logs::LogTag>& tags) { mTopicExtraTags = tags; }
+    const std::vector<std::pair<TagKey, std::string>>& GetContainerMetadatas() { return mContainerMetadatas; }
 
-    const std::shared_ptr<std::vector<sls_logs::LogTag>>& GetContainerExtraTags() { return mContainerExtraTags; }
+    void AddContainerMetadatas(const std::vector<std::pair<TagKey, std::string>>& tags) {
+        mContainerMetadatas.insert(mContainerMetadatas.end(), tags.begin(), tags.end());
+    }
 
-    void SetContainerExtraTags(const std::shared_ptr<std::vector<sls_logs::LogTag>> tags) {
-        mContainerExtraTags = tags;
+    const std::vector<std::pair<std::string, std::string>>& GetExtraTags() { return mExtraTags; }
+
+    void AddExtraTags(const std::vector<std::pair<std::string, std::string>>& tags) {
+        mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
     }
 
     QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey(); }
@@ -535,8 +541,9 @@ protected:
     std::string mDockerPath;
 
     // tags
-    std::vector<sls_logs::LogTag> mTopicExtraTags;
-    std::shared_ptr<std::vector<sls_logs::LogTag>> mContainerExtraTags;
+    std::vector<std::pair<std::string, std::string>> mTopicExtraTags;
+    std::vector<std::pair<TagKey, std::string>> mContainerMetadatas;
+    std::vector<std::pair<std::string, std::string>> mExtraTags;
     // int32_t mCloseUnusedInterval;
 
     // PreciseTimestampConfig mPreciseTimestampConfig;

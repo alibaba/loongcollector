@@ -19,6 +19,7 @@
 
 #include "json/json.h"
 
+#include "TagConstants.h"
 #include "common/JsonUtil.h"
 #include "pipeline/GlobalConfig.h"
 #include "unittest/Unittest.h"
@@ -66,8 +67,8 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
             "EnableTimestampNanosecond": true,
             "UsingOldContentTag": true,
             "PipelineMetaTagKey": {
-                "key1": "value1",
-                "key2": "value2"
+                "HOST_NAME": "value1",
+                "HOST_ID": "value2"
             },
             "AgentEnvMetaTagKey": {
                 "key3": "value3",
@@ -85,8 +86,8 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->mEnableTimestampNanosecond);
     APSARA_TEST_TRUE(config->mUsingOldContentTag);
     APSARA_TEST_EQUAL(config->mPipelineMetaTagKey.size(), 2);
-    APSARA_TEST_EQUAL(config->mPipelineMetaTagKey["key1"], "value1");
-    APSARA_TEST_EQUAL(config->mPipelineMetaTagKey["key2"], "value2");
+    APSARA_TEST_EQUAL(config->mPipelineMetaTagKey[TagKey::HOST_NAME], "value1");
+    APSARA_TEST_EQUAL(config->mPipelineMetaTagKey[TagKey::HOST_ID], "value2");
 #ifdef __ENTERPRISE__
     APSARA_TEST_EQUAL(config->mAgentEnvMetaTagKey.size(), 2);
     APSARA_TEST_EQUAL(config->mAgentEnvMetaTagKey["key3"], "value3");

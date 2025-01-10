@@ -18,9 +18,11 @@
 
 #include <vector>
 
+#include "TagConstants.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/Monitor.h"
 #include "pipeline/Pipeline.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -47,11 +49,7 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
 
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
 #ifdef __ENTERPRISE__
-    string agentTag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
-    if (!agentTag.empty()) {
-        auto sb = logGroup.GetSourceBuffer()->CopyString(agentTag);
-        addTagIfRequired(logGroup, "AGENT_TAG", AGENT_TAG_DEFAULT_KEY, StringView(sb.data, sb.size));
-    }
+    addDefaultAddedTag(logGroup, TagKey::AGENT_TAG, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
 #endif
 
     if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
@@ -66,10 +64,9 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
         return;
     }
+    addDefaultAddedTag(logGroup, TagKey::HOST_NAME, LoongCollectorMonitor::GetInstance()->mHostname);
+    addDefaultAddedTag(logGroup, TagKey::HOST_IP, LoongCollectorMonitor::GetInstance()->mIpAddr);
 
-    // process level
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LoongCollectorMonitor::mHostname);
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
@@ -95,22 +92,35 @@ bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
     return true;
 }
 
-void ProcessorTagNative::addTagIfRequired(PipelineEventGroup& logGroup,
-                                          const std::string& configKey,
-                                          const std::string& defaultKey,
-                                          const StringView& value) const {
-    auto it = mPipelineMetaTagKey.find(configKey);
+void ProcessorTagNative::addDefaultAddedTag(PipelineEventGroup& logGroup, TagKey tagKey, const string& value) const {
+    auto sb = logGroup.GetSourceBuffer()->CopyString(value);
+    auto it = mPipelineMetaTagKey.find(tagKey);
     if (it != mPipelineMetaTagKey.end()) {
         if (!it->second.empty()) {
             if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-                logGroup.SetTagNoCopy(defaultKey, value);
+                logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
             } else {
-                logGroup.SetTagNoCopy(it->second, value);
+                logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
             }
         }
-        // emtpy value means not set
+        // emtpy value means delete
     } else {
-        logGroup.SetTagNoCopy(defaultKey, value);
+        logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
+    }
+}
+
+void ProcessorTagNative::addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, const string& value) const {
+    auto sb = logGroup.GetSourceBuffer()->CopyString(value);
+    auto it = mPipelineMetaTagKey.find(tagKey);
+    if (it != mPipelineMetaTagKey.end()) {
+        if (!it->second.empty()) {
+            if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+                logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
+            } else {
+                logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
+            }
+        }
+        // emtpy value means delete
     }
 }
 

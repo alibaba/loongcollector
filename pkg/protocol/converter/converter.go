@@ -26,25 +26,6 @@ import (
 )
 
 const (
-	tagHostIP                = "host.ip"
-	tagLogTopic              = "log.topic"
-	tagLogFilePath           = "log.file.path"
-	tagHostname              = "host.name"
-	tagK8sNodeIP             = "k8s.node.ip"
-	tagK8sNodeName           = "k8s.node.name"
-	tagK8sNamespace          = "k8s.namespace.name"
-	tagK8sPodName            = "k8s.pod.name"
-	tagK8sPodIP              = "k8s.pod.ip"
-	tagK8sPodUID             = "k8s.pod.uid"
-	tagContainerName         = "container.name"
-	tagContainerIP           = "container.ip"
-	tagContainerImageName    = "container.image.name"
-	tagK8sContainerName      = "k8s.container.name"
-	tagK8sContainerIP        = "k8s.container.ip"
-	tagK8sContainerImageName = "k8s.container.image.name"
-)
-
-const (
 	ProtocolCustomSingle        = "custom_single"
 	ProtocolCustomSingleFlatten = "custom_single_flatten"
 	ProtocolOtlpV1              = "otlp_v1"
@@ -66,6 +47,25 @@ const (
 	targetTagPrefix     = "tag."
 
 	targetGroupMetadataPrefix = "metadata."
+)
+
+const (
+	tagHostIP                = "host.ip"
+	tagLogTopic              = "log.topic"
+	tagLogFilePath           = "log.file.path"
+	tagHostname              = "host.name"
+	tagK8sNodeIP             = "k8s.node.ip"
+	tagK8sNodeName           = "k8s.node.name"
+	tagK8sNamespace          = "k8s.namespace.name"
+	tagK8sPodName            = "k8s.pod.name"
+	tagK8sPodIP              = "k8s.pod.ip"
+	tagK8sPodUID             = "k8s.pod.uid"
+	tagContainerName         = "container.name"
+	tagContainerIP           = "container.ip"
+	tagContainerImageName    = "container.image.name"
+	tagK8sContainerName      = "k8s.container.name"
+	tagK8sContainerIP        = "k8s.container.ip"
+	tagK8sContainerImageName = "k8s.container.image.name"
 )
 
 // todo: make multiple pools for different size levels

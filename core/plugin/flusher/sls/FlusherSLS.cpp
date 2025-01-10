@@ -962,7 +962,6 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
 bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
     string serializedData, compressedData;
     BatchedEvents g(std::move(group.MutableEvents()),
-                    std::move(group.GetAllMetadata()),
                     std::move(group.GetSizedTags()),
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),

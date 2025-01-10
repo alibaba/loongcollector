@@ -36,7 +36,7 @@ type ProcessorTag struct {
 	AgentEnvMetaTagKey           map[string]string
 }
 
-func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext, globalConfig *config.GlobalConfig) {
+func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	tags, ok := logCtx.Context["tags"]
 	if !ok {
 		return
@@ -47,44 +47,26 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext, globalConfig *
 	}
 	p.addTagIfRequired("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
 
-	// Add tags for each log, includes: default hostname tag,
-	// env tags and global tags in config.
-	for k, v := range loadAdditionalTags(globalConfig).Iterator() {
-		if p.EnableAgentEnvMetaTagControl && p.AgentEnvMetaTagKey != nil {
-			if newK, ok := p.AgentEnvMetaTagKey[k]; ok {
-				if newK != "" {
-					tagsMap[newK] = v
-				}
-			}
-		} else {
-			tagsMap[k] = v
-		}
+	// env tags
+	for i := 0; i < len(helper.EnvTags); i += 2 {
+		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 	}
 }
 
-func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents, globalConfig *config.GlobalConfig) {
+func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
 	p.addTagIfRequired("HOST_NAME", util.GetHostName(), tagsMap)
-
-	// Add tags for each log, includes: default hostname tag,
-	// env tags and global tags in config.
-	for k, v := range loadAdditionalTags(globalConfig).Iterator() {
-		if p.EnableAgentEnvMetaTagControl && p.AgentEnvMetaTagKey != nil {
-			if newK, ok := p.AgentEnvMetaTagKey[k]; ok {
-				if newK != "" {
-					tagsMap[newK] = v
-				}
-			}
-		} else {
-			tagsMap[k] = v
-		}
-	}
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
+
+	// env tags
+	for i := 0; i < len(helper.EnvTags); i += 2 {
+		in.Group.Tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
+	}
 }
 
-func (p *ProcessorTag) addTagIfRequired(configKey, defaultKey, value string, tags map[string]string) {
+func (p *ProcessorTag) addDefaultAddedTag(configKey, defaultKey, value string, tags map[string]string) {
 	if key, ok := p.PipelineMetaTagKey[configKey]; ok {
 		if key != "" {
 			if key == defaultConfigTagKeyValue {
@@ -93,7 +75,21 @@ func (p *ProcessorTag) addTagIfRequired(configKey, defaultKey, value string, tag
 				tags[key] = value
 			}
 		}
+		// emtpy value means delete
 	} else {
 		tags[defaultKey] = value
+	}
+}
+
+func (p *ProcessorTag) addOptionalTag(configKey, defaultKey, value string, tags map[string]string) {
+	if key, ok := p.PipelineMetaTagKey[configKey]; ok {
+		if key != "" {
+			if key == defaultConfigTagKeyValue {
+				tags[defaultKey] = value
+			} else {
+				tags[key] = value
+			}
+		}
+		// emtpy value means delete
 	}
 }

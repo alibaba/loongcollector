@@ -192,4 +192,59 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
     return true;
 }
 
+
+string ParseDefaultAddedTag(const Json::Value* config,
+                            const string& configField,
+                            const string& defaultTagKeyValue,
+                            const PipelineContext& context,
+                            const string& pluginType) {
+    string errorMsg;
+    string customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
+    if (config && config->isMember(configField)) {
+        if (!GetOptionalStringParam(*config, configField, customTagKey, errorMsg)) {
+            PARAM_WARNING_DEFAULT(context.GetLogger(),
+                                  context.GetAlarm(),
+                                  errorMsg,
+                                  "__default__",
+                                  pluginType,
+                                  context.GetConfigName(),
+                                  context.GetProjectName(),
+                                  context.GetLogstoreName(),
+                                  context.GetRegion());
+        }
+        if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+            return defaultTagKeyValue;
+        }
+        return customTagKey;
+    }
+    return defaultTagKeyValue;
+}
+
+string ParseOptionalTag(const Json::Value* config,
+                        const string& configField,
+                        const string& defaultTagKeyValue,
+                        const PipelineContext& context,
+                        const string& pluginType) {
+    string errorMsg;
+    string customTagKey;
+    if (config && config->isMember(configField)) {
+        if (!GetOptionalStringParam(*config, configField, customTagKey, errorMsg)) {
+            PARAM_WARNING_DEFAULT(context.GetLogger(),
+                                  context.GetAlarm(),
+                                  errorMsg,
+                                  "__default__",
+                                  pluginType,
+                                  context.GetConfigName(),
+                                  context.GetProjectName(),
+                                  context.GetLogstoreName(),
+                                  context.GetRegion());
+        }
+        if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+            return defaultTagKeyValue;
+        }
+        return customTagKey;
+    }
+    return "";
+}
+
 } // namespace logtail

@@ -20,6 +20,8 @@
 
 #include "boost/regex.hpp"
 
+#include "PipelineEventGroup.h"
+#include "TagConstants.h"
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
 #include "constants/Constants.h"
@@ -50,19 +52,6 @@ bool ProcessorSplitMultilineLogStringNative::Init(const Json::Value& config) {
 
     if (!mMultiline.Init(config, *mContext, sName)) {
         return false;
-    }
-
-    // AppendingLogPositionMeta
-    if (!GetOptionalBoolParam(config, "AppendingLogPositionMeta", mAppendingLogPositionMeta, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mAppendingLogPositionMeta,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
     }
 
     // EnableRawContent
@@ -330,9 +319,10 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
         auto const length
             = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
         targetEvent->SetPosition(offset, length);
-        if (mAppendingLogPositionMeta) {
+        if (logGroup.HasMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY)) {
             StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
-            targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+            targetEvent->SetContentNoCopy(logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
+                                          StringView(offsetStr.data, offsetStr.size));
         }
         newEvents.emplace_back(std::move(targetEvent), true, nullptr);
     }

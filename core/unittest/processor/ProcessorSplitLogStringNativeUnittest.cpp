@@ -17,7 +17,6 @@
 #include <sstream>
 
 #include "common/JsonUtil.h"
-#include "common/TagConstants.h"
 #include "config/PipelineConfig.h"
 #include "constants/Constants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
@@ -64,7 +63,7 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, TagKeyDefaultValue[TagKey::FILE_OFFSET_KEY]);
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, TagKeyToString(TagKey::FILE_OFFSET_KEY));
     std::stringstream inJson;
     inJson << R"({
         "events" :
@@ -100,11 +99,13 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
                 "contents" :
                 {
                     "content" : "{\n\"k1\":\"v1\"\n}",
-                    "log.file.offset": "1"
+                    ")"
+            + DEFAULT_LOG_TAG_FILE_OFFSET + R"(": "1"
                 },
                 "fileOffset": 1,
                 "rawSize": )"
-               << strlen(R"({n"k1":"v1"n}0)") << R"(,
+               << strlen(R"({n"k1":"v1"n}0)")
+               << R"(,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -113,20 +114,23 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
                 "contents" :
                 {
                     "content" : "{\n\"k2\":\"v2\"\n}",
-                    "log.file.offset": ")"
+                    ")"
+            + DEFAULT_LOG_TAG_FILE_OFFSET + R"(": ")"
                << strlen(R"({n"k1":"v1"n}0)") + 1 << R"("
                 },
                 "fileOffset": )"
                << strlen(R"({n"k1":"v1"n}0)") + 1 << R"(,
                 "rawSize": )"
-               << strlen(R"({n"k2":"v2"n})") << R"(,
+               << strlen(R"({n"k2":"v2"n})")
+               << R"(,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
             }
         ],
         "metadata": {
-            "log.file.offset": "log.file.offset"
+            "log.file.offset": ")"
+            + DEFAULT_LOG_TAG_FILE_OFFSET + R"("
         }
     })";
     std::string outJson = logGroupList[0].ToJsonString(true);

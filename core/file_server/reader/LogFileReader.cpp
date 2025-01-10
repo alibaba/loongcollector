@@ -14,6 +14,11 @@
 
 #include "file_server/reader/LogFileReader.h"
 
+#include "Monitor.h"
+#include "PipelineEventGroup.h"
+#include "StringView.h"
+#include "TagConstants.h"
+
 #if defined(_MSC_VER)
 #include <fcntl.h>
 #include <io.h>
@@ -125,7 +130,8 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
-                reader->SetContainerExtraTags(containerPath->mTags);
+                reader->AddContainerMetadatas(containerPath->mMetadatas);
+                reader->AddExtraTags(containerPath->mTags);
             }
         }
 
@@ -773,10 +779,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
             if (matchedSize == (size_t)1) {
                 // != default topic name
                 if (keys[0] != "__topic_1__") {
-                    sls_logs::LogTag tag;
-                    tag.set_key(keys[0]);
-                    tag.set_value(values[0]);
-                    mTopicExtraTags.push_back(tag);
+                    mTopicExtraTags.emplace_back(keys[0], values[0]);
                 }
                 return values[0];
             } else {
@@ -786,10 +789,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     } else {
                         res = res + "_" + values[i];
                     }
-                    sls_logs::LogTag tag;
-                    tag.set_key(keys[i]);
-                    tag.set_value(values[i]);
-                    mTopicExtraTags.push_back(tag);
+                    mTopicExtraTags.emplace_back(keys[i], values[i]);
                 }
             }
             return res;
@@ -811,10 +811,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     res = res + "_" + what[i];
                 }
                 if (matchedSize > 2) {
-                    sls_logs::LogTag tag;
-                    tag.set_key(string("__topic_") + ToString(i) + "__");
-                    tag.set_value(what[i]);
-                    mTopicExtraTags.push_back(tag);
+                    mTopicExtraTags.emplace_back(string("__topic_") + ToString(i) + "__", what[i]);
                 }
             }
         } else {
@@ -2470,62 +2467,55 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
     }
     bool isContainerLog = mFileLogFormat == LogFormat::DOCKER_JSON_FILE || mFileLogFormat == LogFormat::CONTAINERD_TEXT;
     if (!isContainerLog) {
-        group.SetMetadata(EventGroupMetaKey::LOG_FILE_PATH, GetConvertedPath());
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, GetHostLogPath());
-        group.SetMetadata(EventGroupMetaKey::LOG_FILE_INODE, ToString(GetDevInode().inode));
     }
     group.SetMetadata(EventGroupMetaKey::SOURCE_ID, GetSourceId());
-    group.SetMetadata(EventGroupMetaKey::SOURCE, LogFileProfiler::mIpAddr);
-    group.SetMetadata(EventGroupMetaKey::TOPIC, GetTopicName());
-    group.SetMetadata(EventGroupMetaKey::MACHINE_UUID, Application::GetInstance()->GetUUID());
+    // we store info which users can see in tags
+    // for log, these includes:
+    // 1. topic
+    std::string topic = GetTopicName();
+    if (!topic.empty()) {
+        StringBuffer b = group.GetSourceBuffer()->CopyString(topic);
+        group.SetTagNoCopy(LOG_RESERVED_KEY_TOPIC, StringView(b.data, b.size));
+    }
+    auto topicExtraTags = GetTopicExtraTags();
+    for (auto& tag : topicExtraTags) {
+        group.SetTag(tag.first, tag.second);
+    }
+    // 2. external k8s env/label tag
+    auto extraTags = GetExtraTags();
+    for (auto& tag : extraTags) {
+        group.SetTag(tag.first, tag.second);
+    }
+    // 3. offset, inode, path, container name tag
     if (mTagConfig.first != nullptr) {
         auto offsetKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_OFFSET_KEY);
         if (!offsetKey.empty()) {
             group.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, offsetKey);
         }
-    }
 
-    // we store info which users can see in tags
-    // for log, these includes:
-    // 1. extra topic
-    auto topicExtraTags = GetTopicExtraTags();
-    for (size_t i = 0; i < topicExtraTags.size(); ++i) {
-        group.SetTag(topicExtraTags[i].key(), topicExtraTags[i].value());
-    }
-    // 2. container name tag, external k8s env/label tag
-    auto containerExtraTags = GetContainerExtraTags();
-    if (containerExtraTags) {
-        for (size_t i = 0; i < containerExtraTags->size(); ++i) {
-            auto key = ContainerInfo::GetFileTagKey((*containerExtraTags)[i].key());
-            if (key != TagKey::UNKOWN) { // container name tag
-                StringBuffer b = group.GetSourceBuffer()->CopyString((*containerExtraTags)[i].value());
-                if (mTagConfig.first == nullptr) { // no tag config
-                    group.SetTagNoCopy(TagKeyDefaultValue[key], StringView(b.data, b.size));
-                } else {
-                    if (mTagConfig.first != nullptr) {
-                        auto keyName = mTagConfig.first->GetFileTagKeyName(key);
-                        if (!keyName.empty()) {
-                            group.SetTagNoCopy(keyName, StringView(b.data, b.size));
-                        }
-                    }
-                }
-            } else { // external k8s env/label tag
-                group.SetTag((*containerExtraTags)[i].key(), (*containerExtraTags)[i].value());
+        auto inodeKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_INODE_TAG_KEY);
+        if (!inodeKey.empty()) {
+            StringBuffer b = group.GetSourceBuffer()->CopyString(ToString(GetDevInode().inode));
+            group.SetTagNoCopy(inodeKey, StringView(b.data, b.size));
+        }
+
+        auto pathKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_PATH_TAG_KEY);
+        if (!pathKey.empty()) {
+            const string path = GetConvertedPath().substr(0, 511);
+            StringBuffer b = group.GetSourceBuffer()->CopyString(path);
+            if (!path.empty()) {
+                group.SetTagNoCopy(pathKey, StringView(b.data, b.size));
             }
         }
-    }
-    if (mTagConfig.first != nullptr) {
-        // 3. inode
-        auto keyName = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_INODE_TAG_KEY);
-        if (!keyName.empty()) {
-            StringBuffer b = group.GetSourceBuffer()->CopyString(ToString(GetDevInode().inode));
-            group.SetTagNoCopy(keyName, StringView(b.data, b.size));
-        }
-        // 4. path
-        keyName = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_PATH_TAG_KEY);
-        if (!keyName.empty()) {
-            StringBuffer b = group.GetSourceBuffer()->CopyString(GetConvertedPath());
-            group.SetTagNoCopy(keyName, StringView(b.data, b.size));
+
+        auto containerMetadatas = GetContainerMetadatas();
+        for (auto& metadata : containerMetadatas) {
+            auto key = mTagConfig.first->GetFileTagKeyName(metadata.first);
+            if (!key.empty()) {
+                StringBuffer b = group.GetSourceBuffer()->CopyString(metadata.second);
+                group.SetTagNoCopy(key, StringView(b.data, b.size));
+            }
         }
     }
 }

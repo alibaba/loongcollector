@@ -17,16 +17,18 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
-	hostNameDefaultTagKey    = "host.name"
-	hostIPDefaultTagKey      = "host.ip"
-	defaultConfigTagKeyValue = "__default__"
+	hostNameDefaultTagKey      = "host_name"
+	hostIPDefaultTagKey        = "host_ip"
+	hostIDDefaultTagKey        = "host_id"
+	cloudProviderDefaultTagKey = "cloud_provider"
+	defaultConfigTagKeyValue   = "__default__"
 )
 
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
@@ -36,7 +38,7 @@ type ProcessorTag struct {
 	AgentEnvMetaTagKey           map[string]string
 }
 
-func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext, globalConfig *config.GlobalConfig) {
+func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	tags, ok := logCtx.Context["tags"]
 	if !ok {
 		return
@@ -45,32 +47,30 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext, globalConfig *
 	if !ok {
 		return
 	}
-	p.addTagIfRequired("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
-	p.addTagIfRequired("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
+	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
 
-	// Add tags for each log, includes: default hostname tag,
-	// env tags and global tags in config.
-	for k, v := range loadAdditionalTags(globalConfig).Iterator() {
-		tagsMap[k] = v
+	// env tags
+	for i := 0; i < len(helper.EnvTags); i += 2 {
+		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 	}
 }
 
-func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents, globalConfig *config.GlobalConfig) {
+func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
-	p.addTagIfRequired("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
-	p.addTagIfRequired("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
+	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
 
-	// Add tags for each log, includes: default hostname tag,
-	// env tags and global tags in config.
-	for k, v := range loadAdditionalTags(globalConfig).Iterator() {
-		in.Group.Tags.Add(k, v)
+	// env tags
+	for i := 0; i < len(helper.EnvTags); i += 2 {
+		in.Group.Tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
 	}
 }
 
-func (p *ProcessorTag) addTagIfRequired(configKey, defaultKey, value string, tags map[string]string) {
+func (p *ProcessorTag) addDefaultAddedTag(configKey, defaultKey, value string, tags map[string]string) {
 	if key, ok := p.PipelineMetaTagKey[configKey]; ok {
 		if key != "" {
 			if key == defaultConfigTagKeyValue {
@@ -79,7 +79,21 @@ func (p *ProcessorTag) addTagIfRequired(configKey, defaultKey, value string, tag
 				tags[key] = value
 			}
 		}
+		// emtpy value means delete
 	} else {
 		tags[defaultKey] = value
+	}
+}
+
+func (p *ProcessorTag) addOptionalTag(configKey, defaultKey, value string, tags map[string]string) {
+	if key, ok := p.PipelineMetaTagKey[configKey]; ok {
+		if key != "" {
+			if key == defaultConfigTagKeyValue {
+				tags[defaultKey] = value
+			} else {
+				tags[key] = value
+			}
+		}
+		// emtpy value means delete
 	}
 }

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "TagConstants.h"
 #include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
@@ -32,11 +33,9 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    void addTagIfRequired(PipelineEventGroup& logGroup,
-                          const std::string& configKey,
-                          const std::string& defaultKey,
-                          const StringView& value) const;
-    std::unordered_map<std::string, std::string> mPipelineMetaTagKey;
+    void addDefaultAddedTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
+    void addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
+    std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
 #ifdef __ENTERPRISE__
     bool mEnableAgentEnvMetaTagControl = false;
     std::unordered_map<std::string, std::string> mAgentEnvMetaTagKey;

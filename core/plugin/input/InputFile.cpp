@@ -233,7 +233,7 @@ bool InputFile::CreateInnerProcessors() {
         }
         detail["EnableRawContent"]
             = Json::Value(!mContext->HasNativeProcessors() && !mContext->IsExactlyOnceEnabled()
-                          && !mContext->IsFlushingThroughGoPipeline() && !mFileReader.mAppendingLogPositionMeta);
+                          && !mContext->IsFlushingThroughGoPipeline() && !mFileTag.IsEnableLogPositionMeta());
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

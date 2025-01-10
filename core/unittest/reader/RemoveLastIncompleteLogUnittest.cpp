@@ -15,6 +15,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "FileTagOptions.h"
 #include "common/FileSystemUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "file_server/reader/LogFileReader.h"
@@ -520,8 +521,12 @@ UNIT_TEST_CASE(GetLastLineUnittest, TestGetLastLineEmpty);
 
 void GetLastLineUnittest::TestGetLastLine() {
     std::string testLog = "first line\nsecond line\nthird line";
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(nullptr, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(nullptr, &ctx),
+                                std::make_pair(nullptr, &ctx));
     auto lastLine = logFileReader.GetLastLine(const_cast<char*>(testLog.data()), testLog.size());
     std::string expectLog = "third line";
     APSARA_TEST_EQUAL_FATAL(expectLog, std::string(lastLine.data.data(), lastLine.data.size()));
@@ -529,8 +534,12 @@ void GetLastLineUnittest::TestGetLastLine() {
 
 void GetLastLineUnittest::TestGetLastLineEmpty() {
     std::string testLog = "";
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(nullptr, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(nullptr, &ctx),
+                                std::make_pair(nullptr, &ctx));
     auto lastLine = logFileReader.GetLastLine(const_cast<char*>(testLog.data()), testLog.size());
     APSARA_TEST_EQUAL_FATAL(0, int(lastLine.data.size()));
     APSARA_TEST_EQUAL_FATAL("", std::string(lastLine.data.data(), lastLine.data.size()));
@@ -571,8 +580,12 @@ void ContainerdTextRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncom
     config["EndPattern"] = LOG_END_REGEX;
     MultilineOptions multilineOpts;
     multilineOpts.Init(config, ctx, "");
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -638,8 +651,12 @@ void ContainerdTextRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncom
     config["StartPattern"] = LOG_BEGIN_REGEX;
     MultilineOptions multilineOpts;
     multilineOpts.Init(config, ctx, "");
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -824,8 +841,12 @@ void ContainerdTextRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncom
     config["EndPattern"] = LOG_END_REGEX;
     MultilineOptions multilineOpts;
     multilineOpts.Init(config, ctx, "");
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1024,8 +1045,12 @@ void DockerJsonRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncomplet
     config["StartPattern"] = LOG_BEGIN_REGEX;
     MultilineOptions multilineOpts;
     multilineOpts.Init(config, ctx, "");
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1184,8 +1209,12 @@ void DockerJsonRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncomplet
     config["EndPattern"] = LOG_END_REGEX;
     MultilineOptions multilineOpts;
     multilineOpts.Init(config, ctx, "");
-    LogFileReader logFileReader(
-        "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader("dir",
+                                "file",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);

@@ -24,6 +24,8 @@
 
 #include "json/json.h"
 
+#include "constants/TagConstants.h"
+
 namespace logtail {
 
 class PipelineContext;
@@ -40,14 +42,8 @@ struct GlobalConfig {
     uint32_t mPriority = 1U;
     bool mEnableTimestampNanosecond = false;
     bool mUsingOldContentTag = false;
-    std::unordered_map<std::string, std::string> mPipelineMetaTagKey;
-    Json::Value GetPipelineMetaTagKeyJsonValue() const {
-        Json::Value json;
-        for (const auto& kv : mPipelineMetaTagKey) {
-            json[kv.first] = kv.second;
-        }
-        return json;
-    }
+    std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
+    Json::Value GetPipelineMetaTagKeyJsonValue() const;
 
 #ifdef __ENTERPRISE__
     bool mEnableAgentEnvMetaTagControl = false;

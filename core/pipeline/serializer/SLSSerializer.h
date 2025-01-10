@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "common/TagConstants.h"
 #include "pipeline/serializer/Serializer.h"
 
 namespace logtail {

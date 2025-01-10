@@ -18,9 +18,10 @@
 
 #include <json/json.h>
 
+#include <string>
 #include <unordered_map>
 
-#include "common/TagConstants.h"
+#include "constants/TagConstants.h"
 #include "pipeline/PipelineContext.h"
 
 namespace logtail {
@@ -32,20 +33,15 @@ public:
               const std::string& pluginType,
               bool enableContainerDiscovery);
     StringView GetFileTagKeyName(TagKey key) const;
-
+    bool IsEnableLogPositionMeta();
 
 private:
-    void parseDefaultAddTag(const Json::Value* config,
-                            const std::string& keyName,
-                            const TagKey& keyEnum,
-                            const PipelineContext& context,
-                            const std::string& pluginType);
-    void parseDefaultNotAddTag(const Json::Value* config,
-                               const std::string& keyName,
-                               const TagKey& keyEnum,
-                               const PipelineContext& context,
-                               const std::string& pluginType);
-
+    void parseTagKey(const Json::Value* config,
+                     const std::string& configField,
+                     TagKey tagKey,
+                     const PipelineContext& context,
+                     const std::string& pluginType,
+                     bool defaultAdded);
     std::unordered_map<TagKey, std::string> mFileTags;
 
 #ifdef APSARA_UNIT_TEST_MAIN

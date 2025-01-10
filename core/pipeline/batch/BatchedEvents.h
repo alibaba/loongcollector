@@ -26,7 +26,6 @@ namespace logtail {
 
 struct BatchedEvents {
     EventsContainer mEvents;
-    GroupMetadata mMetadata;
     SizedMap mTags;
     std::vector<std::shared_ptr<SourceBuffer>> mSourceBuffers;
     size_t mSizeBytes = 0; // only set on completion
@@ -41,7 +40,6 @@ struct BatchedEvents {
 
     // for flusher_sls only
     BatchedEvents(EventsContainer&& events,
-                  GroupMetadata metadata,
                   SizedMap&& tags,
                   std::shared_ptr<SourceBuffer>&& sourceBuffer,
                   StringView packIdPrefix,

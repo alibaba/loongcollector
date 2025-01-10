@@ -14,8 +14,12 @@
 
 #include "pipeline/GlobalConfig.h"
 
+#include <string>
+#include <unordered_map>
+
 #include "json/json.h"
 
+#include "TagConstants.h"
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueManager.h"
@@ -24,8 +28,13 @@ using namespace std;
 
 namespace logtail {
 
-const unordered_set<string> GlobalConfig::sNativeParam
-    = {"TopicType", "TopicFormat", "Priority", "EnableTimestampNanosecond", "UsingOldContentTag"};
+const unordered_set<string> GlobalConfig::sNativeParam = {"TopicType",
+                                                          "TopicFormat",
+                                                          "Priority",
+                                                          "EnableTimestampNanosecond",
+                                                          "UsingOldContentTag",
+                                                          "PipelineMetaTagKey",
+                                                          "AgentEnvMetaTagKey"};
 
 bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, Json::Value& extendedParams) {
     const string moduleName = "global";
@@ -153,7 +162,8 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
     }
 
     // PipelineMetaTagKey
-    if (!GetOptionalMapParam(config, "PipelineMetaTagKey", mPipelineMetaTagKey, errorMsg)) {
+    unordered_map<string, string> tagKeys;
+    if (!GetOptionalMapParam(config, "PipelineMetaTagKey", tagKeys, errorMsg)) {
         PARAM_WARNING_IGNORE(ctx.GetLogger(),
                              ctx.GetAlarm(),
                              errorMsg,
@@ -162,6 +172,27 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
                              ctx.GetProjectName(),
                              ctx.GetLogstoreName(),
                              ctx.GetRegion());
+    }
+#ifdef __ENTERPRISE__
+    mPipelineMetaTagKey[TagKey::AGENT_TAG] = DEFAULT_CONFIG_TAG_KEY_VALUE;
+#endif
+    for (const auto& kv : tagKeys) {
+        if (kv.first == "HOST_NAME") {
+            mPipelineMetaTagKey[TagKey::HOST_NAME] = kv.second;
+        } else if (kv.first == "HOST_ID") {
+            mPipelineMetaTagKey[TagKey::HOST_ID] = kv.second;
+        } else if (kv.first == "CLOUD_PROVIDER") {
+            mPipelineMetaTagKey[TagKey::CLOUD_PROVIDER] = kv.second;
+        }
+#ifdef __ENTERPRISE__
+        else if (kv.first == "AGENT_TAG") {
+            mPipelineMetaTagKey[TagKey::AGENT_TAG] = kv.second;
+        }
+#else
+        else if (kv.first == "HOST_IP") {
+            mPipelineMetaTagKey[TagKey::HOST_IP] = kv.second;
+        }
+#endif
     }
 
 #ifdef __ENTERPRISE__
@@ -183,6 +214,14 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
     }
 #endif
     return true;
+}
+
+Json::Value GlobalConfig::GetPipelineMetaTagKeyJsonValue() const {
+    Json::Value json;
+    for (const auto& kv : mPipelineMetaTagKey) {
+        json[kv.first] = kv.second;
+    }
+    return json;
 }
 
 } // namespace logtail

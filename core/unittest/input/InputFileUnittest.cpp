@@ -255,7 +255,6 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\n', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
@@ -291,7 +290,6 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         APSARA_TEST_TRUE(plugin->mMultiline.mIgnoringUnmatchWarning);
         APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::DISCARD,
                           plugin->mMultiline.mUnmatchedContentTreatment);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
@@ -316,7 +314,6 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
@@ -345,7 +342,6 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
         APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
