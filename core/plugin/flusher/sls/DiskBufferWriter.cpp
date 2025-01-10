@@ -870,56 +870,57 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         dataType = RawDataType::EVENT_GROUP;
     }
 
-    auto telemetryType = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
-    switch (telemetryType)
-    {
-    case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
-        return PostLogStoreLogs(accessKeyId,
-                                accessKeySecret,
-                                type,
-                                host,
-                                httpsFlag,
-                                bufferMeta.project(),
-                                bufferMeta.logstore(),
-                                GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                dataType,
-                                logData,
-                                bufferMeta.rawsize(),
-                                bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "");
-    case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
-        return PostMetricStoreLogs(accessKeyId,
-                                   accessKeySecret,
-                                   type,
-                                   host,
-                                   httpsFlag,
-                                   bufferMeta.project(),
-                                   bufferMeta.logstore(),
-                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                   logData,
-                                   bufferMeta.rawsize());
-    case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
-    case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-    case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
-        return PostAPMBackendLogs(accessKeyId,
-                                  accessKeySecret,
-                                  type,
-                                  host,
-                                  httpsFlag,
-                                  bufferMeta.project(),
-                                  bufferMeta.logstore(),
-                                  GetSLSCompressTypeString(bufferMeta.compresstype()),
-                                  dataType,
-                                  logData,
-                                  bufferMeta.rawsize(),
-                                  bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
-                                  bufferMeta.subpath());
-    default:
-        // should not happen
-        LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));
-        SLSResponse response;
-        response.mErrorCode = LOGE_REQUEST_ERROR;
-        response.mErrorMsg = "Unhandled telemetry type";
-        return response;
+    auto telemetryType
+        = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    switch (telemetryType) {
+        case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+            return PostLogStoreLogs(accessKeyId,
+                                    accessKeySecret,
+                                    type,
+                                    host,
+                                    httpsFlag,
+                                    bufferMeta.project(),
+                                    bufferMeta.logstore(),
+                                    GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                    dataType,
+                                    logData,
+                                    bufferMeta.rawsize(),
+                                    bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "");
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
+            return PostMetricStoreLogs(accessKeyId,
+                                       accessKeySecret,
+                                       type,
+                                       host,
+                                       httpsFlag,
+                                       bufferMeta.project(),
+                                       bufferMeta.logstore(),
+                                       GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                       logData,
+                                       bufferMeta.rawsize());
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+            return PostAPMBackendLogs(accessKeyId,
+                                      accessKeySecret,
+                                      type,
+                                      host,
+                                      httpsFlag,
+                                      bufferMeta.project(),
+                                      bufferMeta.logstore(),
+                                      GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                      dataType,
+                                      logData,
+                                      bufferMeta.rawsize(),
+                                      bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
+                                      bufferMeta.subpath());
+        default: {
+            // should not happen
+            LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));
+            SLSResponse response;
+            response.mErrorCode = LOGE_REQUEST_ERROR;
+            response.mErrorMsg = "Unhandled telemetry type";
+            return response;
+        }
     }
 }
 
