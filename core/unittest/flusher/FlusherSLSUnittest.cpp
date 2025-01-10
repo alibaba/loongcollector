@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <string>
+#include <random>
 
 #include "json/json.h"
 
@@ -63,6 +64,9 @@ public:
     void TestFlushAll();
     void TestAddPackId();
     void OnGoPipelineSend();
+    void TestSendAPMMetrics();
+    void TestSendAPMTraces();
+    void TestSendAPMAgentInfos();
 
 protected:
     static void SetUpTestCase() {
@@ -1706,6 +1710,303 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
     }
 }
 
+
+std::string GenerateRandomString(size_t length) {
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::random_device rd;
+    std::mt19937 generator(rd()); 
+    std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+    std::string result;
+    for (size_t i = 0; i < length; ++i) {
+        result += chars[distribution(generator)];
+    }
+    return result;
+}
+void FlusherSLSUnittest::TestSendAPMTraces() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "TelemetryType": "arms_traces",
+            "Aliuid": "1108555361245511",
+            "Project": "proj-xtrace-505959c38776d9324945dbff709582-cn-hangzhou",
+            "Region": "cn-hangzhou",
+            "Endpoint": "pub-cn-hangzhou-staging.log.aliyuncs.com",
+            "Match": {
+                "Type": "tag",
+                "Key": "data_type",
+                "Value": "trace"
+            }
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.Init(configJson, optionalGoPipeline);
+    SLSSenderQueueItem item("hello, world!", 100, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
+    bool keepItem = false;
+    std::string errMsg = "";
+    unique_ptr<HttpSinkRequest> req;
+    APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
+    {
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+        std::vector<std::unique_ptr<ProcessQueueItem>> items;
+        // construct vector<PipelineEventGroup>
+        // 1000 timeseries for app
+        std::vector<std::string> app_ids = {
+            "eeeb8df999f59f569da84d27fa408a94", 
+            "deddf8ef215107d8fd37540ac4e3291b", 
+            "52abe1564d8ee3fea66e9302fc21d80d", 
+            "87f79be5ab74d72b4a10b62c02dc7f34", 
+            "1796627f8e0b7fbba042c145820311f9"
+        };
+        std::vector<std::string> service_name = {
+            "test-service-1", 
+            "test-service-2", 
+            "test-service-3", 
+            "test-service-4", 
+            "test-service-5"
+        };
+        for (size_t i = 0; i < app_ids.size(); i ++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("serviceName"), service_name[i]);
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
+            for (size_t j = 0 ; j < 25; j ++) {
+                auto spanEvent = mTestEventGroup.AddSpanEvent();
+                // spanEvent->SetScopeTag();
+                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("rpcType"), std::string("0"));
+                spanEvent->SetTag(std::string("callType"), std::string("http"));
+                spanEvent->SetTag(std::string("statusCode"), std::string("200"));
+                spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetKind(SpanEvent::Kind::Server);
+                std::string trace_id = GenerateRandomString(32);
+                std::string span_id = GenerateRandomString(16);
+                spanEvent->SetSpanId(span_id);
+                spanEvent->SetTraceId(trace_id);
+                spanEvent->SetStartTimeNs(nano - 5e6);
+                spanEvent->SetEndTimeNs(nano);
+                spanEvent->SetTimestamp(seconds);
+            }
+            for (size_t j = 0 ; j < 25; j ++) {
+                auto spanEvent = mTestEventGroup.AddSpanEvent();
+                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("rpcType"), std::string("25"));
+                spanEvent->SetTag(std::string("callType"), std::string("http-client"));
+                spanEvent->SetTag(std::string("statusCode"), std::string("200"));
+                spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetKind(SpanEvent::Kind::Client);
+                std::string trace_id = GenerateRandomString(32);
+                std::string span_id = GenerateRandomString(16);
+                spanEvent->SetSpanId(span_id);
+                spanEvent->SetTraceId(trace_id);
+                spanEvent->SetStartTimeNs(nano - 5e9);
+                spanEvent->SetEndTimeNs(nano);
+                spanEvent->SetTimestamp(seconds);
+            }
+            // TODO flush
+            flusher.Send(std::move(mTestEventGroup));
+        }
+    }
+    flusher.FlushAll();
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
+    APSARA_TEST_EQUAL(1U, res.size());
+}
+void FlusherSLSUnittest::TestSendAPMMetrics() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "TelemetryType": "arms_metrics",
+            "Aliuid": "1108555361245511",
+            "Project": "proj-xtrace-505959c38776d9324945dbff709582-cn-hangzhou",
+            "Region": "cn-hangzhou",
+            "Endpoint": "pub-cn-hangzhou-staging.log.aliyuncs.com",
+            "Match": {
+                "Type": "tag",
+                "Key": "data_type",
+                "Value": "metric"
+            }
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.Init(configJson, optionalGoPipeline);
+    // generate apm metrics
+    {
+        const std::vector<std::string> app_metric_names = {
+                                "arms_rpc_requests_count", 
+                                "arms_rpc_requests_slow_count", 
+                                "arms_rpc_requests_error_count",
+                                "arms_rpc_requests_seconds",
+                                "arms_rpc_requests_by_status_count",
+                            };
+        const std::vector<std::string> tcp_metrics_names = {
+                                "arms_npm_tcp_rtt_avg", 
+                                "arms_npm_tcp_count_by_state", 
+                                "arms_npm_tcp_conn_stats_count",
+                                "arms_npm_tcp_drop_count",
+                                "arms_npm_tcp_retrans_total",
+                                "arms_npm_recv_packets_total",
+                                "arms_npm_sent_packets_total",
+                                "arms_npm_recv_bytes_total",
+                                "arms_npm_sent_bytes_total",
+        };
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        std::vector<std::unique_ptr<ProcessQueueItem>> items;
+        // construct vector<PipelineEventGroup>
+        // 1000 timeseries for app
+        std::vector<std::string> app_ids = {
+            "eeeb8df999f59f569da84d27fa408a94", 
+            "deddf8ef215107d8fd37540ac4e3291b", 
+            "52abe1564d8ee3fea66e9302fc21d80d", 
+            "87f79be5ab74d72b4a10b62c02dc7f34", 
+            "1796627f8e0b7fbba042c145820311f9"
+        };
+        for (size_t i = 0; i < app_ids.size(); i ++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
+            for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
+                for (size_t z = 0; z < 10; z ++ ) {
+                    auto metricsEvent = mTestEventGroup.AddMetricEvent();
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local" + std::to_string(z)));
+                    metricsEvent->SetTag(std::string("rpcType"), std::string("0"));
+                    metricsEvent->SetTag(std::string("callType"), std::string("http"));
+                    metricsEvent->SetTag(std::string("statusCode"), std::string("200"));
+                    metricsEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                    metricsEvent->SetName(app_metric_names[j]);
+                    metricsEvent->SetValue(UntypedSingleValue{10.0});
+                    metricsEvent->SetTimestamp(seconds);
+                }
+            }
+            APSARA_TEST_TRUE(flusher.Send(std::move(mTestEventGroup)));
+        }
+        // tcp_metrics
+        for (size_t i = 0; i < app_ids.size(); i ++)  {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.44");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
+            for (size_t j = 0 ; j < tcp_metrics_names.size(); j ++) {
+                for (size_t z = 0; z < 20; z ++ ) {
+                    auto metricsEvent = mTestEventGroup.AddMetricEvent();
+                    metricsEvent->SetName(tcp_metrics_names[j]);
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("qianlu"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("dest_ip"), std::string("10.54.0." + std::to_string(z)));
+                    metricsEvent->SetTag(std::string("callType"), std::string("conn_stats"));
+                    metricsEvent->SetValue(UntypedSingleValue{20.0});
+                    metricsEvent->SetTimestamp(seconds);
+                }
+            }
+            APSARA_TEST_TRUE(flusher.Send(std::move(mTestEventGroup)));
+        }
+    }
+    flusher.FlushAll();
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
+    APSARA_TEST_EQUAL(1U, res.size());
+}
+void FlusherSLSUnittest::TestSendAPMAgentInfos() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "TelemetryType": "arms_agentinfo",
+            "Aliuid": "1108555361245511",
+            "Project": "proj-xtrace-505959c38776d9324945dbff709582-cn-hangzhou",
+            "Region": "cn-hangzhou",
+            "Endpoint": "pub-cn-hangzhou-staging.log.aliyuncs.com",
+            "Match": {
+                "Type": "tag",
+                "Key": "data_type",
+                "Value": "agent_info"
+            }
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.Init(configJson, optionalGoPipeline);
+    std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    eventGroup.SetTag(std::string("data_type"), std::string("agent_info"));
+    const std::string app_id_key = "appId";
+    const std::string agentIdKey = "agentId";
+    const std::string app_prefix = "app-";
+    const std::string agent_version = "1.0.0-rc";
+    const std::string vmVersion = "xxxx";
+    const std::string startTimestamp = "1729479979167"; // ms
+    const std::string startTimestampKey = "startTimeStamp";
+    const std::string appNameKey = "appName";
+    const std::string appNamePrefix = "test-ebpf-app-";
+    const std::string ipKey = "ip";
+    const std::string ip_prefix = "30.221.146.";
+    const std::string agentVersionKey = "agentVersion";
+    for (int i = 0; i < 50; i ++) {
+        std::string app = app_prefix + std::to_string(i);
+        std::string ip = ip_prefix + std::to_string(i);
+        auto logEvent = eventGroup.AddLogEvent();
+        logEvent->SetContent(app_id_key, app);
+        logEvent->SetContent(ipKey, ip);
+        logEvent->SetContent(agentIdKey, app);
+        logEvent->SetContent(appNameKey, appNamePrefix + std::to_string(i));
+        logEvent->SetContent(startTimestampKey, startTimestamp);
+        logEvent->SetContent(agentVersionKey, "0.0.1");
+        // auto now = std::chrono::steady_clock::now();
+        logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+    }
+    APSARA_TEST_TRUE(flusher.Send(std::move(eventGroup)));
+    flusher.FlushAll();
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
+    APSARA_TEST_EQUAL(1U, res.size());
+}
+
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnFailedInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnPipelineUpdate)
@@ -1715,6 +2016,9 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendAPMAgentInfos)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendAPMMetrics)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendAPMTraces)
 
 } // namespace logtail
 

@@ -237,22 +237,21 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
 }
 
 void PreparePostAPMBackendRequest(const string& accessKeyId,
-                                    const string& accessKeySecret,
-                                    SLSClientManager::AuthType type,
-                                    const string& host,
-                                    bool isHostIp,
-                                    const string& project,
-                                    const string& logstore,
-                                    const string& compressType,
-                                    RawDataType dataType,
-                                    const string& body,
-                                    size_t rawSize,
-                                    const string& shardHashKey,
-                                    optional<uint64_t> seqId,
-                                    const string& path,
-                                    string& query,
-                                    map<string, string>& header) {
-
+                                  const string& accessKeySecret,
+                                  SLSClientManager::AuthType type,
+                                  const string& host,
+                                  bool isHostIp,
+                                  const string& project,
+                                  const string& logstore,
+                                  const string& compressType,
+                                  RawDataType dataType,
+                                  const string& body,
+                                  size_t rawSize,
+                                  const string& shardHashKey,
+                                  optional<uint64_t> seqId,
+                                  const string& path,
+                                  string& query,
+                                  map<string, string>& header) {
     if (isHostIp) {
         header[HOST] = project + "." + host;
     } else {
@@ -359,39 +358,40 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
 }
 
 SLSResponse PostAPMBackendLogs(const string& accessKeyId,
-                             const string& accessKeySecret,
-                             SLSClientManager::AuthType type,
-                             const string& host,
-                             bool httpsFlag,
-                             const string& project,
-                             const string& logstore,
-                             const string& compressType,
-                             RawDataType dataType,
-                             const string& body,
-                             size_t rawSize,
-                             const string& shardHashKey,
-                             const std::string& subpath) {
+                               const string& accessKeySecret,
+                               SLSClientManager::AuthType type,
+                               const string& host,
+                               bool httpsFlag,
+                               const string& project,
+                               const string& logstore,
+                               const string& compressType,
+                               RawDataType dataType,
+                               const string& body,
+                               size_t rawSize,
+                               const string& shardHashKey,
+                               const std::string& subpath) {
     string query;
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
-                                   accessKeySecret,
-                                   type,
-                                   host,
-                                   false, // sync request always uses vip
-                                   project,
-                                   logstore,
-                                   compressType,
-                                   dataType,
-                                   body,
-                                   rawSize,
-                                   shardHashKey,
-                                   nullopt, // sync request does not support exactly-once
-                                   subpath,
-                                   query,
-                                   header);
+                                 accessKeySecret,
+                                 type,
+                                 host,
+                                 false, // sync request always uses vip
+                                 project,
+                                 logstore,
+                                 compressType,
+                                 dataType,
+                                 body,
+                                 rawSize,
+                                 shardHashKey,
+                                 nullopt, // sync request does not support exactly-once
+                                 subpath,
+                                 query,
+                                 header);
     HttpResponse response;
-    SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, subpath, "", header, body),
-                    response);
+    SendHttpRequest(
+        make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, subpath, "", header, body),
+        response);
     return ParseHttpResponse(response);
 }
 
