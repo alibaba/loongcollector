@@ -28,12 +28,19 @@ using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, bool);
 
 extern "C" {
 int set_logger(logtail::ebpf::eBPFLogHandler fn);
+
+// control plane
 int start_plugin(logtail::ebpf::PluginConfig* arg);
-int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms);
 int update_plugin(logtail::ebpf::PluginConfig* arg);
 int stop_plugin(logtail::ebpf::PluginType);
 int suspend_plugin(logtail::ebpf::PluginType);
 int resume_plugin(logtail::ebpf::PluginType);
+
+// data plane
+int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms);
+
+// networkobserver 特有
 void set_networkobserver_config(int32_t opt, int32_t value);
 void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update);
+
 }

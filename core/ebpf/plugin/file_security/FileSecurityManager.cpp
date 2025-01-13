@@ -1,7 +1,7 @@
 #include "FileSecurityManager.h"
 
 #include "ebpf/Config.h"
-#include "ebpf/util/IdAllocator.h"
+// #include "ebpf/util/IdAllocator.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -50,13 +50,16 @@ int FileSecurityManager::EnableCallName(const std::string& callName, const confi
         selector_filters kernel_filters;
         ::memset(&kernel_filters, 0, sizeof(kernel_filters));
 
-        int idx = IdAllocator::GetInstance()->GetNextId<logtail::ebpf::StringPrefixMap>();
-        if (idx < 0) {
-            LOG_WARNING(sLogger,
-                        ("Failed to get next id, reach max",
-                         IdAllocator::GetInstance()->GetMaxId<logtail::ebpf::StringPrefixMap>()));
-            return 1;
-        }
+        int idx = 0;
+
+        // int idx = IdAllocator::GetInstance()->GetNextId<logtail::ebpf::StringPrefixMap>();
+        // if (idx < 0) {
+        //     LOG_WARNING(sLogger,
+        //                 ("Failed to get next id, reach max",
+        //                  IdAllocator::GetInstance()->GetMaxId<logtail::ebpf::StringPrefixMap>()));
+        //     return 1;
+        // }
+
         LOG_DEBUG(sLogger, ("call_name", callName)("index", idx));
         // step1: add a new entry into string_prefix_maps, and assign a filter id
         // step2: add a filter into filter map and record filter type and filter id
@@ -134,7 +137,7 @@ int FileSecurityManager::DisableCallName(const std::string& callName) {
         assert(filter.filter_type == FILTER_TYPE_FILE_PREFIX);
         auto outter_key = filter.map_idx[0];
         // wrapper_->DeleteInnerMap<logtail::ebpf::StringPrefixMap>("string_prefix_maps", &outter_key);
-        IdAllocator::GetInstance()->ReleaseId<logtail::ebpf::StringPrefixMap>(outter_key);
+        // IdAllocator::GetInstance()->ReleaseId<logtail::ebpf::StringPrefixMap>(outter_key);
         LOG_DEBUG(sLogger, ("Release filter for type", (int)filter.filter_type)("map_idx", outter_key));
     }
 

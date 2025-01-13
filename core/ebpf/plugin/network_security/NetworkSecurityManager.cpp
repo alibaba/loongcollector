@@ -10,11 +10,22 @@ namespace ebpf {
 NetworkSecurityManager::NetworkSecurityManager(std::unique_ptr<BaseManager>& base,
                                              std::shared_ptr<SourceManager> sourceManager)
     : AbstractManager(base, sourceManager) {
+    mAggregateTree = std::make_unique<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>>(
+        1000, // max nodes
+        [](std::unique_ptr<BaseSecurityNode>& base, const std::unique_ptr<BaseSecurityEvent>& n) {
+            // 聚合逻辑
+        },
+        [](const std::unique_ptr<BaseSecurityEvent>& n) {
+            // 生成新节点逻辑
+            return std::make_unique<BaseSecurityNode>();
+        }
+    );
 }
 
-NetworkSecurityManager::~NetworkSecurityManager() {
-    Destroy();
-}
+// 网络监控 3 个 poller parser iterator 
+// poller 2 个 
+// 共用 1 个 runner 
+// 共用 1 个 Timer 
 
 int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     auto securityOpts = std::get_if<SecurityOptions*>(&options);
@@ -23,141 +34,134 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
         return -1;
     }
 
-    mRunning = true;
-    // 启动一个线程，调用 PollPerfBuffers
-
+    mFlag = true;
+    
+    // 启动工作线程
+    mPollerThread = std::thread(&NetworkSecurityManager::PollerThread, this);
     mRunnerThread = std::thread(&NetworkSecurityManager::RunnerThread, this);
+    
+    // 初始化定时器
+    InitTimer();
     
     LOG_INFO(sLogger, ("NetworkSecurityManager initialized", ""));
     return 0;
 }
 
-void NetworkSecurityManager::Stop() {
-    {
-        std::lock_guard<std::mutex> lock(mContextMutex);
-        mRunning = false;
-        mPipelineCtx = nullptr;
-        mPluginIndex = -1;
-    }
-    
-    mRunnerCV.notify_one();
-    
-    if (mRunnerThread.joinable()) {
-        mRunnerThread.join();
-    }
-    if (mPollerThread.joinable()) {
-        mPollerThread.join();
-    }
+void NetworkSecurityManager::RunnerThread() {
+    while (mFlag) {
+        if (mSuspendFlag) {
+            std::unique_lock<std::mutex> lock(mContextMutex);
+            mRunnerCV.wait(lock, [this]() { return !mSuspendFlag || !mFlag; });
+            continue;
+        }
+        // consume queue && aggregate
+        ProcessEvents();
+        
+    } 
 }
 
 int NetworkSecurityManager::Destroy() {
-    Stop();
+    if (!mFlag) {
+        return 0;
+    }
+
+    mFlag = false;
+    mRunnerCV.notify_all();
+
+    if (mRunnerThread.joinable()) {
+        mRunnerThread.join();
+    }
+
+    if (mPollerThread.joinable()) {
+        mPollerThread.join();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mContextMutex);
+        mPipelineCtx = nullptr;
+        mQueueKey = 0;
+        mPluginIndex = -1;
+    }
+
     return 0;
 }
 
-void NetworkSecurityManager::PollerThread() {    
-    while (true) {
-        std::unique_lock<std::mutex> lock(mRunnerMutex);
-        
-        {
-            std::lock_guard<std::mutex> contextLock(mContextMutex);
-            if (!mRunning) {
-                break;
+void NetworkSecurityManager::InitTimer() {
+    // TODO @qianlu.kk self event ...
+    auto event = std::make_unique<TimerEvent>(
+        std::chrono::seconds(1), // every 1 second
+        [this]() {
+            if (!mSuspendFlag) {
+                ReportAggTree();
             }
-            
-            if (mSuspendFlag) {
-                mRunnerCV.wait_for(lock, std::chrono::milliseconds(100));
-                continue;
-            }
-
-            // 从eBPF maps中读取事件
-            int32_t flag = 0;
-            int ret = mSourceManager->PollPerfBuffers(PluginType::NETWORK_SECURITY, 64, &flag, 0);
-            if (ret < 0) {
-                LOG_WARNING(sLogger, ("poll event error, ret", ret));
-                continue;
-            }
+        },
+        [this]() {
+            // add lock ...
+            return !mSuspendFlag && mFlag;
         }
-    }
-}
-
-void NetworkSecurityManager::RunnerThread() {
-    std::vector<std::unique_ptr<BaseSecurityEvent>> events;
-    events.reserve(64);
+    );
     
-    while (true) {
-        std::unique_lock<std::mutex> lock(mRunnerMutex);
-        
-        {
-            std::lock_guard<std::mutex> contextLock(mContextMutex);
-            if (!mRunning) {
-                break;
-            }
-            
-            if (mSuspendFlag) {
-                mRunnerCV.wait_for(lock, std::chrono::milliseconds(100));
-                continue;
-            }            
-        }
-
-        // events 从 concurrent queue 中读取
-        ProcessEvents(events);
-
-        if (!events.empty()) {
-            events.clear();
-        }
+    if (mTimer) {
+        mTimer->PushEvent(std::move(event));
     }
 }
 
-void NetworkSecurityManager::ProcessEvents(std::vector<std::unique_ptr<BaseSecurityEvent>>& events) {
-    std::lock_guard<std::mutex> lock(mContextMutex);
-    if (!mPipelineCtx || mPluginIndex < 0) {
+void NetworkSecurityManager::ProcessEvents() {
+    // std::unique_lock<std::mutex> lock(mContextMutex);
+    // if (!mPipelineCtx || mPluginIndex < 0) {
+    //     return;
+    // }
+    std::vector<std::unique_ptr<BaseSecurityEvent>> items(1024);
+    size_t count = mEventQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+    LOG_DEBUG(sLogger, ("get records:", count));
+    // handle ....
+    if (count == 0) {
         return;
     }
-    // 遍历 events，并送入 Aggregator 中
-    for (auto& event : events) {
-        // generate hash key
-        std::array<size_t, 2> hash_result;
-        hash_result.fill(0UL);
-        hash_result[0] = 1;
-        hash_result[1] = 2;
-        mAggregateTree->Aggregate(std::move(event), hash_result);
-    }
     
-}
-
-int NetworkSecurityManager::EnableCallName(const std::string& call_name, const configType config) {
-    return 0;
-}
-
-int NetworkSecurityManager::DisableCallName(const std::string& call_name) {
-    return 0;
+    for (auto& event : items) {
+        std::array<size_t, 2> hashResult{1, 2};
+        mAggregateTree->Aggregate(std::move(event), hashResult);
+    }
 }
 
 void NetworkSecurityManager::ReportAggTree() {
-    auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
-    if (nodes.empty()) {
-        LOG_DEBUG(sLogger, ("empty nodes...", ""));
+    std::unique_lock<std::mutex> lock(mContextMutex);
+    if (!mPipelineCtx || mPluginIndex < 0) {
         return;
     }
 
-    std::vector<std::unique_ptr<SecurityEventGroup>> group;
-    group.reserve(nodes.size());
-    for (auto& node : nodes) {
-        bool init = false;
-        auto event_group = std::make_unique<SecurityEventGroup>();
+    auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
+    if (nodes.empty()) {
+        return;
+    }
+    
+    for (auto* node : nodes) {
+        auto eventGroup = std::make_unique<PipelineEventGroup>();
+        // TODO @qianlu.kk fill event group
         mAggregateTree->ForEach(node, [&](const BaseSecurityNode* group) {
-        // connection level ...
-        if (!init) {
-            // fill group 
-        }
-            
+
         });
-        group.emplace_back(std::move(event_group));
+
+        std::unique_lock<std::mutex> lock(mContextMutex);
+        if (!mPipelineCtx || mPluginIndex < 0) {
+            return;
+        }
+        
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIndex);
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(
+                sLogger,
+                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", mPluginIndex)("[Event] push queue failed!", ""));
+        }
     }
 
+
+    // TODO @qianlu.kk push to ProcessQueue
+    // ProcessQueueManager::GetInstance()->PushEventGroup(mPipelineCtx, mPluginIndex, std::move(groups));
+    
     mAggregateTree->Clear();
-    // 基于 mPipelineCtx 将 group 发送出去
+    
 }
 
 } // namespace ebpf

@@ -19,6 +19,7 @@
 #include <array>
 #include <set>
 #include <queue>
+#include <condition_variable>
 
 #include "ebpf/SourceManager.h"
 #include "BaseManager.h"
@@ -66,12 +67,14 @@ public:
         WriteLock lock(mMtx);
         // flag_ = false;
         mSuspendFlag = true;
+        mRunnerCV.notify_all();
         return;
     }
 
     virtual void Resume() {
         WriteLock lock(mMtx);
         mSuspendFlag = false;
+        mRunnerCV.notify_all();
         return;
     }
 
@@ -80,7 +83,18 @@ public:
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
 protected:
+    BaseManager *mBaseManager;
     std::shared_ptr<SourceManager> mSourceManager;
+    mutable std::mutex mContextMutex;
+    PipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    uint32_t mPluginIndex{-1};
+    std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
+    // static ...
+    std::unique_ptr<Timer> mTimer;
+    std::chrono::nanoseconds mTimeDiff;
+    std::condition_variable mRunnerCV;
+
     // int InitOrGetCallNameIdx(const std::string& call_name);
     // int ReleaseCallNameIdx(const std::string& call_name);
     // int GetCallNameIdx(const std::string& call_name);
@@ -103,16 +117,15 @@ protected:
     //     call_name_indexes_[int(call_name)].clear();
     // }
 
-    BaseManager *mBaseManager;
-    std::chrono::nanoseconds mTimeDiff;
+    
+    
     // call name to idx
     // std::unordered_map<std::string, int> call_name_2_idx_;
     // std::array<std::set<int>, SECURE_FUNCS_MAX> call_name_indexes_;
 
     // std::queue<std::string> enable_callnames_;
 
-    std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
-    static logtail::Timer* mTimer;
+    
     // uint64_t last_export_sec_ = 0;
 };
 
