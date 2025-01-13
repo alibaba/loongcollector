@@ -1,7 +1,8 @@
 #include "FileSecurityManager.h"
-#include "logger/Logger.h"
-#include "ebpf/util/IdAllocator.h"
+
 #include "ebpf/Config.h"
+#include "ebpf/util/IdAllocator.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {
@@ -30,13 +31,15 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
 }
 
 
-int FileSecurityManager::EnableCallName(const std::string &callName,
-                                        const configType newConfig) {
+int FileSecurityManager::EnableCallName(const std::string& callName, const configType newConfig) {
     int ret = 0;
-    LOG_DEBUG(sLogger, ("EnableCallName", callName) ("idx", newConfig.index()) ("hold", std::holds_alternative<logtail::ebpf::SecurityFileFilter>(newConfig)));
+    LOG_DEBUG(sLogger,
+              ("EnableCallName", callName)("idx", newConfig.index())(
+                  "hold", std::holds_alternative<logtail::ebpf::SecurityFileFilter>(newConfig)));
 
     int call_name_idx = GetCallNameIdx(callName);
-    if (call_name_idx < 0) return 1;
+    if (call_name_idx < 0)
+        return 1;
 
     auto filter = std::get_if<logtail::ebpf::SecurityFileFilter>(&newConfig);
     // update filters map
@@ -49,10 +52,12 @@ int FileSecurityManager::EnableCallName(const std::string &callName,
 
         int idx = IdAllocator::GetInstance()->GetNextId<logtail::ebpf::StringPrefixMap>();
         if (idx < 0) {
-            LOG_WARNING(sLogger, ("Failed to get next id, reach max", IdAllocator::GetInstance()->GetMaxId<logtail::ebpf::StringPrefixMap>()));
+            LOG_WARNING(sLogger,
+                        ("Failed to get next id, reach max",
+                         IdAllocator::GetInstance()->GetMaxId<logtail::ebpf::StringPrefixMap>()));
             return 1;
         }
-        LOG_DEBUG(sLogger, ("call_name", callName) ("index", idx));
+        LOG_DEBUG(sLogger, ("call_name", callName)("index", idx));
         // step1: add a new entry into string_prefix_maps, and assign a filter id
         // step2: add a filter into filter map and record filter type and filter id
         selector_filter k_filter;
@@ -65,9 +70,9 @@ int FileSecurityManager::EnableCallName(const std::string &callName,
         kernel_filters.filters[0] = k_filter;
 
         LOG_DEBUG(sLogger, ("filter not empty!", ""));
-        for (size_t i = 0; i < filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i ++) {
+        for (size_t i = 0; i < filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
             auto& x = filter->mFilePathList[i];
-            LOG_DEBUG(sLogger, ("path", x) ("begin to update map in map for filter detail, idx", idx));
+            LOG_DEBUG(sLogger, ("path", x)("begin to update map in map for filter detail, idx", idx));
 
             // update inner map
             string_prefix_lpm_trie prefix_trie;
@@ -75,11 +80,15 @@ int FileSecurityManager::EnableCallName(const std::string &callName,
             ::memcpy(prefix_trie.data, x.data(), x.length());
             prefix_trie.prefixlen = x.length() * 8; // in bits
             // uint8_t val(1);
-            LOG_DEBUG(sLogger, ("[before update] prefix trie data", prefix_trie.data) ("prefix_len", prefix_trie.prefixlen));
+            LOG_DEBUG(sLogger,
+                      ("[before update] prefix trie data", prefix_trie.data)("prefix_len", prefix_trie.prefixlen));
             // TODO @qianlu.kk update inner map
-            // ret = wrapper_->UpdateInnerMapElem<logtail::ebpf::StringPrefixMap>(std::string("string_prefix_maps"), &idx, &prefix_trie, &val, 0);
+            // ret = wrapper_->UpdateInnerMapElem<logtail::ebpf::StringPrefixMap>(std::string("string_prefix_maps"),
+            // &idx, &prefix_trie, &val, 0);
             if (ret) {
-                LOG_DEBUG(sLogger, ("[after update] prefix trie data failed! data", prefix_trie.data) ("prefix_len", prefix_trie.prefixlen));
+                LOG_DEBUG(sLogger,
+                          ("[after update] prefix trie data failed! data", prefix_trie.data)("prefix_len",
+                                                                                             prefix_trie.prefixlen));
                 continue;
             }
         }
@@ -89,7 +98,7 @@ int FileSecurityManager::EnableCallName(const std::string &callName,
         // wrapper_->UpdateBPFHashMap("filter_map", &call_name_idx, &kernel_filters, 0);
     }
 
-    // TODO @qianlu.kk 
+    // TODO @qianlu.kk
     // std::vector<AttachProgOps> attach_ops = {AttachProgOps("kprobe_" + call_name, true)};
     // ret = wrapper_->DynamicAttachBPFObject(attach_ops);
 
@@ -99,9 +108,10 @@ int FileSecurityManager::EnableCallName(const std::string &callName,
 
 int FileSecurityManager::DisableCallName(const std::string& callName) {
     LOG_DEBUG(sLogger, ("DisableCallName", callName));
-    
+
     int call_name_idx = GetCallNameIdx(callName);
-    if (call_name_idx < 0) return 1;
+    if (call_name_idx < 0)
+        return 1;
     int ret = 0;
     // step1: detach callname
     // std::vector<AttachProgOps> attach_ops = {AttachProgOps("kprobe_" + call_name, true)};
@@ -119,13 +129,13 @@ int FileSecurityManager::DisableCallName(const std::string& callName) {
     }
 
     // step3: remove filters
-    for (int i = 0 ; i < kernel_filters.filter_count; i ++) {
+    for (int i = 0; i < kernel_filters.filter_count; i++) {
         auto filter = kernel_filters.filters[i];
         assert(filter.filter_type == FILTER_TYPE_FILE_PREFIX);
         auto outter_key = filter.map_idx[0];
         // wrapper_->DeleteInnerMap<logtail::ebpf::StringPrefixMap>("string_prefix_maps", &outter_key);
         IdAllocator::GetInstance()->ReleaseId<logtail::ebpf::StringPrefixMap>(outter_key);
-        LOG_DEBUG(sLogger, ("Release filter for type", (int)filter.filter_type) ("map_idx", outter_key));
+        LOG_DEBUG(sLogger, ("Release filter for type", (int)filter.filter_type)("map_idx", outter_key));
     }
 
     // step4: delete filter map for call name
@@ -135,5 +145,5 @@ int FileSecurityManager::DisableCallName(const std::string& callName) {
     return ret;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

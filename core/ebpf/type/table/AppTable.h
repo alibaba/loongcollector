@@ -14,13 +14,13 @@
 
 #pragma once
 
-#include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "ebpf/type/table/DataTable.h"
 
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kConnTrackerElements [] = {
+static constexpr DataElement kConnTrackerElements[] = {
     kHost,
     kAppName,
     kAppId,
@@ -58,10 +58,9 @@ static constexpr DataElement kConnTrackerElements [] = {
 
 static constexpr size_t kConnTrackerElementsTableSize = std::size(kConnTrackerElements);
 
-static constexpr auto kConnTrackerTable =
-    DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
+static constexpr auto kConnTrackerTable = DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
 
-static constexpr DataElement kAppMetricsElements [] = {
+static constexpr DataElement kAppMetricsElements[] = {
     kHost, // host
     kAppId, // pid
     kIp, // server ip
@@ -69,10 +68,10 @@ static constexpr DataElement kAppMetricsElements [] = {
     kWorkloadKind,
     kWorkloadName,
 
-    kProtocol, 
-    kRpc, 
-    kDestId, 
-    // kContainerId, 
+    kProtocol,
+    kRpc,
+    kDestId,
+    // kContainerId,
     /* non-aggregate keys */
 
     kRpcType,
@@ -83,10 +82,9 @@ static constexpr DataElement kAppMetricsElements [] = {
 
 static constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
-static constexpr auto kAppMetricsTable =
-    DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
+static constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
-static constexpr DataElement kAppTraceElements [] = {
+static constexpr DataElement kAppTraceElements[] = {
     kHost, // host
     kAppId, // pid
     kIp, // server ip
@@ -94,10 +92,10 @@ static constexpr DataElement kAppTraceElements [] = {
     kWorkloadKind,
     kWorkloadName,
 
-    kProtocol, 
-    kRpc, 
-    kDestId, 
-    // kContainerId, 
+    kProtocol,
+    kRpc,
+    kDestId,
+    // kContainerId,
     /* non-aggregate keys */
 
     kRpcType,
@@ -108,8 +106,7 @@ static constexpr DataElement kAppTraceElements [] = {
 
 static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 
-static constexpr auto kAppTraceTable =
-    DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
+static constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

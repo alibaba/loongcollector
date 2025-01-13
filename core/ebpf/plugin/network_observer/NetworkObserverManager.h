@@ -7,15 +7,15 @@
 #include <atomic>
 #include <vector>
 
-#include "ebpf/util/sampler/Sampler.h"
-#include "ebpf/plugin/AbstractManager.h"
-#include "common/queue/blockingconcurrentqueue.h"
-#include "ebpf/type/NetworkObserverEvent.h"
 #include "ConnTrackerManager.h"
 #include "Worker.h"
+#include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
+#include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
+#include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/FrequencyManager.h"
+#include "ebpf/util/sampler/Sampler.h"
 
 namespace logtail {
 namespace ebpf {
@@ -29,17 +29,22 @@ public:
     using MeterHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>&)>;
     using SpanHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&)>;
 
-    static std::shared_ptr<NetworkObserverManager> Create(std::unique_ptr<BaseManager>& mgr, std::shared_ptr<SourceManager> sourceManager, 
-        std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> flusher) {
+    static std::shared_ptr<NetworkObserverManager>
+    Create(std::unique_ptr<BaseManager>& mgr,
+           std::shared_ptr<SourceManager> sourceManager,
+           std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> flusher) {
         return std::make_shared<NetworkObserverManager>(mgr, sourceManager, flusher);
     }
 
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() {}
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
-    explicit NetworkObserverManager(std::unique_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)> flusher) 
+    explicit NetworkObserverManager(
+        std::unique_ptr<BaseManager>& baseMgr,
+        std::shared_ptr<SourceManager> sourceManager,
+        std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)> flusher)
         : AbstractManager(baseMgr, sourceManager), mFlusher(flusher) {}
-    
+
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
     int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
@@ -51,20 +56,20 @@ public:
     void RecordEventLost(enum callback_type_e type, uint64_t lost_count);
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
-    void AcceptNetStatsEvent(struct conn_stats_event_t *event);
+    void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
     void EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const;
 
     void PollBufferWrapper();
     void ConsumeRecords();
-    
+
 private:
     //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
     //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
-    void ConsumeRecordsAsEvent(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
-    void ConsumeRecordsAsMetric(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
-    void ConsumeRecordsAsTrace(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
-    
+    void ConsumeRecordsAsEvent(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ConsumeRecordsAsMetric(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ConsumeRecordsAsTrace(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+
     void RunInThread();
 
     bool UpdateParsers(const std::vector<std::string>& protocols);
@@ -106,7 +111,7 @@ private:
 
     // store parsed records
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRecordQueue;
-    
+
     // WorkerPool: used to parse protocols from raw record
     // NetDataHandler netDataHandler_;
     std::unique_ptr<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>> mWorkerPool;
@@ -131,9 +136,9 @@ private:
         }
     }
 
-  // TODO @qianlu.kk 
-//   std::unique_ptr<Aggregator> metric_aggregator_ = nullptr;
+    // TODO @qianlu.kk
+    //   std::unique_ptr<Aggregator> metric_aggregator_ = nullptr;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

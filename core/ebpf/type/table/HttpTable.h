@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "ebpf/type/table/DataTable.h"
 
-namespace logtail{
+namespace logtail {
 namespace ebpf {
 
 constexpr DataElement kStatusCode = {
@@ -28,26 +28,23 @@ constexpr DataElement kStatusCode = {
     "status code",
 };
 
-static constexpr DataElement kHTTPElements[] = {
-    kIp, // agg key
-    kAppId, // agg key
-    kProtocol, // agg key 
-    kRpc, // agg key
-    kDestId, // agg key
-    kContainerId, // agg key
-    kRpcType,
-    kCallType,
-    kCallKind,
-    kEndpoint,
-    kStatusCode,
-    kStartTsNs,
-    kEndTsNs
-};
+static constexpr DataElement kHTTPElements[] = {kIp, // agg key
+                                                kAppId, // agg key
+                                                kProtocol, // agg key
+                                                kRpc, // agg key
+                                                kDestId, // agg key
+                                                kContainerId, // agg key
+                                                kRpcType,
+                                                kCallType,
+                                                kCallKind,
+                                                kEndpoint,
+                                                kStatusCode,
+                                                kStartTsNs,
+                                                kEndTsNs};
 
-static constexpr auto kHTTPTable =
-    DataTableSchema("http_record", "HTTP request-response pair events", kHTTPElements);
+static constexpr auto kHTTPTable = DataTableSchema("http_record", "HTTP request-response pair events", kHTTPElements);
 
 static constexpr int kHTTPPathIdx = kHTTPTable.ColIndex("path");
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

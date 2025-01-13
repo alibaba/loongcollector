@@ -15,7 +15,5 @@
 #pragma once
 
 namespace logtail {
-namespace ebpf {
-
-}
-}
+namespace ebpf {}
+} // namespace logtail

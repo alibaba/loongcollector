@@ -35,5 +35,5 @@ namespace ebpf {
 //     friend class ConvergerFactory;
 // };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

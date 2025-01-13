@@ -29,10 +29,10 @@
 #include "ebpf/handler/ObserveHandler.h"
 #include "ebpf/handler/SecurityHandler.h"
 #include "ebpf/include/export.h"
-#include "monitor/metric_models/MetricTypes.h"
-#include "runner/InputRunner.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
+#include "monitor/metric_models/MetricTypes.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 namespace ebpf {
@@ -40,7 +40,7 @@ namespace ebpf {
 class EnvManager {
 public:
     void InitEnvInfo();
-    bool IsSupportedEnv(logtail::ebpf::PluginType type);
+    bool IsSupportedEnv(PluginType type);
     bool AbleToLoadDyLib();
 
 private:
@@ -68,9 +68,9 @@ public:
 
     void Stop() override;
 
-    std::string CheckLoadedPipelineName(logtail::ebpf::PluginType type);
+    std::string CheckLoadedPipelineName(PluginType type);
 
-    void UpdatePipelineName(logtail::ebpf::PluginType type, const std::string& name, const std::string& project);
+    void UpdatePipelineName(PluginType type, const std::string& name, const std::string& project);
 
     bool EnablePlugin(const std::string& pipeline_name,
                       uint32_t plugin_index,
@@ -79,13 +79,13 @@ public:
                       const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                       PluginMetricManagerPtr mgr);
 
-    bool DisablePlugin(const std::string& pipeline_name, logtail::ebpf::PluginType type);
+    bool DisablePlugin(const std::string& pipeline_name, PluginType type);
 
-    bool SuspendPlugin(const std::string& pipeline_name, logtail::ebpf::PluginType type);
+    bool SuspendPlugin(const std::string& pipeline_name, PluginType type);
 
     bool HasRegisteredPlugins() const override;
 
-    bool IsSupportedEnv(logtail::ebpf::PluginType type);
+    bool IsSupportedEnv(PluginType type);
 
     std::string GetAllProjects();
 

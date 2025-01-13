@@ -4,15 +4,16 @@
 
 #pragma once
 
-#include <vector>
-#include <thread>
-#include <functional>
-#include <atomic>
 #include <pthread.h>
 
+#include <atomic>
+#include <functional>
+#include <thread>
+#include <vector>
+
 #include "common/queue/blockingconcurrentqueue.h"
-#include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/protocol/ProtocolParser.h"
+#include "ebpf/type/NetworkObserverEvent.h"
 
 namespace logtail {
 namespace ebpf {
@@ -63,7 +64,8 @@ private:
             Event event;
             // TODO @qianlu.kk make it configurable
             if (eventQueue_.wait_dequeue_timed(event, std::chrono::milliseconds(200))) {
-                if (done_) break; // Early exit if done_ is true
+                if (done_)
+                    break; // Early exit if done_ is true
                 func_(event, resultQueue_);
             }
         }
@@ -79,14 +81,15 @@ private:
 
 class NetDataHandler : public WorkerFunc<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>> {
 public:
-    void operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue &resQueue) override;
+    void operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue& resQueue) override;
     ~NetDataHandler() {}
     NetDataHandler(const NetDataHandler&& other) : count_(other.count_) {}
     NetDataHandler() {}
     NetDataHandler(const NetDataHandler& other) : count_(other.count_) {}
+
 private:
     int64_t count_ = 0;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

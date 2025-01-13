@@ -84,7 +84,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-        // EnableMetric (Optional)
+    // EnableMetric (Optional)
     if (!GetOptionalBoolParam(probeConfig, "EnableCidFilter", thisObserverNetworkOption.mEnableCidFilter, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
@@ -96,7 +96,8 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // EnableMetric (Optional)
-    if (!GetOptionalListParam<std::string>(probeConfig, "EnableCids", thisObserverNetworkOption.mEnableCids, errorMsg)) {
+    if (!GetOptionalListParam<std::string>(
+            probeConfig, "EnableCids", thisObserverNetworkOption.mEnableCids, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,

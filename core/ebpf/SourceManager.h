@@ -27,9 +27,8 @@
 #include <vector>
 
 #include "common/DynamicLibHelper.h"
-#include "ebpf/include/export.h"
-
 #include "ebpf/driver/NetworkObserver.h"
+#include "ebpf/include/export.h"
 
 namespace logtail {
 namespace ebpf {
@@ -43,15 +42,15 @@ public:
 
     void Init();
 
-    bool StartPlugin(logtail::ebpf::PluginType plugin_type, std::unique_ptr<logtail::ebpf::PluginConfig> conf);
+    bool StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
 
-    bool StopPlugin(logtail::ebpf::PluginType plugin_type);
+    bool StopPlugin(PluginType plugin_type);
 
-    bool SuspendPlugin(logtail::ebpf::PluginType plugin_type);
+    bool SuspendPlugin(PluginType plugin_type);
 
-    bool CheckPluginRunning(logtail::ebpf::PluginType plugin_type);
+    bool CheckPluginRunning(PluginType plugin_type);
 
-    int32_t PollPerfBuffers(PluginType, int32_t, int32_t *, int);
+    int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
 
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
     bool SetNetworkObserverCidFilter(const std::string&, bool update);
@@ -63,7 +62,7 @@ private:
     bool LoadDynamicLib(const std::string& lib_name);
     bool LoadCoolBPF();
     bool DynamicLibSuccess();
-    bool UpdatePlugin(logtail::ebpf::PluginType plugin_type, std::unique_ptr<logtail::ebpf::PluginConfig> conf);
+    bool UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
 
     enum class network_observer_uprobe_funcs {
         EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG,
@@ -90,7 +89,7 @@ private:
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
     std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
-    std::array<std::atomic_bool, (int)logtail::ebpf::PluginType::MAX> mRunning = {};
+    std::array<std::atomic_bool, (int)PluginType::MAX> mRunning = {};
     std::string mHostIp;
     std::string mHostName;
     std::string mHostPathPrefix;
@@ -100,7 +99,7 @@ private:
     eBPFLogHandler mLogPrinter;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    std::unique_ptr<logtail::ebpf::PluginConfig> mConfig;
+    std::unique_ptr<PluginConfig> mConfig;
     friend class eBPFServerUnittest;
 #endif
 };

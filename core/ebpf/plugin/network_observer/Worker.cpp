@@ -3,9 +3,10 @@
 //
 
 #include "Worker.h"
+
+#include "common/magic_enum.hpp"
 #include "ebpf/protocol/ProtocolParser.h"
 #include "logger/Logger.h"
-#include "common/magic_enum.hpp"
 
 extern "C" {
 #include <net.h>
@@ -28,9 +29,9 @@ void NetDataHandler::operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue&
 
     LOG_DEBUG(sLogger, ("[NetDataHandler] begin parse, protocol is", std::string(magic_enum::enum_name(protocol))));
 
-    std::vector<std::unique_ptr<AbstractRecord>> records =
-        ProtocolParserManager::GetInstance().Parse(protocol, std::move(evt));
-    
+    std::vector<std::unique_ptr<AbstractRecord>> records
+        = ProtocolParserManager::GetInstance().Parse(protocol, std::move(evt));
+
     // add records to span/event generate queue
     for (auto& record : records) {
         resQueue.enqueue(std::move(record));
@@ -38,7 +39,5 @@ void NetDataHandler::operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue&
 }
 
 // template class WorkerPool<std::unique_ptr<NetDataEvent>, std::unique_ptr<AbstractRecord>>;
-}
-}
-
-
+} // namespace ebpf
+} // namespace logtail

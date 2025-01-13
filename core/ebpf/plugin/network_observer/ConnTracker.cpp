@@ -1,6 +1,7 @@
 #include "ConnTracker.h"
-#include "logger/Logger.h"
+
 #include "common/magic_enum.hpp"
+#include "logger/Logger.h"
 extern "C" {
 #include <net.h>
 }
@@ -12,32 +13,24 @@ std::regex ConnTracker::rgx_ = std::regex("[a-f0-9]{64}");
 
 bool ConnTracker::MetaAttachReadyForApp() {
     auto res = net_meta_attached_ && k8s_meta_attached_ && k8s_peer_meta_attached_ && protocol_set_;
-    if (!res) LOG_WARNING(sLogger, ("app meta not ready, container_id", container_id_trim_) 
-        ("k8s_meta_attached", k8s_meta_attached_)
-        ("k8s_peer_meta_attached", k8s_peer_meta_attached_)
-        ("protocol_set", protocol_set_)
-        ("net_meta_attached", net_meta_attached_)
-        ("pid", conn_id_.tgid)
-        ("fd", conn_id_.fd)
-        ("start", conn_id_.start)
-        ("protocol", int(protocol_))
-        ("role", int(role))
-        ("dip", dip_) ("daddr", daddr_));
+    if (!res)
+        LOG_WARNING(
+            sLogger,
+            ("app meta not ready, container_id", container_id_trim_)("k8s_meta_attached", k8s_meta_attached_)(
+                "k8s_peer_meta_attached", k8s_peer_meta_attached_)("protocol_set", protocol_set_)(
+                "net_meta_attached", net_meta_attached_)("pid", conn_id_.tgid)("fd", conn_id_.fd)(
+                "start", conn_id_.start)("protocol", int(protocol_))("role", int(role))("dip", dip_)("daddr", daddr_));
     return res;
 }
 
 bool ConnTracker::MetaAttachReadyForNet() {
     auto res = net_meta_attached_ && k8s_meta_attached_ && k8s_peer_meta_attached_;
     if (!res) {
-        LOG_WARNING(sLogger, ("net meta not ready, container_id", container_id_trim_) 
-            ("k8s_meta_attached", k8s_meta_attached_)
-            ("k8s_peer_meta_attached", k8s_peer_meta_attached_)
-            ("protocol_set", protocol_set_)
-            ("net_meta_attached", net_meta_attached_)
-            ("pid", conn_id_.tgid)
-            ("fd", conn_id_.fd)
-            ("start", conn_id_.start)
-            ("dip", dip_) ("daddr", daddr_));
+        LOG_WARNING(sLogger,
+                    ("net meta not ready, container_id", container_id_trim_)("k8s_meta_attached", k8s_meta_attached_)(
+                        "k8s_peer_meta_attached", k8s_peer_meta_attached_)("protocol_set", protocol_set_)(
+                        "net_meta_attached", net_meta_attached_)("pid", conn_id_.tgid)("fd", conn_id_.fd)(
+                        "start", conn_id_.start)("dip", dip_)("daddr", daddr_));
     }
     return res;
 }
@@ -45,16 +38,13 @@ bool ConnTracker::MetaAttachReadyForNet() {
 
 std::array<std::string, kConnTrackerElementsTableSize> ConnTracker::GetConnTrackerAttrs() {
     ReadLock lock(mReadWriteLock);
-    if (k8s_meta_attached_ && k8s_peer_meta_attached_ && protocol_set_ && net_meta_attached_) return attrs_;
-    LOG_WARNING(sLogger, ("not attach, containerid", container_id_trim_) 
-                ("k8s_meta_attached", k8s_meta_attached_)
-                ("k8s_peer_meta_attached", k8s_peer_meta_attached_)
-                ("protocol_set", protocol_set_)
-                ("net_meta_attached", net_meta_attached_)
-                ("pid", conn_id_.tgid)
-                ("fd", conn_id_.fd)
-                ("start", conn_id_.start)
-                ("dip", dip_) ("daddr", daddr_));
+    if (k8s_meta_attached_ && k8s_peer_meta_attached_ && protocol_set_ && net_meta_attached_)
+        return attrs_;
+    LOG_WARNING(sLogger,
+                ("not attach, containerid", container_id_trim_)("k8s_meta_attached", k8s_meta_attached_)(
+                    "k8s_peer_meta_attached",
+                    k8s_peer_meta_attached_)("protocol_set", protocol_set_)("net_meta_attached", net_meta_attached_)(
+                    "pid", conn_id_.tgid)("fd", conn_id_.fd)("start", conn_id_.start)("dip", dip_)("daddr", daddr_));
     LOG_WARNING(sLogger, ("not attach, containerid", container_id_trim_));
     return attrs_;
 }
@@ -69,9 +59,9 @@ void ConnTracker::UpdateRole(enum support_role_e role) {
         this->role = role;
         return;
     }
-    
+
     if (this->role != role) {
-        LOG_WARNING(sLogger, ("role change!! last role", int(this->role)) ("new role", int(role)));
+        LOG_WARNING(sLogger, ("role change!! last role", int(this->role))("new role", int(role)));
         this->role = role;
     }
     return;
@@ -87,9 +77,9 @@ void ConnTracker::UpdateProtocol(ProtocolType protocol) {
         return;
     }
     if (protocol_ != ProtocolType::UNKNOWN && int(protocol_) != int(protocol)) {
-        LOG_WARNING(sLogger, ("protocol change!! last protocol", int(this->protocol_)) ("new protocol", int(protocol)));
+        LOG_WARNING(sLogger, ("protocol change!! last protocol", int(this->protocol_))("new protocol", int(protocol)));
     }
-    
+
     {
         protocol_ = protocol;
         attrs_[kConnTrackerTable.ColIndex(kProtocol.name())] = std::string(magic_enum::enum_name(protocol_));
@@ -104,7 +94,7 @@ void ConnTracker::UpdateProtocol(ProtocolType protocol) {
             attrs_[kConnTrackerTable.ColIndex(kCallType.name())] = "http";
             protocol_set_ = true;
         }
-        
+
         return;
     }
 }
@@ -178,7 +168,7 @@ void ConnTracker::UpdateSelfPodMetaForUnknown() {
 void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod) {
     WriteLock lock(mReadWriteLock);
     if (!pod) {
-      // no meta info ...
+        // no meta info ...
         attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
         attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
         attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
@@ -188,8 +178,8 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
         attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = "external";
         MarkPeerPodMetaAttached();
         return;
-  }
-  // set workloadKind
+    }
+    // set workloadKind
     peer_service_name_ = pod->serviceName;
     peer_arms_app_name_ = pod->appName;
     peer_pod_ip_ = pod->podIp;
@@ -198,13 +188,17 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
     peer_workload_name_ = pod->workloadName;
     peer_namespace_ = pod->k8sNamespace;
 
-    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = peer_arms_app_name_.size() ? peer_arms_app_name_ : "unknown";
+    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())]
+        = peer_arms_app_name_.size() ? peer_arms_app_name_ : "unknown";
     attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_pod_name_ : "unknown";
     attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_pod_ip_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())]
+        = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())]
+        = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
     attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_namespace_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = peer_service_name_.size() ? peer_service_name_ : "unknown";
+    attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())]
+        = peer_service_name_.size() ? peer_service_name_ : "unknown";
 
     if (role == IsClient) {
         if (peer_arms_app_name_.size()) {
@@ -228,17 +222,16 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
  *  @param event
  */
 
-void ConnTracker::UpdateConnState(struct conn_ctrl_event_t *event) {
+void ConnTracker::UpdateConnState(struct conn_ctrl_event_t* event) {
     WriteLock lock(mReadWriteLock);
     if (EventClose == event->type) {
         this->MarkClose();
     } else if (EventConnect == event->type) {
-      // a new connection established
-      
+        // a new connection established
     }
 }
 
-void ConnTracker::UpdateConnStats(struct conn_stats_event_t *event) {
+void ConnTracker::UpdateConnStats(struct conn_stats_event_t* event) {
     WriteLock lock(mReadWriteLock);
     if (event->conn_events == StatusClose) {
         MarkClose();
@@ -252,18 +245,22 @@ void ConnTracker::UpdateConnStats(struct conn_stats_event_t *event) {
     this->last_update_timestamp = tt;
 
     if (this->role != IsUnknown && this->role != event->role) {
-        LOG_WARNING(sLogger, ("role change!! last role", int(this->role)) ("new role", int(event->role)));
+        LOG_WARNING(sLogger, ("role change!! last role", int(this->role))("new role", int(event->role)));
     } else {
-      // set role
+        // set role
         this->role = event->role;
-      // LOG(WARNING) << " last role:" << int(this->role) << " new role:" << int(event->role) << " tgid:" << this->conn_id_.tgid << " fd:" << this->conn_id_.fd << " start:" << this->conn_id_.start;
+        // LOG(WARNING) << " last role:" << int(this->role) << " new role:" << int(event->role) << " tgid:" <<
+        // this->conn_id_.tgid << " fd:" << this->conn_id_.fd << " start:" << this->conn_id_.start;
     }
 
     if (event->protocol != support_proto_e::ProtoUnknown) {
         if (this->protocol_ != ProtocolType::UNKNOWN && int(protocol_) != int(event->protocol)) {
-            LOG_WARNING(sLogger, ("protocol change!! last protocol", int(this->protocol_)) ("new protocol", int(event->protocol)));
+            LOG_WARNING(
+                sLogger,
+                ("protocol change!! last protocol", int(this->protocol_))("new protocol", int(event->protocol)));
         } else {
-            // LOG(WARNING) << " last protocol:" << int(protocol_) << " new role:" << int(event->protocol) << " tgid:" << this->conn_id_.tgid << " fd:" << this->conn_id_.fd << " start:" << this->conn_id_.start;
+            // LOG(WARNING) << " last protocol:" << int(protocol_) << " new role:" << int(event->protocol) << " tgid:"
+            // << this->conn_id_.tgid << " fd:" << this->conn_id_.fd << " start:" << this->conn_id_.start;
             UpdateProtocol(ProtocolType(event->protocol));
         }
     }
@@ -272,11 +269,11 @@ void ConnTracker::UpdateConnStats(struct conn_stats_event_t *event) {
 
     // update conn stats
     // TODO @qianlu.kk
-  //   this->curr_conn_stats_record_->send_bytes_ = event->wr_bytes;
-  //   this->curr_conn_stats_record_->recv_bytes_ = event->rd_bytes;
-  //   this->curr_conn_stats_record_->send_packets_ = event->wr_pkts;
-  //   this->curr_conn_stats_record_->recv_packets_ = event->rd_pkts;
-    
+    //   this->curr_conn_stats_record_->send_bytes_ = event->wr_bytes;
+    //   this->curr_conn_stats_record_->recv_bytes_ = event->rd_bytes;
+    //   this->curr_conn_stats_record_->send_packets_ = event->wr_pkts;
+    //   this->curr_conn_stats_record_->recv_packets_ = event->rd_pkts;
+
     // this->role = event->role;
     this->RecordLastUpdateTs(event->ts);
 }
@@ -289,7 +286,7 @@ std::string AddrString(int family, uint32_t addr) {
     }
     auto res = inet_ntop(AF_INET, &addr, addrStr, sizeof(addrStr));
     if (res == NULL) {
-        LOG_WARNING(sLogger, ("failed to parse addr string for addr", addr) ("family",family));
+        LOG_WARNING(sLogger, ("failed to parse addr string for addr", addr)("family", family));
         return "";
     }
     return std::string(addrStr);
@@ -316,7 +313,6 @@ std::string ConnTracker::GetRemoteAddr() {
 }
 
 void ConnTracker::InitEventCommonAttrs() {
-
     attrs_[kConnTrackerTable.ColIndex(kFd.name())] = std::to_string(conn_id_.fd);
     attrs_[kConnTrackerTable.ColIndex(kPid.name())] = std::to_string(conn_id_.tgid);
     attrs_[kConnTrackerTable.ColIndex(kStartTsNs.name())] = std::to_string(conn_id_.start);
@@ -329,12 +325,11 @@ void ConnTracker::InitEventCommonAttrs() {
     attrs_[kConnTrackerTable.ColIndex(kFamily.name())] = std::to_string(net_ns_);
     attrs_[kConnTrackerTable.ColIndex(kTraceRole.name())] = std::string(magic_enum::enum_name(role));
     attrs_[kConnTrackerTable.ColIndex(kIp.name())] = sip_;
-
 }
 
-void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t *event) {
+void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t* event) {
     if (net_meta_attached_) {
-      return;
+        return;
     }
 
     struct socket_info& si = event->si;
@@ -345,7 +340,8 @@ void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t *event) {
         if (std::regex_search(container_id_, match, rgx_)) {
             container_id_trim_ = match.str(0);
         }
-        LOG_DEBUG(sLogger, ("origin container_id", container_id_) ("trim", container_id_trim_) ("match pos", match.position()));
+        LOG_DEBUG(sLogger,
+                  ("origin container_id", container_id_)("trim", container_id_trim_)("match pos", match.position()));
     }
 
     if (si.family == 0 && si.netns == 0 && si.ap.sport == 0 && si.ap.dport == 0) {
@@ -376,5 +372,5 @@ void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t *event) {
     return;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

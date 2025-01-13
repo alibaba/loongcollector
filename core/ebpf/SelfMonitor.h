@@ -35,7 +35,8 @@ namespace ebpf {
 //     virtual ~BaseBPFMonitor() = default;
 
 // protected:
-//     BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) : mPipelineName(name), mPluginMetricMgr(mgr) {}
+//     BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) : mPipelineName(name), mPluginMetricMgr(mgr)
+//     {}
 
 //     // attention: not thread safe!!
 //     void InitMetricInner();
@@ -65,7 +66,8 @@ namespace ebpf {
 
 // class NetworkObserverSelfMonitor : public BaseBPFMonitor {
 // public:
-//     NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr /**/) : BaseBPFMonitor(name, mgr) {}
+//     NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr /**/) : BaseBPFMonitor(name, mgr)
+//     {}
 
 //     void InitMetric() override;
 
@@ -120,10 +122,9 @@ namespace ebpf {
 // public:
 //     eBPFSelfMonitorMgr();
 //     void
-//     Init(const logtail::ebpf::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
-//     void Release(const logtail::ebpf::PluginType type);
-//     void Suspend(const logtail::ebpf::PluginType type);
-//     void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
+//     Init(const logtail::ebpf::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const
+//     std::string& project); void Release(const logtail::ebpf::PluginType type); void Suspend(const
+//     logtail::ebpf::PluginType type); void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
 
 // private:
 //     // `mLock` is used to protect mSelfMonitors

@@ -23,9 +23,9 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "ebpf/driver/NetworkObserver.h"
 #include "ebpf/include/SysAkApi.h"
 #include "logger/Logger.h"
-#include "ebpf/driver/NetworkObserver.h"
 
 namespace logtail {
 namespace ebpf {
@@ -69,8 +69,9 @@ namespace ebpf {
             Dl_info dlinfo; \
             int dlAddrErr = dladdr((const void*)(funcPtr), &dlinfo); \
             if (dlAddrErr == 0) { \
-                LOG_ERROR(sLogger, \
-                          ("[source_manager] load ebpf dl address", "failed")("error", dlAddrErr)("method", #funcName)); \
+                LOG_ERROR( \
+                    sLogger, \
+                    ("[source_manager] load ebpf dl address", "failed")("error", dlAddrErr)("method", #funcName)); \
                 offset = LOAD_UPROBE_OFFSET_FAIL; \
             } else { \
                 offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase; \
@@ -94,7 +95,7 @@ SourceManager::~SourceManager() {
             continue;
         }
         // stop plugin
-        StopPlugin(static_cast<logtail::ebpf::PluginType>(i));
+        StopPlugin(static_cast<PluginType>(i));
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -164,7 +165,7 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
         return false;
     }
-    
+
     // load method
     mFuncs[static_cast<int>(ebpf_func::EBPF_SET_LOGGER)] = LOAD_EBPF_FUNC_ADDR(set_logger);
     mFuncs[static_cast<int>(ebpf_func::EBPF_START_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(start_plugin);
@@ -173,8 +174,10 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     mFuncs[static_cast<int>(ebpf_func::EBPF_SUSPEND_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(suspend_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_RESUME_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(resume_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)] = LOAD_EBPF_FUNC_ADDR(poll_plugin_pbs);
-    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)] = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
-    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)] = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)]
+        = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)]
+        = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
@@ -190,7 +193,9 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     // set global logger ...
     auto eBPFSetLogger = (set_logger_func)mFuncs[static_cast<int>(ebpf_func::EBPF_SET_LOGGER)];
     if (!eBPFSetLogger) {
-        LOG_WARNING(sLogger, ("cannot set logger for ebpf driver, because set_logger func was load incorrectly ... ", "please check"));
+        LOG_WARNING(
+            sLogger,
+            ("cannot set logger for ebpf driver, because set_logger func was load incorrectly ... ", "please check"));
     } else {
         eBPFSetLogger(mLogPrinter);
     }
@@ -214,25 +219,29 @@ bool SourceManager::LoadCoolBPF() {
         return false;
     }
 
-    // load address 
-    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_cleanup_dog);
-    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_role);
-    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_disable_process);
-    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)] = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_addr);
+    // load address
+    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG)]
+        = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_cleanup_dog);
+    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)]
+        = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_role);
+    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)]
+        = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_disable_process);
+    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)]
+        = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_addr);
     if (!std::all_of(mOffsets.begin(), mOffsets.end(), [](auto x) { return x > 0; })) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf funcs addr, path", mBinaryPath));
         return false;
     }
 
     mCoolbpfLib = std::move(tmp_lib);
-    
+
     return true;
 }
 
 bool SourceManager::DynamicLibSuccess() {
-// #ifdef APSARA_UNIT_TEST_MAIN
-//     return true;
-// #endif
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     return true;
+    // #endif
     if (!mLib)
         return false;
     if (!std::all_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x != nullptr; })) {
@@ -241,7 +250,7 @@ bool SourceManager::DynamicLibSuccess() {
     return true;
 }
 
-bool SourceManager::CheckPluginRunning(logtail::ebpf::PluginType plugin_type) {
+bool SourceManager::CheckPluginRunning(PluginType plugin_type) {
     if (!LoadDynamicLib(mDriverLibName)) {
         LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(plugin_type)));
         return false;
@@ -280,7 +289,7 @@ bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool upd
     return true;
 }
 
-int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents, int32_t * flag, int timeoutMs) {
+int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents, int32_t* flag, int timeoutMs) {
     if (!DynamicLibSuccess()) {
         return -1;
     }
@@ -294,7 +303,8 @@ int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents
     return poll_func(plugin_type, maxEvents, flag, timeoutMs);
 }
 
-bool SourceManager::StartPlugin(logtail::ebpf::PluginType plugin_type, std::unique_ptr<logtail::ebpf::PluginConfig> conf) {
+bool SourceManager::StartPlugin(PluginType plugin_type,
+                                std::unique_ptr<PluginConfig> conf) {
     if (CheckPluginRunning(plugin_type)) {
         // plugin update ...
         return UpdatePlugin(plugin_type, std::move(conf));
@@ -307,19 +317,23 @@ bool SourceManager::StartPlugin(logtail::ebpf::PluginType plugin_type, std::uniq
         if (nconf) {
             nconf->mSo = mBinaryPath + "libcoolbpf.so.1.0.0";
             nconf->mLogHandler = mLogPrinter;
-            nconf->mUpcaOffset = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)];
-            nconf->mUprobeOffset = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG)];
-            nconf->mUpcrOffset = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)];
-            nconf->mUppsOffset = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)];
+            nconf->mUpcaOffset
+                = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)];
+            nconf->mUprobeOffset
+                = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG)];
+            nconf->mUpcrOffset
+                = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)];
+            nconf->mUppsOffset
+                = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)];
         }
     }
     // conf->type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
     // FillCommonConf(conf);
-// #ifdef APSARA_UNIT_TEST_MAIN
-//     mConfig = std::move(conf);
-//     mRunning[int(plugin_type)] = true;
-//     return true;
-// #endif
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     mConfig = std::move(conf);
+    //     mRunning[int(plugin_type)] = true;
+    //     return true;
+    // #endif
     void* f = mFuncs[(int)ebpf_func::EBPF_START_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(plugin_type)));
@@ -332,7 +346,8 @@ bool SourceManager::StartPlugin(logtail::ebpf::PluginType plugin_type, std::uniq
     return !res;
 }
 
-bool SourceManager::UpdatePlugin(logtail::ebpf::PluginType plugin_type, std::unique_ptr<logtail::ebpf::PluginConfig> conf) {
+bool SourceManager::UpdatePlugin(PluginType plugin_type,
+                                 std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(plugin_type)) {
         LOG_ERROR(sLogger, ("plugin not started, type", int(plugin_type)));
         return false;
@@ -341,10 +356,10 @@ bool SourceManager::UpdatePlugin(logtail::ebpf::PluginType plugin_type, std::uni
     LOG_INFO(sLogger, ("begin to update plugin, type", int(plugin_type)));
     // conf->type = UpdataType::SECURE_UPDATE_TYPE_CONFIG_CHAGE;
     // FillCommonConf(conf);
-// #ifdef APSARA_UNIT_TEST_MAIN
-//     mConfig = std::move(conf);
-//     return true;
-// #endif
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     mConfig = std::move(conf);
+    //     return true;
+    // #endif
     void* f = mFuncs[(int)ebpf_func::EBPF_UPDATE_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
@@ -356,18 +371,18 @@ bool SourceManager::UpdatePlugin(logtail::ebpf::PluginType plugin_type, std::uni
     return !res;
 }
 
-bool SourceManager::SuspendPlugin(logtail::ebpf::PluginType plugin_type) {
+bool SourceManager::SuspendPlugin(PluginType plugin_type) {
     if (!CheckPluginRunning(plugin_type)) {
         LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(plugin_type)));
         return false;
     }
-//     auto config = std::make_unique<logtail::ebpf::PluginConfig>();
-//     config->mPluginType = plugin_type;
-//     // config->type = UpdataType::SECURE_UPDATE_TYPE_SUSPEND_PROBE;
-// #ifdef APSARA_UNIT_TEST_MAIN
-//     mConfig = std::move(config);
-//     return true;
-// #endif
+    //     auto config = std::make_unique<PluginConfig>();
+    //     config->mPluginType = plugin_type;
+    //     // config->type = UpdataType::SECURE_UPDATE_TYPE_SUSPEND_PROBE;
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     mConfig = std::move(config);
+    //     return true;
+    // #endif
     // ensure that sysak would not call handle()
     void* f = mFuncs[(int)ebpf_func::EBPF_SUSPEND_PLUGIN];
     if (!f) {
@@ -381,21 +396,21 @@ bool SourceManager::SuspendPlugin(logtail::ebpf::PluginType plugin_type) {
     return !res;
 }
 
-bool SourceManager::StopPlugin(logtail::ebpf::PluginType plugin_type) {
+bool SourceManager::StopPlugin(PluginType plugin_type) {
     if (!CheckPluginRunning(plugin_type)) {
         LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
         return true;
     }
 
-    auto config = std::make_unique<logtail::ebpf::PluginConfig>();
+    auto config = std::make_unique<PluginConfig>();
     config->mPluginType = plugin_type;
     // config->type = UpdataType::SECURE_UPDATE_TYPE_DISABLE_PROBE;
 
-// #ifdef APSARA_UNIT_TEST_MAIN
-//     mConfig = std::move(config);
-//     mRunning[int(plugin_type)] = false;
-//     return true;
-// #endif
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     mConfig = std::move(config);
+    //     mRunning[int(plugin_type)] = false;
+    //     return true;
+    // #endif
 
     void* f = mFuncs[(int)ebpf_func::EBPF_STOP_PLUGIN];
     if (!f) {
@@ -411,7 +426,7 @@ bool SourceManager::StopPlugin(logtail::ebpf::PluginType plugin_type) {
 }
 
 //// ******************* ////
-// int SourceManager::PrepareSkeleton(logtail::ebpf::PluginType type) {
+// int SourceManager::PrepareSkeleton(PluginType type) {
 //     void* f = mFuncs[(int)ebpf_op_func::PREPARE_SKELETON];
 //     if (f) {
 //         auto func = (prepare_skeleton_func)f;
@@ -421,7 +436,8 @@ bool SourceManager::StopPlugin(logtail::ebpf::PluginType plugin_type) {
 //     }
 // }
 
-// int SourceManager::NetworkObserverSetupNetStatisticsProcessFunc(const std::function<void(void *, struct conn_stats_event_t *)>& func, void* custom_data) {
+// int SourceManager::NetworkObserverSetupNetStatisticsProcessFunc(const std::function<void(void *, struct
+// conn_stats_event_t *)>& func, void* custom_data) {
 //     void* f = mFuncs[(int)ebpf_op_func::SETUP_NET_STATISTICS_PROCESS_FUNC];
 //     if (f) {
 //         auto stats_func = (ebpf_setup_net_statistics_process_func)f;

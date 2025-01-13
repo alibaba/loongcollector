@@ -13,7 +13,5 @@
 // limitations under the License.
 
 namespace logtail {
-namespace ebpf {
-
-}
-}
+namespace ebpf {}
+} // namespace logtail

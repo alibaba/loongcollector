@@ -19,14 +19,12 @@
 namespace logtail {
 namespace ebpf {
 
-constexpr DataElement kHost = {
-    "host",
-    "host", // metric
-    "host", // span
-    "host", // log
-    "",
-    AggregationType::Level0
-};
+constexpr DataElement kHost = {"host",
+                               "host", // metric
+                               "host", // span
+                               "host", // log
+                               "",
+                               AggregationType::Level0};
 
 constexpr DataElement kPodName = {
     "pod_name",
@@ -154,72 +152,56 @@ constexpr DataElement kLocalAddr = {
     AggregationType::Level1,
 };
 
-constexpr DataElement kLocalPort = {
-    "local_port",
-    "local_addr", // metric
-    "local.port", // span
-    "local.port", // log
-    "Port of the local endpoint."
-};
+constexpr DataElement kLocalPort = {"local_port",
+                                    "local_addr", // metric
+                                    "local.port", // span
+                                    "local.port", // log
+                                    "Port of the local endpoint."};
 
-constexpr DataElement kTraceRole = {
-    "trace_role",
-    "trace_role", // metric
-    "trace.role", // span
-    "trace.role", // log
-    "The role (client-or-server) of the process that owns the connections."
-};
+constexpr DataElement kTraceRole = {"trace_role",
+                                    "trace_role", // metric
+                                    "trace.role", // span
+                                    "trace.role", // log
+                                    "The role (client-or-server) of the process that owns the connections."};
 
-constexpr DataElement kLatencyNS = {
-    "latency",
-    "latency", // metric
-    "latency", // span
-    "latency", // log
-    "Request-response latency."
-};
+constexpr DataElement kLatencyNS = {"latency",
+                                    "latency", // metric
+                                    "latency", // span
+                                    "latency", // log
+                                    "Request-response latency."};
 
-constexpr DataElement kStartTsNs = {
-    "startTsNs",
-    "startTsNs", // metric
-    "startTsNs", // span
-    "start.ts.ns", // log
-    "Request-response latency."
-};
+constexpr DataElement kStartTsNs = {"startTsNs",
+                                    "startTsNs", // metric
+                                    "startTsNs", // span
+                                    "start.ts.ns", // log
+                                    "Request-response latency."};
 
-constexpr DataElement kEndTsNs = {
-    "endTsNs",
-    "", // metric
-    "endTsNs", // span
-    "end.ts.ns", // log
-    "Request-response latency."
-};
+constexpr DataElement kEndTsNs = {"endTsNs",
+                                  "", // metric
+                                  "endTsNs", // span
+                                  "end.ts.ns", // log
+                                  "Request-response latency."};
 
-constexpr DataElement kRegionId = {
-    "region_id",
-    "regionId", // metric
-    "regionId", // span
-    "region.id", // log
-    "region id",
-    AggregationType::Level0
-};
+constexpr DataElement kRegionId = {"region_id",
+                                   "regionId", // metric
+                                   "regionId", // span
+                                   "region.id", // log
+                                   "region id",
+                                   AggregationType::Level0};
 
-constexpr DataElement kIp = {
-    "ip",
-    "serverIp", // metric
-    "ip", // span
-    "ip", // log
-    "local ip.",
-    AggregationType::Level0
-};
+constexpr DataElement kIp = {"ip",
+                             "serverIp", // metric
+                             "ip", // span
+                             "ip", // log
+                             "local ip.",
+                             AggregationType::Level0};
 
-constexpr DataElement kAppId = {
-    "app_id",
-    "pid", // metric
-    "app.id", // span
-    "arms.app.id", // log
-    "arms app id",
-    AggregationType::Level0
-};
+constexpr DataElement kAppId = {"app_id",
+                                "pid", // metric
+                                "app.id", // span
+                                "arms.app.id", // log
+                                "arms app id",
+                                AggregationType::Level0};
 
 constexpr DataElement kNetNs = {
     "net_ns",
@@ -236,23 +218,19 @@ constexpr DataElement kFamily = {
     "",
 };
 
-constexpr DataElement kAppName = {
-    "app_name",
-    "service", // metric
-    "arms.app.name", // span
-    "arms.app.name", // log
-    "arms app name",
-    AggregationType::Level0
-};
+constexpr DataElement kAppName = {"app_name",
+                                  "service", // metric
+                                  "arms.app.name", // span
+                                  "arms.app.name", // log
+                                  "arms app name",
+                                  AggregationType::Level0};
 
-constexpr DataElement kPeerAppName = {
-    "peer_app_name",
-    "arms_peer_app_name", // metric
-    "arms.peer.app.name", // span
-    "arms.app.name", // log
-    "arms app name",
-    AggregationType::Level0
-};
+constexpr DataElement kPeerAppName = {"peer_app_name",
+                                      "arms_peer_app_name", // metric
+                                      "arms.peer.app.name", // span
+                                      "arms.app.name", // log
+                                      "arms app name",
+                                      AggregationType::Level0};
 
 constexpr DataElement kDestId = {
     "dest_id",
@@ -279,13 +257,11 @@ constexpr DataElement kPid = {
     "pid",
 };
 
-constexpr DataElement kEndpoint = {
-    "endpoint",
-    "endpoint", // metric
-    "endpoint", // span
-    "endpoint", // log
-    "reqeust path"
-};
+constexpr DataElement kEndpoint = {"endpoint",
+                                   "endpoint", // metric
+                                   "endpoint", // span
+                                   "endpoint", // log
+                                   "reqeust path"};
 
 constexpr DataElement kProtocol = {
     "protocol",
@@ -342,210 +318,54 @@ constexpr DataElement kContainerId = {
 };
 
 // for processes
-constexpr DataElement kProcessId = {
-    "",
-    "",
-    "",
-    "",
-    "",
-    AggregationType::Level0
-};
+constexpr DataElement kProcessId = {"", "", "", "", "", AggregationType::Level0};
 
-constexpr DataElement kKtime = {
-    "",
-    "",
-    "",
-    "",
-    "",
-    AggregationType::Level0
-};
+constexpr DataElement kKtime = {"", "", "", "", "", AggregationType::Level0};
 
-constexpr DataElement kExecId = {
-    "",
-    "",
-    "",
-    "exec_id",
-    "",
-    AggregationType::NoAggregate
-};
+constexpr DataElement kExecId = {"", "", "", "exec_id", "", AggregationType::NoAggregate};
 
-constexpr DataElement kParentExecId = {
-    "",
-    "",
-    "",
-    "parent_exec_id",
-    "",
-    AggregationType::NoAggregate
-};
+constexpr DataElement kParentExecId = {"", "", "", "parent_exec_id", "", AggregationType::NoAggregate};
 
-constexpr DataElement kUser = {
-    "",
-    "",
-    "",
-    "user",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kUser = {"", "", "", "user", "", AggregationType::NoAggregate};
 
-constexpr DataElement kUid = {
-    "",
-    "",
-    "",
-    "uid",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kUid = {"", "", "", "uid", "", AggregationType::NoAggregate};
 
-constexpr DataElement kBinary = {
-    "",
-    "",
-    "",
-    "binary",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kBinary = {"", "", "", "binary", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCWD = {
-    "",
-    "",
-    "",
-    "cwd",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kCWD = {"", "", "", "cwd", "", AggregationType::NoAggregate};
 
-constexpr DataElement kArguments = {
-    "",
-    "",
-    "",
-    "arguments",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kArguments = {"", "", "", "arguments", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCap = {
-    "",
-    "",
-    "",
-    "cap",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kCap = {"", "", "", "cap", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCallName = {
-    "",
-    "",
-    "",
-    "call_name",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kCallName = {"", "", "", "call_name", "", AggregationType::NoAggregate};
 
-constexpr DataElement kEventType = {
-    "event_type",
-    "event_type",
-    "event_type",
-    "event_type",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kEventType
+    = {"event_type", "event_type", "event_type", "event_type", "", AggregationType::NoAggregate};
 
-constexpr DataElement kEventTime = {
-    "event_time",
-    "event_time",
-    "event_time",
-    "event_time",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kEventTime
+    = {"event_time", "event_time", "event_time", "event_time", "", AggregationType::NoAggregate};
 
-constexpr DataElement kParentProcess = {
-    "parent_process",
-    "parent_process",
-    "parent_process",
-    "parent_process",
-    "",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kParentProcess
+    = {"parent_process", "parent_process", "parent_process", "parent_process", "", AggregationType::NoAggregate};
 
 // for network
-constexpr DataElement kSaddr = {
-    "source.addr",
-    "saddr",
-    "saddr",
-    "saddr",
-    "source address",
-    AggregationType::NoAggregate
-}; 
-constexpr DataElement kDaddr = {
-    "",
-    "",
-    "",
-    "daddr",
-    "dest address",
-    AggregationType::NoAggregate
-}; 
-constexpr DataElement kSport = {
-    "",
-    "",
-    "",
-    "sport",
-    "source port",
-    AggregationType::NoAggregate
-}; 
-constexpr DataElement kState = {
-    "",
-    "",
-    "",
-    "state",
-    "connection state",
-    AggregationType::NoAggregate
-}; 
-constexpr DataElement kDport = {
-    "",
-    "",
-    "",
-    "dport",
-    "dest port",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kSaddr
+    = {"source.addr", "saddr", "saddr", "saddr", "source address", AggregationType::NoAggregate};
+constexpr DataElement kDaddr = {"", "", "", "daddr", "dest address", AggregationType::NoAggregate};
+constexpr DataElement kSport = {"", "", "", "sport", "source port", AggregationType::NoAggregate};
+constexpr DataElement kState = {"", "", "", "state", "connection state", AggregationType::NoAggregate};
+constexpr DataElement kDport = {"", "", "", "dport", "dest port", AggregationType::NoAggregate};
 
-constexpr DataElement kL4Protocol = {
-    "",
-    "",
-    "",
-    "protocol",
-    "L4 protocol",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kL4Protocol = {"", "", "", "protocol", "L4 protocol", AggregationType::NoAggregate};
 
-constexpr DataElement kNetwork = {
-    "",
-    "",
-    "",
-    "network",
-    "value is json for saddr and daddr ... ",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kNetwork
+    = {"", "", "", "network", "value is json for saddr and daddr ... ", AggregationType::NoAggregate};
 
 // for file
-constexpr DataElement kFilePath = {
-    "",
-    "",
-    "",
-    "path",
-    "file path",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kFilePath = {"", "", "", "path", "file path", AggregationType::NoAggregate};
 
-constexpr DataElement kFile = {
-    "",
-    "",
-    "",
-    "file",
-    "value is json for path ... ",
-    AggregationType::NoAggregate
-}; 
+constexpr DataElement kFile = {"", "", "", "file", "value is json for path ... ", AggregationType::NoAggregate};
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

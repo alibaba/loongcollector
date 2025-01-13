@@ -14,13 +14,13 @@
 
 #pragma once
 
-#include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "ebpf/type/table/DataTable.h"
 
-namespace logtail{
+namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kNetMetricsElements [] = {
+static constexpr DataElement kNetMetricsElements[] = {
 
     kHost, // host
     kAppId, // pid
@@ -34,13 +34,12 @@ static constexpr DataElement kNetMetricsElements [] = {
     /* non-aggregate keys */
 };
 
-static constexpr auto kNetMetricsTable =
-    DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
+static constexpr auto kNetMetricsTable = DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
 
 static constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
 
 static constexpr DataElement kNetElements[] = {
-    kIp, 
+    kIp,
     kAppId,
 
     kLocalAddr,
@@ -48,8 +47,7 @@ static constexpr DataElement kNetElements[] = {
     kRemotePort,
 };
 
-static constexpr auto kNetTable =
-    DataTableSchema("net_record", "net events", kNetElements);
+static constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
 
-} 
-}
+} // namespace ebpf
+} // namespace logtail

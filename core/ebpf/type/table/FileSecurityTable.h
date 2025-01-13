@@ -14,13 +14,13 @@
 
 #pragma once
 
-#include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "ebpf/type/table/DataTable.h"
 
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kFileSecurityElements [] = {
+static constexpr DataElement kFileSecurityElements[] = {
     kExecId,
     kParentExecId,
     kProcessId,
@@ -43,8 +43,7 @@ static constexpr DataElement kFileSecurityElements [] = {
 
 static constexpr size_t kFileSecurityTableSize = std::size(kFileSecurityElements);
 
-static constexpr auto kFileSecurityTable =
-    DataTableSchema("file_security_table", "", kFileSecurityElements);
+static constexpr auto kFileSecurityTable = DataTableSchema("file_security_table", "", kFileSecurityElements);
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

@@ -15,17 +15,18 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
+
 #include <array>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 namespace logtail {
 namespace ebpf {
 
 class Sampler {
 public:
-    [[nodiscard]] virtual bool ShouldSample(const std::array<uint8_t, 16>&) const =0;
+    [[nodiscard]] virtual bool ShouldSample(const std::array<uint8_t, 16>&) const = 0;
 
     virtual ~Sampler() = default;
 };
@@ -35,7 +36,7 @@ protected:
     RatioSampler(double fraction, uint64_t thresHold);
 
 public:
-    [[nodiscard]] bool ShouldSample(const std::array<uint8_t, 16> &traceID) const override;
+    [[nodiscard]] bool ShouldSample(const std::array<uint8_t, 16>& traceID) const override;
 
 private:
     double fraction_;
@@ -54,5 +55,5 @@ public:
 #endif
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail
