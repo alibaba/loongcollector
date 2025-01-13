@@ -491,9 +491,13 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
-    if (!mBatcher.Init(
-            itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
-        // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
+    if (!mBatcher.Init(itr ? *itr : Json::Value(),
+                       this,
+                       strategy,
+                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
+                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS)) {
+        // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
+        // enable group batch
         return false;
     }
 
@@ -893,7 +897,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
     }
 #ifdef __ENTERPRISE__
-    bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
+    bool hasNetworkError = sendResult == SEND_NETWORK_ERROR;
     EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
         mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
     mCandidateHostsInfo->SelectBestHost();
