@@ -10,6 +10,24 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
+type IndexItem struct {
+	Keys map[string]struct{} // alternative to set, struct{} is zero memory
+}
+
+func NewIndexItem() IndexItem {
+	return IndexItem{
+		Keys: make(map[string]struct{}),
+	}
+}
+
+func (i IndexItem) Add(key string) {
+	i.Keys[key] = struct{}{}
+}
+
+func (i IndexItem) Remove(key string) {
+	delete(i.Keys, key)
+}
+
 type DeferredDeletionMetaStore struct {
 	keyFunc    cache.KeyFunc
 	indexRules []IdxFunc
@@ -19,7 +37,7 @@ type DeferredDeletionMetaStore struct {
 
 	// cache
 	Items map[string]*ObjectWrapper
-	Index map[string][]string
+	Index map[string]IndexItem
 	lock  sync.RWMutex
 
 	// timer
@@ -47,7 +65,7 @@ func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan stru
 		stopCh:  stopCh,
 
 		Items: make(map[string]*ObjectWrapper),
-		Index: make(map[string][]string),
+		Index: make(map[string]IndexItem),
 
 		gracePeriod: gracePeriod,
 		sendFuncs:   make(map[string]*SendFuncWithStopCh),
@@ -68,8 +86,16 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 		if !ok {
 			continue
 		}
-		for _, realKey := range realKeys {
-			result[k] = append(result[k], m.Items[realKey])
+		for realKey := range realKeys.Keys {
+			if obj, ok := m.Items[realKey]; ok {
+				if obj.Raw != nil {
+					result[k] = append(result[k], obj)
+				} else {
+					logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "raw object not found", realKey)
+				}
+			} else {
+				logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "key not found", realKey)
+			}
 		}
 	}
 	return result
@@ -160,10 +186,8 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 		select {
 		case event := <-m.eventCh:
 			switch event.EventType {
-			case EventTypeAdd:
-				m.handleAddEvent(event)
-			case EventTypeUpdate:
-				m.handleUpdateEvent(event)
+			case EventTypeAdd, EventTypeUpdate:
+				m.handleAddOrUpdateEvent(event)
 			case EventTypeDelete:
 				m.handleDeleteEvent(event)
 			case EventTypeDeferredDelete:
@@ -184,7 +208,7 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 	}
 }
 
-func (m *DeferredDeletionMetaStore) handleAddEvent(event *K8sMetaEvent) {
+func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
 		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
@@ -192,38 +216,24 @@ func (m *DeferredDeletionMetaStore) handleAddEvent(event *K8sMetaEvent) {
 	}
 	idxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
-	m.Items[key] = event.Object
-	for _, idxKey := range idxKeys {
-		if _, ok := m.Index[idxKey]; !ok {
-			m.Index[idxKey] = make([]string, 0)
-		}
-		m.Index[idxKey] = append(m.Index[idxKey], key)
-	}
-	m.lock.Unlock()
-	m.registerLock.RLock()
-	for _, f := range m.sendFuncs {
-		f.SendFunc([]*K8sMetaEvent{event})
-	}
-	m.registerLock.RUnlock()
-}
-
-func (m *DeferredDeletionMetaStore) handleUpdateEvent(event *K8sMetaEvent) {
-	key, err := m.keyFunc(event.Object.Raw)
-	if err != nil {
-		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
-		return
-	}
-	idxKeys := m.getIdxKeys(event.Object)
-	m.lock.Lock()
+	// should delete oldIdxKeys in two cases:
+	// 1. update event
+	// 2. add event when the previous object is between deleted and deferred delete
 	if obj, ok := m.Items[key]; ok {
+		var oldIdxKeys []string
 		event.Object.FirstObservedTime = obj.FirstObservedTime
+		oldIdxKeys = m.getIdxKeys(obj)
+		for _, idxKey := range oldIdxKeys {
+			m.Index[idxKey].Remove(key)
+		}
 	}
+
 	m.Items[key] = event.Object
 	for _, idxKey := range idxKeys {
 		if _, ok := m.Index[idxKey]; !ok {
-			m.Index[idxKey] = make([]string, 0)
+			m.Index[idxKey] = NewIndexItem()
 		}
-		m.Index[idxKey] = append(m.Index[idxKey], key)
+		m.Index[idxKey].Add(key)
 	}
 	m.lock.Unlock()
 	m.registerLock.RLock()
@@ -273,34 +283,16 @@ func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEven
 		if obj.Deleted {
 			delete(m.Items, key)
 			for _, idxKey := range idxKeys {
-				for i, k := range m.Index[idxKey] {
-					if k == key {
-						m.Index[idxKey] = append(m.Index[idxKey][:i], m.Index[idxKey][i+1:]...)
-						break
-					}
+				if _, ok := m.Index[idxKey]; !ok {
+					continue
 				}
-				if len(m.Index[idxKey]) == 0 {
+				m.Index[idxKey].Remove(key)
+				if len(m.Index[idxKey].Keys) == 0 {
 					delete(m.Index, idxKey)
 				}
 			}
-		} else {
-			// there is a new add event between delete event and deferred delete event
-			// clear invalid index
-			newIdxKeys := m.getIdxKeys(obj)
-			for i := range idxKeys {
-				if idxKeys[i] != newIdxKeys[i] {
-					for j, k := range m.Index[idxKeys[i]] {
-						if k == key {
-							m.Index[idxKeys[i]] = append(m.Index[idxKeys[i]][:j], m.Index[idxKeys[i]][j+1:]...)
-							break
-						}
-					}
-					if len(m.Index[idxKeys[i]]) == 0 {
-						delete(m.Index, idxKeys[i])
-					}
-				}
-			}
 		}
+		// if deleted is false, there is a new add event between delete event and deferred delete event
 	}
 }
 
