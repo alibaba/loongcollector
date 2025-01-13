@@ -27,6 +27,7 @@
 #include "ebpf/include/export.h"
 #include "ebpf/util/AggregateTree.h"
 #include "ebpf/type/SecurityEvent.h"
+#include "common/timer/Timer.h"
 
 // #include "driver/bpf_wrapper.h"
 // #include "common/agg_tree.h"
@@ -110,7 +111,8 @@ protected:
 
     // std::queue<std::string> enable_callnames_;
 
-    // std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> aggregate_tree_;
+    std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
+    static logtail::Timer* mTimer;
     // uint64_t last_export_sec_ = 0;
 };
 
