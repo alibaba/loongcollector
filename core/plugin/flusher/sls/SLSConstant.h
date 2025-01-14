@@ -27,7 +27,6 @@ extern const std::string HEALTH;
 extern const std::string APM_METRICS_URL;
 extern const std::string APM_TRACES_URL;
 extern const std::string APM_AGENTINFOS_URL;
-extern const std::string DUMMY_LOG_STORE;
 
 extern const std::string CONTENT_MD5;
 

@@ -247,8 +247,6 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   RawDataType dataType,
                                   const string& body,
                                   size_t rawSize,
-                                  const string& shardHashKey,
-                                  optional<uint64_t> seqId,
                                   const string& path,
                                   string& query,
                                   map<string, string>& header) {
@@ -278,14 +276,6 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
     }
 
     map<string, string> parameterList;
-    if (!shardHashKey.empty()) {
-        parameterList["key"] = shardHashKey;
-        if (seqId.has_value()) {
-            parameterList["seqid"] = to_string(seqId.value());
-        }
-    }
-    query = GetQueryString(parameterList);
-
     string signature = GetUrlSignature(HTTP_POST, path, header, parameterList, body, accessKeySecret);
     header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
 }
@@ -383,8 +373,6 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  dataType,
                                  body,
                                  rawSize,
-                                 shardHashKey,
-                                 nullopt, // sync request does not support exactly-once
                                  subpath,
                                  query,
                                  header);

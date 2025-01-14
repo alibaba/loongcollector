@@ -297,7 +297,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
-        // TelemetryType not set (for log scenarios)
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
                               errorMsg,
@@ -334,7 +333,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // Logstore
-    if (telemetryType.empty() || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -348,8 +347,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         }
     } else if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS || 
         mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES){
-        // apm
-        mLogstore = DUMMY_LOG_STORE;
     }
 
     // Region
@@ -1290,8 +1287,6 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                    item->mType,
                                    item->mData,
                                    item->mRawSize,
-                                   item->mShardHashKey,
-                                   nullopt,
                                    mSubpath,
                                    query,
                                    header);

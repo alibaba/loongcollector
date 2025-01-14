@@ -80,8 +80,6 @@ static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
 static const string kAKErrorMsg = "can not get valid access key";
 #endif
 
-static const string kNoSubpathErrorMsg = "subpath not set";
-
 static const string kNoHostErrorMsg = "can not get available host";
 
 static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {

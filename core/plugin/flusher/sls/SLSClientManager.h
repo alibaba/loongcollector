@@ -102,8 +102,6 @@ void PreparePostAPMBackendRequest(const std::string& accessKeyId,
                                   RawDataType dataType,
                                   const std::string& body,
                                   size_t rawSize,
-                                  const std::string& shardHashKey,
-                                  std::optional<uint64_t> seqId,
                                   const std::string& path,
                                   std::string& query,
                                   std::map<std::string, std::string>& header);

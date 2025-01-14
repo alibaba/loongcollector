@@ -25,7 +25,6 @@ const string HEALTH = "/health";
 const string APM_METRICS_URL = "/apm/metric/arms/v1/metric_log";
 const string APM_TRACES_URL = "/apm/trace/arms/v1/trace_log";
 const string APM_AGENTINFOS_URL = "/apm/meta/arms/v1/meta_log/AgentInfo";
-const string DUMMY_LOG_STORE = "___dummy___";
 
 const string LOGTAIL_USER_AGENT = "ali-log-logtail";
 
