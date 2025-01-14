@@ -188,9 +188,7 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("kind", obj.Kind)
 		log.Contents.Add("name", obj.Name)
-		for k, v := range obj.Labels {
-			log.Contents.Add("label_"+k, v)
-		}
+		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		return []models.PipelineEvent{log}
 	}
 	return nil
