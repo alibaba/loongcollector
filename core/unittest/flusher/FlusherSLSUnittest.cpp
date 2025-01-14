@@ -457,7 +457,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     SenderQueueManager::GetInstance()->Clear();
-    
+
     // apm
     std::vector<std::string> apmConfigStr = {R"(
         {
