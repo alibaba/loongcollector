@@ -472,7 +472,8 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
                 "Value": "trace"
             }
         }
-    )", R"(
+    )",
+                                             R"(
         {
             "Type": "flusher_sls",
             "TelemetryType": "arms_metrics",
@@ -485,7 +486,8 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
                 "Value": "metric"
             }
         }
-    )", R"(
+    )",
+                                             R"(
         {
             "Type": "flusher_sls",
             "TelemetryType": "arms_agentinfo",
@@ -505,7 +507,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_METRICS,
         sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_AGENTINFOS,
     };
-    for (size_t ii = 0; ii < apmConfigStr.size(); ii ++) {
+    for (size_t ii = 0; ii < apmConfigStr.size(); ii++) {
         auto& cfg = apmConfigStr[ii];
         APSARA_TEST_TRUE(ParseJsonTable(cfg, configJson, errorMsg));
         flusher.reset(new FlusherSLS());
@@ -965,7 +967,8 @@ void FlusherSLSUnittest::TestBuildRequest() {
                     "Value": "trace"
                 }
             }
-        )", R"(
+        )",
+                                                 R"(
             {
                 "Type": "flusher_sls",
                 "TelemetryType": "arms_metrics",
@@ -978,7 +981,8 @@ void FlusherSLSUnittest::TestBuildRequest() {
                     "Value": "metric"
                 }
             }
-        )", R"(
+        )",
+                                                 R"(
             {
                 "Type": "flusher_sls",
                 "TelemetryType": "arms_agentinfo",
@@ -998,7 +1002,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
             sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_METRICS,
             sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_AGENTINFOS,
         };
-        for (size_t zz = 0; zz < apmConfigStr.size(); zz ++) {
+        for (size_t zz = 0; zz < apmConfigStr.size(); zz++) {
             std::string configStrAPM = apmConfigStr[zz];
             APSARA_TEST_TRUE(ParseJsonTable(configStrAPM, configJsonAPM, errorMsgAPM));
             FlusherSLS flusherAPM;
@@ -1007,7 +1011,12 @@ void FlusherSLSUnittest::TestBuildRequest() {
             APSARA_TEST_TRUE(flusherAPM.Init(configJsonAPM, optionalGoPipeline));
 
             // normal
-            SLSSenderQueueItem item("hello, world!", rawSize, &flusherAPM, flusherAPM.GetQueueKey(), flusherAPM.mLogstore, RawDataType::EVENT_GROUP);
+            SLSSenderQueueItem item("hello, world!",
+                                    rawSize,
+                                    &flusherAPM,
+                                    flusherAPM.GetQueueKey(),
+                                    flusherAPM.mLogstore,
+                                    RawDataType::EVENT_GROUP);
             APSARA_TEST_TRUE(flusherAPM.BuildRequest(&item, req, &keepItem, &errMsg));
             APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
             APSARA_TEST_EQUAL(apmSubpath[zz], req->mUrl);
