@@ -53,7 +53,7 @@ type MetaManager struct {
 	registerLock    sync.RWMutex
 
 	// self metrics
-	projectNames       map[string]struct{}
+	projectNames       map[string]int
 	metricRecord       pipeline.MetricsRecord
 	addEventCount      pipeline.CounterMetric
 	updateEventCount   pipeline.CounterMetric
@@ -77,7 +77,7 @@ func GetMetaManagerInstance() *MetaManager {
 		}
 		metaManager.linkGenerator = NewK8sMetaLinkGenerator(metaManager.cacheMap)
 		metaManager.linkRegisterMap = make(map[string][]string)
-		metaManager.projectNames = make(map[string]struct{})
+		metaManager.projectNames = make(map[string]int)
 	})
 	return metaManager
 }
@@ -146,7 +146,11 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 			m.registerLock.RUnlock()
 		}, interval)
 		m.registerLock.Lock()
-		m.projectNames[projectName] = struct{}{}
+		if cnt, ok := m.projectNames[projectName]; ok {
+			m.projectNames[projectName] = cnt + 1
+		} else {
+			m.projectNames[projectName] = 1
+		}
 		m.registerLock.Unlock()
 		return
 	}
@@ -164,11 +168,17 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 }
 
 func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
-	m.registerLock.Lock()
 	for _, cache := range m.cacheMap {
 		cache.UnRegisterSendFunc(configName)
 	}
-	delete(m.projectNames, projectName)
+	m.registerLock.Lock()
+	if cnt, ok := m.projectNames[projectName]; ok {
+		if cnt == 1 {
+			delete(m.projectNames, projectName)
+		} else {
+			m.projectNames[projectName] = cnt - 1
+		}
+	}
 	delete(m.linkRegisterMap, configName)
 	m.registerLock.Unlock()
 }
