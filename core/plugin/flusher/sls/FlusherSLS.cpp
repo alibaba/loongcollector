@@ -337,16 +337,14 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
-                            mContext->GetAlarm(),
-                            errorMsg,
-                            sName,
-                            mContext->GetConfigName(),
-                            mContext->GetProjectName(),
-                            mContext->GetLogstoreName(),
-                            mContext->GetRegion());
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
-    } else if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS || 
-        mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES){
     }
 
     // Region
@@ -452,7 +450,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 #endif
 
-    
 
     // Batch
     const char* key = "Batch";
@@ -483,25 +480,17 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // ShardHashKeys
-    if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    } else if (!mShardHashKeys.empty() && mContext->IsExactlyOnceEnabled()) {
-        mShardHashKeys.clear();
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             "exactly once enabled when ShardHashKeys is not empty",
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
+    if (mTelemetryType == sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS && !mContext->IsExactlyOnceEnabled()) {
+        if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
     }
 
     DefaultFlushStrategyOptions strategy{
@@ -1269,27 +1258,26 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
-                                                                         const string& accessKeySecret,
-                                                                         SLSClientManager::AuthType type,
-                                                                         SLSSenderQueueItem* item,
-                                                                         const std::string& subPath) const {
-    
+                                                                    const string& accessKeySecret,
+                                                                    SLSClientManager::AuthType type,
+                                                                    SLSSenderQueueItem* item,
+                                                                    const std::string& subPath) const {
     string query;
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
-                                   accessKeySecret,
-                                   type,
-                                   item->mCurrentHost,
-                                   item->mRealIpFlag,
-                                   mProject,
-                                   item->mLogstore,
-                                   CompressTypeToString(mCompressor->GetCompressType()),
-                                   item->mType,
-                                   item->mData,
-                                   item->mRawSize,
-                                   mSubpath,
-                                   query,
-                                   header);
+                                 accessKeySecret,
+                                 type,
+                                 item->mCurrentHost,
+                                 item->mRealIpFlag,
+                                 mProject,
+                                 item->mLogstore,
+                                 CompressTypeToString(mCompressor->GetCompressType()),
+                                 item->mType,
+                                 item->mData,
+                                 item->mRawSize,
+                                 mSubpath,
+                                 query,
+                                 header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,

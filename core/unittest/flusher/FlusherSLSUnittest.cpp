@@ -158,7 +158,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Region": "test_region",
             "Endpoint": "test_region.log.aliyuncs.com",
             "Aliuid": "123456789",
-            "TelemetryType": "metrics",
+            "TelemetryType": "logs",
             "ShardHashKeys": [
                 "__source__"
             ]
@@ -180,7 +180,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mAliuid);
 #endif
     APSARA_TEST_EQUAL("test_region.log.aliyuncs.com", flusher->mEndpoint);
-    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
     APSARA_TEST_EQUAL("__source__", flusher->mShardHashKeys[0]);
     SenderQueueManager::GetInstance()->Clear();

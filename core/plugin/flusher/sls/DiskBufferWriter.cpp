@@ -909,7 +909,6 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       dataType,
                                       logData,
                                       bufferMeta.rawsize(),
-                                      bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "",
                                       bufferMeta.subpath());
         default: {
             // should not happen
