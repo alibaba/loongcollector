@@ -137,7 +137,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
             }
             if (!IsConfigEnabled(pipelineName, *detail)) {
                 switch (GetConfigType(*detail)) {
-                    case ConfigType::Pipeline:
+                    case ConfigType::Collection:
                         if (mPipelineManager->FindConfigByName(pipelineName)) {
                             pDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
@@ -247,7 +247,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 }
                 if (!IsConfigEnabled(configName, *detail)) {
                     switch (GetConfigType(*detail)) {
-                        case ConfigType::Pipeline:
+                        case ConfigType::Collection:
                             if (mPipelineManager->FindConfigByName(configName)) {
                                 pDiff.mRemoved.push_back(configName);
                                 LOG_INFO(sLogger,
@@ -291,7 +291,7 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
                                              TaskConfigDiff& tDiff,
                                              SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
-        case ConfigType::Pipeline: {
+        case ConfigType::Collection: {
             CollectionConfig config(configName, std::move(configDetail));
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
@@ -331,7 +331,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                                                 TaskConfigDiff& tDiff,
                                                 SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
-        case ConfigType::Pipeline: {
+        case ConfigType::Collection: {
             shared_ptr<CollectionPipeline> p = mPipelineManager->FindConfigByName(configName);
             if (!p) {
                 CollectionConfig config(configName, std::move(configDetail));
