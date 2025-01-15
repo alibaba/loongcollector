@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/interface/Flusher.h"
-#include "pipeline/serializer/Serializer.h"
+#include "collection_pipeline/plugin/interface/Flusher.h"
+#include "collection_pipeline/serializer/Serializer.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -54,7 +54,7 @@ private:
 
     BatchedEvents CreateBatchedMetricEvents(bool withEvents = true);
 
-    PipelineContext mCtx;
+    CollectionPipelineContext mCtx;
 };
 
 unique_ptr<Flusher> SerializerUnittest::sFlusher;

@@ -24,9 +24,9 @@
 
 #include "PluginRegistry.h"
 #include "logger/Logger.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "prometheus/Constants.h"

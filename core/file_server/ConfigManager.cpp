@@ -47,8 +47,8 @@
 #include "file_server/FileServer.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "monitor/AlarmManager.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 
 using namespace std;
 

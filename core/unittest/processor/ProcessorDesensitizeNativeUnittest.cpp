@@ -13,7 +13,7 @@
 // limitations under the License.
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -35,7 +35,7 @@ public:
     void TestMultipleLines();
     void TestMultipleLinesWithProcessorMergeMultilineLogNative();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorDesensitizeNativeUnittest, TestInit);

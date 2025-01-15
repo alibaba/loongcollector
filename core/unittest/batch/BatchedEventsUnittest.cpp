@@ -14,7 +14,7 @@
 
 
 #include "models/EventPool.h"
-#include "pipeline/batch/BatchedEvents.h"
+#include "collection_pipeline/batch/BatchedEvents.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
 

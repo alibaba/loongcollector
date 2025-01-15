@@ -30,7 +30,7 @@
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;

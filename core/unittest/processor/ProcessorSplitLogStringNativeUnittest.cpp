@@ -17,9 +17,9 @@
 #include <sstream>
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 
@@ -34,7 +34,7 @@ public:
     void TestProcessCommon();
     void TestEnableRawContent();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestInit)

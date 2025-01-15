@@ -22,7 +22,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
 namespace logtail {

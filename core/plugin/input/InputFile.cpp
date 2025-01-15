@@ -24,9 +24,9 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
@@ -41,7 +41,7 @@ namespace logtail {
 const string InputFile::sName = "input_file";
 
 bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
-                                             const PipelineContext*,
+                                             const CollectionPipelineContext*,
                                              const FileDiscoveryOptions* fileDiscovery) {
     string logPath = GetLogPath(fileDiscovery);
     return SetContainerBaseDir(containerInfo, logPath);

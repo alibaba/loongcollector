@@ -19,7 +19,7 @@
 #include "config/common_provider/CommonConfigProvider.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
-#include "pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"

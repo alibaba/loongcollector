@@ -75,7 +75,7 @@ public:
     static std::string gbkFile;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(JsonLogFileReaderUnittest, TestReadGBK)
@@ -248,7 +248,7 @@ public:
     std::unique_ptr<JsonLogFileReader> mLogFileReader;
     MultilineOptions multilineOpts;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(RemoveLastIncompleteLogUnittest, TestRemoveLastIncompleteLogSingleLine)

@@ -25,7 +25,7 @@
 
 #include "common/FeedbackInterface.h"
 #include "file_server/event/Event.h"
-#include "pipeline/queue/QueueKey.h"
+#include "collection_pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

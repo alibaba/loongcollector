@@ -26,7 +26,7 @@
 #include "file_server/FileServer.h"
 #include "gmock/gmock.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -445,19 +445,19 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
 #ifdef __ENTERPRISE__
         builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
-        PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(!pipelineConfigDiff.first.IsEmpty());
         APSARA_TEST_EQUAL(1U + builtinPipelineCnt, pipelineConfigDiff.first.mAdded.size());
         APSARA_TEST_EQUAL(pipelineConfigDiff.first.mAdded[builtinPipelineCnt].mName, "config1");
-        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames().size(), 1U + builtinPipelineCnt);
-        APSARA_TEST_TRUE(PipelineManager::GetInstance()->FindConfigByName("config1").get() != nullptr);
+        APSARA_TEST_EQUAL(CollectionPipelineManager::GetInstance()->GetAllConfigNames().size(), 1U + builtinPipelineCnt);
+        APSARA_TEST_TRUE(CollectionPipelineManager::GetInstance()->FindConfigByName("config1").get() != nullptr);
         // 再次处理 pipelineconfig
         pipelineConfigDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(pipelineConfigDiff.first.IsEmpty());
         APSARA_TEST_TRUE(pipelineConfigDiff.first.mAdded.empty());
-        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames().size(), 1U + builtinPipelineCnt);
-        APSARA_TEST_TRUE(PipelineManager::GetInstance()->FindConfigByName("config1").get() != nullptr);
+        APSARA_TEST_EQUAL(CollectionPipelineManager::GetInstance()->GetAllConfigNames().size(), 1U + builtinPipelineCnt);
+        APSARA_TEST_TRUE(CollectionPipelineManager::GetInstance()->FindConfigByName("config1").get() != nullptr);
 
 
         APSARA_TEST_EQUAL(provider.mInstanceConfigInfoMap.size(), 2);
@@ -673,17 +673,17 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
 #ifdef __ENTERPRISE__
         builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
-        PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(!pipelineConfigDiff.first.IsEmpty());
         APSARA_TEST_EQUAL(1U, pipelineConfigDiff.first.mRemoved.size());
         APSARA_TEST_EQUAL(pipelineConfigDiff.first.mRemoved[0], "config1");
-        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, PipelineManager::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, CollectionPipelineManager::GetInstance()->GetAllConfigNames().size());
         // 再次处理pipelineConfigDiff
         pipelineConfigDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(pipelineConfigDiff.first.IsEmpty());
         APSARA_TEST_TRUE(pipelineConfigDiff.first.mRemoved.empty());
-        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, PipelineManager::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, CollectionPipelineManager::GetInstance()->GetAllConfigNames().size());
 
         APSARA_TEST_TRUE(provider.mInstanceConfigInfoMap.empty());
         // 处理instanceConfigDiff

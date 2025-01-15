@@ -14,9 +14,9 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
@@ -37,7 +37,7 @@ public:
     void TestProcessJsonRaw();
     void TestMultipleLines();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestInit);

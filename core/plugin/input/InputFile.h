@@ -23,7 +23,7 @@
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-#include "pipeline/plugin/interface/Input.h"
+#include "collection_pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
@@ -32,7 +32,7 @@ public:
     static const std::string sName;
 
     static bool
-    DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const PipelineContext*, const FileDiscoveryOptions*);
+    DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const CollectionPipelineContext*, const FileDiscoveryOptions*);
 
     InputFile();
 

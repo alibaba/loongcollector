@@ -21,9 +21,9 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
@@ -61,8 +61,8 @@ protected:
     }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void InputFileUnittest::OnSuccessfulInit() {

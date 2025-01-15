@@ -20,8 +20,8 @@
 #include "common/ParamExtractor.h"
 #include "file_server/FileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -232,7 +232,7 @@ std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
 }
 
 bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
-                                                       const PipelineContext* ctx,
+                                                       const CollectionPipelineContext* ctx,
                                                        const FileDiscoveryOptions*) {
     if (!containerInfo.mRealBaseDir.empty()) {
         return true;

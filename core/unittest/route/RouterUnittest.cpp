@@ -14,8 +14,8 @@
 
 #include "common/JsonUtil.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/route/Router.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/route/Router.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -32,7 +32,7 @@ protected:
     void SetUp() override { ctx.SetConfigName("test_config"); }
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void RouterUnittest::TestInit() {

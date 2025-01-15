@@ -38,7 +38,7 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
-#include "pipeline/PipelineManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"

@@ -33,7 +33,7 @@ protected:
     }
 
 private:
-    PipelineContext mCtx;
+    CollectionPipelineContext mCtx;
     string mFlusherId;
 };
 

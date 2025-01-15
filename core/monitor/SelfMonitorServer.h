@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <string>
 
-#include "Pipeline.h"
+#include "collection_pipeline/CollectionPipeline.h"
 
 namespace logtail {
 
@@ -30,9 +32,9 @@ public:
     void Monitor();
     void Stop();
 
-    void UpdateMetricPipeline(PipelineContext* ctx, SelfMonitorMetricRules* rules);
+    void UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules);
     void RemoveMetricPipeline();
-    void UpdateAlarmPipeline(PipelineContext* ctx); // Todo
+    void UpdateAlarmPipeline(CollectionPipelineContext* ctx); // Todo
 private:
     SelfMonitorServer();
     ~SelfMonitorServer() = default;
@@ -47,14 +49,14 @@ private:
     void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events);
     void ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEventGroup);
 
-    PipelineContext* mMetricPipelineCtx = nullptr;
+    CollectionPipelineContext* mMetricPipelineCtx = nullptr;
     SelfMonitorMetricRules* mSelfMonitorMetricRules = nullptr;
     SelfMonitorMetricEventMap mSelfMonitorMetricEventMap;
     mutable ReadWriteLock mMetricPipelineLock;
 
     void SendAlarms();
 
-    PipelineContext* mAlarmPipelineCtx;
+    CollectionPipelineContext* mAlarmPipelineCtx;
     std::mutex mAlarmPipelineMux;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalMetricsUnittest;

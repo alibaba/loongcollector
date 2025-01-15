@@ -22,7 +22,7 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "monitor/Monitor.h"
-#include "pipeline/Pipeline.h"
+#include "collection_pipeline/CollectionPipeline.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"

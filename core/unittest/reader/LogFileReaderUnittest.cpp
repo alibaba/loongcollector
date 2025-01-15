@@ -77,7 +77,7 @@ public:
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
@@ -555,7 +555,7 @@ public:
     static std::string gbkFile;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogMultiBytesUnittest, TestAlignLastCharacterUTF8);
@@ -680,7 +680,7 @@ public:
     static std::string logPathDir;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderCheckpointUnittest, TestDumpMetaToMem);

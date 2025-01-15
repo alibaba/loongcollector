@@ -25,7 +25,7 @@
 
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"
-#include "pipeline/queue/QueueKey.h"
+#include "collection_pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

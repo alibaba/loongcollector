@@ -21,14 +21,14 @@
 #include "models/PipelineEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
 
-SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
+SecurityHandler::SecurityHandler(const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
     : AbstractHandler(ctx, key, idx) {
     mHostName = GetHostName();
     mHostIp = GetHostIp();

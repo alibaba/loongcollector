@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/serializer/SLSSerializer.h"
+#include "collection_pipeline/serializer/SLSSerializer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 
@@ -45,7 +45,7 @@ private:
 
     static unique_ptr<FlusherSLS> sFlusher;
 
-    PipelineContext mCtx;
+    CollectionPipelineContext mCtx;
 };
 
 unique_ptr<FlusherSLS> SLSSerializerUnittest::sFlusher;

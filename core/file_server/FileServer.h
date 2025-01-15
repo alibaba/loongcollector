@@ -26,7 +26,7 @@
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-#include "pipeline/PipelineContext.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 
 namespace logtail {
@@ -49,21 +49,21 @@ public:
     const std::unordered_map<std::string, FileDiscoveryConfig>& GetAllFileDiscoveryConfigs() const {
         return mPipelineNameFileDiscoveryConfigsMap;
     }
-    void AddFileDiscoveryConfig(const std::string& name, FileDiscoveryOptions* opts, const PipelineContext* ctx);
+    void AddFileDiscoveryConfig(const std::string& name, FileDiscoveryOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileDiscoveryConfig(const std::string& name);
 
     FileReaderConfig GetFileReaderConfig(const std::string& name) const;
     const std::unordered_map<std::string, FileReaderConfig>& GetAllFileReaderConfigs() const {
         return mPipelineNameFileReaderConfigsMap;
     }
-    void AddFileReaderConfig(const std::string& name, const FileReaderOptions* opts, const PipelineContext* ctx);
+    void AddFileReaderConfig(const std::string& name, const FileReaderOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileReaderConfig(const std::string& name);
 
     MultilineConfig GetMultilineConfig(const std::string& name) const;
     const std::unordered_map<std::string, MultilineConfig>& GetAllMultilineConfigs() const {
         return mPipelineNameMultilineConfigsMap;
     }
-    void AddMultilineConfig(const std::string& name, const MultilineOptions* opts, const PipelineContext* ctx);
+    void AddMultilineConfig(const std::string& name, const MultilineOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveMultilineConfig(const std::string& name);
 
     void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<ContainerInfo>>& info);

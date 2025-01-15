@@ -26,7 +26,7 @@ namespace logtail {
 
 const string CommonParserOptions::legacyUnmatchedRawLogKey = "__raw_log__";
 
-bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
+bool CommonParserOptions::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
     string errorMsg;
 
     // KeepingSourceWhenParseFail

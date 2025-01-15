@@ -16,9 +16,9 @@
 #include <sstream>
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorSPL.h"
 #include "unittest/Unittest.h"
 
@@ -30,7 +30,7 @@ static std::atomic_bool running(true);
 class SplUnittest : public ::testing::Test {
 public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     Json::Value GetCastConfig(std::string spl);
     void TestInit();
     void TestWhere();

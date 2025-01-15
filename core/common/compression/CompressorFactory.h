@@ -23,7 +23,7 @@
 
 #include "common/compression/CompressType.h"
 #include "common/compression/Compressor.h"
-#include "pipeline/PipelineContext.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail {
 
@@ -40,7 +40,7 @@ public:
     }
 
     std::unique_ptr<Compressor> Create(const Json::Value& config,
-                                       const PipelineContext& ctx,
+                                       const CollectionPipelineContext& ctx,
                                        const std::string& pluginType,
                                        const std::string& flusherId,
                                        CompressType defaultType);

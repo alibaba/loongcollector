@@ -73,7 +73,7 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -209,7 +209,7 @@ public:
 
 private:
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(RemoveLastIncompleteLogMultilineUnittest, TestRemoveLastIncompleteLogWithBeginContinue);
@@ -482,7 +482,7 @@ public:
 
 private:
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(GetLastLineUnittest, TestGetLastLine);
@@ -516,7 +516,7 @@ public:
 
 private:
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     const std::string LOG_PART = "2021-08-25T07:00:00.000000000Z stdout P ";
     const std::string LOG_FULL = "2021-08-25T07:00:00.000000000Z stdout F ";
     const std::string LOG_FULL_NOT_FOUND = "2021-08-25T07:00:00.000000000Z stdout ";
@@ -957,7 +957,7 @@ public:
 
 private:
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 
     const std::string LOG_BEGIN_STRING = "Exception in thread \"main\" java.lang.NullPointerException";
     const std::string LOG_BEGIN_REGEX = R"(Exception.*)";

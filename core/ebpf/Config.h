@@ -21,7 +21,7 @@
 #include "json/json.h"
 
 #include "ebpf/include/export.h"
-#include "pipeline/PipelineContext.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 
 namespace logtail {
@@ -32,7 +32,7 @@ namespace ebpf {
 enum class ObserverType { PROCESS, FILE, NETWORK };
 bool InitObserverNetworkOption(const Json::Value& config,
                                nami::ObserverNetworkOption& thisObserverNetworkOption,
-                               const PipelineContext* mContext,
+                               const CollectionPipelineContext* mContext,
                                const std::string& sName);
 
 /////////////////////  /////////////////////
@@ -43,7 +43,7 @@ class SecurityOptions {
 public:
     bool Init(SecurityProbeType filterType,
               const Json::Value& config,
-              const PipelineContext* mContext,
+              const CollectionPipelineContext* mContext,
               const std::string& sName);
 
     std::vector<nami::SecurityOption> mOptionList;

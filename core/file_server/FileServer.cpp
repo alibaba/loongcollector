@@ -134,7 +134,7 @@ FileDiscoveryConfig FileServer::GetFileDiscoveryConfig(const string& name) const
 }
 
 // 添加文件发现配置
-void FileServer::AddFileDiscoveryConfig(const string& name, FileDiscoveryOptions* opts, const PipelineContext* ctx) {
+void FileServer::AddFileDiscoveryConfig(const string& name, FileDiscoveryOptions* opts, const CollectionPipelineContext* ctx) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileDiscoveryConfigsMap[name] = make_pair(opts, ctx);
 }
@@ -156,7 +156,7 @@ FileReaderConfig FileServer::GetFileReaderConfig(const string& name) const {
 }
 
 // 添加文件读取器配置
-void FileServer::AddFileReaderConfig(const string& name, const FileReaderOptions* opts, const PipelineContext* ctx) {
+void FileServer::AddFileReaderConfig(const string& name, const FileReaderOptions* opts, const CollectionPipelineContext* ctx) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileReaderConfigsMap[name] = make_pair(opts, ctx);
 }
@@ -178,7 +178,7 @@ MultilineConfig FileServer::GetMultilineConfig(const string& name) const {
 }
 
 // 添加多行配置
-void FileServer::AddMultilineConfig(const string& name, const MultilineOptions* opts, const PipelineContext* ctx) {
+void FileServer::AddMultilineConfig(const string& name, const MultilineOptions* opts, const CollectionPipelineContext* ctx) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameMultilineConfigsMap[name] = make_pair(opts, ctx);
 }

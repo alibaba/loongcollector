@@ -49,9 +49,9 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 
 using namespace sls_logs;

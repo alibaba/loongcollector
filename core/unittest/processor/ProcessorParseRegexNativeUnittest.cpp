@@ -15,9 +15,9 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"
 #include "unittest/Unittest.h"
 
@@ -40,7 +40,7 @@ protected:
     void SetUp() override { ctx.SetConfigName("test_config"); }
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 PluginInstance::PluginMeta getPluginMeta() {

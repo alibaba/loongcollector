@@ -14,7 +14,7 @@
 
 #include <memory>
 
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -39,7 +39,7 @@ void ProcessorInstanceUnittest::TestInit() const {
     unique_ptr<ProcessorInstance> processor
         = make_unique<ProcessorInstance>(new ProcessorMock(), PluginInstance::PluginMeta("0"));
     Json::Value config;
-    PipelineContext context;
+    CollectionPipelineContext context;
     APSARA_TEST_TRUE(processor->Init(config, context));
     APSARA_TEST_EQUAL(&context, &processor->mPlugin->GetContext());
 }
@@ -48,7 +48,7 @@ void ProcessorInstanceUnittest::TestProcess() const {
     unique_ptr<ProcessorInstance> processor
         = make_unique<ProcessorInstance>(new ProcessorMock(), PluginInstance::PluginMeta("0"));
     Json::Value config;
-    PipelineContext context;
+    CollectionPipelineContext context;
     processor->Init(config, context);
 
     vector<PipelineEventGroup> groups;

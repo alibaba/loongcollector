@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "SelfMonitorServer.h"
+#include "monitor/SelfMonitorServer.h"
 
-#include "Monitor.h"
-#include "PipelineManager.h"
+#include "monitor/Monitor.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "runner/ProcessorRunner.h"
 
@@ -75,7 +75,7 @@ void SelfMonitorServer::Stop() {
     }
 }
 
-void SelfMonitorServer::UpdateMetricPipeline(PipelineContext* ctx, SelfMonitorMetricRules* rules) {
+void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules) {
     WriteLock lock(mMetricPipelineLock);
     mMetricPipelineCtx = ctx;
     mSelfMonitorMetricRules = rules;
@@ -105,8 +105,8 @@ void SelfMonitorServer::SendMetrics() {
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
-    shared_ptr<Pipeline> pipeline
-        = PipelineManager::GetInstance()->FindConfigByName(mMetricPipelineCtx->GetConfigName());
+    shared_ptr<CollectionPipeline> pipeline
+        = CollectionPipelineManager::GetInstance()->FindConfigByName(mMetricPipelineCtx->GetConfigName());
     if (pipeline.get() != nullptr) {
         if (pipelineEventGroup.GetEvents().size() > 0) {
             ProcessorRunner::GetInstance()->PushQueue(
@@ -168,7 +168,7 @@ void SelfMonitorServer::ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEve
     }
 }
 
-void SelfMonitorServer::UpdateAlarmPipeline(PipelineContext* ctx) {
+void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx) {
     lock_guard<mutex> lock(mAlarmPipelineMux);
     mAlarmPipelineCtx = ctx;
 }

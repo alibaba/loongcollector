@@ -18,7 +18,7 @@
 #include "json/json.h"
 
 #include "common/JsonUtil.h"
-#include "pipeline/GlobalConfig.h"
+#include "collection_pipeline/GlobalConfig.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -33,7 +33,7 @@ protected:
     void SetUp() override { ctx.SetConfigName("test_config"); }
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void GlobalConfigUnittest::OnSuccessfulInit() const {

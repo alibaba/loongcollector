@@ -66,7 +66,7 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -1029,7 +1029,7 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -1291,7 +1291,7 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;

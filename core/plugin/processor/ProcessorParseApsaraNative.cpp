@@ -22,7 +22,7 @@
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
