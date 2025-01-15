@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "common/JsonUtil.h"
+#include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
 #include "unittest/Unittest.h"
 
