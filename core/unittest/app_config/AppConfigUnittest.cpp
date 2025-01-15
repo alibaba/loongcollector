@@ -28,12 +28,15 @@ DECLARE_FLAG_STRING(ebpf_converage_config_strategy);
 DECLARE_FLAG_STRING(ebpf_sample_config_strategy);
 DECLARE_FLAG_DOUBLE(ebpf_sample_config_config_rate);
 DECLARE_FLAG_BOOL(logtail_mode);
+DECLARE_FLAG_STRING(host_path_blacklist);
+DECLARE_FLAG_DOUBLE(default_machine_cpu_usage_threshold);
 
 namespace logtail {
 
 class AppConfigUnittest : public ::testing::Test {
 public:
     void TestRecurseParseJsonToFlags();
+    void TestParseEnvToFlags();
 
 private:
     void writeLogtailConfigJSON(const Json::Value& v) {
@@ -168,7 +171,34 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     APSARA_TEST_EQUAL(INT32_FLAG(ebpf_receive_event_chan_cap), 55);
 }
 
+void AppConfigUnittest::TestParseEnvToFlags() {
+    // 忽略列表中的环境变量，继续可以用小写且允许 LOONG_ 前缀的格式
+    {
+        SetEnv("host_path_blacklist", "test1");
+        AppConfig::GetInstance()->ParseEnvToFlags();
+        APSARA_TEST_EQUAL(STRING_FLAG(host_path_blacklist), "test1");
+        UnsetEnv("host_path_blacklist");
+
+        SetEnv("LOONG_host_path_blacklist", "test2");
+        AppConfig::GetInstance()->ParseEnvToFlags();
+        APSARA_TEST_EQUAL(STRING_FLAG(host_path_blacklist), "test2");
+    }
+    // 不忽略列表中的环境变量，需要为大写,LOONG_ 前缀
+    {
+        SetEnv("default_machine_cpu_usage_threshold", "1");
+        AppConfig::GetInstance()->ParseEnvToFlags();
+        APSARA_TEST_NOT_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 1);
+        APSARA_TEST_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 0.4);
+        UnsetEnv("default_machine_cpu_usage_threshold");
+
+        SetEnv("LOONG_DEFAULT_MACHINE_CPU_USAGE_THRESHOLD", "2");
+        AppConfig::GetInstance()->ParseEnvToFlags();
+        APSARA_TEST_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 2);
+    }
+}
+
 UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
+UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
 
 } // namespace logtail
 
