@@ -57,13 +57,13 @@ public:
 
 class ArmsMeterHandler : public MeterHandler {
 public:
-    ArmsMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
+    ArmsMeterHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) override;
 };
 
 class ArmsSpanHandler : public SpanHandler {
 public:
-    ArmsSpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
+    ArmsSpanHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&) override;
 };
 
