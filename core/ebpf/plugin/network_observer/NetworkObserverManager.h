@@ -43,9 +43,10 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, 
+           std::shared_ptr<Timer> scheduler,
            std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> flusher) {
-        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, flusher);
+        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, scheduler, flusher);
     }
 
     NetworkObserverManager() = delete;
@@ -54,9 +55,9 @@ public:
     explicit NetworkObserverManager(
         std::shared_ptr<BaseManager>& baseMgr,
         std::shared_ptr<SourceManager> sourceManager,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler,
         std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)> flusher)
-        : AbstractManager(baseMgr, sourceManager, queue), mFlusher(flusher) {}
+        : AbstractManager(baseMgr, sourceManager, queue, scheduler), mFlusher(flusher) {}
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;

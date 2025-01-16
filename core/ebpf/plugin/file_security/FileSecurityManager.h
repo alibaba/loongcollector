@@ -34,8 +34,8 @@ public:
     //     return std::make_shared<FileSecurityManager>(mgr, wrapper);
     // }
     FileSecurityManager() = delete;
-    FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-        : AbstractManager(baseMgr, sourceManager, queue) {}
+    FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+        : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
 
     ~FileSecurityManager();
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;

@@ -22,8 +22,8 @@ namespace logtail {
 namespace ebpf {
 
 NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
-                                             std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(base, sourceManager, queue) {
+                                             std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+    : AbstractManager(base, sourceManager, queue, scheduler) {
     // mAggregateTree = std::make_unique<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>>(
     //     1000, // max nodes
     //     [](std::unique_ptr<BaseSecurityNode>& base, const std::unique_ptr<BaseSecurityEvent>& n) {

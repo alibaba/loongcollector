@@ -27,6 +27,7 @@
 #include "ebpf/SourceManager.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 namespace ebpf {
@@ -68,6 +69,8 @@ public:
         mFlushProcessEvent = isFlush;
     }
 
+    bool FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime);
+
     void PollPerfBuffers();
 
     bool Init();
@@ -95,6 +98,7 @@ private:
 
     std::atomic_bool mFlushProcessEvent = false;
     std::future<void> mPoller;
+    std::future<void> mCacheUpdater;
 };
 
 } // namespace ebpf

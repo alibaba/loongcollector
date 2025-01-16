@@ -20,8 +20,10 @@
 namespace logtail {
 namespace ebpf {
 
-AbstractManager::AbstractManager(std::shared_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) 
-    : mSourceManager(sourceManager), mCommonEventQueue(queue) { mTimeDiff = GetTimeDiffFromBoot();}
+AbstractManager::AbstractManager(std::shared_ptr<BaseManager> bm, 
+    std::shared_ptr<SourceManager> sourceManager, 
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) 
+    : mBaseManager(bm), mSourceManager(sourceManager), mCommonEventQueue(queue), mScheduler(scheduler) { mTimeDiff = GetTimeDiffFromBoot();}
 
 int AbstractManager::GetCallNameIdx(const std::string& callName) {
     if (callName == "security_file_permission") return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION;

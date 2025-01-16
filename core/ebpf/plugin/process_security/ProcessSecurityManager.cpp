@@ -24,6 +24,10 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ProcessSecurityManager.h"
 #include "common/magic_enum.hpp"
+#include "ebpf/type/PeriodicalEvent.h"
+#include "pipeline/PipelineContext.h"
+#include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -37,7 +41,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
     mBaseManager->MarkProcessEventFlushStatus(true);
 
     mAggregateTree = std::make_unique<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> (
-        10, 
+        4096, 
         [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
             // TODO
             // gen attrs ... 
@@ -65,6 +69,77 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
             return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
         }
     );
+
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
+        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+            if (!this->mFlag) {
+                return false;
+            }
+            // this->mVec.push_back(1);
+            // read aggregator
+            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+            if (nodes.empty()) {
+                LOG_DEBUG(sLogger, ("empty nodes...", ""));
+                return true;
+            }
+
+            for (auto& node : nodes) {
+                // convert to a item and push to process queue
+                this->mAggregateTree->ForEach(node, [&](const ProcessEventGroup* group) {
+                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+                    // represent a process ...
+                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
+                    if (!ok) {
+                        return;
+                    }
+                    for (auto& innerEvent : group->mInnerEvents) {
+                        auto* logEvent = eventGroup.AddLogEvent();
+                        auto ts = innerEvent.mTimestamp + this->mTimeDiff.count();
+                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                        logEvent->SetTimestamp(seconds.count(), ts);
+                        switch (innerEvent.mEventType)
+                        {
+                        case KernelEventType::PROCESS_EXECVE_EVENT:{
+                            logEvent->SetContent("call_name", std::string("execve"));
+                            logEvent->SetContent("event_type", std::string("execve"));
+                            break;
+                        }
+                        case KernelEventType::PROCESS_EXIT_EVENT:{
+                            logEvent->SetContent("call_name", std::string("exit"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        case KernelEventType::PROCESS_CLONE_EVENT:{
+                            logEvent->SetContent("call_name", std::string("clone"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                    }
+                    // TODO add lock??
+                    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        LOG_WARNING(sLogger, 
+                            ("configName", mPipelineCtx->GetConfigName())
+                            ("pluginIdx", this->mPluginIndex)
+                            ("[ProcessSecurityEvent] push queue failed!", ""));
+                    }
+                });
+                // push process queue
+                
+            }
+            this->mAggregateTree->Clear();
+            
+            return true;
+        }, [this]() { // validator
+            return !this->mFlag.load();
+        }
+    );
+
+    mScheduler->PushEvent(std::move(event));
 
     return 0;
 }
@@ -98,7 +173,8 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
                                             0x9e3779b9 +
                                             (hash_result[0] << 6) +
                                             (hash_result[0] >> 2);
-    mAggregateTree->Aggregate(processEvent, hash_result);
+    bool ret = mAggregateTree->Aggregate(processEvent, hash_result);
+    LOG_DEBUG(sLogger, ("after aggregate", ret));
 
     return 0;
 }

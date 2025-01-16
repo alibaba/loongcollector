@@ -182,7 +182,7 @@ class ProcessEventNode {
 public:
     ProcessEventNode(uint64_t ts) : mTimestamp(ts) {}
     uint64_t mTimestamp;
-    // KernelEventType mEventType;
+    KernelEventType mEventType;
     // attrs
     
 };
@@ -190,7 +190,7 @@ public:
 // std::vector<ProcessEventGroup>
 class ProcessEventGroup {
 public:
-    ProcessEventGroup(uint32_t pid, uint32_t ktime) : mPid(pid), mKtime(ktime) {}
+    ProcessEventGroup(uint32_t pid, uint64_t ktime) : mPid(pid), mKtime(ktime) {}
     uint32_t mPid;
     uint64_t mKtime;
     // attrs

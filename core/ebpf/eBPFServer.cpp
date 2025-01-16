@@ -233,6 +233,7 @@ void eBPFServer::Stop() {
         mFileSecureCB->UpdateContext(nullptr, -1, -1);
     
     mScheduler->Stop();
+    mBaseManager->Stop();
 
     mRunning = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
@@ -288,11 +289,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     // step2: call init function
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
-            auto idx = static_cast<int>(PluginType::PROCESS_SECURITY);
-            mPlugins[idx] = ProcessSecurityManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue);
-            
-            ret = (mPlugins[idx]->Init(options) == 0);
+            auto mgr = ProcessSecurityManager::Create(
+                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+            UpdatePluginManager(type, mgr);
+            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (mgr->Init(options) == 0);
             break;
         }
 
@@ -302,13 +303,14 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             // TODO @qianlu.kk register k8s metadata callback for metric ??
 
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            auto idx = static_cast<int>(PluginType::NETWORK_OBSERVE);
-            mPlugins[idx] = NetworkObserverManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
+            auto mgr = NetworkObserverManager::Create(
+                mBaseManager, mSourceManager, mDataEventQueue, mScheduler, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
                     mEventCB->handle(events);
                 });
+            UpdatePluginManager(type, mgr);
+            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
 
-            ret = (mPlugins[idx]->Init(options) == 0);
+            ret = (mgr->Init(options) == 0);
             break;
         }
 
@@ -387,6 +389,13 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
         LOG_WARNING(sLogger, ("prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
     }
+
+    auto pluginManager = GetPluginManager(type);
+    if (pluginManager) {
+        pluginManager->UpdateContext(nullptr, -1, -1);
+        return pluginManager->Destroy() == 0;
+    }
+
     bool ret = mSourceManager->StopPlugin(type);
     // UpdateContext must after than StopPlugin
     if (ret) {
@@ -488,6 +497,15 @@ std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
     }
 }
 
+void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
+    std::lock_guard<std::mutex> lk(mMtx);
+    if (type == PluginType::MAX) {
+        return;
+    } else {
+        mPlugins[static_cast<int>(type)] = mgr;
+    }
+}
+
 void eBPFServer::HandlerEvents() {
     std::vector<std::shared_ptr<CommonEvent>> items(1024);
     while(mRunning) {
@@ -511,6 +529,7 @@ void eBPFServer::HandlerEvents() {
 
         // handle
         items.clear();
+        items.resize(1024);
 
     }
 }

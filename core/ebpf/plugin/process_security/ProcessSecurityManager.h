@@ -34,14 +34,14 @@ public:
     //     return std::make_shared<ProcessSecurityManager>(mgr, wrapper);
     // }
     ProcessSecurityManager() = delete;
-    ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-        : AbstractManager(baseMgr, sourceManager, queue) {}
+    ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+        : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<ProcessSecurityManager>(mgr, sourceManager, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) {
+        return std::make_shared<ProcessSecurityManager>(mgr, sourceManager, queue, scheduler);
     }
 
     ~ProcessSecurityManager() {}

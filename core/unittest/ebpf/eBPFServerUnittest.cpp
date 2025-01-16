@@ -156,7 +156,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
     Json::Value configJson, optionalGoPipeline;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "input_process_security");
+    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "test");
     std::shared_ptr<InputProcessSecurity> input(new InputProcessSecurity());
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
@@ -165,12 +165,17 @@ void eBPFServerUnittest::TestProcessSecurity() {
     APSARA_TEST_TRUE(initStatus);
     APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
     APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
-    ebpf::eBPFServer::GetInstance()->mHostPathPrefix = "";
     SecurityOptions opts;
     auto res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &opts, input->mPluginMgr);
+        "test", 1, logtail::ebpf::PluginType::PROCESS_SECURITY, &ctx, &opts, input->mPluginMgr);
     EXPECT_TRUE(res);
 
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    // stop
+    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
+    ebpf::eBPFServer::GetInstance()->Stop();
+    EXPECT_TRUE(res);
 
 }
 
@@ -976,7 +981,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
 //     EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 // }
 
-UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
 UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);

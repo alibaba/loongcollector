@@ -97,6 +97,7 @@ public:
     void HandlerEvents();
 
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
+    void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
 
 private:
     bool StartPluginInternal(const std::string& pipeline_name,

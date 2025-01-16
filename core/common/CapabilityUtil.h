@@ -16,10 +16,11 @@
 
 #include <string>
 
-namespace nami {
-
+namespace logtail {
+namespace ebpf {
 std::string GetCapabilities(uint64_t capInt);
 
 std::string GetCapability(int32_t capInt);
 
+}
 }

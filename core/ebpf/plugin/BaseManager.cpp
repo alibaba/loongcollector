@@ -30,6 +30,9 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/ExecIdUtil.h"
 #include "logger/Logger.h"
+#include "common/JsonUtil.h"
+#include "json/value.h"
+#include "ebpf/util/CapabilityUtil.h"
 
 namespace logtail {
 namespace ebpf {
@@ -92,6 +95,10 @@ bool BaseManager::Init() {
     auto ebpfConfig = std::make_unique<PluginConfig>();
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
+    auto ret = SyncAllProc();
+    if (ret != 0) {
+        LOG_ERROR(sLogger, ("failed to sync all proc, ret", ret));
+    }
     pconfig.mPerfBufferSpec = {{"tcpmon_map",
         128,
         this,
@@ -103,14 +110,15 @@ bool BaseManager::Init() {
     ebpfConfig->mConfig = pconfig;
     mFlag = true;
     mPoller = async(std::launch::async, &BaseManager::PollPerfBuffers, this);
+    mCacheUpdater = async(std::launch::async, &BaseManager::HandleCacheUpdate, this);
     return mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
 }
 
 void BaseManager::PollPerfBuffers() {
     int zero = 0;
     while (mFlag) {
-        int ret = mSourceManager->PollPerfBuffers(PluginType::PROCESS_SECURITY, 4096, &zero, 200);
-        LOG_DEBUG(sLogger, ("poll event num", ret));
+        mSourceManager->PollPerfBuffers(PluginType::PROCESS_SECURITY, 4096, &zero, 200);
+        // LOG_DEBUG(sLogger, ("poll event num", ret));
     }
 }
 
@@ -126,6 +134,15 @@ void BaseManager::Stop() {
             LOG_INFO(sLogger, ("poller thread", "stopped successfully"));
         } else {
             LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
+        }
+    }
+
+    std::future_status s2 = mCacheUpdater.wait_for(std::chrono::seconds(1));
+    if (mCacheUpdater.valid()) {
+        if (s2 == std::future_status::ready) {
+            LOG_INFO(sLogger, ("cachee updater thread", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("cachee updater thread", "forced to stopped"));
         }
     }
     mInited = false;
@@ -189,7 +206,7 @@ void BaseManager::RecordExecveEvent(msg_execve_event* event_ptr) {
     event->kube.docker = std::string(event_ptr->kube.docker_id);
     LOG_DEBUG(
         sLogger,
-        ("begin enqueue pid", event->process.pid)("cmdline", event->process.cmdline)(
+        ("begin enqueue pid", event->process.pid) ("ktime", event->process.ktime) ("cmdline", event->process.cmdline)(
             "filename", event->process.filename)("raw_args", raw_args)("cwd", cwd)("dockerid", event->kube.docker));
 
     mRecordQueue.enqueue(std::move(event));
@@ -590,42 +607,93 @@ void BaseManager::HandleCacheUpdate() {
                           "cmdline", mProcParser.GetPIDCmdline(entity->process.pid))(
                           "filename", mProcParser.GetPIDExePath(entity->process.pid))("args", entity->process.args));
 
-            // update cache
-            // attention we should not use entity again ...
-            // because the memory is managed by cache_
-            // if we want to use value, we need to call `LookUpCacheSafe`
             UpdateCache(exec_key, entity);
-
-            if (mFlushProcessEvent) {
-                // compose common event and push 
-
-            }
-
-            // TODO @qianlu.kk flush event ...
-
-            //   {
-            //     std::shared_lock<std::shared_mutex> lk(mtx_);
-            //     if (!base_event_queue_) continue;
-            //     std::unique_ptr<GenericProcessEventUnix> xx = std::make_unique<GenericProcessEventUnix>();
-            //     xx->call_name = "execve";
-            //     xx->event_type = "execve";
-            //     xx->exec_id = exec_key;
-            //     xx->parent_exec_id = parent_key;
-            //     xx->timestamp = ktime + time_diff_.count();
-            //     // LOG(INFO) << "[execve] event ts:" << ktime << " boot_time:" << time_diff_.count();
-
-            //     // LOG(INFO) << "[RecordExecveEvent][DUMP] begin insert into base queue pid: " << entity->process.pid
-            //     << " cmdline: " << entity->process.cmdline << " filename: " << entity->process.filename << " arg: "
-            //     << entity->process.args;
-
-            //     // push to queue
-            //     base_event_queue_->enqueue(std::move(xx));
-            //   }
         }
 
         items.clear();
         items.resize(mMaxBatchConsumeSize);
     }
+}
+
+bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime) {
+    auto execId = GenerateExecId(pid, ktime);
+    auto proc = LookupCache(execId);
+    if (!proc) {
+        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId) ("pid", pid) ("ktime", ktime));
+        return false;
+    }
+    // finalize proc tags
+
+    auto parentExecId = GenerateParentExecId(proc);
+    auto parentProc = LookupCache(execId);
+    // finalize parent tags
+    // std::string args = utf8::replace_invalid(proc->process.args);
+    // std::string binary = utf8::replace_invalid(proc->process.filename);
+    std::string args = ""; // TODO
+    std::string binary = ""; // TODO
+    std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
+    std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
+    std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
+
+    Json::Value cap;
+    cap["permitted"] = permitted;
+    cap["effective"] = effective;
+    cap["inheritable"] = inheritable;
+
+    Json::StreamWriterBuilder writer;
+
+    std::string capStr = Json::writeString(writer, cap);
+
+    // event_type, added by xxx_security_manager
+    // call_name, added by xxx_security_manager
+    // event_time, added by xxx_security_manager
+    eventGroup.SetTag("exec_id", proc->exec_id);
+    eventGroup.SetTag("parent_exec_id", proc->parent_exec_id);
+    eventGroup.SetTag("pid", std::to_string(proc->process.pid));
+    eventGroup.SetTag("uid", std::to_string(proc->process.uid));
+    eventGroup.SetTag("user", proc->process.user.name);
+    eventGroup.SetTag("binary", binary);
+    eventGroup.SetTag("arguments", args);
+    eventGroup.SetTag("cwd", proc->process.cwd);
+    eventGroup.SetTag("ktime", std::to_string(proc->process.ktime));
+    eventGroup.SetTag("cap", capStr);
+
+    // for parent
+    if (!parentProc){
+        eventGroup.SetTag("parent_process", std::string("unknown"));
+        return true;
+    } else {
+        std::string permitted = GetCapabilities(parentProc->msg->creds.cap.permitted);
+        std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
+        std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
+
+        Json::Value cap;
+        cap["permitted"] = permitted;
+        cap["effective"] = effective;
+        cap["inheritable"] = inheritable;
+
+        std::string args = ""; // TODO
+        std::string binary = ""; // TODO
+        // std::string args = utf8::replace_invalid(parentProc->process.args);
+        // std::string binary = utf8::replace_invalid(parentProc->process.filename);
+
+        Json::Value j;
+        j["exec_id"] = parentProc->exec_id;
+        j["parent_exec_id"] = parentProc->parent_exec_id;
+        j["pid"] = std::to_string(parentProc->process.pid);
+        j["uid"] = std::to_string(parentProc->process.uid);
+        j["user"] = parentProc->process.user.name;
+        j["binary"] = binary;
+        j["arguments"] = args;
+        j["cwd"] = parentProc->process.cwd;
+        j["ktime"] = std::to_string(parentProc->process.ktime);
+        j["cap"] = Json::writeString(Json::StreamWriterBuilder(), cap);
+
+        Json::StreamWriterBuilder writer;
+        std::string result = Json::writeString(writer, j);
+        eventGroup.SetTag("parent_process", result);
+    }
+    return true;
 }
 
 } // namespace ebpf

@@ -43,7 +43,7 @@ public:
     using configType = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter,
                      logtail::ebpf::SecurityNetworkFilter>;
     AbstractManager() = delete;
-    explicit AbstractManager(std::shared_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+    explicit AbstractManager(std::shared_ptr<BaseManager>, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
     virtual ~AbstractManager() {}
 
     virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
@@ -86,15 +86,23 @@ public:
         return;
     }
 
+    void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
+        std::lock_guard lk(mContextMutex);
+        mPipelineCtx = ctx;
+        mQueueKey = key;
+        mPluginIndex = index;
+    }
+
     mutable ReadWriteLock mMtx;
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
 protected:
-    BaseManager *mBaseManager;
+    std::shared_ptr<BaseManager> mBaseManager;
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
+    std::shared_ptr<Timer> mScheduler;
     mutable std::mutex mContextMutex;
-    PipelineContext* mPipelineCtx{nullptr};
+    const PipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 
@@ -104,7 +112,6 @@ protected:
     std::condition_variable mRunnerCV;
 
     // used for timer event ...
-    std::shared_ptr<Timer> mScheduler; 
 };
 
 }

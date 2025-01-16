@@ -28,7 +28,7 @@ namespace ebpf {
 class NetworkSecurityManager : public AbstractManager {
 public:
     NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
-                          std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                          std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
     ~NetworkSecurityManager() override {}
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) override;

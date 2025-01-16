@@ -20,6 +20,8 @@
 #include <vector>
 #include <functional>
 
+#include "logger/Logger.h"
+
 namespace logtail {
 
 template<class Data, class Value, class KeyType>
@@ -81,6 +83,7 @@ public:
             auto result = p->child.find(val);
             if (result == p->child.end() && now_nodes >= max_nodes) {
                 // when we exceed the maximum limit, we will drop new metrics
+                LOG_ERROR(sLogger, ("maximum limit exceeded", max_nodes));
                 return false;
             }
             if (result == p->child.end()) {
