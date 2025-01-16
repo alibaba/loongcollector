@@ -116,14 +116,6 @@ func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
 }
 
 func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*protocol.LogGroup) error) (context.Context, error) {
-	var startTime int32
-	var enableExactlyCheck bool
-	value := ctx.Value(config.StartTimeContextKey)
-	if value != nil {
-		startTime = value.(int32)
-		enableExactlyCheck = true
-	}
-	println("MetricCheck: startTime", startTime, enableExactlyCheck)
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var groups []*protocol.LogGroup
@@ -134,11 +126,6 @@ func MetricCheck(ctx context.Context, expect int, duration int64, checker func([
 			count = 0
 			currTime := time.Now().Unix()
 			lastScrapeTime := int32(currTime - duration)
-			if enableExactlyCheck {
-				expect = int(int32(currTime)-startTime) / int(duration)
-				lastScrapeTime = int32(startTime)
-			}
-			println("MetricCheck: expect", expect, "duration", duration, "lastScrapeTime", lastScrapeTime)
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), lastScrapeTime)
 			if err != nil {
 				return err
