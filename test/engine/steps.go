@@ -100,6 +100,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 
 	// metric
 	ctx.Then(`^there is more than \{(\d+)\} metrics in \{(\d+)\} seconds$`, verify.MetricCount)
+	ctx.Then(`^there is exactly \{(\d+)\} metrics in \{(\d+)\} interval seconds$`, verify.MetricCount)
 
 	// other
 	ctx.Then(`wait \{(\d+)\} seconds`, func(ctx context.Context, t int) context.Context {
