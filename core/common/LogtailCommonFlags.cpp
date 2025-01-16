@@ -44,9 +44,6 @@
 //                   1024 * 50);
 // #endif
 // DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
-// DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
-//                  "if enable containerd upper dir detect when locating rootfs",
-//                  false);
 // DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
 // DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
 // DEFINE_FLAG_BOOL(default_secondary_storage, "default strategy whether enable secondary storage", false);
