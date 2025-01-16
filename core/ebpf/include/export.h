@@ -44,7 +44,7 @@ public:
   PerfBufferSpec(const std::string& name, ssize_t size, void* ctx, PerfBufferSampleHandler scb, PerfBufferLostHandler lcb):
     mName(name), mSize(size), mCtx(ctx), mSampleHandler(scb), mLostHandler(lcb) {}
   std::string mName;
-  ssize_t mSize;
+  ssize_t mSize = 0;
   void* mCtx;
   PerfBufferSampleHandler mSampleHandler;
   PerfBufferLostHandler mLostHandler;

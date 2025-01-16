@@ -112,19 +112,18 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::FILE_SECURITY: {
-            // std::vector<logtail::ebpf::PerfBufferOps> perf_buffers = {
-            //     logtail::ebpf::PerfBufferOps("file_secure_output", 10*1024*1024, HandleFileKernelEvent, HandleFileKernelEventLoss),
-            // };
             auto config = std::get_if<logtail::ebpf::FileSecurityConfig>(&arg->mConfig);
 
             int ret = 0;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "begin to set tail call\n");
+            // set tail call
             ret = wrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
             if (ret != 0) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "file security: SetTailCall fail ret:%d\n", ret);
                 return ret;
             }
 
+            // set pb
             std::vector<logtail::ebpf::PerfBufferOps> perf_buffers;
             for (auto& spec : config->mPerfBufferSpec) {
                 void* pb = wrapper->CreatePerfBuffer(spec.mName,
@@ -132,11 +131,47 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                                                      spec.mCtx,
                                                      static_cast<perf_buffer_sample_fn>(spec.mSampleHandler),
                                                      static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
+                if (!pb) {
+                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "file security: create perfbuffer fail, name:%s, size:%d\n", spec.mName, spec.mSize);
+                    return 1;
+                }
                 gPluginPbs[int(arg->mPluginType)].push_back(pb);
             }
 
+            // update filter config
+            config->options_;
+
+            // dynamic instrument 
+
         }
         case logtail::ebpf::PluginType::NETWORK_SECURITY: {
+            auto config = std::get_if<logtail::ebpf::NetworkSecurityConfig>(&arg->mConfig);
+
+            int ret = 0;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "begin to set tail call\n");
+            // set tail call
+            ret = wrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
+            if (ret != 0) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "network security: SetTailCall fail ret:%d\n", ret);
+                return ret;
+            }
+
+            // set pb
+            std::vector<logtail::ebpf::PerfBufferOps> perf_buffers;
+            for (auto& spec : config->mPerfBufferSpec) {
+                void* pb = wrapper->CreatePerfBuffer(spec.mName,
+                                                     spec.mSize,
+                                                     spec.mCtx,
+                                                     static_cast<perf_buffer_sample_fn>(spec.mSampleHandler),
+                                                     static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
+                if (!pb) {
+                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "network security: create perfbuffer fail, name:%s, size:%d\n", spec.mName, spec.mSize);
+                    return 1;
+                }
+                gPluginPbs[int(arg->mPluginType)].push_back(pb);
+            }
+
+
         }
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             int err = wrapper->Init();
@@ -163,6 +198,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
 
+            // create pb and set perf buffer meta
             std::vector<logtail::ebpf::PerfBufferOps> perf_buffers;
             for (auto& spec : config->mPerfBufferSpec) {
                 void* pb = wrapper->CreatePerfBuffer(spec.mName,
@@ -170,27 +206,27 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                                                      spec.mCtx,
                                                      static_cast<perf_buffer_sample_fn>(spec.mSampleHandler),
                                                      static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
+                if (!pb) {
+                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "process security: create perfbuffer fail, name:%s, size:%d\n", spec.mName, spec.mSize);
+                    return 1;
+                }
                 gPluginPbs[int(arg->mPluginType)].push_back(pb);
             }
-            // TODO use handler from config ...
-            // std::vector<logtail::ebpf::PerfBufferOps> perf_buffers = {
-            //     logtail::ebpf::PerfBufferOps("tcpmon_map", 50 * 1024 * 1024, HandleKernelProcessEvent,
-            //                     HandleKernelProcessEventLost),
-            // };
-            // poll perf buffers ...
 
-            // set perf buffer
-            gflag = true;
-            // pws = wrapper->AttachPerfBuffers(nullptr, perf_buffers, std::ref(gflag));
-            // std::cout << "[ResourceInstance] begin to dynamic attach bpf object" << std::endl;
+            
+            // gflag = true;
+            
+            // attach bpf object
             int ret = wrapper->DynamicAttachBPFObject(attach_ops);
             if (ret != 0) {
-                std::cout << "[ResourceInstance] DynamicAttachBPFObject fail :" << ret << std::endl;
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "process security: DynamicAttachBPFObject fail ret:%d\n", ret);
+                return 1;
             }
-            std::cout << "[ResourceInstance] dynamic attach bpf object, ret:" << ret << std::endl;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "process security: DynamicAttachBPFObject success\n");
             break;
         }
         default:
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "unknown plugin type, please check. \n");
             break;
     }
     return 0;
@@ -219,12 +255,10 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
     return cnt;
 }
 
+// just update config ... 
 int update_plugin(logtail::ebpf::PluginConfig* arg) {
-    // 1. suspend consumer
-    // 2. detach prog
-    // 3. set filter
-    // 4. attach prog
-    // 5. resume consumer
+    // 1. cleanup filter
+    // 2. set filter
     return 0;
 }
 
@@ -236,7 +270,19 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
         case logtail::ebpf::PluginType::NETWORK_OBSERVE:
             return ebpf_stop();
         case logtail::ebpf::PluginType::PROCESS_SECURITY:
-
+            // 1. dynamic detach 
+            // 2. clean-up filter
+            // 3. delete perf buffer
+            break;
+        case logtail::ebpf::PluginType::NETWORK_SECURITY:
+            // 1. dynamic detach 
+            // 2. clean-up filter
+            // 3. delete perf buffer
+            break;
+        case logtail::ebpf::PluginType::FILE_SECURITY:
+            // 1. dynamic detach 
+            // 2. clean-up filter
+            // 3. delete perf buffer
             break;
         default:
             break;
@@ -244,10 +290,16 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
     return 0;
 }
 
+// deprecated
 int suspend_plugin(logtail::ebpf::PluginType) {
     return 0;
 }
 
+// deprecated
 int resume_plugin(logtail::ebpf::PluginType) {
     return 0;
+}
+
+int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag) {
+  return wrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
 }

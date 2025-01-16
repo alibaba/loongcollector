@@ -178,6 +178,8 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
     mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)]
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_MAP_UPDATE_ELEM)]
+        = LOAD_EBPF_FUNC_ADDR(update_bpf_map_elem);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
@@ -423,6 +425,24 @@ bool SourceManager::StopPlugin(PluginType plugin_type) {
     if (!res)
         mRunning[int(plugin_type)] = false;
     return !res;
+}
+
+bool SourceManager::BPFMapUpdateElem(PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag) {
+    if (!CheckPluginRunning(plugin_type)) {
+        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
+        return true;
+    }
+
+    void* f = mFuncs[(int)ebpf_func::EBPF_MAP_UPDATE_ELEM];
+    if (!f) {
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, remove func ptr is null", int(plugin_type)));
+        return false;
+    }
+
+    auto ff = (update_bpf_map_elem_func)f;
+    int res = ff(plugin_type, map_name.c_str(), key, value, flag);
+    return res == 0;
+
 }
 
 //// ******************* ////

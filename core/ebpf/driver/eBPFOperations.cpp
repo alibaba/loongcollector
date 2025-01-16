@@ -75,10 +75,6 @@ int remove_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, vo
   return security_bpf_wrapper->RemoveBPFHashMap(std::string(map_name), key);
 }
 
-int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag) {
-  return security_bpf_wrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
-}
-
 void* create_perf_buffer(logtail::ebpf::PluginType type, const char* map_name, int page_cnt, void* ctx, perf_process_event_fn data_cb, perf_loss_event_fn loss_cb) {
   return security_bpf_wrapper->CreatePerfBuffer(std::string(map_name), page_cnt, ctx, data_cb, loss_cb);
 }

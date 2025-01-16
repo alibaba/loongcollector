@@ -20,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <variant>
+#include <future>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "ebpf/Config.h"
@@ -33,6 +34,9 @@
 #include "ebpf/plugin/BaseManager.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
+#include "common/timer/Timer.h"
+#include "common/queue/blockingconcurrentqueue.h"
+#include "type/CommonDataEvent.h"
 
 namespace logtail {
 namespace ebpf {
@@ -89,6 +93,11 @@ public:
 
     std::string GetAllProjects();
 
+    void PollPerfBuffers();
+    void HandlerEvents();
+
+    std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
+
 private:
     bool StartPluginInternal(const std::string& pipeline_name,
                              uint32_t plugin_index,
@@ -116,9 +125,15 @@ private:
     mutable std::mutex mMtx;
     std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};
     std::array<std::string, static_cast<size_t>(PluginType::MAX)> mPluginProject = {};
+    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
 
     eBPFAdminConfig mAdminConfig;
-    volatile bool mInited = false;
+    std::atomic_bool mInited = false;
+    std::atomic_bool mRunning = false;
+
+    std::string mHostIp;
+    std::string mHostName;
+    std::string mHostPathPrefix;
 
     EnvManager mEnvMgr;
     MetricsRecordRef mRef;
@@ -128,8 +143,14 @@ private:
     CounterPtr mSuspendPluginTotal;
 
     // hold some managers ...
-    std::unique_ptr<BaseManager> mBaseManager;
-    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
+    std::shared_ptr<BaseManager> mBaseManager;
+    
+    std::shared_ptr<Timer> mScheduler;
+
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;
+
+    std::future<void> mPoller;
+    std::future<void> mHandler;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

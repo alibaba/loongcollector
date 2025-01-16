@@ -27,7 +27,6 @@ using get_bpf_map_fd_by_id_func = int(*)(logtail::ebpf::PluginType, int);
 
 using lookup_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*);
 using remove_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*);
-using update_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*, uint64_t);
 
 using create_perf_buffer_func = void* (*)(logtail::ebpf::PluginType, const char*, int, void*, perf_process_event_fn, perf_loss_event_fn);
 using delete_perf_buffer_func = void (*)(logtail::ebpf::PluginType, void*);
@@ -67,7 +66,6 @@ int get_bpf_map_fd_by_id(logtail::ebpf::PluginType type, int id);
 
 int lookup_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value);
 int remove_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key);
-int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
 
 void* create_perf_buffer(logtail::ebpf::PluginType type, const char* map_name, int page_cnt, void* ctx, perf_process_event_fn data_cb, perf_loss_event_fn loss_cb);
 void delete_perf_buffer(logtail::ebpf::PluginType type, void* pb);

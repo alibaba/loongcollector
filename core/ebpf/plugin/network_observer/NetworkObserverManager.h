@@ -1,6 +1,16 @@
+// Copyright 2023 iLogtail Authors
 //
-// Created by qianlu on 2024/7/1.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -16,6 +26,7 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
+#include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail {
 namespace ebpf {
@@ -30,26 +41,32 @@ public:
     using SpanHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&)>;
 
     static std::shared_ptr<NetworkObserverManager>
-    Create(std::unique_ptr<BaseManager>& mgr,
+    Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events)> flusher) {
-        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, flusher);
+        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, flusher);
     }
 
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() {}
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     explicit NetworkObserverManager(
-        std::unique_ptr<BaseManager>& baseMgr,
+        std::shared_ptr<BaseManager>& baseMgr,
         std::shared_ptr<SourceManager> sourceManager,
+        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
         std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)> flusher)
-        : AbstractManager(baseMgr, sourceManager), mFlusher(flusher) {}
+        : AbstractManager(baseMgr, sourceManager, queue), mFlusher(flusher) {}
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
     int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
     int DisableCallName(const std::string& call_name) override { return 0; }
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
+
+    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override {return 0;}
+
+    virtual int PollPerfBuffer() override { return 0; }
 
     void Stop();
 
@@ -116,7 +133,10 @@ private:
     // NetDataHandler netDataHandler_;
     std::unique_ptr<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>> mWorkerPool;
 
+    // coreThread used for polling kernel event...
     std::thread mCoreThread;
+    
+    // recordConsume used for polling kernel event...
     std::thread mRecordConsume;
 
     std::atomic_bool mEnableSpan;

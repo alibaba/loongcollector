@@ -1,3 +1,16 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "NetworkObserverManager.h"
 
@@ -256,7 +269,7 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(const std::vector<std::share
             hash_result.fill(0UL);
 
             auto elements = logtail::ebpf::kAppMetricsTable.elements();
-            std::hash<std::string> hasher;
+            // std::hash<std::string> hasher;
 
             for (size_t j = 0; j < elements.size(); j++) {
                 int agg_level = static_cast<int>(elements[j].agg_type());
@@ -271,7 +284,7 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(const std::vector<std::share
                     // 对于 span
                     // 类型，或许我们也需要一个滑动窗口。。。也就是按秒上报数据，只需要一级聚合即可。或者直接写个简单的
                     // map
-                    int hash_result_index = agg_level - logtail::ebpf::MinAggregationLevel;
+                    // int hash_result_index = agg_level - logtail::ebpf::MinAggregationLevel;
                     // TODO @qianlu.kk we should not to use record->GetMetricAttribute(j)
                     // because we already have entity relative attributes in conn tracker, and we already get these
                     // attributes hash_result[hash_result_index] ^= hasher(record->GetMetricAttribute(j)) +

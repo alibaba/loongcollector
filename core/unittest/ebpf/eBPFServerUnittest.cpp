@@ -28,7 +28,8 @@ class eBPFServerUnittest : public testing::Test {
 public:
     eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
 //     void TestInit();
-    void TestStartNO();
+    void TestNetworkObserver();
+    void TestProcessSecurity();
 
     // void TestEnableNetworkPlugin();
 
@@ -103,7 +104,7 @@ public:
 //     SecurityOptions security_opts;
 };
 
-void eBPFServerUnittest::TestStartNO() {
+void eBPFServerUnittest::TestNetworkObserver() {
     std::string configStr = R"(
         {
             "Type": "input_network_observer",
@@ -142,6 +143,34 @@ void eBPFServerUnittest::TestStartNO() {
     EXPECT_TRUE(res);
 
     std::this_thread::sleep_for(std::chrono::seconds(30));
+}
+
+
+void eBPFServerUnittest::TestProcessSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_process_security"
+        }
+    )";
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    SecurityOptions security_options;
+    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "input_process_security");
+    std::shared_ptr<InputProcessSecurity> input(new InputProcessSecurity());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+
+    APSARA_TEST_TRUE(initStatus);
+    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
+    ebpf::eBPFServer::GetInstance()->mHostPathPrefix = "";
+    SecurityOptions opts;
+    auto res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &opts, input->mPluginMgr);
+    EXPECT_TRUE(res);
+
 
 }
 
@@ -947,7 +976,8 @@ void eBPFServerUnittest::TestStartNO() {
 //     EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 // }
 
-UNIT_TEST_CASE(eBPFServerUnittest, TestStartNO);
+UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
+UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);

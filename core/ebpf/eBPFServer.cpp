@@ -18,6 +18,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <future>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
@@ -30,6 +31,7 @@
 #include "metadata/K8sMetadata.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
+#include "plugin/process_security/ProcessSecurityManager.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -147,6 +149,28 @@ void eBPFServer::Init() {
         return;
     }
     mInited = true;
+    mRunning = true;
+
+    mHostIp = GetHostIp();
+    mHostName = GetHostName();
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    mHostPathPrefix = "/logtail_host";
+    LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+#else
+    // read host path prefix
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        mHostPathPrefix = STRING_FLAG(default_container_host_path);
+        LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+    } else {
+        LOG_DEBUG(sLogger, ("running in host mode", "would not set host path prefix ..."));
+    }
+#endif
+
+    mScheduler = std::make_unique<Timer>();
+    mScheduler->Init();
+    mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
+    mHandler = async(std::launch::async, &eBPFServer::HandlerEvents, this);
     // check env
 
     // mMonitorMgr = std::make_unique<eBPFSelfMonitorMgr>();
@@ -185,6 +209,7 @@ void eBPFServer::Stop() {
     if (!mInited)
         return;
     mInited = false;
+
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     // destroy source manager
     // do not destroy source manager ...
@@ -206,6 +231,27 @@ void eBPFServer::Stop() {
         mProcessSecureCB->UpdateContext(nullptr, -1, -1);
     if (mFileSecureCB)
         mFileSecureCB->UpdateContext(nullptr, -1, -1);
+    
+    mScheduler->Stop();
+
+    mRunning = false;
+    std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
+    std::future_status s2 = mHandler.wait_for(std::chrono::seconds(1));
+    if (mPoller.valid()) {
+        if (s1 == std::future_status::ready) {
+            LOG_INFO(sLogger, ("poller thread", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
+        }
+    }
+
+    if (mHandler.valid()) {
+        if (s2 == std::future_status::ready) {
+            LOG_INFO(sLogger, ("handler thread", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("handler thread", "forced to stopped"));
+        }
+    }
 }
 
 // maybe update or create 
@@ -225,6 +271,12 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
     UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
 
+    if (type != PluginType::NETWORK_OBSERVE) {
+        LOG_DEBUG(sLogger, ("hostname", mHostName) ("mHostPathPrefix", mHostPathPrefix));
+        mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
+        mBaseManager->Init();
+    }
+
     // init self monitor
     // mMonitorMgr->Init(type, mgr, pipeline_name, ctx->GetProjectName());
 
@@ -236,18 +288,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     // step2: call init function
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
-            ProcessConfig pconfig;
-            // TODO @qianlu.kk set new handler ...
-
-            // pconfig.process_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-            //     return mProcessSecureCB->handle(events);
-            // };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            pconfig.options_ = opts->mOptionList;
-            // UpdateContext must ahead of StartPlugin
-            mProcessSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            eBPFConfig->mConfig = std::move(pconfig);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            auto idx = static_cast<int>(PluginType::PROCESS_SECURITY);
+            mPlugins[idx] = ProcessSecurityManager::Create(
+                mBaseManager, mSourceManager, mDataEventQueue);
+            
+            ret = (mPlugins[idx]->Init(options) == 0);
             break;
         }
 
@@ -259,7 +304,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             auto idx = static_cast<int>(PluginType::NETWORK_OBSERVE);
             mPlugins[idx] = NetworkObserverManager::Create(
-                mBaseManager, mSourceManager, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
+                mBaseManager, mSourceManager, mDataEventQueue, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
                     mEventCB->handle(events);
                 });
 
@@ -421,6 +466,52 @@ void eBPFServer::UpdateCBContext(PluginType type,
         }
         default:
             return;
+    }
+}
+
+void eBPFServer::PollPerfBuffers() {
+    while(mRunning) {
+        for (int i = 0; i < int(PluginType::MAX); i ++) {
+            auto plugin = GetPluginManager(PluginType(i));
+            if (!plugin) continue;
+            plugin->PollPerfBuffer();
+        }
+    }
+}
+
+std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
+    std::lock_guard<std::mutex> lk(mMtx);
+    if (type == PluginType::MAX) {
+        return nullptr;
+    } else {
+        return mPlugins[static_cast<int>(type)];
+    }
+}
+
+void eBPFServer::HandlerEvents() {
+    std::vector<std::shared_ptr<CommonEvent>> items(1024);
+    while(mRunning) {
+        // consume queue
+        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+        LOG_DEBUG(sLogger, ("get data events, number", count));
+        // handle ....
+        if (count == 0) {
+            continue;
+        }
+
+        for (size_t i = 0; i < count; i ++) {
+            auto event = items[i];
+            auto pluginType = event->GetPluginType();
+            auto plugin = GetPluginManager(pluginType);
+            if (plugin) {
+                // handle event and put into aggregator ...
+                plugin->HandleEvent(event);
+            }
+        }
+
+        // handle
+        items.clear();
+
     }
 }
 

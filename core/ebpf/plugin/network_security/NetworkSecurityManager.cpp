@@ -1,3 +1,17 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "NetworkSecurityManager.h"
 #include "logger/Logger.h"
 #include "common/MachineInfoUtil.h"
@@ -7,19 +21,24 @@
 namespace logtail {
 namespace ebpf {
 
-NetworkSecurityManager::NetworkSecurityManager(std::unique_ptr<BaseManager>& base,
-                                             std::shared_ptr<SourceManager> sourceManager)
-    : AbstractManager(base, sourceManager) {
-    mAggregateTree = std::make_unique<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>>(
-        1000, // max nodes
-        [](std::unique_ptr<BaseSecurityNode>& base, const std::unique_ptr<BaseSecurityEvent>& n) {
-            // 聚合逻辑
-        },
-        [](const std::unique_ptr<BaseSecurityEvent>& n) {
-            // 生成新节点逻辑
-            return std::make_unique<BaseSecurityNode>();
-        }
-    );
+NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
+                                             std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    : AbstractManager(base, sourceManager, queue) {
+    // mAggregateTree = std::make_unique<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>>(
+    //     1000, // max nodes
+    //     [](std::unique_ptr<BaseSecurityNode>& base, const std::unique_ptr<BaseSecurityEvent>& n) {
+    //         // 聚合逻辑
+    //     },
+    //     [](const std::unique_ptr<BaseSecurityEvent>& n) {
+    //         // 生成新节点逻辑
+    //         return std::make_unique<BaseSecurityNode>(n->key.pid, n->key.ktime);
+    //     }
+    // );
+}
+
+int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
+    // TODO @qianlu.kk 
+    return 0;
 }
 
 // 网络监控 3 个 poller parser iterator 
@@ -47,6 +66,18 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
     return 0;
 }
 
+void NetworkSecurityManager::PollerThread() {
+    while (mFlag) {
+        if (mSuspendFlag) {
+            std::unique_lock<std::mutex> lock(mContextMutex);
+            mRunnerCV.wait(lock, [this]() { return !mSuspendFlag || !mFlag; });
+            continue;
+        }
+        int zero = 0;
+        mSourceManager->PollPerfBuffers(PluginType::NETWORK_SECURITY, 1024, &zero, 100);
+    }
+}
+
 void NetworkSecurityManager::RunnerThread() {
     while (mFlag) {
         if (mSuspendFlag) {
@@ -56,7 +87,6 @@ void NetworkSecurityManager::RunnerThread() {
         }
         // consume queue && aggregate
         ProcessEvents();
-        
     } 
 }
 
@@ -88,22 +118,18 @@ int NetworkSecurityManager::Destroy() {
 
 void NetworkSecurityManager::InitTimer() {
     // TODO @qianlu.kk self event ...
-    auto event = std::make_unique<TimerEvent>(
-        std::chrono::seconds(1), // every 1 second
-        [this]() {
-            if (!mSuspendFlag) {
-                ReportAggTree();
-            }
-        },
-        [this]() {
-            // add lock ...
-            return !mSuspendFlag && mFlag;
-        }
-    );
-    
-    if (mTimer) {
-        mTimer->PushEvent(std::move(event));
-    }
+    // auto event = std::make_unique<TimerEvent>(
+    //     std::chrono::seconds(1), // every 1 second
+    //     [this]() {
+    //         if (!mSuspendFlag) {
+    //             ReportAggTree();
+    //         }
+    //     },
+    //     [this]() {
+    //         // add lock ...
+    //         return !mSuspendFlag && mFlag;
+    //     }
+    // );
 }
 
 void NetworkSecurityManager::ProcessEvents() {
@@ -119,48 +145,48 @@ void NetworkSecurityManager::ProcessEvents() {
         return;
     }
     
-    for (auto& event : items) {
-        std::array<size_t, 2> hashResult{1, 2};
-        mAggregateTree->Aggregate(std::move(event), hashResult);
-    }
+    // for (auto& event : items) {
+        // std::array<size_t, 2> hashResult{1, 2};
+        // mAggregateTree->Aggregate(std::move(event), hashResult);
+    // }
 }
 
 void NetworkSecurityManager::ReportAggTree() {
-    std::unique_lock<std::mutex> lock(mContextMutex);
-    if (!mPipelineCtx || mPluginIndex < 0) {
-        return;
-    }
+    // std::unique_lock<std::mutex> lock(mContextMutex);
+    // if (!mPipelineCtx || mPluginIndex < 0) {
+    //     return;
+    // }
 
-    auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
-    if (nodes.empty()) {
-        return;
-    }
+    // auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
+    // if (nodes.empty()) {
+    //     return;
+    // }
     
-    for (auto* node : nodes) {
-        auto eventGroup = std::make_unique<PipelineEventGroup>();
-        // TODO @qianlu.kk fill event group
-        mAggregateTree->ForEach(node, [&](const BaseSecurityNode* group) {
+    // for (auto* node : nodes) {
+    //     auto eventGroup = std::make_unique<PipelineEventGroup>();
+    //     // TODO @qianlu.kk fill event group
+    //     mAggregateTree->ForEach(node, [&](const BaseSecurityNode* group) {
 
-        });
+    //     });
 
-        std::unique_lock<std::mutex> lock(mContextMutex);
-        if (!mPipelineCtx || mPluginIndex < 0) {
-            return;
-        }
+    //     std::unique_lock<std::mutex> lock(mContextMutex);
+    //     if (!mPipelineCtx || mPluginIndex < 0) {
+    //         return;
+    //     }
         
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIndex);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(
-                sLogger,
-                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", mPluginIndex)("[Event] push queue failed!", ""));
-        }
-    }
+    //     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIndex);
+    //     if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+    //         LOG_WARNING(
+    //             sLogger,
+    //             ("configName", mPipelineCtx->GetConfigName())("pluginIdx", mPluginIndex)("[Event] push queue failed!", ""));
+    //     }
+    // }
 
 
     // TODO @qianlu.kk push to ProcessQueue
     // ProcessQueueManager::GetInstance()->PushEventGroup(mPipelineCtx, mPluginIndex, std::move(groups));
     
-    mAggregateTree->Clear();
+    // mAggregateTree->Clear();
     
 }
 

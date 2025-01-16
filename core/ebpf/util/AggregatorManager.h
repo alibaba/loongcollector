@@ -49,7 +49,7 @@ private:
     FlushFunc mFunc;
 };
 
-template <typename T, typename D, typename FlushType>
+template <typename Data, typename Value, typename FlushType>
 class AggregatorManager {
 public:
     AggregatorManager(size_t max_nodes,
@@ -65,11 +65,11 @@ public:
             // 1. generate measurebatch ==> eventgroup
             // 2. push to process queue ... 
             // 3. swap agg tree
-            mTimer.PushEvent();
+            // mTimer.PushEvent();
         }));
     }
     
-    void Aggregate(const std::array<size_t, nami::MaxAggregationLevel>& key, const D& value) {
+    void Aggregate(const std::array<size_t, MaxAggregationLevel>& key, const Value& value) {
         mTree.Aggregate(key, value);
     }
 
@@ -84,7 +84,7 @@ private:
 
     Timer mTimer;
     // volatile bool mInited = false;
-    SIZETAggTree<T, D> mTree;
+    SIZETAggTree<Data, Value> mTree;
     int mIntervalSec;
 };
 

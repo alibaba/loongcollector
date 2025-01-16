@@ -53,8 +53,8 @@ public:
     AggTree(size_t max_nodes,
             const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
             const std::function<std::unique_ptr<Data>(const Value &n)> &generate)
-            : max_nodes(max_nodes), aggregate_(aggregate), generate_(generate),
-              root_node_(std::make_unique<AggNode<Data, KeyType>>()) {}
+            : max_nodes(max_nodes), root_node_(std::make_unique<AggNode<Data, KeyType>>()), aggregate_(aggregate), generate_(generate)
+               {}
 
     AggTree(AggTree<Data, Value, KeyType> &&other) noexcept
             : max_nodes(other.max_nodes),

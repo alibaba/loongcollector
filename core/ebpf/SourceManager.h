@@ -55,6 +55,9 @@ public:
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
     bool SetNetworkObserverCidFilter(const std::string&, bool update);
 
+    // for bpf object operations ...
+    bool BPFMapUpdateElem(PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag);
+
     SourceManager();
     ~SourceManager();
 
@@ -82,6 +85,9 @@ private:
         EBPF_POLL_PLUGIN_PBS,
         EBPF_SET_NETWORKOBSERVER_CONFIG,
         EBPF_SET_NETWORKOBSERVER_CID_FILTER,
+
+        // operations
+        EBPF_MAP_UPDATE_ELEM,
         EBPF_FUNC_MAX,
     };
 

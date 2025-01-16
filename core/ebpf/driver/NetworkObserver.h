@@ -26,6 +26,9 @@ using poll_plugin_pbs_func = int (*)(logtail::ebpf::PluginType, int32_t, int32_t
 using set_networkobserver_config_func = void (*)(int32_t, int32_t);
 using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, bool);
 
+using update_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*, uint64_t);
+
+
 extern "C" {
 int set_logger(logtail::ebpf::eBPFLogHandler fn);
 
@@ -39,8 +42,12 @@ int resume_plugin(logtail::ebpf::PluginType);
 // data plane
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms);
 
-// networkobserver 特有
+// networkobserver 特有，后续采集配置改造后会
 void set_networkobserver_config(int32_t opt, int32_t value);
 void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update);
+
+// oprations
+int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
+
 
 }

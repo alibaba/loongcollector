@@ -3,11 +3,17 @@
 #include <algorithm>
 #include <iostream>
 #include <random>
+#include <chrono>
+#include <atomic>
 
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
 #include "ebpf/util/AggregateTree.h"
+#include "common/timer/Timer.h"
+#include "common/timer/TimerEvent.h"
+#include "ebpf/type/PeriodicalEvent.h"
+
 
 DECLARE_FLAG_BOOL(logtail_mode);
 
@@ -22,12 +28,19 @@ class HT {
 
 namespace logtail {
 namespace ebpf {
+
 class AggregatorUnittest : public testing::Test {
 public:
-    AggregatorUnittest() {}
+    AggregatorUnittest() {
+        mTimer.Init();
+    }
+    ~AggregatorUnittest() {
+        mTimer.Stop();
+    }
 
     void TestBasicAgg();
     void TestMove();
+    void TestAggManager();
 
 protected:
     void SetUp() override {
@@ -75,9 +88,39 @@ protected:
     }
 
 private:
-
+    Timer mTimer;
+    std::atomic_bool mFlag = true;
+    std::vector<int> mVec;
+    int mIntervalSec = 1;
     std::unique_ptr<SIZETAggTree<HT, std::vector<std::string>>> agg;
 };
+
+void AggregatorUnittest::TestAggManager() {
+    auto now = std::chrono::steady_clock::now();
+    auto nextTime = now + std::chrono::seconds(1);
+
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(1, 
+        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+            if (!this->mFlag) {
+                return false;
+            }
+            this->mVec.push_back(1);
+            return true;
+        }, [this]() { // validator
+            return !this->mFlag.load();
+        }
+    );
+
+    mTimer.PushEvent(std::move(event));
+
+    std::this_thread::sleep_for(std::chrono::seconds(4));
+    mFlag = false;
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    APSARA_TEST_EQUAL(mVec.size(), 3);
+    mFlag = true;
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    APSARA_TEST_EQUAL(mVec.size(), 3);
+}
 
 void AggregatorUnittest::TestBasicAgg() {
     Aggregate({"a", "b", "c", "d"}, 4);
@@ -115,6 +158,7 @@ void AggregatorUnittest::TestMove() {
 
 UNIT_TEST_CASE(AggregatorUnittest, TestBasicAgg);
 UNIT_TEST_CASE(AggregatorUnittest, TestMove);
+UNIT_TEST_CASE(AggregatorUnittest, TestAggManager);
 
 } // namespace ebpf
 } // namespace logtail

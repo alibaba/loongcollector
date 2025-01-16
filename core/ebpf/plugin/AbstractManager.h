@@ -29,6 +29,7 @@
 #include "ebpf/util/AggregateTree.h"
 #include "ebpf/type/SecurityEvent.h"
 #include "common/timer/Timer.h"
+#include "ebpf/type/CommonDataEvent.h"
 
 // #include "driver/bpf_wrapper.h"
 // #include "common/agg_tree.h"
@@ -42,7 +43,7 @@ public:
     using configType = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter,
                      logtail::ebpf::SecurityNetworkFilter>;
     AbstractManager() = delete;
-    explicit AbstractManager(std::unique_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager);
+    explicit AbstractManager(std::shared_ptr<BaseManager>&, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
     virtual ~AbstractManager() {}
 
     virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
@@ -52,6 +53,13 @@ public:
     virtual int EnableCallName(const std::string& call_name, const configType config) = 0;
     
     virtual int DisableCallName(const std::string& call_name) = 0;
+
+    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) = 0;
+
+    virtual int PollPerfBuffer() {
+        int zero = 0;
+        return mSourceManager->PollPerfBuffers(GetPluginType(), 1024, &zero, 200);
+    }
 
     bool IsRunning();
 
@@ -78,55 +86,25 @@ public:
         return;
     }
 
-
     mutable ReadWriteLock mMtx;
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
 protected:
     BaseManager *mBaseManager;
     std::shared_ptr<SourceManager> mSourceManager;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     mutable std::mutex mContextMutex;
     PipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
-    uint32_t mPluginIndex{-1};
-    std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
+    uint32_t mPluginIndex{0};
+
+    // std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
     // static ...
-    std::unique_ptr<Timer> mTimer;
     std::chrono::nanoseconds mTimeDiff;
     std::condition_variable mRunnerCV;
 
-    // int InitOrGetCallNameIdx(const std::string& call_name);
-    // int ReleaseCallNameIdx(const std::string& call_name);
-    // int GetCallNameIdx(const std::string& call_name);
-
-    // void UpdateStatisticsInner();
-
-    // virtual std::shared_ptr<eBPFStatistics> AllocNewStats() {
-    //     return std::make_shared<eBPFStatistics>();
-    // }
-
-    // void UpdateProcessCacheMissTotal(int n = 1) { miss_process_cache_total_.fetch_add(n); }
-
-    // void RecordIndex(enum secure_funcs call_name, int idx) {
-    //     call_name_indexes_[int(call_name)].insert(idx);
-    // }
-    // const std::set<int> GetCallNameAllIndex(enum secure_funcs call_name) const {
-    //     return call_name_indexes_[int(call_name)];
-    // }
-    // void RelaseCallNameIndexes(enum secure_funcs call_name) {
-    //     call_name_indexes_[int(call_name)].clear();
-    // }
-
-    
-    
-    // call name to idx
-    // std::unordered_map<std::string, int> call_name_2_idx_;
-    // std::array<std::set<int>, SECURE_FUNCS_MAX> call_name_indexes_;
-
-    // std::queue<std::string> enable_callnames_;
-
-    
-    // uint64_t last_export_sec_ = 0;
+    // used for timer event ...
+    std::shared_ptr<Timer> mScheduler; 
 };
 
 }

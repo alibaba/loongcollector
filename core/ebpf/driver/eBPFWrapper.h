@@ -438,6 +438,7 @@ public:
             perf_args->sample_cb = op.sample_cb;
             perf_args->lost_cb = op.lost_cb;
             perf_args->ctx = ctx;
+            perf_args->pg_cnt = op.size_;
             res.emplace_back(std::thread(PerfThreadWoker, (void*)perf_args, op.name_, std::ref(flag)));
         }
 
