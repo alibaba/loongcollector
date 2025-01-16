@@ -40,8 +40,10 @@ RUN source /tmp/.env && rm /tmp/.env; \
     fi; \
     useradd --uid $USER_UID --gid $GROUP_GID -m $USERNAME; \
     if [ -n "$USER_PASSWORD" ]; then echo "$USERNAME:$USER_PASSWORD" | chpasswd; fi; \
-    echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME; \
-    chmod 0440 /etc/sudoers.d/$USERNAME; \
+    # the filename should not have the . or ~ symbol.
+    USER_SUDOER_FILE=$(echo $USERNAME | sed 's/\./-/g'); \
+    echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USER_SUDOER_FILE; \
+    chmod 0440 /etc/sudoers.d/$USER_SUDOER_FILE; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     chmod -R 755 $(eval echo ~$USERNAME);
 
