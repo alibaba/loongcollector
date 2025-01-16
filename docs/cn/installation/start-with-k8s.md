@@ -206,12 +206,14 @@ wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/star
 ```
         - name: logtail
           command:
-          - /usr/local/ilogtail/ilogtail_control.sh
+            - /usr/local/ilogtail/ilogtail_control.sh
           args:
-          - "start_and_block"
-          - "-enable_containerd_upper_dir_detect=true"
-          - "-dirfile_check_interval_ms=5000"
-          - "-logtail_checkpoint_check_gc_interval_sec=120"
+            - "start_and_block"
+            - "-dirfile_check_interval_ms=5000"
+            - "-logtail_checkpoint_check_gc_interval_sec=120"
+          env:
+            - name: enable_containerd_upper_dir_detect
+              value: "true"
 ```
 
 应用上述配置

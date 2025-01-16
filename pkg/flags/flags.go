@@ -74,6 +74,8 @@ var DefaultRegion = flag.String("ALICLOUD_LOG_REGION", "", "default log region")
 
 var SelfEnvConfigFlag bool
 
+var EnableContainerdUpperDirDetect = flag.Bool("enable_containerd_upper_dir_detect", false, "if enable containerd upper dir detect when locating rootfs")
+
 func init() {
 	_ = util.InitFromEnvBool("ALICLOUD_LOG_K8S_FLAG", K8sFlag, *K8sFlag)
 	_ = util.InitFromEnvBool("ALICLOUD_LOG_DOCKER_ENV_CONFIG", DockerConfigInitFlag, *DockerConfigInitFlag)
@@ -100,4 +102,5 @@ func init() {
 	if *DockerConfigInitFlag && *DockerConfigPluginInitFlag {
 		_ = util.InitFromEnvBool("ALICLOUD_LOG_DOCKER_ENV_CONFIG_SELF", &SelfEnvConfigFlag, false)
 	}
+	_ = util.InitFromEnvBool("enable_containerd_upper_dir_detect", EnableContainerdUpperDirDetect, *EnableContainerdUpperDirDetect)
 }

@@ -37,7 +37,7 @@ import (
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -197,7 +197,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	var containerdClient *containerd.Client
-	if config.LogtailGlobalConfig.EnableContainerdUpperDirDetect {
+	if *flags.EnableContainerdUpperDirDetect {
 		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
 		if err == nil {
 			_, err = containerdClient.Version(context.Background())

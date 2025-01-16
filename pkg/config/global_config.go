@@ -36,7 +36,6 @@ type GlobalConfig struct {
 	DelayStopSec int
 
 	EnableTimestampNanosecond      bool
-	EnableContainerdUpperDirDetect bool
 	EnableSlsMetricsFormat         bool
 }
 
