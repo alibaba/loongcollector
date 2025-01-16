@@ -49,7 +49,7 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, false));
     APSARA_TEST_EQUAL(1, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
 
     // AppendingLogPositionMeta
     configStr = R"(
@@ -61,9 +61,10 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, false));
     APSARA_TEST_EQUAL(3, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_OFFSET_KEY], TagKeyToString(TagKey::FILE_OFFSET_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_INODE_TAG_KEY], TagKeyToString(TagKey::FILE_INODE_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_OFFSET_KEY], GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_INODE_TAG_KEY],
+                      GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY));
 
     configStr = R"(
         {
@@ -78,7 +79,7 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, false));
     APSARA_TEST_EQUAL(3, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_OFFSET_KEY], "test_offset");
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_INODE_TAG_KEY], "test_inode");
 
@@ -95,7 +96,7 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, false));
     APSARA_TEST_EQUAL(3, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_OFFSET_KEY], "test_offset");
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_INODE_TAG_KEY], "test_inode");
 
@@ -109,15 +110,19 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, true));
     APSARA_TEST_EQUAL(7, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_NAMESPACE_TAG_KEY], TagKeyToString(TagKey::K8S_NAMESPACE_TAG_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_NAME_TAG_KEY], TagKeyToString(TagKey::K8S_POD_NAME_TAG_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_UID_TAG_KEY], TagKeyToString(TagKey::K8S_POD_UID_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_NAMESPACE_TAG_KEY],
+                      GetDefaultTagKeyString(TagKey::K8S_NAMESPACE_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_NAME_TAG_KEY],
+                      GetDefaultTagKeyString(TagKey::K8S_POD_NAME_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_UID_TAG_KEY],
+                      GetDefaultTagKeyString(TagKey::K8S_POD_UID_TAG_KEY));
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::CONTAINER_NAME_TAG_KEY],
-                      TagKeyToString(TagKey::CONTAINER_NAME_TAG_KEY));
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::CONTAINER_IP_TAG_KEY], TagKeyToString(TagKey::CONTAINER_IP_TAG_KEY));
+                      GetDefaultTagKeyString(TagKey::CONTAINER_NAME_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::CONTAINER_IP_TAG_KEY],
+                      GetDefaultTagKeyString(TagKey::CONTAINER_IP_TAG_KEY));
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::CONTAINER_IMAGE_NAME_TAG_KEY],
-                      TagKeyToString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY));
+                      GetDefaultTagKeyString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY));
 
     configStr = R"(
         {
@@ -136,7 +141,7 @@ void FileTagOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, true));
     APSARA_TEST_EQUAL(7, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_NAMESPACE_TAG_KEY], "test_namespace");
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_NAME_TAG_KEY], "test_pod_name");
     APSARA_TEST_EQUAL(config->mFileTags[TagKey::K8S_POD_UID_TAG_KEY], "test_pod_uid");
@@ -191,7 +196,7 @@ void FileTagOptionsUnittest::OnInvalidInit() const {
     config.reset(new FileTagOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType, false));
     APSARA_TEST_EQUAL(1, config->mFileTags.size());
-    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], TagKeyToString(TagKey::FILE_PATH_TAG_KEY));
+    APSARA_TEST_EQUAL(config->mFileTags[TagKey::FILE_PATH_TAG_KEY], GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY));
 }
 
 UNIT_TEST_CASE(FileTagOptionsUnittest, OnSuccessfulInit)

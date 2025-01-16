@@ -83,7 +83,7 @@ void FileTagUnittest::TestDefaultTag() {
         reader.SetEventGroupMetaAndTag(eventGroup);
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 1);
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_PATH_TAG_KEY)),
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
                           hostLogPathDir + "/" + hostLogPathFile);
     }
     {
@@ -105,26 +105,27 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicName = "test_topic";
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
-        reader.mExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         reader.SetEventGroupMetaAndTag(eventGroup);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
-                          TagKeyToString(TagKey::FILE_OFFSET_KEY));
+                          GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 12);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_PATH_TAG_KEY)),
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
                           hostLogPathDir + "/" + hostLogPathFile);
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_INODE_TAG_KEY)), "0");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_POD_NAME_TAG_KEY)), "test_pod");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_NAMESPACE_TAG_KEY)), "test_namespace");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_POD_UID_TAG_KEY)), "test_pod_uid");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY)), "test_image");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_NAME_TAG_KEY)), "test_container");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_IP_TAG_KEY)), "test_container_ip");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_POD_NAME_TAG_KEY)), "test_pod");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_NAMESPACE_TAG_KEY)), "test_namespace");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_POD_UID_TAG_KEY)), "test_pod_uid");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY)),
+                          "test_image");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_NAME_TAG_KEY)), "test_container");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_IP_TAG_KEY)), "test_container_ip");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
@@ -157,13 +158,13 @@ void FileTagUnittest::TestDefaultTag() {
         reader.SetEventGroupMetaAndTag(eventGroup);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
-                          TagKeyToString(TagKey::FILE_OFFSET_KEY));
+                          GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_PATH_TAG_KEY)),
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
                           hostLogPathDir + "/" + hostLogPathFile);
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_INODE_TAG_KEY)), "0");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
     }
@@ -195,13 +196,13 @@ void FileTagUnittest::TestDefaultTag() {
         reader.SetEventGroupMetaAndTag(eventGroup);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
-                          TagKeyToString(TagKey::FILE_OFFSET_KEY));
+                          GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_PATH_TAG_KEY)),
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
                           hostLogPathDir + "/" + hostLogPathFile);
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_INODE_TAG_KEY)), "0");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
     }
@@ -235,26 +236,27 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicName = "test_topic";
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
-        reader.mExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         reader.SetEventGroupMetaAndTag(eventGroup);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
-                          TagKeyToString(TagKey::FILE_OFFSET_KEY));
+                          GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 12);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_PATH_TAG_KEY)),
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
                           hostLogPathDir + "/" + hostLogPathFile);
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::FILE_INODE_TAG_KEY)), "0");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY)), "test_image");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_NAME_TAG_KEY)), "test_container");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::CONTAINER_IP_TAG_KEY)), "test_container_ip");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_POD_NAME_TAG_KEY)), "test_pod");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_NAMESPACE_TAG_KEY)), "test_namespace");
-        APSARA_TEST_EQUAL(eventGroup.GetTag(TagKeyToString(TagKey::K8S_POD_UID_TAG_KEY)), "test_pod_uid");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY)),
+                          "test_image");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_NAME_TAG_KEY)), "test_container");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_IP_TAG_KEY)), "test_container_ip");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_POD_NAME_TAG_KEY)), "test_pod");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_NAMESPACE_TAG_KEY)), "test_namespace");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_POD_UID_TAG_KEY)), "test_pod_uid");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
@@ -367,7 +369,7 @@ void FileTagUnittest::TestRenameTag() {
         reader.mTopicName = "test_topic";
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
-        reader.mExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -489,7 +491,7 @@ void FileTagUnittest::TestDeleteTag() {
         reader.mTopicName = "test_topic";
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
-        reader.mExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);

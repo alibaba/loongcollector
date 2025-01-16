@@ -29,7 +29,6 @@
 #include "pipeline/plugin/PluginRegistry.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
-#include "plugin/processor/inner/ProcessorTagNative.h"
 
 using namespace std;
 
@@ -233,17 +232,7 @@ bool InputFile::CreateInnerProcessors() {
         }
         detail["EnableRawContent"]
             = Json::Value(!mContext->HasNativeProcessors() && !mContext->IsExactlyOnceEnabled()
-                          && !mContext->IsFlushingThroughGoPipeline() && !mFileTag.IsEnableLogPositionMeta());
-        if (!processor->Init(detail, *mContext)) {
-            // should not happen
-            return false;
-        }
-        mInnerProcessors.emplace_back(std::move(processor));
-    }
-    {
-        Json::Value detail;
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName,
-                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+                          && !mContext->IsFlushingThroughGoPipeline() && !mFileTag.EnableLogPositionMeta());
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

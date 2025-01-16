@@ -25,7 +25,6 @@
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
-#include "plugin/processor/inner/ProcessorTagNative.h"
 
 using namespace std;
 
@@ -357,16 +356,6 @@ bool InputContainerStdio::CreateInnerProcessors() {
             }
         }
         if (!processor->Init(detail, *mContext)) {
-            return false;
-        }
-        mInnerProcessors.emplace_back(std::move(processor));
-    }
-    {
-        Json::Value detail;
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName,
-                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
-        if (!processor->Init(detail, *mContext)) {
-            // should not happen
             return false;
         }
         mInnerProcessors.emplace_back(std::move(processor));

@@ -40,7 +40,7 @@ enum TagKey : int {
 #endif
 };
 
-const std::string& TagKeyToString(TagKey key);
+const std::string& GetDefaultTagKeyString(TagKey key);
 
 ////////////////////////// COMMON ////////////////////////
 extern const std::string DEFAULT_CONFIG_TAG_KEY_VALUE;

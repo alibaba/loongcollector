@@ -28,13 +28,8 @@ using namespace std;
 
 namespace logtail {
 
-const unordered_set<string> GlobalConfig::sNativeParam = {"TopicType",
-                                                          "TopicFormat",
-                                                          "Priority",
-                                                          "EnableTimestampNanosecond",
-                                                          "UsingOldContentTag",
-                                                          "PipelineMetaTagKey",
-                                                          "AgentEnvMetaTagKey"};
+const unordered_set<string> GlobalConfig::sNativeParam
+    = {"TopicType", "TopicFormat", "Priority", "EnableTimestampNanosecond", "UsingOldContentTag"};
 
 bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, Json::Value& extendedParams) {
     const string moduleName = "global";
@@ -160,68 +155,7 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
             extendedParams[itr.name()] = *itr;
         }
     }
-
-    // PipelineMetaTagKey
-    unordered_map<string, string> tagKeys;
-    if (!GetOptionalMapParam(config, "PipelineMetaTagKey", tagKeys, errorMsg)) {
-        PARAM_WARNING_IGNORE(ctx.GetLogger(),
-                             ctx.GetAlarm(),
-                             errorMsg,
-                             moduleName,
-                             ctx.GetConfigName(),
-                             ctx.GetProjectName(),
-                             ctx.GetLogstoreName(),
-                             ctx.GetRegion());
-    }
-#ifdef __ENTERPRISE__
-    mPipelineMetaTagKey[TagKey::AGENT_TAG] = DEFAULT_CONFIG_TAG_KEY_VALUE;
-#endif
-    for (const auto& kv : tagKeys) {
-        if (kv.first == "HOST_NAME") {
-            mPipelineMetaTagKey[TagKey::HOST_NAME] = kv.second;
-        } else if (kv.first == "HOST_ID") {
-            mPipelineMetaTagKey[TagKey::HOST_ID] = kv.second;
-        } else if (kv.first == "CLOUD_PROVIDER") {
-            mPipelineMetaTagKey[TagKey::CLOUD_PROVIDER] = kv.second;
-        }
-#ifdef __ENTERPRISE__
-        else if (kv.first == "AGENT_TAG") {
-            mPipelineMetaTagKey[TagKey::AGENT_TAG] = kv.second;
-        }
-#else
-        else if (kv.first == "HOST_IP") {
-            mPipelineMetaTagKey[TagKey::HOST_IP] = kv.second;
-        }
-#endif
-    }
-
-#ifdef __ENTERPRISE__
-    // AgentEnvMetaTagKey
-    const std::string key = "AgentEnvMetaTagKey";
-    const Json::Value* itr = config.find(key.c_str(), key.c_str() + key.length());
-    if (itr) {
-        mEnableAgentEnvMetaTagControl = true;
-    }
-    if (!GetOptionalMapParam(config, "AgentEnvMetaTagKey", mAgentEnvMetaTagKey, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-#endif
     return true;
-}
-
-Json::Value GlobalConfig::GetPipelineMetaTagKeyJsonValue() const {
-    Json::Value json;
-    for (const auto& kv : mPipelineMetaTagKey) {
-        json[kv.first] = kv.second;
-    }
-    return json;
 }
 
 } // namespace logtail

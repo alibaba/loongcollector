@@ -39,7 +39,8 @@ private:
     void addOptionalTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
     std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
 #ifdef __ENTERPRISE__
-    bool mEnableAgentEnvMetaTagControl = false;
+    // After unmarshalling from json, we cannot determine the map is empty or no such config
+    bool mAppendingAllEnvMetaTag = false;
     std::unordered_map<std::string, std::string> mAgentEnvMetaTagKey;
 #endif
 

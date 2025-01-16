@@ -25,7 +25,6 @@
 
 #include "json/json.h"
 
-#include "PipelineEventGroup.h"
 #include "constants/TagConstants.h"
 
 namespace logtail {

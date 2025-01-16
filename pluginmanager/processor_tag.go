@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build enterprise
+//go:build !enterprise
 
 package pluginmanager
 
@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	hostNameDefaultTagKey      = "__hostname__"
+	hostNameDefaultTagKey      = "host_name"
+	hostIPDefaultTagKey        = "host_ip"
 	hostIDDefaultTagKey        = "host_id"
 	cloudProviderDefaultTagKey = "cloud_provider"
 	defaultConfigTagKeyValue   = "__default__"
@@ -32,9 +33,9 @@ const (
 
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
 type ProcessorTag struct {
-	PipelineMetaTagKey           map[string]string
-	EnableAgentEnvMetaTagControl bool
-	AgentEnvMetaTagKey           map[string]string
+	PipelineMetaTagKey     map[string]string
+	AppendingAllEnvMetaTag bool
+	AgentEnvMetaTagKey     map[string]string
 }
 
 func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
@@ -47,10 +48,10 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 		return
 	}
 	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
 	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
 	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 
-	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 	}
@@ -59,6 +60,7 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
 	p.addDefaultAddedTag("HOST_NAME", hostNameDefaultTagKey, util.GetHostName(), tagsMap)
+	p.addDefaultAddedTag("HOST_IP", hostIPDefaultTagKey, util.GetIPAddress(), tagsMap)
 	p.addOptionalTag("HOST_ID", hostIDDefaultTagKey, "", tagsMap)
 	p.addOptionalTag("CLOUD_PROVIDER", cloudProviderDefaultTagKey, "", tagsMap)
 	for k, v := range tagsMap {

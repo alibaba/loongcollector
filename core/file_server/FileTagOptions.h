@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <string>
 #include <unordered_map>
+
+#include "json/json.h"
 
 #include "constants/TagConstants.h"
 #include "pipeline/PipelineContext.h"
@@ -33,15 +33,9 @@ public:
               const std::string& pluginType,
               bool enableContainerDiscovery);
     StringView GetFileTagKeyName(TagKey key) const;
-    bool IsEnableLogPositionMeta();
+    bool EnableLogPositionMeta();
 
 private:
-    void parseTagKey(const Json::Value* config,
-                     const std::string& configField,
-                     TagKey tagKey,
-                     const PipelineContext& context,
-                     const std::string& pluginType,
-                     bool defaultAdded);
     std::unordered_map<TagKey, std::string> mFileTags;
 
 #ifdef APSARA_UNIT_TEST_MAIN

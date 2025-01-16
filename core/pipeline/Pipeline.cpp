@@ -19,8 +19,12 @@
 #include <chrono>
 #include <cstdint>
 
+#include <memory>
 #include <utility>
 
+#include "json/value.h"
+
+#include "ProcessorInstance.h"
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
@@ -33,6 +37,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
+#include "plugin/processor/inner/ProcessorTagNative.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
@@ -219,11 +224,27 @@ bool Pipeline::Init(PipelineConfig&& config) {
         if (!mContext.InitGlobalConfig(*config.mGlobal, extendedParams)) {
             return false;
         }
+        // extended global param includes: tag config
         AddExtendedGlobalParamToGoPipeline(extendedParams, mGoPipelineWithInput);
         AddExtendedGlobalParamToGoPipeline(extendedParams, mGoPipelineWithoutInput);
     }
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithInput);
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
+
+    {
+        unique_ptr<ProcessorInstance> processor
+            = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
+        mInnerProcessorLine.emplace_back(std::move(processor));
+        Json::Value detail;
+        if (config.mGlobal) {
+            detail = *config.mGlobal;
+        }
+        if (!processor->Init(detail, mContext)) {
+            // should not happen
+            return false;
+        }
+        mInnerProcessorLine.emplace_back(std::move(processor));
+    }
 
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.
     if ((inputFile != nullptr || inputContainerStdio != nullptr) && IsFlushingThroughGoPipeline()) {
@@ -374,6 +395,9 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
         p->Process(logGroupList);
     }
+    for (auto& p : mInnerProcessorLine) {
+        p->Process(logGroupList);
+    }
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
@@ -486,11 +510,6 @@ void Pipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline) {
         Json::Value& global = pipeline["global"];
         global["EnableTimestampNanosecond"] = mContext.GetGlobalConfig().mEnableTimestampNanosecond;
         global["UsingOldContentTag"] = mContext.GetGlobalConfig().mUsingOldContentTag;
-        global["PipelineMetaTagKey"] = mContext.GetGlobalConfig().GetPipelineMetaTagKeyJsonValue();
-#ifdef __ENTERPRISE__
-        global["EnableAgentEnvMetaTagControl"] = mContext.GetGlobalConfig().mEnableAgentEnvMetaTagControl;
-        global["AgentEnvMetaTagKey"] = mContext.GetGlobalConfig().GetAgentEnvMetaTagKeyJsonValue();
-#endif
     }
 }
 

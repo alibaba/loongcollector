@@ -90,7 +90,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name":"java_app",
-    "host.ip": "192.168.6.128",
+    "host_ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/home/test-log/test.log"
   },

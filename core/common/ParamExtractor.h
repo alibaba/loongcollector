@@ -327,11 +327,20 @@ bool IsValidList(const Json::Value& config, const std::string& key, std::string&
 
 bool IsValidMap(const Json::Value& config, const std::string& key, std::string& errorMsg);
 
+void ParseTagKey(const Json::Value* config,
+                 const std::string& configField,
+                 TagKey tagKey,
+                 std::unordered_map<TagKey, std::string>& tagKeyMap,
+                 const PipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded);
+
 std::string ParseDefaultAddedTag(const Json::Value* config,
                                  const std::string& configField,
                                  const std::string& defaultTagKeyValue,
                                  const PipelineContext& context,
                                  const std::string& pluginType);
+
 std::string ParseOptionalTag(const Json::Value* config,
                              const std::string& configField,
                              const std::string& defaultTagKeyValue,

@@ -243,9 +243,9 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	var logCtx *pipeline.LogWithContext
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey:           p.LogstoreConfig.GlobalConfig.PipelineMetaTagKey,
-		EnableAgentEnvMetaTagControl: p.LogstoreConfig.GlobalConfig.EnableAgentEnvMetaTagControl,
-		AgentEnvMetaTagKey:           p.LogstoreConfig.GlobalConfig.AgentEnvMetaTagKey,
+		PipelineMetaTagKey:     p.LogstoreConfig.GlobalConfig.PipelineMetaTagKey,
+		AppendingAllEnvMetaTag: p.LogstoreConfig.GlobalConfig.AppendingAllEnvMetaTag,
+		AgentEnvMetaTagKey:     p.LogstoreConfig.GlobalConfig.AgentEnvMetaTagKey,
 	}
 	for {
 		select {

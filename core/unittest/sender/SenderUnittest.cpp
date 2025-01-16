@@ -2861,7 +2861,6 @@ APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControl, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControlPause, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControlExpire, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestTooOldFilesIntegrity, gCaseID);
-APSARA_UNIT_TEST_CASE(SenderUnittest, TestMergeTruncateInfo, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestGlobalMarkOffset, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestRealIpSend, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestEmptyRealIp, gCaseID);

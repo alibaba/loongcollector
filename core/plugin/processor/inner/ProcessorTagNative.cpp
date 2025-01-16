@@ -18,10 +18,13 @@
 
 #include <vector>
 
+#include "json/value.h"
+
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
 #include "constants/TagConstants.h"
 #include "models/PipelineEventGroup.h"
@@ -41,34 +44,61 @@ namespace logtail {
 const string ProcessorTagNative::sName = "processor_tag_native";
 
 bool ProcessorTagNative::Init(const Json::Value& config) {
-    mPipelineMetaTagKey = mContext->GetGlobalConfig().mPipelineMetaTagKey;
+    string errorMsg;
+    // PipelineMetaTagKey
+    const char* pipelineTagKey = "PipelineMetaTagKey";
+    const Json::Value* tagConfig = config.find(pipelineTagKey, pipelineTagKey + strlen(pipelineTagKey));
+    if (tagConfig) {
+        if (!tagConfig->isObject()) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 "param PipelineMetaTagKey is not of type object",
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+            tagConfig = nullptr;
+        }
+    }
+    ParseTagKey(tagConfig, "HOST_NAME", TagKey::HOST_NAME, mPipelineMetaTagKey, *mContext, sName, true);
+    ParseTagKey(tagConfig, "HOST_ID", TagKey::HOST_ID, mPipelineMetaTagKey, *mContext, sName, true);
+    ParseTagKey(tagConfig, "CLOUD_PROVIDER", TagKey::CLOUD_PROVIDER, mPipelineMetaTagKey, *mContext, sName, true);
+
 #ifdef __ENTERPRISE__
-    mEnableAgentEnvMetaTagControl = mContext->GetGlobalConfig().mEnableAgentEnvMetaTagControl;
-    mAgentEnvMetaTagKey = mContext->GetGlobalConfig().mAgentEnvMetaTagKey;
+    ParseTagKey(tagConfig, "AGENT_TAG", TagKey::AGENT_TAG, mPipelineMetaTagKey, *mContext, sName, true);
+#else
+    ParseTagKey(tagConfig, "HOST_IP", TagKey::HOST_IP, mPipelineMetaTagKey, *mContext, sName, true);
+#endif
+
+#ifdef __ENTERPRISE__
+    // AgentEnvMetaTagKey
+    const std::string envTagKey = "AgentEnvMetaTagKey";
+    const Json::Value* itr = config.find(envTagKey.c_str(), envTagKey.c_str() + envTagKey.length());
+    if (!itr) {
+        mAppendingAllEnvMetaTag = true;
+    } else {
+        if (!GetOptionalMapParam(config, "AgentEnvMetaTagKey", mAgentEnvMetaTagKey, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+    }
 #endif
     return true;
 }
 
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
-#ifdef __ENTERPRISE__
-    addDefaultAddedTag(logGroup, TagKey::AGENT_TAG, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
-#endif
-
-    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-        vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
-        if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
-            for (size_t i = 0; i < fileTags.size(); ++i) {
-                logGroup.SetTag(fileTags[i].key(), fileTags[i].value());
-            }
-        }
-    }
-
     if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
         return;
     }
-    addDefaultAddedTag(logGroup, TagKey::HOST_NAME, LoongCollectorMonitor::GetInstance()->mHostname);
-    addDefaultAddedTag(logGroup, TagKey::HOST_IP, LoongCollectorMonitor::GetInstance()->mIpAddr);
 
+    addDefaultAddedTag(logGroup, TagKey::HOST_NAME, LoongCollectorMonitor::GetInstance()->mHostname);
     auto entity = InstanceIdentity::Instance()->GetEntity();
     if (entity != nullptr) {
         addOptionalTag(logGroup, TagKey::HOST_ID, entity->GetHostID());
@@ -81,14 +111,25 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
 #endif
         addOptionalTag(logGroup, TagKey::CLOUD_PROVIDER, cloudProvider);
     }
+#ifdef __ENTERPRISE__
+    addDefaultAddedTag(logGroup, TagKey::AGENT_TAG, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
+#else
+    addDefaultAddedTag(logGroup, TagKey::HOST_IP, LoongCollectorMonitor::GetInstance()->mIpAddr);
+#endif
 
-    auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
+    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
+        vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
+        if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
+            for (size_t i = 0; i < fileTags.size(); ++i) {
+                logGroup.SetTag(fileTags[i].key(), fileTags[i].value());
+            }
+        }
+    }
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {
 #ifdef __ENTERPRISE__
-            if (mEnableAgentEnvMetaTagControl) {
+            if (mAppendingAllEnvMetaTag) {
                 auto envTagKey = sEnvTags[i].key();
                 if (mAgentEnvMetaTagKey.find(envTagKey) != mAgentEnvMetaTagKey.end()) {
                     if (!mAgentEnvMetaTagKey[envTagKey].empty()) {
@@ -101,6 +142,9 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
             logGroup.SetTagNoCopy(sEnvTags[i].key(), sEnvTags[i].value());
         }
     }
+
+    auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
 }
 
 bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
@@ -113,14 +157,14 @@ void ProcessorTagNative::addDefaultAddedTag(PipelineEventGroup& logGroup, TagKey
     if (it != mPipelineMetaTagKey.end()) {
         if (!it->second.empty()) {
             if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-                logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
+                logGroup.SetTagNoCopy(GetDefaultTagKeyString(tagKey), StringView(sb.data, sb.size));
             } else {
                 logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
             }
         }
         // empty value means delete
     } else {
-        logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
+        logGroup.SetTagNoCopy(GetDefaultTagKeyString(tagKey), StringView(sb.data, sb.size));
     }
 }
 
@@ -130,7 +174,7 @@ void ProcessorTagNative::addOptionalTag(PipelineEventGroup& logGroup, TagKey tag
     if (it != mPipelineMetaTagKey.end()) {
         if (!it->second.empty()) {
             if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-                logGroup.SetTagNoCopy(TagKeyToString(tagKey), StringView(sb.data, sb.size));
+                logGroup.SetTagNoCopy(GetDefaultTagKeyString(tagKey), StringView(sb.data, sb.size));
             } else {
                 logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
             }
@@ -144,7 +188,7 @@ void ProcessorTagNative::addOptionalTag(PipelineEventGroup& logGroup, TagKey tag
     if (it != mPipelineMetaTagKey.end()) {
         if (!it->second.empty()) {
             if (it->second == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-                logGroup.SetTagNoCopy(TagKeyToString(tagKey), value);
+                logGroup.SetTagNoCopy(GetDefaultTagKeyString(tagKey), value);
             } else {
                 logGroup.SetTagNoCopy(it->second, value);
             }

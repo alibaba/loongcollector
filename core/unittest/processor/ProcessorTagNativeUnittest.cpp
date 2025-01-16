@@ -63,7 +63,6 @@ void ProcessorTagNativeUnittest::TestInit() {
 
 void ProcessorTagNativeUnittest::TestProcess() {
     { // plugin branch default
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -91,11 +90,10 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
 #ifdef __ENTERPRISE__
@@ -106,7 +104,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // plugin branch default
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -140,11 +137,10 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
 #ifdef __ENTERPRISE__
@@ -155,7 +151,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // plugin branch rename
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -189,11 +184,10 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
 #ifdef __ENTERPRISE__
@@ -204,7 +198,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // plugin branch delete
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -238,11 +231,10 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
 #ifdef __ENTERPRISE__
@@ -251,7 +243,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // native branch default
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -278,29 +269,27 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
 
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_NAME)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mHostname,
-                                eventGroup.GetTag(TagKeyToString(TagKey::HOST_NAME)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::AGENT_TAG)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
         APSARA_TEST_EQUAL_FATAL(EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet(),
-                                eventGroup.GetTag(TagKeyToString(TagKey::AGENT_TAG)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
 #else
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_IP)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
-                                eventGroup.GetTag(TagKeyToString(TagKey::HOST_IP)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
 #endif
     }
     { // native branch default
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -333,24 +322,23 @@ void ProcessorTagNativeUnittest::TestProcess() {
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_NAME)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mHostname,
-                                eventGroup.GetTag(TagKeyToString(TagKey::HOST_NAME)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::AGENT_TAG)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
         APSARA_TEST_EQUAL_FATAL(EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet(),
-                                eventGroup.GetTag(TagKeyToString(TagKey::AGENT_TAG)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
 #else
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_IP)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
-                                eventGroup.GetTag(TagKeyToString(TagKey::HOST_IP)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
 #endif
     }
     { // native branch rename
@@ -446,11 +434,11 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
 
         processor.Process(eventGroup);
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_NAME)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::AGENT_TAG)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
 #else
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(TagKeyToString(TagKey::HOST_IP)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
 #endif
     }
 }

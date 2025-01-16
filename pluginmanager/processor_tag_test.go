@@ -33,8 +33,8 @@ func TestTagDefault(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey:           map[string]string{},
-		EnableAgentEnvMetaTagControl: false,
+		PipelineMetaTagKey:     map[string]string{},
+		AppendingAllEnvMetaTag: false,
 	}
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
@@ -71,8 +71,8 @@ func TestTagDefaultV2(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey:           map[string]string{},
-		EnableAgentEnvMetaTagControl: false,
+		PipelineMetaTagKey:     map[string]string{},
+		AppendingAllEnvMetaTag: false,
 	}
 	in := &models.PipelineGroupEvents{
 		Group: &models.GroupInfo{

@@ -89,7 +89,7 @@ func TestGetIndexKeys(t *testing.T) {
 	})
 	Convey("Given a composite dynamic index expression", t, func() {
 		flusher := &FlusherElasticSearch{
-			Index: "index_%{content.field}_%{tag.host.ip}_%{+yyyyMMdd}",
+			Index: "index_%{content.field}_%{tag.host_ip}_%{+yyyyMMdd}",
 		}
 		Convey("When getIndexKeys is called", func() {
 			keys, isDynamicIndex, err := flusher.getIndexKeys()
@@ -98,7 +98,7 @@ func TestGetIndexKeys(t *testing.T) {
 				So(isDynamicIndex, ShouldBeTrue)
 				So(len(keys), ShouldEqual, 2)
 				So(keys[0], ShouldEqual, "content.field")
-				So(keys[1], ShouldEqual, "tag.host.ip")
+				So(keys[1], ShouldEqual, "tag.host_ip")
 			})
 		})
 	})

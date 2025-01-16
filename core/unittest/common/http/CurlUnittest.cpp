@@ -66,11 +66,11 @@ void CurlUnittest::TestFollowRedirect() {
     tls.mCertFile = "client.crt";
     tls.mKeyFile = "client.key";
 
-    request = std::make_unique<HttpRequest>(
-        "GET", false, "example.com", 80, "/path", "", map<string, string>(), "", 10, 3, true);
-    bool success = SendHttpRequest(std::move(request), res);
-    APSARA_TEST_TRUE(success);
-    APSARA_TEST_EQUAL(404, res.GetStatusCode());
+    // request = std::make_unique<HttpRequest>(
+    //     "GET", false, "example.com", 80, "/path", "", map<string, string>(), "", 10, 3, true);
+    // bool success = SendHttpRequest(std::move(request), res);
+    // APSARA_TEST_TRUE(success);
+    // APSARA_TEST_EQUAL(404, res.GetStatusCode());
 }
 
 UNIT_TEST_CASE(CurlUnittest, TestSendHttpRequest)

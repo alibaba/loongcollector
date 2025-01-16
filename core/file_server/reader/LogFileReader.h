@@ -24,7 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include "TagConstants.h"
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
@@ -33,6 +32,7 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
+#include "constants/TagConstants.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
@@ -401,14 +401,12 @@ public:
 
     const std::vector<std::pair<TagKey, std::string>>& GetContainerMetadatas() { return mContainerMetadatas; }
 
-    void AddContainerMetadatas(const std::vector<std::pair<TagKey, std::string>>& tags) {
-        mContainerMetadatas.insert(mContainerMetadatas.end(), tags.begin(), tags.end());
-    }
+    void SetContainerMetadatas(const std::vector<std::pair<TagKey, std::string>>& tags) { mContainerMetadatas = tags; }
 
-    const std::vector<std::pair<std::string, std::string>>& GetExtraTags() { return mExtraTags; }
+    const std::vector<std::pair<std::string, std::string>>& GetExtraTags() { return mContainerExtraTags; }
 
-    void AddExtraTags(const std::vector<std::pair<std::string, std::string>>& tags) {
-        mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
+    void SetContainerExtraTags(const std::vector<std::pair<std::string, std::string>>& tags) {
+        mContainerExtraTags = tags;
     }
 
     QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey(); }
@@ -543,7 +541,7 @@ protected:
     // tags
     std::vector<std::pair<std::string, std::string>> mTopicExtraTags;
     std::vector<std::pair<TagKey, std::string>> mContainerMetadatas;
-    std::vector<std::pair<std::string, std::string>> mExtraTags;
+    std::vector<std::pair<std::string, std::string>> mContainerExtraTags;
     // int32_t mCloseUnusedInterval;
 
     // PreciseTimestampConfig mPreciseTimestampConfig;

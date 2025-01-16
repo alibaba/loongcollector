@@ -18,9 +18,9 @@
 
 #include <unistd.h>
 
-#include "PipelineContext.h"
-#include "TagConstants.h"
 #include "common/ParamExtractor.h"
+#include "constants/TagConstants.h"
+#include "pipeline/PipelineContext.h"
 
 using namespace std;
 
@@ -66,28 +66,30 @@ bool FileTagOptions::Init(const Json::Value& config,
 
     // the priority of FileOffsetKey and FileInodeTagKey is higher than appendingLogPositionMeta
     if (config.isMember("FileOffsetKey") || (tagConfig && tagConfig->isMember("FileInodeTagKey"))) {
-        parseTagKey(&config, "FileOffsetKey", TagKey::FILE_OFFSET_KEY, context, pluginType, false);
-        parseTagKey(tagConfig, "FileInodeTagKey", TagKey::FILE_INODE_TAG_KEY, context, pluginType, false);
+        ParseTagKey(&config, "FileOffsetKey", TagKey::FILE_OFFSET_KEY, mFileTags, context, pluginType, false);
+        ParseTagKey(tagConfig, "FileInodeTagKey", TagKey::FILE_INODE_TAG_KEY, mFileTags, context, pluginType, false);
     } else if (appendingLogPositionMeta) {
-        mFileTags[TagKey::FILE_OFFSET_KEY] = TagKeyToString(TagKey::FILE_OFFSET_KEY);
-        mFileTags[TagKey::FILE_INODE_TAG_KEY] = TagKeyToString(TagKey::FILE_INODE_TAG_KEY);
+        mFileTags[TagKey::FILE_OFFSET_KEY] = GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY);
+        mFileTags[TagKey::FILE_INODE_TAG_KEY] = GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY);
     }
-
-    auto filePathTagKey = ParseDefaultAddedTag(
-        tagConfig, "FilePathTagKey", TagKeyToString(TagKey::FILE_PATH_TAG_KEY), context, pluginType);
-    if (!filePathTagKey.empty()) {
-        mFileTags[TagKey::FILE_PATH_TAG_KEY] = filePathTagKey;
-    }
+    ParseTagKey(tagConfig, "FilePathTagKey", TagKey::FILE_PATH_TAG_KEY, mFileTags, context, pluginType, true);
 
     // ContainerDiscovery
     if (enableContainerDiscovery) {
-        parseTagKey(tagConfig, "K8sNamespaceTagKey", TagKey::K8S_NAMESPACE_TAG_KEY, context, pluginType, true);
-        parseTagKey(tagConfig, "K8sPodNameTagKey", TagKey::K8S_POD_NAME_TAG_KEY, context, pluginType, true);
-        parseTagKey(tagConfig, "K8sPodUidTagKey", TagKey::K8S_POD_UID_TAG_KEY, context, pluginType, true);
-        parseTagKey(tagConfig, "ContainerNameTagKey", TagKey::CONTAINER_NAME_TAG_KEY, context, pluginType, true);
-        parseTagKey(tagConfig, "ContainerIpTagKey", TagKey::CONTAINER_IP_TAG_KEY, context, pluginType, true);
-        parseTagKey(
-            tagConfig, "ContainerImageNameTagKey", TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, context, pluginType, true);
+        ParseTagKey(
+            tagConfig, "K8sNamespaceTagKey", TagKey::K8S_NAMESPACE_TAG_KEY, mFileTags, context, pluginType, true);
+        ParseTagKey(tagConfig, "K8sPodNameTagKey", TagKey::K8S_POD_NAME_TAG_KEY, mFileTags, context, pluginType, true);
+        ParseTagKey(tagConfig, "K8sPodUidTagKey", TagKey::K8S_POD_UID_TAG_KEY, mFileTags, context, pluginType, true);
+        ParseTagKey(
+            tagConfig, "ContainerNameTagKey", TagKey::CONTAINER_NAME_TAG_KEY, mFileTags, context, pluginType, true);
+        ParseTagKey(tagConfig, "ContainerIpTagKey", TagKey::CONTAINER_IP_TAG_KEY, mFileTags, context, pluginType, true);
+        ParseTagKey(tagConfig,
+                    "ContainerImageNameTagKey",
+                    TagKey::CONTAINER_IMAGE_NAME_TAG_KEY,
+                    mFileTags,
+                    context,
+                    pluginType,
+                    true);
     }
 
     return true;
@@ -102,25 +104,12 @@ StringView FileTagOptions::GetFileTagKeyName(TagKey key) const {
     return StringView();
 }
 
-bool FileTagOptions::IsEnableLogPositionMeta() {
-    return !mFileTags[TagKey::FILE_OFFSET_KEY].empty() || !mFileTags[TagKey::FILE_INODE_TAG_KEY].empty();
-}
-
-void FileTagOptions::parseTagKey(const Json::Value* config,
-                                 const string& configField,
-                                 TagKey tagKey,
-                                 const PipelineContext& context,
-                                 const std::string& pluginType,
-                                 bool defaultAdded) {
-    string customTagKey;
-    if (defaultAdded) {
-        customTagKey = ParseDefaultAddedTag(config, configField, TagKeyToString(tagKey), context, pluginType);
-    } else {
-        customTagKey = ParseOptionalTag(config, configField, TagKeyToString(tagKey), context, pluginType);
-    }
-    if (!customTagKey.empty()) {
-        mFileTags[tagKey] = customTagKey;
-    }
+bool FileTagOptions::EnableLogPositionMeta() {
+    bool enableFileOffset
+        = mFileTags.find(TagKey::FILE_OFFSET_KEY) != mFileTags.end() && !mFileTags[TagKey::FILE_OFFSET_KEY].empty();
+    bool enableFileInode = mFileTags.find(TagKey::FILE_INODE_TAG_KEY) != mFileTags.end()
+        && !mFileTags[TagKey::FILE_INODE_TAG_KEY].empty();
+    return enableFileOffset || enableFileInode;
 }
 
 } // namespace logtail

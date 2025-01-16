@@ -24,7 +24,7 @@
 
 namespace logtail {
 
-const std::unordered_map<std::string, TagKey> containerNameTag = {
+static const std::unordered_map<std::string, TagKey> containerNameTag = {
     {"_image_name_", TagKey::CONTAINER_IMAGE_NAME_TAG_KEY},
     {"_container_name_", TagKey::CONTAINER_NAME_TAG_KEY},
     {"_pod_name_", TagKey::K8S_POD_NAME_TAG_KEY},
@@ -108,7 +108,7 @@ bool ContainerInfo::ParseByJSONObj(const Json::Value& params, ContainerInfo& con
             if (tags[i].isString() && tags[i - 1].isString()) {
                 std::string key = tags[i - 1].asString();
                 std::string value = tags[i].asString();
-                // 不是老版本
+                // 老版本或者容器元信息
                 if (isOldCheckpoint && containerNameTag.find(key) != containerNameTag.end()) {
                     containerInfo.AddMetadata(key, value);
                 } else {

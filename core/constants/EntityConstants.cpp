@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
-#include "EntityConstants.h"
+#include "constants/EntityConstants.h"
+
+using namespace std;
 
 namespace logtail {
 
-const std::string DEFAULT_VALUE_DOMAIN_ACS = "acs";
-const std::string DEFAULT_VALUE_DOMAIN_INFRA = "infra";
+const string DEFAULT_VALUE_DOMAIN_ACS = "acs";
+const string DEFAULT_VALUE_DOMAIN_INFRA = "infra";
 
 } // namespace logtail

@@ -130,8 +130,8 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
-                reader->AddContainerMetadatas(containerPath->mMetadatas);
-                reader->AddExtraTags(containerPath->mTags);
+                reader->SetContainerMetadatas(containerPath->mMetadatas);
+                reader->SetContainerExtraTags(containerPath->mTags);
             }
         }
 
@@ -2470,53 +2470,51 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, GetHostLogPath());
     }
     group.SetMetadata(EventGroupMetaKey::SOURCE_ID, GetSourceId());
-    // we store info which users can see in tags
-    // for log, these includes:
-    // 1. topic
-    std::string topic = GetTopicName();
-    if (!topic.empty()) {
-        StringBuffer b = group.GetSourceBuffer()->CopyString(topic);
-        group.SetTagNoCopy(LOG_RESERVED_KEY_TOPIC, StringView(b.data, b.size));
-    }
-    auto topicExtraTags = GetTopicExtraTags();
-    for (auto& tag : topicExtraTags) {
-        group.SetTag(tag.first, tag.second);
-    }
-    // 2. external k8s env/label tag
-    auto extraTags = GetExtraTags();
-    for (auto& tag : extraTags) {
-        group.SetTag(tag.first, tag.second);
-    }
-    // 3. offset, inode, path, container name tag
+    // process tag key according to tag config
     if (mTagConfig.first != nullptr) {
-        auto offsetKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_OFFSET_KEY);
-        if (!offsetKey.empty()) {
-            group.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, offsetKey);
-        }
+        if (!isContainerLog) {
+            const auto& offsetKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_OFFSET_KEY);
+            if (!offsetKey.empty()) {
+                group.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, offsetKey);
+            }
 
-        auto inodeKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_INODE_TAG_KEY);
-        if (!inodeKey.empty()) {
-            StringBuffer b = group.GetSourceBuffer()->CopyString(ToString(GetDevInode().inode));
-            group.SetTagNoCopy(inodeKey, StringView(b.data, b.size));
-        }
-
-        auto pathKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_PATH_TAG_KEY);
-        if (!pathKey.empty()) {
-            const string path = GetConvertedPath().substr(0, 511);
-            StringBuffer b = group.GetSourceBuffer()->CopyString(path);
-            if (!path.empty()) {
-                group.SetTagNoCopy(pathKey, StringView(b.data, b.size));
+            const auto& inodeKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_INODE_TAG_KEY);
+            if (!inodeKey.empty()) {
+                StringBuffer b = group.GetSourceBuffer()->CopyString(ToString(GetDevInode().inode));
+                group.SetTagNoCopy(inodeKey, StringView(b.data, b.size));
+            }
+            const auto& pathKey = mTagConfig.first->GetFileTagKeyName(TagKey::FILE_PATH_TAG_KEY);
+            if (!pathKey.empty()) {
+                const auto& path = GetConvertedPath().substr(0, 511);
+                StringBuffer b = group.GetSourceBuffer()->CopyString(path);
+                if (!path.empty()) {
+                    group.SetTagNoCopy(pathKey, StringView(b.data, b.size));
+                }
             }
         }
-
-        auto containerMetadatas = GetContainerMetadatas();
-        for (auto& metadata : containerMetadatas) {
-            auto key = mTagConfig.first->GetFileTagKeyName(metadata.first);
+        const auto& containerMetadatas = GetContainerMetadatas();
+        for (const auto& metadata : containerMetadatas) {
+            const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
             if (!key.empty()) {
                 StringBuffer b = group.GetSourceBuffer()->CopyString(metadata.second);
                 group.SetTagNoCopy(key, StringView(b.data, b.size));
             }
         }
+    }
+
+    std::string topic = GetTopicName();
+    if (!topic.empty()) {
+        StringBuffer b = group.GetSourceBuffer()->CopyString(topic);
+        group.SetTagNoCopy(LOG_RESERVED_KEY_TOPIC, StringView(b.data, b.size));
+    }
+    const auto& topicExtraTags = GetTopicExtraTags();
+    for (const auto& tag : topicExtraTags) {
+        group.SetTag(tag.first, tag.second);
+    }
+
+    const auto& extraTags = GetExtraTags();
+    for (const auto& tag : extraTags) {
+        group.SetTag(tag.first, tag.second);
     }
 }
 

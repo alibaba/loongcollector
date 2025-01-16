@@ -14,7 +14,11 @@
 
 #include "common/ParamExtractor.h"
 
+#include <unordered_map>
+
 #include "boost/regex.hpp"
+
+#include "TagConstants.h"
 
 using namespace std;
 
@@ -192,6 +196,24 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
     return true;
 }
 
+void ParseTagKey(const Json::Value* config,
+                 const string& configField,
+                 TagKey tagKey,
+                 unordered_map<TagKey, string>& tagKeyMap,
+                 const PipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded) {
+    string customTagKey;
+    if (defaultAdded) {
+        customTagKey = ParseDefaultAddedTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType);
+    } else {
+        customTagKey = ParseOptionalTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType);
+    }
+    if (!customTagKey.empty()) {
+        tagKeyMap[tagKey] = customTagKey;
+    }
+}
+
 
 string ParseDefaultAddedTag(const Json::Value* config,
                             const string& configField,
@@ -205,7 +227,7 @@ string ParseDefaultAddedTag(const Json::Value* config,
             PARAM_WARNING_DEFAULT(context.GetLogger(),
                                   context.GetAlarm(),
                                   errorMsg,
-                                  "__default__",
+                                  customTagKey,
                                   pluginType,
                                   context.GetConfigName(),
                                   context.GetProjectName(),
@@ -232,7 +254,7 @@ string ParseOptionalTag(const Json::Value* config,
             PARAM_WARNING_DEFAULT(context.GetLogger(),
                                   context.GetAlarm(),
                                   errorMsg,
-                                  "__default__",
+                                  customTagKey,
                                   pluginType,
                                   context.GetConfigName(),
                                   context.GetProjectName(),

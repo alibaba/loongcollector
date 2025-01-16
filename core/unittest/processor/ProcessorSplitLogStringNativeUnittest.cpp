@@ -63,7 +63,7 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, TagKeyToString(TagKey::FILE_OFFSET_KEY));
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY, GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
     std::stringstream inJson;
     inJson << R"({
         "events" :
