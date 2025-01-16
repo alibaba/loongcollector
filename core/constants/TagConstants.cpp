@@ -77,6 +77,7 @@ const string DEFAULT_LOG_TAG_CLOUD_PROVIDER = "__cloud_provider__";
 const string DEFAULT_LOG_TAG_USER_DEFINED_ID = "__user_defined_id__";
 #endif
 
+// only used in pipeline, not serialized
 const string LOG_RESERVED_KEY_SOURCE = "__source__";
 const string LOG_RESERVED_KEY_TOPIC = "__topic__";
 const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";

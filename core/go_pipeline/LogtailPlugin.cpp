@@ -17,6 +17,7 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "application/Application.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
@@ -39,6 +40,7 @@ DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS met
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
                  "if enable containerd upper dir detect when locating rootfs",
                  false);
+DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 
 using namespace std;
 using namespace logtail;
@@ -78,6 +80,8 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
+    mPluginCfg["LogFileTagsPath"] = STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
+    mPluginCfg["MachineUUID"] = Application::GetInstance()->GetUUID();
 }
 
 LogtailPlugin::~LogtailPlugin() {

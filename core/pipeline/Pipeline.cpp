@@ -231,7 +231,8 @@ bool Pipeline::Init(PipelineConfig&& config) {
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithInput);
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
 
-    {
+    // only add native tag processor when there is only native input, otherwise will use go tag processor
+    if (!mInputs.empty() && !HasGoPipelineWithInput()) {
         unique_ptr<ProcessorInstance> processor
             = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
         mInnerProcessorLine.emplace_back(std::move(processor));

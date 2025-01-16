@@ -223,7 +223,7 @@ string ParseDefaultAddedTag(const Json::Value* config,
     string errorMsg;
     string customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
     if (config && config->isMember(configField)) {
-        if (!GetOptionalStringParam(*config, configField, customTagKey, errorMsg)) {
+        if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
             PARAM_WARNING_DEFAULT(context.GetLogger(),
                                   context.GetAlarm(),
                                   errorMsg,

@@ -257,10 +257,10 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	pipeContext := p.ProcessPipeContext
 	pipeChan := p.InputPipeContext.Collector().Observe()
-	processorTag := ProcessorTag{
-		PipelineMetaTagKey:     p.LogstoreConfig.GlobalConfig.PipelineMetaTagKey,
-		AppendingAllEnvMetaTag: p.LogstoreConfig.GlobalConfig.AppendingAllEnvMetaTag,
-		AgentEnvMetaTagKey:     p.LogstoreConfig.GlobalConfig.AgentEnvMetaTagKey,
+	var processorTag *ProcessorTag
+	if len(p.ServicePlugins)+len(p.MetricPlugins) != 0 {
+		globalConfig := p.LogstoreConfig.GlobalConfig
+		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.LogFileTagsPath, globalConfig.MachineUUID)
 	}
 	for {
 		select {
@@ -269,7 +269,9 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case group := <-pipeChan:
-			processorTag.ProcessV2(group)
+			if processorTag != nil {
+				processorTag.ProcessV2(group)
+			}
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(group.Events)))
 			pipeEvents := []*models.PipelineGroupEvents{group}
 			for _, processor := range p.ProcessorPlugins {
@@ -465,22 +467,11 @@ func (p *pluginv2Runner) ReceiveLogGroup(in pipeline.LogGroupWithContext) {
 	meta.Add(ctxKeyTopic, topic)
 
 	tags := models.NewTags()
-	if !p.LogstoreConfig.GlobalConfig.UsingOldContentTag {
-		for _, tag := range in.LogGroup.GetLogTags() {
-			tags.Add(tag.GetKey(), tag.GetValue())
-		}
-		if len(topic) > 0 {
-			tags.Add(tagKeyLogTopic, topic)
-		}
-	} else {
-		for _, log := range in.LogGroup.GetLogs() {
-			for _, tag := range in.LogGroup.GetLogTags() {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   tag.GetKey(),
-					Value: tag.GetValue(),
-				})
-			}
-		}
+	for _, tag := range in.LogGroup.GetLogTags() {
+		tags.Add(tag.GetKey(), tag.GetValue())
+	}
+	if len(topic) > 0 {
+		tags.Add(tagKeyLogTopic, topic)
 	}
 
 	group := models.NewGroup(meta, tags)

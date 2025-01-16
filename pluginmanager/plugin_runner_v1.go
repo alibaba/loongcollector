@@ -242,10 +242,10 @@ func (p *pluginv1Runner) runProcessor() {
 func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	var logCtx *pipeline.LogWithContext
-	processorTag := ProcessorTag{
-		PipelineMetaTagKey:     p.LogstoreConfig.GlobalConfig.PipelineMetaTagKey,
-		AppendingAllEnvMetaTag: p.LogstoreConfig.GlobalConfig.AppendingAllEnvMetaTag,
-		AgentEnvMetaTagKey:     p.LogstoreConfig.GlobalConfig.AgentEnvMetaTagKey,
+	var processorTag *ProcessorTag
+	if len(p.ServicePlugins)+len(p.MetricPlugins) != 0 {
+		globalConfig := p.LogstoreConfig.GlobalConfig
+		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.LogFileTagsPath, globalConfig.MachineUUID)
 	}
 	for {
 		select {
@@ -254,7 +254,9 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case logCtx = <-p.LogsChan:
-			processorTag.ProcessV1(logCtx)
+			if processorTag != nil {
+				processorTag.ProcessV1(logCtx)
+			}
 			logs := []*protocol.Log{logCtx.Log}
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(logs)))
 			for _, processor := range p.ProcessorPlugins {
