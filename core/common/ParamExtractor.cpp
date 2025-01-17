@@ -201,9 +201,9 @@ void ParseDefaultAddedTag(const Json::Value* config,
                           const string& defaultTagKeyValue,
                           const PipelineContext& context,
                           const string& pluginType,
-                          string& outputKey) {
+                          string& customTagKey) {
     string errorMsg;
-    string customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
+    customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
     if (config && config->isMember(configField)) {
         if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
             PARAM_WARNING_DEFAULT(context.GetLogger(),
@@ -217,11 +217,11 @@ void ParseDefaultAddedTag(const Json::Value* config,
                                   context.GetRegion());
         }
         if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-            outputKey = defaultTagKeyValue;
+            customTagKey = defaultTagKeyValue;
         }
-        outputKey = customTagKey;
+    } else {
+        customTagKey = defaultTagKeyValue;
     }
-    outputKey = defaultTagKeyValue;
 }
 
 void ParseOptionalTag(const Json::Value* config,
@@ -229,9 +229,8 @@ void ParseOptionalTag(const Json::Value* config,
                       const string& defaultTagKeyValue,
                       const PipelineContext& context,
                       const string& pluginType,
-                      string& outputKey) {
+                      string& customTagKey) {
     string errorMsg;
-    string customTagKey;
     if (config && config->isMember(configField)) {
         if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
             PARAM_WARNING_DEFAULT(context.GetLogger(),
@@ -245,11 +244,11 @@ void ParseOptionalTag(const Json::Value* config,
                                   context.GetRegion());
         }
         if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-            outputKey = defaultTagKeyValue;
+            customTagKey = defaultTagKeyValue;
         }
-        outputKey = customTagKey;
+    } else {
+        customTagKey = "";
     }
-    outputKey = "";
 }
 
 // if there is no tag config, config maybe nullptr, will act as default (default added or optional)

@@ -244,8 +244,12 @@ bool Pipeline::Init(PipelineConfig&& config) {
         mPipelineInnerProcessor.emplace_back(std::move(processor));
     } else {
         // processor tag requires tags as input, so it is a special processor, cannot add as plugin
-        mGoPipelineWithInput["global"]["EnableProcessorTag"] = true;
-        mGoPipelineWithoutInput["global"]["EnableProcessorTag"] = true;
+        if (!mGoPipelineWithInput.isNull()) {
+            mGoPipelineWithInput["global"]["EnableProcessorTag"] = true;
+        }
+        if (!mGoPipelineWithoutInput.isNull()) {
+            mGoPipelineWithoutInput["global"]["EnableProcessorTag"] = true;
+        }
     }
 
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.

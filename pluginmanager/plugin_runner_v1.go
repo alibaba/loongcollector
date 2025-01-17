@@ -243,8 +243,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	var logCtx *pipeline.LogWithContext
 	var processorTag *ProcessorTag
-	if len(p.ServicePlugins)+len(p.MetricPlugins) != 0 {
-		globalConfig := p.LogstoreConfig.GlobalConfig
+	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
 		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.LogFileTagsPath, globalConfig.MachineUUID)
 	}
 	for {

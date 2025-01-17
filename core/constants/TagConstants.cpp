@@ -53,22 +53,6 @@ const string& GetDefaultTagKeyString(TagKey key) {
 const string DEFAULT_CONFIG_TAG_KEY_VALUE = "__default__";
 
 ////////////////////////// LOG ////////////////////////
-#ifndef __ENTERPRISE__ // 开源版
-const string DEFAULT_LOG_TAG_HOST_NAME = "namespace"; // should keep same with metric
-const string DEFAULT_LOG_TAG_NAMESPACE = "host_name"; // should keep same with metric
-const string DEFAULT_LOG_TAG_POD_NAME = "pod_name"; // should keep same with metric
-const string DEFAULT_LOG_TAG_POD_UID = "pod_uid"; // should keep same with metric
-const string DEFAULT_LOG_TAG_CONTAINER_NAME = "container_name"; // should keep same with metric
-const string DEFAULT_LOG_TAG_CONTAINER_IP = "container_ip"; // should keep same with metric
-const string DEFAULT_LOG_TAG_IMAGE_NAME = "image_name"; // should keep same with metric
-const string DEFAULT_LOG_TAG_FILE_OFFSET = "file_offset";
-const string DEFAULT_LOG_TAG_FILE_INODE = "file_inode";
-const string DEFAULT_LOG_TAG_FILE_PATH = "file_path";
-
-const string DEFAULT_LOG_TAG_HOST_IP = "host_ip";
-const string DEFAULT_LOG_TAG_HOST_ID = "host_id";
-const string DEFAULT_LOG_TAG_CLOUD_PROVIDER = "cloud_provider";
-#else
 const string DEFAULT_LOG_TAG_HOST_NAME = "__hostname__";
 const string DEFAULT_LOG_TAG_NAMESPACE = "_namespace_";
 const string DEFAULT_LOG_TAG_POD_NAME = "_pod_name_";
@@ -81,7 +65,9 @@ const string DEFAULT_LOG_TAG_FILE_INODE = "__inode__";
 const string DEFAULT_LOG_TAG_FILE_PATH = "__path__";
 const string DEFAULT_LOG_TAG_HOST_ID = "__host_id__";
 const string DEFAULT_LOG_TAG_CLOUD_PROVIDER = "__cloud_provider__";
-
+#ifndef __ENTERPRISE__
+const string DEFAULT_LOG_TAG_HOST_IP = "__host_ip__";
+#else
 const string DEFAULT_LOG_TAG_USER_DEFINED_ID = "__user_defined_id__";
 #endif
 
@@ -92,12 +78,12 @@ const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
 const string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
 
 ////////////////////////// METRIC ////////////////////////
-const string DEFAULT_METRIC_TAG_NAMESPACE = "namespace"; // should keep same with log
-const string DEFAULT_METRIC_TAG_POD_NAME = "pod_name"; // should keep same with log
-const string DEFAULT_METRIC_TAG_POD_UID = "pod_uid"; // should keep same with log
-const string DEFAULT_METRIC_TAG_CONTAINER_NAME = "container_name"; // should keep same with log
-const string DEFAULT_METRIC_TAG_CONTAINER_IP = "container_ip"; // should keep same with log
-const string DEFAULT_METRIC_TAG_IMAGE_NAME = "image_name"; // should keep same with log
+const string DEFAULT_METRIC_TAG_NAMESPACE = "namespace";
+const string DEFAULT_METRIC_TAG_POD_NAME = "pod_name";
+const string DEFAULT_METRIC_TAG_POD_UID = "pod_uid";
+const string DEFAULT_METRIC_TAG_CONTAINER_NAME = "container_name";
+const string DEFAULT_METRIC_TAG_CONTAINER_IP = "container_ip";
+const string DEFAULT_METRIC_TAG_IMAGE_NAME = "image_name";
 
 ////////////////////////// TRACE ////////////////////////
 

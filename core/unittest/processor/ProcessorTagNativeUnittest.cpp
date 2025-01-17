@@ -342,7 +342,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // native branch rename
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -374,12 +373,10 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
-        Json::Value extendedParams;
-        context.InitGlobalConfig(config, extendedParams);
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
         APSARA_TEST_TRUE_FATAL(eventGroup.HasTag("test_host_name"));
@@ -394,7 +391,6 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #endif
     }
     { // native branch delete
-        Json::Value processorConfig;
         Json::Value config;
         std::string configStr, errorMsg;
 #ifdef __ENTERPRISE__
@@ -431,7 +427,7 @@ void ProcessorTagNativeUnittest::TestProcess() {
 
         ProcessorTagNative processor;
         processor.SetContext(context);
-        APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
         APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));

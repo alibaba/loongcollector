@@ -58,6 +58,7 @@ type GlobalConfig struct {
 	UsingOldContentTag             bool
 	EnableContainerdUpperDirDetect bool
 	EnableSlsMetricsFormat         bool
+	EnableProcessorTag             bool
 
 	PipelineMetaTagKey     map[string]string
 	AppendingAllEnvMetaTag bool

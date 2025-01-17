@@ -258,8 +258,7 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	pipeContext := p.ProcessPipeContext
 	pipeChan := p.InputPipeContext.Collector().Observe()
 	var processorTag *ProcessorTag
-	if len(p.ServicePlugins)+len(p.MetricPlugins) != 0 {
-		globalConfig := p.LogstoreConfig.GlobalConfig
+	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
 		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.LogFileTagsPath, globalConfig.MachineUUID)
 	}
 	for {

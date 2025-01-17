@@ -33,10 +33,10 @@ const (
 )
 
 const (
-	hostNameDefaultTagKey      = "host_name"
-	hostIPDefaultTagKey        = "host_ip"
-	hostIDDefaultTagKey        = "host_id"
-	cloudProviderDefaultTagKey = "cloud_provider"
+	hostNameDefaultTagKey      = "host.name"
+	hostIPDefaultTagKey        = "host.ip"
+	hostIDDefaultTagKey        = "host.id"
+	cloudProviderDefaultTagKey = "cloud.provider"
 	machineUUIDDefaultTagKey   = "__machine_uuid__"
 	defaultConfigTagKeyValue   = "__default__"
 )
