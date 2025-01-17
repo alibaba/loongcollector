@@ -18,31 +18,37 @@
 #include <mutex>
 #include <thread>
 
-#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
+#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
-#include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/FileEvent.h"
+#include "ebpf/type/NetworkObserverEvent.h"
 
 namespace logtail {
 namespace ebpf {
 class FileSecurityManager : public AbstractManager {
 public:
     FileSecurityManager() = delete;
-    FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+    FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+                        std::shared_ptr<SourceManager> sourceManager,
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        std::shared_ptr<Timer> scheduler)
         : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
     static std::shared_ptr<FileSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) {
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           std::shared_ptr<Timer> scheduler) {
         return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, scheduler);
     }
 
     ~FileSecurityManager();
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
+
+    void RecordFileEvent(file_data_t* event);
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 

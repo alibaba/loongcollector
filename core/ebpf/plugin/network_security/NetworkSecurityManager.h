@@ -14,13 +14,14 @@
 
 #pragma once
 
-#include "ebpf/plugin/AbstractManager.h"
 #include <atomic>
-#include <thread>
-#include <mutex>
 #include <condition_variable>
-#include "common/timer/Timer.h"
+#include <mutex>
+#include <thread>
+
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/timer/Timer.h"
+#include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/type/NetworkEvent.h"
 
 
@@ -30,19 +31,24 @@ namespace ebpf {
 class NetworkSecurityManager : public AbstractManager {
 public:
     NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
-                          std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
+                           std::shared_ptr<SourceManager> sourceManager,
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           std::shared_ptr<Timer> scheduler);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) {
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           std::shared_ptr<Timer> scheduler) {
         return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, scheduler);
     }
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) override;
     int Destroy() override;
-    
+
+    void RecordNetworkEvent(tcp_data_t* event);
+
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;

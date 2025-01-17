@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #include "NetworkSecurityManager.h"
-#include "logger/Logger.h"
+
 #include "common/MachineInfoUtil.h"
-#include "models/PipelineEventGroup.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/type/PeriodicalEvent.h"
+#include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
@@ -25,8 +26,70 @@
 namespace logtail {
 namespace ebpf {
 
+
+void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return;
+    }
+    NetworkSecurityManager* ss = static_cast<NetworkSecurityManager*>(ctx);
+    if (ss == nullptr)
+        return;
+    tcp_data_t* event = static_cast<tcp_data_t*>(data);
+    ss->RecordNetworkEvent(event);
+    // TODO @qianlu.kk  self monitor
+    //   ss->UpdateRecvKernelEventsTotal();
+    return;
+}
+
+void HandleNetworkKernelEventLoss(void* ctx, int cpu, __u64 num) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", "")("lost network kernel events num", num));
+        return;
+    }
+    NetworkSecurityManager* ss = static_cast<NetworkSecurityManager*>(ctx);
+    if (ss == nullptr)
+        return;
+    //   ss->UpdateLossKernelEventsTotal(lost_cnt);
+
+    return;
+}
+
+void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
+    KernelEventType type;
+    switch (event->func) {
+        case TRACEPOINT_FUNC_TCP_SENDMSG:
+            type = KernelEventType::TCP_SENDMSG_EVENT;
+            break;
+        case TRACEPOINT_FUNC_TCP_CONNECT:
+            type = KernelEventType::TCP_CONNECT_EVENT;
+            break;
+        case TRACEPOINT_FUNC_TCP_CLOSE:
+            type = KernelEventType::TCP_CLOSE_EVENT;
+            break;
+        default:
+            break;
+    }
+    auto evt = std::make_shared<NetworkEvent>(event->key.pid,
+                                              event->key.ktime,
+                                              type,
+                                              event->timestamp,
+                                              event->protocol,
+                                              event->family,
+                                              event->saddr,
+                                              event->daddr,
+                                              event->sport,
+                                              event->dport,
+                                              event->net_ns);
+    mCommonEventQueue.enqueue(std::move(evt));
+    return;
+}
+
+
 NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
-                                             std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+                                               std::shared_ptr<SourceManager> sourceManager,
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               std::shared_ptr<Timer> scheduler)
     : AbstractManager(base, sourceManager, queue, scheduler) {
 }
 
@@ -39,27 +102,42 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     mFlag = true;
 
-    mAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> (
-        4096, 
-        [this](std::unique_ptr<NetworkEventGroup> &base, const std::shared_ptr<NetworkEvent>& other) {
+    mAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>>(
+        4096,
+        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
             base->mInnerEvents.emplace_back(std::move(other));
-        }, 
+        },
         [this](const std::shared_ptr<NetworkEvent>& in) {
-            return std::make_unique<NetworkEventGroup>(in->mPid, in->mKtime, in->mProtocol, in->mFamily, in->mSaddr, in->mDaddr, in->mSport, in->mDport, in->mNetns);
-        }
-    );
-    mSafeAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> (
-        4096, 
-        [this](std::unique_ptr<NetworkEventGroup> &base, const std::shared_ptr<NetworkEvent>& other) {
+            return std::make_unique<NetworkEventGroup>(in->mPid,
+                                                       in->mKtime,
+                                                       in->mProtocol,
+                                                       in->mFamily,
+                                                       in->mSaddr,
+                                                       in->mDaddr,
+                                                       in->mSport,
+                                                       in->mDport,
+                                                       in->mNetns);
+        });
+    mSafeAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>>(
+        4096,
+        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
             base->mInnerEvents.emplace_back(std::move(other));
-        }, 
+        },
         [this](const std::shared_ptr<NetworkEvent>& in) {
-            return std::make_unique<NetworkEventGroup>(in->mPid, in->mKtime, in->mProtocol, in->mFamily, in->mSaddr, in->mDaddr, in->mSport, in->mDport, in->mNetns);
-        }
-    );
+            return std::make_unique<NetworkEventGroup>(in->mPid,
+                                                       in->mKtime,
+                                                       in->mProtocol,
+                                                       in->mFamily,
+                                                       in->mSaddr,
+                                                       in->mDaddr,
+                                                       in->mSport,
+                                                       in->mDport,
+                                                       in->mNetns);
+        });
 
-    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
-        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
+        2,
+        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             if (!this->mFlag) {
                 return false;
             }
@@ -101,48 +179,47 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                         // set timestamp
                         logEvent->SetTimestamp(seconds.count(), ts);
 
-                        // set callnames 
-                        switch (innerEvent->mEventType)
-                        {
-                        case KernelEventType::TCP_SENDMSG_EVENT:{
-                            logEvent->SetContent("call_name", std::string("tcp_sendmsg"));
-                            logEvent->SetContent("event_type", std::string("kprobe"));
-                            break;
-                        }
-                        case KernelEventType::TCP_CONNECT_EVENT:{
-                            logEvent->SetContent("call_name", std::string("tcp_connect"));
-                            logEvent->SetContent("event_type", std::string("kprobe"));
-                            break;
-                        }
-                        case KernelEventType::TCP_CLOSE_EVENT:{
-                            logEvent->SetContent("call_name", std::string("tcp_close"));
-                            logEvent->SetContent("event_type", std::string("kprobe"));
-                            break;
-                        }
-                        default:
-                            break;
+                        // set callnames
+                        switch (innerEvent->mEventType) {
+                            case KernelEventType::TCP_SENDMSG_EVENT: {
+                                logEvent->SetContent("call_name", std::string("tcp_sendmsg"));
+                                logEvent->SetContent("event_type", std::string("kprobe"));
+                                break;
+                            }
+                            case KernelEventType::TCP_CONNECT_EVENT: {
+                                logEvent->SetContent("call_name", std::string("tcp_connect"));
+                                logEvent->SetContent("event_type", std::string("kprobe"));
+                                break;
+                            }
+                            case KernelEventType::TCP_CLOSE_EVENT: {
+                                logEvent->SetContent("call_name", std::string("tcp_close"));
+                                logEvent->SetContent("event_type", std::string("kprobe"));
+                                break;
+                            }
+                            default:
+                                break;
                         }
                     }
 
                     {
                         std::lock_guard lk(mContextMutex);
-                        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                        std::unique_ptr<ProcessQueueItem> item
+                            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
                         if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                            LOG_WARNING(sLogger, 
-                                ("configName", mPipelineCtx->GetConfigName())
-                                ("pluginIdx", this->mPluginIndex)
-                                ("[NetworkSecurityEvent] push queue failed!", ""));
+                            LOG_WARNING(sLogger,
+                                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                            "[NetworkSecurityEvent] push queue failed!", ""));
                         }
                     }
                 });
             }
             this->mSafeAggregateTree->Clear();
-            
+
             return true;
-        }, [this]() { // validator
+        },
+        [this]() { // validator
             return !this->mFlag.load();
-        }
-    );
+        });
     mScheduler->PushEvent(std::move(event));
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
@@ -166,39 +243,33 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) 
 
     std::array<uint64_t, 2> arr1 = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr1) {
-        hash_result[0] ^= hasher(x) +
-                                0x9e3779b9 +
-                                (hash_result[0] << 6) +
-                                (hash_result[0] >> 2);
+        hash_result[0] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
     }
-    std::array<uint64_t, 5> arr2 = {
-        uint64_t(event->mDaddr), 
-        uint64_t(event->mSaddr), 
-        uint64_t(event->mDport), 
-        uint64_t(event->mSport), 
-        uint64_t(event->mNetns)
-    };
+    std::array<uint64_t, 5> arr2 = {uint64_t(event->mDaddr),
+                                    uint64_t(event->mSaddr),
+                                    uint64_t(event->mDport),
+                                    uint64_t(event->mSport),
+                                    uint64_t(event->mNetns)};
 
     for (uint64_t x : arr2) {
-        hash_result[1] ^= hasher(x) +
-                                0x9e3779b9 +
-                                (hash_result[0] << 6) +
-                                (hash_result[0] >> 2);
+        hash_result[1] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
     }
     return hash_result;
 }
 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto networkEvent = std::dynamic_pointer_cast<NetworkEvent>(event);
-    LOG_DEBUG(sLogger, ("receive event, pid", event->mPid) ("ktime", event->mKtime) ("eventType", magic_enum::enum_name(event->mEventType)));
+    LOG_DEBUG(sLogger,
+              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
+                                                                          magic_enum::enum_name(event->mEventType)));
     if (networkEvent == nullptr) {
-        LOG_ERROR(sLogger, ("failed to convert CommonEvent to NetworkEvent, kernel event type", 
-            magic_enum::enum_name(event->GetKernelEventType()))
-            ("PluginType", magic_enum::enum_name(event->GetPluginType()))
-        );
+        LOG_ERROR(sLogger,
+                  ("failed to convert CommonEvent to NetworkEvent, kernel event type",
+                   magic_enum::enum_name(event->GetKernelEventType()))("PluginType",
+                                                                       magic_enum::enum_name(event->GetPluginType())));
         return 1;
     }
-    
+
     // calculate agg key
     std::array<size_t, 2> hash_result = GenerateAggKey(networkEvent);
 
