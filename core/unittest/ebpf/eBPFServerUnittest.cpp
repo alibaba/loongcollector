@@ -174,6 +174,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
 
     // stop
     res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
+    EXPECT_TRUE(res);
     ebpf::eBPFServer::GetInstance()->Stop();
     EXPECT_TRUE(res);
 

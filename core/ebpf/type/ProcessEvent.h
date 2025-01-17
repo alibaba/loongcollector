@@ -178,14 +178,14 @@ public:
 
 /// newest ...
 
-class ProcessEventNode {
-public:
-    ProcessEventNode(uint64_t ts) : mTimestamp(ts) {}
-    uint64_t mTimestamp;
-    KernelEventType mEventType;
-    // attrs
+// class ProcessEventNode {
+// public:
+//     ProcessEventNode(KernelEventType type, uint64_t ts) : mEventType(type), mTimestamp(ts) {}
+//     KernelEventType mEventType;
+//     uint64_t mTimestamp;
+//     // attrs
     
-};
+// };
 
 // std::vector<ProcessEventGroup>
 class ProcessEventGroup {
@@ -194,7 +194,7 @@ public:
     uint32_t mPid;
     uint64_t mKtime;
     // attrs
-    std::vector<ProcessEventNode> mInnerEvents;
+    std::vector<std::shared_ptr<ProcessEvent>> mInnerEvents;
 };
 
 }

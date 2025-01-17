@@ -43,24 +43,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
     mAggregateTree = std::make_unique<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> (
         4096, 
         [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
-            // TODO
-            // gen attrs ... 
-            switch (other->GetKernelEventType())
-            {
-            case KernelEventType::PROCESS_EXECVE_EVENT:
-                
-                break;
-            case KernelEventType::PROCESS_CLONE_EVENT:
-
-                break;
-            case KernelEventType::PROCESS_EXIT_EVENT:
-
-                break;
-            default:
-                LOG_ERROR(sLogger, ("kernel event type not supported", magic_enum::enum_name(other->GetKernelEventType())));
-                break;
-            }
-            base->mInnerEvents.emplace_back(other->mTimestamp);
+            base->mInnerEvents.emplace_back(std::move(other));
         }, 
         [this](const std::shared_ptr<ProcessEvent>& in) {
             // generate key
@@ -93,12 +76,12 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                     if (!ok) {
                         return;
                     }
-                    for (auto& innerEvent : group->mInnerEvents) {
+                    for (auto innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
-                        auto ts = innerEvent.mTimestamp + this->mTimeDiff.count();
+                        auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         logEvent->SetTimestamp(seconds.count(), ts);
-                        switch (innerEvent.mEventType)
+                        switch (innerEvent->mEventType)
                         {
                         case KernelEventType::PROCESS_EXECVE_EVENT:{
                             logEvent->SetContent("call_name", std::string("execve"));
@@ -106,8 +89,15 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                             break;
                         }
                         case KernelEventType::PROCESS_EXIT_EVENT:{
+                            auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
+                            if (exitEvent == nullptr) {
+                                LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
+                                continue;
+                            }
                             logEvent->SetContent("call_name", std::string("exit"));
                             logEvent->SetContent("event_type", std::string("kprobe"));
+                            logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
+                            logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
                             break;
                         }
                         case KernelEventType::PROCESS_CLONE_EVENT:{
@@ -119,7 +109,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                             break;
                         }
                     }
-                    // TODO add lock??
+                    // TODO @qianlu.kk add lock
                     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
                     if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
                         LOG_WARNING(sLogger, 
@@ -128,8 +118,6 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                             ("[ProcessSecurityEvent] push queue failed!", ""));
                     }
                 });
-                // push process queue
-                
             }
             this->mAggregateTree->Clear();
             
