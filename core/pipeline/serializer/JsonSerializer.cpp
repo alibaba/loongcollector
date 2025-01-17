@@ -86,7 +86,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
-                        eventJson[METRIC_RESERVED_KEY_VALUE][value->first.to_string()] = value->second;
+                        eventJson[METRIC_RESERVED_KEY_VALUE][value->first.to_string()] = value->second.Value;
                     }
                 }
                 Json::StreamWriterBuilder writer;
