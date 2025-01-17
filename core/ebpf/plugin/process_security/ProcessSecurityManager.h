@@ -56,7 +56,9 @@ public:
     virtual int PollPerfBuffer() override { return 0; }
 
 private:
+    ReadWriteLock mLock;
     std::unique_ptr<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> mAggregateTree;
+    std::unique_ptr<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> mSafeAggregateTree;
 };
 
 } // namespace ebpf

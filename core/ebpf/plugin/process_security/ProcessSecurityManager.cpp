@@ -58,18 +58,25 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
             if (!this->mFlag) {
                 return false;
             }
+
+            {
+                WriteLock lk(this->mLock);
+                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
+            }
             // this->mVec.push_back(1);
             // read aggregator
-            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
                 return true;
             }
 
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
-                this->mAggregateTree->ForEach(node, [&](const ProcessEventGroup* group) {
+                this->mSafeAggregateTree->ForEach(node, [&](const ProcessEventGroup* group) {
                     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
                     // represent a process ...
                     bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
@@ -122,7 +129,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                     }
                 });
             }
-            this->mAggregateTree->Clear();
+            this->mSafeAggregateTree->Clear();
             
             return true;
         }, [this]() { // validator
@@ -140,6 +147,22 @@ int ProcessSecurityManager::Destroy() {
     return 0;
 }
 
+std::array<size_t, 1> GenerateAggKey(const std::shared_ptr<ProcessEvent> event) {
+    // calculate agg key
+    std::array<size_t, 1> hash_result;
+    hash_result.fill(0UL);
+    std::hash<uint64_t> hasher;
+
+    std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
+    for (uint64_t x : arr) {
+        hash_result[0] ^= hasher(x) +
+                                0x9e3779b9 +
+                                (hash_result[0] << 6) +
+                                (hash_result[0] >> 2);
+    }
+    return hash_result;
+}
+
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto processEvent = std::dynamic_pointer_cast<ProcessEvent>(event);
     LOG_DEBUG(sLogger, ("receive event, pid", event->mPid) ("ktime", event->mKtime) ("eventType", magic_enum::enum_name(event->mEventType)));
@@ -152,18 +175,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     }
     
     // calculate agg key
-    std::array<size_t, 1> hash_result;
-    hash_result.fill(0UL);
-    std::hash<uint64_t> hasher;
-    
-    hash_result[0] ^= hasher(event->mPid) +
-                                            0x9e3779b9 +
-                                            (hash_result[0] << 6) +
-                                            (hash_result[0] >> 2);
-    hash_result[0] ^= hasher(event->mKtime) +
-                                            0x9e3779b9 +
-                                            (hash_result[0] << 6) +
-                                            (hash_result[0] >> 2);
+    std::array<size_t, 1> hash_result = GenerateAggKey(processEvent);
     bool ret = mAggregateTree->Aggregate(processEvent, hash_result);
     LOG_DEBUG(sLogger, ("after aggregate", ret));
 

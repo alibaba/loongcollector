@@ -37,6 +37,7 @@
 #include "common/timer/Timer.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "type/CommonDataEvent.h"
+#include "util/FrequencyManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -145,6 +146,8 @@ private:
 
     std::future<void> mPoller;
     std::future<void> mHandler;
+
+    FrequencyManager mFrequencyMgr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

@@ -69,6 +69,8 @@ public:
         mFlushProcessEvent = isFlush;
     }
 
+    SizedMap FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime);
+
     bool FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime);
 
     void PollPerfBuffers();

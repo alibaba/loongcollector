@@ -48,8 +48,9 @@ public:
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
 private:
-    
-    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mAggregateTree;
+    ReadWriteLock mLock;
+    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mAggregateTree; // guard by mLock
+    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mSafeAggregateTree;
 };
 
 } // namespace ebpf

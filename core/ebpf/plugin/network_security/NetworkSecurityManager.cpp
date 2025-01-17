@@ -48,13 +48,26 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             return std::make_unique<NetworkEventGroup>(in->mPid, in->mKtime, in->mProtocol, in->mFamily, in->mSaddr, in->mDaddr, in->mSport, in->mDport, in->mNetns);
         }
     );
+    mSafeAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> (
+        4096, 
+        [this](std::unique_ptr<NetworkEventGroup> &base, const std::shared_ptr<NetworkEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        }, 
+        [this](const std::shared_ptr<NetworkEvent>& in) {
+            return std::make_unique<NetworkEventGroup>(in->mPid, in->mKtime, in->mProtocol, in->mFamily, in->mSaddr, in->mDaddr, in->mSport, in->mDport, in->mNetns);
+        }
+    );
 
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
         [this](const std::chrono::steady_clock::time_point& execTime){ // handler
             if (!this->mFlag) {
                 return false;
             }
-            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            {
+                WriteLock lk(this->mLock);
+                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
+            }
+            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -65,7 +78,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
-                this->mAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
+                this->mSafeAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
                     // set process tag
                     bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
                     if (!ok) {
@@ -123,7 +136,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     }
                 });
             }
-            this->mAggregateTree->Clear();
+            this->mSafeAggregateTree->Clear();
             
             return true;
         }, [this]() { // validator
@@ -134,7 +147,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::NETWORK_SECURITY;
-    // set configs
+    // TODO @qianlu.kk set configs
     NetworkSecurityConfig config;
     pc->mConfig = std::move(config);
 
@@ -145,7 +158,55 @@ int NetworkSecurityManager::Destroy() {
     return mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
 }
 
+std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) {
+    // calculate agg key
+    std::array<size_t, 2> hash_result;
+    hash_result.fill(0UL);
+    std::hash<uint64_t> hasher;
+
+    std::array<uint64_t, 2> arr1 = {uint64_t(event->mPid), event->mKtime};
+    for (uint64_t x : arr1) {
+        hash_result[0] ^= hasher(x) +
+                                0x9e3779b9 +
+                                (hash_result[0] << 6) +
+                                (hash_result[0] >> 2);
+    }
+    std::array<uint64_t, 5> arr2 = {
+        uint64_t(event->mDaddr), 
+        uint64_t(event->mSaddr), 
+        uint64_t(event->mDport), 
+        uint64_t(event->mSport), 
+        uint64_t(event->mNetns)
+    };
+
+    for (uint64_t x : arr2) {
+        hash_result[1] ^= hasher(x) +
+                                0x9e3779b9 +
+                                (hash_result[0] << 6) +
+                                (hash_result[0] >> 2);
+    }
+    return hash_result;
+}
+
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
+    auto networkEvent = std::dynamic_pointer_cast<NetworkEvent>(event);
+    LOG_DEBUG(sLogger, ("receive event, pid", event->mPid) ("ktime", event->mKtime) ("eventType", magic_enum::enum_name(event->mEventType)));
+    if (networkEvent == nullptr) {
+        LOG_ERROR(sLogger, ("failed to convert CommonEvent to NetworkEvent, kernel event type", 
+            magic_enum::enum_name(event->GetKernelEventType()))
+            ("PluginType", magic_enum::enum_name(event->GetPluginType()))
+        );
+        return 1;
+    }
+    
+    // calculate agg key
+    std::array<size_t, 2> hash_result = GenerateAggKey(networkEvent);
+
+    {
+        WriteLock lk(mLock);
+        bool ret = mAggregateTree->Aggregate(networkEvent, hash_result);
+        LOG_DEBUG(sLogger, ("after aggregate", ret));
+    }
     return 0;
 }
 

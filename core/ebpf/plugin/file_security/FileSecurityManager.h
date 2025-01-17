@@ -49,7 +49,9 @@ public:
     virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
 private:
+    ReadWriteLock mLock;
     std::unique_ptr<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> mAggregateTree;
+    std::unique_ptr<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> mSafeAggregateTree;
 };
 
 } // namespace ebpf

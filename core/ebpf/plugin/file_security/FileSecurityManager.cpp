@@ -25,6 +25,22 @@
 namespace logtail {
 namespace ebpf {
 
+std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
+    std::array<size_t, 2> hash_result;
+    hash_result.fill(0UL);
+    std::hash<std::string> hasher;
+    std::hash<uint64_t> hasher0;
+    
+    hash_result[0] = uint64_t(event->mPid) ^ (event->mKtime >> 32) ^ (event->mKtime << 32);
+    // LOG_INFO(sLogger, ("ktime", event->mKtime) ("hash result", hash_result[0]));
+    // aggregate_tree_.Aggregate();
+    hash_result[1] ^= hasher(event->mPath) +
+                                        0x9e3779b9 +
+                                        (hash_result[1] << 6) +
+                                        (hash_result[1] >> 2);
+    return hash_result;
+}
+
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
     // set init flag ...
     mFlag = true;
@@ -45,7 +61,13 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
             if (!this->mFlag) {
                 return false;
             }
-            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            
+            {
+                WriteLock lk(this->mLock);
+                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
+            }
+
+            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -55,7 +77,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
             PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
-                this->mAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
+                this->mSafeAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
                     // set process tag
                     bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
                     if (!ok) {
@@ -106,7 +128,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
                     }
                 });
             }
-            this->mAggregateTree->Clear();
+            this->mSafeAggregateTree->Clear();
             
             return true;
         }, [this]() { // validator
@@ -124,11 +146,43 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
     pc->mConfig = std::move(config);
 
     return mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
+}
 
+std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
+    // calculate agg key
+    std::array<size_t, 2> hash_result;
+    hash_result.fill(0UL);
+    std::hash<uint64_t> hasher;
+    std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
+    for (uint64_t x : arr) {
+        hash_result[0] ^= hasher(x) +
+                                0x9e3779b9 +
+                                (hash_result[0] << 6) +
+                                (hash_result[0] >> 2);
+    }
+    std::hash<std::string> strHasher;
+    hash_result[1] ^= strHasher(event->mPath) +
+                                0x9e3779b9 +
+                                (hash_result[0] << 6) +
+                                (hash_result[0] >> 2);
+    return hash_result;
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
-    return 0;
+    auto fileEvent = std::dynamic_pointer_cast<FileEvent>(event);
+    LOG_DEBUG(sLogger, ("receive event, pid", event->mPid) ("ktime", event->mKtime) ("eventType", magic_enum::enum_name(event->mEventType)));
+    if (fileEvent == nullptr) {
+        LOG_ERROR(sLogger, ("failed to convert CommonEvent to FileEvent, kernel event type", 
+            magic_enum::enum_name(event->GetKernelEventType()))
+            ("PluginType", magic_enum::enum_name(event->GetPluginType()))
+        );
+        return 1;
+    }
+    
+    // calculate agg key
+    std::array<size_t, 2> hash_result = GenerateAggKey(fileEvent);
+    bool ret = mAggregateTree->Aggregate(fileEvent, hash_result);
+    LOG_DEBUG(sLogger, ("after aggregate", ret));
 }
 
 int FileSecurityManager::Destroy() {

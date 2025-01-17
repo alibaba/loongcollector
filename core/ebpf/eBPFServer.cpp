@@ -402,11 +402,17 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type
     return true;
 }
 
-// TODO @qianlu.kk
-// we need add some frequency control logic, 
-// otherwise it will always occupy CPU...
 void eBPFServer::PollPerfBuffers() {
+    mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while(mRunning) {
+        auto now = std::chrono::steady_clock::now();
+        auto next_window = mFrequencyMgr.Next();
+        if (!mFrequencyMgr.Expired(now)) {
+          std::this_thread::sleep_until(next_window);
+          mFrequencyMgr.Reset(next_window);
+        } else {
+          mFrequencyMgr.Reset(now);
+        }
         for (int i = 0; i < int(PluginType::MAX); i ++) {
             auto plugin = GetPluginManager(PluginType(i));
             if (!plugin) continue;

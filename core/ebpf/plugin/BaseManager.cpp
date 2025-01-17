@@ -621,6 +621,19 @@ void BaseManager::HandleCacheUpdate() {
     }
 }
 
+// TODO @qianlu.kk
+SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime) {
+    SizedMap res;
+
+    // auto key = sb->CopyString(proc->exec_id);
+    // auto val = sb->CopyString(proc->parent_exec_id);
+    // res.Insert(StringView(key.data, key.size), StringView(val.data, val.size));
+    // auto ret = sb->CopyString(proc->exec_id);
+    // sb->CopyString(proc->parent_exec_id);
+    // res.Insert(StringView(), StringView());
+    return res;
+}
+
 bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime) {
     auto execId = GenerateExecId(pid, ktime);
     auto proc = LookupCache(execId);
