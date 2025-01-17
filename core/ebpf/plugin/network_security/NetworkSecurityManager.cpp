@@ -60,7 +60,8 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
                 return true;
             }
-
+            // do we need to aggregate all the events into a eventgroup??
+            // use source buffer to hold the memory
             PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
@@ -109,13 +110,16 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                             break;
                         }
                     }
-                    // TODO @qianlu.kk add lock
-                    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                        LOG_WARNING(sLogger, 
-                            ("configName", mPipelineCtx->GetConfigName())
-                            ("pluginIdx", this->mPluginIndex)
-                            ("[NetworkSecurityEvent] push queue failed!", ""));
+
+                    {
+                        std::lock_guard lk(mContextMutex);
+                        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                            LOG_WARNING(sLogger, 
+                                ("configName", mPipelineCtx->GetConfigName())
+                                ("pluginIdx", this->mPluginIndex)
+                                ("[NetworkSecurityEvent] push queue failed!", ""));
+                        }
                     }
                 });
             }

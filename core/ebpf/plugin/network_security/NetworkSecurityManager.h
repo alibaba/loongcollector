@@ -33,6 +33,13 @@ public:
                           std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
     ~NetworkSecurityManager() override {}
 
+    static std::shared_ptr<NetworkSecurityManager>
+    Create(std::shared_ptr<BaseManager>& mgr,
+           std::shared_ptr<SourceManager> sourceManager,
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) {
+        return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, scheduler);
+    }
+
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) override;
     int Destroy() override;
     

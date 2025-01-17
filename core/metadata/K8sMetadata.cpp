@@ -25,6 +25,7 @@
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 #include "common/StringTools.h"
+#include "app_config/AppConfig.h"
 
 using namespace std;
 
@@ -39,7 +40,10 @@ bool K8sMetadata::Enable() {
 #ifdef APSARA_UNIT_TEST_MAIN
     return false;
 #endif
-    // TODO @qianlu.kk 
+    if (!AppConfig::GetInstance()->IsPurageContainerMode()) {
+        return false;
+    }
+    // Is this enough?
     return true;
 }
 

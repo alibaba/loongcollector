@@ -109,13 +109,16 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                             break;
                         }
                     }
-                    // TODO @qianlu.kk add lock
-                    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                        LOG_WARNING(sLogger, 
-                            ("configName", mPipelineCtx->GetConfigName())
-                            ("pluginIdx", this->mPluginIndex)
-                            ("[ProcessSecurityEvent] push queue failed!", ""));
+                    
+                    {
+                        std::lock_guard lk(mContextMutex);
+                        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                            LOG_WARNING(sLogger, 
+                                ("configName", mPipelineCtx->GetConfigName())
+                                ("pluginIdx", this->mPluginIndex)
+                                ("[ProcessSecurityEvent] push queue failed!", ""));
+                        }
                     }
                 });
             }

@@ -30,13 +30,15 @@ namespace logtail {
 namespace ebpf {
 class FileSecurityManager : public AbstractManager {
 public:
-    // static std::shared_ptr<FileSecurityManager> Create(std::shared_ptr<BaseManager>& mgr,
-    // std::shared_ptr<BPFWrapper<sockettrace_secure_bpf>> wrapper) {
-    //     return std::make_shared<FileSecurityManager>(mgr, wrapper);
-    // }
     FileSecurityManager() = delete;
     FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
         : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
+    static std::shared_ptr<FileSecurityManager>
+    Create(std::shared_ptr<BaseManager>& mgr,
+           std::shared_ptr<SourceManager> sourceManager,
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler) {
+        return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, scheduler);
+    }
 
     ~FileSecurityManager();
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;

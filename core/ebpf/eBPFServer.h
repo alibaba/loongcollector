@@ -115,13 +115,6 @@ private:
                          int idx);
 
     std::shared_ptr<SourceManager> mSourceManager;
-    // source manager
-    std::unique_ptr<EventHandler> mEventCB;
-    std::unique_ptr<MeterHandler> mMeterCB;
-    std::unique_ptr<SpanHandler> mSpanCB;
-    std::unique_ptr<SecurityHandler> mNetworkSecureCB;
-    std::unique_ptr<SecurityHandler> mProcessSecureCB;
-    std::unique_ptr<SecurityHandler> mFileSecureCB;
 
     mutable std::mutex mMtx;
     std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};

@@ -54,6 +54,9 @@ public:
 
     virtual int PollPerfBuffer() {
         int zero = 0;
+        // TODO @qianlu.kk do we need to hold some events for a while and enqueue bulk??
+        // the max_events doesn't work so far
+        // and if there is no managers at all, this thread will occupy the cpu
         return mSourceManager->PollPerfBuffers(GetPluginType(), 1024, &zero, 200);
     }
 
@@ -97,7 +100,9 @@ protected:
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<Timer> mScheduler;
+
     mutable std::mutex mContextMutex;
+    // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
     const PipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};

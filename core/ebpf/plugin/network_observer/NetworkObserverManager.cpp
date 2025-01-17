@@ -386,8 +386,9 @@ void NetworkObserverManager::ConsumeRecordsAsEvent(const std::vector<std::shared
     }
 
     {
-        // TODO @qianlu.kk add sync logic ...
-        mFlusher(events);
+        std::lock_guard lk(mContextMutex);
+        // TODO @qianlu.kk we need flush records like security plugins
+
         LOG_DEBUG(sLogger,
                   ("call event cb, total event count",
                    count)("bucket count", bucket_count)("events size", events.size())("real size", nn));

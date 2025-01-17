@@ -32,6 +32,8 @@
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
+#include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/network_security/NetworkSecurityManager.h"
 #include "common/magic_enum.hpp"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
@@ -192,18 +194,6 @@ void eBPFServer::Init() {
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
-    mEventCB = std::make_unique<EventHandler>(nullptr, -1, 0);
-#ifdef __ENTERPRISE__
-    mMeterCB = std::make_unique<ArmsMeterHandler>(nullptr, -1, 0);
-    mSpanCB = std::make_unique<ArmsSpanHandler>(nullptr, -1, 0);
-#else
-    mMeterCB = std::make_unique<OtelMeterHandler>(nullptr, -1, 0);
-    mSpanCB = std::make_unique<OtelSpanHandler>(nullptr, -1, 0);
-#endif
-
-    mNetworkSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
-    mProcessSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
-    mFileSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
 }
 
 void eBPFServer::Stop() {
@@ -218,20 +208,6 @@ void eBPFServer::Stop() {
     for (int i = 0; i < int(PluginType::MAX); i++) {
         UpdatePipelineName(static_cast<PluginType>(i), "", "");
     }
-
-    // UpdateContext must after than StopPlugin
-    if (mEventCB)
-        mEventCB->UpdateContext(nullptr, -1, -1);
-    if (mMeterCB)
-        mMeterCB->UpdateContext(nullptr, -1, -1);
-    if (mSpanCB)
-        mSpanCB->UpdateContext(nullptr, -1, -1);
-    if (mNetworkSecureCB)
-        mNetworkSecureCB->UpdateContext(nullptr, -1, -1);
-    if (mProcessSecureCB)
-        mProcessSecureCB->UpdateContext(nullptr, -1, -1);
-    if (mFileSecureCB)
-        mFileSecureCB->UpdateContext(nullptr, -1, -1);
     
     mScheduler->Stop();
     mBaseManager->Stop();
@@ -302,12 +278,8 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             NetworkObserveConfig nconfig;
 
             // TODO @qianlu.kk register k8s metadata callback for metric ??
-
-            mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             auto mgr = NetworkObserverManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, mScheduler, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
-                    mEventCB->handle(events);
-                });
+                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
             UpdatePluginManager(type, mgr);
             mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
 
@@ -316,34 +288,20 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
         }
 
         case PluginType::NETWORK_SECURITY: {
-            NetworkSecurityConfig nconfig;
-            // TODO @qianlu.kk set new handler ...
-
-            // nconfig.network_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-            //     return mNetworkSecureCB->handle(events);
-            // };
-            // SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            // nconfig.options_ = opts->mOptionList;
-            // eBPFConfig->mConfig = std::move(nconfig);
-            // // UpdateContext must ahead of StartPlugin
-            // mNetworkSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            auto mgr = NetworkSecurityManager::Create(
+                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+            UpdatePluginManager(type, mgr);
+            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (mgr->Init(options) == 0);
             break;
         }
 
         case PluginType::FILE_SECURITY: {
-            FileSecurityConfig fconfig;
-            // TODO @qianlu.kk set new handler ...
-
-            // fconfig.file_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-            //     return mFileSecureCB->handle(events);
-            // };
-            // SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            // fconfig.options_ = opts->mOptionList;
-            // eBPFConfig->mConfig = std::move(fconfig);
-            // // UpdateContext must ahead of StartPlugin
-            // mFileSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+            auto mgr = FileSecurityManager::Create(
+                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+            UpdatePluginManager(type, mgr);
+            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (mgr->Init(options) == 0);
             break;
         }
         default:
@@ -430,49 +388,23 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type
     if (!IsSupportedEnv(type)) {
         return false;
     }
-    // mark plugin status is update
-    bool ret = mSourceManager->SuspendPlugin(type);
-    if (ret) {
-        UpdateCBContext(type, nullptr, -1, -1);
-        mSuspendPluginTotal->Add(1);
-    }
-    return ret;
+
+    auto mgr = GetPluginManager(type);
+    if (!mgr) return true;
+
+    // TODO @qianlu.kk
+    // this will stop handle or push eventGroup to queue,
+    // we need to resume plugin when we restart plugin, and we don't implement yet...
+    // pay attention to timer process
+    // and we need to figure out wether we need to STOP plugin... especially for perf workers.
+    mgr->UpdateContext(nullptr, -1, -1);
+    mSuspendPluginTotal->Add(1);
+    return true;
 }
 
-void eBPFServer::UpdateCBContext(PluginType type,
-                                 const logtail::CollectionPipelineContext* ctx,
-                                 logtail::QueueKey key,
-                                 int idx) {
-    switch (type) {
-        case PluginType::PROCESS_SECURITY: {
-            if (mProcessSecureCB)
-                mProcessSecureCB->UpdateContext(ctx, key, idx);
-            return;
-        }
-        case PluginType::NETWORK_OBSERVE: {
-            if (mMeterCB)
-                mMeterCB->UpdateContext(ctx, key, idx);
-            if (mSpanCB)
-                mSpanCB->UpdateContext(ctx, key, idx);
-            if (mEventCB)
-                mEventCB->UpdateContext(ctx, key, idx);
-            return;
-        }
-        case PluginType::NETWORK_SECURITY: {
-            if (mNetworkSecureCB)
-                mNetworkSecureCB->UpdateContext(ctx, key, idx);
-            return;
-        }
-        case PluginType::FILE_SECURITY: {
-            if (mFileSecureCB)
-                mFileSecureCB->UpdateContext(ctx, key, idx);
-            return;
-        }
-        default:
-            return;
-    }
-}
-
+// TODO @qianlu.kk
+// we need add some frequency control logic, 
+// otherwise it will always occupy CPU...
 void eBPFServer::PollPerfBuffers() {
     while(mRunning) {
         for (int i = 0; i < int(PluginType::MAX); i ++) {
@@ -525,7 +457,6 @@ void eBPFServer::HandlerEvents() {
         // handle
         items.clear();
         items.resize(1024);
-
     }
 }
 
