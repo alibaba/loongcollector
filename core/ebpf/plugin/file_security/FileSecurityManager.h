@@ -24,6 +24,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/type/FileEvent.h"
 
 namespace logtail {
 namespace ebpf {
@@ -41,19 +42,12 @@ public:
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
 
-    void RecordFileEvent(file_data_t* event);
-
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override {return 0;}
-
-    void FlushFilekEvent();
+    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
     virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    int EnableCallName(const std::string& call_name, const configType config) override;
-    int DisableCallName(const std::string& call_name) override;
-
 private:
-    mutable moodycamel::BlockingConcurrentQueue<std::unique_ptr<FileSecurityNode>> mEventQueue;
+    std::unique_ptr<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> mAggregateTree;
 };
 
 } // namespace ebpf

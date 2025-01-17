@@ -95,10 +95,7 @@ bool BaseManager::Init() {
     auto ebpfConfig = std::make_unique<PluginConfig>();
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
-    auto ret = SyncAllProc();
-    if (ret != 0) {
-        LOG_ERROR(sLogger, ("failed to sync all proc, ret", ret));
-    }
+    
     pconfig.mPerfBufferSpec = {{"tcpmon_map",
         128,
         this,
@@ -111,7 +108,16 @@ bool BaseManager::Init() {
     mFlag = true;
     mPoller = async(std::launch::async, &BaseManager::PollPerfBuffers, this);
     mCacheUpdater = async(std::launch::async, &BaseManager::HandleCacheUpdate, this);
-    return mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
+    bool status = mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
+    if (!status) {
+        LOG_ERROR(sLogger, ("failed to start process security plugin", ""));
+        return false;
+    }
+    auto ret = SyncAllProc();
+    if (ret != 0) {
+        LOG_WARNING(sLogger, ("failed to sync all proc, ret", ret));
+    }
+    return true;
 }
 
 void BaseManager::PollPerfBuffers() {
@@ -126,7 +132,8 @@ void BaseManager::Stop() {
     if (!mInited) {
         return;
     }
-    mSourceManager->StopPlugin(PluginType::PROCESS_SECURITY);
+    auto res = mSourceManager->StopPlugin(PluginType::PROCESS_SECURITY);
+    LOG_INFO(sLogger, ("stop process probes for base manager, status", res));
     mFlag = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
     if (mPoller.valid()) {
@@ -220,7 +227,6 @@ void BaseManager::RecordExecveEvent(msg_execve_event* event_ptr) {
 
     return;
 }
-
 
 void BaseManager::RecordExitEvent(msg_exit* event_ptr) {
     if (mFlushProcessEvent) {

@@ -32,6 +32,7 @@
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
+#include "common/magic_enum.hpp"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -161,9 +162,9 @@ void eBPFServer::Init() {
     // read host path prefix
     if (AppConfig::GetInstance()->IsPurageContainerMode()) {
         mHostPathPrefix = STRING_FLAG(default_container_host_path);
-        LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+        LOG_INFO(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
     } else {
-        LOG_DEBUG(sLogger, ("running in host mode", "would not set host path prefix ..."));
+        LOG_INFO(sLogger, ("running in host mode", "would not set host path prefix ..."));
     }
 #endif
 
@@ -273,7 +274,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
 
     if (type != PluginType::NETWORK_OBSERVE) {
-        LOG_DEBUG(sLogger, ("hostname", mHostName) ("mHostPathPrefix", mHostPathPrefix));
+        LOG_INFO(sLogger, ("hostname", mHostName) ("mHostPathPrefix", mHostPathPrefix));
         mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
         mBaseManager->Init();
     }
@@ -394,15 +395,9 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
     if (pluginManager) {
         pluginManager->UpdateContext(nullptr, -1, -1);
         return pluginManager->Destroy() == 0;
-    }
-
-    bool ret = mSourceManager->StopPlugin(type);
-    // UpdateContext must after than StopPlugin
-    if (ret) {
-        UpdateCBContext(type, nullptr, -1, -1);
-        mStopPluginTotal->Add(1);
-    }
-    return ret;
+    } else 
+    LOG_WARNING(sLogger, ("no plugin registered, plugin type", magic_enum::enum_name(type))("pipeline", pipeline_name));
+    return true;
 }
 
 std::string eBPFServer::CheckLoadedPipelineName(PluginType type) {

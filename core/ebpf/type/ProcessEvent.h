@@ -167,6 +167,11 @@ public:
   bool kernel_thread;
 };
 
+class ProcessEvent : public CommonEvent {
+public:
+    ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : CommonEvent(pid,ktime,type,timestamp) {}
+    virtual PluginType GetPluginType() const { return PluginType::PROCESS_SECURITY; };
+};
 
 class ProcessExitEvent : public ProcessEvent {
 public:
@@ -176,18 +181,6 @@ public:
     uint32_t mExitTid;
 };
 
-/// newest ...
-
-// class ProcessEventNode {
-// public:
-//     ProcessEventNode(KernelEventType type, uint64_t ts) : mEventType(type), mTimestamp(ts) {}
-//     KernelEventType mEventType;
-//     uint64_t mTimestamp;
-//     // attrs
-    
-// };
-
-// std::vector<ProcessEventGroup>
 class ProcessEventGroup {
 public:
     ProcessEventGroup(uint32_t pid, uint64_t ktime) : mPid(pid), mKtime(ktime) {}

@@ -15,8 +15,12 @@
 #include "FileSecurityManager.h"
 
 #include "ebpf/Config.h"
-// #include "ebpf/util/IdAllocator.h"
 #include "logger/Logger.h"
+#include "common/magic_enum.hpp"
+#include "ebpf/type/PeriodicalEvent.h"
+#include "pipeline/PipelineContext.h"
+#include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -25,141 +29,107 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
     // set init flag ...
     mFlag = true;
 
-    int ret = 0;
-    // step1. setup tail call
-    // ret = wrapper_->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
-    LOG_DEBUG(sLogger, ("set tail call, ret", ret));
 
-
-    // step1. setup perf buffer
-    // 1. create perf buffer
-    // std::vector<PerfBufferOps> perf_buffers = {
-    //     PerfBufferOps("file_secure_output", 10*1024*1024, HandleFileKernelEvent, HandleFileKernelEventLoss),
-    // };
-
-    // 2. add pb to poller's task array ...
-    // perf_workers_ = wrapper_->AttachPerfBuffers(this, perf_buffers, std::ref(flag_));
-    LOG_DEBUG(sLogger, ("attach perf buffer, ret", ret));
-
-    return ret;
-}
-
-
-int FileSecurityManager::EnableCallName(const std::string& callName, const configType newConfig) {
-    int ret = 0;
-    LOG_DEBUG(sLogger,
-              ("EnableCallName", callName)("idx", newConfig.index())(
-                  "hold", std::holds_alternative<logtail::ebpf::SecurityFileFilter>(newConfig)));
-
-    int call_name_idx = GetCallNameIdx(callName);
-    if (call_name_idx < 0)
-        return 1;
-
-    auto filter = std::get_if<logtail::ebpf::SecurityFileFilter>(&newConfig);
-    // update filters map
-    std::vector<path_entry> path_entries;
-    // concatenate path and filename, then write the resulting char* path into path_filter_list
-    // TODO qianlu.kk use map in map feature to support filters for different call names
-    if (filter && filter->mFilePathList.size()) {
-        selector_filters kernel_filters;
-        ::memset(&kernel_filters, 0, sizeof(kernel_filters));
-
-        int idx = 0;
-
-        // int idx = IdAllocator::GetInstance()->GetNextId<logtail::ebpf::StringPrefixMap>();
-        // if (idx < 0) {
-        //     LOG_WARNING(sLogger,
-        //                 ("Failed to get next id, reach max",
-        //                  IdAllocator::GetInstance()->GetMaxId<logtail::ebpf::StringPrefixMap>()));
-        //     return 1;
-        // }
-
-        LOG_DEBUG(sLogger, ("call_name", callName)("index", idx));
-        // step1: add a new entry into string_prefix_maps, and assign a filter id
-        // step2: add a filter into filter map and record filter type and filter id
-        selector_filter k_filter;
-        ::memset(&k_filter, 0, sizeof(k_filter));
-        k_filter.filter_type = FILTER_TYPE_FILE_PREFIX;
-        k_filter.map_idx[0] = idx;
-        // in bytes
-        // k_filter.vallen = x.length();
-        kernel_filters.filter_count = 1;
-        kernel_filters.filters[0] = k_filter;
-
-        LOG_DEBUG(sLogger, ("filter not empty!", ""));
-        for (size_t i = 0; i < filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
-            auto& x = filter->mFilePathList[i];
-            LOG_DEBUG(sLogger, ("path", x)("begin to update map in map for filter detail, idx", idx));
-
-            // update inner map
-            string_prefix_lpm_trie prefix_trie;
-            ::memset(&prefix_trie, 0, sizeof(prefix_trie));
-            ::memcpy(prefix_trie.data, x.data(), x.length());
-            prefix_trie.prefixlen = x.length() * 8; // in bits
-            // uint8_t val(1);
-            LOG_DEBUG(sLogger,
-                      ("[before update] prefix trie data", prefix_trie.data)("prefix_len", prefix_trie.prefixlen));
-            // TODO @qianlu.kk update inner map
-            // ret = wrapper_->UpdateInnerMapElem<logtail::ebpf::StringPrefixMap>(std::string("string_prefix_maps"),
-            // &idx, &prefix_trie, &val, 0);
-            if (ret) {
-                LOG_DEBUG(sLogger,
-                          ("[after update] prefix trie data failed! data", prefix_trie.data)("prefix_len",
-                                                                                             prefix_trie.prefixlen));
-                continue;
-            }
+    mAggregateTree = std::make_unique<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> (
+        4096, 
+        [this](std::unique_ptr<FileEventGroup> &base, const std::shared_ptr<FileEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        }, 
+        [this](const std::shared_ptr<FileEvent>& in) {
+            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
         }
+    );
 
-        // TODO @qianlu.kk update inner map
-        // udpate filter_map
-        // wrapper_->UpdateBPFHashMap("filter_map", &call_name_idx, &kernel_filters, 0);
-    }
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
+        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+            if (!this->mFlag) {
+                return false;
+            }
+            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+            if (nodes.empty()) {
+                LOG_DEBUG(sLogger, ("empty nodes...", ""));
+                return true;
+            }
 
-    // TODO @qianlu.kk
-    // std::vector<AttachProgOps> attach_ops = {AttachProgOps("kprobe_" + call_name, true)};
-    // ret = wrapper_->DynamicAttachBPFObject(attach_ops);
+            PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+            for (auto& node : nodes) {
+                // convert to a item and push to process queue
+                this->mAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
+                    // set process tag
+                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
+                    if (!ok) {
+                        return;
+                    }
 
-    return ret;
+                    // set file tag
+                    eventGroup.SetTag("path", group->mPath);
+
+                    for (auto innerEvent : group->mInnerEvents) {
+                        auto* logEvent = eventGroup.AddLogEvent();
+                        auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
+                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                        // set timestamp
+                        logEvent->SetTimestamp(seconds.count(), ts);
+                        // set callnames 
+                        switch (innerEvent->mEventType)
+                        {
+                        case KernelEventType::FILE_PATH_TRUNCATE:{
+                            logEvent->SetContent("call_name", std::string("security_path_truncate"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        case KernelEventType::FILE_MMAP:{
+                            logEvent->SetContent("call_name", std::string("security_mmap_file"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        case KernelEventType::FILE_PERMISSION_EVENT:{
+                            logEvent->SetContent("call_name", std::string("security_file_permission"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                    }
+                    // TODO @qianlu.kk add lock
+                    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        LOG_WARNING(sLogger, 
+                            ("configName", mPipelineCtx->GetConfigName())
+                            ("pluginIdx", this->mPluginIndex)
+                            ("[FileSecurityEvent] push queue failed!", ""));
+                    }
+                });
+            }
+            this->mAggregateTree->Clear();
+            
+            return true;
+        }, [this]() { // validator
+            return !this->mFlag.load();
+        }
+    );
+
+    mScheduler->PushEvent(std::move(event));
+
+    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::FILE_SECURITY;
+    // set configs
+
+    FileSecurityConfig config;
+    pc->mConfig = std::move(config);
+
+    return mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
+
 }
 
+int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
+    return 0;
+}
 
-int FileSecurityManager::DisableCallName(const std::string& callName) {
-    LOG_DEBUG(sLogger, ("DisableCallName", callName));
-
-    int call_name_idx = GetCallNameIdx(callName);
-    if (call_name_idx < 0)
-        return 1;
-    int ret = 0;
-    // step1: detach callname
-    // std::vector<AttachProgOps> attach_ops = {AttachProgOps("kprobe_" + call_name, true)};
-    // ret = wrapper_->DynamicDetachBPFObject(attach_ops);
-
-    // step2: get filters for call name
-    selector_filters kernel_filters;
-    ::memset(&kernel_filters, 0, sizeof(kernel_filters));
-    // get filters
-    // ret = wrapper_->LookupBPFHashMap("filter_map", &call_name_idx, &kernel_filters);
-    if (ret) {
-        // no filters found, return directly
-        LOG_WARNING(sLogger, ("There is no filter for call name", callName));
-        return 0;
-    }
-
-    // step3: remove filters
-    for (int i = 0; i < kernel_filters.filter_count; i++) {
-        auto filter = kernel_filters.filters[i];
-        assert(filter.filter_type == FILTER_TYPE_FILE_PREFIX);
-        auto outter_key = filter.map_idx[0];
-        // wrapper_->DeleteInnerMap<logtail::ebpf::StringPrefixMap>("string_prefix_maps", &outter_key);
-        // IdAllocator::GetInstance()->ReleaseId<logtail::ebpf::StringPrefixMap>(outter_key);
-        LOG_DEBUG(sLogger, ("Release filter for type", (int)filter.filter_type)("map_idx", outter_key));
-    }
-
-    // step4: delete filter map for call name
-    ::memset(&kernel_filters, 0, sizeof(kernel_filters));
-    // ret = wrapper_->UpdateBPFHashMap("filter_map", &call_name_idx, &kernel_filters, 0);
-
-    return ret;
+int FileSecurityManager::Destroy() {
+    return mSourceManager->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
 }
 
 } // namespace ebpf

@@ -23,6 +23,7 @@ extern "C" {
 
 #include "BPFMapTraits.h"
 #include "NetworkObserver.h"
+#include "Log.h"
 
 namespace logtail {
 namespace ebpf {
@@ -335,9 +336,9 @@ public:
      */
     int UpdateBPFHashMap(const std::string& map_name, void* key, void* value, uint64_t flag) {
         int map_fd = SearchMapFd(map_name);
-        //     LOG(INFO) << "[BPFWrapper] find " << map_name << " fd:" << map_fd ;
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][UpdateBPFHashMap] find map name: %s map fd: %d \n", map_name, map_fd);
         if (map_fd < 0) {
-            //       LOG(INFO) << "[BPFWrapper] find hash map failed for " << map_name ;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][UpdateBPFHashMap] find hash map failed for: %s \n", map_name);
             return 1;
         }
         return bpf_map_update_elem(map_fd, key, value, flag);
@@ -348,9 +349,9 @@ public:
      */
     int LookupBPFHashMap(const std::string& map_name, void* key, void* value) {
         int map_fd = SearchMapFd(map_name);
-        //     LOG(INFO) << "[BPFWrapper] find " << map_name << " fd:" << map_fd ;
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][LookupBPFHashMap] find map name: %s map fd: %d \n", map_name, map_fd);
         if (map_fd < 0) {
-            //       LOG(WARNING) << "[BPFWrapper] find hash map failed for " << map_name;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][LookupBPFHashMap] find hash map failed for: %s \n", map_name);
             return 1;
         }
         return bpf_map_lookup_elem(map_fd, key, value);
@@ -361,9 +362,9 @@ public:
      */
     int RemoveBPFHashMap(const std::string& map_name, void* key) {
         int map_fd = SearchMapFd(map_name);
-        //     LOG(INFO) << "[BPFWrapper] find " << map_name << " fd:" << map_fd ;
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][RemoveBPFHashMap] find map name: %s map fd: %d \n", map_name, map_fd);
         if (map_fd < 0) {
-            //       LOG(INFO) << "[BPFWrapper] find hash map failed for " << map_name ;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[BPFWrapper][RemoveBPFHashMap] find hash map failed for: %s \n", map_name);
             return 1;
         }
         bpf_map_delete_elem(map_fd, key);
@@ -403,13 +404,13 @@ public:
         pb = perf_buffer__new(mapFd, page_cnt == 0 ? 128 : page_cnt, &pb_opts);
         auto err = libbpf_get_error(pb);
         if (err) {
-            std::cout << "error new perf buffer: " << strerror(-err) << std::endl;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[BPFWrapper][CreatePerfBuffer] error new perf buffer: %s \n", strerror(-err));
             return nullptr;
         }
 
         if (!pb) {
             err = -errno;
-            std::cout << "failed to open perf buffer: " << err << std::endl;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[BPFWrapper][CreatePerfBuffer] failed to open perf buffer: %d \n", err);
             return nullptr;
         }
         return pb;
@@ -446,13 +447,6 @@ public:
     }
 
     int DetachAllPerfBuffers() {
-        // for (auto &th: perf_threads_) {
-        //   if (th.second.joinable()) th.second.join();
-        // }
-        // for (auto& th : perf_threads_) {
-        //   if (th.joinable()) th.join();
-        // }
-        // perf_threads_.clear();
         return 0;
     }
 
@@ -468,7 +462,7 @@ public:
             auto link = it.second;
             auto err = bpf_link__destroy(link);
             if (err) {
-                //         LOG(WARNING) << it.first << " failed to destroy link, err: " << err;
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[BPFWrapper][Destroy] failed to destroy link, err: %d \n", err);
             }
         }
 

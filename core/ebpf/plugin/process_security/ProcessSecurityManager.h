@@ -55,12 +55,8 @@ public:
     // process perfbuffer was polled by baseManager ...
     virtual int PollPerfBuffer() override { return 0; }
 
-    int EnableCallName(const std::string& call_name, const configType config) override {return 0;}
-    int DisableCallName(const std::string& call_name) override {return 0;}
-
 private:
     std::unique_ptr<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> mAggregateTree;
-
 };
 
 } // namespace ebpf

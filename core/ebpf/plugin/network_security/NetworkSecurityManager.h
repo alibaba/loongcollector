@@ -21,6 +21,8 @@
 #include <condition_variable>
 #include "common/timer/Timer.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "ebpf/type/NetworkEvent.h"
+
 
 namespace logtail {
 namespace ebpf {
@@ -33,23 +35,14 @@ public:
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) override;
     int Destroy() override;
-    int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
-    int DisableCallName(const std::string& call_name) override { return 0; }
     
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
 private:
-    void PollerThread();
-    void RunnerThread();
-    void ProcessEvents();
-    void ReportAggTree();
-    void InitTimer();
     
-    std::thread mRunnerThread;
-    std::thread mPollerThread;
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<BaseSecurityEvent>> mEventQueue;
+    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mAggregateTree;
 };
 
 } // namespace ebpf

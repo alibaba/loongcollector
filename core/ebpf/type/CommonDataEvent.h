@@ -29,8 +29,8 @@ enum class KernelEventType {
     TCP_CONNECT_EVENT,
     TCP_CLOSE_EVENT,
 
-    SYS_WRITE_EVENT,
-    SYS_READ_EVENT,
+    FILE_PATH_TRUNCATE,
+    FILE_MMAP,
     FILE_PERMISSION_EVENT,
 };
 
@@ -48,25 +48,6 @@ private:
     CommonEvent() = delete;
 };
 
-class ProcessEvent : public CommonEvent {
-public:
-    ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : CommonEvent(pid,ktime,type,timestamp) {}
-    virtual PluginType GetPluginType() const { return PluginType::PROCESS_SECURITY; };
-};
-
-class FileEvent : public CommonEvent {
-public:
-    FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : CommonEvent(pid,ktime,type,timestamp) {}
-    virtual PluginType GetPluginType() const { return PluginType::FILE_SECURITY; };
-    std::string mPath;
-};
-
-class NetworkEvent : public CommonEvent {
-public:
-    NetworkEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : CommonEvent(pid,ktime,type,timestamp) {}
-    virtual PluginType GetPluginType() const { return PluginType::NETWORK_SECURITY; };
-    // addr etc.
-};
 
 }
 }

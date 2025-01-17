@@ -147,6 +147,46 @@ void eBPFServerUnittest::TestNetworkObserver() {
 
 
 void eBPFServerUnittest::TestProcessSecurity() {
+    std::shared_ptr<InputNetworkObserver> ninput(new InputNetworkObserver());
+    {
+        std::string configStr = R"(
+            {
+                "Type": "input_network_observer",
+                "ProbeConfig": 
+                {
+                    "EnableLog": true,
+                    "EnableMetric": true,
+                    "EnableSpan": false,
+                    "EnableProtocols": [
+                        "http"
+                    ],
+                    "DisableProtocolParse": false,
+                    "DisableConnStats": false,
+                    "EnableConnTrackerDump": false,
+                    "EnableEvent": true,
+                }
+            }
+        )";
+        std::string errorMsg;
+        Json::Value configJson, optionalGoPipeline;
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+        logtail::ebpf::ObserverNetworkOption network_option;
+        bool res = ebpf::InitObserverNetworkOption(configJson, network_option, &ctx, "test-networkobserver");
+        EXPECT_TRUE(res);
+        // observer_options.Init(ObserverType::NETWORK, configJson, &ctx, "test");
+        
+        ninput->SetContext(ctx);
+        ninput->SetMetricsRecordRef("test-networkobserver", "1");
+        auto initStatus = ninput->Init(configJson, optionalGoPipeline);
+        EXPECT_TRUE(initStatus);
+        EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+        EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
+        res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+            "test-networkobserver", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, ninput->mPluginMgr);
+        EXPECT_TRUE(res);
+    }
+
     std::string configStr = R"(
         {
             "Type": "input_process_security"
@@ -175,9 +215,10 @@ void eBPFServerUnittest::TestProcessSecurity() {
     // stop
     res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
     EXPECT_TRUE(res);
+    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test-networkobserver", PluginType::NETWORK_OBSERVE);
+    EXPECT_TRUE(res);
     ebpf::eBPFServer::GetInstance()->Stop();
     EXPECT_TRUE(res);
-
 }
 
 // static int generateRandomInt(int bound) {

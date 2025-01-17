@@ -16,6 +16,10 @@
 #include "logger/Logger.h"
 #include "common/MachineInfoUtil.h"
 #include "models/PipelineEventGroup.h"
+#include "common/magic_enum.hpp"
+#include "ebpf/type/PeriodicalEvent.h"
+#include "pipeline/PipelineContext.h"
+#include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
@@ -24,27 +28,7 @@ namespace ebpf {
 NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
                                              std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
     : AbstractManager(base, sourceManager, queue, scheduler) {
-    // mAggregateTree = std::make_unique<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>>(
-    //     1000, // max nodes
-    //     [](std::unique_ptr<BaseSecurityNode>& base, const std::unique_ptr<BaseSecurityEvent>& n) {
-    //         // 聚合逻辑
-    //     },
-    //     [](const std::unique_ptr<BaseSecurityEvent>& n) {
-    //         // 生成新节点逻辑
-    //         return std::make_unique<BaseSecurityNode>(n->key.pid, n->key.ktime);
-    //     }
-    // );
 }
-
-int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
-    // TODO @qianlu.kk 
-    return 0;
-}
-
-// 网络监控 3 个 poller parser iterator 
-// poller 2 个 
-// 共用 1 个 runner 
-// 共用 1 个 Timer 
 
 int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     auto securityOpts = std::get_if<SecurityOptions*>(&options);
@@ -54,141 +38,114 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
     }
 
     mFlag = true;
-    
-    // 启动工作线程
-    mPollerThread = std::thread(&NetworkSecurityManager::PollerThread, this);
-    mRunnerThread = std::thread(&NetworkSecurityManager::RunnerThread, this);
-    
-    // 初始化定时器
-    InitTimer();
-    
-    LOG_INFO(sLogger, ("NetworkSecurityManager initialized", ""));
-    return 0;
-}
 
-void NetworkSecurityManager::PollerThread() {
-    while (mFlag) {
-        if (mSuspendFlag) {
-            std::unique_lock<std::mutex> lock(mContextMutex);
-            mRunnerCV.wait(lock, [this]() { return !mSuspendFlag || !mFlag; });
-            continue;
+    mAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> (
+        4096, 
+        [this](std::unique_ptr<NetworkEventGroup> &base, const std::shared_ptr<NetworkEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        }, 
+        [this](const std::shared_ptr<NetworkEvent>& in) {
+            return std::make_unique<NetworkEventGroup>(in->mPid, in->mKtime, in->mProtocol, in->mFamily, in->mSaddr, in->mDaddr, in->mSport, in->mDport, in->mNetns);
         }
-        int zero = 0;
-        mSourceManager->PollPerfBuffers(PluginType::NETWORK_SECURITY, 1024, &zero, 100);
-    }
-}
+    );
 
-void NetworkSecurityManager::RunnerThread() {
-    while (mFlag) {
-        if (mSuspendFlag) {
-            std::unique_lock<std::mutex> lock(mContextMutex);
-            mRunnerCV.wait(lock, [this]() { return !mSuspendFlag || !mFlag; });
-            continue;
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
+        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+            if (!this->mFlag) {
+                return false;
+            }
+            auto nodes = this->mAggregateTree->GetNodesWithAggDepth(1);
+            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+            if (nodes.empty()) {
+                LOG_DEBUG(sLogger, ("empty nodes...", ""));
+                return true;
+            }
+
+            PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+            for (auto& node : nodes) {
+                // convert to a item and push to process queue
+                this->mAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
+                    // set process tag
+                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
+                    if (!ok) {
+                        return;
+                    }
+
+                    // set network tag
+                    eventGroup.SetTag("protocol", std::to_string(group->mProtocol));
+                    eventGroup.SetTag("family", std::to_string(group->mFamily));
+                    eventGroup.SetTag("saddr", std::to_string(group->mSaddr));
+                    eventGroup.SetTag("daddr", std::to_string(group->mDaddr));
+                    eventGroup.SetTag("sport", std::to_string(group->mSport));
+                    eventGroup.SetTag("dport", std::to_string(group->mDport));
+                    eventGroup.SetTag("netns", std::to_string(group->mNetns));
+
+                    for (auto innerEvent : group->mInnerEvents) {
+                        auto* logEvent = eventGroup.AddLogEvent();
+                        auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
+                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                        // set timestamp
+                        logEvent->SetTimestamp(seconds.count(), ts);
+
+                        // set callnames 
+                        switch (innerEvent->mEventType)
+                        {
+                        case KernelEventType::TCP_SENDMSG_EVENT:{
+                            logEvent->SetContent("call_name", std::string("tcp_sendmsg"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        case KernelEventType::TCP_CONNECT_EVENT:{
+                            logEvent->SetContent("call_name", std::string("tcp_connect"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        case KernelEventType::TCP_CLOSE_EVENT:{
+                            logEvent->SetContent("call_name", std::string("tcp_close"));
+                            logEvent->SetContent("event_type", std::string("kprobe"));
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                    }
+                    // TODO @qianlu.kk add lock
+                    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                    if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        LOG_WARNING(sLogger, 
+                            ("configName", mPipelineCtx->GetConfigName())
+                            ("pluginIdx", this->mPluginIndex)
+                            ("[NetworkSecurityEvent] push queue failed!", ""));
+                    }
+                });
+            }
+            this->mAggregateTree->Clear();
+            
+            return true;
+        }, [this]() { // validator
+            return !this->mFlag.load();
         }
-        // consume queue && aggregate
-        ProcessEvents();
-    } 
+    );
+    mScheduler->PushEvent(std::move(event));
+
+    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::NETWORK_SECURITY;
+    // set configs
+    NetworkSecurityConfig config;
+    pc->mConfig = std::move(config);
+
+    return mSourceManager->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
 }
 
 int NetworkSecurityManager::Destroy() {
-    if (!mFlag) {
-        return 0;
-    }
+    return mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
+}
 
-    mFlag = false;
-    mRunnerCV.notify_all();
-
-    if (mRunnerThread.joinable()) {
-        mRunnerThread.join();
-    }
-
-    if (mPollerThread.joinable()) {
-        mPollerThread.join();
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mContextMutex);
-        mPipelineCtx = nullptr;
-        mQueueKey = 0;
-        mPluginIndex = -1;
-    }
-
+int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     return 0;
 }
 
-void NetworkSecurityManager::InitTimer() {
-    // TODO @qianlu.kk self event ...
-    // auto event = std::make_unique<TimerEvent>(
-    //     std::chrono::seconds(1), // every 1 second
-    //     [this]() {
-    //         if (!mSuspendFlag) {
-    //             ReportAggTree();
-    //         }
-    //     },
-    //     [this]() {
-    //         // add lock ...
-    //         return !mSuspendFlag && mFlag;
-    //     }
-    // );
-}
-
-void NetworkSecurityManager::ProcessEvents() {
-    // std::unique_lock<std::mutex> lock(mContextMutex);
-    // if (!mPipelineCtx || mPluginIndex < 0) {
-    //     return;
-    // }
-    std::vector<std::unique_ptr<BaseSecurityEvent>> items(1024);
-    size_t count = mEventQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
-    LOG_DEBUG(sLogger, ("get records:", count));
-    // handle ....
-    if (count == 0) {
-        return;
-    }
-    
-    // for (auto& event : items) {
-        // std::array<size_t, 2> hashResult{1, 2};
-        // mAggregateTree->Aggregate(std::move(event), hashResult);
-    // }
-}
-
-void NetworkSecurityManager::ReportAggTree() {
-    // std::unique_lock<std::mutex> lock(mContextMutex);
-    // if (!mPipelineCtx || mPluginIndex < 0) {
-    //     return;
-    // }
-
-    // auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
-    // if (nodes.empty()) {
-    //     return;
-    // }
-    
-    // for (auto* node : nodes) {
-    //     auto eventGroup = std::make_unique<PipelineEventGroup>();
-    //     // TODO @qianlu.kk fill event group
-    //     mAggregateTree->ForEach(node, [&](const BaseSecurityNode* group) {
-
-    //     });
-
-    //     std::unique_lock<std::mutex> lock(mContextMutex);
-    //     if (!mPipelineCtx || mPluginIndex < 0) {
-    //         return;
-    //     }
-        
-    //     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIndex);
-    //     if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-    //         LOG_WARNING(
-    //             sLogger,
-    //             ("configName", mPipelineCtx->GetConfigName())("pluginIdx", mPluginIndex)("[Event] push queue failed!", ""));
-    //     }
-    // }
-
-
-    // TODO @qianlu.kk push to ProcessQueue
-    // ProcessQueueManager::GetInstance()->PushEventGroup(mPipelineCtx, mPluginIndex, std::move(groups));
-    
-    // mAggregateTree->Clear();
-    
-}
+// TODO perf worker functions ...
 
 } // namespace ebpf
 } // namespace logtail

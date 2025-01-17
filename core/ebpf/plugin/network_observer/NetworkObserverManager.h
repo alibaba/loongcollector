@@ -50,7 +50,7 @@ public:
     }
 
     NetworkObserverManager() = delete;
-    ~NetworkObserverManager() {}
+    ~NetworkObserverManager() { Destroy(); }
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     explicit NetworkObserverManager(
         std::shared_ptr<BaseManager>& baseMgr,
@@ -61,8 +61,6 @@ public:
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
-    int EnableCallName(const std::string& call_name, const configType config) override { return 0; }
-    int DisableCallName(const std::string& call_name) override { return 0; }
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override {return 0;}

@@ -131,50 +131,50 @@ public:
 };
 
 
-class BaseEventGroup {
-public:
-    virtual ~BaseEventGroup() {}
-    std::vector<std::unique_ptr<BaseSecurityNode>> events_;
-};
+// class BaseEventGroup {
+// public:
+//     virtual ~BaseEventGroup() {}
+//     std::vector<std::unique_ptr<BaseSecurityNode>> events_;
+// };
 
-class FileEventGroup : public BaseEventGroup {
-public:
-    FileEventGroup(const std::string& path) : path_(path) {}
-    FileEventGroup(const std::string&& path) : path_(std::move(path)) {}
-    void AddSecurityEvent(std::unique_ptr<BaseSecurityNode>&& event) { events_.emplace_back(std::move(event)); }
-    std::string path_;
-};
+// class FileEventGroup : public BaseEventGroup {
+// public:
+//     FileEventGroup(const std::string& path) : path_(path) {}
+//     FileEventGroup(const std::string&& path) : path_(std::move(path)) {}
+//     void AddSecurityEvent(std::unique_ptr<BaseSecurityNode>&& event) { events_.emplace_back(std::move(event)); }
+//     std::string path_;
+// };
 
-class NetworkEventGroup : public BaseEventGroup {
-public:
-    NetworkEventGroup(uint16_t protocol,
-                      uint16_t family,
-                      uint32_t saddr,
-                      uint32_t daddr,
-                      uint16_t sport,
-                      uint16_t dport,
-                      uint32_t net_ns)
-        : protocol_(protocol),
-          family_(family),
-          saddr_(saddr),
-          daddr_(daddr),
-          sport_(sport),
-          dport_(dport),
-          net_ns_(net_ns) {}
-    void AddSecurityEvent(std::unique_ptr<BaseSecurityNode>&& event) { events_.emplace_back(std::move(event)); }
-    // network attributes ...
-    uint16_t protocol_;
-    uint16_t family_;
-    uint32_t saddr_; // Source address
-    uint32_t daddr_; // Destination address
-    uint16_t sport_; // Source port
-    uint16_t dport_; // Destination port
-    uint32_t net_ns_; // Network namespace
-    // set in inner events ...
-    // uint64_t timestamp;
-    // uint16_t state;
-    // uint64_t bytes;
-};
+// class NetworkEventGroup : public BaseEventGroup {
+// public:
+//     NetworkEventGroup(uint16_t protocol,
+//                       uint16_t family,
+//                       uint32_t saddr,
+//                       uint32_t daddr,
+//                       uint16_t sport,
+//                       uint16_t dport,
+//                       uint32_t net_ns)
+//         : protocol_(protocol),
+//           family_(family),
+//           saddr_(saddr),
+//           daddr_(daddr),
+//           sport_(sport),
+//           dport_(dport),
+//           net_ns_(net_ns) {}
+//     void AddSecurityEvent(std::unique_ptr<BaseSecurityNode>&& event) { events_.emplace_back(std::move(event)); }
+//     // network attributes ...
+//     uint16_t protocol_;
+//     uint16_t family_;
+//     uint32_t saddr_; // Source address
+//     uint32_t daddr_; // Destination address
+//     uint16_t sport_; // Source port
+//     uint16_t dport_; // Destination port
+//     uint32_t net_ns_; // Network namespace
+//     // set in inner events ...
+//     // uint64_t timestamp;
+//     // uint16_t state;
+//     // uint64_t bytes;
+// };
 
 
 class BaseSecurityEvent {

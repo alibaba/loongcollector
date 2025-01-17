@@ -50,10 +50,6 @@ public:
 
     virtual int Destroy() = 0;
 
-    virtual int EnableCallName(const std::string& call_name, const configType config) = 0;
-    
-    virtual int DisableCallName(const std::string& call_name) = 0;
-
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) = 0;
 
     virtual int PollPerfBuffer() {

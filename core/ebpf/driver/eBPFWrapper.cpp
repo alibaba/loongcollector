@@ -5,6 +5,7 @@ extern "C" {
 };
 
 #include "eBPFWrapper.h"
+#include "Log.h"
 
 #include <iostream>
 #include <atomic>
