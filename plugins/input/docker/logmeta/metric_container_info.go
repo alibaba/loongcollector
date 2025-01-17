@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -117,6 +117,7 @@ func formatPath(path string) string {
 	if len(path) == 0 {
 		return path
 	}
+	path = filepath.Clean(path)
 	if path[len(path)-1] == '/' {
 		return path[0 : len(path)-1]
 	}
@@ -211,8 +212,8 @@ func (idf *InputDockerFile) Description() string {
 func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, containerInfo ContainerInfoCache, allCmd *DockerFileUpdateCmdAll) {
 	var cmd DockerFileUpdateCmd
 	cmd.ID = info.ContainerInfo.ID
-	cmd.UpperDir = path.Clean(containerInfo.UpperDir)
-	cmd.LogPath = path.Clean(containerInfo.LogPath)
+	cmd.UpperDir = filepath.Clean(containerInfo.UpperDir)
+	cmd.LogPath = filepath.Clean(containerInfo.LogPath)
 	// tags
 	tags := info.GetExternalTags(idf.ExternalEnvTag, idf.ExternalK8sLabelTag)
 	cmd.Tags = make([]string, 0, len(tags)*2)
@@ -229,8 +230,8 @@ func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, c
 	cmd.Mounts = make([]Mount, 0, len(containerInfo.Mounts))
 	for _, mount := range containerInfo.Mounts {
 		cmd.Mounts = append(cmd.Mounts, Mount{
-			Source:      path.Clean(mount.Source),
-			Destination: path.Clean(mount.Destination),
+			Source:      filepath.Clean(mount.Source),
+			Destination: filepath.Clean(mount.Destination),
 		})
 	}
 	cmdBuf, _ := json.Marshal(&cmd)
@@ -280,7 +281,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 }
 
 func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, allCmd *DockerFileUpdateCmdAll) {
-	logPath := path.Clean(info.StdoutPath)
+	logPath := filepath.Clean(info.StdoutPath)
 	id := info.ContainerInfo.ID
 	mounts := info.ContainerInfo.Mounts
 	upperDir := info.DefaultRootPath

@@ -124,3 +124,56 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestFormatPath(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty path",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "normal path without trailing slash",
+			input: "/path/to/somewhere",
+			want:  "/path/to/somewhere",
+		},
+		{
+			name:  "path with trailing forward slash",
+			input: "/path/to/somewhere/",
+			want:  "/path/to/somewhere",
+		},
+		{
+			name:  "path with trailing backslash",
+			input: "/path/to/somewhere\\",
+			want:  "/path/to/somewhere",
+		},
+		{
+			name:  "path with dots",
+			input: "/path/./to/../somewhere",
+			want:  "/path/somewhere",
+		},
+		{
+			name:  "path with multiple slashes",
+			input: "/path//to///somewhere",
+			want:  "/path/to/somewhere",
+		},
+		{
+			name:  "path with multiple slashes",
+			input: "/////path//////to///somewhere",
+			want:  "/path/to/somewhere",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatPath(tt.input)
+			if got != tt.want {
+				t.Errorf("formatPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
