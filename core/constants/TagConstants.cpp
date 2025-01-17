@@ -14,31 +14,39 @@
 
 #include "constants/TagConstants.h"
 
+#include <unordered_map>
+
 using namespace std;
 
 namespace logtail {
 
 const string& GetDefaultTagKeyString(TagKey key) {
-    static const vector<string> TagKeyDefaultValue = {
-        DEFAULT_LOG_TAG_FILE_OFFSET,
-        DEFAULT_LOG_TAG_FILE_INODE,
-        DEFAULT_LOG_TAG_FILE_PATH,
-        DEFAULT_LOG_TAG_NAMESPACE,
-        DEFAULT_LOG_TAG_POD_NAME,
-        DEFAULT_LOG_TAG_POD_UID,
-        DEFAULT_LOG_TAG_CONTAINER_NAME,
-        DEFAULT_LOG_TAG_CONTAINER_IP,
-        DEFAULT_LOG_TAG_IMAGE_NAME,
-        DEFAULT_LOG_TAG_HOST_NAME,
-        DEFAULT_LOG_TAG_HOST_ID,
-        DEFAULT_LOG_TAG_CLOUD_PROVIDER,
+    static const unordered_map<TagKey, string> TagKeyDefaultValue = {
+        {TagKey::FILE_OFFSET_KEY, DEFAULT_LOG_TAG_FILE_OFFSET},
+        {TagKey::FILE_INODE_TAG_KEY, DEFAULT_LOG_TAG_FILE_INODE},
+        {TagKey::FILE_PATH_TAG_KEY, DEFAULT_LOG_TAG_FILE_PATH},
+        {TagKey::K8S_NAMESPACE_TAG_KEY, DEFAULT_LOG_TAG_NAMESPACE},
+        {TagKey::K8S_POD_NAME_TAG_KEY, DEFAULT_LOG_TAG_POD_NAME},
+        {TagKey::K8S_POD_UID_TAG_KEY, DEFAULT_LOG_TAG_POD_UID},
+        {TagKey::CONTAINER_NAME_TAG_KEY, DEFAULT_LOG_TAG_CONTAINER_NAME},
+        {TagKey::CONTAINER_IP_TAG_KEY, DEFAULT_LOG_TAG_CONTAINER_IP},
+        {TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, DEFAULT_LOG_TAG_IMAGE_NAME},
+        {TagKey::HOST_NAME_TAG_KEY, DEFAULT_LOG_TAG_HOST_NAME},
+        {TagKey::HOST_ID_TAG_KEY, DEFAULT_LOG_TAG_HOST_ID},
+        {TagKey::CLOUD_PROVIDER_TAG_KEY, DEFAULT_LOG_TAG_CLOUD_PROVIDER},
 #ifndef __ENTERPRISE__
-        DEFAULT_LOG_TAG_HOST_IP,
+        {TagKey::HOST_IP_TAG_KEY, DEFAULT_LOG_TAG_HOST_IP},
 #else
-        DEFAULT_LOG_TAG_USER_DEFINED_ID,
+        {TagKey::AGENT_TAG_TAG_KEY, DEFAULT_LOG_TAG_USER_DEFINED_ID},
 #endif
     };
-    return TagKeyDefaultValue[key];
+    static const string unknown = "unknown_tag_key";
+    auto iter = TagKeyDefaultValue.find(key);
+    if (iter != TagKeyDefaultValue.end()) {
+        return iter->second;
+    } else {
+        return unknown;
+    }
 }
 
 ////////////////////////// COMMON ////////////////////////

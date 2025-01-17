@@ -25,6 +25,9 @@ Feature: flusher loki
           value: "log contents"
     flushers:
       - Type: flusher_loki
+        Convert:
+          TagFieldsRename:
+            loki_name: name
         URL: http://loki:3100/loki/api/v1/push
         TenantID: loongcollector
         MaxMessageWait: 100000000
@@ -34,7 +37,7 @@ Feature: flusher loki
         MaxBackoff: 1000000000000
         MaxRetries: 10
         DynamicLabels:
-          - tag.name
+          - tag.loki_name
         StaticLabels:
           source: loongcollector
     """

@@ -18,7 +18,7 @@
 
 #include "boost/regex.hpp"
 
-#include "TagConstants.h"
+#include "constants/TagConstants.h"
 
 using namespace std;
 
@@ -196,30 +196,12 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
     return true;
 }
 
-void ParseTagKey(const Json::Value* config,
-                 const string& configField,
-                 TagKey tagKey,
-                 unordered_map<TagKey, string>& tagKeyMap,
-                 const PipelineContext& context,
-                 const std::string& pluginType,
-                 bool defaultAdded) {
-    string customTagKey;
-    if (defaultAdded) {
-        customTagKey = ParseDefaultAddedTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType);
-    } else {
-        customTagKey = ParseOptionalTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType);
-    }
-    if (!customTagKey.empty()) {
-        tagKeyMap[tagKey] = customTagKey;
-    }
-}
-
-
-string ParseDefaultAddedTag(const Json::Value* config,
-                            const string& configField,
-                            const string& defaultTagKeyValue,
-                            const PipelineContext& context,
-                            const string& pluginType) {
+void ParseDefaultAddedTag(const Json::Value* config,
+                          const string& configField,
+                          const string& defaultTagKeyValue,
+                          const PipelineContext& context,
+                          const string& pluginType,
+                          string& outputKey) {
     string errorMsg;
     string customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
     if (config && config->isMember(configField)) {
@@ -235,22 +217,23 @@ string ParseDefaultAddedTag(const Json::Value* config,
                                   context.GetRegion());
         }
         if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-            return defaultTagKeyValue;
+            outputKey = defaultTagKeyValue;
         }
-        return customTagKey;
+        outputKey = customTagKey;
     }
-    return defaultTagKeyValue;
+    outputKey = defaultTagKeyValue;
 }
 
-string ParseOptionalTag(const Json::Value* config,
-                        const string& configField,
-                        const string& defaultTagKeyValue,
-                        const PipelineContext& context,
-                        const string& pluginType) {
+void ParseOptionalTag(const Json::Value* config,
+                      const string& configField,
+                      const string& defaultTagKeyValue,
+                      const PipelineContext& context,
+                      const string& pluginType,
+                      string& outputKey) {
     string errorMsg;
     string customTagKey;
     if (config && config->isMember(configField)) {
-        if (!GetOptionalStringParam(*config, configField, customTagKey, errorMsg)) {
+        if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
             PARAM_WARNING_DEFAULT(context.GetLogger(),
                                   context.GetAlarm(),
                                   errorMsg,
@@ -262,11 +245,30 @@ string ParseOptionalTag(const Json::Value* config,
                                   context.GetRegion());
         }
         if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
-            return defaultTagKeyValue;
+            outputKey = defaultTagKeyValue;
         }
-        return customTagKey;
+        outputKey = customTagKey;
     }
-    return "";
+    outputKey = "";
+}
+
+// if there is no tag config, config maybe nullptr, will act as default (default added or optional)
+void ParseTagKey(const Json::Value* config,
+                 const string& configField,
+                 TagKey tagKey,
+                 unordered_map<TagKey, string>& tagKeyMap,
+                 const PipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded) {
+    string customTagKey;
+    if (defaultAdded) {
+        ParseDefaultAddedTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType, customTagKey);
+    } else {
+        ParseOptionalTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType, customTagKey);
+    }
+    if (!customTagKey.empty()) {
+        tagKeyMap[tagKey] = customTagKey;
+    }
 }
 
 } // namespace logtail

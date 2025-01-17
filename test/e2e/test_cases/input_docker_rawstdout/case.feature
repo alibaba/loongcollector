@@ -2,7 +2,7 @@
 Feature: input docker rawstdout
   Test input docker rawstdout
 
-  @e2e @docker-compose @WIP
+  @e2e @docker-compose
   Scenario: TestInputDockerRawStdout
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config

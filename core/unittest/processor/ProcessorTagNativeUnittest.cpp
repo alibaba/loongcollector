@@ -276,17 +276,17 @@ void ProcessorTagNativeUnittest::TestProcess() {
 
         processor.Process(eventGroup);
 
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mHostname,
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet(),
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG_TAG_KEY)));
 #else
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
     }
     { // native branch default
@@ -328,17 +328,17 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         processor.Process(eventGroup);
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mHostname,
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet(),
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::AGENT_TAG_TAG_KEY)));
 #else
-        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
-                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
+                                eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
     }
     { // native branch rename
@@ -434,11 +434,11 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(processor.Init(processorConfig));
 
         processor.Process(eventGroup);
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_NAME_TAG_KEY)));
 #ifdef __ENTERPRISE__
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::AGENT_TAG_TAG_KEY)));
 #else
-        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP)));
+        APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
     }
 }

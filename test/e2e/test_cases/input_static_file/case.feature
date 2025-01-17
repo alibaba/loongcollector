@@ -25,6 +25,6 @@ Feature: input static file
     Then there is at least {1000} logs
     Then the log fields match kv
     """
-    "__tag__:file_path": "^/root/test/1/2/3/axxxx.log$"
+    "__tag__:__path__": "^/root/test/1/2/3/axxxx.log$"
     content: "^\\d+===="
     """

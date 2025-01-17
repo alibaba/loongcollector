@@ -114,7 +114,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 func (f *FlusherOTLP) getConverter() (*converter.Converter, error) {
 	switch f.Version {
 	case v1:
-		return converter.NewConverter(converter.ProtocolOtlpV1, converter.EncodingNone, nil, f.context.GetPipelineScopeConfig())
+		return converter.NewConverter(converter.ProtocolOtlpV1, converter.EncodingNone, nil, nil, f.context.GetPipelineScopeConfig())
 	default:
 		return nil, fmt.Errorf("unsupported otlp log protocol version : %s", f.Version)
 	}

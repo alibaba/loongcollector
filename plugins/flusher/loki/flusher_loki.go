@@ -63,6 +63,8 @@ type FlusherLoki struct {
 }
 
 type convertConfig struct {
+	// Rename one or more fields from tags.
+	TagFieldsRename map[string]string
 	// Rename one or more fields, The protocol field options can only be: contents, tags, time
 	ProtocolFieldsRename map[string]string
 	// Convert protocol, default value: custom_single
@@ -177,8 +179,8 @@ func (f *FlusherLoki) Stop() error {
 
 func (f *FlusherLoki) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
-		"Encoding", f.Convert.Encoding, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	cvt, err := converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
+	cvt, err := converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
 	if err != nil {
 		return nil, err
 	}

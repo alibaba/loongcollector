@@ -105,10 +105,10 @@ StringView FileTagOptions::GetFileTagKeyName(TagKey key) const {
 }
 
 bool FileTagOptions::EnableLogPositionMeta() {
-    bool enableFileOffset
-        = mFileTags.find(TagKey::FILE_OFFSET_KEY) != mFileTags.end() && !mFileTags[TagKey::FILE_OFFSET_KEY].empty();
-    bool enableFileInode = mFileTags.find(TagKey::FILE_INODE_TAG_KEY) != mFileTags.end()
-        && !mFileTags[TagKey::FILE_INODE_TAG_KEY].empty();
+    auto offsetIter = mFileTags.find(TagKey::FILE_OFFSET_KEY);
+    bool enableFileOffset = offsetIter != mFileTags.end() && !offsetIter->second.empty();
+    auto inodeIter = mFileTags.find(TagKey::FILE_INODE_TAG_KEY);
+    bool enableFileInode = inodeIter != mFileTags.end() && !inodeIter->second.empty();
     return enableFileOffset || enableFileInode;
 }
 

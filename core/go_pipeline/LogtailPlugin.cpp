@@ -80,7 +80,7 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
-    mPluginCfg["LogFileTagsPath"] = STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
+    mPluginCfg["FileTagsPath"] = STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
     mPluginCfg["MachineUUID"] = Application::GetInstance()->GetUUID();
 }
 

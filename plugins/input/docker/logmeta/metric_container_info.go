@@ -221,9 +221,10 @@ func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, c
 		cmd.Tags = append(cmd.Tags, val)
 	}
 	// info.ContainerNameTag
+	cmd.MetaDatas = make([]string, 0, len(info.ContainerNameTag)*2)
 	for key, val := range info.ContainerNameTag {
-		cmd.Tags = append(cmd.Tags, key)
-		cmd.Tags = append(cmd.Tags, val)
+		cmd.MetaDatas = append(cmd.MetaDatas, key)
+		cmd.MetaDatas = append(cmd.MetaDatas, val)
 	}
 	cmd.Mounts = make([]Mount, 0, len(containerInfo.Mounts))
 	for _, mount := range containerInfo.Mounts {

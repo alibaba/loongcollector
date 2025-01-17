@@ -17,6 +17,7 @@
 | Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                                                   |
 | Convert.Protocol                  | String   | 否    | ilogtail数据转换协议，elasticsearch flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
 | Convert.Encoding                  | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                     |
+| Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                                                |
 | Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                              |
 | Index                             | String   | 是    | 插入数据目标索引                                                                                                           |          |      |                                                                                    |
 | Authentication                    | Struct   | 是    | ElasticSearch 连接访问认证配置                                                                                             |
@@ -137,7 +138,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log"
   },
@@ -156,7 +157,7 @@ flushers:
     "thread": "http-nio-8080-exec-10",
     "@time": "2022-07-20 16:55:05.415",
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log",
     "time": 1664435098

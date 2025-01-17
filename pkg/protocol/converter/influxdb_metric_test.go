@@ -65,7 +65,7 @@ func TestConvertToInfluxdbProtocolStream(t *testing.T) {
 			},
 		}
 
-		converter, err := NewConverter("influxdb", "custom", nil, &config.GlobalConfig{})
+		converter, err := NewConverter("influxdb", "custom", nil, nil, &config.GlobalConfig{})
 		convey.So(err, convey.ShouldBeNil)
 
 		for _, test := range cases {
@@ -142,7 +142,7 @@ func TestConverter_ConvertToInfluxdbProtocolStreamV2(t *testing.T) {
 			},
 		}
 
-		converter, err := NewConverter("influxdb", "custom", nil, &config.GlobalConfig{})
+		converter, err := NewConverter("influxdb", "custom", nil, nil, &config.GlobalConfig{})
 		convey.So(err, convey.ShouldBeNil)
 
 		for _, test := range cases {

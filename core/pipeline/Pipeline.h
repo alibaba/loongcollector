@@ -93,7 +93,7 @@ private:
 
     std::string mName;
     std::vector<std::unique_ptr<InputInstance>> mInputs;
-    std::vector<std::unique_ptr<ProcessorInstance>> mInnerProcessorLine;
+    std::vector<std::unique_ptr<ProcessorInstance>> mPipelineInnerProcessor;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;
     std::vector<std::unique_ptr<FlusherInstance>> mFlushers;
     Router mRouter;

@@ -351,10 +351,10 @@ func TestHttpFlusherFlush(t *testing.T) {
 
 				Convey("each http request body should be valid as expect", func() {
 					So(actualRequests, ShouldResemble, []string{
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000000","__value__":"30"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000001","__value__":"32"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000003","__value__":"30"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000004","__value__":"32"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000000","__value__":"30"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000001","__value__":"32"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000003","__value__":"30"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000004","__value__":"32"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
 					})
 				})
 			})
@@ -1007,10 +1007,10 @@ func TestFlusherHTTP_GzipCompression(t *testing.T) {
 
 				Convey("each http request body should be valid as expect", func() {
 					So(actualRequests, ShouldResemble, []string{
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000000","__value__":"30"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000001","__value__":"32"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000003","__value__":"30"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
-						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000004","__value__":"32"},"tags":{"db":"mydb","host_ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000000","__value__":"30"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000001","__value__":"32"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000003","__value__":"30"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
+						`{"contents":{"__labels__":"location#$#hangzhou|province#$#zhejiang","__name__":"weather","__time_nano__":"1668653452000000004","__value__":"32"},"tags":{"db":"mydb","host.ip":""},"time":0}`,
 					})
 				})
 			})

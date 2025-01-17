@@ -16,6 +16,7 @@ Alpha
 | Convert                      | Struct   | 否             | ilogtail数据转换协议配置                                                                              |
 | Convert.Protocol             | String   | 否             | ilogtail数据转换协议，可选值：`custom_single`, `custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
 | Convert.Encoding             | String   | 否             | ilogtail数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                        |
+| Convert.TagFieldsRename      | Map      | 否             | 对日志中tags中的json字段重命名                                                                           |
 | Convert.ProtocolFieldsRename | Map      | 否             | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
 | Convert.OnlyContents         | Bool     | 否             | 仅发送contents中的字段，目前只能和`custom_single_flatten`协议一起使用，默认值：`false`                                |
 | URL                          | String   | 是             | Loki 推送地址，例如：`http://localhost:3100/loki/api/v1/push`                                         |
@@ -90,7 +91,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/home/test-log/test.log"
   },
@@ -112,3 +113,20 @@ DynamicLabels:
 
 - `content.fieldname`：`content` 代表从 `contents` 中解析指定字段值。
 - `tag.fieldname`：`tag` 代表从 `tags` 中解析指定字段值。
+
+### tag 重命名
+
+`ilogtail` 中的 `converter` 支持通过配置对 `tags` 中的字段进行重命名。在 flusher_loki 中进行如下的配置，即可对存入 Loki 中动态 label 进行重命名：
+
+```yaml
+flushers:
+  - Type: flusher_loki
+    URL: http://<loki 服务的地址与端口>/loki/api/v1/push
+    DynamicLabels:
+      - tag.my.host.name
+    Convert:
+      TagFieldsRename:
+        host.name: my.host.name
+```
+
+之后在 Loki 中进行查询时，可以通过重命名后的 label， `{my.host.name="master"}` 进行查询。

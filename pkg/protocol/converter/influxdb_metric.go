@@ -28,7 +28,7 @@ import (
 )
 
 // ConvertToInfluxdbProtocolStream converts @logGroup to []byte in the influxdb line protocol,
-// @c.ProtocolKeyRenameMap param will be ignored, as they are not very suitable for metrics.
+// @c.TagKeyRenameMap, @c.ProtocolKeyRenameMap param will be ignored, as they are not very suitable for metrics.
 func (c *Converter) ConvertToInfluxdbProtocolStream(logGroup *protocol.LogGroup, targetFields []string) (stream [][]byte, values []map[string]string, err error) {
 	pooledBuf := GetPooledByteBuf()
 

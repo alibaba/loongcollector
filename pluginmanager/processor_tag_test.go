@@ -33,7 +33,7 @@ func TestTagDefault(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey:     map[string]string{},
+		PipelineMetaTagKey:     map[TagKey]string{},
 		AppendingAllEnvMetaTag: false,
 	}
 	logCtx := &pipeline.LogWithContext{
@@ -48,9 +48,9 @@ func TestTagDefault(t *testing.T) {
 	assert.Equal(t, util.GetIPAddress(), tagsMap[hostIPDefaultTagKey])
 	assert.Equal(t, "test_env_tag_value", tagsMap["test_env_tag"])
 
-	processorTag.PipelineMetaTagKey = map[string]string{
-		"HOST_NAME": "__default__",
-		"HOST_IP":   "__default__",
+	processorTag.PipelineMetaTagKey = map[TagKey]string{
+		TagKeyHostName: "__default__",
+		TagKeyHostIP:   "__default__",
 	}
 	logCtx = &pipeline.LogWithContext{
 		Context: map[string]interface{}{
@@ -71,7 +71,7 @@ func TestTagDefaultV2(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey:     map[string]string{},
+		PipelineMetaTagKey:     map[TagKey]string{},
 		AppendingAllEnvMetaTag: false,
 	}
 	in := &models.PipelineGroupEvents{
@@ -84,9 +84,9 @@ func TestTagDefaultV2(t *testing.T) {
 	assert.Equal(t, util.GetIPAddress(), in.Group.Tags.Get(hostIPDefaultTagKey))
 	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
 
-	processorTag.PipelineMetaTagKey = map[string]string{
-		"HOST_NAME": "__default__",
-		"HOST_IP":   "__default__",
+	processorTag.PipelineMetaTagKey = map[TagKey]string{
+		TagKeyHostName: "__default__",
+		TagKeyHostIP:   "__default__",
 	}
 	in = &models.PipelineGroupEvents{
 		Group: &models.GroupInfo{
@@ -105,9 +105,9 @@ func TestTagRename(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey: map[string]string{
-			"HOST_NAME": "test_host_name",
-			"HOST_IP":   "test_host_ip",
+		PipelineMetaTagKey: map[TagKey]string{
+			TagKeyHostName: "test_host_name",
+			TagKeyHostIP:   "test_host_ip",
 		},
 	}
 	logCtx := &pipeline.LogWithContext{
@@ -129,9 +129,9 @@ func TestTagRenameV2(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey: map[string]string{
-			"HOST_NAME": "test_host_name",
-			"HOST_IP":   "test_host_ip",
+		PipelineMetaTagKey: map[TagKey]string{
+			TagKeyHostName: "test_host_name",
+			TagKeyHostIP:   "test_host_ip",
 		},
 	}
 	in := &models.PipelineGroupEvents{
@@ -150,9 +150,9 @@ func TestTagDelete(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey: map[string]string{
-			"HOST_NAME": "",
-			"HOST_IP":   "",
+		PipelineMetaTagKey: map[TagKey]string{
+			TagKeyHostName: "",
+			TagKeyHostIP:   "",
 		},
 	}
 	logCtx := &pipeline.LogWithContext{
@@ -172,9 +172,9 @@ func TestTagDeleteV2(t *testing.T) {
 		"test_env_tag_value",
 	}
 	processorTag := ProcessorTag{
-		PipelineMetaTagKey: map[string]string{
-			"HOST_NAME": "",
-			"HOST_IP":   "",
+		PipelineMetaTagKey: map[TagKey]string{
+			TagKeyHostName: "",
+			TagKeyHostIP:   "",
 		},
 	}
 	in := &models.PipelineGroupEvents{

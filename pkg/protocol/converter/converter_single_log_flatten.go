@@ -23,9 +23,9 @@ import (
 func (c *Converter) ConvertToSingleProtocolLogsFlatten(logGroup *protocol.LogGroup, targetFields []string) ([]map[string]interface{}, []map[string]string, error) {
 	convertedLogs, desiredValues := make([]map[string]interface{}, len(logGroup.Logs)), make([]map[string]string, len(logGroup.Logs))
 	for i, log := range logGroup.Logs {
-		contents, tags := convertLogToMap(log, logGroup.LogTags, logGroup.Source, logGroup.Topic)
+		contents, tags := convertLogToMap(log, logGroup.LogTags, logGroup.Source, logGroup.Topic, c.TagKeyRenameMap)
 
-		desiredValue, err := findTargetValues(targetFields, contents, tags)
+		desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
 		if err != nil {
 			return nil, nil, err
 		}

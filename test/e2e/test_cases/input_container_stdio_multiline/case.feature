@@ -26,9 +26,9 @@ Feature: input container stdio multiline
     Then there is at least {1} logs
     Then the log tags match kv
     """
-    image_name: ".*_container:latest$"
-    container_name: ".*[-_]container[-_]1$"
-    container_ip: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
+    _image_name_: ".*_container:latest$"
+    _container_name_: ".*[-_]container[-_]1$"
+    _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
     """
     Then the log fields match kv
     """

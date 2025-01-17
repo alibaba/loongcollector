@@ -20,6 +20,7 @@
 | Convert                               | Struct   | 否    | iLogtail数据转换协议配置                                                                                           |
 | Convert.Protocol                      | String   | 否    | iLogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
 | Convert.Encoding                      | String   | 否    | iLogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
 | Convert.ProtocolFieldsRename          | Map      | 否    | iLogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | Authentication                        | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                                            |
 | Authentication.PlainText.Username     | String   | 否    | PlainText认证用户名                                                                                             |
@@ -142,7 +143,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name": "java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log"
   },
@@ -238,6 +239,28 @@ flushers:
 
 - `${app_name}`就是我们上面添加的系统变量。
 
+### TagFieldsRename
+
+例如将`tags`中的`host.name`重命名为`hostname`，配置参考如下：
+
+```yaml
+enable: true
+inputs:
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/*.log
+flushers:
+  - Type: flusher_kafka_v2
+    Brokers:
+      - 192.XX.XX.1:9092
+      - 192.XX.XX.2:9092
+      - 192.XX.XX.3:9092
+    Convert:
+      TagFieldsRename:
+        host.name: hostname
+    Topic: KafkaTestTopic
+```
+
 ### ProtocolFieldsRename
 
 对`ilogtail`协议字段重命名，在`ilogtail`的数据转换协议中，
@@ -258,6 +281,8 @@ flushers:
       - 192.XX.XX.2:9092
       - 192.XX.XX.3:9092
     Convert:
+      TagFieldsRename:
+        host.name: hostname
       ProtocolFieldsRename:
         time: '@timestamp'
     Topic: KafkaTestTopic
@@ -358,7 +383,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name": "java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log"
   },
@@ -377,7 +402,7 @@ flushers:
   "thread": "http-nio-8080-exec-10",
   "@time": "2022-07-20 16:55:05.415",
   "k8s.namespace.name": "java_app",
-  "host_ip": "192.168.6.128",
+  "host.ip": "192.168.6.128",
   "host.name": "master",
   "log.file.path": "/data/test.log",
   "time": 1664435098

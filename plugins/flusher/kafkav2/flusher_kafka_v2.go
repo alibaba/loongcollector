@@ -149,6 +149,8 @@ type metaRetryConfig struct {
 }
 
 type convertConfig struct {
+	// Rename one or more fields from tags.
+	TagFieldsRename map[string]string
 	// Rename one or more fields, The protocol field options can only be: contents, tags, time
 	ProtocolFieldsRename map[string]string
 	// Convert protocol, default value: custom_single
@@ -562,8 +564,8 @@ func (k *FlusherKafka) makeHeaders() []sarama.RecordHeader {
 }
 
 func (k *FlusherKafka) getConverter() (*converter.Converter, error) {
-	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol, "Encoding", k.Convert.Encoding, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.ProtocolFieldsRename, k.context.GetPipelineScopeConfig())
+	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol, "Encoding", k.Convert.Encoding, "TagFieldsRename", k.Convert.TagFieldsRename, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
+	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename, k.context.GetPipelineScopeConfig())
 }
 
 func init() {

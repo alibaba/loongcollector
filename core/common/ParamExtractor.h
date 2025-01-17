@@ -334,16 +334,4 @@ void ParseTagKey(const Json::Value* config,
                  const PipelineContext& context,
                  const std::string& pluginType,
                  bool defaultAdded);
-
-std::string ParseDefaultAddedTag(const Json::Value* config,
-                                 const std::string& configField,
-                                 const std::string& defaultTagKeyValue,
-                                 const PipelineContext& context,
-                                 const std::string& pluginType);
-
-std::string ParseOptionalTag(const Json::Value* config,
-                             const std::string& configField,
-                             const std::string& defaultTagKeyValue,
-                             const PipelineContext& context,
-                             const std::string& pluginType);
 } // namespace logtail

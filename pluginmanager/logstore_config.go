@@ -440,7 +440,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			}
 			pluginConfig.AppendingAllEnvMetaTag = false
 			if pluginConfigMap, ok := pluginConfigInterface.(map[string]interface{}); ok {
-				if _, ok := pluginConfigMap["AgentEnvMetaTagKey"]; ok {
+				if _, ok := pluginConfigMap["AgentEnvMetaTagKey"]; !ok {
 					pluginConfig.AppendingAllEnvMetaTag = true
 				}
 			}

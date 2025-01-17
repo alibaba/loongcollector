@@ -28,7 +28,7 @@ import (
 
 func TestConvertToSimple(t *testing.T) {
 	Convey("Given a converter with protocol: single, encoding: json, with no tag rename or protocol key rename", t, func() {
-		c, err := NewConverter("custom_single", "json", nil, &config.GlobalConfig{})
+		c, err := NewConverter("custom_single", "json", nil, nil, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from host environment", func() {
@@ -78,7 +78,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 4)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 				}
 			})
@@ -135,7 +135,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 7)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "container.name")
 					So(unmarshaledLog["tags"], ShouldContainKey, "container.ip")
@@ -201,7 +201,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 13)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
@@ -269,7 +269,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 9)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
@@ -327,7 +327,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["contents"], ShouldContainKey, "status")
 					So(unmarshaledLog["tags"], ShouldHaveLength, 5)
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "container.name")
 					So(unmarshaledLog["tags"], ShouldContainKey, "container.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "container.image.name")
@@ -389,7 +389,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["contents"], ShouldContainKey, "label")
 					So(unmarshaledLog["tags"], ShouldHaveLength, 10)
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.namespace.name")
@@ -449,7 +449,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 4)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 				}
 			})
@@ -501,7 +501,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 3)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldNotContainKey, "log.topic")
 				}
 			})
@@ -563,7 +563,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["tags"], ShouldHaveLength, 13)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["tags"], ShouldContainKey, "host.name")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
@@ -580,12 +580,18 @@ func TestConvertToSimple(t *testing.T) {
 	})
 
 	Convey("Given a converter with protocol: single, encoding: json, with tag rename and protocol key rename", t, func() {
+		keyRenameMap := map[string]string{
+			"k8s.node.ip": "ip",
+			"host.name":   "hostname",
+			"label":       "tag",
+			"env":         "env_tag",
+		}
 		protocolKeyRenameMap := map[string]string{
 			"time":     "@timestamp",
 			"contents": "values",
 			"tags":     "annos",
 		}
-		c, err := NewConverter("custom_single", "json", protocolKeyRenameMap, &config.GlobalConfig{})
+		c, err := NewConverter("custom_single", "json", keyRenameMap, protocolKeyRenameMap, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -646,7 +652,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["annos"], ShouldHaveLength, 14)
 					So(unmarshaledLog["annos"], ShouldContainKey, "log.file.path")
 					So(unmarshaledLog["annos"], ShouldContainKey, "hostname")
-					So(unmarshaledLog["annos"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["annos"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["annos"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["annos"], ShouldContainKey, "ip")
 					So(unmarshaledLog["annos"], ShouldContainKey, "k8s.node.name")
@@ -683,7 +689,13 @@ func TestConvertToSimple(t *testing.T) {
 	})
 
 	Convey("Given a converter with protocol: single, encoding: json, with null tag rename", t, func() {
-		c, err := NewConverter("custom_single", "json", nil, &config.GlobalConfig{})
+		keyRenameMap := map[string]string{
+			"k8s.node.ip": "",
+			"host.name":   "",
+			"label":       "",
+			"env":         "",
+		}
+		c, err := NewConverter("custom_single", "json", keyRenameMap, nil, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -743,7 +755,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["contents"], ShouldContainKey, "status")
 					So(unmarshaledLog["tags"], ShouldHaveLength, 10)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.namespace.name")
@@ -811,7 +823,7 @@ func TestConvertToSimple(t *testing.T) {
 					So(unmarshaledLog["contents"], ShouldContainKey, "status")
 					So(unmarshaledLog["tags"], ShouldHaveLength, 10)
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.file.path")
-					So(unmarshaledLog["tags"], ShouldContainKey, "host_ip")
+					So(unmarshaledLog["tags"], ShouldContainKey, "host.ip")
 					So(unmarshaledLog["tags"], ShouldContainKey, "log.topic")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.node.name")
 					So(unmarshaledLog["tags"], ShouldContainKey, "k8s.namespace.name")
@@ -826,7 +838,7 @@ func TestConvertToSimple(t *testing.T) {
 	})
 
 	Convey("When constructing converter with unsupported encoding", t, func() {
-		_, err := NewConverter("custom_single", "pb", nil, &config.GlobalConfig{})
+		_, err := NewConverter("custom_single", "pb", nil, nil, &config.GlobalConfig{})
 
 		Convey("Then error should be returned", func() {
 			So(err, ShouldNotBeNil)

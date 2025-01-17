@@ -28,10 +28,16 @@ import (
 func TestConvertToSimpleFlat(t *testing.T) {
 
 	Convey("Given a converter with protocol: single, encoding: json, with tag rename and protocol key rename", t, func() {
+		keyRenameMap := map[string]string{
+			"k8s.node.ip": "ip",
+			"host.name":   "hostname",
+			"label":       "tag",
+			"env":         "env_tag",
+		}
 		protocolKeyRenameMap := map[string]string{
 			"time": "@timestamp",
 		}
-		c, err := NewConverter("custom_single_flatten", "json", protocolKeyRenameMap, &config.GlobalConfig{})
+		c, err := NewConverter("custom_single_flatten", "json", keyRenameMap, protocolKeyRenameMap, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -86,7 +92,7 @@ func TestConvertToSimpleFlat(t *testing.T) {
 					So(unmarshaledLog, ShouldContainKey, "@timestamp")
 					So(unmarshaledLog, ShouldContainKey, "log.file.path")
 					So(unmarshaledLog, ShouldContainKey, "hostname")
-					So(unmarshaledLog, ShouldContainKey, "host_ip")
+					So(unmarshaledLog, ShouldContainKey, "host.ip")
 					So(unmarshaledLog, ShouldContainKey, "log.topic")
 					So(unmarshaledLog, ShouldContainKey, "ip")
 					So(unmarshaledLog, ShouldContainKey, "k8s.node.name")
@@ -123,7 +129,13 @@ func TestConvertToSimpleFlat(t *testing.T) {
 	})
 
 	Convey("Given a converter with protocol: single, encoding: json, with null tag rename", t, func() {
-		c, err := NewConverter("custom_single_flatten", "json", nil, &config.GlobalConfig{})
+		keyRenameMap := map[string]string{
+			"k8s.node.ip": "",
+			"host.name":   "",
+			"label":       "",
+			"env":         "",
+		}
+		c, err := NewConverter("custom_single_flatten", "json", keyRenameMap, nil, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -178,7 +190,7 @@ func TestConvertToSimpleFlat(t *testing.T) {
 					So(unmarshaledLog, ShouldContainKey, "method")
 					So(unmarshaledLog, ShouldContainKey, "status")
 					So(unmarshaledLog, ShouldContainKey, "log.file.path")
-					So(unmarshaledLog, ShouldContainKey, "host_ip")
+					So(unmarshaledLog, ShouldContainKey, "host.ip")
 					So(unmarshaledLog, ShouldContainKey, "log.topic")
 					So(unmarshaledLog, ShouldContainKey, "k8s.node.name")
 					So(unmarshaledLog, ShouldContainKey, "k8s.namespace.name")
@@ -241,7 +253,7 @@ func TestConvertToSimpleFlat(t *testing.T) {
 					So(unmarshaledLog, ShouldContainKey, "method")
 					So(unmarshaledLog, ShouldContainKey, "status")
 					So(unmarshaledLog, ShouldContainKey, "log.file.path")
-					So(unmarshaledLog, ShouldContainKey, "host_ip")
+					So(unmarshaledLog, ShouldContainKey, "host.ip")
 					So(unmarshaledLog, ShouldContainKey, "log.topic")
 					So(unmarshaledLog, ShouldContainKey, "k8s.node.name")
 					So(unmarshaledLog, ShouldContainKey, "k8s.namespace.name")

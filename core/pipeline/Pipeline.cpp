@@ -24,7 +24,6 @@
 
 #include "json/value.h"
 
-#include "ProcessorInstance.h"
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
@@ -231,11 +230,9 @@ bool Pipeline::Init(PipelineConfig&& config) {
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithInput);
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
 
-    // only add native tag processor when there is only native input, otherwise will use go tag processor
-    if (!mInputs.empty() && !HasGoPipelineWithInput()) {
+    if (config.ShouldAddNativeTagProcessor()) {
         unique_ptr<ProcessorInstance> processor
             = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
-        mInnerProcessorLine.emplace_back(std::move(processor));
         Json::Value detail;
         if (config.mGlobal) {
             detail = *config.mGlobal;
@@ -244,7 +241,11 @@ bool Pipeline::Init(PipelineConfig&& config) {
             // should not happen
             return false;
         }
-        mInnerProcessorLine.emplace_back(std::move(processor));
+        mPipelineInnerProcessor.emplace_back(std::move(processor));
+    } else {
+        // processor tag requires tags as input, so it is a special processor, cannot add as plugin
+        mGoPipelineWithInput["global"]["EnableProcessorTag"] = true;
+        mGoPipelineWithoutInput["global"]["EnableProcessorTag"] = true;
     }
 
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.
@@ -396,7 +397,7 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
         p->Process(logGroupList);
     }
-    for (auto& p : mInnerProcessorLine) {
+    for (auto& p : mPipelineInnerProcessor) {
         p->Process(logGroupList);
     }
     for (auto& p : mProcessorLine) {

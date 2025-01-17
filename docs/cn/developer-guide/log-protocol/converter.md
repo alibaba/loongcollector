@@ -10,6 +10,7 @@
 type Converter struct {
     Protocol             string
     Encoding             string
+    TagKeyRenameMap      map[string]string
     ProtocolKeyRenameMap map[string]string
 }
 ```
@@ -18,6 +19,7 @@ type Converter struct {
 
 - `Protocol`：协议名称
 - `Encoding`：编码方式
+- `TagKeyRenameMap`：tag字段Key重命名表，可用于重命名sls协议中LogTag字段的Key，其中系统保留的LogTag的Key默认值见附录。如果需要删去某个tag，则只需将该tag重命名为空字符串即可。
 - `ProtocolKeyRenameMap`：协议字段Key重命名表，可用于重命名协议字段的Key，仅部分编码模式下可用，详见附录
 
 用户可以使用如下函数创建`Converter`对象实例：
@@ -122,6 +124,24 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
     | json | json编码方式 |
     | protobuf | protobuf编码方式 |
     | custom | 自定义编码方式  |
+
+- sls协议中系统保留LogTag的Key默认值：
+
+    | 字段名 | 描述 |
+    | ------ | ------ |
+    | host.ip | LoongCollector所属机器或容器的ip地址 |
+    | log.topic | 日志的topic |
+    | log.file.path | 被采集文件的路径 |
+    | host.name | LoongCollector所属机器或容器的主机名 |
+    | k8s.node.ip | LoongCollector容器所处K8s节点的ip |
+    | k8s.node.name | LoongCollector容器所处K8s节点的名称 |
+    | k8s.namespace.name | 业务容器所属的K8s命名空间 |
+    | k8s.pod.name | 业务容器所属的K8s Pod名称 |
+    | k8s.pod.ip | 业务容器所属的K8s Pod ip |
+    | k8s.pod.uid | 业务容器所属的K8s Pod uid |
+    | (k8s.)container.name | 业务容器的名称。如果处于K8s环境中，则增加“k8s”前缀 |
+    | (k8s.)container.ip | 业务容器的ip。如果处于K8s环境中，则增加“k8s”前缀 |
+    | (k8s.)container.image.name | 用于创建业务容器的镜像名称。如果处于K8s环境中，则增加“k8s”前缀 |
 
 - 可用于重命名协议字段Key的编码格式：
 

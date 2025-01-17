@@ -34,8 +34,8 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    void addTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
-    void addTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
+    void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
+    void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
     std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
 #ifdef __ENTERPRISE__
     // After unmarshalling from json, we cannot determine the map is empty or no such config

@@ -16,6 +16,7 @@
 | Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                   |
 | Convert.Protocol                  | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`otlp_log_v1`。默认值：`custom_single` |
 | Convert.Encoding                  | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                     |
+| Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                |
 | Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                              |
 | Authentication                    | Struct   | 是    | Clickhouse 连接访问认证配置                                                                |
 | Authentication.PlainText.Username | String   | 否    | ClickHouse 用户名                                                                     |

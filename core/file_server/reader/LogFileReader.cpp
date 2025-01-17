@@ -2502,7 +2502,7 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         }
     }
 
-    std::string topic = GetTopicName();
+    const auto& topic = GetTopicName();
     if (!topic.empty()) {
         StringBuffer b = group.GetSourceBuffer()->CopyString(topic);
         group.SetTagNoCopy(LOG_RESERVED_KEY_TOPIC, StringView(b.data, b.size));

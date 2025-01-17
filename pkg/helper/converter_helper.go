@@ -15,6 +15,7 @@
 package helper
 
 type ConvertConfig struct {
+	TagFieldsRename      map[string]string // Rename one or more fields from tags.
 	ProtocolFieldsRename map[string]string // Rename one or more fields, The protocol field options can only be: contents, tags, time
 	Separator            string            // Convert separator
 	Protocol             string            // Convert protocol

@@ -25,7 +25,7 @@ import (
 
 func TestInvalidProtocol(t *testing.T) {
 	Convey("When constructing converter with invalid protocol", t, func() {
-		_, err := NewConverter("xml", "pb", nil, &config.GlobalConfig{})
+		_, err := NewConverter("xml", "pb", nil, nil, &config.GlobalConfig{})
 
 		Convey("Then error should be returned", func() {
 			So(err, ShouldNotBeNil)

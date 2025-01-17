@@ -19,6 +19,7 @@
 | Convert                               | Struct   | 否    | ilogtail数据转换协议配置                                                                                           |
 | Convert.Protocol                      | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
 | Convert.Encoding                      | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
 | Convert.ProtocolFieldsRename          | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | EnableTLS                             | Boolean  | 否    | 是否启用TLS安全连接，对应采用TLS和Athenz两种认证模式都需要设置为true，默认值：`false`                                                     |
 | TLSTrustCertsFilePath                 | String   | 否    | TLS CA根证书文件路径，对应采用TLS和Athenz认证时需要指定                                                                        |
@@ -99,7 +100,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log"
   },
@@ -125,6 +126,25 @@ Topic: test_%{content.application}
 - `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka-v2`中的使用。
 - 其它方式暂不支持
 
+### TagFieldsRename
+
+例如将`tags`中的`host.name`重命名为`hostname`，配置参考如下：
+
+```yaml
+enable: true
+inputs:
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/*.log
+flushers:
+  - Type: flusher_pulsar
+    URL: "pulsar://192.168.6.128:6650,192.168.6.129:6650,192.168.6.130:6650"
+    Convert:
+      TagFieldsRename:
+        host.name: hostname
+    Topic: PulsarTestTopic
+```
+
 ### ProtocolFieldsRename
 
 对`ilogtail`协议字段重命名，在`ilogtail`的数据转换协议中，
@@ -142,6 +162,8 @@ flushers:
   - Type: flusher_pulsar
     URL: "pulsar://192.168.6.128:6650,192.168.6.129:6650,192.168.6.130:6650"
     Convert:
+      TagFieldsRename:
+        host.name: hostname
       ProtocolFieldsRename:
         time: '@timestamp'
     Topic: PulsarTestTopic
@@ -207,7 +229,7 @@ flushers:
   },
   "tags": {
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log"
   },
@@ -226,7 +248,7 @@ flushers:
     "thread": "http-nio-8080-exec-10",
     "@time": "2022-07-20 16:55:05.415",
     "k8s.namespace.name":"java_app",
-    "host_ip": "192.168.6.128",
+    "host.ip": "192.168.6.128",
     "host.name": "master",
     "log.file.path": "/data/test.log",
     "time": 1664435098
