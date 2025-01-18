@@ -32,7 +32,7 @@
 #include "logger/Logger.h"
 #include "common/JsonUtil.h"
 #include "json/value.h"
-#include "ebpf/util/CapabilityUtil.h"
+#include "common/CapabilityUtil.h"
 
 namespace logtail {
 namespace ebpf {

@@ -4,6 +4,7 @@
 #include <queue>
 
 #include "BPFMapTraits.h"
+#include "Log.h"
 
 namespace logtail {
 namespace ebpf {

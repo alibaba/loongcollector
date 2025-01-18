@@ -241,10 +241,6 @@ public:
 
     AbstractNetRecord(const ConnId& conn_id) : conn_id_(conn_id) {}
 
-    bool IsError() const override { return false; }
-    bool IsSlow() const override { return false; }
-    int GetStatusCode() const override { return 0; }
-
 protected:
     ConnId conn_id_;
 };
@@ -373,6 +369,42 @@ private:
 };
 
 class AppRecord : public AbstractRecord {};
+
+
+class MetricData {
+public:
+    virtual ~MetricData() {}
+    MetricData(const ConnId& connId) : mConnId(connId) {}
+    ConnId mConnId;
+};
+
+class AppMetricData : public MetricData {
+public:
+    AppMetricData(const ConnId& connId) : MetricData(connId) {}
+    ~AppMetricData() {}
+    uint64_t mCount = 0;
+    double mSum = 0;
+    uint64_t mSlowCount = 0;
+    uint64_t mErrCount = 0;
+    uint64_t m2xxCount = 0;
+    uint64_t m3xxCount = 0;
+    uint64_t m4xxCount = 0;
+    uint64_t m5xxCount = 0;
+};
+
+class NetMetricData : public MetricData {
+public:
+    NetMetricData(const ConnId& connId) : MetricData(connId) {}
+    ~NetMetricData() {}
+    uint64_t mDropCount;
+    uint64_t mRetransCount;
+    uint64_t mRtt;
+    uint64_t mRecvBytes;
+    uint64_t mSendBytes;
+    uint64_t mRecvPkts;
+    uint64_t mSendPkts;
+};
+
 
 } // namespace ebpf
 } // namespace logtail

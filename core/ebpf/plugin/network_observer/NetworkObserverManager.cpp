@@ -85,6 +85,36 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     // TODO @qianlu.kk init converger
 
     // TODO @qianlu.kk init aggregator ...
+    // SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> mAppAggregator;
+    mAppAggregator = std::make_unique<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>>(
+        4096,
+        [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractAppRecord>& other) {
+            base->m2xxCount += other->GetStatusCode() / 100 == 2;
+            base->m3xxCount += other->GetStatusCode() / 100 == 3;
+            base->m4xxCount += other->GetStatusCode() / 100 == 4;
+            base->m5xxCount += other->GetStatusCode() / 100 == 5;
+            base->mCount++;
+            base->mErrCount += other->IsError();
+            base->mSlowCount += other->IsSlow();
+        },
+        [this](const std::shared_ptr<AbstractAppRecord>& in) {
+            return std::make_unique<AppMetricData>(in->GetConnId());
+        });
+
+    mNetAggregator = std::make_unique<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>>(
+        4096,
+        [this](std::unique_ptr<NetMetricData>& base, const std::shared_ptr<ConnStatsRecord>& other) {
+            // TODO aggregate
+            base->mDropCount += other->drop_count_;
+            base->mRetransCount += other->retrans_count_;
+            base->mRecvBytes += other->recv_bytes_;
+            base->mSendBytes += other->send_bytes_;
+            base->mRecvPkts += other->recv_packets_;
+            base->mSendPkts += other->send_packets_;
+        },
+        [this](const std::shared_ptr<ConnStatsRecord>& in) {
+            return std::make_unique<NetMetricData>(in->GetConnId());
+        });
 
     // init sampler
     mSampler = std::make_unique<HashRatioSampler>(0.01);

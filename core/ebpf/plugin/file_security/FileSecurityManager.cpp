@@ -34,7 +34,7 @@ void HandleFileKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
     FileSecurityManager* ss = static_cast<FileSecurityManager*>(ctx);
     if (ss == nullptr)
         return;
-    tcp_data_t* event = static_cast<file_data_t*>(data);
+    file_data_t* event = static_cast<file_data_t*>(data);
     ss->RecordFileEvent(event);
     // TODO @qianlu.kk  self monitor
     //   ss->UpdateRecvKernelEventsTotal();
@@ -79,25 +79,20 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
     mCommonEventQueue.enqueue(std::move(evt));
 }
 
-std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
-    std::array<size_t, 2> hash_result;
-    hash_result.fill(0UL);
-    std::hash<std::string> hasher;
-    std::hash<uint64_t> hasher0;
-
-    hash_result[0] = uint64_t(event->mPid) ^ (event->mKtime >> 32) ^ (event->mKtime << 32);
-    // LOG_INFO(sLogger, ("ktime", event->mKtime) ("hash result", hash_result[0]));
-    // aggregate_tree_.Aggregate();
-    hash_result[1] ^= hasher(event->mPath) + 0x9e3779b9 + (hash_result[1] << 6) + (hash_result[1] >> 2);
-    return hash_result;
-}
-
-int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     // set init flag ...
     mFlag = true;
 
-
     mAggregateTree = std::make_unique<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>>(
+        4096,
+        [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        },
+        [this](const std::shared_ptr<FileEvent>& in) {
+            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+        });
+
+    mSafeAggregateTree = std::make_unique<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>>(
         4096,
         [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
             base->mInnerEvents.emplace_back(std::move(other));
@@ -125,11 +120,11 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
                 return true;
             }
 
-            PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
                 this->mSafeAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
                     // set process tag
+                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
                     bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
                     if (!ok) {
                         return;
@@ -190,9 +185,15 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;
-    // set configs
-
     FileSecurityConfig config;
+    SecurityOptions* opts = std::get<SecurityOptions*>(options);
+    config.options_ = opts->mOptionList;
+    config.mPerfBufferSpec
+        = {{"file_secure_output",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
     return mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
@@ -229,6 +230,7 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     std::array<size_t, 2> hash_result = GenerateAggKey(fileEvent);
     bool ret = mAggregateTree->Aggregate(fileEvent, hash_result);
     LOG_DEBUG(sLogger, ("after aggregate", ret));
+    return 0;
 }
 
 int FileSecurityManager::Destroy() {

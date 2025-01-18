@@ -82,6 +82,12 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
                                               event->dport,
                                               event->net_ns);
     mCommonEventQueue.enqueue(std::move(evt));
+    LOG_DEBUG(sLogger, ("[record_network_event] pid", event->key.pid) ("ktime", event->key.ktime)
+        ("saddr", event->saddr)
+        ("daddr", event->daddr)
+        ("sport", event->sport)
+        ("dport", event->dport)
+    );
     return;
 }
 
@@ -153,11 +159,11 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
             // do we need to aggregate all the events into a eventgroup??
             // use source buffer to hold the memory
-            PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
                 this->mSafeAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
                     // set process tag
+                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
                     bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
                     if (!ok) {
                         return;
@@ -224,8 +230,15 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::NETWORK_SECURITY;
-    // TODO @qianlu.kk set configs
     NetworkSecurityConfig config;
+    SecurityOptions* opts = std::get<SecurityOptions*>(options);
+    config.options_ = opts->mOptionList;
+    config.mPerfBufferSpec
+        = {{"sock_secure_output",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleNetworkKernelEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
     return mSourceManager->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;

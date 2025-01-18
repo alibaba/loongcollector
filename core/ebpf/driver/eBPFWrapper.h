@@ -116,7 +116,6 @@ public:
      * detach bpf programs
      */
     int DynamicDetachBPFObject(const std::vector<AttachProgOps>& ops) {
-        int err;
         for (auto op : ops) {
             auto it = links_.find(op.name_);
             if (it == links_.end()) {

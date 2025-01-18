@@ -143,6 +143,10 @@ private:
 
     std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
 
+    std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
+    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
+    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
+
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {
         if (oldValue != newValue) {
@@ -150,9 +154,6 @@ private:
             onUpdate(oldValue, newValue);
         }
     }
-
-    // TODO @qianlu.kk
-    //   std::unique_ptr<Aggregator> metric_aggregator_ = nullptr;
 };
 
 } // namespace ebpf

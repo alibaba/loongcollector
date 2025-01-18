@@ -20,7 +20,7 @@
 #include <sstream>
 
 namespace logtail {
-namespace ebpf {
+
 std::unordered_map<uint64_t, std::string> capabilitiesString = {
   {0, "CAP_CHOWN"},
   {1, "DAC_OVERRIDE"},
@@ -106,5 +106,4 @@ std::string GetCapabilities(uint64_t capInt) {
   return oss.str();
 }
 
-}
 }

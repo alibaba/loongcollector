@@ -53,6 +53,19 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
         }
     );
 
+    mSafeAggregateTree = std::make_unique<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> (
+        4096, 
+        [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        }, 
+        [this](const std::shared_ptr<ProcessEvent>& in) {
+            // generate key
+            // auto execId = this->mBaseManager->GenerateExecId(in->mPid, in->mKtime);
+            
+            return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
+        }
+    );
+
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
         [this](const std::chrono::steady_clock::time_point& execTime){ // handler
             if (!this->mFlag) {

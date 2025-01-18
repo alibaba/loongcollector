@@ -44,7 +44,7 @@ public:
         return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, scheduler);
     }
 
-    ~FileSecurityManager();
+    ~FileSecurityManager() {}
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
 

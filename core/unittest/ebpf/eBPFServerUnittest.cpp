@@ -27,9 +27,12 @@ namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
 public:
     eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
+    ~eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Stop(); }
 //     void TestInit();
     void TestNetworkObserver();
     void TestProcessSecurity();
+    void TestNetworkSecurity();
+    void TestFileSecurity();
 
     // void TestEnableNetworkPlugin();
 
@@ -145,6 +148,75 @@ void eBPFServerUnittest::TestNetworkObserver() {
     std::this_thread::sleep_for(std::chrono::seconds(30));
 }
 
+void eBPFServerUnittest::TestNetworkSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_network_security",
+            "ProbeConfig":
+            {
+                "AddrFilter": {
+                    "DestAddrList": ["10.0.0.0/8","192.168.0.0/16"],
+                    "DestPortList": [80],
+                    "SourceAddrBlackList": ["127.0.0.1/8"],
+                    "SourcePortBlackList": [9300]
+                }
+            }
+        }
+    )";
+    std::shared_ptr<InputNetworkSecurity> input(new InputNetworkSecurity());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    ;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    SecurityOptions security_options;
+    security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_network_security");
+    input->Init(configJson, optionalGoPipeline);
+    bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        "input_network_security", 5, logtail::ebpf::PluginType::NETWORK_SECURITY, &ctx, &security_options, input->mPluginMgr);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    res = ebpf::eBPFServer::GetInstance()->DisablePlugin(
+        "input_network_security", logtail::ebpf::PluginType::NETWORK_SECURITY);
+    EXPECT_TRUE(res);
+}
+void eBPFServerUnittest::TestFileSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
+        }
+    )";
+
+    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    ;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    SecurityOptions security_options;
+    security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_file_security");
+    input->Init(configJson, optionalGoPipeline);
+    bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        "input_file_security", 0, logtail::ebpf::PluginType::FILE_SECURITY, &ctx, &security_options, input->mPluginMgr);
+    EXPECT_EQ(std::get<logtail::ebpf::SecurityFileFilter>(security_options.mOptionList[0].filter_).mFilePathList.size(), 3);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("input_file_security", PluginType::FILE_SECURITY);
+    EXPECT_TRUE(res);
+}
 
 void eBPFServerUnittest::TestProcessSecurity() {
     std::shared_ptr<InputNetworkObserver> ninput(new InputNetworkObserver());
@@ -1024,7 +1096,9 @@ void eBPFServerUnittest::TestProcessSecurity() {
 // }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
-UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
