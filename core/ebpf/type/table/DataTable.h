@@ -93,7 +93,7 @@ public:
     constexpr ArrayView<DataElement> elements() const { return elements_; }
 
     constexpr uint32_t ColIndex(std::string_view key) const {
-        uint32_t i = 0;
+        uint32_t i = -1;
         for (i = 0; i < elements_.size(); i++) {
             if (elements_[i].name() == key) {
                 break;

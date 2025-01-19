@@ -68,7 +68,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
 
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
         [this](const std::chrono::steady_clock::time_point& execTime){ // handler
-            if (!this->mFlag) {
+            if (!this->mFlag || this->mSuspendFlag) {
                 return false;
             }
 

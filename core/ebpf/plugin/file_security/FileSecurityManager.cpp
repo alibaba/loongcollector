@@ -104,7 +104,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            if (!this->mFlag) {
+            if (!this->mFlag || this->mSuspendFlag) {
                 return false;
             }
 
@@ -130,15 +130,13 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
                         return;
                     }
 
-                    // set file tag
-                    eventGroup.SetTag("path", group->mPath);
-
                     for (auto innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         // set timestamp
                         logEvent->SetTimestamp(seconds.count(), ts);
+                        logEvent->SetContent("path", group->mPath);
                         // set callnames
                         switch (innerEvent->mEventType) {
                             case KernelEventType::FILE_PATH_TRUNCATE: {

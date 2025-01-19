@@ -108,5 +108,29 @@ static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 
 static constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
+static constexpr DataElement kAppLogElements[] = {
+    kHost, // host
+    kAppId, // pid
+    kIp, // server ip
+    kAppName, // service
+    kWorkloadKind,
+    kWorkloadName,
+
+    kProtocol,
+    kRpc,
+    kDestId,
+    // kContainerId,
+    /* non-aggregate keys */
+
+    kRpcType,
+    kCallType,
+    kCallKind,
+    kEndpoint,
+};
+
+static constexpr size_t kAppLogNum = std::size(kAppLogElements);
+
+static constexpr auto kAppLogTable = DataTableSchema("app_log", "app log table", kAppLogElements);
+
 } // namespace ebpf
 } // namespace logtail

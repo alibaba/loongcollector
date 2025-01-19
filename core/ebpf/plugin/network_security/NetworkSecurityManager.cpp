@@ -144,7 +144,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            if (!this->mFlag) {
+            if (!this->mFlag || this->mSuspendFlag) {
                 return false;
             }
             {
@@ -161,6 +161,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             // use source buffer to hold the memory
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
+                LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
                 this->mSafeAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
                     // set process tag
                     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());

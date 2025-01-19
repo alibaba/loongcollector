@@ -77,6 +77,10 @@ public:
     void PollBufferWrapper();
     void ConsumeRecords();
 
+    std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractAppRecord> event);
+    std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
+    std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
+
 private:
     //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
     //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);

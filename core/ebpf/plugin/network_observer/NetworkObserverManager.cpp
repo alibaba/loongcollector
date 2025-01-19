@@ -19,6 +19,9 @@
 #include "ebpf/include/export.h"
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
+#include "ebpf/type/PeriodicalEvent.h"
+#include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 extern "C" {
 #include <net.h>
@@ -26,6 +29,58 @@ extern "C" {
 
 namespace logtail {
 namespace ebpf {
+
+std::array<size_t, 2> NetworkObserverManager::GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> record) {
+    // calculate agg key
+    std::array<size_t, 2> hash_result;
+    hash_result.fill(0UL);
+    std::hash<std::string> hasher;
+    auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
+
+    for (size_t j = 0; j < kAppMetricsTable.elements().size(); j++) {
+        int agg_level = static_cast<int>(kAppMetricsTable.elements()[j].agg_type());
+        if (agg_level >= MinAggregationLevel && agg_level <= MaxAggregationLevel) {
+            bool ok = kConnTrackerTable.HasCol(kAppMetricsTable.elements()[j].name());
+            std::string attr;
+            if (ok) {
+                attr = connTrackerAttrs[kConnTrackerTable.ColIndex(kAppMetricsTable.elements()[j].name())];
+            } else {
+                // record dedicated ... 
+            }
+                
+            int hash_result_index = agg_level - MinAggregationLevel;
+            // TODO @qianlu.kk we should not to use record->GetMetricAttribute(j)
+            // because we already have entity relative attributes in conn tracker, and we already get these attributes
+            hash_result[hash_result_index] ^= hasher(attr) +
+                                                0x9e3779b9 +
+                                                (hash_result[hash_result_index] << 6) +
+                                                (hash_result[hash_result_index] >> 2);
+        }
+    }
+
+    return hash_result;
+}
+
+std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForSpan(const std::shared_ptr<AbstractAppRecord> record) {
+    // calculate agg key
+    // just appid
+    std::array<size_t, 1> hash_result;
+    hash_result.fill(0UL);
+    std::hash<uint64_t> hasher;
+
+
+
+    return hash_result;
+}
+
+std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event) {
+    // just appid
+    std::array<size_t, 1> hash_result;
+    hash_result.fill(0UL);
+    std::hash<uint64_t> hasher;
+
+    return hash_result;
+}
 
 void NetworkObserverManager::EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const {
     mRecvHttpDataEventsTotal_.fetch_add(1);
@@ -115,6 +170,139 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         [this](const std::shared_ptr<ConnStatsRecord>& in) {
             return std::make_unique<NetMetricData>(in->GetConnId());
         });
+
+    std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
+        1,
+        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
+            if (!this->mFlag || this->mSuspendFlag) {
+                return false;
+            }
+
+            auto nodes = this->mSpanAggregator->GetNodesWithAggDepth(1);
+            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+            if (nodes.empty()) {
+                LOG_DEBUG(sLogger, ("empty nodes...", ""));
+                return true;
+            }
+
+            for (auto& node : nodes) {
+                // convert to a item and push to process queue
+                PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>()); // per node represent an APP ... 
+                bool init = false;
+                this->mSpanAggregator->ForEach(node, [&](const NetMetricData* group) {
+                    // set process tag
+                    if (!init) {
+                        // set app attrs ... 
+                        eventGroup.SetTag(std::string("service.name"), ""); // app name
+                        eventGroup.SetTag(std::string("arms.appId"), ""); // app id
+                        eventGroup.SetTag(std::string("host.ip"), ""); // pod ip
+                        eventGroup.SetTag(std::string("host.name"), ""); // pod name
+                        eventGroup.SetTag(std::string("arms.app.type"), "ebpf"); // 
+                        eventGroup.SetTag(std::string("data_type"), "span");
+                        init = true;
+                    }
+
+                    // generate tag metric
+                    auto* tagMetric = eventGroup.AddMetricEvent();
+                    auto* requestsMetric = eventGroup.AddMetricEvent();
+                    auto* errorMetric = eventGroup.AddMetricEvent();
+                    auto* slowMetric = eventGroup.AddMetricEvent();
+                    auto* latencyMetric = eventGroup.AddMetricEvent();
+                    auto* statusMetric = eventGroup.AddMetricEvent();
+
+                    {
+                        std::lock_guard lk(mContextMutex);
+                        std::unique_ptr<ProcessQueueItem> item
+                            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                            LOG_WARNING(sLogger,
+                                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                            "[FileSecurityEvent] push queue failed!", ""));
+                        }
+                    }
+                });
+            }
+            this->mAppAggregator->Clear();
+
+            return true;
+        },
+
+        [this]() { // validator
+            return !this->mFlag.load();
+        });
+
+    std::unique_ptr<AggregateEvent> appMetricEvent = std::make_unique<AggregateEvent>(
+        15,
+        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
+            if (!this->mFlag || this->mSuspendFlag) {
+                return false;
+            }
+
+            auto nodes = this->mAppAggregator->GetNodesWithAggDepth(1);
+            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+            if (nodes.empty()) {
+                LOG_DEBUG(sLogger, ("empty nodes...", ""));
+                return true;
+            }
+
+            for (auto& node : nodes) {
+                // convert to a item and push to process queue
+                PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>()); // per node represent an APP ... 
+                bool init = false;
+                this->mAppAggregator->ForEach(node, [&](const AppMetricData* group) {
+                    // set process tag
+                    if (!init) {
+                        // set app attrs ... 
+                        eventGroup.SetTag(std::string("pid"), ""); // app id 
+                        eventGroup.SetTag(std::string("serverIp"), ""); // pod ip
+                        eventGroup.SetTag(std::string("source"), "ebpf");
+                        eventGroup.SetTag(std::string("service"), ""); // app name
+                        eventGroup.SetTag(std::string("host"), ""); // pod name
+                        eventGroup.SetTag(std::string("data_type"), "metric");
+                        init = true;
+                    }
+
+                    // generate tag metric
+                    {
+                        auto* tagMetric = eventGroup.AddMetricEvent();
+
+                    }
+                    if (group->mCount) {
+                        auto* requestsMetric = eventGroup.AddMetricEvent();
+                        auto* latencyMetric = eventGroup.AddMetricEvent();
+                    }
+                    if (group->mErrCount) {
+                        auto* errorMetric = eventGroup.AddMetricEvent();
+                    }
+                    if (group->mSlowCount) {
+                        auto* slowMetric = eventGroup.AddMetricEvent();
+                    }
+                    if (group->m2xxCount || group->m3xxCount || group->m4xxCount || group->m5xxCount) {
+                        auto* statusMetric = eventGroup.AddMetricEvent();
+                    }   
+
+                    {
+                        std::lock_guard lk(mContextMutex);
+                        std::unique_ptr<ProcessQueueItem> item
+                            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                            LOG_WARNING(sLogger,
+                                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                            "[FileSecurityEvent] push queue failed!", ""));
+                        }
+                    }
+                });
+            }
+            this->mAppAggregator->Clear();
+
+            return true;
+        },
+
+        [this]() { // validator
+            return !this->mFlag.load();
+        });
+
+    mScheduler->PushEvent(std::move(appMetricEvent));
 
     // init sampler
     mSampler = std::make_unique<HashRatioSampler>(0.01);
@@ -264,6 +452,9 @@ void NetworkObserverManager::ConsumeRecordsAsTrace(const std::vector<std::shared
                 continue;
             }
 
+            auto res = mSpanAggregator->Aggregate(appRecord, GenerateAggKeyForSpan(appRecord));
+            LOG_DEBUG(sLogger, ("agg res", res));
+
             // Aggregator::GetInstance().Aggregate(appRecord);
 
             continue;
@@ -293,42 +484,8 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(const std::vector<std::share
                         ("app meta ready, rollback:",
                          record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
 
-            // TODO @qianlu.kk we need converge logic ...
-            // ConvergeAbstractRecord(appRecord);
-            std::array<size_t, logtail::ebpf::MaxAggregationLevel> hash_result;
-            hash_result.fill(0UL);
-
-            auto elements = logtail::ebpf::kAppMetricsTable.elements();
-            // std::hash<std::string> hasher;
-
-            for (size_t j = 0; j < elements.size(); j++) {
-                int agg_level = static_cast<int>(elements[j].agg_type());
-                if (agg_level >= logtail::ebpf::MinAggregationLevel
-                    && agg_level <= logtail::ebpf::MaxAggregationLevel) {
-                    // 这里估计就两级，一级是 appid、host 之类的，另一级是 rpc 之类的
-                    // 因为 appid host 都是 agg level 0，对应1
-                    // rpc 之类是 agg level 1，对应2
-                    // callKind callType 这些不用参与聚合，直接是 no agg
-                    //
-                    // 对于 app 指标，我们只需要
-                    // 对于 span
-                    // 类型，或许我们也需要一个滑动窗口。。。也就是按秒上报数据，只需要一级聚合即可。或者直接写个简单的
-                    // map
-                    // int hash_result_index = agg_level - logtail::ebpf::MinAggregationLevel;
-                    // TODO @qianlu.kk we should not to use record->GetMetricAttribute(j)
-                    // because we already have entity relative attributes in conn tracker, and we already get these
-                    // attributes hash_result[hash_result_index] ^= hasher(record->GetMetricAttribute(j)) +
-                    //                                     0x9e3779b9 +
-                    //                                     (hash_result[hash_result_index] << 6) +
-                    //                                     (hash_result[hash_result_index] >> 2);
-                }
-            }
-            // {
-            //     std::unique_lock<std::shared_mutex> lock_app(app_tree_mtx_);
-            //     app_metrics_tree_.Aggregate(*record, hash_result);
-            // }
-
-
+            auto res = mAppAggregator->Aggregate(appRecord, GenerateAggKeyForAppMetric(appRecord));
+            LOG_DEBUG(sLogger, ("agg res", res));
             continue;
         }
 
@@ -451,8 +608,7 @@ void NetworkObserverManager::ConsumeRecords() {
             continue;
         }
 
-        // ConvergeAbstractRecord(appRecord);
-
+        // TODO ConvergeAbstractRecord(appRecord);
         if (mEnableLog) {
             ConsumeRecordsAsEvent(items, count);
         }
@@ -462,17 +618,6 @@ void NetworkObserverManager::ConsumeRecords() {
             ConsumeRecordsAsMetric(items, count);
         }
         if (mEnableSpan) {
-            // generate traceId
-            auto spanId = GenerateSpanID();
-            if (!mSampler->ShouldSample(spanId)) {
-                LOG_DEBUG(sLogger, ("sampler", "reject"));
-                continue;
-            }
-            auto traceId = GenerateTraceID();
-            LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId))("traceId", FromTraceId(traceId)));
-            // set trace id to
-            // do sample
-            // aggregate ...
             ConsumeRecordsAsTrace(items, count);
         }
 

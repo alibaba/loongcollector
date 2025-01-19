@@ -85,6 +85,15 @@ public:
         return;
     }
 
+    virtual int UpdatePlugin(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+        // detach prog
+        // cleanup filter
+        // setup new filter
+        // attach prog
+
+        return 0;
+    }
+
     void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
         std::lock_guard lk(mContextMutex);
         mPipelineCtx = ctx;

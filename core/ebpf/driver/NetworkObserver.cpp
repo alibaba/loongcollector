@@ -344,8 +344,78 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
 
 // just update config ...
 int update_plugin(logtail::ebpf::PluginConfig* arg) {
-    // 1. cleanup filter
-    // 2. set filter
+    auto pluginType = arg->mPluginType;
+    if (pluginType == logtail::ebpf::PluginType::NETWORK_OBSERVE || pluginType == logtail::ebpf::PluginType::PROCESS_SECURITY) {
+        return 0;
+    }
+    // detach prog
+    // cleanup filter
+    // setup new filter
+    // attach prog
+    
+    gPluginStatus[int(pluginType)] = false;
+
+    // 1. detach prog
+    // 2. stop consumer
+    // 3. destruct skeleton
+    switch (pluginType) {
+        case logtail::ebpf::PluginType::NETWORK_SECURITY: {
+            // 1. dynamic detach
+            auto callNames = gPluginCallNames[int(pluginType)];
+            gPluginCallNames[int(pluginType)] = {};
+            std::vector<logtail::ebpf::AttachProgOps> detachOps;
+            for (auto cn : callNames) {
+                detachOps.emplace_back("kprobe_" + cn, true);
+            }
+            int ret = 0;
+            ret = wrapper->DynamicDetachBPFObject(detachOps);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                    "network security: detach progs failed\n");
+            }
+            // 2. clean-up filter
+            for (auto cn : callNames) {
+                ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
+                if (ret) {
+                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "network security: delete filter for callname %s falied\n", cn);
+                }
+            }
+            // 3. reload filter
+
+            // 4. start
+            break;
+        }
+        case logtail::ebpf::PluginType::FILE_SECURITY: {
+            // 1. dynamic detach
+            auto callNames = gPluginCallNames[int(pluginType)];
+            gPluginCallNames[int(pluginType)] = {};
+            std::vector<logtail::ebpf::AttachProgOps> detachOps;
+            for (auto cn : callNames) {
+                detachOps.emplace_back("kprobe_" + cn, true);
+            }
+            int ret = wrapper->DynamicDetachBPFObject(detachOps);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                    "network security: detach progs failed\n");
+            }
+            // 2. clean-up filter
+            for (auto cn : callNames) {
+                ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
+                if (ret) {
+                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "file security: delete filter for callname %s falied\n", cn);
+                }
+            }
+            // 3. reload filter
+            
+            // 4. start
+            break;
+        }
+        default:
+            break;
+    }
+    gPluginStatus[int(pluginType)] = true;
     return 0;
 }
 

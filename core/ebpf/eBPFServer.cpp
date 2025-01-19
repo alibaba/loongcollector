@@ -206,11 +206,15 @@ void eBPFServer::Stop() {
     // do not destroy source manager ...
     // mSourceManager.reset();
     for (int i = 0; i < int(PluginType::MAX); i++) {
-        UpdatePipelineName(static_cast<PluginType>(i), "", "");
+        auto pipelineName = mLoadedPipeline[i];
+        if (pipelineName.size()) {
+            bool ret = DisablePlugin(pipelineName, static_cast<PluginType>(i));
+            LOG_INFO(sLogger, ("force stop plugin", magic_enum::enum_name(static_cast<PluginType>(i))) ("pipeline", pipelineName) ("ret", ret));
+        }
     }
     
+    LOG_INFO(sLogger, ("begin to stop timer", ""));
     mScheduler->Stop();
-    mBaseManager->Stop();
 
     mRunning = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
@@ -245,6 +249,18 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                     ("pipeline already loaded, plugin type",
                      int(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
+    }
+
+    if (prev_pipeline_name.size() && prev_pipeline_name == pipeline_name) {
+        // TODO @qianlu.kk for update scenario ...
+
+        // mgr->Update();
+        // for file/network security scenario, just update FILTER CONFIG
+        // for process scenario, do nothing, just resume
+        // for network observer scenario, we just need to update some user config, like enable metric or not ... 
+
+        // mgr->Resume();
+        return true;
     }
 
     UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
@@ -349,12 +365,25 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
         return true;
     }
 
+    LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
     auto pluginManager = GetPluginManager(type);
     if (pluginManager) {
         pluginManager->UpdateContext(nullptr, -1, -1);
-        return pluginManager->Destroy() == 0;
-    } else 
-    LOG_WARNING(sLogger, ("no plugin registered, plugin type", magic_enum::enum_name(type))("pipeline", pipeline_name));
+        int ret = pluginManager->Destroy() == 0;
+        UpdatePluginManager(type, nullptr);
+        if (ret) {
+            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
+            if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY || type == PluginType::FILE_SECURITY) {
+                // check if we need stop basemanager
+                if (!GetPluginManager(PluginType::NETWORK_SECURITY) && !GetPluginManager(PluginType::PROCESS_SECURITY) && !GetPluginManager(PluginType::FILE_SECURITY)) {
+                    LOG_WARNING(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
+                    mBaseManager->Stop();
+                }
+            }
+        }
+    } else {
+        LOG_WARNING(sLogger, ("no plugin registered, plugin type", magic_enum::enum_name(type))("pipeline", pipeline_name));
+    }
     return true;
 }
 
@@ -398,6 +427,7 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type
     // pay attention to timer process
     // and we need to figure out wether we need to STOP plugin... especially for perf workers.
     mgr->UpdateContext(nullptr, -1, -1);
+    mgr->Suspend();
     mSuspendPluginTotal->Add(1);
     return true;
 }
