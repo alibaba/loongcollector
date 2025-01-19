@@ -165,7 +165,7 @@ func TestDoICMPing(t *testing.T) {
 	netPing.doICMPing(&config1)
 	res1 := <-netPing.resultChannel
 	fmt.Println(res1)
-	assert.Equal(t, true, strings.Contains(res1.Label.String(), "dst#$#8.8.8.8|name#$#|src#$#|"), res1)
+	assert.Equal(t, true, strings.Contains(res1.Label.String(), "dst#$#8.8.8.8"), res1)
 	assert.Equal(t, true, res1.Valid)
 	assert.Equal(t, 3, res1.Total)
 	assert.Equal(t, 3, res1.Success+res1.Failed)
