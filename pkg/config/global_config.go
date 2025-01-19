@@ -35,8 +35,8 @@ type GlobalConfig struct {
 	AlwaysOnline bool
 	DelayStopSec int
 
-	EnableTimestampNanosecond      bool
-	EnableSlsMetricsFormat         bool
+	EnableTimestampNanosecond bool
+	EnableSlsMetricsFormat    bool
 }
 
 // LogtailGlobalConfig is the singleton instance of GlobalConfig.
