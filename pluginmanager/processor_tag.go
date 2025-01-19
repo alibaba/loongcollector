@@ -43,22 +43,22 @@ const (
 
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
 type ProcessorTag struct {
-	PipelineMetaTagKey     map[TagKey]string
-	AppendingAllEnvMetaTag bool
-	AgentEnvMetaTagKey     map[string]string
+	pipelineMetaTagKey     map[TagKey]string
+	appendingAllEnvMetaTag bool
+	agentEnvMetaTagKey     map[string]string
 
 	// TODO: file tags, read in background with double buffer
-	FileTagsPath string
-	MachineUUID  string
+	fileTagsPath string
+	machineUUID  string
 }
 
-func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, FileTagsPath, machineUUID string) *ProcessorTag {
+func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath, machineUUID string) *ProcessorTag {
 	processorTag := &ProcessorTag{
-		PipelineMetaTagKey:     make(map[TagKey]string),
-		AppendingAllEnvMetaTag: appendingAllEnvMetaTag,
-		AgentEnvMetaTagKey:     agentEnvMetaTagKey,
-		FileTagsPath:           FileTagsPath,
-		MachineUUID:            machineUUID,
+		pipelineMetaTagKey:     make(map[TagKey]string),
+		appendingAllEnvMetaTag: appendingAllEnvMetaTag,
+		agentEnvMetaTagKey:     agentEnvMetaTagKey,
+		fileTagsPath:           fileTagsPath,
+		machineUUID:            machineUUID,
 	}
 	processorTag.parseDefaultAddedTag("HOST_NAME", TagKeyHostName, hostNameDefaultTagKey, pipelineMetaTagKey)
 	processorTag.parseDefaultAddedTag("HOST_IP", TagKeyHostIP, hostIPDefaultTagKey, pipelineMetaTagKey)
@@ -110,14 +110,14 @@ func (p *ProcessorTag) parseDefaultAddedTag(configKey string, tagKey TagKey, def
 	if customKey, ok := config[configKey]; ok {
 		if customKey != "" {
 			if customKey == defaultConfigTagKeyValue {
-				p.PipelineMetaTagKey[tagKey] = defaultKey
+				p.pipelineMetaTagKey[tagKey] = defaultKey
 			} else {
-				p.PipelineMetaTagKey[tagKey] = customKey
+				p.pipelineMetaTagKey[tagKey] = customKey
 			}
 		}
 		// empty value means delete
 	} else {
-		p.PipelineMetaTagKey[tagKey] = defaultKey
+		p.pipelineMetaTagKey[tagKey] = defaultKey
 	}
 }
 
@@ -125,9 +125,9 @@ func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, default
 	if customKey, ok := config[configKey]; ok {
 		if customKey != "" {
 			if customKey == defaultConfigTagKeyValue {
-				p.PipelineMetaTagKey[tagKey] = defaultKey
+				p.pipelineMetaTagKey[tagKey] = defaultKey
 			} else {
-				p.PipelineMetaTagKey[tagKey] = customKey
+				p.pipelineMetaTagKey[tagKey] = customKey
 			}
 		}
 		// empty value means delete
@@ -135,7 +135,7 @@ func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, default
 }
 
 func (p *ProcessorTag) addTag(tagKey TagKey, value string, tags map[string]string) {
-	if key, ok := p.PipelineMetaTagKey[tagKey]; ok {
+	if key, ok := p.pipelineMetaTagKey[tagKey]; ok {
 		if key != "" {
 			tags[key] = value
 		}
