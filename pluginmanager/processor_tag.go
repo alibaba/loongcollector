@@ -33,10 +33,10 @@ const (
 )
 
 const (
-	hostNameDefaultTagKey      = "host.name"
-	hostIPDefaultTagKey        = "host.ip"
-	hostIDDefaultTagKey        = "host.id"
-	cloudProviderDefaultTagKey = "cloud.provider"
+	hostNameDefaultTagKey      = "__hostname__"
+	hostIPDefaultTagKey        = "__host_ip__"
+	hostIDDefaultTagKey        = "__host_id__"
+	cloudProviderDefaultTagKey = "__cloud_provider__"
 	machineUUIDDefaultTagKey   = "__machine_uuid__"
 	defaultConfigTagKeyValue   = "__default__"
 )
@@ -47,16 +47,17 @@ type ProcessorTag struct {
 	AppendingAllEnvMetaTag bool
 	AgentEnvMetaTagKey     map[string]string
 
-	LogFileTagsPath string
-	MachineUUID     string
+	// TODO: file tags, read in background with double buffer
+	FileTagsPath string
+	MachineUUID  string
 }
 
-func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, logFileTagsPath, machineUUID string) *ProcessorTag {
+func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, FileTagsPath, machineUUID string) *ProcessorTag {
 	processorTag := &ProcessorTag{
 		PipelineMetaTagKey:     make(map[TagKey]string),
 		AppendingAllEnvMetaTag: appendingAllEnvMetaTag,
 		AgentEnvMetaTagKey:     agentEnvMetaTagKey,
-		LogFileTagsPath:        logFileTagsPath,
+		FileTagsPath:           FileTagsPath,
 		MachineUUID:            machineUUID,
 	}
 	processorTag.parseDefaultAddedTag("HOST_NAME", TagKeyHostName, hostNameDefaultTagKey, pipelineMetaTagKey)
@@ -86,7 +87,6 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 	}
-	tagsMap[machineUUIDDefaultTagKey] = p.MachineUUID
 }
 
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {

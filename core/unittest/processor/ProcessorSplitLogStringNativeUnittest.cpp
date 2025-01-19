@@ -97,10 +97,9 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
         [
             {
                 "contents" :
-                {
-                    "content" : "{\n\"k1\":\"v1\"\n}",
-                    ")"
-            + DEFAULT_LOG_TAG_FILE_OFFSET + R"(": "1"
+                {")"
+            + DEFAULT_LOG_TAG_FILE_OFFSET + R"(": "1",
+                    "content" : "{\n\"k1\":\"v1\"\n}"
                 },
                 "fileOffset": 1,
                 "rawSize": )"
@@ -112,11 +111,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             },
             {
                 "contents" :
-                {
-                    "content" : "{\n\"k2\":\"v2\"\n}",
-                    ")"
+                {")"
             + DEFAULT_LOG_TAG_FILE_OFFSET + R"(": ")"
-               << strlen(R"({n"k1":"v1"n}0)") + 1 << R"("
+               << strlen(R"({n"k1":"v1"n}0)") + 1 << R"(",
+                    "content" : "{\n\"k2\":\"v2\"\n}"
                 },
                 "fileOffset": )"
                << strlen(R"({n"k1":"v1"n}0)") + 1 << R"(,
