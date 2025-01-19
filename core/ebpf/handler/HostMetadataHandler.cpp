@@ -19,6 +19,7 @@
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "metadata/K8sMetadata.h"
+#include "common/magic_enum.hpp"
 
 namespace logtail {
 namespace ebpf {
@@ -87,8 +88,8 @@ void HostMetadataHandler::ReportAgentInfo() {
 
             std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
-            if (res) {
-                LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", res));
+            if (res == QueueStatus::OK) {
+                LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", magic_enum::enum_name(res)));
             } else {
                 LOG_DEBUG(sLogger, ("[AgentInfo] push queue success!", ""));
             }

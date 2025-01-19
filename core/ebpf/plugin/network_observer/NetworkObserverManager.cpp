@@ -66,9 +66,7 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForSpan(const std::s
     // just appid
     std::array<size_t, 1> hash_result;
     hash_result.fill(0UL);
-    std::hash<uint64_t> hasher;
-
-
+    // std::hash<uint64_t> hasher;
 
     return hash_result;
 }
@@ -77,7 +75,7 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForLog(const std::sh
     // just appid
     std::array<size_t, 1> hash_result;
     hash_result.fill(0UL);
-    std::hash<uint64_t> hasher;
+    // std::hash<uint64_t> hasher;
 
     return hash_result;
 }
@@ -203,18 +201,18 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     }
 
                     // generate tag metric
-                    auto* tagMetric = eventGroup.AddMetricEvent();
-                    auto* requestsMetric = eventGroup.AddMetricEvent();
-                    auto* errorMetric = eventGroup.AddMetricEvent();
-                    auto* slowMetric = eventGroup.AddMetricEvent();
-                    auto* latencyMetric = eventGroup.AddMetricEvent();
-                    auto* statusMetric = eventGroup.AddMetricEvent();
+                    // auto* tagMetric = eventGroup.AddMetricEvent();
+                    // auto* requestsMetric = eventGroup.AddMetricEvent();
+                    // auto* errorMetric = eventGroup.AddMetricEvent();
+                    // auto* slowMetric = eventGroup.AddMetricEvent();
+                    // auto* latencyMetric = eventGroup.AddMetricEvent();
+                    // auto* statusMetric = eventGroup.AddMetricEvent();
 
                     {
                         std::lock_guard lk(mContextMutex);
                         std::unique_ptr<ProcessQueueItem> item
                             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
                             LOG_WARNING(sLogger,
                                         ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
                                             "[FileSecurityEvent] push queue failed!", ""));
@@ -263,29 +261,29 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     }
 
                     // generate tag metric
-                    {
-                        auto* tagMetric = eventGroup.AddMetricEvent();
+                    // {
+                    //     auto* tagMetric = eventGroup.AddMetricEvent();
 
-                    }
-                    if (group->mCount) {
-                        auto* requestsMetric = eventGroup.AddMetricEvent();
-                        auto* latencyMetric = eventGroup.AddMetricEvent();
-                    }
-                    if (group->mErrCount) {
-                        auto* errorMetric = eventGroup.AddMetricEvent();
-                    }
-                    if (group->mSlowCount) {
-                        auto* slowMetric = eventGroup.AddMetricEvent();
-                    }
-                    if (group->m2xxCount || group->m3xxCount || group->m4xxCount || group->m5xxCount) {
-                        auto* statusMetric = eventGroup.AddMetricEvent();
-                    }   
+                    // }
+                    // if (group->mCount) {
+                    //     auto* requestsMetric = eventGroup.AddMetricEvent();
+                    //     auto* latencyMetric = eventGroup.AddMetricEvent();
+                    // }
+                    // if (group->mErrCount) {
+                    //     auto* errorMetric = eventGroup.AddMetricEvent();
+                    // }
+                    // if (group->mSlowCount) {
+                    //     auto* slowMetric = eventGroup.AddMetricEvent();
+                    // }
+                    // if (group->m2xxCount || group->m3xxCount || group->m4xxCount || group->m5xxCount) {
+                    //     auto* statusMetric = eventGroup.AddMetricEvent();
+                    // }   
 
                     {
                         std::lock_guard lk(mContextMutex);
                         std::unique_ptr<ProcessQueueItem> item
                             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
                             LOG_WARNING(sLogger,
                                         ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
                                             "[FileSecurityEvent] push queue failed!", ""));

@@ -212,7 +212,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                         std::lock_guard lk(mContextMutex);
                         std::unique_ptr<ProcessQueueItem> item
                             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
                             LOG_WARNING(sLogger,
                                         ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
                                             "[NetworkSecurityEvent] push queue failed!", ""));
