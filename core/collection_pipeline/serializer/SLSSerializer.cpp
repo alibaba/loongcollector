@@ -116,13 +116,30 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<MetricEvent>();
+                for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
+                    LOG_DEBUG(sLogger, 
+                        ("event tags for metricname", std::string(e.GetName()))
+                        (std::string(tag->first), std::string(tag->second))
+                    );
+                }
+                for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
+                    LOG_DEBUG(sLogger, 
+                        ("group tags for metricname", std::string(e.GetName()))
+                        (std::string(tag->first), std::string(tag->second))
+                    );
+                }
+                
+                
                 if (e.Is<UntypedSingleValue>()) {
                     metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
+                    // should not happen
+                    LOG_ERROR(sLogger,
+                              ("config", mFlusher->GetContext().GetConfigName()) ("metricname", e.GetName()));
                 } else {
                     // should not happen
                     LOG_ERROR(sLogger,
                               ("unexpected error",
-                               "invalid metric event type")("config", mFlusher->GetContext().GetConfigName()));
+                               "invalid metric event type")("config", mFlusher->GetContext().GetConfigName()) ("metricname", e.GetName()));
                     continue;
                 }
                 metricEventContentCache[i].second = GetMetricLabelSize(e);

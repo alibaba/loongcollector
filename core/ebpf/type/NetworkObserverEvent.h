@@ -271,7 +271,6 @@ public:
     uint64_t send_packets_;
     uint64_t recv_bytes_;
     uint64_t send_bytes_;
-    std::array<std::string, kNetMetricsNum> metric_attributes_;
 };
 
 // AbstractAppRecord is intentionally designed to distinguish L5 and L7 Record of AbstractNetRecord. AbstractAppRecord
@@ -281,33 +280,6 @@ public:
     AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {};
 
     DataTableSchema GetMetricsTableSchema() const override { return kAppMetricsTable; }
-
-    // std::string GetMetricAttribute(size_t col) const override {
-    //   if (col >= std::size(metric_attributes_)) {
-    //       return "";
-    //   }
-    //   return metric_attributes_[col];
-    // }
-
-    // std::string GetMetricAttributeByName(const std::string& key) const {
-
-    // }
-
-    void InitMetricAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
-        // generate http dedicated attributes ...
-    }
-
-    void InitSpanAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
-        // generate http dedicated attributes ...
-    }
-
-    void InitLogAttributes(const std::array<std::string, kConnTrackerElementsTableSize>& conntracker_attr) {
-        // generate http dedicated attributes ...
-    }
-
-    std::array<std::string, kAppMetricsNum> metric_attributes_;
-    std::array<std::string, kAppTraceNum> trace_attributes_;
-    ArrayView<std::string> conn_tracker_attributes_;
 };
 
 
@@ -380,7 +352,7 @@ public:
 
 class AppMetricData : public MetricData {
 public:
-    AppMetricData(const ConnId& connId) : MetricData(connId) {}
+    AppMetricData(const ConnId& connId, const std::string& spanName) : MetricData(connId), mSpanName(spanName) {}
     ~AppMetricData() {}
     uint64_t mCount = 0;
     double mSum = 0;
@@ -390,6 +362,7 @@ public:
     uint64_t m3xxCount = 0;
     uint64_t m4xxCount = 0;
     uint64_t m5xxCount = 0;
+    std::string mSpanName;
 };
 
 class NetMetricData : public MetricData {

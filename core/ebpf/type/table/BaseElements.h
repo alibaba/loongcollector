@@ -46,7 +46,7 @@ constexpr DataElement kPodIp = {
 
 constexpr DataElement kWorkloadKind = {
     "workload_kind",
-    "workload_kind", // metric
+    "workloadKind", // metric
     "k8s.workload.kind", // span
     "k8s.workload.kind", // log
     "",
@@ -55,7 +55,7 @@ constexpr DataElement kWorkloadKind = {
 
 constexpr DataElement kWorkloadName = {
     "workload_name",
-    "workload_name", // metric
+    "workloadName", // metric
     "k8s.workload.name", // span
     "k8s.workload.name", // log
     "",
@@ -73,7 +73,7 @@ constexpr DataElement kNamespace = {
 
 constexpr DataElement kPeerPodName = {
     "peer_pod_name",
-    "peer_pod_name", // metric
+    "peerPodName", // metric
     "k8s.peer.pod.name", // span
     "k8s.peer.pod.name", // log
     "",
@@ -82,7 +82,7 @@ constexpr DataElement kPeerPodName = {
 
 constexpr DataElement kPeerPodIp = {
     "peer_pod_ip",
-    "peer_pod_ip", // metric
+    "peerPodIp", // metric
     "k8s.peer.pod.ip", // span
     "k8s.peer.pod.ip", // log
     "",
@@ -91,7 +91,7 @@ constexpr DataElement kPeerPodIp = {
 
 constexpr DataElement kPeerWorkloadKind = {
     "peer_workload_kind",
-    "peer_workload_kind", // metric
+    "peerWorkloadKind", // metric
     "k8s.peer.workload.kind", // span
     "k8s.peer.workload.kind", // log
     "",
@@ -100,7 +100,7 @@ constexpr DataElement kPeerWorkloadKind = {
 
 constexpr DataElement kPeerWorkloadName = {
     "peer_workload_name",
-    "peer_workload_name", // metric
+    "peerWorkloadName", // metric
     "k8s.peer.workload.name", // span
     "k8s.peer.workload.name", // log
     "",
@@ -109,7 +109,7 @@ constexpr DataElement kPeerWorkloadName = {
 
 constexpr DataElement kPeerServiceName = {
     "peer_service_name",
-    "peer_service_name", // metric
+    "peerServiceName", // metric
     "k8s.peer.service.name", // span
     "k8s.peer.service.name", // log
     "",
@@ -118,7 +118,7 @@ constexpr DataElement kPeerServiceName = {
 
 constexpr DataElement kPeerNamespace = {
     "peer_namespace",
-    "peer_namespace", // metric
+    "peerNamespace", // metric
     "k8s.peer.namespace", // span
     "k8s.peer.namespace", // log
     "",

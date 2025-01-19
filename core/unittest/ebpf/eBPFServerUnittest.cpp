@@ -1095,9 +1095,9 @@ void eBPFServerUnittest::TestProcessSecurity() {
 //     EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 // }
 
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
+UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);

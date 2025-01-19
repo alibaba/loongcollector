@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "models/ArrayView.h"
+#include "models/StringView.h"
 
 namespace logtail {
 namespace ebpf {
@@ -48,11 +49,11 @@ constexpr int MaxAggregationLevel = static_cast<int>(AggregationType::Aggregatio
 class DataElement {
 public:
     constexpr DataElement() = delete;
-    constexpr DataElement(std::string_view name,
-                          std::string_view metric_key,
-                          std::string_view span_key,
-                          std::string_view log_key,
-                          std::string_view desc,
+    constexpr DataElement(StringView name,
+                          StringView metric_key,
+                          StringView span_key,
+                          StringView log_key,
+                          StringView desc,
                           AggregationType agg_type = AggregationType::NoAggregate)
         : name_(name),
           metric_key_(metric_key),
@@ -61,20 +62,20 @@ public:
           desc_(desc),
           agg_type_(agg_type) {}
 
-    constexpr std::string_view name() const { return name_; }
-    constexpr std::string_view metric_key() const { return metric_key_; }
-    constexpr std::string_view span_key() const { return span_key_; }
-    constexpr std::string_view log_key() const { return log_key_; }
-    constexpr std::string_view desc() const { return desc_; }
+    constexpr StringView name() const { return name_; }
+    constexpr StringView metric_key() const { return metric_key_; }
+    constexpr StringView span_key() const { return span_key_; }
+    constexpr StringView log_key() const { return log_key_; }
+    constexpr StringView desc() const { return desc_; }
 
     constexpr AggregationType agg_type() const { return agg_type_; }
 
 protected:
-    const std::string_view name_;
-    const std::string_view metric_key_;
-    const std::string_view span_key_;
-    const std::string_view log_key_;
-    const std::string_view desc_;
+    const StringView name_;
+    const StringView metric_key_;
+    const StringView span_key_;
+    const StringView log_key_;
+    const StringView desc_;
     const AggregationType agg_type_ = AggregationType::NoAggregate;
 };
 
@@ -82,18 +83,18 @@ class DataTableSchema {
 public:
     // TODO(oazizi): This constructor should only be called at compile-time. Need to enforce this.
     template <std::size_t N>
-    constexpr DataTableSchema(std::string_view name, std::string_view desc, const DataElement (&elements)[N])
+    constexpr DataTableSchema(StringView name, StringView desc, const DataElement (&elements)[N])
         : name_(name), desc_(desc), elements_(elements) {}
 
-    DataTableSchema(std::string_view name, std::string_view desc, const std::vector<DataElement>& elements)
+    DataTableSchema(StringView name, StringView desc, const std::vector<DataElement>& elements)
         : name_(name), desc_(desc), elements_(elements.data(), elements.size()) {}
 
-    constexpr std::string_view name() const { return name_; }
-    constexpr std::string_view desc() const { return desc_; }
+    constexpr StringView name() const { return name_; }
+    constexpr StringView desc() const { return desc_; }
     constexpr ArrayView<DataElement> elements() const { return elements_; }
 
-    constexpr uint32_t ColIndex(std::string_view key) const {
-        uint32_t i = -1;
+    constexpr uint32_t ColIndex(StringView key) const {
+        uint32_t i = 0;
         for (i = 0; i < elements_.size(); i++) {
             if (elements_[i].name() == key) {
                 break;
@@ -102,7 +103,7 @@ public:
         return i;
     }
 
-    constexpr bool HasCol(std::string_view key) const {
+    constexpr bool HasCol(StringView key) const {
         uint32_t i = 0;
         for (i = 0; i < elements_.size(); i++) {
             if (elements_[i].name() == key) {
@@ -112,15 +113,15 @@ public:
         return false;
     }
 
-    constexpr std::string_view ColName(size_t i) const { return elements_[i].name(); }
+    constexpr StringView ColName(size_t i) const { return elements_[i].name(); }
 
-    constexpr std::string_view ColMetricKey(size_t i) const { return elements_[i].metric_key(); }
-    constexpr std::string_view ColSpanKey(size_t i) const { return elements_[i].span_key(); }
-    constexpr std::string_view ColLogKey(size_t i) const { return elements_[i].log_key(); }
+    constexpr StringView ColMetricKey(size_t i) const { return elements_[i].metric_key(); }
+    constexpr StringView ColSpanKey(size_t i) const { return elements_[i].span_key(); }
+    constexpr StringView ColLogKey(size_t i) const { return elements_[i].log_key(); }
 
 private:
-    const std::string_view name_;
-    const std::string_view desc_;
+    const StringView name_;
+    const StringView desc_;
     const ArrayView<DataElement> elements_;
 };
 

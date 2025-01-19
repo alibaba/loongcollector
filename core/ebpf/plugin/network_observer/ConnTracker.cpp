@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cctype>
+
 #include "ConnTracker.h"
 
 #include "common/magic_enum.hpp"
@@ -127,6 +129,9 @@ void ConnTracker::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
     workload_kind_ = pod->workloadKind;
     workload_name_ = pod->workloadName;
     namespace_ = pod->k8sNamespace;
+    if (workload_kind_.size()) {
+        workload_kind_[0] = std::toupper(workload_kind_[0]); // upper case
+    }
 
     attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = arms_app_id_;
     attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = arms_app_name_;
@@ -201,6 +206,9 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
     peer_workload_kind_ = pod->workloadKind;
     peer_workload_name_ = pod->workloadName;
     peer_namespace_ = pod->k8sNamespace;
+    if (peer_workload_kind_.size()) {
+        peer_workload_kind_[0] = std::toupper(peer_workload_kind_[0]);
+    }
 
     attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())]
         = peer_arms_app_name_.size() ? peer_arms_app_name_ : "unknown";

@@ -147,7 +147,9 @@ private:
 
     std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
 
+    ReadWriteLock mAppAggLock;
     std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
+    std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mSafeAppAggregator;
     std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
     std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
 
