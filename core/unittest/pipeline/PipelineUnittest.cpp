@@ -2950,8 +2950,8 @@ void PipelineUnittest::TestWaitAllItemsInProcessFinished() const {
 void PipelineUnittest::TestMultiFlusherAndRouter() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
-    unique_ptr<PipelineConfig> config;
-    unique_ptr<Pipeline> pipeline;
+    unique_ptr<CollectionConfig> config;
+    unique_ptr<CollectionPipeline> pipeline;
     // new pipeline
     configStr = R"(
         {
@@ -3008,9 +3008,9 @@ void PipelineUnittest::TestMultiFlusherAndRouter() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    config.reset(new CollectionConfig(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    pipeline.reset(new Pipeline());
+    pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
 }
 
