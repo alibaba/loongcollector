@@ -17,6 +17,7 @@
 package pluginmanager
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,15 +37,21 @@ func TestTagDefault(t *testing.T) {
 	processorTag := NewProcessorTag(make(map[string]string), false, make(map[string]string), "")
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
-			"tags": map[string]string{},
+			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
 	processorTag.ProcessV1(logCtx)
-	tagsMap := logCtx.Context["tags"].(map[string]string)
-	assert.Equal(t, 3, len(tagsMap))
-	assert.Equal(t, util.GetHostName(), tagsMap[hostNameDefaultTagKey])
-	assert.Equal(t, util.GetIPAddress(), tagsMap[hostIPDefaultTagKey])
-	assert.Equal(t, "test_env_tag_value", tagsMap["test_env_tag"])
+	tagsArray := logCtx.Context["tags"].([]*protocol.LogTag)
+	assert.Equal(t, 3, len(tagsArray))
+	sort.Slice(tagsArray, func(i, j int) bool {
+		return tagsArray[i].Key < tagsArray[j].Key
+	})
+	assert.Equal(t, hostIPDefaultTagKey, tagsArray[0].Key)
+	assert.Equal(t, util.GetIPAddress(), tagsArray[0].Value)
+	assert.Equal(t, hostNameDefaultTagKey, tagsArray[1].Key)
+	assert.Equal(t, util.GetHostName(), tagsArray[1].Value)
+	assert.Equal(t, "test_env_tag", tagsArray[2].Key)
+	assert.Equal(t, "test_env_tag_value", tagsArray[2].Value)
 
 	pipelineMetaTagKeyDefault := make(map[string]string)
 	pipelineMetaTagKeyDefault["HOST_NAME"] = defaultConfigTagKeyValue
@@ -52,15 +59,21 @@ func TestTagDefault(t *testing.T) {
 	processorTag = NewProcessorTag(pipelineMetaTagKeyDefault, false, make(map[string]string), "")
 	logCtx = &pipeline.LogWithContext{
 		Context: map[string]interface{}{
-			"tags": map[string]string{},
+			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
 	processorTag.ProcessV1(logCtx)
-	tagsMap = logCtx.Context["tags"].(map[string]string)
-	assert.Equal(t, 3, len(tagsMap))
-	assert.Equal(t, util.GetHostName(), tagsMap[hostNameDefaultTagKey])
-	assert.Equal(t, util.GetIPAddress(), tagsMap[hostIPDefaultTagKey])
-	assert.Equal(t, "test_env_tag_value", tagsMap["test_env_tag"])
+	tagsArray = logCtx.Context["tags"].([]*protocol.LogTag)
+	assert.Equal(t, 3, len(tagsArray))
+	sort.Slice(tagsArray, func(i, j int) bool {
+		return tagsArray[i].Key < tagsArray[j].Key
+	})
+	assert.Equal(t, hostIPDefaultTagKey, tagsArray[0].Key)
+	assert.Equal(t, util.GetIPAddress(), tagsArray[0].Value)
+	assert.Equal(t, hostNameDefaultTagKey, tagsArray[1].Key)
+	assert.Equal(t, util.GetHostName(), tagsArray[1].Value)
+	assert.Equal(t, "test_env_tag", tagsArray[2].Key)
+	assert.Equal(t, "test_env_tag_value", tagsArray[2].Value)
 }
 
 func TestTagDefaultV2(t *testing.T) {
@@ -105,15 +118,21 @@ func TestTagRename(t *testing.T) {
 	}, false, make(map[string]string), "")
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
-			"tags": map[string]string{},
+			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
 	processorTag.ProcessV1(logCtx)
-	tagsMap := logCtx.Context["tags"].(map[string]string)
-	assert.Equal(t, 3, len(tagsMap))
-	assert.Equal(t, util.GetHostName(), tagsMap["test_host_name"])
-	assert.Equal(t, util.GetIPAddress(), tagsMap["test_host_ip"])
-	assert.Equal(t, "test_env_tag_value", tagsMap["test_env_tag"])
+	tagsArray := logCtx.Context["tags"].([]*protocol.LogTag)
+	assert.Equal(t, 3, len(tagsArray))
+	sort.Slice(tagsArray, func(i, j int) bool {
+		return tagsArray[i].Key < tagsArray[j].Key
+	})
+	assert.Equal(t, "test_env_tag", tagsArray[0].Key)
+	assert.Equal(t, "test_env_tag_value", tagsArray[0].Value)
+	assert.Equal(t, "test_host_ip", tagsArray[1].Key)
+	assert.Equal(t, util.GetIPAddress(), tagsArray[1].Value)
+	assert.Equal(t, "test_host_name", tagsArray[2].Key)
+	assert.Equal(t, util.GetHostName(), tagsArray[2].Value)
 }
 
 func TestTagRenameV2(t *testing.T) {
