@@ -143,6 +143,11 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
         }
     }
 
+    if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
+        return;
+    }
+    // machine_uuid is used in serializer
+    // When flushing through Go pipeline, it will skip serializer, add a new unexpected tag
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
 }

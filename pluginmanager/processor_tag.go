@@ -38,7 +38,6 @@ const (
 	hostIPDefaultTagKey        = "__host_ip__"
 	hostIDDefaultTagKey        = "__host_id__"
 	cloudProviderDefaultTagKey = "__cloud_provider__"
-	machineUUIDDefaultTagKey   = "__machine_uuid__"
 	defaultConfigTagKeyValue   = "__default__"
 )
 
@@ -53,13 +52,12 @@ type ProcessorTag struct {
 	machineUUID  string
 }
 
-func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath, machineUUID string) *ProcessorTag {
+func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath string) *ProcessorTag {
 	processorTag := &ProcessorTag{
 		pipelineMetaTagKey:     make(map[TagKey]string),
 		appendingAllEnvMetaTag: appendingAllEnvMetaTag,
 		agentEnvMetaTagKey:     agentEnvMetaTagKey,
 		fileTagsPath:           fileTagsPath,
-		machineUUID:            machineUUID,
 	}
 	processorTag.parseDefaultAddedTag("HOST_NAME", TagKeyHostName, hostNameDefaultTagKey, pipelineMetaTagKey)
 	processorTag.parseDefaultAddedTag("HOST_IP", TagKeyHostIP, hostIPDefaultTagKey, pipelineMetaTagKey)

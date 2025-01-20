@@ -199,7 +199,7 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
 void ParseDefaultAddedTag(const Json::Value* config,
                           const string& configField,
                           const string& defaultTagKeyValue,
-                          const PipelineContext& context,
+                          const CollectionPipelineContext& context,
                           const string& pluginType,
                           string& customTagKey) {
     string errorMsg;
@@ -227,7 +227,7 @@ void ParseDefaultAddedTag(const Json::Value* config,
 void ParseOptionalTag(const Json::Value* config,
                       const string& configField,
                       const string& defaultTagKeyValue,
-                      const PipelineContext& context,
+                      const CollectionPipelineContext& context,
                       const string& pluginType,
                       string& customTagKey) {
     string errorMsg;
@@ -256,7 +256,7 @@ void ParseTagKey(const Json::Value* config,
                  const string& configField,
                  TagKey tagKey,
                  unordered_map<TagKey, string>& tagKeyMap,
-                 const PipelineContext& context,
+                 const CollectionPipelineContext& context,
                  const std::string& pluginType,
                  bool defaultAdded) {
     string customTagKey;

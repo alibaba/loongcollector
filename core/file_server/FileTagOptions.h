@@ -21,15 +21,15 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "constants/TagConstants.h"
-#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
 class FileTagOptions {
 public:
     bool Init(const Json::Value& config,
-              const PipelineContext& context,
+              const CollectionPipelineContext& context,
               const std::string& pluginType,
               bool enableContainerDiscovery);
     StringView GetFileTagKeyName(TagKey key) const;
@@ -43,6 +43,6 @@ private:
 #endif
 };
 
-using FileTagConfig = std::pair<const FileTagOptions*, const PipelineContext*>;
+using FileTagConfig = std::pair<const FileTagOptions*, const CollectionPipelineContext*>;
 
 } // namespace logtail

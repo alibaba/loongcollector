@@ -14,11 +14,11 @@
 
 #include <cstdlib>
 
-#include "collection_pipeline/CollectionPipeline.h"
-#include "config/CollectionConfig.h"
 #include "TagConstants.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "monitor/Monitor.h"
@@ -50,8 +50,7 @@ void ProcessorTagNativeUnittest::TestInit() {
     // make config
     Json::Value config;
     CollectionPipeline pipeline;
-    Pipeline pipeline;
-    PipelineContext context;
+    CollectionPipelineContext context;
     context.SetConfigName("project##config_0");
     context.SetPipeline(pipeline);
     context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
@@ -86,8 +85,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string inode = "123456";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, inode);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
@@ -133,8 +132,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
@@ -180,8 +179,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
@@ -227,8 +226,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         context.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
@@ -266,8 +265,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         Json::Value extendedParams;
@@ -319,8 +318,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         Json::Value extendedParams;
@@ -371,8 +370,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
 
@@ -420,8 +419,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string resolvedFilePath = "/run/var/log/message";
         eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, resolvedFilePath);
-        Pipeline pipeline;
-        PipelineContext context;
+        CollectionPipeline pipeline;
+        CollectionPipelineContext context;
         context.SetConfigName("project##config_0");
         context.SetPipeline(pipeline);
         Json::Value extendedParams;

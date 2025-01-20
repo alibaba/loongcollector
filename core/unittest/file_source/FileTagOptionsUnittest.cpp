@@ -17,9 +17,9 @@
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileTagOptions.h"
-#include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -33,7 +33,7 @@ public:
 
 private:
     const string pluginType = "test";
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void FileTagOptionsUnittest::OnSuccessfulInit() const {

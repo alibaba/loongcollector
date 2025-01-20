@@ -17,7 +17,6 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
-#include "application/Application.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/DynamicLibHelper.h"
@@ -81,7 +80,6 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
     mPluginCfg["FileTagsPath"] = STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
-    mPluginCfg["MachineUUID"] = Application::GetInstance()->GetUUID();
 }
 
 LogtailPlugin::~LogtailPlugin() {

@@ -25,11 +25,11 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/StringTools.h"
 #include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "pipeline/PipelineContext.h"
 
 #define PARAM_ERROR_RETURN(logger, alarm, msg, module, config, project, logstore, region) \
     if (module.empty()) { \
@@ -331,7 +331,7 @@ void ParseTagKey(const Json::Value* config,
                  const std::string& configField,
                  TagKey tagKey,
                  std::unordered_map<TagKey, std::string>& tagKeyMap,
-                 const PipelineContext& context,
+                 const CollectionPipelineContext& context,
                  const std::string& pluginType,
                  bool defaultAdded);
 } // namespace logtail

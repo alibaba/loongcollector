@@ -18,16 +18,16 @@
 
 #include <unistd.h>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/ParamExtractor.h"
 #include "constants/TagConstants.h"
-#include "pipeline/PipelineContext.h"
 
 using namespace std;
 
 namespace logtail {
 
 bool FileTagOptions::Init(const Json::Value& config,
-                          const PipelineContext& context,
+                          const CollectionPipelineContext& context,
                           const string& pluginType,
                           bool enableContainerDiscovery) {
     string errorMsg;

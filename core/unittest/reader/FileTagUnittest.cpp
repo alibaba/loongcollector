@@ -55,7 +55,7 @@ private:
 
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     string hostLogPathDir = ".";
     string hostLogPathFile = "FileTagUnittest.txt";
     const string pluginType = "test";

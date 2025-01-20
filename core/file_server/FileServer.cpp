@@ -207,7 +207,9 @@ FileTagConfig FileServer::GetFileTagConfig(const string& name) const {
 }
 
 // 添加Tag配置
-void FileServer::AddFileTagConfig(const std::string& name, const FileTagOptions* opts, const PipelineContext* ctx) {
+void FileServer::AddFileTagConfig(const std::string& name,
+                                  const FileTagOptions* opts,
+                                  const CollectionPipelineContext* ctx) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileTagConfigsMap[name] = make_pair(opts, ctx);
 }

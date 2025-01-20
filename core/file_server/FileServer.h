@@ -74,7 +74,7 @@ public:
     const std::unordered_map<std::string, FileTagConfig>& GetAllFileTagConfigs() const {
         return mPipelineNameFileTagConfigsMap;
     }
-    void AddFileTagConfig(const std::string& name, const FileTagOptions* opts, const PipelineContext* ctx);
+    void AddFileTagConfig(const std::string& name, const FileTagOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileTagConfig(const std::string& name);
 
     void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<ContainerInfo>>& info);
