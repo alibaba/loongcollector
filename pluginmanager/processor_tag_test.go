@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -145,13 +146,14 @@ func TestTagDelete(t *testing.T) {
 	}, false, make(map[string]string), "", "")
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
-			"tags": map[string]string{},
+			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
 	processorTag.ProcessV1(logCtx)
-	tagsMap := logCtx.Context["tags"].(map[string]string)
+	tagsMap := logCtx.Context["tags"].([]*protocol.LogTag)
 	assert.Equal(t, 1, len(tagsMap))
-	assert.Equal(t, "test_env_tag_value", tagsMap["test_env_tag"])
+	assert.Equal(t, "test_env_tag", tagsMap[0].Key)
+	assert.Equal(t, "test_env_tag_value", tagsMap[0].Value)
 }
 
 func TestTagDeleteV2(t *testing.T) {

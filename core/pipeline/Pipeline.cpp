@@ -231,6 +231,7 @@ bool Pipeline::Init(PipelineConfig&& config) {
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
 
     if (config.ShouldAddNativeTagProcessor()) {
+        LOG_INFO(sLogger, ("add tag processor", "native"));
         unique_ptr<ProcessorInstance> processor
             = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
         Json::Value detail;

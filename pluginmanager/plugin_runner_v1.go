@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"context"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -244,6 +245,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	var logCtx *pipeline.LogWithContext
 	var processorTag *ProcessorTag
 	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
+		logger.Info(context.Background(), "add tag processor", "extend")
 		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.LogFileTagsPath, globalConfig.MachineUUID)
 	}
 	for {

@@ -20,6 +20,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -68,13 +69,15 @@ func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTa
 }
 
 func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
-	tags, ok := logCtx.Context["tags"]
-	if !ok {
-		return
-	}
-	tagsMap, ok := tags.(map[string]string)
-	if !ok {
-		return
+	tagsMap := make(map[string]string)
+	if tags, ok := logCtx.Context["tags"]; ok {
+		tagsArray, ok := tags.([]*protocol.LogTag)
+		if !ok {
+			return
+		}
+		for _, tag := range tagsArray {
+			tagsMap[tag.Key] = tag.Value
+		}
 	}
 	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
 	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
@@ -83,10 +86,16 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	p.addTag(TagKeyCloudProvider, "cloud provider", tagsMap)
 
 	// TODO: file tags, read in background with double buffer
-
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 	}
+	newTags := make([]*protocol.LogTag, len(tagsMap))
+	i := 0
+	for key, value := range tagsMap {
+		newTags[i] = &protocol.LogTag{Key: key, Value: value}
+		i++
+	}
+	logCtx.Context["tags"] = newTags
 }
 
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {

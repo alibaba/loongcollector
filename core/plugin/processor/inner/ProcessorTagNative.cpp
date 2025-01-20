@@ -95,10 +95,6 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
 }
 
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
-    if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
-        return;
-    }
-
     AddTag(logGroup, TagKey::HOST_NAME_TAG_KEY, LoongCollectorMonitor::GetInstance()->mHostname);
     auto entity = InstanceIdentity::Instance()->GetEntity();
     if (entity != nullptr) {
