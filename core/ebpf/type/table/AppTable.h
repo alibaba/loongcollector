@@ -85,23 +85,34 @@ static constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 static constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
 static constexpr DataElement kAppTraceElements[] = {
-    kHost, // host
-    kAppId, // pid
-    kIp, // server ip
-    kAppName, // service
+    kNamespace,
     kWorkloadKind,
     kWorkloadName,
-
+    kPeerAppName,
+    kPeerPodName,
+    kPeerPodIp,
+    kPeerNamespace,
+    kPeerWorkloadKind,
+    kPeerWorkloadName,
+    kPeerWorkloadName,
+    kPeerServiceName,
     kProtocol,
-    kRpc,
-    kDestId,
-    // kContainerId,
-    /* non-aggregate keys */
-
+    kLocalAddr,
+    kRemoteAddr,
+    kRemotePort,
     kRpcType,
-    kCallType,
     kCallKind,
+    kCallType,
+    kDestId,
     kEndpoint,
+    kFd,
+    kPid,
+    kContainerId,
+    kTraceRole,
+    kIp,
+    kNetNs,
+    kFamily,
+    kStartTsNs,
 };
 
 static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);

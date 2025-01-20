@@ -279,7 +279,21 @@ class AbstractAppRecord : public AbstractNetRecord {
 public:
     AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {};
 
+    void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
+    void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
+
+    virtual std::string GetReqBody() = 0;
+    virtual std::string GetRespBody() =0 ;
+    virtual std::string GetMethod() = 0;
+    virtual HeadersMap GetReqHeaderMap() = 0;
+    virtual HeadersMap GetRespHeaderMap() = 0;
+    virtual std::string GetProtocolVersion() = 0;
+    virtual std::string GetPath() = 0;
+
     DataTableSchema GetMetricsTableSchema() const override { return kAppMetricsTable; }
+
+    mutable std::string mTraceId;
+    mutable std::string mSpanId;
 };
 
 
@@ -342,7 +356,6 @@ private:
 
 class AppRecord : public AbstractRecord {};
 
-
 class MetricData {
 public:
     virtual ~MetricData() {}
@@ -354,6 +367,7 @@ class AppMetricData : public MetricData {
 public:
     AppMetricData(const ConnId& connId, const std::string& spanName) : MetricData(connId), mSpanName(spanName) {}
     ~AppMetricData() {}
+    
     uint64_t mCount = 0;
     double mSum = 0;
     uint64_t mSlowCount = 0;
@@ -362,6 +376,19 @@ public:
     uint64_t m3xxCount = 0;
     uint64_t m4xxCount = 0;
     uint64_t m5xxCount = 0;
+    
+    std::string mAppId;
+    std::string mAppName;
+    std::string mHost;
+    std::string mIp;
+    std::string mNamespace;
+    std::string mWorkloadName;
+    std::string mWorkloadKind;
+    std::string mDestId;
+    std::string mEndpoint;
+    std::string mRpcType;
+    std::string mCallType;
+    std::string mCallKind;
     std::string mSpanName;
 };
 
@@ -376,6 +403,14 @@ public:
     uint64_t mSendBytes;
     uint64_t mRecvPkts;
     uint64_t mSendPkts;
+};
+
+class AppSpanGroup {
+public:
+    AppSpanGroup() {}
+    ~AppSpanGroup() {}
+
+    std::vector<std::shared_ptr<AbstractAppRecord>> mRecords;
 };
 
 

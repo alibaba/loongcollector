@@ -36,10 +36,10 @@ constexpr DataElement kPodName = {
 };
 
 constexpr DataElement kPodIp = {
-    "pod_name",
-    "pod_name", // metric
-    "k8s.pod.name", // span
-    "k8s.pod.name", // log
+    "pod_ip",
+    "pod_ip", // metric
+    "k8s.pod.ip", // span
+    "k8s.pod.ip", // log
     "",
     AggregationType::Level1,
 };
@@ -101,7 +101,7 @@ constexpr DataElement kPeerWorkloadKind = {
 constexpr DataElement kPeerWorkloadName = {
     "peer_workload_name",
     "peerWorkloadName", // metric
-    "k8s.peer.workload.name", // span
+    "peerWorkloadName", // span
     "k8s.peer.workload.name", // log
     "",
     AggregationType::Level1,

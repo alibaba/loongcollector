@@ -84,9 +84,9 @@ public:
 private:
     //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
     //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
-    void ConsumeRecordsAsEvent(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
-    void ConsumeRecordsAsMetric(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
-    void ConsumeRecordsAsTrace(const std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ConsumeRecordsAsEvent(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ConsumeRecordsAsMetric(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ConsumeRecordsAsTrace(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
 
     void RunInThread();
 
@@ -150,8 +150,14 @@ private:
     ReadWriteLock mAppAggLock;
     std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
     std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mSafeAppAggregator;
+
+    ReadWriteLock mNetAggLock;
     std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
-    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
+    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mSafeNetAggregator;
+
+    ReadWriteLock mSpanAggLock;
+    std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
+    std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSafeSpanAggregator;
 
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

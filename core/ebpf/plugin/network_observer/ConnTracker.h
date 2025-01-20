@@ -47,7 +47,7 @@ public:
           k8s_meta_attached_(false),
           k8s_peer_meta_attached_(false),
           protocol_set_(false),
-          epoch_(5),
+          epoch_(10),
           close_(false),
           last_update_timestamp(0),
           last_active_timestamp(INT64_MAX),
@@ -85,6 +85,8 @@ public:
 
     bool IsClose() const { return close_; }
 
+    support_role_e GetRole() const { return role; }
+
     std::shared_ptr<ConnStatsRecord> GenerateConnStatsRecord() const;
 
     int GetEpoch() const { return epoch_; }
@@ -105,7 +107,7 @@ public:
 
     void RecordActive() {
         WriteLock lock(mReadWriteLock);
-        this->epoch_ = 5;
+        this->epoch_ = 10;
         auto now = std::chrono::steady_clock::now();
         last_active_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
@@ -201,7 +203,7 @@ private:
     int64_t last_update_timestamp;
     int64_t last_active_timestamp;
     ConnId conn_id_;
-    enum support_role_e role;
+    enum support_role_e role = IsClient;
 
     std::chrono::time_point<std::chrono::steady_clock> mark_close_time_;
 
