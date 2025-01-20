@@ -50,8 +50,7 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags, const std::vector<StringView>& toDelete);
-    std::vector<StringView> GetToDeleteTargetLabels(const GroupTags& targetTags) const;
+    bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags);
 
     void AddAutoMetrics(PipelineEventGroup& eGroup, const prom::AutoMetric& autoMetric) const;
     void UpdateAutoMetrics(const PipelineEventGroup& eGroup, prom::AutoMetric& autoMetric) const;
@@ -61,9 +60,9 @@ private:
                    time_t timestamp,
                    uint32_t nanoSec,
                    const GroupTags& targetTags) const;
+    void AppendLabel(StringView k, StringView v, MetricEvent& e, bool honorLabels) const;
 
     std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
-    std::string mLoongCollectorScraper;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorPromRelabelMetricNativeUnittest;

@@ -59,4 +59,51 @@ private:
     size_t mAllocatedSize = 0;
 };
 
+class SizedVectorTags {
+public:
+    void Insert(StringView key, StringView val) {
+        auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
+        if (iter != mInner.end()) {
+            mAllocatedSize += val.size() - iter->second.size();
+            iter->second = val;
+        } else {
+            mAllocatedSize += key.size() + val.size();
+            mInner.emplace_back(key, val);
+        }
+    }
+
+    void Erase(StringView key) {
+        auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
+        if (iter != mInner.end()) {
+            mAllocatedSize -= (iter->first.size() + iter->second.size());
+            mInner.erase(iter);
+        }
+    }
+
+    void EraseIf(const std::function<bool(std::pair<StringView, StringView>)>& condition) {
+        size_t index = 0;
+        mAllocatedSize = 0;
+        for (const auto& item : mInner) {
+            if (condition(item)) {
+                continue;
+            }
+            mInner[index++] = item;
+            mAllocatedSize += item.first.size() + item.second.size();
+        }
+        mInner.resize(index);
+    }
+
+    size_t DataSize() const { return sizeof(decltype(mInner)) + mAllocatedSize; }
+
+    void Clear() {
+        mInner.clear();
+        mAllocatedSize = 0;
+    }
+
+    std::vector<std::pair<StringView, StringView>> mInner;
+
+private:
+    size_t mAllocatedSize = 0;
+};
+
 } // namespace logtail
