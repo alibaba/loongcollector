@@ -21,7 +21,7 @@ RUN go env -w GOPROXY="https://goproxy.cn,direct" && \
     go build -o ConfigServer
 
 FROM centos:centos7.9.2009
-MAINTAINER TomYu yyuuttaaoo@gmail.com
+LABEL maintainer="TomYu <yyuuttaaoo@gmail.com>"
 
 ENV container docker
 
