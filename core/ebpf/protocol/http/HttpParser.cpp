@@ -43,7 +43,16 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::uniq
         std::string_view buf = data_event->req_msg;
         ParseState state = http::ParseRequest(&buf, &result);
         if (state == ParseState::kSuccess) {
+            std::size_t pos = result.req_path.find('?');
+            record->SetRealPath(result.req_path);
+            if (pos != std::string::npos) {
+                result.req_path = result.req_path.substr(0, pos);
+            }
+            if (result.req_path.empty()) {
+                result.req_path = "/";
+            }
             record->SetPath(result.req_path);
+            
             record->SetReqBody(result.body);
             record->SetMethod(result.req_method);
             record->SetProtocolVersion("http1." + std::to_string(result.minor_version));

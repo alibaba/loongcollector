@@ -308,6 +308,8 @@ public:
 
     void SetPath(const std::string& path) { path_ = path; }
 
+    void SetRealPath(const std::string& path) { real_path_ = path; }
+
     void SetReqBody(const std::string& body) { req_body = body; }
 
     void SetRespBody(const std::string& body) { resp_body = body; }
@@ -337,14 +339,14 @@ public:
     HeadersMap GetRespHeaderMap() { return resp_header_map; }
     std::string GetProtocolVersion() { return protocol_version; }
     std::string GetPath() { return path_; }
-
-
+    std::string GetRealPaht() { return real_path_;}
     std::string GetSpanName() override { return path_; }
 
 private:
     std::string status_code;
     int code_;
     std::string path_;
+    std::string real_path_;
     std::string conv_path_;
     std::string req_body;
     std::string resp_body;

@@ -401,10 +401,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
                     if (!init) {
                         // set app attrs ... 
-                        eventGroup.SetTagNoCopy(kAppId.metric_key(), group->mAppId); // app id 
-                        eventGroup.SetTagNoCopy(kIp.metric_key(), group->mIp); // pod ip
-                        eventGroup.SetTagNoCopy(kAppName.metric_key(), group->mAppName); // app name
-                        eventGroup.SetTagNoCopy(kHost.metric_key(), group->mHost); // pod name
+                        eventGroup.SetTag(kAppId.metric_key(), group->mAppId); // app id 
+                        eventGroup.SetTag(kIp.metric_key(), group->mIp); // pod ip
+                        eventGroup.SetTag(kAppName.metric_key(), group->mAppName); // app name
+                        eventGroup.SetTag(kHost.metric_key(), group->mHost); // pod name
                         
                         auto* tagMetric = eventGroup.AddMetricEvent();
                         tagMetric->SetName("arms_tag_entity");
