@@ -15,11 +15,11 @@
 #include <iostream>
 #include <sstream>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseDelimiterNative.h"
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"
@@ -60,7 +60,7 @@ Json::Value GetCastConfig(std::string spl) {
 static void BM_SplRegex(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config
@@ -141,7 +141,7 @@ static void BM_SplRegex(int size, int batchSize) {
 static void BM_RawRegex(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config
@@ -248,7 +248,7 @@ static void BM_RawRegex(int size, int batchSize) {
 static void BM_SplJson(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config
@@ -344,7 +344,7 @@ static void BM_SplJson(int size, int batchSize) {
 static void BM_RawJson(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config
@@ -448,7 +448,7 @@ static void BM_RawJson(int size, int batchSize) {
 static void BM_SplSplit(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config
@@ -541,7 +541,7 @@ static void BM_SplSplit(int size, int batchSize) {
 static void BM_RawSplit(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     // make config

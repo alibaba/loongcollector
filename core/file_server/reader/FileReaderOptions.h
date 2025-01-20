@@ -23,7 +23,7 @@
 
 #include "json/json.h"
 
-#include "pipeline/PipelineContext.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail {
 struct FileReaderOptions {
@@ -46,9 +46,9 @@ struct FileReaderOptions {
 
     FileReaderOptions();
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
+    bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
 };
 
-using FileReaderConfig = std::pair<const FileReaderOptions*, const PipelineContext*>;
+using FileReaderConfig = std::pair<const FileReaderOptions*, const CollectionPipelineContext*>;
 
 } // namespace logtail

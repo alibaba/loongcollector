@@ -14,11 +14,11 @@
 
 #include <cstdlib>
 
-#include "config/PipelineConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "monitor/Monitor.h"
-#include "pipeline/Pipeline.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
@@ -42,13 +42,13 @@ protected:
     }
 
 private:
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 void ProcessorTagNativeUnittest::TestInit() {
     // make config
     Json::Value config;
-    Pipeline pipeline;
+    CollectionPipeline pipeline;
     mContext.SetPipeline(pipeline);
     mContext.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
 
@@ -72,7 +72,7 @@ void ProcessorTagNativeUnittest::TestProcess() {
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_INODE, inode);
 
     { // plugin branch
-        Pipeline pipeline;
+        CollectionPipeline pipeline;
         mContext.SetPipeline(pipeline);
         mContext.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         ProcessorTagNative processor;
@@ -92,7 +92,7 @@ void ProcessorTagNativeUnittest::TestProcess() {
     }
 
     { // native branch
-        Pipeline pipeline;
+        CollectionPipeline pipeline;
         mContext.SetPipeline(pipeline);
         ProcessorTagNative processor;
         processor.SetContext(mContext);

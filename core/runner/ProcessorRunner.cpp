@@ -16,12 +16,12 @@
 
 #include "app_config/AppConfig.h"
 #include "batch/TimeoutFlushManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/EventPool.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/PipelineManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -122,10 +122,10 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         sInGroupsCnt->Add(1);
         sInGroupDataSizeBytes->Add(item->mEventGroup.DataSize());
 
-        shared_ptr<Pipeline>& pipeline = item->mPipeline;
+        shared_ptr<CollectionPipeline>& pipeline = item->mPipeline;
         bool hasOldPipeline = pipeline != nullptr;
         if (!hasOldPipeline) {
-            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+            pipeline = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
         }
         if (!pipeline) {
             LOG_INFO(sLogger,
@@ -141,7 +141,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
         if (hasOldPipeline) {
-            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
+            pipeline = CollectionPipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",

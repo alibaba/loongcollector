@@ -24,6 +24,7 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/DevInode.h"
 #include "common/ExceptionBase.h"
 #include "common/LogtailCommonFlags.h"
@@ -38,7 +39,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
-#include "pipeline/PipelineManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"

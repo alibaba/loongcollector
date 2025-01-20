@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "common/JsonUtil.h"
+#include "models/MetricEvent.h"
+#include "models/MetricValue.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

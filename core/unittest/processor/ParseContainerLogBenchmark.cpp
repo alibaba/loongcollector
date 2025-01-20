@@ -18,9 +18,9 @@
 #include <iostream>
 #include <sstream>
 
-#include "config/PipelineConfig.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "unittest/Unittest.h"
 
@@ -44,7 +44,7 @@ std::string formatSize(long long size) {
 static void BM_DockerJson(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     Json::Value config;
@@ -157,7 +157,7 @@ static void BM_DockerJson(int size, int batchSize) {
 static void BM_ContainerdText(int size, int batchSize) {
     logtail::Logger::Instance().InitGlobalLoggers();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
     mContext.SetConfigName("project##config_0");
 
     Json::Value config;

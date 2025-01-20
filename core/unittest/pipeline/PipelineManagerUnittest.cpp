@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -26,12 +26,12 @@ public:
 };
 
 void PipelineManagerUnittest::TestPipelineManagement() const {
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test1"] = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test2"] = make_shared<Pipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test1"] = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test2"] = make_shared<CollectionPipeline>();
 
-    APSARA_TEST_EQUAL(2U, PipelineManager::GetInstance()->GetAllConfigNames().size());
-    APSARA_TEST_NOT_EQUAL(nullptr, PipelineManager::GetInstance()->FindConfigByName("test1"));
-    APSARA_TEST_EQUAL(nullptr, PipelineManager::GetInstance()->FindConfigByName("test3"));
+    APSARA_TEST_EQUAL(2U, CollectionPipelineManager::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_NOT_EQUAL(nullptr, CollectionPipelineManager::GetInstance()->FindConfigByName("test1"));
+    APSARA_TEST_EQUAL(nullptr, CollectionPipelineManager::GetInstance()->FindConfigByName("test3"));
 }
 
 UNIT_TEST_CASE(PipelineManagerUnittest, TestPipelineManagement)

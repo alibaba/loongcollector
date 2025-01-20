@@ -19,16 +19,16 @@
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -66,8 +66,8 @@ protected:
         // init pipeline and config
         unique_ptr<Json::Value> configJson;
         string configStr, errorMsg;
-        unique_ptr<PipelineConfig> config;
-        unique_ptr<Pipeline> pipeline;
+        unique_ptr<CollectionConfig> config;
+        unique_ptr<CollectionPipeline> pipeline;
 
         // new pipeline
         configStr = R"(
@@ -96,9 +96,9 @@ protected:
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
-        config.reset(new PipelineConfig(mConfigName, std::move(configJson)));
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson)));
         APSARA_TEST_TRUE(config->Parse());
-        pipeline.reset(new Pipeline());
+        pipeline.reset(new CollectionPipeline());
         APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
         ctx.SetPipeline(*pipeline.get());
         ctx.SetConfigName(mConfigName);
@@ -137,7 +137,7 @@ private:
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     FileDiscoveryConfig mConfig;
 
     std::shared_ptr<LogFileReader> mReaderPtr;

@@ -14,9 +14,9 @@
 
 #include <memory>
 
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/interface/Flusher.h"
-#include "pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/interface/Flusher.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -33,10 +33,10 @@ protected:
 };
 
 void FlusherUnittest::TestStop() const {
-    auto pipeline = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
+    auto pipeline = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
 
-    auto ctx = PipelineContext();
+    auto ctx = CollectionPipelineContext();
     ctx.SetConfigName("test_config");
 
     auto mock = make_unique<FlusherMock>();

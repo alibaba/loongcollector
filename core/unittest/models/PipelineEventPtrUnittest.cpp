@@ -14,6 +14,7 @@
 
 #include <cstdlib>
 
+#include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "unittest/Unittest.h"
 

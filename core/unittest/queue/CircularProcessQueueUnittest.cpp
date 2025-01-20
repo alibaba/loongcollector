@@ -14,10 +14,10 @@
 
 #include <memory>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/CircularProcessQueue.h"
+#include "collection_pipeline/queue/SenderQueue.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/queue/CircularProcessQueue.h"
-#include "pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -44,7 +44,7 @@ protected:
     }
 
 private:
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const size_t sCap = 2;
 
@@ -61,7 +61,7 @@ private:
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
 
-PipelineContext CircularProcessQueueUnittest::sCtx;
+CollectionPipelineContext CircularProcessQueueUnittest::sCtx;
 
 void CircularProcessQueueUnittest::TestPush() {
     unique_ptr<ProcessQueueItem> res;
@@ -182,12 +182,12 @@ void CircularProcessQueueUnittest::TestMetric() {
 }
 
 void CircularProcessQueueUnittest::TestSetPipeline() {
-    auto pipeline = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
+    auto pipeline = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
 
     auto item1 = GenerateItem(1);
     auto p1 = item1.get();
-    auto pipelineTmp = make_shared<Pipeline>();
+    auto pipelineTmp = make_shared<CollectionPipeline>();
     item1->mPipeline = pipelineTmp;
 
     auto item2 = GenerateItem(1);
@@ -195,7 +195,7 @@ void CircularProcessQueueUnittest::TestSetPipeline() {
 
     mQueue->Push(std::move(item1));
     mQueue->Push(std::move(item2));
-    auto p = PipelineManager::GetInstance()->FindConfigByName("test_config");
+    auto p = CollectionPipelineManager::GetInstance()->FindConfigByName("test_config");
     mQueue->SetPipelineForItems(p);
 
     APSARA_TEST_EQUAL(pipelineTmp, p1->mPipeline);

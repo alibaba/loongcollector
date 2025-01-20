@@ -24,7 +24,7 @@ using namespace std;
 namespace logtail {
 
 unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
-                                                 const PipelineContext& ctx,
+                                                 const CollectionPipelineContext& ctx,
                                                  const string& pluginType,
                                                  const string& flusherId,
                                                  CompressType defaultType) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/queue/SenderQueue.h"
+#include "collection_pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
 
@@ -46,7 +46,7 @@ protected:
     }
 
 private:
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const string sFlusherId;
     static const size_t sCap = 2;
@@ -63,7 +63,7 @@ private:
     unique_ptr<SenderQueue> mQueue;
 };
 
-PipelineContext SenderQueueUnittest::sCtx;
+CollectionPipelineContext SenderQueueUnittest::sCtx;
 const QueueKey SenderQueueUnittest::sKey;
 const string SenderQueueUnittest::sFlusherId = "1";
 const size_t SenderQueueUnittest::sDataSize;

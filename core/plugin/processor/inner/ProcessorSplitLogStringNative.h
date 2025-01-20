@@ -20,8 +20,8 @@
 
 #include <vector>
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "constants/Constants.h"
-#include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
 

@@ -17,10 +17,10 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "file_server/reader/FileReaderOptions.h"
-#include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_tail_limit_kb);
@@ -40,7 +40,7 @@ public:
 
 private:
     const string pluginType = "test";
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void FileReaderOptionsUnittest::OnSuccessfulInit() const {

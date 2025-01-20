@@ -20,8 +20,8 @@
 
 #include "boost/regex.hpp"
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {

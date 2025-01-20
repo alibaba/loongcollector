@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/plugin/PluginRegistry.h"
-#include "pipeline/queue/SenderQueueManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #include "unittest/Unittest.h"
@@ -45,7 +45,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         // http
         auto flusher = make_unique<FlusherHttpMock>();
         Json::Value tmp;
-        PipelineContext ctx;
+        CollectionPipelineContext ctx;
         flusher->SetContext(ctx);
         flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
@@ -64,7 +64,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         // unknown
         auto flusher = make_unique<FlusherMock>();
         Json::Value tmp;
-        PipelineContext ctx;
+        CollectionPipelineContext ctx;
         flusher->SetContext(ctx);
         flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
@@ -82,7 +82,7 @@ void FlusherRunnerUnittest::TestDispatch() {
 void FlusherRunnerUnittest::TestPushToHttpSink() {
     auto flusher = make_unique<FlusherHttpMock>();
     Json::Value tmp;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef("name", "1");
     flusher->Init(Json::Value(), tmp);

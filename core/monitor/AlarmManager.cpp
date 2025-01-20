@@ -16,14 +16,14 @@
 
 #include "Monitor.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 
@@ -202,7 +202,7 @@ void AlarmManager::SendAllRegionAlarm() {
             QueueKey alarmPrjLogstoreKey
                 = QueueKeyManager::GetInstance()->GetKey("-flusher_sls-" + project + "#" + ALARM_SLS_LOGSTORE_NAME);
             if (SenderQueueManager::GetInstance()->GetQueue(alarmPrjLogstoreKey) == nullptr) {
-                PipelineContext ctx;
+                CollectionPipelineContext ctx;
                 SenderQueueManager::GetInstance()->CreateQueue(
                     alarmPrjLogstoreKey,
                     "self_monitor",

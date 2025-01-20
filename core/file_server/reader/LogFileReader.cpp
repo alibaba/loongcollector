@@ -32,6 +32,9 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -49,9 +52,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 
 using namespace sls_logs;

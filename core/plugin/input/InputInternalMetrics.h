@@ -16,8 +16,8 @@
 
 #pragma once
 
+#include "collection_pipeline/plugin/interface/Input.h"
 #include "monitor/SelfMonitorServer.h"
-#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 

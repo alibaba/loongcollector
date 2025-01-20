@@ -14,12 +14,12 @@
 
 #include "file_server/event/BlockEventManager.h"
 
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
