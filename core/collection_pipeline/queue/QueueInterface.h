@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "monitor/MetricManager.h"
-#include "monitor/metric_constants/MetricConstants.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/QueueKey.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 

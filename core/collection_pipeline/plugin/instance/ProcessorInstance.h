@@ -20,11 +20,11 @@
 
 #include "json/json.h"
 
-#include "models/PipelineEventGroup.h"
-#include "monitor/MetricManager.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/instance/PluginInstance.h"
 #include "collection_pipeline/plugin/interface/Processor.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail {
 

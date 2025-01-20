@@ -22,12 +22,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/FeedbackInterface.h"
 #include "collection_pipeline/limiter/ConcurrencyLimiter.h"
 #include "collection_pipeline/limiter/RateLimiter.h"
 #include "collection_pipeline/queue/BoundedQueueInterface.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/FeedbackInterface.h"
 
 namespace logtail {
 
@@ -38,8 +38,12 @@ class BoundedSenderQueueInterface : public BoundedQueueInterface<std::unique_ptr
 public:
     static void SetFeedback(FeedbackInterface* feedback);
 
-    BoundedSenderQueueInterface(
-        size_t cap, size_t low, size_t high, QueueKey key, const std::string& flusherId, const CollectionPipelineContext& ctx);
+    BoundedSenderQueueInterface(size_t cap,
+                                size_t low,
+                                size_t high,
+                                QueueKey key,
+                                const std::string& flusherId,
+                                const CollectionPipelineContext& ctx);
 
     bool Pop(std::unique_ptr<SenderQueueItem>& item) override { return false; }
 

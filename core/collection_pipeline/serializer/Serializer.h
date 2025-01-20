@@ -20,10 +20,10 @@
 
 #include <string>
 
-#include "models/PipelineEventPtr.h"
-#include "monitor/metric_constants/MetricConstants.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
+#include "models/PipelineEventPtr.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 

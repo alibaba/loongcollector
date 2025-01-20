@@ -20,10 +20,10 @@
 #include <vector>
 
 #include "checkpoint/RangeCheckpoint.h"
-#include "logger/Logger.h"
 #include "collection_pipeline/queue/BoundedSenderQueueInterface.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 

@@ -20,14 +20,14 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
-#include "common/JsonUtil.h"
-#include "config/CollectionConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "common/JsonUtil.h"
+#include "config/CollectionConfig.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
@@ -2936,7 +2936,8 @@ void PipelineUnittest::TestWaitAllItemsInProcessFinished() const {
     pipeline->mInProcessCnt.store(0);
 
     pipeline->mInProcessCnt.store(1);
-    std::future<void> future = std::async(std::launch::async, &CollectionPipeline::WaitAllItemsInProcessFinished, pipeline.get());
+    std::future<void> future
+        = std::async(std::launch::async, &CollectionPipeline::WaitAllItemsInProcessFinished, pipeline.get());
 
     // block
     APSARA_TEST_NOT_EQUAL(std::future_status::ready, future.wait_for(std::chrono::seconds(0)));

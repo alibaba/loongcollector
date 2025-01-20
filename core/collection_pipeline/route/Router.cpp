@@ -14,10 +14,10 @@
 
 #include "collection_pipeline/route/Router.h"
 
-#include "common/ParamExtractor.h"
-#include "monitor/metric_constants/MetricConstants.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
+#include "common/ParamExtractor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 

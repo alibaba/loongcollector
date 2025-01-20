@@ -19,6 +19,8 @@
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -27,8 +29,6 @@
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
-#include "collection_pipeline/CollectionPipeline.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

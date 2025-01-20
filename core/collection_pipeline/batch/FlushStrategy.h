@@ -23,8 +23,8 @@
 
 #include "json/json.h"
 
-#include "models/PipelineEventPtr.h"
 #include "collection_pipeline/batch/BatchStatus.h"
+#include "models/PipelineEventPtr.h"
 
 namespace logtail {
 

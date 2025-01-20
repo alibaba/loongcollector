@@ -33,7 +33,10 @@ public:
 
     const std::string& Name() const override { return mPlugin->Name(); }
 
-    bool Init(const Json::Value& config, CollectionPipelineContext& context, size_t inputIdx, Json::Value& optionalGoPipeline);
+    bool Init(const Json::Value& config,
+              CollectionPipelineContext& context,
+              size_t inputIdx,
+              Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
     bool SupportAck() const { return mPlugin->SupportAck(); }

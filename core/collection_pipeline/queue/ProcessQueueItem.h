@@ -20,8 +20,8 @@
 
 #include <memory>
 
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 

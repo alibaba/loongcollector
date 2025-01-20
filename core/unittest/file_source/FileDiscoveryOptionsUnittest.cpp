@@ -18,9 +18,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

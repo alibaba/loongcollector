@@ -14,15 +14,18 @@
 
 #include "collection_pipeline/queue/CircularProcessQueue.h"
 
-#include "logger/Logger.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "logger/Logger.h"
 
 using namespace std;
 
 namespace logtail {
 
-CircularProcessQueue::CircularProcessQueue(size_t cap, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
+CircularProcessQueue::CircularProcessQueue(size_t cap,
+                                           int64_t key,
+                                           uint32_t priority,
+                                           const CollectionPipelineContext& ctx)
     : QueueInterface<std::unique_ptr<ProcessQueueItem>>(key, cap, ctx), ProcessQueueInterface(key, cap, priority, ctx) {
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_QUEUE_TYPE, "circular"}});
     mDiscardedEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL);

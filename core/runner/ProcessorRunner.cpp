@@ -16,12 +16,12 @@
 
 #include "app_config/AppConfig.h"
 #include "batch/TimeoutFlushManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/EventPool.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 

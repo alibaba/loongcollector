@@ -20,9 +20,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "collection_pipeline/CollectionPipeline.h"
 #include "common/Lock.h"
 #include "config/ConfigDiff.h"
-#include "collection_pipeline/CollectionPipeline.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {

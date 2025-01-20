@@ -20,9 +20,9 @@
 #include <string>
 
 #include "BaseScheduler.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/http/HttpResponse.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "collection_pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
 #include "prometheus/component/StreamScraper.h"
 #include "prometheus/schedulers/ScrapeConfig.h"

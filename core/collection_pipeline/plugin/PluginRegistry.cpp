@@ -38,12 +38,12 @@
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
 #endif
-#include "logger/Logger.h"
 #include "collection_pipeline/plugin/creator/CProcessor.h"
 #include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
 #include "collection_pipeline/plugin/creator/StaticFlusherCreator.h"
 #include "collection_pipeline/plugin/creator/StaticInputCreator.h"
 #include "collection_pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "logger/Logger.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 #include "plugin/processor/ProcessorFilterNative.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"

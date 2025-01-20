@@ -2683,18 +2683,18 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_4;
     // To be compatible with old settings.
     CollectionConfig* cfg_5 = new CollectionConfig(PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz",
-                                               "x.log",
-                                               REGEX_LOG,
-                                               "a",
-                                               "",
-                                               "",
-                                               "",
-                                               "prj",
-                                               true,
-                                               0,
-                                               -1,
-                                               "cat",
-                                               "");
+                                                   "x.log",
+                                                   REGEX_LOG,
+                                                   "a",
+                                                   "",
+                                                   "",
+                                                   "",
+                                                   "prj",
+                                                   true,
+                                                   0,
+                                                   -1,
+                                                   "cat",
+                                                   "");
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz" + PS + "xyz0"), true);

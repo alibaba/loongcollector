@@ -21,9 +21,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/route/Condition.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"
-#include "collection_pipeline/route/Condition.h"
 
 namespace logtail {
 

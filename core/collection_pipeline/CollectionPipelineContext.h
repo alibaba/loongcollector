@@ -22,11 +22,11 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/GlobalConfig.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
-#include "collection_pipeline/GlobalConfig.h"
-#include "collection_pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

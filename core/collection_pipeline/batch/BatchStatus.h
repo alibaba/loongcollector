@@ -19,8 +19,8 @@
 #include <cstdint>
 #include <ctime>
 
-#include "models/PipelineEventPtr.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
+#include "models/PipelineEventPtr.h"
 
 namespace logtail {
 

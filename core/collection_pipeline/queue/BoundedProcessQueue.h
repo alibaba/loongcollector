@@ -22,9 +22,9 @@
 #include <queue>
 #include <vector>
 
-#include "common/FeedbackInterface.h"
 #include "collection_pipeline/queue/BoundedQueueInterface.h"
 #include "collection_pipeline/queue/ProcessQueueInterface.h"
+#include "common/FeedbackInterface.h"
 
 namespace logtail {
 

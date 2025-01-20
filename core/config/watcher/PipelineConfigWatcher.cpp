@@ -16,12 +16,12 @@
 
 #include <memory>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
 #include "config/common_provider/CommonConfigProvider.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"

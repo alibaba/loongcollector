@@ -21,9 +21,9 @@
 #include <atomic>
 #include <future>
 
-#include "monitor/MetricManager.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "monitor/MetricManager.h"
 #include "runner/sink/SinkType.h"
 
 namespace logtail {

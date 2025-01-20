@@ -20,11 +20,11 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
-#include "common/JsonUtil.h"
-#include "file_server/FileServer.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/JsonUtil.h"
+#include "file_server/FileServer.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "unittest/Unittest.h"
 

@@ -19,9 +19,9 @@
 #include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
-#include "collection_pipeline/plugin/PluginRegistry.h"
 
 DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration", false);
 

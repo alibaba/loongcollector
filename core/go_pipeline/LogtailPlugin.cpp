@@ -17,6 +17,8 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
@@ -28,8 +30,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
-#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"

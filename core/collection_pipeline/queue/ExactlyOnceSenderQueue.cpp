@@ -16,8 +16,8 @@
 
 #include <iostream>
 
-#include "logger/Logger.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 using namespace std;

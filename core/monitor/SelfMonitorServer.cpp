@@ -16,9 +16,9 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "monitor/Monitor.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
+#include "monitor/Monitor.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;

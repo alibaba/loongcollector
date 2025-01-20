@@ -15,11 +15,11 @@
 #include <iostream>
 #include <sstream>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseDelimiterNative.h"
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"

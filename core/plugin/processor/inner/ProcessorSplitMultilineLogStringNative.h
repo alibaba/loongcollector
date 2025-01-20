@@ -20,9 +20,9 @@
 
 #include <vector>
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "constants/Constants.h"
 #include "file_server/MultilineOptions.h"
-#include "collection_pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {

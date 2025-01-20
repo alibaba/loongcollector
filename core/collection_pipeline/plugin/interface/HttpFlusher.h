@@ -18,9 +18,9 @@
 
 #include <string>
 
-#include "common/http/HttpResponse.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/http/HttpResponse.h"
 #include "runner/sink/http/HttpSinkRequest.h"
 
 namespace logtail {

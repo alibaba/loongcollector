@@ -17,10 +17,10 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/CollectionConfig.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "unittest/Unittest.h"
 

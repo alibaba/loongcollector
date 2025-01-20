@@ -19,8 +19,8 @@
 #include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
-#include "models/LogEvent.h"
 #include "collection_pipeline/plugin/interface/Processor.h"
+#include "models/LogEvent.h"
 
 namespace logtail {
 

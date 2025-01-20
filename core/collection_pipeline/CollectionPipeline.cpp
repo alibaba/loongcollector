@@ -22,14 +22,14 @@
 #include <utility>
 
 #include "app_config/AppConfig.h"
-#include "common/Flags.h"
-#include "common/ParamExtractor.h"
-#include "go_pipeline/LogtailPlugin.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/Flags.h"
+#include "common/ParamExtractor.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
@@ -471,9 +471,9 @@ std::string CollectionPipeline::GenPluginTypeWithID(std::string pluginType, std:
 
 // Rule: pluginTypeWithID=pluginType/pluginID#pluginPriority.
 void CollectionPipeline::AddPluginToGoPipeline(const string& pluginType,
-                                     const Json::Value& plugin,
-                                     const string& module,
-                                     Json::Value& dst) {
+                                               const Json::Value& plugin,
+                                               const string& module,
+                                               Json::Value& dst) {
     Json::Value res(Json::objectValue), detail = plugin;
     detail.removeMember("Type");
     res["type"] = GenPluginTypeWithID(pluginType, GetNowPluginID());

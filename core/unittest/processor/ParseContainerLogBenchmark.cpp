@@ -18,9 +18,9 @@
 #include <iostream>
 #include <sstream>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "unittest/Unittest.h"
 

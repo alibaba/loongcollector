@@ -25,16 +25,16 @@
 
 #include "json/json.h"
 
-#include "common/Flags.h"
-#include "common/ParamExtractor.h"
-#include "models/PipelineEventGroup.h"
-#include "monitor/MetricManager.h"
-#include "monitor/metric_constants/MetricConstants.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/batch/BatchItem.h"
 #include "collection_pipeline/batch/BatchStatus.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
+#include "common/Flags.h"
+#include "common/ParamExtractor.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 

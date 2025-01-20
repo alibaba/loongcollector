@@ -17,12 +17,12 @@
 #include "plugin/processor/ProcessorParseApsaraNative.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 

@@ -25,8 +25,8 @@
 
 #include "json/json.h"
 
-#include "file_server/ContainerInfo.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "file_server/ContainerInfo.h"
 
 namespace logtail {
 
@@ -34,8 +34,9 @@ class FileDiscoveryOptions {
 public:
     static bool CompareByPathLength(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
                                     std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
-    static bool CompareByDepthAndCreateTime(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-                                            std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
+    static bool
+    CompareByDepthAndCreateTime(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+                                std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
     const std::string& GetBasePath() const { return mBasePath; }

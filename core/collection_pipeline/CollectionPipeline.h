@@ -23,14 +23,14 @@
 
 #include "json/json.h"
 
-#include "config/CollectionConfig.h"
-#include "models/PipelineEventGroup.h"
-#include "monitor/MetricManager.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/instance/FlusherInstance.h"
 #include "collection_pipeline/plugin/instance/InputInstance.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "collection_pipeline/route/Router.h"
+#include "config/CollectionConfig.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/MetricManager.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 

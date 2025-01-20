@@ -14,10 +14,10 @@
 
 #include <memory>
 
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/CircularProcessQueue.h"
 #include "collection_pipeline/queue/SenderQueue.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

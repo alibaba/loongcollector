@@ -20,9 +20,9 @@
 #include <utility>
 #include <vector>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail {
 

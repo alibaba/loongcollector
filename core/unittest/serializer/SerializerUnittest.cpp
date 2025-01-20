@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "monitor/metric_constants/MetricConstants.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/Serializer.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

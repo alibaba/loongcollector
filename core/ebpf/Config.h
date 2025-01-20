@@ -20,8 +20,8 @@
 
 #include "json/json.h"
 
-#include "ebpf/include/export.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "ebpf/include/export.h"
 
 
 namespace logtail {

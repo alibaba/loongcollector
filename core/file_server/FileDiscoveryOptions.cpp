@@ -90,8 +90,9 @@ static bool isNotSubPath(const string& basePath, const string& path) {
     return basePathSize > 1 && pathSize > basePathSize && path[checkPos] != PATH_SEPARATOR[0];
 }
 
-bool FileDiscoveryOptions::CompareByPathLength(pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-                                               pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
+bool FileDiscoveryOptions::CompareByPathLength(
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
     int32_t leftDepth = 0;
     int32_t rightDepth = 0;
     for (size_t i = 0; i < (left.first->mBasePath).size(); ++i) {
@@ -131,7 +132,9 @@ bool FileDiscoveryOptions::CompareByDepthAndCreateTime(
     return false;
 }
 
-bool FileDiscoveryOptions::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
+bool FileDiscoveryOptions::Init(const Json::Value& config,
+                                const CollectionPipelineContext& ctx,
+                                const string& pluginType) {
     string errorMsg;
 
     // FilePaths + MaxDirSearchDepth

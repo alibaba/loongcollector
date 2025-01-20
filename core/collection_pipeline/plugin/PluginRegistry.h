@@ -21,12 +21,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "common/DynamicLibHelper.h"
 #include "collection_pipeline/plugin/creator/PluginCreator.h"
 #include "collection_pipeline/plugin/instance/FlusherInstance.h"
 #include "collection_pipeline/plugin/instance/InputInstance.h"
 #include "collection_pipeline/plugin/instance/PluginInstance.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
+#include "common/DynamicLibHelper.h"
 #include "runner/sink/SinkType.h"
 
 struct processor_interface_t;

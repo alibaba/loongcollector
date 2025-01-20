@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "common/TimeUtil.h"
 #include "collection_pipeline/plugin/interface/Processor.h"
+#include "common/TimeUtil.h"
 
 namespace logtail {
 class ProcessorParseTimestampNative : public Processor {

@@ -16,14 +16,14 @@
 
 #include "Monitor.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
-#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 

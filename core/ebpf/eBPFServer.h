@@ -21,6 +21,7 @@
 #include <mutex>
 #include <variant>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "ebpf/Config.h"
 #include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
@@ -29,7 +30,6 @@
 #include "ebpf/handler/SecurityHandler.h"
 #include "ebpf/include/export.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -97,7 +97,10 @@ private:
     eBPFServer() = default;
     ~eBPFServer() = default;
 
-    void UpdateCBContext(nami::PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
+    void UpdateCBContext(nami::PluginType type,
+                         const logtail::CollectionPipelineContext* ctx,
+                         logtail::QueueKey key,
+                         int idx);
 
     std::unique_ptr<SourceManager> mSourceManager;
     // source manager

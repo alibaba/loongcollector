@@ -20,12 +20,12 @@
 
 #include "json/json.h"
 
-#include "models/PipelineEventGroup.h"
-#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/instance/PluginInstance.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/queue/QueueKey.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 
@@ -37,7 +37,10 @@ public:
     const std::string& Name() const override { return mPlugin->Name(); };
     const Flusher* GetPlugin() const { return mPlugin.get(); }
 
-    bool Init(const Json::Value& config, CollectionPipelineContext& context, size_t flusherIdx, Json::Value& optionalGoPipeline);
+    bool Init(const Json::Value& config,
+              CollectionPipelineContext& context,
+              size_t flusherIdx,
+              Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
     bool Send(PipelineEventGroup&& g);

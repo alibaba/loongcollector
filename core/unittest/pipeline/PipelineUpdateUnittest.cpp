@@ -16,16 +16,16 @@
 #include <string>
 #include <vector>
 
-#include "common/JsonUtil.h"
-#include "config/CollectionConfig.h"
-#include "file_server/EventDispatcher.h"
-#include "file_server/event_handler/LogInput.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/JsonUtil.h"
+#include "config/CollectionConfig.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/event_handler/LogInput.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
@@ -388,7 +388,8 @@ void PipelineUpdateUnittest::TestFileServerStart() {
         = CollectionConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson));
     nativePipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(nativePipelineConfigObj));
-    CollectionConfig goPipelineConfigObj = CollectionConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
+    CollectionConfig goPipelineConfigObj
+        = CollectionConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
     goPipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(goPipelineConfigObj));
 
@@ -513,8 +514,13 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);
@@ -697,8 +703,13 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);
@@ -864,8 +875,13 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-8", flusher);
     AddDataToSenderQueue(configName, "test-data-9", flusher);
     AddDataToSenderQueue(configName, "test-data-10", flusher);
@@ -996,8 +1012,13 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    auto flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    auto flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                            ->GetAllPipelines()
+                                            .at(configName)
+                                            .get()
+                                            ->GetFlushers()[0]
+                                            .get()
+                                            ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
     AddDataToSenderQueue(configName, "test-data-3", flusher);
@@ -1324,8 +1345,13 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
 
-    flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-8", flusher);
     AddDataToSenderQueue(configName, "test-data-9", flusher);
     AddDataToSenderQueue(configName, "test-data-10", flusher);
@@ -1441,8 +1467,13 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);

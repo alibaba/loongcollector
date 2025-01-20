@@ -20,8 +20,8 @@
 
 #include "json/json.h"
 
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 

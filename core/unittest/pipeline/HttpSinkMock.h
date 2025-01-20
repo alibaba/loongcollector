@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "logger/Logger.h"
 #include "collection_pipeline/plugin/interface/HttpFlusher.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/SLSConstant.h"
 #include "runner/FlusherRunner.h"

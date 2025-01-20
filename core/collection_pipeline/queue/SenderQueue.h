@@ -30,8 +30,12 @@ class Flusher;
 // not thread-safe, should be protected explicitly by queue manager
 class SenderQueue : public BoundedSenderQueueInterface {
 public:
-    SenderQueue(
-        size_t cap, size_t low, size_t high, QueueKey key, const std::string& flusherId, const CollectionPipelineContext& ctx);
+    SenderQueue(size_t cap,
+                size_t low,
+                size_t high,
+                QueueKey key,
+                const std::string& flusherId,
+                const CollectionPipelineContext& ctx);
 
     bool Push(std::unique_ptr<SenderQueueItem>&& item) override;
     bool Remove(SenderQueueItem* item) override;

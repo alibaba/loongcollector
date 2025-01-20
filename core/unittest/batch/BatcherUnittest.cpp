@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/JsonUtil.h"
 #include "collection_pipeline/batch/Batcher.h"
+#include "common/JsonUtil.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

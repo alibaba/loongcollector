@@ -27,7 +27,6 @@
 #include <vector>
 
 #include "checkpoint/RangeCheckpoint.h"
-#include "common/FeedbackInterface.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceSenderQueue.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -35,6 +34,7 @@
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/QueueParam.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/FeedbackInterface.h"
 
 namespace logtail {
 

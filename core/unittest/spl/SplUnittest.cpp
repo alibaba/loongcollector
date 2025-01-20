@@ -15,10 +15,10 @@
 #include <iostream>
 #include <sstream>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorSPL.h"
 #include "unittest/Unittest.h"
 

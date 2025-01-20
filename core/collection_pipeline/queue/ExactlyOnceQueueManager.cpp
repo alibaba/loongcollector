@@ -14,11 +14,11 @@
 
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/Flags.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/input/InputFile.h"
 

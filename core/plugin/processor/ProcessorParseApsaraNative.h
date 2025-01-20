@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {

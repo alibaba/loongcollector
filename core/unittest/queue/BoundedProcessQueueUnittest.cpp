@@ -14,11 +14,11 @@
 
 #include <memory>
 
-#include "common/FeedbackInterface.h"
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/SenderQueue.h"
+#include "common/FeedbackInterface.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
 

@@ -6,6 +6,8 @@
 #include "json/json.h"
 
 #include "application/Application.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "file_server/EventDispatcher.h"
@@ -13,8 +15,6 @@
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingEventQueue.h"
 #include "file_server/polling/PollingModify.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
-#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"

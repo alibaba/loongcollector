@@ -14,11 +14,11 @@
 
 #include <cstdlib>
 
+#include "collection_pipeline/CollectionPipeline.h"
 #include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "monitor/Monitor.h"
-#include "collection_pipeline/CollectionPipeline.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__

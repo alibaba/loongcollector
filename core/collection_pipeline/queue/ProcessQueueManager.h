@@ -26,12 +26,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/FeedbackInterface.h"
 #include "collection_pipeline/queue/BoundedSenderQueueInterface.h"
 #include "collection_pipeline/queue/ProcessQueueInterface.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/QueueParam.h"
+#include "common/FeedbackInterface.h"
 
 namespace logtail {
 
@@ -56,7 +56,8 @@ public:
     void Feedback(QueueKey key) override { Trigger(); }
 
     bool CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
-    bool CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const CollectionPipelineContext& ctx);
+    bool
+    CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const CollectionPipelineContext& ctx);
     bool DeleteQueue(QueueKey key);
     bool IsValidToPush(QueueKey key) const;
     // 0: success, 1: queue is full, 2: queue not found

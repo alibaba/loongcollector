@@ -14,11 +14,11 @@
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 
-#include "common/Flags.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/CircularProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "common/Flags.h"
 
 DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 5);
 
@@ -32,7 +32,9 @@ ProcessQueueManager::ProcessQueueManager() : mBoundedQueueParam(INT32_FLAG(bound
     ResetCurrentQueueIndex();
 }
 
-bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx) {
+bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key,
+                                                     uint32_t priority,
+                                                     const CollectionPipelineContext& ctx) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {

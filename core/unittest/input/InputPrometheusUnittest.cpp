@@ -19,9 +19,9 @@
 
 #include "PluginRegistry.h"
 #include "app_config/AppConfig.h"
-#include "common/JsonUtil.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/JsonUtil.h"
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"

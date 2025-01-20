@@ -22,13 +22,13 @@
 #include <string>
 #include <utility>
 
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "logger/Logger.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "collection_pipeline/queue/QueueKey.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"

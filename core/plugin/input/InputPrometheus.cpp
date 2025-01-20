@@ -23,10 +23,10 @@
 #include "json/value.h"
 
 #include "PluginRegistry.h"
-#include "logger/Logger.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
+#include "logger/Logger.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "prometheus/Constants.h"

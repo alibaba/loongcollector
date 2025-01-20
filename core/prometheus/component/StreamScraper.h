@@ -5,8 +5,8 @@
 #include <utility>
 
 #include "Labels.h"
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/queue/QueueKey.h"
+#include "models/PipelineEventGroup.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
 #include <vector>

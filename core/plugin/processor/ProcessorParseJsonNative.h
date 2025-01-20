@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include "models/LogEvent.h"
 #include "collection_pipeline/plugin/interface/Processor.h"
+#include "models/LogEvent.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {

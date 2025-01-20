@@ -22,9 +22,9 @@
 
 #include "json/json.h"
 
-#include "file_server/FileDiscoveryOptions.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/instance/PluginInstance.h"
+#include "file_server/FileDiscoveryOptions.h"
 
 namespace logtail {
 

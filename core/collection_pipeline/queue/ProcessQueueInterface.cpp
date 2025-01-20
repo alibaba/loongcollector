@@ -20,7 +20,10 @@ using namespace std;
 
 namespace logtail {
 
-ProcessQueueInterface::ProcessQueueInterface(int64_t key, size_t cap, uint32_t priority, const CollectionPipelineContext& ctx)
+ProcessQueueInterface::ProcessQueueInterface(int64_t key,
+                                             size_t cap,
+                                             uint32_t priority,
+                                             const CollectionPipelineContext& ctx)
     : QueueInterface(key, cap, ctx), mPriority(priority), mConfigName(ctx.GetConfigName()) {
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE}});
     mFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL);

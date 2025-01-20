@@ -17,9 +17,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
-#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

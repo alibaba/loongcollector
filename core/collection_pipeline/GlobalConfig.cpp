@@ -16,9 +16,9 @@
 
 #include "json/json.h"
 
-#include "common/ParamExtractor.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/ParamExtractor.h"
 
 using namespace std;
 

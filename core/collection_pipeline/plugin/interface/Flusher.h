@@ -22,10 +22,10 @@
 
 #include "json/json.h"
 
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/plugin/interface/Plugin.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "models/PipelineEventGroup.h"
 #include "runner/sink/SinkType.h"
 
 namespace logtail {

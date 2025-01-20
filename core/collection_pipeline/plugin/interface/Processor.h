@@ -18,9 +18,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/plugin/interface/Plugin.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
-#include "collection_pipeline/plugin/interface/Plugin.h"
 
 namespace logtail {
 

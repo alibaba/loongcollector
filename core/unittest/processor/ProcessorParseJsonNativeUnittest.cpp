@@ -13,10 +13,10 @@
 // limitations under the License.
 #include <cstdlib>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"

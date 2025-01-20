@@ -20,11 +20,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 #include "collection_pipeline/batch/BatchStatus.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
+#include "models/PipelineEventGroup.h"
+#include "models/StringView.h"
 
 namespace logtail {
 

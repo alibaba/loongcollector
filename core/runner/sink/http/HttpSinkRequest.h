@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "common/http/HttpRequest.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/http/HttpRequest.h"
 
 namespace logtail {
 

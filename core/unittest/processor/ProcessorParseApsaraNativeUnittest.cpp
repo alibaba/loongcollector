@@ -14,11 +14,11 @@
 
 #include <cstdlib>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
 #include "models/StringView.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"

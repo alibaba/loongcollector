@@ -23,9 +23,9 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "ebpf/eBPFServer.h"
 #endif
-#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
@@ -213,7 +213,8 @@ void CollectionPipelineManager::FlushAllBatch() {
     }
 }
 
-void CollectionPipelineManager::IncreasePluginUsageCnt(const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
+void CollectionPipelineManager::IncreasePluginUsageCnt(
+    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
     for (const auto& item : statistics) {
         for (const auto& plugin : item.second) {
             mPluginCntMap[item.first][plugin.first] += plugin.second;
@@ -221,7 +222,8 @@ void CollectionPipelineManager::IncreasePluginUsageCnt(const unordered_map<strin
     }
 }
 
-void CollectionPipelineManager::DecreasePluginUsageCnt(const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
+void CollectionPipelineManager::DecreasePluginUsageCnt(
+    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
     for (const auto& item : statistics) {
         for (const auto& plugin : item.second) {
             mPluginCntMap[item.first][plugin.first] -= plugin.second;

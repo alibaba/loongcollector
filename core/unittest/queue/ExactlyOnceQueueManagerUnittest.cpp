@@ -14,11 +14,11 @@
 
 #include <memory>
 
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "models/PipelineEventGroup.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "unittest/Unittest.h"

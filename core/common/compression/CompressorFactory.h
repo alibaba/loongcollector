@@ -21,9 +21,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/compression/CompressType.h"
 #include "common/compression/Compressor.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail {
 

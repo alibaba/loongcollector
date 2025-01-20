@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-#include "config/InstanceConfig.h"
 #include "config/CollectionConfig.h"
+#include "config/InstanceConfig.h"
 #include "config/TaskConfig.h"
 
 namespace logtail {

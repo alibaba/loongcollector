@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"

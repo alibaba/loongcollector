@@ -14,9 +14,9 @@
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
-#include "common/Flags.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "common/Flags.h"
 
 DEFINE_FLAG_INT32(sender_queue_gc_threshold_sec, "30s", 30);
 DEFINE_FLAG_INT32(sender_queue_capacity, "", 15);

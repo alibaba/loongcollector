@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
@@ -30,7 +31,6 @@
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
