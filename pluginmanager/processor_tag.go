@@ -49,7 +49,6 @@ type ProcessorTag struct {
 
 	// TODO: file tags, read in background with double buffer
 	fileTagsPath string
-	machineUUID  string
 }
 
 func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath string) *ProcessorTag {
