@@ -138,8 +138,8 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 
 	for _, mount := range staticInfo.Mounts {
 		dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
-			Source:      mount.Source,
-			Destination: mount.Destination,
+			Source:      filepath.Clean(mount.Source),
+			Destination: filepath.Clean(mount.Destination),
 			Driver:      mount.Driver,
 		})
 	}

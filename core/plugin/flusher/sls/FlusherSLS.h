@@ -79,6 +79,8 @@ public:
     // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
+    std::string GetSubpath() const { return mSubpath; }
+
     std::string mProject;
     std::string mLogstore;
     std::string mRegion;
@@ -130,6 +132,13 @@ private:
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
                                                                       SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
+                                                                 const std::string& accessKeySecret,
+                                                                 SLSClientManager::AuthType type,
+                                                                 SLSSenderQueueItem* item,
+                                                                 const std::string& subPath) const;
+
+    std::string mSubpath;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;

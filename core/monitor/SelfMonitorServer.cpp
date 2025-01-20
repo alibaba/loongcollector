@@ -103,6 +103,7 @@ void SelfMonitorServer::SendMetrics() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, "__metric__");
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
     shared_ptr<CollectionPipeline> pipeline
