@@ -62,7 +62,8 @@ func TestFindPodByServiceIPPort(t *testing.T) {
 			},
 		},
 	}
-	serviceCache.metaStore.Index["2.2.2.2"] = []string{"default/service1"}
+	serviceCache.metaStore.Index["2.2.2.2"] = NewIndexItem()
+	serviceCache.metaStore.Index["2.2.2.2"].Add("default/service1")
 	manager.cacheMap[SERVICE] = serviceCache
 	handler := newMetadataHandler(GetMetaManagerInstance())
 	podMetadata := handler.findPodByServiceIPPort("2.2.2.2", 0)

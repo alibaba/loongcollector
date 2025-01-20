@@ -34,7 +34,7 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	case REPLICASET_DEPLOYMENT:
 		return g.getReplicaSetDeploymentLink(events)
 	case POD_REPLICASET, POD_STATEFULSET, POD_DAEMONSET, POD_JOB:
-		return g.getParentPodLink(events)
+		return g.getParentPodLink(events, linkType)
 	case JOB_CRONJOB:
 		return g.getJobCronJobLink(events)
 	case POD_PERSISENTVOLUMECLAIN:
@@ -108,7 +108,7 @@ func (g *LinkGenerator) getReplicaSetDeploymentLink(events []*K8sMetaEvent) []*K
 	return result
 }
 
-func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
+func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent, linkType string) []*K8sMetaEvent {
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
@@ -116,8 +116,8 @@ func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent) []*K8sMetaEven
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
-		switch pod.OwnerReferences[0].Kind {
-		case "ReplicaSet":
+		switch {
+		case linkType == POD_REPLICASET && pod.OwnerReferences[0].Kind == "ReplicaSet":
 			rsList := g.metaCache[REPLICASET].Get([]string{generateNameWithNamespaceKey(pod.Namespace, parentName)})
 			for _, rs := range rsList {
 				for _, r := range rs {
@@ -135,7 +135,7 @@ func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent) []*K8sMetaEven
 					})
 				}
 			}
-		case "StatefulSet":
+		case linkType == POD_STATEFULSET && pod.OwnerReferences[0].Kind == "StatefulSet":
 			ssList := g.metaCache[STATEFULSET].Get([]string{generateNameWithNamespaceKey(pod.Namespace, parentName)})
 			for _, ss := range ssList {
 				for _, s := range ss {
@@ -153,7 +153,7 @@ func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent) []*K8sMetaEven
 					})
 				}
 			}
-		case "DaemonSet":
+		case linkType == POD_DAEMONSET && pod.OwnerReferences[0].Kind == "DaemonSet":
 			dsList := g.metaCache[DAEMONSET].Get([]string{generateNameWithNamespaceKey(pod.Namespace, parentName)})
 			for _, ds := range dsList {
 				for _, d := range ds {
@@ -171,7 +171,7 @@ func (g *LinkGenerator) getParentPodLink(podList []*K8sMetaEvent) []*K8sMetaEven
 					})
 				}
 			}
-		case "Job":
+		case linkType == POD_JOB && pod.OwnerReferences[0].Kind == "Job":
 			jobList := g.metaCache[JOB].Get([]string{generateNameWithNamespaceKey(pod.Namespace, parentName)})
 			for _, job := range jobList {
 				for _, j := range job {

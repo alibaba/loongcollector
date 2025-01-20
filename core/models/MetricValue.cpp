@@ -20,7 +20,7 @@ using namespace std;
 
 namespace logtail {
 
-bool UntypedMultiDoubleValues::GetValue(StringView key, double& val) const {
+bool UntypedMultiDoubleValues::GetValue(StringView key, UntypedMultiDoubleValue& val) const {
     if (mValues.find(key) != mValues.end()) {
         val = mValues.at(key);
         return true;
@@ -32,23 +32,23 @@ bool UntypedMultiDoubleValues::HasValue(StringView key) const {
     return mValues.find(key) != mValues.end();
 }
 
-void UntypedMultiDoubleValues::SetValue(const std::string& key, double val) {
+void UntypedMultiDoubleValues::SetValue(const std::string& key, UntypedMultiDoubleValue val) {
     if (mMetricEventPtr) {
         SetValueNoCopy(mMetricEventPtr->GetSourceBuffer()->CopyString(key), val);
     }
 }
 
-void UntypedMultiDoubleValues::SetValue(StringView key, double val) {
+void UntypedMultiDoubleValues::SetValue(StringView key, UntypedMultiDoubleValue val) {
     if (mMetricEventPtr) {
         SetValueNoCopy(mMetricEventPtr->GetSourceBuffer()->CopyString(key), val);
     }
 }
 
-void UntypedMultiDoubleValues::SetValueNoCopy(const StringBuffer& key, double val) {
+void UntypedMultiDoubleValues::SetValueNoCopy(const StringBuffer& key, UntypedMultiDoubleValue val) {
     SetValueNoCopy(StringView(key.data, key.size), val);
 }
 
-void UntypedMultiDoubleValues::SetValueNoCopy(StringView key, double val) {
+void UntypedMultiDoubleValues::SetValueNoCopy(StringView key, UntypedMultiDoubleValue val) {
     mValues[key] = val;
 }
 
@@ -56,11 +56,11 @@ void UntypedMultiDoubleValues::DelValue(StringView key) {
     mValues.erase(key);
 }
 
-std::map<StringView, double>::const_iterator UntypedMultiDoubleValues::ValuesBegin() const {
+std::map<StringView, UntypedMultiDoubleValue>::const_iterator UntypedMultiDoubleValues::ValuesBegin() const {
     return mValues.begin();
 }
 
-std::map<StringView, double>::const_iterator UntypedMultiDoubleValues::ValuesEnd() const {
+std::map<StringView, UntypedMultiDoubleValue>::const_iterator UntypedMultiDoubleValues::ValuesEnd() const {
     return mValues.end();
 }
 
@@ -101,7 +101,13 @@ void UntypedSingleValue::FromJson(const Json::Value& value) {
 Json::Value UntypedMultiDoubleValues::ToJson() const {
     Json::Value res;
     for (auto metric : mValues) {
-        res[metric.first.to_string()] = metric.second;
+        string type = "unknown";
+        if (metric.second.MetricType == UntypedValueMetricType::MetricTypeCounter)
+            type = "counter";
+        else if (metric.second.MetricType == UntypedValueMetricType::MetricTypeGauge)
+            type = "gauge";
+        res[metric.first.to_string()]["type"] = type;
+        res[metric.first.to_string()]["value"] = metric.second.Value;
     }
     return res;
 }
@@ -109,9 +115,12 @@ Json::Value UntypedMultiDoubleValues::ToJson() const {
 void UntypedMultiDoubleValues::FromJson(const Json::Value& value) {
     mValues.clear();
     for (Json::Value::const_iterator itr = value.begin(); itr != value.end(); ++itr) {
-        if (itr->asDouble()) {
-            SetValue(itr.key().asString(), itr->asDouble());
-        }
+        UntypedValueMetricType type;
+        if (itr->get("type", "unknown").asString() == "counter")
+            type = UntypedValueMetricType::MetricTypeCounter;
+        else if (itr->get("type", "unknown").asString() == "gauge")
+            type = UntypedValueMetricType::MetricTypeGauge;
+        SetValue(itr.key().asString(), UntypedMultiDoubleValue{type, itr->get("value", 0).asDouble()});
     }
 }
 #endif

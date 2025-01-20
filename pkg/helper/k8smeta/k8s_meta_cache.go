@@ -20,6 +20,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
+const hostIPIndexPrefix = "host/"
+
 type k8sMetaCache struct {
 	metaStore *DeferredDeletionMetaStore
 	clientset *kubernetes.Clientset
@@ -211,10 +213,12 @@ func (m *k8sMetaCache) preProcessCommon(obj interface{}) interface{} {
 	runtimeObj, ok := obj.(runtime.Object)
 	if !ok {
 		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not runtime object", obj)
+		return obj
 	}
 	metaObj, err := meta.Accessor(runtimeObj)
 	if err != nil {
 		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not meta object", err)
+		return obj
 	}
 	// fill empty kind
 	if runtimeObj.GetObjectKind().GroupVersionKind().Empty() {
@@ -238,6 +242,7 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 	m.preProcessCommon(obj)
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
+		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod", obj)
 		return obj
 	}
 	pod.ManagedFields = nil
@@ -291,7 +296,11 @@ func generateHostIPKey(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, fmt.Errorf("object is not a pod")
 	}
-	return []string{pod.Status.HostIP}, nil
+	return []string{addHostIPIndexPrefex(pod.Status.HostIP)}, nil
+}
+
+func addHostIPIndexPrefex(ip string) string {
+	return hostIPIndexPrefix + ip
 }
 
 func generateServiceIPKey(obj interface{}) ([]string, error) {

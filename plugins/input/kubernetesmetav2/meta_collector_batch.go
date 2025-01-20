@@ -22,7 +22,7 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 		log.Contents.Add("namespace", obj.Namespace)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("status", obj.Status.String())
+		log.Contents.Add("status", m.processEntityJSONObject(obj.Status))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{

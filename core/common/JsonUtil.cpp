@@ -17,6 +17,7 @@
 #include <memory>
 #include <sstream>
 
+#include "AppConfig.h"
 #include "common/ExceptionBase.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
@@ -194,9 +195,16 @@ bool LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
         loaded = true; \
         APSARA_LOG_INFO(sLogger, ("load parameter from env", name)("value", outVal)); \
     } \
-    if (envName != NULL && LoadEnvValueIfExisting(envName, value)) { \
+    if (envName != NULL && LoadEnvValueIfExisting(envName, outVal)) { \
         loaded = true; \
         APSARA_LOG_INFO(sLogger, ("load parameter from env", envName)("value", outVal)); \
+    } \
+    if (name != NULL) { \
+        const auto newEnvName = LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(name); \
+        if (LoadEnvValueIfExisting(newEnvName.c_str(), outVal)) { \
+            loaded = true; \
+            APSARA_LOG_INFO(sLogger, ("load parameter from env", newEnvName)("value", outVal)); \
+        } \
     } \
     if (name != NULL && (confJSON.isMember(name) && confJSON[name].testJSONFunc())) { \
         outVal = confJSON[name].convertJSONFunc(); \

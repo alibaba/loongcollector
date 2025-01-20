@@ -34,7 +34,7 @@ void CurlUnittest::TestSendHttpRequest() {
     std::unique_ptr<HttpRequest> request;
     HttpResponse res;
     request
-        = std::make_unique<HttpRequest>("GET", false, "example.com", 80, "/path", "", map<string, string>(), "", 10, 3);
+        = std::make_unique<HttpRequest>("GET", false, "httpstat.us", 80, "/404", "", map<string, string>(), "", 10, 3);
     bool success = SendHttpRequest(std::move(request), res);
     APSARA_TEST_TRUE(success);
     APSARA_TEST_EQUAL(404, res.GetStatusCode());
@@ -67,7 +67,7 @@ void CurlUnittest::TestFollowRedirect() {
     tls.mKeyFile = "client.key";
 
     request = std::make_unique<HttpRequest>(
-        "GET", false, "example.com", 80, "/path", "", map<string, string>(), "", 10, 3, true);
+        "GET", false, "httpstat.us", 80, "/404", "", map<string, string>(), "", 10, 3, true);
     bool success = SendHttpRequest(std::move(request), res);
     APSARA_TEST_TRUE(success);
     APSARA_TEST_EQUAL(404, res.GetStatusCode());

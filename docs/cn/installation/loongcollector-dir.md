@@ -127,28 +127,28 @@ inotify日志：`/opt/loongcollector/run/inotify_watcher_dirs`
 
 LoongCollector 提供以下参数用于自定义各类目录位置：
 
-- `loongcollector_conf_dir`: 配置目录
+- 配置目录: gflag为`conf_dir`、环境变量为`LOONG_CONF_DIR`
 
-- `loongcollector_log_dir`: 日志目录
+- 日志目录: gflag为`logs_dir`、环境变量为`LOONG_LOGS_DIR`
 
-- `loongcollector_data_dir`: 数据目录
+- 数据目录: gflag为`data_dir`、环境变量为`LOONG_DATA_DIR`
 
-- `loongcollector_run_dir`: 运行时目录
+- 运行时目录: gflag为`run_dir`、环境变量为`LOONG_RUN_DIR`
 
-- `loongcollector_third_party_dir`: 第三方依赖目录
+- 第三方依赖目录: gflag为`third_party_dir`、环境变量为`LOONG_THIRD_PARTY_DIR`
 
 ### 配置方式
 
 1. 命令行参数:
 
    ```bash
-   ./loongcollector --loongcollector_conf_dir=/custom/path/conf
+   ./loongcollector --conf_dir=/custom/path/conf
    ```
 
 2. 环境变量:
 
    ```bash
-   export loongcollector_conf_dir=/custom/path/conf
+   export LOONG_CONF_DIR=/custom/path/conf
    ./loongcollector
    ```
 

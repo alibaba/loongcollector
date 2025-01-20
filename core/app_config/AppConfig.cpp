@@ -17,12 +17,14 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <unordered_set>
 #include <utility>
 
 #include "boost/filesystem.hpp"
 #include "json/value.h"
 
 #include "RuntimeUtil.h"
+#include "StringTools.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
@@ -161,9 +163,9 @@ DEFINE_FLAG_STRING(metrics_report_method,
                    "method to report metrics (default none, means logtail will not report metrics)",
                    "sls");
 
-DEFINE_FLAG_STRING(loong_collector_operator_service, "loong collector operator service", "");
-DEFINE_FLAG_INT32(loong_collector_operator_service_port, "loong collector operator service port", 8888);
-DEFINE_FLAG_INT32(loong_collector_k8s_meta_service_port, "loong collector operator service port", 9000);
+DEFINE_FLAG_STRING(operator_service, "loong collector operator service", "");
+DEFINE_FLAG_INT32(operator_service_port, "loong collector operator service port", 8888);
+DEFINE_FLAG_INT32(k8s_meta_service_port, "loong collector operator service port", 9000);
 DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
 
 DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
@@ -210,14 +212,21 @@ const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE = 10;
 const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE = 40;
 
 std::string AppConfig::sLocalConfigDir = "local";
+
+const std::string LOONGCOLLECTOR_ENV_PREFIX = "LOONG_";
+
+std::string GetLoongcollectorEnv(const std::string& flagName) {
+    return LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(flagName);
+}
+
 void CreateAgentDir() {
     try {
-        const char* value = getenv("logtail_mode");
+        const char* value = getenv("LOGTAIL_MODE");
         if (value != NULL) {
             STRING_FLAG(logtail_mode) = StringTo<bool>(value);
         }
     } catch (const exception& e) {
-        std::cout << "load config from env error, env_name:logtail_mode, error:" << e.what() << std::endl;
+        std::cout << "load config from env error, env_name:LOGTAIL_MODE, error:" << e.what() << std::endl;
     }
     if (BOOL_FLAG(logtail_mode)) {
         return;
@@ -226,7 +235,8 @@ void CreateAgentDir() {
     Json::Value emptyJson;
 #define PROCESSDIRFLAG(flag_name) \
     try { \
-        const char* value = getenv(#flag_name); \
+        const auto env_name = GetLoongcollectorEnv(#flag_name); \
+        const char* value = getenv(env_name.c_str()); \
         if (value != NULL) { \
             STRING_FLAG(flag_name) = StringTo<string>(value); \
         } \
@@ -247,11 +257,11 @@ void CreateAgentDir() {
         } \
     }
 
-    PROCESSDIRFLAG(loongcollector_conf_dir);
-    PROCESSDIRFLAG(loongcollector_log_dir);
-    PROCESSDIRFLAG(loongcollector_data_dir);
-    PROCESSDIRFLAG(loongcollector_run_dir);
-    PROCESSDIRFLAG(loongcollector_third_party_dir);
+    PROCESSDIRFLAG(conf_dir);
+    PROCESSDIRFLAG(logs_dir);
+    PROCESSDIRFLAG(data_dir);
+    PROCESSDIRFLAG(run_dir);
+    PROCESSDIRFLAG(third_party_dir);
 }
 
 std::string GetAgentThirdPartyDir() {
@@ -262,7 +272,7 @@ std::string GetAgentThirdPartyDir() {
     if (BOOL_FLAG(logtail_mode)) {
         dir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
     } else {
-        dir = STRING_FLAG(loongcollector_third_party_dir) + PATH_SEPARATOR;
+        dir = STRING_FLAG(third_party_dir) + PATH_SEPARATOR;
     }
     return dir;
 }
@@ -278,7 +288,7 @@ std::string GetAgentLogDir() {
     if (BOOL_FLAG(logtail_mode)) {
         dir = GetProcessExecutionDir();
     } else {
-        dir = STRING_FLAG(loongcollector_log_dir) + PATH_SEPARATOR;
+        dir = STRING_FLAG(logs_dir) + PATH_SEPARATOR;
     }
 #endif
     return dir;
@@ -372,7 +382,7 @@ std::string GetAgentDataDir() {
     if (BOOL_FLAG(logtail_mode)) {
         dir = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "checkpoint";
     } else {
-        dir = STRING_FLAG(loongcollector_data_dir) + PATH_SEPARATOR;
+        dir = STRING_FLAG(data_dir) + PATH_SEPARATOR;
     }
 #endif
     if (!CheckExistance(dir)) {
@@ -396,7 +406,7 @@ std::string GetAgentConfDir() {
     if (BOOL_FLAG(logtail_mode)) {
         dir = GetProcessExecutionDir();
     } else {
-        dir = STRING_FLAG(loongcollector_conf_dir) + PATH_SEPARATOR;
+        dir = STRING_FLAG(conf_dir) + PATH_SEPARATOR;
     }
 #endif
     return dir;
@@ -413,7 +423,7 @@ std::string GetAgentRunDir() {
     if (BOOL_FLAG(logtail_mode)) {
         dir = GetProcessExecutionDir();
     } else {
-        dir = STRING_FLAG(loongcollector_run_dir) + PATH_SEPARATOR;
+        dir = STRING_FLAG(run_dir) + PATH_SEPARATOR;
     }
 #endif
     return dir;
@@ -838,28 +848,22 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
     } catch (const exception& e) {
         LOG_WARNING(sLogger, (string("set ") + envKey + " from env failed, exception", e.what()));
     }
-    return false;
-}
-
-/**
- * @brief 从环境变量加载配置值（如果存在）
- *
- * @tparam T 配置值的类型
- * @param envKey 环境变量的键
- * @param cfgValue 配置值的引用，如果环境变量存在，将被更新
- */
-template <typename T>
-void LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
     try {
-        const char* value = getenv(envKey);
+        char* value = NULL;
+        const auto newEnvKey = LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(envKey);
+        value = getenv(newEnvKey.c_str());
         if (value != NULL) {
             T val = StringTo<T>(value);
-            cfgValue = val;
-            LOG_INFO(sLogger, ("load config from env", envKey)("value", val));
+            if (val >= minValue) {
+                configValue = val;
+                LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
+                return true;
+            }
         }
-    } catch (const std::exception& e) {
-        LOG_WARNING(sLogger, ("load config from env error", envKey)("error", e.what()));
+    } catch (const exception& e) {
+        LOG_WARNING(sLogger, (string("set ") + envKey + " from env failed, exception", e.what()));
     }
+    return false;
 }
 
 void AppConfig::LoadEnvResourceLimit() {
@@ -1457,11 +1461,7 @@ void AppConfig::InitEnvMapping(const std::string& envStr, std::map<std::string, 
     }
 }
 void AppConfig::SetConfigFlag(const std::string& flagName, const std::string& value) {
-    static set<string> sIgnoreFlagSet = {"loongcollector_conf_dir",
-                                         "loongcollector_log_dir",
-                                         "loongcollector_data_dir",
-                                         "loongcollector_run_dir",
-                                         "logtail_mode"};
+    static set<string> sIgnoreFlagSet = {"conf_dir", "logs_dir", "data_dir", "run_dir", "logtail_mode"};
     if (sIgnoreFlagSet.find(flagName) != sIgnoreFlagSet.end()) {
         return;
     }
@@ -1508,9 +1508,43 @@ void AppConfig::ParseEnvToFlags() {
         }
     }
 #endif
+    std::unordered_set<std::string> sIgnoreFlagSet = {"buffer_file_path",
+                                                      "check_point_filename",
+                                                      "data_server_port",
+                                                      "host_path_blacklist",
+                                                      "process_thread_count",
+                                                      "send_request_concurrency",
+                                                      "check_point_dump_interval",
+                                                      "check_point_max_count",
+                                                      "enable_root_path_collection",
+                                                      "ilogtail_config",
+                                                      "ilogtail_discard_interval",
+                                                      "default_tail_limit_kb",
+                                                      "logreader_max_rotate_queue_size",
+                                                      "force_release_deleted_file_fd_timeout",
+                                                      "batch_send_interval",
+                                                      "ALIYUN_LOG_FILE_TAGS",
+                                                      "default_container_host_path",
+                                                      "default_max_inotify_watch_num",
+                                                      "enable_full_drain_mode",
+                                                      "ilogtail_discard_old_data",
+                                                      "timeout_interval",
+                                                      "enable_env_ref_in_config",
+                                                      "max_watch_dir_count",
+                                                      "polling_max_stat_count",
+                                                      "polling_max_stat_count_per_config",
+                                                      "polling_max_stat_count_per_dir"};
     for (const auto& iter : envMapping) {
-        const std::string& key = iter.first;
         const std::string& value = iter.second;
+        std::string key = iter.first;
+        // Skip if key is not in ignore set and doesn't start with prefix
+        if (sIgnoreFlagSet.find(key) == sIgnoreFlagSet.end() && !StartWith(key, LOONGCOLLECTOR_ENV_PREFIX)) {
+            continue;
+        }
+        // Convert to lowercase if key has prefix
+        if (StartWith(key, LOONGCOLLECTOR_ENV_PREFIX)) {
+            key = ToLowerCaseString(key.substr(LOONGCOLLECTOR_ENV_PREFIX.size()));
+        }
         SetConfigFlag(key, value);
         // 尝试解析为 double
         char* end;

@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -290,8 +291,8 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 				hostnamePath = mount.Source
 			}
 			dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
-				Source:      mount.Source,
-				Destination: mount.Destination,
+				Source:      filepath.Clean(mount.Source),
+				Destination: filepath.Clean(mount.Destination),
 				Driver:      mount.Type,
 			})
 		}
