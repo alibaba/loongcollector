@@ -126,7 +126,7 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {
 #ifdef __ENTERPRISE__
-            if (mAgentEnvMetaTagKey.empty() && AppendingAllEnvMetaTag) {
+            if (mAgentEnvMetaTagKey.empty() && mAppendingAllEnvMetaTag) {
                 logGroup.SetTagNoCopy(sEnvTags[i].key(), sEnvTags[i].value());
             } else {
                 auto envTagKey = sEnvTags[i].key();
