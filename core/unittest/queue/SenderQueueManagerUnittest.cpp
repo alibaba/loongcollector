@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/QueueParam.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/QueueParam.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 
@@ -72,7 +72,7 @@ private:
     static SenderQueueManager* sManager;
     static shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter;
     static vector<RangeCheckpointPtr> sCheckpoints;
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
     static string sFlusherId;
 
     unique_ptr<SenderQueueItem> GenerateItem(bool isSLS = false);
@@ -85,7 +85,7 @@ const size_t SenderQueueManagerUnittest::sDataSize;
 SenderQueueManager* SenderQueueManagerUnittest::sManager;
 shared_ptr<ConcurrencyLimiter> SenderQueueManagerUnittest::sConcurrencyLimiter;
 vector<RangeCheckpointPtr> SenderQueueManagerUnittest::sCheckpoints;
-PipelineContext SenderQueueManagerUnittest::sCtx;
+CollectionPipelineContext SenderQueueManagerUnittest::sCtx;
 string SenderQueueManagerUnittest::sFlusherId;
 
 void SenderQueueManagerUnittest::TestCreateQueue() {

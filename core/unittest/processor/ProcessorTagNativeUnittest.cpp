@@ -14,13 +14,14 @@
 
 #include <cstdlib>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "config/CollectionConfig.h"
 #include "TagConstants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "monitor/Monitor.h"
-#include "pipeline/Pipeline.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
@@ -48,6 +49,7 @@ private:
 void ProcessorTagNativeUnittest::TestInit() {
     // make config
     Json::Value config;
+    CollectionPipeline pipeline;
     Pipeline pipeline;
     PipelineContext context;
     context.SetConfigName("project##config_0");

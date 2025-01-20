@@ -1047,7 +1047,7 @@ void ConfigMatchUnittest::TestChinesePathAndFilePattern() {
     filePattern = EncodingConverter::GetInstance()->FromACPToUTF8(filePattern);
 #endif
     {
-        PipelineConfig cfg(
+        CollectionConfig cfg(
             basePath, filePattern, LogType::REGEX_LOG, "log", ".*", "", "", "project", true, 3, 3, "logstore");
         fsutil::Dir dir(pathRoot);
         APSARA_TEST_TRUE(dir.Open());

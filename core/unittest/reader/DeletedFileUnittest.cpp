@@ -45,7 +45,7 @@ private:
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
     FileTagOptions tagOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     string hostLogPathDir = ".";
     string hostLogPathFile = "DeletedFileUnittest.txt";
 };

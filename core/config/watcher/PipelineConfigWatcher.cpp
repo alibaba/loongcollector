@@ -16,12 +16,12 @@
 
 #include <memory>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
 #include "config/common_provider/CommonConfigProvider.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -33,12 +33,12 @@ namespace logtail {
 
 PipelineConfigWatcher::PipelineConfigWatcher()
     : ConfigWatcher(),
-      mPipelineManager(PipelineManager::GetInstance()),
+      mPipelineManager(CollectionPipelineManager::GetInstance()),
       mTaskPipelineManager(TaskPipelineManager::GetInstance()) {
 }
 
-pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff() {
-    PipelineConfigDiff pDiff;
+pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff() {
+    CollectionConfigDiff pDiff;
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
     SingletonConfigCache singletonCache;
@@ -89,7 +89,7 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
     return make_pair(std::move(pDiff), std::move(tDiff));
 }
 
-void PipelineConfigWatcher::InsertBuiltInPipelines(PipelineConfigDiff& pDiff,
+void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
                                                    TaskConfigDiff& tDiff,
                                                    unordered_set<string>& configSet,
                                                    SingletonConfigCache& singletonCache) {
@@ -137,7 +137,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(PipelineConfigDiff& pDiff,
             }
             if (!IsConfigEnabled(pipelineName, *detail)) {
                 switch (GetConfigType(*detail)) {
-                    case ConfigType::Pipeline:
+                    case ConfigType::Collection:
                         if (mPipelineManager->FindConfigByName(pipelineName)) {
                             pDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
@@ -176,7 +176,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(PipelineConfigDiff& pDiff,
 #endif
 }
 
-void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
+void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
                                             std::unordered_set<std::string>& configSet,
                                             SingletonConfigCache& singletonCache) {
@@ -247,7 +247,7 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
                 }
                 if (!IsConfigEnabled(configName, *detail)) {
                     switch (GetConfigType(*detail)) {
-                        case ConfigType::Pipeline:
+                        case ConfigType::Collection:
                             if (mPipelineManager->FindConfigByName(configName)) {
                                 pDiff.mRemoved.push_back(configName);
                                 LOG_INFO(sLogger,
@@ -287,12 +287,12 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
 
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
                                              unique_ptr<Json::Value>&& configDetail,
-                                             PipelineConfigDiff& pDiff,
+                                             CollectionConfigDiff& pDiff,
                                              TaskConfigDiff& tDiff,
                                              SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
-        case ConfigType::Pipeline: {
-            PipelineConfig config(configName, std::move(configDetail));
+        case ConfigType::Collection: {
+            CollectionConfig config(configName, std::move(configDetail));
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
                 AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
@@ -327,14 +327,14 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
 
 bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                                                 unique_ptr<Json::Value>&& configDetail,
-                                                PipelineConfigDiff& pDiff,
+                                                CollectionConfigDiff& pDiff,
                                                 TaskConfigDiff& tDiff,
                                                 SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
-        case ConfigType::Pipeline: {
-            shared_ptr<Pipeline> p = mPipelineManager->FindConfigByName(configName);
+        case ConfigType::Collection: {
+            shared_ptr<CollectionPipeline> p = mPipelineManager->FindConfigByName(configName);
             if (!p) {
-                PipelineConfig config(configName, std::move(configDetail));
+                CollectionConfig config(configName, std::move(configDetail));
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing invalid config modified and remains invalid",
@@ -353,7 +353,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                           "prepare to build pipeline")("config", configName));
                 PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
             } else if (*configDetail != p->GetConfig()) {
-                PipelineConfig config(configName, std::move(configDetail));
+                CollectionConfig config(configName, std::move(configDetail));
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing valid config modified and becomes invalid",
@@ -421,7 +421,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
 
 bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
                                                  const filesystem::path& path,
-                                                 PipelineConfigDiff& pDiff,
+                                                 CollectionConfigDiff& pDiff,
                                                  TaskConfigDiff& tDiff,
                                                  SingletonConfigCache& singletonCache) {
     auto pipeline = mPipelineManager->FindConfigByName(configName);
@@ -430,7 +430,7 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
         return true;
     } else if (pipeline) { // running pipeline in last config update
         std::unique_ptr<Json::Value> configDetail = make_unique<Json::Value>();
-        PipelineConfig config(configName, std::move(configDetail));
+        CollectionConfig config(configName, std::move(configDetail));
         config.mCreateTime = pipeline->GetContext().GetCreateTime();
         config.mSingletonInput = pipeline->GetSingletonInput();
         PushPipelineConfig(std::move(config), ConfigDiffEnum::Unchanged, pDiff, singletonCache);
@@ -443,7 +443,7 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
             LOG_DEBUG(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
             return false;
         }
-        PipelineConfig config(configName, std::move(detail));
+        CollectionConfig config(configName, std::move(detail));
         if (!config.Parse()) {
             LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
@@ -462,9 +462,9 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
     return true;
 }
 
-void PipelineConfigWatcher::PushPipelineConfig(PipelineConfig&& config,
+void PipelineConfigWatcher::PushPipelineConfig(CollectionConfig&& config,
                                                ConfigDiffEnum diffEnum,
-                                               PipelineConfigDiff& pDiff,
+                                               CollectionConfigDiff& pDiff,
                                                SingletonConfigCache& singletonCache) {
     // singleton input
     if (config.mSingletonInput) {
@@ -490,7 +490,7 @@ void PipelineConfigWatcher::PushPipelineConfig(PipelineConfig&& config,
     }
 }
 
-void PipelineConfigWatcher::CheckSingletonInput(PipelineConfigDiff& pDiff, SingletonConfigCache& singletonCache) {
+void PipelineConfigWatcher::CheckSingletonInput(CollectionConfigDiff& pDiff, SingletonConfigCache& singletonCache) {
     for (auto& [name, configs] : singletonCache) {
         std::sort(configs.begin(),
                   configs.end(),

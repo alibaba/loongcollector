@@ -20,17 +20,17 @@
 
 #include "TagConstants.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -91,8 +91,8 @@ protected:
     }
 
 private:
-    Pipeline pipeline;
-    PipelineContext ctx;
+    CollectionPipeline pipeline;
+    CollectionPipelineContext ctx;
 };
 
 void FlusherSLSUnittest::OnSuccessfulInit() {
@@ -678,7 +678,7 @@ void FlusherSLSUnittest::OnFailedInit() {
 }
 
 void FlusherSLSUnittest::OnPipelineUpdate() {
-    PipelineContext ctx1;
+    CollectionPipelineContext ctx1;
     ctx1.SetConfigName("test_config_1");
 
     Json::Value configJson, optionalGoPipeline;
@@ -702,7 +702,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
 
     {
-        PipelineContext ctx2;
+        CollectionPipelineContext ctx2;
         ctx2.SetConfigName("test_config_2");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
@@ -732,7 +732,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         flusher1.Start();
     }
     {
-        PipelineContext ctx2;
+        CollectionPipelineContext ctx2;
         ctx2.SetConfigName("test_config_1");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
@@ -1344,7 +1344,7 @@ void FlusherSLSUnittest::TestSend() {
         )";
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
-        PipelineContext ctx;
+        CollectionPipelineContext ctx;
         ctx.SetConfigName("test_config");
         ctx.SetExactlyOnceFlag(true);
         flusher.SetContext(ctx);
@@ -1812,7 +1812,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.mProject = "test_project";
         flusher.mLogstore = "test_logstore";
         flusher.mCompressor = CompressorFactory::GetInstance()->Create(
-            Json::Value(), PipelineContext(), "flusher_sls", "1", CompressType::LZ4);
+            Json::Value(), CollectionPipelineContext(), "flusher_sls", "1", CompressType::LZ4);
 
         APSARA_TEST_TRUE(flusher.Send("content", ""));
 

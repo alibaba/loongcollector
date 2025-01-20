@@ -18,13 +18,13 @@
 
 #include <cstdint>
 
+#include "collection_pipeline/plugin/interface/Input.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
@@ -32,8 +32,9 @@ class InputFile : public Input {
 public:
     static const std::string sName;
 
-    static bool
-    DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const PipelineContext*, const FileDiscoveryOptions*);
+    static bool DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                             const CollectionPipelineContext*,
+                                             const FileDiscoveryOptions*);
 
     InputFile();
 

@@ -78,7 +78,7 @@ public:
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     FileTagOptions fileTagOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
@@ -621,7 +621,7 @@ public:
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
     FileTagOptions fileTagOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogMultiBytesUnittest, TestAlignLastCharacterUTF8);
@@ -771,7 +771,7 @@ public:
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
     FileTagOptions fileTagOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderCheckpointUnittest, TestDumpMetaToMem);

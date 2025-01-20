@@ -19,12 +19,12 @@
 #include <cstdint>
 
 #include "FileTagOptions.h"
+#include "collection_pipeline/plugin/interface/Input.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
@@ -33,8 +33,9 @@ public:
     static const std::string sName;
 
     static std::string TryGetRealPath(const std::string& path);
-    static bool
-    DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const PipelineContext*, const FileDiscoveryOptions*);
+    static bool DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                             const CollectionPipelineContext*,
+                                             const FileDiscoveryOptions*);
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;

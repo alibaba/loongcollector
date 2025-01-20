@@ -14,7 +14,7 @@
 
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 
-#include "pipeline/queue/SenderQueueManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 
 using namespace std;
 

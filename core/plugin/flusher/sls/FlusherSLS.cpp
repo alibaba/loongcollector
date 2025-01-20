@@ -15,6 +15,11 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/batch/FlushStrategy.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/EndpointUtil.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -22,11 +27,6 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/batch/FlushStrategy.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -946,7 +946,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     if (!HasContext()) {
         key = QueueKeyManager::GetInstance()->GetKey(mProject + "-" + mLogstore);
         if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
-            PipelineContext ctx;
+            CollectionPipelineContext ctx;
             SenderQueueManager::GetInstance()->CreateQueue(
                 key, "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
         }
@@ -969,7 +969,8 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
     }
     if (mContext->IsFlushingThroughGoPipeline()) {
         Json::Value plugin(Json::objectValue);
-        plugin["type"] = Pipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
+        plugin["type"]
+            = CollectionPipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
         plugin["detail"] = detail;
         res["flushers"].append(plugin);
     }

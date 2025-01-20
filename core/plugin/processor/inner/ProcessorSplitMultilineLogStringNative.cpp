@@ -23,12 +23,12 @@
 #include "PipelineEventGroup.h"
 #include "TagConstants.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
 #include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 

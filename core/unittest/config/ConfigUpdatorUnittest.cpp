@@ -934,10 +934,10 @@ void ConfigUpdatorUnittest::TestLogRotateWhenUpdate() {
     WaitForFileBeenRead();
     sleep(2 * INT32_FLAG(batch_send_interval) + 2);
 
-    unordered_map<string, PipelineConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
-    unordered_map<string, PipelineConfig*>::iterator it = configMap.find("commonreg.com");
+    unordered_map<string, CollectionConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
+    unordered_map<string, CollectionConfig*>::iterator it = configMap.find("commonreg.com");
     APSARA_TEST_TRUE(it != configMap.end());
-    PipelineConfig* config = it->second;
+    CollectionConfig* config = it->second;
     APSARA_TEST_EQUAL(config->mProjectName, "2000000_proj");
     APSARA_TEST_EQUAL(config->mBasePath, mRootDir + PATH_SEPARATOR + "comm");
     APSARA_TEST_EQUAL(config->mVersion, 1);
@@ -1034,10 +1034,10 @@ void ConfigUpdatorUnittest::TestConfigUpdate() {
     WaitForFileBeenRead();
     sleep(2 * INT32_FLAG(batch_send_interval) + 2);
 
-    unordered_map<string, PipelineConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
-    unordered_map<string, PipelineConfig*>::iterator it = configMap.find("commonreg.com");
+    unordered_map<string, CollectionConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
+    unordered_map<string, CollectionConfig*>::iterator it = configMap.find("commonreg.com");
     APSARA_TEST_TRUE(it != configMap.end());
-    PipelineConfig* config = it->second;
+    CollectionConfig* config = it->second;
     APSARA_TEST_EQUAL(config->mProjectName, "2000000_proj");
     APSARA_TEST_EQUAL(config->mBasePath, mRootDir + PATH_SEPARATOR + "comm");
     APSARA_TEST_EQUAL(config->mVersion, 1);
@@ -1273,10 +1273,10 @@ void ConfigUpdatorUnittest::TestLocalConfigUpdate() {
     sleep(2 * INT32_FLAG(batch_send_interval) + 2);
 
     LOG_INFO(sLogger, ("Test config update status", ""));
-    unordered_map<string, PipelineConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
-    unordered_map<string, PipelineConfig*>::iterator it = configMap.find("commonreg.com");
+    unordered_map<string, CollectionConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
+    unordered_map<string, CollectionConfig*>::iterator it = configMap.find("commonreg.com");
     APSARA_TEST_TRUE(it != configMap.end());
-    PipelineConfig* config = it->second;
+    CollectionConfig* config = it->second;
     APSARA_TEST_EQUAL(config->mProjectName, "2000000_proj");
     APSARA_TEST_EQUAL(config->mBasePath, (bfs::path(mRootDir) / "comm").string());
     APSARA_TEST_EQUAL(config->mVersion, 1);
@@ -2273,11 +2273,11 @@ void ConfigUpdatorUnittest::TestUpdateGroupTopic() {
     WaitForFileBeenRead();
     sleep(2 * INT32_FLAG(batch_send_interval) + 2);
 
-    unordered_map<string, PipelineConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
-    unordered_map<string, PipelineConfig*>::iterator it;
+    unordered_map<string, CollectionConfig*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
+    unordered_map<string, CollectionConfig*>::iterator it;
     it = configMap.find("apsara_log");
     APSARA_TEST_TRUE(it != configMap.end());
-    PipelineConfig* config = it->second;
+    CollectionConfig* config = it->second;
     APSARA_TEST_EQUAL(config->mProjectName, "8000000_proj");
     APSARA_TEST_EQUAL(config->mBasePath, mRootDir + PATH_SEPARATOR + "apsara_log");
     APSARA_TEST_EQUAL(config->mVersion, 1);
@@ -2640,7 +2640,7 @@ void ConfigUpdatorUnittest::TestValidWildcardPath2() {
 
 void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // No wildcard.
-    PipelineConfig* cfg_1 = new PipelineConfig(
+    CollectionConfig* cfg_1 = new CollectionConfig(
         PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
@@ -2648,7 +2648,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi"), false);
     delete cfg_1;
     // To be compatible with old settings
-    PipelineConfig* cfg_2 = new PipelineConfig(
+    CollectionConfig* cfg_2 = new CollectionConfig(
         PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat");
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
@@ -2657,7 +2657,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi" + PS + "agec" + PS + "egegt"), true);
     delete cfg_2;
 
-    PipelineConfig* cfg_3 = new PipelineConfig(
+    CollectionConfig* cfg_3 = new CollectionConfig(
         PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
@@ -2674,7 +2674,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_3;
 
     // Wildcard.
-    PipelineConfig* cfg_4 = new PipelineConfig(
+    CollectionConfig* cfg_4 = new CollectionConfig(
         PS + "ab?" + PS + "de" + PS + "*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
@@ -2682,19 +2682,19 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi"), false);
     delete cfg_4;
     // To be compatible with old settings.
-    PipelineConfig* cfg_5 = new PipelineConfig(PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz",
-                                               "x.log",
-                                               REGEX_LOG,
-                                               "a",
-                                               "",
-                                               "",
-                                               "",
-                                               "prj",
-                                               true,
-                                               0,
-                                               -1,
-                                               "cat",
-                                               "");
+    CollectionConfig* cfg_5 = new CollectionConfig(PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz",
+                                                   "x.log",
+                                                   REGEX_LOG,
+                                                   "a",
+                                                   "",
+                                                   "",
+                                                   "",
+                                                   "prj",
+                                                   true,
+                                                   0,
+                                                   -1,
+                                                   "cat",
+                                                   "");
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz" + PS + "xyz0"), true);
@@ -2705,7 +2705,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
               true);
     delete cfg_5;
 
-    PipelineConfig* cfg_6 = new PipelineConfig(
+    CollectionConfig* cfg_6 = new CollectionConfig(
         PS + "abc" + PS + "d?" + PS + "f*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc" + PS + "de"), false);
@@ -2726,12 +2726,12 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // Wildcard on root path, only Windows works.
     {
 #if defined(__linux__)
-        PipelineConfig cfg("/*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
+        CollectionConfig cfg("/*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
         EXPECT_TRUE(cfg.WithinMaxDepth("/var"));
         BOOL_FLAG(enable_root_path_collection) = true;
         EXPECT_TRUE(cfg.WithinMaxDepth("/var"));
 #elif defined(_MSC_VER)
-        PipelineConfig cfg("D:\\*", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 3, "cat");
+        CollectionConfig cfg("D:\\*", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 3, "cat");
         EXPECT_TRUE(!cfg.WithinMaxDepth("D:\\var"));
         BOOL_FLAG(enable_root_path_collection) = true;
         EXPECT_TRUE(cfg.WithinMaxDepth("D:\\var"));
@@ -2741,7 +2741,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
 }
 
 void ConfigUpdatorUnittest::TestParseWildcardPath() {
-    PipelineConfig cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 0, 0, "cat");
+    CollectionConfig cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 0, 0, "cat");
 
     std::string pathRoot = "";
 #if defined(_MSC_VER)
@@ -2802,7 +2802,7 @@ void ConfigUpdatorUnittest::TestParseWildcardPath() {
 }
 
 void ConfigUpdatorUnittest::TestIsWildcardPathMatch() {
-    PipelineConfig cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 100, 100, "cat");
+    CollectionConfig cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 100, 100, "cat");
 
     cfg.mBasePath = PS + "usr" + PS + "?" + PS + "abc" + PS + "*" + PS + "def";
     cfg.ParseWildcardPath();

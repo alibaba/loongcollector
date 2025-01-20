@@ -14,7 +14,7 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "models/LogEvent.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
@@ -36,7 +36,7 @@ public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
     void TestInit();
     void TestProcess();
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestInit);
@@ -860,7 +860,7 @@ public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
     void TestProcessEventsWithPartLog();
     void TestProcess();
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessEventsWithPartLogUnittest, TestProcessEventsWithPartLog);
@@ -1847,7 +1847,7 @@ public:
     void TestLogSplitWithBegin();
     void TestLogSplitWithContinueEnd();
     void TestLogSplitWithEnd();
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorMergeMultilineLogDisacardUnmatchUnittest, TestLogSplitWithBeginContinue);
@@ -2906,7 +2906,7 @@ public:
     void TestLogSplitWithBegin();
     void TestLogSplitWithContinueEnd();
     void TestLogSplitWithEnd();
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorMergeMultilineLogKeepUnmatchUnittest, TestLogSplitWithBeginContinue);

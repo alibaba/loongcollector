@@ -14,10 +14,10 @@
 
 #include <cstdlib>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorParseDelimiterNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -47,7 +47,7 @@ public:
     void TestAllowingShortenedFields();
     void TestExtend();
     void TestEmpty();
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestInit);

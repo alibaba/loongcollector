@@ -9,10 +9,10 @@
 #include "Flags.h"
 #include "Labels.h"
 #include "Logger.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringTools.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 #include "prometheus/Utils.h"
 #include "runner/ProcessorRunner.h"
 

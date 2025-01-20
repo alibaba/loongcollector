@@ -14,6 +14,7 @@
 
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

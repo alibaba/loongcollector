@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ExceptionBase.h"
 #include "common/JsonUtil.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorFilterNative.h"
 #include "unittest/Unittest.h"
 
@@ -32,7 +32,7 @@ public:
     void TestBaseFilter();
     void TestFilterNoneUtf8();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, OnSuccessfulInit)

@@ -22,7 +22,7 @@
 #include <optional>
 #include <string>
 
-#include "pipeline/queue/SenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueItem.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 
 namespace logtail {

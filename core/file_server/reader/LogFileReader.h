@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "checkpoint/RangeCheckpoint.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
 #include "common/FileInfo.h"
@@ -40,7 +41,6 @@
 #include "file_server/reader/FileReaderOptions.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
-#include "pipeline/queue/QueueKey.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {

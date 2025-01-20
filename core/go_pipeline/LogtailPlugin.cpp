@@ -18,6 +18,8 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
@@ -29,8 +31,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -274,7 +274,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
             return 0;
         }
     } else {
-        shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindConfigByName(configNameStr);
+        shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
             LOG_INFO(sLogger,
                      ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)(

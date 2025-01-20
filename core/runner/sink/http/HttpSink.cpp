@@ -15,14 +15,14 @@
 #include "runner/sink/http/HttpSink.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/interface/HttpFlusher.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/interface/HttpFlusher.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SenderQueueItem.h"
 #include "runner/FlusherRunner.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/HttpSinkMock.h"
