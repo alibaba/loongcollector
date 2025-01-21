@@ -13,12 +13,12 @@
 // limitations under the License.
 
 
-#include "common/Lock.h"
 #include "ebpf/handler/SecurityHandler.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/Lock.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
@@ -70,7 +70,9 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
         }
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
         if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[SecurityEvent] push queue failed!", ""));
+            LOG_WARNING(sLogger,
+                        ("configName", mCtx->GetConfigName())("pluginIdx",
+                                                              mPluginIdx)("[SecurityEvent] push queue failed!", ""));
         }
     }
 }

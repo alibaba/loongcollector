@@ -14,11 +14,12 @@
 
 #include "TraceId.h"
 
-#include <array>
-#include <random>
-#include <memory>
 #include <cstring>
+
+#include <array>
 #include <iomanip>
+#include <memory>
+#include <random>
 #include <sstream>
 
 namespace logtail {
@@ -81,5 +82,5 @@ std::array<uint8_t, 16> GenerateSpanID() {
     return result;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

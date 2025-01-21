@@ -21,19 +21,20 @@
 #include <set>
 #include <unordered_map>
 
+#include "json/value.h"
+
+#include "common/CapabilityUtil.h"
+#include "common/EncodingUtil.h"
+#include "common/JsonUtil.h"
 #include "common/LRUCache.h"
 #include "common/ProcParser.h"
 #include "common/magic_enum.hpp"
-#include "common/EncodingUtil.h"
 #include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 #include "ebpf/driver/coolbpf/src/security/data_msg.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "ebpf/type/table/ProcessTable.h"
 #include "ebpf/util/ExecIdUtil.h"
 #include "logger/Logger.h"
-#include "common/JsonUtil.h"
-#include "json/value.h"
-#include "common/CapabilityUtil.h"
-#include "ebpf/type/table/ProcessTable.h"
 #include "util/FrequencyManager.h"
 
 namespace logtail {
@@ -92,21 +93,21 @@ void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long lost_cn
 ////////////////////////////////////////////////////////////////////////////////////////
 
 bool BaseManager::Init() {
-    if (mInited) {return true;}
+    if (mInited) {
+        return true;
+    }
     mInited = true;
     mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     auto ebpfConfig = std::make_unique<PluginConfig>();
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
-    
-    pconfig.mPerfBufferSpec = {{"tcpmon_map",
-        128,
-        this,
-        [](void* ctx, int cpu, void* data, uint32_t size) { HandleKernelProcessEvent(ctx, cpu, data, size); },
-        [](void* ctx, int cpu, unsigned long long cnt) {
-            HandleKernelProcessEventLost(ctx, cpu, cnt);
-        }}
-    };
+
+    pconfig.mPerfBufferSpec
+        = {{"tcpmon_map",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleKernelProcessEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleKernelProcessEventLost(ctx, cpu, cnt); }}};
     ebpfConfig->mConfig = pconfig;
     mFlag = true;
     mPoller = async(std::launch::async, &BaseManager::PollPerfBuffers, this);
@@ -130,10 +131,10 @@ void BaseManager::PollPerfBuffers() {
         auto now = std::chrono::steady_clock::now();
         auto next_window = mFrequencyMgr.Next();
         if (!mFrequencyMgr.Expired(now)) {
-          std::this_thread::sleep_until(next_window);
-          mFrequencyMgr.Reset(next_window);
+            std::this_thread::sleep_until(next_window);
+            mFrequencyMgr.Reset(next_window);
         } else {
-          mFrequencyMgr.Reset(now);
+            mFrequencyMgr.Reset(now);
         }
         auto ret = mSourceManager->PollPerfBuffers(PluginType::PROCESS_SECURITY, 4096, &zero, 200);
         LOG_DEBUG(sLogger, ("poll event num", ret));
@@ -226,13 +227,16 @@ void BaseManager::RecordExecveEvent(msg_execve_event* event_ptr) {
     event->kube.docker = std::string(event_ptr->kube.docker_id);
     LOG_DEBUG(
         sLogger,
-        ("begin enqueue pid", event->process.pid) ("ktime", event->process.ktime) ("cmdline", event->process.cmdline)(
+        ("begin enqueue pid", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
             "filename", event->process.filename)("raw_args", raw_args)("cwd", cwd)("dockerid", event->kube.docker));
 
     mRecordQueue.enqueue(std::move(event));
 
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessEvent>(event_ptr->process.pid, event_ptr->process.ktime, KernelEventType::PROCESS_EXECVE_EVENT, event_ptr->common.ktime);
+        auto event = std::make_shared<ProcessEvent>(event_ptr->process.pid,
+                                                    event_ptr->process.ktime,
+                                                    KernelEventType::PROCESS_EXECVE_EVENT,
+                                                    event_ptr->common.ktime);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -243,9 +247,12 @@ void BaseManager::RecordExecveEvent(msg_execve_event* event_ptr) {
 
 void BaseManager::RecordExitEvent(msg_exit* event_ptr) {
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessExitEvent>(event_ptr->current.pid, 
-            event_ptr->current.ktime, KernelEventType::PROCESS_EXIT_EVENT, 
-            event_ptr->common.ktime, event_ptr->info.code, event_ptr->info.tid);
+        auto event = std::make_shared<ProcessExitEvent>(event_ptr->current.pid,
+                                                        event_ptr->current.ktime,
+                                                        KernelEventType::PROCESS_EXIT_EVENT,
+                                                        event_ptr->common.ktime,
+                                                        event_ptr->info.code,
+                                                        event_ptr->info.tid);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -256,7 +263,8 @@ void BaseManager::RecordExitEvent(msg_exit* event_ptr) {
 
 void BaseManager::RecordCloneEvent(msg_clone_event* event_ptr) {
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessEvent>(event_ptr->tgid, event_ptr->ktime, KernelEventType::PROCESS_CLONE_EVENT, event_ptr->common.ktime);
+        auto event = std::make_shared<ProcessEvent>(
+            event_ptr->tgid, event_ptr->ktime, KernelEventType::PROCESS_CLONE_EVENT, event_ptr->common.ktime);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -636,7 +644,7 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
     auto execId = GenerateExecId(pid, ktime);
     auto proc = LookupCache(execId);
     if (!proc) {
-        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId) ("pid", pid) ("ktime", ktime));
+        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime));
         return res;
     }
 
@@ -676,7 +684,7 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
 
     auto uidSb = sb->CopyString(std::to_string(proc->process.uid));
     res.Insert(kUid.log_key(), StringView(uidSb.data, uidSb.size));
-    
+
     auto userSb = sb->CopyString(proc->process.user.name);
     res.Insert(kUser.log_key(), StringView(userSb.data, userSb.size));
 
@@ -696,7 +704,7 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
     res.Insert(kCap.log_key(), StringView(capSb.data, capSb.size));
 
     // for parent
-    if (!parentProc){
+    if (!parentProc) {
         auto unknownSb = sb->CopyString(std::string("unknown"));
         res.Insert(kParentProcess.log_key(), StringView(unknownSb.data, unknownSb.size));
         return res;
@@ -739,7 +747,7 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
     auto execId = GenerateExecId(pid, ktime);
     auto proc = LookupCache(execId);
     if (!proc) {
-        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId) ("pid", pid) ("ktime", ktime));
+        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime));
         return false;
     }
     // finalize proc tags
@@ -779,7 +787,7 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
     eventGroup.SetTag("cap", capStr);
 
     // for parent
-    if (!parentProc){
+    if (!parentProc) {
         eventGroup.SetTag("parent_process", std::string("unknown"));
         return true;
     } else {

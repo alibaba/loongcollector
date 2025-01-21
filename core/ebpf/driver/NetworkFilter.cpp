@@ -10,12 +10,12 @@ extern "C" {
 #include <vector>
 
 #include "BPFMapTraits.h"
+#include "CallName.h"
 #include "IdAllocator.h"
 #include "Log.h"
 #include "NetworkFilter.h"
 #include "eBPFWrapper.h"
 #include "ebpf/include/export.h"
-#include "CallName.h"
 
 namespace logtail {
 namespace ebpf {
@@ -433,9 +433,7 @@ int SetSportFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
     k_filter.op_type = OP_TYPE_IN;
     k_filter.map_idx[0] = idx;
     if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "filters count exceeded! max: %d\n",
-                 MAX_FILTER_FOR_PER_CALLNAME);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
         return 1;
     }
     filters.filters[filters.filter_count++] = k_filter;
@@ -444,16 +442,13 @@ int SetSportFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
         return 0;
     for (int i = 0; i < config->mSourcePortList.size(); i++) {
         uint32_t port = config->mSourcePortList[i];
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "begin to update map in map for filter detail, idx: %d\n",
-                 idx);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
         uint8_t val = 1;
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][white] source port: %u\n", port);
         int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
         if (ret) {
-            ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[update failed][white] port map update failed! sport: %u\n",
-                     port);
+            ebpf_log(
+                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][white] port map update failed! sport: %u\n", port);
             continue;
         }
     }
@@ -471,9 +466,7 @@ int SetSportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
     k_filter.op_type = OP_TYPE_NOT_IN;
     k_filter.map_idx[0] = idx;
     if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "filters count exceeded! max: %d\n",
-                 MAX_FILTER_FOR_PER_CALLNAME);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
         return 1;
     }
     filters.filters[filters.filter_count++] = k_filter;
@@ -482,16 +475,13 @@ int SetSportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
         return 0;
     for (int i = 0; i < config->mSourcePortBlackList.size(); i++) {
         uint32_t port = config->mSourcePortBlackList[i];
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "begin to update map in map for filter detail, idx: %d\n",
-                 idx);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
         uint8_t val = 0;
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][black] source port: %u\n", port);
         int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
         if (ret) {
-            ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[update failed][black] port map update failed! sport: %u\n",
-                     port);
+            ebpf_log(
+                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][black] port map update failed! sport: %u\n", port);
             continue;
         }
     }
@@ -509,9 +499,7 @@ int SetDportFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
     k_filter.op_type = OP_TYPE_IN;
     k_filter.map_idx[0] = idx;
     if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "filters count exceeded! max: %d\n",
-                 MAX_FILTER_FOR_PER_CALLNAME);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
         return 1;
     }
     filters.filters[filters.filter_count++] = k_filter;
@@ -520,16 +508,13 @@ int SetDportFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
         return 0;
     for (int i = 0; i < config->mDestPortList.size(); i++) {
         uint32_t port = config->mDestPortList[i];
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "begin to update map in map for filter detail, idx: %d\n",
-                 idx);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
         uint8_t val = 1;
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][white] dest port: %u\n", port);
         int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
         if (ret) {
-            ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[update failed][white] port map update failed! dport: %u\n",
-                     port);
+            ebpf_log(
+                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][white] port map update failed! dport: %u\n", port);
             continue;
         }
     }
@@ -548,9 +533,7 @@ int SetDportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
     k_filter.op_type = OP_TYPE_NOT_IN;
     k_filter.map_idx[0] = idx;
     if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "filters count exceeded! max: %d\n",
-                 MAX_FILTER_FOR_PER_CALLNAME);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
         return 1;
     }
     filters.filters[filters.filter_count++] = k_filter;
@@ -559,16 +542,13 @@ int SetDportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
         return 0;
     for (int i = 0; i < config->mDestPortBlackList.size(); i++) {
         uint32_t port = config->mDestPortBlackList[i];
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "begin to update map in map for filter detail, idx: %d\n",
-                 idx);
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
         uint8_t val = 0;
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][black] dest port: %u\n", port);
         int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
         if (ret) {
-            ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[update failed][black] port map update failed! dport: %u\n",
-                     port);
+            ebpf_log(
+                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][black] port map update failed! dport: %u\n", port);
             continue;
         }
     }
@@ -637,8 +617,7 @@ int CreateNetworkFilterForCallname(
     return ret;
 }
 
-int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
-                                   const std::string& call_name) {
+int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>> wrapper, const std::string& call_name) {
     std::vector<AttachProgOps> attach_ops = {AttachProgOps("kprobe_" + call_name, true)};
     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "DisableCallName %s\n", call_name.c_str());
 
@@ -651,9 +630,7 @@ int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>> wra
     ::memset(&kernel_filters, 0, sizeof(kernel_filters));
     ret = wrapper->LookupBPFHashMap("filter_map", &call_name_idx, &kernel_filters);
     if (ret) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "there is no filter for call name: %s\n",
-                 call_name.c_str());
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "there is no filter for call name: %s\n", call_name.c_str());
         return 0;
     }
 

@@ -15,15 +15,15 @@
 #include "NetworkSecurityManager.h"
 
 #include "common/MachineInfoUtil.h"
+#include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
-#include "common/NetworkUtil.h"
-#include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {
 namespace ebpf {
@@ -84,12 +84,9 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
                                               event->dport,
                                               event->net_ns);
     mCommonEventQueue.enqueue(std::move(evt));
-    LOG_DEBUG(sLogger, ("[record_network_event] pid", event->key.pid) ("ktime", event->key.ktime)
-        ("saddr", event->saddr)
-        ("daddr", event->daddr)
-        ("sport", event->sport)
-        ("dport", event->dport)
-    );
+    LOG_DEBUG(sLogger,
+              ("[record_network_event] pid", event->key.pid)("ktime", event->key.ktime)("saddr", event->saddr)(
+                  "daddr", event->daddr)("sport", event->sport)("dport", event->dport));
     return;
 }
 
@@ -98,23 +95,24 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& bas
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                std::shared_ptr<Timer> scheduler)
-    : AbstractManager(base, sourceManager, queue, scheduler), mAggregateTree(
-        4096,
-        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<NetworkEvent>& in) {
-            return std::make_unique<NetworkEventGroup>(in->mPid,
-                                                       in->mKtime,
-                                                       in->mProtocol,
-                                                       in->mFamily,
-                                                       in->mSaddr,
-                                                       in->mDaddr,
-                                                       in->mSport,
-                                                       in->mDport,
-                                                       in->mNetns);
-        }
-    ) {}
+    : AbstractManager(base, sourceManager, queue, scheduler),
+      mAggregateTree(
+          4096,
+          [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
+              base->mInnerEvents.emplace_back(std::move(other));
+          },
+          [this](const std::shared_ptr<NetworkEvent>& in) {
+              return std::make_unique<NetworkEventGroup>(in->mPid,
+                                                         in->mKtime,
+                                                         in->mProtocol,
+                                                         in->mFamily,
+                                                         in->mSaddr,
+                                                         in->mDaddr,
+                                                         in->mSport,
+                                                         in->mDport,
+                                                         in->mNetns);
+          }) {
+}
 
 int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     auto securityOpts = std::get_if<SecurityOptions*>(&options);
@@ -125,7 +123,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     mFlag = true;
 
-    mStartUid ++;
+    mStartUid++;
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
@@ -165,7 +163,8 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     }
                     // attach process tags
                     if (processTags.mInner.empty()) {
-                        LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid) ("ktime", group->mKtime));
+                        LOG_ERROR(sLogger,
+                                  ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                         return;
                     }
 
@@ -217,7 +216,6 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                         }
                     }
                 });
-                
             }
             {
                 std::lock_guard lk(mContextMutex);
@@ -239,7 +237,9 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
         [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
-                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+                LOG_WARNING(sLogger,
+                            ("stop schedule, invalid, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
+                                                                                                     this->mStartUid));
             }
             return isStop;
         },
@@ -292,13 +292,9 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto networkEvent = std::dynamic_pointer_cast<NetworkEvent>(event);
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)
-              ("ktime", event->mKtime)
-              ("saddr", networkEvent->mSaddr)
-              ("daddr", networkEvent->mDaddr)
-              ("sport", networkEvent->mSport)
-              ("dport", networkEvent->mDport)
-              ("eventType", magic_enum::enum_name(event->mEventType)));
+              ("receive event, pid", event->mPid)("ktime", event->mKtime)("saddr", networkEvent->mSaddr)(
+                  "daddr", networkEvent->mDaddr)("sport", networkEvent->mSport)("dport", networkEvent->mDport)(
+                  "eventType", magic_enum::enum_name(event->mEventType)));
     if (networkEvent == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to convert CommonEvent to NetworkEvent, kernel event type",

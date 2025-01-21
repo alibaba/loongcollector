@@ -14,10 +14,11 @@
 
 #include "ebpf/handler/ObserveHandler.h"
 
+#include <metadata/K8sMetadata.h>
+
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include <metadata/K8sMetadata.h>
 #include <unordered_set>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
@@ -50,7 +51,8 @@ namespace ebpf {
     }
 
 #define GENERATE_METRICS(FUNC_NAME, MEASURE_TYPE, INNER_TYPE, METRIC_NAME, FIELD_NAME) \
-    void FUNC_NAME(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t tsSec, uint64_t tsNano) { \
+    void FUNC_NAME( \
+        PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t tsSec, uint64_t tsNano) { \
         if (measure->type_ != (MEASURE_TYPE)) { \
             return; \
         } \
@@ -96,7 +98,8 @@ void OtelMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
             if (!mCtx) {
                 continue;
             }
-            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            std::unique_ptr<ProcessQueueItem> item
+                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
                 LOG_WARNING(
                     sLogger,
@@ -139,7 +142,9 @@ void OtelSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
 }
 
 void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
-    LOG_DEBUG(sLogger, ("enter", "handler") ("size", events.size()) ("ctx null", (mCtx == nullptr)) ("mQueueKey", static_cast<int64_t>(mQueueKey)) ("mPluginIdx", mPluginIdx));
+    LOG_DEBUG(sLogger,
+              ("enter", "handler")("size", events.size())("ctx null", (mCtx == nullptr))(
+                  "mQueueKey", static_cast<int64_t>(mQueueKey))("mPluginIdx", mPluginIdx));
     if (events.empty()) {
         return;
     }
@@ -173,11 +178,16 @@ void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEven
             if (!mCtx) {
                 continue;
             }
-            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            std::unique_ptr<ProcessQueueItem> item
+                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
+                LOG_WARNING(
+                    sLogger,
+                    ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
             } else {
-                LOG_DEBUG(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue success!", ""));
+                LOG_DEBUG(
+                    sLogger,
+                    ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue success!", ""));
             }
         }
     }
@@ -224,7 +234,10 @@ GENERATE_METRICS(GenerateRequestsDurationSumMetrics,
                  rpc_request_status_count,
                  duration_ms_sum_)
 
-void GenerateRequestsStatusMetrics(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t ts, uint64_t tsNano) {
+void GenerateRequestsStatusMetrics(PipelineEventGroup& group,
+                                   const std::unique_ptr<Measure>& measure,
+                                   uint64_t ts,
+                                   uint64_t tsNano) {
     if (measure->type_ != MeasureType::MEASURE_TYPE_APP) {
         return;
     }
@@ -312,16 +325,18 @@ void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
             if (!mCtx) {
                 continue;
             }
-            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            std::unique_ptr<ProcessQueueItem> item
+                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+                LOG_WARNING(
+                    sLogger,
+                    ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
             }
         }
     }
 }
 
-void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures,
-                              uint64_t tsSec) {
+void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t tsSec) {
     if (measures.empty()) {
         return;
     }
@@ -329,11 +344,10 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         ;
         PipelineEventGroup eventGroup(sourceBuffer);
-        LOG_DEBUG(sLogger, ("receive measures size", measures.size()) ("second", tsSec) 
-            ("app name", appBatchMeasures->app_name_)
-            ("app id", appBatchMeasures->app_id_)
-            ("ip", appBatchMeasures->ip_)
-            ("host", appBatchMeasures->host_));
+        LOG_DEBUG(
+            sLogger,
+            ("receive measures size", measures.size())("second", tsSec)("app name", appBatchMeasures->app_name_)(
+                "app id", appBatchMeasures->app_id_)("ip", appBatchMeasures->ip_)("host", appBatchMeasures->host_));
         eventGroup.SetTag(app_name_key, appBatchMeasures->app_name_);
         eventGroup.SetTag(app_id_key, appBatchMeasures->app_id_);
         eventGroup.SetTag(ip_key, appBatchMeasures->ip_);
@@ -368,9 +382,12 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
             if (!mCtx) {
                 continue;
             }
-            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            std::unique_ptr<ProcessQueueItem> item
+                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Metrics] push queue failed!", ""));
+                LOG_WARNING(
+                    sLogger,
+                    ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Metrics] push queue failed!", ""));
             }
         }
     }

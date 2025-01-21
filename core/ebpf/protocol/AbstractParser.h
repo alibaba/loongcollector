@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "ebpf/type/NetworkObserverEvent.h"
 
@@ -24,10 +24,10 @@ namespace ebpf {
 
 class AbstractProtocolParser {
 public:
-  virtual ~AbstractProtocolParser() = default;
-  virtual std::shared_ptr<AbstractProtocolParser> Create() = 0;
-  virtual std::vector<std::unique_ptr<AbstractRecord>> Parse(std::unique_ptr<NetDataEvent> data_event) = 0;
+    virtual ~AbstractProtocolParser() = default;
+    virtual std::shared_ptr<AbstractProtocolParser> Create() = 0;
+    virtual std::vector<std::unique_ptr<AbstractRecord>> Parse(std::unique_ptr<NetDataEvent> data_event) = 0;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

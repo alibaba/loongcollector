@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unordered_map>
-#include <atomic>
-#include <array>
-#include <map>
-#include <queue>
+#include "AggregatorManager.h"
+
 #include <chrono>
 
-#include "common/timer/Timer.h"
+#include <array>
+#include <atomic>
+#include <map>
+#include <queue>
+#include <unordered_map>
+
 #include "AggregateTree.h"
-#include "AggregatorManager.h"
+#include "common/timer/Timer.h"
 
 
 namespace logtail {
@@ -41,5 +43,5 @@ namespace ebpf {
 //     // mTimer.PushEvent();
 // }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

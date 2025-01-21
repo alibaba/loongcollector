@@ -25,8 +25,8 @@
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
-#include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
+#include "ebpf/type/ProcessEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "util/FrequencyManager.h"
 
@@ -36,7 +36,10 @@ namespace ebpf {
 class BaseManager {
 public:
     BaseManager() = delete;
-    BaseManager(std::shared_ptr<SourceManager> sm, const std::string& hostName, const std::string& hostPathPrefix, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    BaseManager(std::shared_ptr<SourceManager> sm,
+                const std::string& hostName,
+                const std::string& hostPathPrefix,
+                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
         : mSourceManager(sm),
           mCache(65535, 1024),
           mProcParser(hostPathPrefix),
@@ -66,9 +69,7 @@ public:
     std::string GenerateExecId(uint32_t pid, uint64_t ktime);
     std::string GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix> event);
 
-    void MarkProcessEventFlushStatus(bool isFlush) {
-        mFlushProcessEvent = isFlush;
-    }
+    void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
     SizedMap FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime);
 
@@ -95,7 +96,7 @@ private:
     // record execve event, used to update process cache ...
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<MsgExecveEventUnix>> mRecordQueue;
 
-    
+
     int mMaxBatchConsumeSize = 1024;
     int mMaxWaitTimeMS = 200;
 

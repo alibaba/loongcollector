@@ -3,7 +3,7 @@
 #include "Log.h"
 #include "ebpf/driver/coolbpf/src/security/type.h"
 
-namespace logtail { 
+namespace logtail {
 namespace ebpf {
 
 static inline int GetCallNameIdx(const std::string& call_name) {
@@ -27,5 +27,5 @@ static inline int GetCallNameIdx(const std::string& call_name) {
     return -1;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

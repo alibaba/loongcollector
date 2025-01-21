@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include <unordered_map>
-#include <atomic>
 #include <array>
+#include <atomic>
 #include <map>
 #include <queue>
+#include <unordered_map>
 
-#include "common/timer/Timer.h"
 #include "AggregateTree.h"
+#include "common/timer/Timer.h"
 #include "ebpf/type/table/DataTable.h"
 
 
@@ -32,9 +32,10 @@ namespace ebpf {
 class FixedInvervalEvent : public TimerEvent {
 public:
     using FlushFunc = std::function<void()>;
-    FixedInvervalEvent(int intervalSec, FlushFunc fn) 
-        : TimerEvent(std::chrono::steady_clock::now() + std::chrono::seconds(intervalSec)), 
-        mIntervalSec(intervalSec), mFunc(fn) {}
+    FixedInvervalEvent(int intervalSec, FlushFunc fn)
+        : TimerEvent(std::chrono::steady_clock::now() + std::chrono::seconds(intervalSec)),
+          mIntervalSec(intervalSec),
+          mFunc(fn) {}
 
     bool IsValid() const override { return mIsValid; }
     bool Execute() {
@@ -53,9 +54,10 @@ template <typename Data, typename Value, typename FlushType>
 class AggregatorManager {
 public:
     AggregatorManager(size_t max_nodes,
-            const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
-            const std::function<std::unique_ptr<Data>(const Value &n)> &generate, int interval_sec) 
-            : mTree(max_nodes, aggregate, generate), mIntervalSec(interval_sec) {}
+                      const std::function<void(std::unique_ptr<Data>&, const Value&)>& aggregate,
+                      const std::function<std::unique_ptr<Data>(const Value& n)>& generate,
+                      int interval_sec)
+        : mTree(max_nodes, aggregate, generate), mIntervalSec(interval_sec) {}
 
     ~AggregatorManager();
 
@@ -63,25 +65,21 @@ public:
         mTimer.PushEvent(std::make_unique<FixedInvervalEvent>(mIntervalSec, [&]() {
             // mTree.NodeCount();
             // 1. generate measurebatch ==> eventgroup
-            // 2. push to process queue ... 
+            // 2. push to process queue ...
             // 3. swap agg tree
             // mTimer.PushEvent();
         }));
     }
-    
+
     void Aggregate(const std::array<size_t, MaxAggregationLevel>& key, const Value& value) {
         mTree.Aggregate(key, value);
     }
 
-    void Flush() {
-        
-    }
+    void Flush() {}
 
     // AggregatorManager(const AggregatorManager&) = delete;
     // AggregatorManager& operator=(const AggregatorManager&) = delete;
 private:
-    
-
     Timer mTimer;
     // volatile bool mInited = false;
     SIZETAggTree<Data, Value> mTree;
@@ -89,6 +87,5 @@ private:
 };
 
 
-
-}
-}
+} // namespace ebpf
+} // namespace logtail

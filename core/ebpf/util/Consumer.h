@@ -15,13 +15,14 @@
 
 #pragma once
 
-#include <iostream>
-#include <vector>
-#include <thread>
+#include <chrono>
+
 #include <atomic>
 #include <condition_variable>
+#include <iostream>
 #include <mutex>
-#include <chrono>
+#include <thread>
+#include <vector>
 
 #include "common/queue/blockingconcurrentqueue.h"
 #include "logger/Logger.h"
@@ -34,14 +35,22 @@ class Consumer {
 public:
     using TaskFunc = std::function<void()>;
     using ProcessFunc = std::function<bool(const std::vector<T>&, size_t)>;
-    Consumer(moodycamel::BlockingConcurrentQueue<T>& queue, std::chrono::milliseconds maxWaitTime, const ProcessFunc& func)
+    Consumer(moodycamel::BlockingConcurrentQueue<T>& queue,
+             std::chrono::milliseconds maxWaitTime,
+             const ProcessFunc& func)
         : mQueue(queue), mMaxWaitTime(maxWaitTime), mStopFlag(false), mSuspendFlag(false), mProcessFunc(func) {}
-    Consumer(moodycamel::BlockingConcurrentQueue<T>& queue, std::chrono::milliseconds maxWaitTime, const TaskFunc& tfunc, const ProcessFunc& pfunc)
-        : mQueue(queue), mMaxWaitTime(maxWaitTime), mStopFlag(false), mSuspendFlag(false), mTaskFunc(tfunc), mProcessFunc(pfunc) {}
+    Consumer(moodycamel::BlockingConcurrentQueue<T>& queue,
+             std::chrono::milliseconds maxWaitTime,
+             const TaskFunc& tfunc,
+             const ProcessFunc& pfunc)
+        : mQueue(queue),
+          mMaxWaitTime(maxWaitTime),
+          mStopFlag(false),
+          mSuspendFlag(false),
+          mTaskFunc(tfunc),
+          mProcessFunc(pfunc) {}
 
-    void start() {
-        mWorker = std::thread(&Consumer::run, this);
-    }
+    void start() { mWorker = std::thread(&Consumer::run, this); }
 
     void stop() {
         {
@@ -75,14 +84,14 @@ private:
                 mCv.wait(lock, [this] { return !mSuspendFlag || mStopFlag; });
             }
 
-            if (mStopFlag) break;
-            // attention: what if suspend flag is changed now ... 
+            if (mStopFlag)
+                break;
+            // attention: what if suspend flag is changed now ...
 
             LOG_INFO(sLogger, ("begin run task func", ""));
             if (mTaskFunc) {
                 mTaskFunc();
             }
-            
         }
     }
     void run() {
@@ -93,7 +102,8 @@ private:
                 mCv.wait(lock, [this] { return !mSuspendFlag || mStopFlag; });
             }
 
-            if (mStopFlag) break;
+            if (mStopFlag)
+                break;
 
             LOG_INFO(sLogger, ("begin process", ""));
             size_t numItemsDequeued = mQueue.wait_dequeue_bulk_timed(items.begin(), items.size(), mMaxWaitTime);
@@ -117,5 +127,5 @@ private:
 #endif
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

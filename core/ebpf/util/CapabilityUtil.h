@@ -12,7 +12,5 @@ namespace ebpf {
 
 // std::string GetCapability(int32_t capInt);
 
-}
-}
-
-
+} // namespace ebpf
+} // namespace logtail

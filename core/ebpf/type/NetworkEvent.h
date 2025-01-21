@@ -2,25 +2,32 @@
 
 #include <cstdint>
 #include <stddef.h>
+
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
-#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 #include "CommonDataEvent.h"
+#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 
 namespace logtail {
 namespace ebpf {
 
 class NetworkEvent : public CommonEvent {
 public:
-    NetworkEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, uint16_t protocol,
-                        uint16_t family,
-                        uint32_t saddr,
-                        uint32_t daddr,
-                        uint16_t sport,
-                        uint16_t dport,
-                        uint32_t net_ns) : CommonEvent(pid,ktime,type,timestamp), mProtocol(protocol),
+    NetworkEvent(uint32_t pid,
+                 uint64_t ktime,
+                 KernelEventType type,
+                 uint64_t timestamp,
+                 uint16_t protocol,
+                 uint16_t family,
+                 uint32_t saddr,
+                 uint32_t daddr,
+                 uint16_t sport,
+                 uint16_t dport,
+                 uint32_t net_ns)
+        : CommonEvent(pid, ktime, type, timestamp),
+          mProtocol(protocol),
           mFamily(family),
           mSport(sport),
           mDport(dport),
@@ -39,13 +46,18 @@ public:
 
 class NetworkEventGroup {
 public:
-    NetworkEventGroup(uint32_t pid, uint64_t ktime, uint16_t protocol,
-                        uint16_t family,
-                        uint32_t saddr,
-                        uint32_t daddr,
-                        uint16_t sport,
-                        uint16_t dport,
-                        uint32_t net_ns) : mPid(pid), mKtime(ktime), mProtocol(protocol),
+    NetworkEventGroup(uint32_t pid,
+                      uint64_t ktime,
+                      uint16_t protocol,
+                      uint16_t family,
+                      uint32_t saddr,
+                      uint32_t daddr,
+                      uint16_t sport,
+                      uint16_t dport,
+                      uint32_t net_ns)
+        : mPid(pid),
+          mKtime(ktime),
+          mProtocol(protocol),
           mFamily(family),
           mSport(sport),
           mDport(dport),
@@ -65,5 +77,5 @@ public:
     std::vector<std::shared_ptr<NetworkEvent>> mInnerEvents;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

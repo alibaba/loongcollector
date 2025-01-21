@@ -2,12 +2,13 @@
 
 #include <cstdint>
 #include <stddef.h>
+
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
-#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 #include "CommonDataEvent.h"
+#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 
 namespace logtail {
 namespace ebpf {
@@ -133,50 +134,52 @@ public:
 
 struct Procs {
 public:
-  uint32_t psize;
-  uint32_t ppid;
-  uint32_t pnspid;
-  uint32_t pflags;
-  uint64_t pktime;
-  std::string pcmdline;
-  std::string pexe;
-  uint32_t size;
-  std::vector<uint32_t> uids;
-  std::vector<uint32_t> gids;
-  uint32_t pid;
-  uint32_t tid;
-  uint32_t nspid;
-  uint32_t auid;
-  uint32_t flags;
-  uint64_t ktime;
-  std::string cmdline;
-  std::string exe;
-  uint64_t effective;
-  uint64_t inheritable;
-  uint64_t permitted;
-  uint32_t uts_ns;
-  uint32_t ipc_ns;
-  uint32_t mnt_ns;
-  uint32_t pid_ns;
-  uint32_t pid_for_children_ns;
-  uint32_t net_ns;
-  uint32_t time_ns;
-  uint32_t time_for_children_ns;
-  uint32_t cgroup_ns;
-  uint32_t user_ns;
-  bool kernel_thread;
+    uint32_t psize;
+    uint32_t ppid;
+    uint32_t pnspid;
+    uint32_t pflags;
+    uint64_t pktime;
+    std::string pcmdline;
+    std::string pexe;
+    uint32_t size;
+    std::vector<uint32_t> uids;
+    std::vector<uint32_t> gids;
+    uint32_t pid;
+    uint32_t tid;
+    uint32_t nspid;
+    uint32_t auid;
+    uint32_t flags;
+    uint64_t ktime;
+    std::string cmdline;
+    std::string exe;
+    uint64_t effective;
+    uint64_t inheritable;
+    uint64_t permitted;
+    uint32_t uts_ns;
+    uint32_t ipc_ns;
+    uint32_t mnt_ns;
+    uint32_t pid_ns;
+    uint32_t pid_for_children_ns;
+    uint32_t net_ns;
+    uint32_t time_ns;
+    uint32_t time_for_children_ns;
+    uint32_t cgroup_ns;
+    uint32_t user_ns;
+    bool kernel_thread;
 };
 
 class ProcessEvent : public CommonEvent {
 public:
-    ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : CommonEvent(pid,ktime,type,timestamp) {}
+    ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
+        : CommonEvent(pid, ktime, type, timestamp) {}
     virtual PluginType GetPluginType() const { return PluginType::PROCESS_SECURITY; };
 };
 
 class ProcessExitEvent : public ProcessEvent {
 public:
-    ProcessExitEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, uint32_t exitCode, uint32_t exitTid) 
-        : ProcessEvent(pid,ktime,type,timestamp), mExitCode(exitCode), mExitTid(exitTid) {}
+    ProcessExitEvent(
+        uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, uint32_t exitCode, uint32_t exitTid)
+        : ProcessEvent(pid, ktime, type, timestamp), mExitCode(exitCode), mExitTid(exitTid) {}
     uint32_t mExitCode;
     uint32_t mExitTid;
 };
@@ -190,5 +193,5 @@ public:
     std::vector<std::shared_ptr<ProcessEvent>> mInnerEvents;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

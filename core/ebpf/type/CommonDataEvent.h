@@ -37,7 +37,8 @@ enum class KernelEventType {
 class CommonEvent {
 public:
     ~CommonEvent() {}
-    explicit CommonEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp) : mPid(pid), mKtime(ktime), mEventType(type), mTimestamp(timestamp) {}
+    explicit CommonEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
+        : mPid(pid), mKtime(ktime), mEventType(type), mTimestamp(timestamp) {}
     virtual PluginType GetPluginType() const = 0;
     virtual KernelEventType GetKernelEventType() const { return mEventType; };
     uint32_t mPid;
@@ -49,5 +50,5 @@ private:
 };
 
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

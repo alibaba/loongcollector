@@ -13,18 +13,22 @@
 // limitations under the License.
 
 #include "ebpf/handler/HostMetadataHandler.h"
-#include "ebpf/include/export.h"
+
+#include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
+#include "ebpf/include/export.h"
+#include "metadata/K8sMetadata.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
-#include "metadata/K8sMetadata.h"
-#include "common/magic_enum.hpp"
 
 namespace logtail {
 namespace ebpf {
 
-HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec)
+HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx,
+                                         QueueKey key,
+                                         uint32_t idx,
+                                         int intervalSec)
     : AbstractHandler(ctx, key, idx), mIntervalSec(intervalSec) {
     mFlag = true;
     // TODO @qianlu.kk we need to move this into start function
@@ -48,19 +52,22 @@ const std::string dataTypeKey = "data_type";
 const std::string agentInfoStr = "agent_info";
 
 void HostMetadataHandler::ReportAgentInfo() {
-    while(mFlag) {
+    while (mFlag) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         eventGroup.SetTag(dataTypeKey, agentInfoStr);
-        auto nowSec = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        auto nowSec
+            = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                  .count();
         {
             ReadLock lk(mLock);
             for (const auto& [ip, spi] : mHostPods) {
                 // generate agentinfo
                 // per min
-                LOG_DEBUG(sLogger, ("AGENT_INFO appid", spi->mAppId)
-                    ("appname", spi->mAppName)
-                    ("ip", spi->mPodIp) ("hostname", spi->mPodName) ("agentVersion", "1.0.0") ("startTs", std::to_string(spi->mStartTime)));
+                LOG_DEBUG(sLogger,
+                          ("AGENT_INFO appid", spi->mAppId)("appname", spi->mAppName)("ip", spi->mPodIp)(
+                              "hostname", spi->mPodName)("agentVersion", "1.0.0")("startTs",
+                                                                                  std::to_string(spi->mStartTime)));
                 auto logEvent = eventGroup.AddLogEvent();
                 logEvent->SetContent(pidKey, spi->mAppId);
                 logEvent->SetContent(appNameKey, spi->mAppName);
@@ -86,7 +93,8 @@ void HostMetadataHandler::ReportAgentInfo() {
                 continue;
             }
 
-            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            std::unique_ptr<ProcessQueueItem> item
+                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
             auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
             if (res == QueueStatus::OK) {
                 LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", magic_enum::enum_name(res)));
@@ -118,13 +126,12 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
             continue;
         }
 
-        std::unique_ptr<SimplePodInfo> spi = std::make_unique<SimplePodInfo>(
-            uint64_t(podInfo->timestamp), 
-            podInfo->appId,
-            podInfo->appName,
-            podInfo->podIp, 
-            podInfo->podName,
-            podInfo->containerIds);
+        std::unique_ptr<SimplePodInfo> spi = std::make_unique<SimplePodInfo>(uint64_t(podInfo->timestamp),
+                                                                             podInfo->appId,
+                                                                             podInfo->appName,
+                                                                             podInfo->podIp,
+                                                                             podInfo->podName,
+                                                                             podInfo->containerIds);
         currentHostPods[ip] = std::move(spi);
         std::string cids;
         for (auto& cid : podInfo->containerIds) {
@@ -135,10 +142,14 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
                 addedContainers.push_back(cid);
             }
         }
-        LOG_DEBUG(sLogger, ("appId", podInfo->appId) ("appName", podInfo->appName) ("podIp", podInfo->podIp) ("podName", podInfo->podName) ("containerId", cids));
+        LOG_DEBUG(sLogger,
+                  ("appId", podInfo->appId)("appName", podInfo->appName)("podIp", podInfo->podIp)(
+                      "podName", podInfo->podName)("containerId", cids));
     }
 
-    LOG_DEBUG(sLogger, ("begin to update local host metadata, pod list size:", newPodIps.size()) ("input pod list size", podIpVec.size()) ("host pod list size", mHostPods.size()));
+    LOG_DEBUG(sLogger,
+              ("begin to update local host metadata, pod list size:",
+               newPodIps.size())("input pod list size", podIpVec.size())("host pod list size", mHostPods.size()));
 
     for (auto& cid : mCids) {
         if (!currentContainers.count(cid)) {
@@ -152,7 +163,7 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
 
     {
         WriteLock lk(mLock);
-        // update cache ... 
+        // update cache ...
         mHostPods = std::move(currentHostPods);
     }
 
@@ -179,16 +190,16 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
         ops.mEnableCids = addedContainers;
         ops.mEnableCidFilter = true;
         bool ret = mUpdateFunc(PluginType::NETWORK_OBSERVE, &ops);
-        LOG_DEBUG(sLogger, ("after update, self pod list size", mHostPods.size()) 
-            ("add cids", addPodsStr) 
-            ("remove cids", removePodsStr) 
-            ("host pods ip", hostPodsStr) 
-            ("ret", ret) ("ops.mEnableCids.size", ops.mEnableCids.size()) ("ops.mDisableCids.size", ops.mDisableCids.size()));
+        LOG_DEBUG(sLogger,
+                  ("after update, self pod list size",
+                   mHostPods.size())("add cids", addPodsStr)("remove cids", removePodsStr)("host pods ip", hostPodsStr)(
+                      "ret", ret)("ops.mEnableCids.size", ops.mEnableCids.size())("ops.mDisableCids.size",
+                                                                                  ops.mDisableCids.size()));
         return ret;
-    }    
+    }
 
     return true;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

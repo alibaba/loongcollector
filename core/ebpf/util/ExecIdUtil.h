@@ -22,4 +22,4 @@ namespace ebpf {
 // std::string GenerateExecId(const std::string& host_name_, uint32_t pid, uint64_t ktime);
 
 }
-}
+} // namespace logtail

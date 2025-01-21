@@ -283,7 +283,7 @@ public:
     void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
 
     virtual std::string GetReqBody() = 0;
-    virtual std::string GetRespBody() =0 ;
+    virtual std::string GetRespBody() = 0;
     virtual std::string GetMethod() = 0;
     virtual HeadersMap GetReqHeaderMap() = 0;
     virtual HeadersMap GetRespHeaderMap() = 0;
@@ -339,7 +339,7 @@ public:
     HeadersMap GetRespHeaderMap() { return resp_header_map; }
     std::string GetProtocolVersion() { return protocol_version; }
     std::string GetPath() { return path_; }
-    std::string GetRealPaht() { return real_path_;}
+    std::string GetRealPaht() { return real_path_; }
     std::string GetSpanName() override { return path_; }
 
 private:
@@ -369,7 +369,7 @@ class AppMetricData : public MetricData {
 public:
     AppMetricData(const ConnId& connId, const std::string& spanName) : MetricData(connId), mSpanName(spanName) {}
     ~AppMetricData() {}
-    
+
     uint64_t mCount = 0;
     double mSum = 0;
     uint64_t mSlowCount = 0;
@@ -378,7 +378,7 @@ public:
     uint64_t m3xxCount = 0;
     uint64_t m4xxCount = 0;
     uint64_t m5xxCount = 0;
-    
+
     std::string mAppId;
     std::string mAppName;
     std::string mHost;

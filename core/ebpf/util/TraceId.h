@@ -15,8 +15,8 @@
 #pragma once
 
 #include <array>
-#include <random>
 #include <memory>
+#include <random>
 
 namespace logtail {
 namespace ebpf {
@@ -28,5 +28,5 @@ std::array<uint8_t, 16> GenerateSpanID();
 std::string FromSpanId(const std::array<uint8_t, 16>&);
 
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

@@ -25,39 +25,35 @@ namespace ebpf {
 
 class ProtocolParserRegistry {
 public:
-  using CreatorFunc = std::function<std::shared_ptr<AbstractProtocolParser>()>;
+    using CreatorFunc = std::function<std::shared_ptr<AbstractProtocolParser>()>;
 
-  static ProtocolParserRegistry& instance() {
-    static ProtocolParserRegistry registry;
-    return registry;
-  }
-
-  void registerParser(ProtocolType type, CreatorFunc creator) {
-    registry_[type] = std::move(creator);
-  }
-
-  std::shared_ptr<AbstractProtocolParser> createParser(ProtocolType type) {
-    if (registry_.find(type) != registry_.end()) {
-      return registry_[type]();
+    static ProtocolParserRegistry& instance() {
+        static ProtocolParserRegistry registry;
+        return registry;
     }
-    return nullptr;
-  }
+
+    void registerParser(ProtocolType type, CreatorFunc creator) { registry_[type] = std::move(creator); }
+
+    std::shared_ptr<AbstractProtocolParser> createParser(ProtocolType type) {
+        if (registry_.find(type) != registry_.end()) {
+            return registry_[type]();
+        }
+        return nullptr;
+    }
 
 private:
-  ProtocolParserRegistry() = default;
-  std::unordered_map<ProtocolType, CreatorFunc> registry_;
+    ProtocolParserRegistry() = default;
+    std::unordered_map<ProtocolType, CreatorFunc> registry_;
 };
 
 #define REGISTER_PROTOCOL_PARSER(type, className) \
     namespace { \
-        struct className##AutoRegister { \
-            className##AutoRegister() { \
-                ProtocolParserRegistry::instance().registerParser(type, []() { \
-                    return std::make_shared<className>(); \
-                }); \
-            } \
-        }; \
-        static className##AutoRegister global_##className##AutoRegister_instance; \
+    struct className##AutoRegister { \
+        className##AutoRegister() { \
+            ProtocolParserRegistry::instance().registerParser(type, []() { return std::make_shared<className>(); }); \
+        } \
+    }; \
+    static className##AutoRegister global_##className##AutoRegister_instance; \
     }
-}
-}
+} // namespace ebpf
+} // namespace logtail

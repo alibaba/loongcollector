@@ -80,18 +80,19 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
 }
 
 FileSecurityManager::FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
-                        std::shared_ptr<SourceManager> sourceManager,
-                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        std::shared_ptr<Timer> scheduler)
-    : AbstractManager(baseMgr, sourceManager, queue, scheduler), mAggregateTree(
-        4096,
-        [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<FileEvent>& in) {
-            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
-        }
-    ) {}
+                                         std::shared_ptr<SourceManager> sourceManager,
+                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         std::shared_ptr<Timer> scheduler)
+    : AbstractManager(baseMgr, sourceManager, queue, scheduler),
+      mAggregateTree(
+          4096,
+          [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
+              base->mInnerEvents.emplace_back(std::move(other));
+          },
+          [this](const std::shared_ptr<FileEvent>& in) {
+              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+          }) {
+}
 
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     // set init flag ...
@@ -134,7 +135,8 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
                         init = true;
                     }
                     if (processTags.mInner.empty()) {
-                        LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid) ("ktime", group->mKtime));
+                        LOG_ERROR(sLogger,
+                                  ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                         return;
                     }
 
@@ -192,7 +194,9 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
         [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
-                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+                LOG_WARNING(sLogger,
+                            ("stop schedule, invalid, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
+                                                                                                     this->mStartUid));
             }
             return isStop;
         },
@@ -233,8 +237,8 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto fileEvent = std::dynamic_pointer_cast<FileEvent>(event);
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)("eventType",
-                                                                          magic_enum::enum_name(event->mEventType)));
+              ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(
+                  "eventType", magic_enum::enum_name(event->mEventType)));
     if (fileEvent == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to convert CommonEvent to FileEvent, kernel event type",

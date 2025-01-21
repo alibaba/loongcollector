@@ -14,23 +14,23 @@
 
 #pragma once
 
-#include <unordered_map>
-#include <atomic>
 #include <array>
-#include <set>
-#include <queue>
+#include <atomic>
 #include <condition_variable>
+#include <queue>
+#include <set>
+#include <unordered_map>
 
-#include "ebpf/SourceManager.h"
 #include "BaseManager.h"
-#include "ebpf/Config.h"
 #include "common/Lock.h"
-#include "ebpf/include/export.h"
-#include "ebpf/util/AggregateTree.h"
-#include "ebpf/type/SecurityEvent.h"
-#include "common/timer/Timer.h"
-#include "ebpf/type/CommonDataEvent.h"
 #include "common/magic_enum.hpp"
+#include "common/timer/Timer.h"
+#include "ebpf/Config.h"
+#include "ebpf/SourceManager.h"
+#include "ebpf/include/export.h"
+#include "ebpf/type/CommonDataEvent.h"
+#include "ebpf/type/SecurityEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
 // #include "driver/bpf_wrapper.h"
 // #include "common/agg_tree.h"
@@ -41,10 +41,13 @@ namespace ebpf {
 
 class AbstractManager {
 public:
-    using configType = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter,
-                     logtail::ebpf::SecurityNetworkFilter>;
+    using configType
+        = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter, logtail::ebpf::SecurityNetworkFilter>;
     AbstractManager() = delete;
-    explicit AbstractManager(std::shared_ptr<BaseManager>, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
+    explicit AbstractManager(std::shared_ptr<BaseManager>,
+                             std::shared_ptr<SourceManager> sourceManager,
+                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                             std::shared_ptr<Timer> scheduler);
     virtual ~AbstractManager() {}
 
     virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
@@ -98,7 +101,8 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
+    virtual std::unique_ptr<PluginConfig>
+    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
 
     virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
         bool ret = mSourceManager->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
@@ -133,8 +137,8 @@ public:
 private:
     mutable ReadWriteLock mBaseMgrLock;
     std::shared_ptr<BaseManager> mBaseManager;
+
 protected:
-    
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<Timer> mScheduler;
@@ -152,5 +156,5 @@ protected:
     int mStartUid = 0;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

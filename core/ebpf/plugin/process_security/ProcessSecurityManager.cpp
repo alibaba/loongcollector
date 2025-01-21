@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ProcessSecurityManager.h"
+
 #include <memory>
 #include <mutex>
 #include <thread>
 
-#include "ebpf/driver/coolbpf/src/security/type.h"
+#include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
+#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
 #include "ebpf/type/NetworkObserverEvent.h"
-#include "ProcessSecurityManager.h"
-#include "common/magic_enum.hpp"
 #include "ebpf/type/PeriodicalEvent.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
@@ -32,17 +33,19 @@
 namespace logtail {
 namespace ebpf {
 
-ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, 
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
-        : AbstractManager(baseMgr, sourceManager, queue, scheduler), mAggregateTree(
-            4096, 
-            [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
-                base->mInnerEvents.emplace_back(std::move(other));
-            }, 
-            [this](const std::shared_ptr<ProcessEvent>& in) {
-                return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
-            }) {
-    
+ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+                                               std::shared_ptr<SourceManager> sourceManager,
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               std::shared_ptr<Timer> scheduler)
+    : AbstractManager(baseMgr, sourceManager, queue, scheduler),
+      mAggregateTree(
+          4096,
+          [this](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<ProcessEvent>& other) {
+              base->mInnerEvents.emplace_back(std::move(other));
+          },
+          [this](const std::shared_ptr<ProcessEvent>& in) {
+              return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
+          }) {
 }
 
 int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>) {
@@ -51,14 +54,15 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
     mFlag = true;
     mSuspendFlag = false;
 
-    mStartUid ++;
+    mStartUid++;
     auto bm = GetBaseManager();
     if (bm == nullptr) {
         LOG_WARNING(sLogger, ("basemanager is null", ""));
         return 1;
     }
     bm->MarkProcessEventFlushStatus(true);
-    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
+    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
+        2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             if (!this->mFlag || this->mSuspendFlag) {
                 return false;
@@ -82,7 +86,6 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                 LOG_DEBUG(sLogger, ("child num", node->child.size()));
                 // convert to a item and push to process queue
                 aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-                    
                     SizedMap processTags;
                     // represent a process ...
                     auto bm = GetBaseManager();
@@ -92,7 +95,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                     }
                     processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
                     if (processTags.mInner.empty()) {
-                        LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid) ("ktime", group->mKtime));
+                        LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                         return;
                     }
                     for (auto innerEvent : group->mInnerEvents) {
@@ -103,32 +106,31 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         logEvent->SetTimestamp(seconds.count(), ts);
-                        switch (innerEvent->mEventType)
-                        {
-                        case KernelEventType::PROCESS_EXECVE_EVENT:{
-                            logEvent->SetContent("call_name", std::string("execve"));
-                            logEvent->SetContent("event_type", std::string("execve"));
-                            break;
-                        }
-                        case KernelEventType::PROCESS_EXIT_EVENT:{
-                            auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
-                            if (exitEvent == nullptr) {
-                                LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
-                                continue;
+                        switch (innerEvent->mEventType) {
+                            case KernelEventType::PROCESS_EXECVE_EVENT: {
+                                logEvent->SetContent("call_name", std::string("execve"));
+                                logEvent->SetContent("event_type", std::string("execve"));
+                                break;
                             }
-                            logEvent->SetContent("call_name", std::string("exit"));
-                            logEvent->SetContent("event_type", std::string("kprobe"));
-                            logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
-                            logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
-                            break;
-                        }
-                        case KernelEventType::PROCESS_CLONE_EVENT:{
-                            logEvent->SetContent("call_name", std::string("clone"));
-                            logEvent->SetContent("event_type", std::string("kprobe"));
-                            break;
-                        }
-                        default:
-                            break;
+                            case KernelEventType::PROCESS_EXIT_EVENT: {
+                                auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
+                                if (exitEvent == nullptr) {
+                                    LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
+                                    continue;
+                                }
+                                logEvent->SetContent("call_name", std::string("exit"));
+                                logEvent->SetContent("event_type", std::string("kprobe"));
+                                logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
+                                logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
+                                break;
+                            }
+                            case KernelEventType::PROCESS_CLONE_EVENT: {
+                                logEvent->SetContent("call_name", std::string("clone"));
+                                logEvent->SetContent("event_type", std::string("kprobe"));
+                                break;
+                            }
+                            default:
+                                break;
                         }
                     }
                 });
@@ -139,26 +141,28 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                     return true;
                 }
                 LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-                std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                std::unique_ptr<ProcessQueueItem> item
+                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
                 if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                    LOG_WARNING(sLogger, 
-                        ("configName", mPipelineCtx->GetConfigName())
-                        ("pluginIdx", this->mPluginIndex)
-                        ("[ProcessSecurityEvent] push queue failed!", ""));
+                    LOG_WARNING(sLogger,
+                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                    "[ProcessSecurityEvent] push queue failed!", ""));
                 }
             }
             aggTree.Clear();
-            
+
             return true;
-        }, [this](int currentUid) { // validator
+        },
+        [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
-                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+                LOG_WARNING(sLogger,
+                            ("stop schedule, invalid, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
+                                                                                                     this->mStartUid));
             }
             return isStop;
         },
-        mStartUid
-    );
+        mStartUid);
 
     mScheduler->PushEvent(std::move(event));
 
@@ -184,25 +188,24 @@ std::array<size_t, 1> GenerateAggKey(const std::shared_ptr<ProcessEvent> event) 
 
     std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr) {
-        hash_result[0] ^= hasher(x) +
-                                0x9e3779b9 +
-                                (hash_result[0] << 6) +
-                                (hash_result[0] >> 2);
+        hash_result[0] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
     }
     return hash_result;
 }
 
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto processEvent = std::dynamic_pointer_cast<ProcessEvent>(event);
-    LOG_DEBUG(sLogger, ("receive event, pid", event->mPid) ("ktime", event->mKtime) ("eventType", magic_enum::enum_name(event->mEventType)));
+    LOG_DEBUG(sLogger,
+              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
+                                                                          magic_enum::enum_name(event->mEventType)));
     if (processEvent == nullptr) {
-        LOG_ERROR(sLogger, ("failed to convert CommonEvent to ProcessEvent, kernel event type", 
-            magic_enum::enum_name(event->GetKernelEventType()))
-            ("PluginType", magic_enum::enum_name(event->GetPluginType()))
-        );
+        LOG_ERROR(sLogger,
+                  ("failed to convert CommonEvent to ProcessEvent, kernel event type",
+                   magic_enum::enum_name(event->GetKernelEventType()))("PluginType",
+                                                                       magic_enum::enum_name(event->GetPluginType())));
         return 1;
     }
-    
+
     // calculate agg key
     std::array<size_t, 1> hash_result = GenerateAggKey(processEvent);
     {
@@ -214,5 +217,5 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     return 0;
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

@@ -14,9 +14,9 @@
 
 #pragma once
 
+#include "ebpf/Config.h"
 #include "ebpf/handler/AbstractHandler.h"
 #include "ebpf/include/export.h"
-#include "ebpf/Config.h"
 
 namespace logtail {
 namespace ebpf {
@@ -24,12 +24,13 @@ namespace ebpf {
 
 class SimplePodInfo {
 public:
-    SimplePodInfo(uint64_t startTime, 
-        const std::string& appId, 
-        const std::string& appName, 
-        const std::string& podIp, 
-        const std::string& podName, 
-        std::vector<std::string>& cids) : mStartTime(startTime), mAppId(appId), mAppName(appName), mPodIp(podIp), mPodName(podName) {}
+    SimplePodInfo(uint64_t startTime,
+                  const std::string& appId,
+                  const std::string& appName,
+                  const std::string& podIp,
+                  const std::string& podName,
+                  std::vector<std::string>& cids)
+        : mStartTime(startTime), mAppId(appId), mAppName(appName), mPodIp(podIp), mPodName(podName) {}
 
     uint64_t mStartTime;
     std::string mAppId;
@@ -41,13 +42,15 @@ public:
 
 class HostMetadataHandler : public AbstractHandler {
 public:
-    using UpdatePluginCallbackFunc = std::function<bool(PluginType, /*UpdataType updateType, */const std::variant<SecurityOptions*, ObserverNetworkOption*>)>;
+    using UpdatePluginCallbackFunc = std::function<bool(
+        PluginType, /*UpdataType updateType, */ const std::variant<SecurityOptions*, ObserverNetworkOption*>)>;
     HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
     ~HostMetadataHandler();
     void RegisterUpdatePluginCallback(UpdatePluginCallbackFunc&& fn) { mUpdateFunc = fn; }
     void DegisterUpdatePluginCallback() { mUpdateFunc = nullptr; }
     bool handle(uint32_t pluginIndex, std::vector<std::string>& podIpVec);
     void ReportAgentInfo();
+
 private:
     // key is podIp, value is cids
     std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> mHostPods;
@@ -59,5 +62,5 @@ private:
     UpdatePluginCallbackFunc mUpdateFunc = nullptr;
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

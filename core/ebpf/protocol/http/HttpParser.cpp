@@ -52,7 +52,7 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::uniq
                 result.req_path = "/";
             }
             record->SetPath(result.req_path);
-            
+
             record->SetReqBody(result.body);
             record->SetMethod(result.req_method);
             record->SetProtocolVersion("http1." + std::to_string(result.minor_version));

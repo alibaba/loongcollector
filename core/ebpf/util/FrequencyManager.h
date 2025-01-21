@@ -43,5 +43,5 @@ private:
     // The count of expired cycle so far.
     uint32_t mCount = 0;
 };
-}
-}
+} // namespace ebpf
+} // namespace logtail

@@ -178,8 +178,7 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
     mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)]
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
-    mFuncs[static_cast<int>(ebpf_func::EBPF_MAP_UPDATE_ELEM)]
-        = LOAD_EBPF_FUNC_ADDR(update_bpf_map_elem);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_MAP_UPDATE_ELEM)] = LOAD_EBPF_FUNC_ADDR(update_bpf_map_elem);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
@@ -305,8 +304,7 @@ int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents
     return poll_func(plugin_type, maxEvents, flag, timeoutMs);
 }
 
-bool SourceManager::StartPlugin(PluginType plugin_type,
-                                std::unique_ptr<PluginConfig> conf) {
+bool SourceManager::StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
     if (CheckPluginRunning(plugin_type)) {
         // plugin update ...
         return UpdatePlugin(plugin_type, std::move(conf));
@@ -360,8 +358,7 @@ bool SourceManager::ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginC
     return !res;
 }
 
-bool SourceManager::UpdatePlugin(PluginType plugin_type,
-                                 std::unique_ptr<PluginConfig> conf) {
+bool SourceManager::UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(plugin_type)) {
         LOG_ERROR(sLogger, ("plugin not started, type", int(plugin_type)));
         return false;
@@ -417,7 +414,8 @@ bool SourceManager::StopPlugin(PluginType plugin_type) {
     return !res;
 }
 
-bool SourceManager::BPFMapUpdateElem(PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag) {
+bool SourceManager::BPFMapUpdateElem(
+    PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag) {
     if (!CheckPluginRunning(plugin_type)) {
         LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
         return true;

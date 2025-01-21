@@ -48,5 +48,4 @@ void set_networkobserver_cid_filter(const char* container_id, size_t length, boo
 
 // oprations
 int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
-
 }

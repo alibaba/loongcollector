@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ExecIdUtil.h"
+
 #include <string>
 
-#include "ExecIdUtil.h"
 #include "common/EncodingUtil.h"
 
 namespace logtail {
@@ -26,5 +27,5 @@ std::string GenerateExecId(const std::string& host_name_, uint32_t pid, uint64_t
 }
 
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

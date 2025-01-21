@@ -23,10 +23,10 @@
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
+#include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
-#include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail {
 namespace ebpf {
@@ -43,7 +43,7 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, 
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::shared_ptr<Timer> scheduler) {
         return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, scheduler);
     }
@@ -51,17 +51,17 @@ public:
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() { Destroy(); }
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
-    explicit NetworkObserverManager(
-        std::shared_ptr<BaseManager>& baseMgr,
-        std::shared_ptr<SourceManager> sourceManager,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+    explicit NetworkObserverManager(std::shared_ptr<BaseManager>& baseMgr,
+                                    std::shared_ptr<SourceManager> sourceManager,
+                                    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                    std::shared_ptr<Timer> scheduler)
         : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override {return 0;}
+    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override { return 0; }
 
     virtual int PollPerfBuffer() override { return 0; }
 
@@ -81,16 +81,17 @@ public:
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
     std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
 
-    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    virtual std::unique_ptr<PluginConfig>
+    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::NETWORK_OBSERVE;
         return ebpfConfig;
     }
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override { 
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
         // TODO
         LOG_WARNING(sLogger, ("TODO", "not support yet"));
-        return 0; 
+        return 0;
     }
 
 private:
@@ -146,7 +147,7 @@ private:
 
     // coreThread used for polling kernel event...
     std::thread mCoreThread;
-    
+
     // recordConsume used for polling kernel event...
     std::thread mRecordConsume;
 
@@ -161,15 +162,15 @@ private:
 
     ReadWriteLock mAppAggLock;
     std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
-    
+
 
     ReadWriteLock mNetAggLock;
     std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
-    
+
 
     ReadWriteLock mSpanAggLock;
     std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
-    
+
 
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

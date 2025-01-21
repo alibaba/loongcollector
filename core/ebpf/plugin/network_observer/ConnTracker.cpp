@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cctype>
-
 #include "ConnTracker.h"
+
+#include <cctype>
 
 #include "common/magic_enum.hpp"
 #include "logger/Logger.h"

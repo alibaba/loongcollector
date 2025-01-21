@@ -1,10 +1,11 @@
-#include <vector>
+#include "ProtocolParser.h"
+
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
-#include "ProtocolParser.h"
-#include "logger/Logger.h"
 #include "common/magic_enum.hpp"
+#include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {
@@ -32,7 +33,8 @@ bool ProtocolParserManager::RemoveParser(ProtocolType type) {
 }
 
 
-std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(ProtocolType type, std::unique_ptr<NetDataEvent> data) {
+std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(ProtocolType type,
+                                                                          std::unique_ptr<NetDataEvent> data) {
     if (parsers_.find(type) != parsers_.end()) {
         return parsers_[type]->Parse(std::move(data));
     } else {
@@ -41,5 +43,5 @@ std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(Protoc
     }
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

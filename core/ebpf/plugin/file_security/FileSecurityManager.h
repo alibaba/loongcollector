@@ -35,7 +35,7 @@ public:
                         std::shared_ptr<SourceManager> sourceManager,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         std::shared_ptr<Timer> scheduler);
-                        
+
     static std::shared_ptr<FileSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
@@ -54,7 +54,8 @@ public:
 
     virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    virtual std::unique_ptr<PluginConfig>
+    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;

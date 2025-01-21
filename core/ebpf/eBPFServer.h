@@ -16,13 +16,15 @@
 
 #include <array>
 #include <atomic>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <variant>
-#include <future>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/queue/blockingconcurrentqueue.h"
+#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
@@ -34,8 +36,6 @@
 #include "ebpf/plugin/BaseManager.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
-#include "common/timer/Timer.h"
-#include "common/queue/blockingconcurrentqueue.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"
 
@@ -139,7 +139,7 @@ private:
 
     // hold some managers ...
     std::shared_ptr<BaseManager> mBaseManager;
-    
+
     std::shared_ptr<Timer> mScheduler;
 
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;

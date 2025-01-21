@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "ebpf/include/export.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
+#include "ebpf/driver/coolbpf/src/security/type.h"
+#include "ebpf/include/export.h"
 
 namespace logtail {
 namespace ebpf {
@@ -179,42 +179,46 @@ public:
 
 class BaseSecurityEvent {
 public:
-  BaseSecurityEvent(const struct msg_execve_key& _key, const struct msg_execve_key& _pkey) : 
-    key(_key), pkey(_pkey) {}
-  ~BaseSecurityEvent() {}
-  struct msg_execve_key key;
-  struct msg_execve_key pkey;
+    BaseSecurityEvent(const struct msg_execve_key& _key, const struct msg_execve_key& _pkey) : key(_key), pkey(_pkey) {}
+    ~BaseSecurityEvent() {}
+    struct msg_execve_key key;
+    struct msg_execve_key pkey;
 };
 
 class NetworkSecurityEvent : public BaseSecurityEvent {
 public:
-  NetworkSecurityEvent(tcp_data_t* event) 
-    : BaseSecurityEvent(event->key, event->pkey), func(event->func),
-    protocol(event->protocol), state(event->state), family(event->family), 
-    pid(event->pid), saddr(event->saddr), daddr(event->daddr), sport(event->sport), dport(event->dport), 
-    net_ns(event->net_ns), timestamp(event->timestamp), bytes(event->bytes) {}
-  enum sock_secure_func func;
-  uint16_t protocol;
-  uint16_t state;
-  uint16_t family;
-  uint32_t pid;
-  uint32_t saddr; // Source address
-  uint32_t daddr; // Destination address
-  uint16_t sport; // Source port
-  uint16_t dport; // Destination port
-  uint32_t net_ns; // Network namespace
-  uint64_t timestamp;
-  uint64_t bytes;
+    NetworkSecurityEvent(tcp_data_t* event)
+        : BaseSecurityEvent(event->key, event->pkey),
+          func(event->func),
+          protocol(event->protocol),
+          state(event->state),
+          family(event->family),
+          pid(event->pid),
+          saddr(event->saddr),
+          daddr(event->daddr),
+          sport(event->sport),
+          dport(event->dport),
+          net_ns(event->net_ns),
+          timestamp(event->timestamp),
+          bytes(event->bytes) {}
+    enum sock_secure_func func;
+    uint16_t protocol;
+    uint16_t state;
+    uint16_t family;
+    uint32_t pid;
+    uint32_t saddr; // Source address
+    uint32_t daddr; // Destination address
+    uint16_t sport; // Source port
+    uint16_t dport; // Destination port
+    uint32_t net_ns; // Network namespace
+    uint64_t timestamp;
+    uint64_t bytes;
 };
 
 // TODO
-class FileSecurityEvent : public BaseSecurityEvent {
-  
-};
+class FileSecurityEvent : public BaseSecurityEvent {};
 
-class ProcessSecurityEvent : public BaseSecurityEvent {
-  
-};
+class ProcessSecurityEvent : public BaseSecurityEvent {};
 
 
 } // namespace ebpf
