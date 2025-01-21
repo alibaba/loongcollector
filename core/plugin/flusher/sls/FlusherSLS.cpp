@@ -693,6 +693,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
+    string hostname = data->mCurrentHost;
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
@@ -911,7 +912,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 #ifdef __ENTERPRISE__
     bool hasNetworkError = sendResult == SEND_NETWORK_ERROR;
     EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
-        mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
+        mProject, mCandidateHostsInfo->GetMode(), hostname, !hasNetworkError);
     mCandidateHostsInfo->SelectBestHost();
 
     if (!hasNetworkError) {
