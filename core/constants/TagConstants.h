@@ -19,7 +19,7 @@
 
 namespace logtail {
 
-enum TagKey {
+enum class TagKey : int {
     FILE_OFFSET_KEY,
     FILE_INODE_TAG_KEY,
     FILE_PATH_TAG_KEY,
