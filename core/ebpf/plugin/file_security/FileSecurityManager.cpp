@@ -79,28 +79,24 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
     mCommonEventQueue.enqueue(std::move(evt));
 }
 
+FileSecurityManager::FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+                        std::shared_ptr<SourceManager> sourceManager,
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        std::shared_ptr<Timer> scheduler)
+    : AbstractManager(baseMgr, sourceManager, queue, scheduler), mAggregateTree(
+        4096,
+        [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        },
+        [this](const std::shared_ptr<FileEvent>& in) {
+            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+        }
+    ) {}
+
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     // set init flag ...
     mFlag = true;
-
-    mAggregateTree = std::make_unique<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>>(
-        4096,
-        [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<FileEvent>& in) {
-            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
-        });
-
-    mSafeAggregateTree = std::make_unique<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>>(
-        4096,
-        [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<FileEvent>& in) {
-            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
-        });
-
+    mStartUid++;
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
@@ -108,30 +104,46 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
                 return false;
             }
 
-            {
-                WriteLock lk(this->mLock);
-                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
-            }
+            WriteLock lk(this->mLock);
+            auto aggTree = std::move(this->mAggregateTree);
+            lk.unlock();
 
-            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
+            auto nodes = aggTree.GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
                 return true;
             }
 
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            PipelineEventGroup eventGroup(sourceBuffer);
             for (auto& node : nodes) {
+                LOG_DEBUG(sLogger, ("child num", node->child.size()));
                 // convert to a item and push to process queue
-                this->mSafeAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
+                SizedMap processTags;
+                bool init = false;
+                aggTree.ForEach(node, [&](const FileEventGroup* group) {
                     // set process tag
-                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
-                    if (!ok) {
+                    if (!init) {
+                        auto bm = GetBaseManager();
+                        if (bm == nullptr) {
+                            LOG_WARNING(sLogger, ("basemanager is null", ""));
+                            return;
+                        }
+                        processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                        init = true;
+                    }
+                    if (processTags.mInner.empty()) {
+                        LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid) ("ktime", group->mKtime));
                         return;
                     }
 
                     for (auto innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
+                        // attach process tags
+                        for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
+                            logEvent->SetContentNoCopy(it->first, it->second);
+                        }
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         // set timestamp
@@ -158,26 +170,33 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
                                 break;
                         }
                     }
-
-                    {
-                        std::lock_guard lk(mContextMutex);
-                        std::unique_ptr<ProcessQueueItem> item
-                            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                            LOG_WARNING(sLogger,
-                                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                            "[FileSecurityEvent] push queue failed!", ""));
-                        }
-                    }
                 });
             }
-            this->mSafeAggregateTree->Clear();
-
+            {
+                std::lock_guard lk(mContextMutex);
+                if (this->mPipelineCtx == nullptr) {
+                    return true;
+                }
+                LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+                std::unique_ptr<ProcessQueueItem> item
+                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                    LOG_WARNING(sLogger,
+                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                    "[FileSecurityEvent] push queue failed!", ""));
+                }
+            }
+            aggTree.Clear();
             return true;
         },
-        [this]() { // validator
-            return !this->mFlag.load();
-        });
+        [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid);
 
     mScheduler->PushEvent(std::move(event));
 
@@ -214,7 +233,7 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto fileEvent = std::dynamic_pointer_cast<FileEvent>(event);
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
+              ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)("eventType",
                                                                           magic_enum::enum_name(event->mEventType)));
     if (fileEvent == nullptr) {
         LOG_ERROR(sLogger,
@@ -226,12 +245,16 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
 
     // calculate agg key
     std::array<size_t, 2> hash_result = GenerateAggKey(fileEvent);
-    bool ret = mAggregateTree->Aggregate(fileEvent, hash_result);
-    LOG_DEBUG(sLogger, ("after aggregate", ret));
+    {
+        WriteLock lk(mLock);
+        bool ret = mAggregateTree.Aggregate(fileEvent, hash_result);
+        LOG_DEBUG(sLogger, ("after aggregate", ret));
+    }
     return 0;
 }
 
 int FileSecurityManager::Destroy() {
+    mFlag = false;
     return mSourceManager->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
 }
 

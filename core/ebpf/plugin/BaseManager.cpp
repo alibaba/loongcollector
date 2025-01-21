@@ -33,6 +33,8 @@
 #include "common/JsonUtil.h"
 #include "json/value.h"
 #include "common/CapabilityUtil.h"
+#include "ebpf/type/table/ProcessTable.h"
+#include "util/FrequencyManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -92,6 +94,7 @@ void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long lost_cn
 bool BaseManager::Init() {
     if (mInited) {return true;}
     mInited = true;
+    mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     auto ebpfConfig = std::make_unique<PluginConfig>();
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
@@ -114,7 +117,7 @@ bool BaseManager::Init() {
         return false;
     }
     auto ret = SyncAllProc();
-    if (ret != 0) {
+    if (ret) {
         LOG_WARNING(sLogger, ("failed to sync all proc, ret", ret));
     }
     return true;
@@ -122,10 +125,20 @@ bool BaseManager::Init() {
 
 void BaseManager::PollPerfBuffers() {
     int zero = 0;
+    LOG_DEBUG(sLogger, ("enter poller thread", ""));
     while (mFlag) {
-        mSourceManager->PollPerfBuffers(PluginType::PROCESS_SECURITY, 4096, &zero, 200);
-        // LOG_DEBUG(sLogger, ("poll event num", ret));
+        auto now = std::chrono::steady_clock::now();
+        auto next_window = mFrequencyMgr.Next();
+        if (!mFrequencyMgr.Expired(now)) {
+          std::this_thread::sleep_until(next_window);
+          mFrequencyMgr.Reset(next_window);
+        } else {
+          mFrequencyMgr.Reset(now);
+        }
+        auto ret = mSourceManager->PollPerfBuffers(PluginType::PROCESS_SECURITY, 4096, &zero, 200);
+        LOG_DEBUG(sLogger, ("poll event num", ret));
     }
+    LOG_DEBUG(sLogger, ("exit poller thread", ""));
 }
 
 void BaseManager::Stop() {
@@ -427,7 +440,6 @@ int BaseManager::SyncAllProc() {
     msg_execve_key key;
     key.pid = 0;
     key.ktime = 0;
-    //    key.ktime = proc->ktime;
     execve_map_value value;
     value.pkey.pid = 0;
     value.pkey.ktime = 1;
@@ -513,10 +525,7 @@ int BaseManager::PushExecveEvent(const std::shared_ptr<Procs> proc) {
         event->msg->common.size = MSG_UNIX_SIZE + proc->psize + proc->size;
 
         if (proc->pid) {
-            //      LOG(INFO) << "[PushExecveEvent] get docker id handle pid:" << proc->pid ;
             std::string docker_id = mProcParser.GetPIDDockerId(proc->pid);
-            //  LOG(INFO) << "[PushExecveEvent] get docker id handle pid done." << proc->pid << " dockerid:" <<
-            //  docker_id ;
             if (docker_id != "") {
                 event->kube.docker = docker_id;
             }
@@ -624,13 +633,105 @@ void BaseManager::HandleCacheUpdate() {
 // TODO @qianlu.kk
 SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime) {
     SizedMap res;
+    auto execId = GenerateExecId(pid, ktime);
+    auto proc = LookupCache(execId);
+    if (!proc) {
+        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId) ("pid", pid) ("ktime", ktime));
+        return res;
+    }
 
-    // auto key = sb->CopyString(proc->exec_id);
-    // auto val = sb->CopyString(proc->parent_exec_id);
-    // res.Insert(StringView(key.data, key.size), StringView(val.data, val.size));
-    // auto ret = sb->CopyString(proc->exec_id);
-    // sb->CopyString(proc->parent_exec_id);
-    // res.Insert(StringView(), StringView());
+    auto parentProc = LookupCache(execId);
+
+    // finalize proc tags
+    auto execIdSb = sb->CopyString(proc->exec_id);
+    res.Insert(kExecId.log_key(), StringView(execIdSb.data, execIdSb.size));
+
+    auto pExecIdSb = sb->CopyString(proc->parent_exec_id);
+    res.Insert(kParentExecId.log_key(), StringView(pExecIdSb.data, pExecIdSb.size));
+
+    // finalize parent tags
+    // std::string args = utf8::replace_invalid(proc->process.args);
+    // std::string binary = utf8::replace_invalid(proc->process.filename);
+
+    std::string args = ""; // TODO
+    std::string binary = ""; // TODO
+    std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
+    std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
+    std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
+
+    Json::Value cap;
+    cap["permitted"] = permitted;
+    cap["effective"] = effective;
+    cap["inheritable"] = inheritable;
+
+    Json::StreamWriterBuilder writer;
+
+    std::string capStr = Json::writeString(writer, cap);
+
+    // event_type, added by xxx_security_manager
+    // call_name, added by xxx_security_manager
+    // event_time, added by xxx_security_manager
+    auto pidSb = sb->CopyString(std::to_string(proc->process.pid));
+    res.Insert(kPid.log_key(), StringView(pidSb.data, pidSb.size));
+
+    auto uidSb = sb->CopyString(std::to_string(proc->process.uid));
+    res.Insert(kUid.log_key(), StringView(uidSb.data, uidSb.size));
+    
+    auto userSb = sb->CopyString(proc->process.user.name);
+    res.Insert(kUser.log_key(), StringView(userSb.data, userSb.size));
+
+    auto binarySb = sb->CopyString(binary);
+    res.Insert(kBinary.log_key(), StringView(binarySb.data, binarySb.size));
+
+    auto argsSb = sb->CopyString(args);
+    res.Insert(kArguments.log_key(), StringView(argsSb.data, argsSb.size));
+
+    auto cwdSb = sb->CopyString(proc->process.cwd);
+    res.Insert(kCWD.log_key(), StringView(cwdSb.data, cwdSb.size));
+
+    auto ktimeSb = sb->CopyString(std::to_string(proc->process.ktime));
+    res.Insert(kKtime.log_key(), StringView(ktimeSb.data, ktimeSb.size));
+
+    auto capSb = sb->CopyString(capStr);
+    res.Insert(kCap.log_key(), StringView(capSb.data, capSb.size));
+
+    // for parent
+    if (!parentProc){
+        auto unknownSb = sb->CopyString(std::string("unknown"));
+        res.Insert(kParentProcess.log_key(), StringView(unknownSb.data, unknownSb.size));
+        return res;
+    } else {
+        std::string permitted = GetCapabilities(parentProc->msg->creds.cap.permitted);
+        std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
+        std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
+
+        Json::Value cap;
+        cap["permitted"] = permitted;
+        cap["effective"] = effective;
+        cap["inheritable"] = inheritable;
+
+        std::string args = ""; // TODO
+        std::string binary = ""; // TODO
+        // std::string args = utf8::replace_invalid(parentProc->process.args);
+        // std::string binary = utf8::replace_invalid(parentProc->process.filename);
+
+        Json::Value j;
+        j["exec_id"] = parentProc->exec_id;
+        j["parent_exec_id"] = parentProc->parent_exec_id;
+        j["pid"] = std::to_string(parentProc->process.pid);
+        j["uid"] = std::to_string(parentProc->process.uid);
+        j["user"] = parentProc->process.user.name;
+        j["binary"] = binary;
+        j["arguments"] = args;
+        j["cwd"] = parentProc->process.cwd;
+        j["ktime"] = std::to_string(parentProc->process.ktime);
+        j["cap"] = Json::writeString(Json::StreamWriterBuilder(), cap);
+
+        Json::StreamWriterBuilder writer;
+        std::string result = Json::writeString(writer, j);
+        auto parentSb = sb->CopyString(result);
+        res.Insert(kParentProcess.log_key(), StringView(parentSb.data, parentSb.size));
+    }
     return res;
 }
 

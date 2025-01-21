@@ -81,6 +81,10 @@ public:
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
     std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
 
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
+        return 0;
+    }
+
 private:
     //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
     //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
@@ -149,15 +153,15 @@ private:
 
     ReadWriteLock mAppAggLock;
     std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
-    std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mSafeAppAggregator;
+    
 
     ReadWriteLock mNetAggLock;
     std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
-    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mSafeNetAggregator;
+    
 
     ReadWriteLock mSpanAggLock;
     std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
-    std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSafeSpanAggregator;
+    
 
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

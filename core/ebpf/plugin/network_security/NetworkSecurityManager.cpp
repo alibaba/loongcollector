@@ -22,6 +22,8 @@
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
+#include "common/NetworkUtil.h"
+#include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {
 namespace ebpf {
@@ -96,8 +98,23 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& bas
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                std::shared_ptr<Timer> scheduler)
-    : AbstractManager(base, sourceManager, queue, scheduler) {
-}
+    : AbstractManager(base, sourceManager, queue, scheduler), mAggregateTree(
+        4096,
+        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
+            base->mInnerEvents.emplace_back(std::move(other));
+        },
+        [this](const std::shared_ptr<NetworkEvent>& in) {
+            return std::make_unique<NetworkEventGroup>(in->mPid,
+                                                       in->mKtime,
+                                                       in->mProtocol,
+                                                       in->mFamily,
+                                                       in->mSaddr,
+                                                       in->mDaddr,
+                                                       in->mSport,
+                                                       in->mDport,
+                                                       in->mNetns);
+        }
+    ) {}
 
 int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     auto securityOpts = std::get_if<SecurityOptions*>(&options);
@@ -108,50 +125,19 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     mFlag = true;
 
-    mAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>>(
-        4096,
-        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<NetworkEvent>& in) {
-            return std::make_unique<NetworkEventGroup>(in->mPid,
-                                                       in->mKtime,
-                                                       in->mProtocol,
-                                                       in->mFamily,
-                                                       in->mSaddr,
-                                                       in->mDaddr,
-                                                       in->mSport,
-                                                       in->mDport,
-                                                       in->mNetns);
-        });
-    mSafeAggregateTree = std::make_unique<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>>(
-        4096,
-        [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        },
-        [this](const std::shared_ptr<NetworkEvent>& in) {
-            return std::make_unique<NetworkEventGroup>(in->mPid,
-                                                       in->mKtime,
-                                                       in->mProtocol,
-                                                       in->mFamily,
-                                                       in->mSaddr,
-                                                       in->mDaddr,
-                                                       in->mSport,
-                                                       in->mDport,
-                                                       in->mNetns);
-        });
-
+    mStartUid ++;
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             if (!this->mFlag || this->mSuspendFlag) {
                 return false;
             }
-            {
-                WriteLock lk(this->mLock);
-                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
-            }
-            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
+
+            WriteLock lk(this->mLock);
+            auto aggTree = std::move(this->mAggregateTree);
+            lk.unlock();
+
+            auto nodes = aggTree.GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -159,28 +145,51 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
             // do we need to aggregate all the events into a eventgroup??
             // use source buffer to hold the memory
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            PipelineEventGroup eventGroup(sourceBuffer);
             for (auto& node : nodes) {
                 // convert to a item and push to process queue
-                LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
-                this->mSafeAggregateTree->ForEach(node, [&](const NetworkEventGroup* group) {
+                LOG_DEBUG(sLogger, ("child num", node->child.size()));
+                bool init = false;
+                SizedMap processTags;
+                aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
                     // set process tag
-                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
-                    if (!ok) {
+                    if (!init) {
+                        auto bm = GetBaseManager();
+                        if (bm == nullptr) {
+                            LOG_WARNING(sLogger, ("basemanager is null", ""));
+                            return;
+                        }
+                        processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                        init = true;
+                    }
+                    // attach process tags
+                    if (processTags.mInner.empty()) {
+                        LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid) ("ktime", group->mKtime));
                         return;
                     }
 
-                    // set network tag
-                    eventGroup.SetTag("protocol", std::to_string(group->mProtocol));
-                    eventGroup.SetTag("family", std::to_string(group->mFamily));
-                    eventGroup.SetTag("saddr", std::to_string(group->mSaddr));
-                    eventGroup.SetTag("daddr", std::to_string(group->mDaddr));
-                    eventGroup.SetTag("sport", std::to_string(group->mSport));
-                    eventGroup.SetTag("dport", std::to_string(group->mDport));
-                    eventGroup.SetTag("netns", std::to_string(group->mNetns));
+                    auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
+                    auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));
+                    auto saddrSb = sourceBuffer->CopyString(GetAddrString(group->mSaddr));
+                    auto daddrSb = sourceBuffer->CopyString(GetAddrString(group->mDaddr));
+                    auto sportSb = sourceBuffer->CopyString(std::to_string(group->mSport));
+                    auto dportSb = sourceBuffer->CopyString(std::to_string(group->mDport));
+                    auto netnsSb = sourceBuffer->CopyString(std::to_string(group->mNetns));
 
                     for (auto innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
+                        for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
+                            logEvent->SetContentNoCopy(it->first, it->second);
+                        }
+                        logEvent->SetContentNoCopy(kL4Protocol.log_key(), StringView(protocolSb.data, protocolSb.size));
+                        logEvent->SetContentNoCopy(kFamily.log_key(), StringView(familySb.data, familySb.size));
+                        logEvent->SetContentNoCopy(kSaddr.log_key(), StringView(saddrSb.data, saddrSb.size));
+                        logEvent->SetContentNoCopy(kDaddr.log_key(), StringView(daddrSb.data, daddrSb.size));
+                        logEvent->SetContentNoCopy(kSport.log_key(), StringView(sportSb.data, sportSb.size));
+                        logEvent->SetContentNoCopy(kDport.log_key(), StringView(dportSb.data, dportSb.size));
+                        logEvent->SetContentNoCopy(kNetNs.log_key(), StringView(netnsSb.data, netnsSb.size));
+
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         // set timestamp
@@ -207,26 +216,34 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
                                 break;
                         }
                     }
-
-                    {
-                        std::lock_guard lk(mContextMutex);
-                        std::unique_ptr<ProcessQueueItem> item
-                            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                            LOG_WARNING(sLogger,
-                                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                            "[NetworkSecurityEvent] push queue failed!", ""));
-                        }
-                    }
                 });
+                
             }
-            this->mSafeAggregateTree->Clear();
-
+            {
+                std::lock_guard lk(mContextMutex);
+                if (this->mPipelineCtx == nullptr) {
+                    return true;
+                }
+                LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+                std::unique_ptr<ProcessQueueItem> item
+                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                    LOG_WARNING(sLogger,
+                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                    "[NetworkSecurityEvent] push queue failed!", ""));
+                }
+            }
+            aggTree.Clear();
             return true;
         },
-        [this]() { // validator
-            return !this->mFlag.load();
-        });
+        [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid);
     mScheduler->PushEvent(std::move(event));
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
@@ -246,6 +263,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 }
 
 int NetworkSecurityManager::Destroy() {
+    mFlag = false;
     return mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
 }
 
@@ -266,7 +284,7 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) 
                                     uint64_t(event->mNetns)};
 
     for (uint64_t x : arr2) {
-        hash_result[1] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
+        hash_result[1] ^= hasher(x) + 0x9e3779b9 + (hash_result[1] << 6) + (hash_result[1] >> 2);
     }
     return hash_result;
 }
@@ -274,8 +292,13 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     auto networkEvent = std::dynamic_pointer_cast<NetworkEvent>(event);
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
-                                                                          magic_enum::enum_name(event->mEventType)));
+              ("receive event, pid", event->mPid)
+              ("ktime", event->mKtime)
+              ("saddr", networkEvent->mSaddr)
+              ("daddr", networkEvent->mDaddr)
+              ("sport", networkEvent->mSport)
+              ("dport", networkEvent->mDport)
+              ("eventType", magic_enum::enum_name(event->mEventType)));
     if (networkEvent == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to convert CommonEvent to NetworkEvent, kernel event type",
@@ -289,7 +312,7 @@ int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
 
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree->Aggregate(networkEvent, hash_result);
+        bool ret = mAggregateTree.Aggregate(networkEvent, hash_result);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
     return 0;

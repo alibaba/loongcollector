@@ -28,6 +28,7 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "models/PipelineEventGroup.h"
+#include "util/FrequencyManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -101,6 +102,8 @@ private:
     std::atomic_bool mFlushProcessEvent = false;
     std::future<void> mPoller;
     std::future<void> mCacheUpdater;
+
+    FrequencyManager mFrequencyMgr;
 };
 
 } // namespace ebpf

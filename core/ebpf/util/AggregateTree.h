@@ -52,6 +52,7 @@ private:
 #endif
 public:
 
+    AggTree() {}
     AggTree(size_t max_nodes,
             const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
             const std::function<std::unique_ptr<Data>(const Value &n)> &generate)
@@ -60,21 +61,11 @@ public:
 
     AggTree(AggTree<Data, Value, KeyType> &&other) noexcept
             : max_nodes(other.max_nodes),
+              now_nodes(other.now_nodes),
               root_node_(std::move(other.root_node_)),
               aggregate_(other.aggregate_),
-              generate_(other.generate_),
-              now_nodes(other.now_nodes) { other.Clear(); }
-
-    AggTree& operator=(AggTree&& other) noexcept {
-        if (this != &other) {
-            max_nodes = other.max_nodes;
-            root_node_ = std::move(other.root_node_);
-            aggregate_ = std::move(other.aggregate_);
-            generate_ = std::move(other.generate_);
-            now_nodes = other.now_nodes;
-        }
-        return *this;
-    }
+              generate_(other.generate_)
+               { other.Clear(); }
 
     template<class ContainerType>
     bool Aggregate(const Value &d, const ContainerType &agg_keys) {

@@ -29,13 +29,8 @@ namespace logtail {
 namespace ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
-    // static std::shared_ptr<ProcessSecurityManager> Create(std::shared_ptr<BaseManager>& mgr,
-    // std::shared_ptr<BPFWrapper<sockettrace_secure_bpf>> wrapper) {
-    //     return std::make_shared<ProcessSecurityManager>(mgr, wrapper);
-    // }
     ProcessSecurityManager() = delete;
-    ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
-        : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
+    ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
@@ -55,10 +50,14 @@ public:
     // process perfbuffer was polled by baseManager ...
     virtual int PollPerfBuffer() override { return 0; }
 
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override { 
+        // do nothing ...
+        return 0; 
+    }
+
 private:
     ReadWriteLock mLock;
-    std::unique_ptr<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> mAggregateTree;
-    std::unique_ptr<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> mSafeAggregateTree;
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> mAggregateTree;
 };
 
 } // namespace ebpf

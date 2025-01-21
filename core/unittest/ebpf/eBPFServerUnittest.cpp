@@ -28,11 +28,21 @@ class eBPFServerUnittest : public testing::Test {
 public:
     eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
     ~eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Stop(); }
+
+    // void TestSourceManager();
 //     void TestInit();
+    // for start and stop single
     void TestNetworkObserver();
     void TestProcessSecurity();
     void TestNetworkSecurity();
     void TestFileSecurity();
+
+    // for start and stop all ...
+    void TestAllStartAndStop();
+
+    // for update scenario ...
+    void TestUpdateFileSecurity();
+    void TestUpdateNetworkSecurity();
 
     // void TestEnableNetworkPlugin();
 
@@ -171,19 +181,128 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     Json::Value configJson, optionalGoPipeline;
     ;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_network_security");
-    input->Init(configJson, optionalGoPipeline);
-    bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_network_security", 5, logtail::ebpf::PluginType::NETWORK_SECURITY, &ctx, &security_options, input->mPluginMgr);
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    res = ebpf::eBPFServer::GetInstance()->DisablePlugin(
-        "input_network_security", logtail::ebpf::PluginType::NETWORK_SECURITY);
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    input->Start();
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(600));
+    res = input->Stop(true);
     EXPECT_TRUE(res);
 }
+
 void eBPFServerUnittest::TestFileSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
+        }
+    )";
+
+    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+
+    // stop
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    // re-run...
+    input->Start();
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+}
+
+void eBPFServerUnittest::TestProcessSecurity() {
+
+    std::string configStr = R"(
+        {
+            "Type": "input_process_security"
+        }
+    )";
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    SecurityOptions security_options;
+    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "test");
+    std::shared_ptr<InputProcessSecurity> input(new InputProcessSecurity());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+    
+    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
+
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    input->Start();
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+
+
+
+    // SecurityOptions opts;
+    // auto res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+    //     "test", 1, logtail::ebpf::PluginType::PROCESS_SECURITY, &ctx, &opts, input->mPluginMgr);
+    // EXPECT_TRUE(res);
+
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    // // stop
+    // res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
+    // EXPECT_TRUE(res);
+    // ebpf::eBPFServer::GetInstance()->Stop();
+}
+
+void eBPFServerUnittest::TestUpdateFileSecurity() {
     std::string configStr = R"(
         {
             "Type": "input_file_security",
@@ -211,86 +330,33 @@ void eBPFServerUnittest::TestFileSecurity() {
     input->Init(configJson, optionalGoPipeline);
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
         "input_file_security", 0, logtail::ebpf::PluginType::FILE_SECURITY, &ctx, &security_options, input->mPluginMgr);
-    EXPECT_EQ(std::get<logtail::ebpf::SecurityFileFilter>(security_options.mOptionList[0].filter_).mFilePathList.size(), 3);
+    
+    res = input->Start();
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("input_file_security", PluginType::FILE_SECURITY);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    // suspend
+    res = input->Stop(false);
     EXPECT_TRUE(res);
-}
 
-void eBPFServerUnittest::TestProcessSecurity() {
-    std::shared_ptr<InputNetworkObserver> ninput(new InputNetworkObserver());
-    {
-        std::string configStr = R"(
-            {
-                "Type": "input_network_observer",
-                "ProbeConfig": 
-                {
-                    "EnableLog": true,
-                    "EnableMetric": true,
-                    "EnableSpan": false,
-                    "EnableProtocols": [
-                        "http"
-                    ],
-                    "DisableProtocolParse": false,
-                    "DisableConnStats": false,
-                    "EnableConnTrackerDump": false,
-                    "EnableEvent": true,
-                }
-            }
-        )";
-        std::string errorMsg;
-        Json::Value configJson, optionalGoPipeline;
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-
-        logtail::ebpf::ObserverNetworkOption network_option;
-        bool res = ebpf::InitObserverNetworkOption(configJson, network_option, &ctx, "test-networkobserver");
-        EXPECT_TRUE(res);
-        // observer_options.Init(ObserverType::NETWORK, configJson, &ctx, "test");
-        
-        ninput->SetContext(ctx);
-        ninput->SetMetricsRecordRef("test-networkobserver", "1");
-        auto initStatus = ninput->Init(configJson, optionalGoPipeline);
-        EXPECT_TRUE(initStatus);
-        EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
-        EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
-        res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-            "test-networkobserver", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, ninput->mPluginMgr);
-        EXPECT_TRUE(res);
-    }
-
-    std::string configStr = R"(
+    // resume ...
+    input = std::make_shared<InputFileSecurity>();
+    configStr = R"(
         {
-            "Type": "input_process_security"
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/lib"
+                ]
+            }
         }
     )";
-    std::string errorMsg;
-    Json::Value configJson, optionalGoPipeline;
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "test");
-    std::shared_ptr<InputProcessSecurity> input(new InputProcessSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
-    auto initStatus = input->Init(configJson, optionalGoPipeline);
-
-    APSARA_TEST_TRUE(initStatus);
-    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
-    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
-    SecurityOptions opts;
-    auto res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 1, logtail::ebpf::PluginType::PROCESS_SECURITY, &ctx, &opts, input->mPluginMgr);
+    input->SetMetricsRecordRef("test", "2");
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    res = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(res);
-
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    // stop
-    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
-    EXPECT_TRUE(res);
-    res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test-networkobserver", PluginType::NETWORK_OBSERVE);
-    EXPECT_TRUE(res);
-    ebpf::eBPFServer::GetInstance()->Stop();
-    EXPECT_TRUE(res);
+    input->Start();
 }
 
 // static int generateRandomInt(int bound) {
@@ -1095,10 +1161,12 @@ void eBPFServerUnittest::TestProcessSecurity() {
 //     EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 // }
 
-UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
+
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);

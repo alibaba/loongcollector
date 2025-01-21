@@ -21,8 +21,8 @@ namespace ebpf {
 
 class AggregateEvent : public PeriodicalTimerEvent {
 public:
-    AggregateEvent(int interval, std::function<bool(const std::chrono::steady_clock::time_point&)> handler, std::function<bool()> stopChecker)
-        : PeriodicalTimerEvent(interval), mHandler(handler), mStopChecker(stopChecker) {}
+    AggregateEvent(int interval, std::function<bool(const std::chrono::steady_clock::time_point&)> handler, std::function<bool(int)> stopChecker, int uid = 0)
+        : PeriodicalTimerEvent(interval), mUid(uid), mHandler(handler), mStopChecker(stopChecker) {}
 
     bool IsValid() const override {
         return true;
@@ -33,12 +33,13 @@ public:
     }
 
     bool IsStop() override {
-        return mStopChecker();
+        return mStopChecker(mUid);
     }
 
 private:
+    int mUid;
     std::function<bool(const std::chrono::steady_clock::time_point& execTime)> mHandler;
-    std::function<bool()> mStopChecker;
+    std::function<bool(int)> mStopChecker;
 };
 
 }

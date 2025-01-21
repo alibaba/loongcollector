@@ -60,7 +60,7 @@ public:
         return mSourceManager->PollPerfBuffers(GetPluginType(), 1024, &zero, 200);
     }
 
-    bool IsRunning();
+    bool IsRunning() { return mFlag && !mSuspendFlag; }
 
     int GetCallNameIdx(const std::string& call_name);
 
@@ -85,14 +85,7 @@ public:
         return;
     }
 
-    virtual int UpdatePlugin(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
-        // detach prog
-        // cleanup filter
-        // setup new filter
-        // attach prog
-
-        return 0;
-    }
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
 
     void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
         std::lock_guard lk(mContextMutex);
@@ -101,11 +94,25 @@ public:
         mPluginIndex = index;
     }
 
+    void UpdateBaseManager(std::shared_ptr<BaseManager> other) {
+        WriteLock lk(mBaseMgrLock);
+        mBaseManager = other;
+    }
+
+    std::shared_ptr<BaseManager> GetBaseManager() const {
+        ReadLock lk(mBaseMgrLock);
+        return mBaseManager;
+    }
+
     mutable ReadWriteLock mMtx;
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
-protected:
+
+private:
+    mutable ReadWriteLock mBaseMgrLock;
     std::shared_ptr<BaseManager> mBaseManager;
+protected:
+    
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<Timer> mScheduler;
@@ -120,8 +127,7 @@ protected:
     // static ...
     std::chrono::nanoseconds mTimeDiff;
     std::condition_variable mRunnerCV;
-
-    // used for timer event ...
+    int mStartUid = 0;
 };
 
 }

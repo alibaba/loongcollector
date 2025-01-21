@@ -20,7 +20,7 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kProcessSecurityElements[] = {kExecId,
+static constexpr DataElement kProcessCommonElements[] = {kExecId,
                                                            kParentExecId,
                                                            kProcessId,
                                                            kUid,
@@ -31,8 +31,12 @@ static constexpr DataElement kProcessSecurityElements[] = {kExecId,
                                                            kKtime,
                                                            kCap,
                                                            kParentProcess,
-                                                           kContainerId,
-                                                           kEventTime,
+                                                           kContainerId};
+static constexpr size_t kProcessCommonTableSize = std::size(kProcessCommonElements);
+
+static constexpr auto kProcessCommonTable = DataTableSchema("process_common_table", "", kProcessCommonElements);
+
+static constexpr DataElement kProcessSecurityElements[] = {kEventTime,
                                                            kCallName,
                                                            kEventType};
 

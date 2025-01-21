@@ -32,53 +32,44 @@
 namespace logtail {
 namespace ebpf {
 
+ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr, std::shared_ptr<SourceManager> sourceManager, 
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue, std::shared_ptr<Timer> scheduler)
+        : AbstractManager(baseMgr, sourceManager, queue, scheduler), mAggregateTree(
+            4096, 
+            [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
+                base->mInnerEvents.emplace_back(std::move(other));
+            }, 
+            [this](const std::shared_ptr<ProcessEvent>& in) {
+                return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
+            }) {
+    
+}
+
 int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>) {
     // just set timer ...
     // register base manager ...
     mFlag = true;
     mSuspendFlag = false;
 
-    mBaseManager->MarkProcessEventFlushStatus(true);
-
-    mAggregateTree = std::make_unique<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> (
-        4096, 
-        [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        }, 
-        [this](const std::shared_ptr<ProcessEvent>& in) {
-            // generate key
-            // auto execId = this->mBaseManager->GenerateExecId(in->mPid, in->mKtime);
-            
-            return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
-        }
-    );
-
-    mSafeAggregateTree = std::make_unique<SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>>> (
-        4096, 
-        [this](std::unique_ptr<ProcessEventGroup> &base, const std::shared_ptr<ProcessEvent>& other) {
-            base->mInnerEvents.emplace_back(std::move(other));
-        }, 
-        [this](const std::shared_ptr<ProcessEvent>& in) {
-            // generate key
-            // auto execId = this->mBaseManager->GenerateExecId(in->mPid, in->mKtime);
-            
-            return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
-        }
-    );
-
+    mStartUid ++;
+    auto bm = GetBaseManager();
+    if (bm == nullptr) {
+        LOG_WARNING(sLogger, ("basemanager is null", ""));
+        return 1;
+    }
+    bm->MarkProcessEventFlushStatus(true);
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(2, 
-        [this](const std::chrono::steady_clock::time_point& execTime){ // handler
+        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             if (!this->mFlag || this->mSuspendFlag) {
                 return false;
             }
 
-            {
-                WriteLock lk(this->mLock);
-                std::swap(this->mSafeAggregateTree, this->mAggregateTree);
-            }
-            // this->mVec.push_back(1);
+            WriteLock lk(this->mLock);
+            auto aggTree = std::move(this->mAggregateTree);
+            lk.unlock();
+
             // read aggregator
-            auto nodes = this->mSafeAggregateTree->GetNodesWithAggDepth(1);
+            auto nodes = aggTree.GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -86,18 +77,29 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
             }
 
             auto sourceBuffer = std::make_shared<SourceBuffer>();
-
+            PipelineEventGroup eventGroup(sourceBuffer);
             for (auto& node : nodes) {
+                LOG_DEBUG(sLogger, ("child num", node->child.size()));
                 // convert to a item and push to process queue
-                this->mSafeAggregateTree->ForEach(node, [&](const ProcessEventGroup* group) {
-                    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+                aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
+                    
+                    SizedMap processTags;
                     // represent a process ...
-                    bool ok = this->mBaseManager->FinalizeProcessTags(eventGroup, group->mPid, group->mKtime);
-                    if (!ok) {
+                    auto bm = GetBaseManager();
+                    if (bm == nullptr) {
+                        LOG_WARNING(sLogger, ("basemanager is null", ""));
+                        return;
+                    }
+                    processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                    if (processTags.mInner.empty()) {
+                        LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid) ("ktime", group->mKtime));
                         return;
                     }
                     for (auto innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
+                        for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
+                            logEvent->SetContentNoCopy(it->first, it->second);
+                        }
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                         logEvent->SetTimestamp(seconds.count(), ts);
@@ -129,25 +131,33 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                             break;
                         }
                     }
-                    
-                    {
-                        std::lock_guard lk(mContextMutex);
-                        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                            LOG_WARNING(sLogger, 
-                                ("configName", mPipelineCtx->GetConfigName())
-                                ("pluginIdx", this->mPluginIndex)
-                                ("[ProcessSecurityEvent] push queue failed!", ""));
-                        }
-                    }
                 });
             }
-            this->mSafeAggregateTree->Clear();
+            {
+                std::lock_guard lk(mContextMutex);
+                if (this->mPipelineCtx == nullptr) {
+                    return true;
+                }
+                LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+                std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+                if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                    LOG_WARNING(sLogger, 
+                        ("configName", mPipelineCtx->GetConfigName())
+                        ("pluginIdx", this->mPluginIndex)
+                        ("[ProcessSecurityEvent] push queue failed!", ""));
+                }
+            }
+            aggTree.Clear();
             
             return true;
-        }, [this]() { // validator
-            return !this->mFlag.load();
-        }
+        }, [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid
     );
 
     mScheduler->PushEvent(std::move(event));
@@ -156,7 +166,13 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
 }
 
 int ProcessSecurityManager::Destroy() {
-    mBaseManager->MarkProcessEventFlushStatus(false);
+    mFlag = false;
+    auto bm = GetBaseManager();
+    if (bm == nullptr) {
+        LOG_WARNING(sLogger, ("basemanager is null", ""));
+        return 1;
+    }
+    bm->MarkProcessEventFlushStatus(false);
     return 0;
 }
 
@@ -189,8 +205,11 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     
     // calculate agg key
     std::array<size_t, 1> hash_result = GenerateAggKey(processEvent);
-    bool ret = mAggregateTree->Aggregate(processEvent, hash_result);
-    LOG_DEBUG(sLogger, ("after aggregate", ret));
+    {
+        WriteLock lk(mLock);
+        bool ret = mAggregateTree.Aggregate(processEvent, hash_result);
+        LOG_DEBUG(sLogger, ("after aggregate", ret));
+    }
 
     return 0;
 }

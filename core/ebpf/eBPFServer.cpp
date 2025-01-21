@@ -202,9 +202,6 @@ void eBPFServer::Stop() {
     mInited = false;
 
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
-    // destroy source manager
-    // do not destroy source manager ...
-    // mSourceManager.reset();
     for (int i = 0; i < int(PluginType::MAX); i++) {
         auto pipelineName = mLoadedPipeline[i];
         if (pipelineName.size()) {
@@ -268,7 +265,8 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     if (type != PluginType::NETWORK_OBSERVE) {
         LOG_INFO(sLogger, ("hostname", mHostName) ("mHostPathPrefix", mHostPathPrefix));
         mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
-        mBaseManager->Init();
+        auto res = mBaseManager->Init();
+        LOG_INFO(sLogger, ("basemanager init ", res));
     }
 
     // init self monitor
@@ -280,44 +278,62 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     eBPFConfig->mPluginType = type;
     // call update function
     // step2: call init function
+    auto pluginMgr = GetPluginManager(type);
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
-            auto mgr = ProcessSecurityManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
-            UpdatePluginManager(type, mgr);
-            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (mgr->Init(options) == 0);
+            if (!pluginMgr) {
+                pluginMgr = ProcessSecurityManager::Create(
+                    mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                UpdatePluginManager(type, pluginMgr);
+            } else {
+                pluginMgr->UpdateBaseManager(mBaseManager);
+            }
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
         case PluginType::NETWORK_OBSERVE: {
+            if (!pluginMgr) {
+                pluginMgr = NetworkObserverManager::Create(
+                    mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                UpdatePluginManager(type, pluginMgr);
+            } else {
+                pluginMgr->UpdateBaseManager(mBaseManager);
+            }
             NetworkObserveConfig nconfig;
-
             // TODO @qianlu.kk register k8s metadata callback for metric ??
-            auto mgr = NetworkObserverManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
-            UpdatePluginManager(type, mgr);
-            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
 
-            ret = (mgr->Init(options) == 0);
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+
+            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
         case PluginType::NETWORK_SECURITY: {
-            auto mgr = NetworkSecurityManager::Create(
+            if (!pluginMgr) {
+                pluginMgr = NetworkSecurityManager::Create(
                 mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
-            UpdatePluginManager(type, mgr);
-            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (mgr->Init(options) == 0);
+                UpdatePluginManager(type, pluginMgr);
+            } else {
+                pluginMgr->UpdateBaseManager(mBaseManager);
+            }
+
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
         case PluginType::FILE_SECURITY: {
-            auto mgr = FileSecurityManager::Create(
+            if (!pluginMgr) {
+                pluginMgr = FileSecurityManager::Create(
                 mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
-            UpdatePluginManager(type, mgr);
-            mgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (mgr->Init(options) == 0);
+                UpdatePluginManager(type, pluginMgr);
+            } else {
+                pluginMgr->UpdateBaseManager(mBaseManager);
+            }
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            ret = (pluginMgr->Init(options) == 0);
             break;
         }
         default:
@@ -367,22 +383,27 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
 
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
     auto pluginManager = GetPluginManager(type);
-    if (pluginManager) {
+    if (pluginManager && pluginManager->IsRunning()) {
         pluginManager->UpdateContext(nullptr, -1, -1);
-        int ret = pluginManager->Destroy() == 0;
-        UpdatePluginManager(type, nullptr);
-        if (ret) {
-            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
+        int ret = pluginManager->Destroy();
+        if (ret == 0) {
+            pluginManager->UpdateBaseManager(nullptr);
+            LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY || type == PluginType::FILE_SECURITY) {
                 // check if we need stop basemanager
-                if (!GetPluginManager(PluginType::NETWORK_SECURITY) && !GetPluginManager(PluginType::PROCESS_SECURITY) && !GetPluginManager(PluginType::FILE_SECURITY)) {
+                auto nsMgr = GetPluginManager(PluginType::NETWORK_SECURITY);
+                auto psMgr = GetPluginManager(PluginType::PROCESS_SECURITY);
+                auto fsMgr = GetPluginManager(PluginType::FILE_SECURITY);
+                if ((!nsMgr || !nsMgr->IsRunning()) && (!psMgr || !psMgr->IsRunning()) && (!fsMgr || !fsMgr->IsRunning())) {
                     LOG_WARNING(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
                     mBaseManager->Stop();
                 }
             }
+        } else {
+            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type)) ("pipeline", pipeline_name));
         }
     } else {
-        LOG_WARNING(sLogger, ("no plugin registered, plugin type", magic_enum::enum_name(type))("pipeline", pipeline_name));
+        LOG_WARNING(sLogger, ("no plugin registered or not running, plugin type", magic_enum::enum_name(type))("pipeline", pipeline_name));
     }
     return true;
 }
@@ -419,7 +440,10 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type
     }
 
     auto mgr = GetPluginManager(type);
-    if (!mgr) return true;
+    if (!mgr || !mgr->IsRunning()) {
+        LOG_DEBUG(sLogger, ("plugin not registered or stopped", ""));
+        return true;
+    }
 
     // TODO @qianlu.kk
     // this will stop handle or push eventGroup to queue,
@@ -445,8 +469,9 @@ void eBPFServer::PollPerfBuffers() {
         }
         for (int i = 0; i < int(PluginType::MAX); i ++) {
             auto plugin = GetPluginManager(PluginType(i));
-            if (!plugin) continue;
-            plugin->PollPerfBuffer();
+            if (!plugin || !plugin->IsRunning()) continue;
+            int cnt = plugin->PollPerfBuffer();
+            LOG_DEBUG(sLogger, ("poll buffer for ", magic_enum::enum_name(PluginType(i)))("cnt", cnt)("running status", plugin->IsRunning()));
         }
     }
 }
@@ -473,7 +498,7 @@ void eBPFServer::HandlerEvents() {
     std::vector<std::shared_ptr<CommonEvent>> items(1024);
     while(mRunning) {
         // consume queue
-        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
         LOG_DEBUG(sLogger, ("get data events, number", count));
         // handle ....
         if (count == 0) {

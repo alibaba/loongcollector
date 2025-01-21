@@ -95,6 +95,7 @@ protected:
 private:
     Timer mTimer;
     std::atomic_bool mFlag = true;
+    int mStartUid = 0;
     std::vector<int> mVec;
     int mIntervalSec = 1;
     std::unique_ptr<SIZETAggTree<HT, std::vector<std::string>>> agg;
@@ -221,9 +222,14 @@ void AggregatorUnittest::TestAggManager() {
             }
             this->mVec.push_back(1);
             return true;
-        }, [this]() { // validator
-            return !this->mFlag.load();
-        }
+        }, [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid
     );
 
     mTimer.PushEvent(std::move(event));

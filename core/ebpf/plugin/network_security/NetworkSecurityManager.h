@@ -53,10 +53,28 @@ public:
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
+        LOG_DEBUG(sLogger,("begin to update plugin", ""));
+        bool res = mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY);
+        if (!res) {
+            LOG_ERROR(sLogger, ("failed to stop plugin", ""));
+            return 1;
+        }
+
+        LOG_DEBUG(sLogger, ("begin to restart plugin", ""));
+        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+        pc->mPluginType = PluginType::NETWORK_SECURITY;
+        NetworkSecurityConfig config;
+        SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        config.options_ = opts->mOptionList;
+        // no need to set perfbuffer
+        res = mSourceManager->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
+        return res ? 0 : 1;
+    }
+
 private:
     ReadWriteLock mLock;
-    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mAggregateTree; // guard by mLock
-    std::unique_ptr<SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>>> mSafeAggregateTree;
+    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> mAggregateTree; // guard by mLock
 };
 
 } // namespace ebpf

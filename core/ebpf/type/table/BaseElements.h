@@ -318,9 +318,9 @@ constexpr DataElement kContainerId = {
 };
 
 // for processes
-constexpr DataElement kProcessId = {"", "", "", "", "", AggregationType::Level0};
+constexpr DataElement kProcessId = {"", "", "", "process.id", "", AggregationType::Level0};
 
-constexpr DataElement kKtime = {"", "", "", "", "", AggregationType::Level0};
+constexpr DataElement kKtime = {"", "", "", "ktime", "", AggregationType::Level0};
 
 constexpr DataElement kExecId = {"", "", "", "exec_id", "", AggregationType::NoAggregate};
 

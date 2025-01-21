@@ -24,6 +24,8 @@
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "models/StringView.h"
 
+#include <random>
+
 extern "C" {
 #include <net.h>
 }
@@ -141,6 +143,9 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         LOG_ERROR(sLogger, ("update parsers", "failed"));
     }
 
+    mFlag = true;
+    mStartUid++;
+
     // start conntracker ...
     mConnTrackerMgr = ConnTrackerManager::Create();
     mConnTrackerMgr->Start();
@@ -187,21 +192,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             return data;
         });
 
-    mSafeAppAggregator = std::make_unique<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>>(
-        4096,
-        [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-            base->m2xxCount += other->GetStatusCode() / 100 == 2;
-            base->m3xxCount += other->GetStatusCode() / 100 == 3;
-            base->m4xxCount += other->GetStatusCode() / 100 == 4;
-            base->m5xxCount += other->GetStatusCode() / 100 == 5;
-            base->mCount++;
-            base->mErrCount += other->IsError();
-            base->mSlowCount += other->IsSlow();
-        },
-        [this](const std::shared_ptr<AbstractAppRecord>& in) {
-            return std::make_unique<AppMetricData>(in->GetConnId(), in->GetSpanName());
-        });
-
     mNetAggregator = std::make_unique<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>>(
         4096,
         [this](std::unique_ptr<NetMetricData>& base, const std::shared_ptr<ConnStatsRecord>& other) {
@@ -226,15 +216,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         [this](const std::shared_ptr<AbstractAppRecord>& in) {
             return std::make_unique<AppSpanGroup>();
         });
-    mSafeSpanAggregator = std::make_unique<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>>(
-        4096,
-        [this](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-            // TODO aggregate
-            base->mRecords.push_back(other);
-        },
-        [this](const std::shared_ptr<AbstractAppRecord>& in) {
-            return std::make_unique<AppSpanGroup>();
-        });
 
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
         1,
@@ -245,10 +226,11 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
             {
                 WriteLock lk(mSpanAggLock);
-                std::swap(this->mSpanAggregator, this->mSafeSpanAggregator);
+                // TODO move ...
+                // std::swap(this->mSpanAggregator, this->mSpanAggregator);
             }
 
-            auto nodes = this->mSafeSpanAggregator->GetNodesWithAggDepth(1);
+            auto nodes = this->mSpanAggregator->GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -261,7 +243,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ... 
                 bool init = false;
                 bool needPush = false;
-                this->mSafeSpanAggregator->ForEach(node, [&](const AppSpanGroup* group) {
+                this->mSpanAggregator->ForEach(node, [&](const AppSpanGroup* group) {
                     // set process tag
                     if (group->mRecords.empty()) {
                         LOG_DEBUG(sLogger, ("", "no records .."));
@@ -329,7 +311,11 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 });
                 if (init && needPush) {
                     std::lock_guard lk(mContextMutex);
+                    if (this->mPipelineCtx == nullptr) {
+                        return true;
+                    }
                     auto eventSize = eventGroup.GetEvents().size();
+                    LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
                     std::unique_ptr<ProcessQueueItem> item
                         = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
                     if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
@@ -343,14 +329,18 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
                 }
             }
-            this->mSafeSpanAggregator->Clear();
+            this->mSpanAggregator->Clear();
 
             return true;
         },
-
-        [this]() { // validator
-            return !this->mFlag.load();
-        });
+        [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid);
 
     auto appMetricHandler = [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             if (!this->mFlag || this->mSuspendFlag) {
@@ -359,10 +349,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
             {
                 WriteLock lk(this->mAppAggLock);
-                std::swap(this->mAppAggregator, this->mSafeAppAggregator);
+                // std::swap(this->mAppAggregator, this->mAppAggregator);
             }
 
-            auto nodes = this->mSafeAppAggregator->GetNodesWithAggDepth(1);
+            auto nodes = this->mAppAggregator->GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -386,7 +376,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 bool needPush = false;
 
                 bool init = false;
-                this->mSafeAppAggregator->ForEach(node, [&](const AppMetricData* group) {
+                this->mAppAggregator->ForEach(node, [&](const AppMetricData* group) {
                     // instance dim
                     if (group->mAppId.size()) {
                         needPush = true;
@@ -401,10 +391,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
                     if (!init) {
                         // set app attrs ... 
-                        eventGroup.SetTag(kAppId.metric_key(), group->mAppId); // app id 
-                        eventGroup.SetTag(kIp.metric_key(), group->mIp); // pod ip
-                        eventGroup.SetTag(kAppName.metric_key(), group->mAppName); // app name
-                        eventGroup.SetTag(kHost.metric_key(), group->mHost); // pod name
+                        eventGroup.SetTag(std::string(kAppId.metric_key()), group->mAppId); // app id 
+                        eventGroup.SetTag(std::string(kIp.metric_key()), group->mIp); // pod ip
+                        eventGroup.SetTag(std::string(kAppName.metric_key()), group->mAppName); // app name
+                        eventGroup.SetTag(std::string(kHost.metric_key()), group->mHost); // pod name
                         
                         auto* tagMetric = eventGroup.AddMetricEvent();
                         tagMetric->SetName("arms_tag_entity");
@@ -517,7 +507,11 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 });
                 if (needPush){
                     std::lock_guard lk(mContextMutex);
+                    if (this->mPipelineCtx == nullptr) {
+                        return true;
+                    }
                     auto eventSize = eventGroup.GetEvents().size();
+                    LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
                     std::unique_ptr<ProcessQueueItem> item
                         = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
                     
@@ -532,7 +526,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     LOG_DEBUG(sLogger, ("appid is empty, no need to push", ""));
                 }
             }
-            this->mSafeAppAggregator->Clear();
+            this->mAppAggregator->Clear();
 
             return true;
         };
@@ -540,9 +534,14 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     std::unique_ptr<AggregateEvent> appMetricEvent = std::make_unique<AggregateEvent>(
         15,
         appMetricHandler,
-        [this]() { // validator
-            return !this->mFlag.load();
-        });
+        [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_WARNING(sLogger, ("stop schedule, invalid, mflag", this->mFlag) ("currentUid", currentUid) ("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid);
 
     mScheduler->PushEvent(std::move(appMetricEvent));
     mScheduler->PushEvent(std::move(appTraceEvent));

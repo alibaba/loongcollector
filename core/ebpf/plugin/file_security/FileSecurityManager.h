@@ -34,8 +34,8 @@ public:
     FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
                         std::shared_ptr<SourceManager> sourceManager,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        std::shared_ptr<Timer> scheduler)
-        : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
+                        std::shared_ptr<Timer> scheduler);
+                        
     static std::shared_ptr<FileSecurityManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
@@ -54,10 +54,28 @@ public:
 
     virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
+        LOG_DEBUG(sLogger,("begin to update plugin", ""));
+        bool res = mSourceManager->StopPlugin(PluginType::FILE_SECURITY);
+        if (!res) {
+            LOG_ERROR(sLogger, ("failed to stop plugin", ""));
+            return 1;
+        }
+
+        LOG_DEBUG(sLogger, ("begin to restart plugin", ""));
+        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+        pc->mPluginType = PluginType::FILE_SECURITY;
+        FileSecurityConfig config;
+        SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        config.options_ = opts->mOptionList;
+        // no need to set perfbuffer
+        res = mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
+        return res ? 0 : 1;
+    }
+
 private:
     ReadWriteLock mLock;
-    std::unique_ptr<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> mAggregateTree;
-    std::unique_ptr<SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>>> mSafeAggregateTree;
+    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> mAggregateTree;
 };
 
 } // namespace ebpf
