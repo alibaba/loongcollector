@@ -61,6 +61,9 @@ func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTa
 
 func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	tagsMap := make(map[string]string)
+	if logCtx.Context == nil {
+		logCtx.Context = make(map[string]interface{})
+	}
 	if tags, ok := logCtx.Context["tags"]; ok {
 		tagsArray, ok := tags.([]*protocol.LogTag)
 		if !ok {
@@ -102,11 +105,11 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
-			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
+			in.Group.Tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
 		} else {
 			if customKey, ok := p.agentEnvMetaTagKey[helper.EnvTags[i]]; ok {
 				if customKey != "" {
-					tagsMap[customKey] = helper.EnvTags[i+1]
+					in.Group.Tags.Add(customKey, helper.EnvTags[i+1])
 				}
 			}
 		}
