@@ -81,8 +81,16 @@ public:
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
     std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
-        return 0;
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+        auto ebpfConfig = std::make_unique<PluginConfig>();
+        ebpfConfig->mPluginType = PluginType::NETWORK_OBSERVE;
+        return ebpfConfig;
+    }
+
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override { 
+        // TODO
+        LOG_WARNING(sLogger, ("TODO", "not support yet"));
+        return 0; 
     }
 
 private:

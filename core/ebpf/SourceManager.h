@@ -46,7 +46,14 @@ public:
 
     bool StopPlugin(PluginType plugin_type);
 
+    // detach bpf progs ...
     bool SuspendPlugin(PluginType plugin_type);
+
+    // just update configs ...
+    bool UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+
+    // re-attach bpf progs ...
+    bool ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
 
     bool CheckPluginRunning(PluginType plugin_type);
 
@@ -65,7 +72,6 @@ private:
     bool LoadDynamicLib(const std::string& lib_name);
     bool LoadCoolBPF();
     bool DynamicLibSuccess();
-    bool UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
 
     enum class network_observer_uprobe_funcs {
         EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG,

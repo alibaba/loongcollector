@@ -50,8 +50,15 @@ public:
     // process perfbuffer was polled by baseManager ...
     virtual int PollPerfBuffer() override { return 0; }
 
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+        auto ebpfConfig = std::make_unique<PluginConfig>();
+        ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
+        return ebpfConfig;
+    }
+
     virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override { 
         // do nothing ...
+        LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0; 
     }
 

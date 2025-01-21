@@ -30,6 +30,7 @@
 #include "ebpf/type/SecurityEvent.h"
 #include "common/timer/Timer.h"
 #include "ebpf/type/CommonDataEvent.h"
+#include "common/magic_enum.hpp"
 
 // #include "driver/bpf_wrapper.h"
 // #include "common/agg_tree.h"
@@ -70,22 +71,43 @@ public:
     //     aggregate_tree_ = nullptr;
     // }
 
-    virtual void Suspend() {
+    virtual int Suspend() {
         WriteLock lock(mMtx);
         // flag_ = false;
         mSuspendFlag = true;
         mRunnerCV.notify_all();
-        return;
+        bool ret = mSourceManager->SuspendPlugin(GetPluginType());
+        if (!ret) {
+            LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(GetPluginType())));
+            return 1;
+        }
+        return 0;
     }
 
-    virtual void Resume() {
-        WriteLock lock(mMtx);
-        mSuspendFlag = false;
-        mRunnerCV.notify_all();
-        return;
+    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+        {
+            WriteLock lock(mMtx);
+            mSuspendFlag = false;
+            mRunnerCV.notify_all();
+        }
+        bool ret = mSourceManager->ResumePlugin(GetPluginType(), GeneratePluginConfig(options));
+        if (!ret) {
+            LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
+            return 1;
+        }
+        return 0;
     }
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
+
+    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+        bool ret = mSourceManager->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
+        if (!ret) {
+            LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
+            return 1;
+        }
+        return 0;
+    }
 
     void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
         std::lock_guard lk(mContextMutex);

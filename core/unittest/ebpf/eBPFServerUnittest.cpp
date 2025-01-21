@@ -286,20 +286,6 @@ void eBPFServerUnittest::TestProcessSecurity() {
     std::this_thread::sleep_for(std::chrono::seconds(10));
     res = input->Stop(true);
     EXPECT_TRUE(res);
-
-
-
-    // SecurityOptions opts;
-    // auto res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-    //     "test", 1, logtail::ebpf::PluginType::PROCESS_SECURITY, &ctx, &opts, input->mPluginMgr);
-    // EXPECT_TRUE(res);
-
-    // std::this_thread::sleep_for(std::chrono::seconds(10));
-
-    // // stop
-    // res = ebpf::eBPFServer::GetInstance()->DisablePlugin("test", PluginType::PROCESS_SECURITY);
-    // EXPECT_TRUE(res);
-    // ebpf::eBPFServer::GetInstance()->Stop();
 }
 
 void eBPFServerUnittest::TestUpdateFileSecurity() {
@@ -317,6 +303,7 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
         }
     )";
 
+    ctx.SetConfigName("test-pipeline-1");
     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
@@ -325,12 +312,7 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     Json::Value configJson, optionalGoPipeline;
     ;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_file_security");
-    input->Init(configJson, optionalGoPipeline);
-    bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_file_security", 0, logtail::ebpf::PluginType::FILE_SECURITY, &ctx, &security_options, input->mPluginMgr);
-    
+    auto res = input->Init(configJson, optionalGoPipeline);
     res = input->Start();
     EXPECT_TRUE(res);
     std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -356,7 +338,85 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     res = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(res);
-    input->Start();
+    res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+}
+
+void eBPFServerUnittest::TestUpdateNetworkSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_network_security",
+            "ProbeConfig":
+            {
+                "AddrFilter": {
+                    "DestAddrList": ["10.0.0.0/8"],
+                    "DestPortList": [80],
+                    "SourceAddrBlackList": ["127.0.0.1/8"],
+                    "SourcePortBlackList": [9300]
+                }
+            }
+        }
+    )";
+    std::shared_ptr<InputNetworkSecurity> input(new InputNetworkSecurity());
+    ctx.SetConfigName("test-file-pipeline");
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    ;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+
+    // suspend
+    res = input->Stop(false);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    // update & resume
+    input = std::make_shared<InputNetworkSecurity>();
+    configStr = R"(
+        {
+            "Type": "input_network_security",
+            "ProbeConfig":
+            {
+                "AddrFilter": {
+                    "DestAddrList": ["192.168.0.0/16"],
+                    "DestPortList": [80],
+                    "SourceAddrBlackList": ["127.0.0.1/8"],
+                    "SourcePortBlackList": [9300]
+                }
+            }
+        }
+    )";
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "2");
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    res = input->Init(configJson, optionalGoPipeline);
+    EXPECT_TRUE(res);
+    res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+
 }
 
 // static int generateRandomInt(int bound) {
@@ -1163,8 +1223,9 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);

@@ -343,7 +343,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         default:
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "unknown plugin type, please check. \n");
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[start plugin] unknown plugin type, please check. \n");
             break;
     }
     gPluginStatus[int(arg->mPluginType)] = true;
@@ -380,6 +380,61 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
     return cnt;
 }
 
+// deprecated
+int resume_plugin(logtail::ebpf::PluginConfig* arg) {
+    switch (arg->mPluginType) {
+        case logtail::ebpf::PluginType::FILE_SECURITY: {
+            auto config = std::get_if<logtail::ebpf::FileSecurityConfig>(&arg->mConfig);
+            int ret = 0;
+            // update filter config
+            std::vector<logtail::ebpf::AttachProgOps> attach_ops; 
+            for (auto opt : config->options_) {
+                for (auto cn : opt.call_names_) {
+                    attach_ops.emplace_back("kprobe_" + cn, true);
+                    gPluginCallNames[int(arg->mPluginType)].push_back(cn);
+                }
+            }
+            // dynamic instrument
+            ret = wrapper->DynamicAttachBPFObject(attach_ops);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                        "file security: DynamicAttachBPFObject fail\n");
+                return 1;
+            }
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                     "file security: DynamicAttachBPFObject success\n");
+            break;
+        }
+        case logtail::ebpf::PluginType::NETWORK_SECURITY: {
+            auto config = std::get_if<logtail::ebpf::NetworkSecurityConfig>(&arg->mConfig);
+            int ret = 0;
+            // update filter config
+            std::vector<logtail::ebpf::AttachProgOps> attach_ops; 
+            for (auto opt : config->options_) {
+                for (auto cn : opt.call_names_) {
+                    attach_ops.emplace_back("kprobe_" + cn, true);
+                    gPluginCallNames[int(arg->mPluginType)].push_back(cn);
+                }
+            }
+            // dynamic instrument
+            ret = wrapper->DynamicAttachBPFObject(attach_ops);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                        "network security: DynamicAttachBPFObject fail\n");
+                return 1;
+            }
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                     "network security: DynamicAttachBPFObject success\n");
+            break;
+        }
+        default:
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[resume plugin] unknown plugin type, please check. \n");
+            break;
+    }
+    gPluginStatus[int(arg->mPluginType)] = true;
+    return 0;
+}
+
 // just update config ...
 int update_plugin(logtail::ebpf::PluginConfig* arg) {
     auto pluginType = arg->mPluginType;
@@ -387,66 +442,54 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
         return 0;
     }
 
-    gPluginStatus[int(pluginType)] = false;
-
     switch (pluginType) {
         case logtail::ebpf::PluginType::NETWORK_SECURITY: {
-            // 1. dynamic detach
-            auto callNames = gPluginCallNames[int(pluginType)];
-            gPluginCallNames[int(pluginType)] = {};
-            std::vector<logtail::ebpf::AttachProgOps> detachOps;
-            for (auto cn : callNames) {
-                detachOps.emplace_back("kprobe_" + cn, true);
-            }
-            int ret = 0;
-            ret = wrapper->DynamicDetachBPFObject(detachOps);
-            if (ret) {
-                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "network security: detach progs failed\n");
-            }
-            // 2. clean-up filter
-            for (auto cn : callNames) {
-                ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
-                if (ret) {
-                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "network security: delete filter for callname %s falied\n", cn);
+            auto config = std::get_if<logtail::ebpf::NetworkSecurityConfig>(&arg->mConfig);
+            for (auto opt : config->options_) {
+                for (auto cn : opt.call_names_) {
+                    gPluginCallNames[int(arg->mPluginType)].push_back(cn);
+                    int ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
+                    if (ret) {
+                        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                                "[update plugin] network security delete filter for callname %s failed.\n", cn);
+                        return 1;
+                    }
+
+                    ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.filter_);
+                    if (ret) {
+                        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                                "[update plugin] network security: create filter for callname %s falied.\n", cn);
+                    }
                 }
             }
-            // 3. reload filter
 
-            // 4. start
             break;
         }
         case logtail::ebpf::PluginType::FILE_SECURITY: {
-            // 1. dynamic detach
-            auto callNames = gPluginCallNames[int(pluginType)];
-            gPluginCallNames[int(pluginType)] = {};
-            std::vector<logtail::ebpf::AttachProgOps> detachOps;
-            for (auto cn : callNames) {
-                detachOps.emplace_back("kprobe_" + cn, true);
-            }
-            int ret = wrapper->DynamicDetachBPFObject(detachOps);
-            if (ret) {
-                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "network security: detach progs failed\n");
-            }
-            // 2. clean-up filter
-            for (auto cn : callNames) {
-                ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
-                if (ret) {
-                    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "file security: delete filter for callname %s falied\n", cn);
+            
+            auto config = std::get_if<logtail::ebpf::FileSecurityConfig>(&arg->mConfig);
+            // 1. clean-up filter
+            for (auto opt : config->options_) {
+                for (auto cn : opt.call_names_) {
+                    int ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
+                    if (ret) {
+                        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                            "[update plugin] file security: delete filter for callname %s falied.\n", cn);
+                    }
+                    ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.filter_);
+                    if (ret) {
+                        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                            "[update plugin] file security: create filter for callname %s falied\n", cn);
+                    }
                 }
             }
-            // 3. reload filter
-            
-            // 4. start
             break;
         }
         default:
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[update plugin] %s plugin type not supported.\n", magic_enum::enum_name(arg->mPluginType));
             break;
     }
-    gPluginStatus[int(pluginType)] = true;
+
     return 0;
 }
 
@@ -483,7 +526,7 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             int ret = wrapper->DynamicDetachBPFObject(attach_ops);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "process security: detach progs failed\n");
+                    "[stop plugin] process security: detach progs failed\n");
             }
             // 2. delete perf buffer
             DeletePerfBuffers(pluginType);
@@ -501,14 +544,14 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             ret = wrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "network security: detach progs failed\n");
+                    "[stop plugin] network security: detach progs failed\n");
             }
             // 2. clean-up filter
             for (auto cn : callNames) {
                 ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "network security: delete filter for callname %s falied\n", cn);
+                     "[stop plugin] network security: delete filter for callname %s falied\n", cn);
                 }
             }
             // 3. delete perf buffer
@@ -526,14 +569,14 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             int ret = wrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "network security: detach progs failed\n");
+                    "[stop plugin] network security: detach progs failed\n");
             }
             // 2. clean-up filter
             for (auto cn : callNames) {
                 ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "file security: delete filter for callname %s falied\n", cn);
+                     "[stop plugin] file security: delete filter for callname %s falied\n", cn);
                 }
             }
             
@@ -542,18 +585,52 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             break;
         }
         default:
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[stop plugin] unknown plugin type, please check. \n");
             break;
     }
     return 0;
 }
 
-// deprecated
-int suspend_plugin(logtail::ebpf::PluginType) {
-    return 0;
-}
-
-// deprecated
-int resume_plugin(logtail::ebpf::PluginType) {
+// do prog detach 
+int suspend_plugin(logtail::ebpf::PluginType pluginType) {
+    gPluginStatus[int(pluginType)] = false;
+    switch (pluginType) {
+        case logtail::ebpf::PluginType::NETWORK_OBSERVE:
+            return ebpf_stop();
+        case logtail::ebpf::PluginType::NETWORK_SECURITY: {
+            auto callNames = gPluginCallNames[int(pluginType)];
+            gPluginCallNames[int(pluginType)] = {};
+            std::vector<logtail::ebpf::AttachProgOps> detachOps;
+            for (auto cn : callNames) {
+                detachOps.emplace_back("kprobe_" + cn, true);
+            }
+            int ret = 0;
+            ret = wrapper->DynamicDetachBPFObject(detachOps);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                    "[suspend plugin] network security: detach progs failed\n");
+            }
+            break;
+        }
+        case logtail::ebpf::PluginType::FILE_SECURITY: {
+            auto callNames = gPluginCallNames[int(pluginType)];
+            gPluginCallNames[int(pluginType)] = {};
+            std::vector<logtail::ebpf::AttachProgOps> detachOps;
+            for (auto cn : callNames) {
+                detachOps.emplace_back("kprobe_" + cn, true);
+            }
+            int ret = wrapper->DynamicDetachBPFObject(detachOps);
+            if (ret) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                    "[suspend plugin] file security: detach progs failed\n");
+            }
+            break;
+        }
+        case logtail::ebpf::PluginType::PROCESS_SECURITY:
+        default:
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[suspend plugin] unknown plugin type, please check. \n");
+            break;
+    }
     return 0;
 }
 

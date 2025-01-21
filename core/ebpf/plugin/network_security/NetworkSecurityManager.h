@@ -53,23 +53,14 @@ public:
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
-        LOG_DEBUG(sLogger,("begin to update plugin", ""));
-        bool res = mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY);
-        if (!res) {
-            LOG_ERROR(sLogger, ("failed to stop plugin", ""));
-            return 1;
-        }
-
-        LOG_DEBUG(sLogger, ("begin to restart plugin", ""));
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         config.options_ = opts->mOptionList;
-        // no need to set perfbuffer
-        res = mSourceManager->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
-        return res ? 0 : 1;
+        pc->mConfig = std::move(config);
+        return pc;
     }
 
 private:

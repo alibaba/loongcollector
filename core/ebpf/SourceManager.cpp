@@ -329,13 +329,7 @@ bool SourceManager::StartPlugin(PluginType plugin_type,
                 = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)];
         }
     }
-    // conf->type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
-    // FillCommonConf(conf);
-    // #ifdef APSARA_UNIT_TEST_MAIN
-    //     mConfig = std::move(conf);
-    //     mRunning[int(plugin_type)] = true;
-    //     return true;
-    // #endif
+
     void* f = mFuncs[(int)ebpf_func::EBPF_START_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(plugin_type)));
@@ -348,6 +342,24 @@ bool SourceManager::StartPlugin(PluginType plugin_type,
     return !res;
 }
 
+bool SourceManager::ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
+    if (!CheckPluginRunning(plugin_type)) {
+        LOG_ERROR(sLogger, ("plugin not started, type", int(plugin_type)));
+        return false;
+    }
+
+    LOG_INFO(sLogger, ("begin to resume plugin, type", int(plugin_type)));
+    void* f = mFuncs[(int)ebpf_func::EBPF_RESUME_PLUGIN];
+    if (!f) {
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
+        return false;
+    }
+
+    auto resume_f = (resume_plugin_func)f;
+    int res = resume_f(conf.get());
+    return !res;
+}
+
 bool SourceManager::UpdatePlugin(PluginType plugin_type,
                                  std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(plugin_type)) {
@@ -356,12 +368,6 @@ bool SourceManager::UpdatePlugin(PluginType plugin_type,
     }
 
     LOG_INFO(sLogger, ("begin to update plugin, type", int(plugin_type)));
-    // conf->type = UpdataType::SECURE_UPDATE_TYPE_CONFIG_CHAGE;
-    // FillCommonConf(conf);
-    // #ifdef APSARA_UNIT_TEST_MAIN
-    //     mConfig = std::move(conf);
-    //     return true;
-    // #endif
     void* f = mFuncs[(int)ebpf_func::EBPF_UPDATE_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
@@ -378,14 +384,6 @@ bool SourceManager::SuspendPlugin(PluginType plugin_type) {
         LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(plugin_type)));
         return false;
     }
-    //     auto config = std::make_unique<PluginConfig>();
-    //     config->mPluginType = plugin_type;
-    //     // config->type = UpdataType::SECURE_UPDATE_TYPE_SUSPEND_PROBE;
-    // #ifdef APSARA_UNIT_TEST_MAIN
-    //     mConfig = std::move(config);
-    //     return true;
-    // #endif
-    // ensure that sysak would not call handle()
     void* f = mFuncs[(int)ebpf_func::EBPF_SUSPEND_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", int(plugin_type)));
@@ -406,17 +404,9 @@ bool SourceManager::StopPlugin(PluginType plugin_type) {
 
     auto config = std::make_unique<PluginConfig>();
     config->mPluginType = plugin_type;
-    // config->type = UpdataType::SECURE_UPDATE_TYPE_DISABLE_PROBE;
-
-    // #ifdef APSARA_UNIT_TEST_MAIN
-    //     mConfig = std::move(config);
-    //     mRunning[int(plugin_type)] = false;
-    //     return true;
-    // #endif
-
     void* f = mFuncs[(int)ebpf_func::EBPF_STOP_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, remove func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", int(plugin_type)));
         return false;
     }
 
@@ -435,37 +425,14 @@ bool SourceManager::BPFMapUpdateElem(PluginType plugin_type, const std::string& 
 
     void* f = mFuncs[(int)ebpf_func::EBPF_MAP_UPDATE_ELEM];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, remove func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update bpf map elem func ptr is null", int(plugin_type)));
         return false;
     }
 
     auto ff = (update_bpf_map_elem_func)f;
     int res = ff(plugin_type, map_name.c_str(), key, value, flag);
     return res == 0;
-
 }
-
-//// ******************* ////
-// int SourceManager::PrepareSkeleton(PluginType type) {
-//     void* f = mFuncs[(int)ebpf_op_func::PREPARE_SKELETON];
-//     if (f) {
-//         auto func = (prepare_skeleton_func)f;
-//         return func(type);
-//     } else {
-//         return -1;
-//     }
-// }
-
-// int SourceManager::NetworkObserverSetupNetStatisticsProcessFunc(const std::function<void(void *, struct
-// conn_stats_event_t *)>& func, void* custom_data) {
-//     void* f = mFuncs[(int)ebpf_op_func::SETUP_NET_STATISTICS_PROCESS_FUNC];
-//     if (f) {
-//         auto stats_func = (ebpf_setup_net_statistics_process_func)f;
-//         return stats_func(func, custom_data);
-//     } else {
-//         return -1;
-//     }
-// }
 
 } // namespace ebpf
 } // namespace logtail
