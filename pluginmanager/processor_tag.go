@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !enterprise
-
 package pluginmanager
 
 import (
@@ -21,7 +19,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type TagKey int
@@ -58,10 +55,7 @@ func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTa
 		agentEnvMetaTagKey:     agentEnvMetaTagKey,
 		fileTagsPath:           fileTagsPath,
 	}
-	processorTag.parseDefaultAddedTag("HOST_NAME", TagKeyHostName, hostNameDefaultTagKey, pipelineMetaTagKey)
-	processorTag.parseDefaultAddedTag("HOST_IP", TagKeyHostIP, hostIPDefaultTagKey, pipelineMetaTagKey)
-	processorTag.parseOptionalTag("HOST_ID", TagKeyHostID, hostIDDefaultTagKey, pipelineMetaTagKey)
-	processorTag.parseOptionalTag("CLOUD_PROVIDER", TagKeyCloudProvider, cloudProviderDefaultTagKey, pipelineMetaTagKey)
+	processorTag.parseAllConfigurableTags(pipelineMetaTagKey)
 	return processorTag
 }
 
@@ -76,15 +70,18 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 			tagsMap[tag.Key] = tag.Value
 		}
 	}
-	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
-	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
-	// TODO: add host id and cloud provider
-	p.addTag(TagKeyHostID, "host id", tagsMap)
-	p.addTag(TagKeyCloudProvider, "cloud provider", tagsMap)
-
+	p.addAllConfigurableTags(tagsMap)
 	// TODO: file tags, read in background with double buffer
 	for i := 0; i < len(helper.EnvTags); i += 2 {
-		tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
+		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
+			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
+		} else {
+			if customKey, ok := p.agentEnvMetaTagKey[helper.EnvTags[i]]; ok {
+				if customKey != "" {
+					tagsMap[customKey] = helper.EnvTags[i+1]
+				}
+			}
+		}
 	}
 	newTags := make([]*protocol.LogTag, len(tagsMap))
 	i := 0
@@ -97,18 +94,22 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	tagsMap := make(map[string]string)
-	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
-	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
-	// TODO: add host id and cloud provider
-	p.addTag(TagKeyHostID, "host id", tagsMap)
-	p.addTag(TagKeyCloudProvider, "cloud provider", tagsMap)
+	p.addAllConfigurableTags(tagsMap)
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
 
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
-		in.Group.Tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
+		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
+			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
+		} else {
+			if customKey, ok := p.agentEnvMetaTagKey[helper.EnvTags[i]]; ok {
+				if customKey != "" {
+					tagsMap[customKey] = helper.EnvTags[i+1]
+				}
+			}
+		}
 	}
 }
 

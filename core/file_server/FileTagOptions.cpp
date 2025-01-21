@@ -16,8 +16,6 @@
 
 #include "file_server/FileTagOptions.h"
 
-#include <unistd.h>
-
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/ParamExtractor.h"
 #include "constants/TagConstants.h"
@@ -106,10 +104,14 @@ StringView FileTagOptions::GetFileTagKeyName(TagKey key) const {
 
 bool FileTagOptions::EnableLogPositionMeta() {
     auto offsetIter = mFileTags.find(TagKey::FILE_OFFSET_KEY);
-    bool enableFileOffset = offsetIter != mFileTags.end() && !offsetIter->second.empty();
+    if (offsetIter != mFileTags.end() && !offsetIter->second.empty()) {
+        return true;
+    }
     auto inodeIter = mFileTags.find(TagKey::FILE_INODE_TAG_KEY);
-    bool enableFileInode = inodeIter != mFileTags.end() && !inodeIter->second.empty();
-    return enableFileOffset || enableFileInode;
+    if (inodeIter != mFileTags.end() && !inodeIter->second.empty()) {
+        return true;
+    }
+    return false;
 }
 
 } // namespace logtail

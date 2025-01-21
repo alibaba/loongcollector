@@ -15,9 +15,6 @@
 #include "collection_pipeline/GlobalConfig.h"
 
 #include <string>
-#include <unordered_map>
-
-#include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -27,8 +24,13 @@ using namespace std;
 
 namespace logtail {
 
-const unordered_set<string> GlobalConfig::sNativeParam
-    = {"TopicType", "TopicFormat", "Priority", "EnableTimestampNanosecond", "UsingOldContentTag"};
+const unordered_set<string> GlobalConfig::sNativeParam = {"TopicType",
+                                                          "TopicFormat",
+                                                          "Priority",
+                                                          "EnableTimestampNanosecond",
+                                                          "UsingOldContentTag",
+                                                          "PipelineMetaTagKey",
+                                                          "AgentMetaTagKey"};
 
 bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineContext& ctx, Json::Value& extendedParams) {
     const string moduleName = "global";

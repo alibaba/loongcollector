@@ -115,7 +115,9 @@ func TestTagRename(t *testing.T) {
 	processorTag := NewProcessorTag(map[string]string{
 		"HOST_NAME": "test_host_name",
 		"HOST_IP":   "test_host_ip",
-	}, false, make(map[string]string), "")
+	}, true, map[string]string{
+		"test_env_tag": "test_env_tag_2",
+	}, "")
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
 			"tags": make([]*protocol.LogTag, 0),
@@ -127,7 +129,7 @@ func TestTagRename(t *testing.T) {
 	sort.Slice(tagsArray, func(i, j int) bool {
 		return tagsArray[i].Key < tagsArray[j].Key
 	})
-	assert.Equal(t, "test_env_tag", tagsArray[0].Key)
+	assert.Equal(t, "test_env_tag_2", tagsArray[0].Key)
 	assert.Equal(t, "test_env_tag_value", tagsArray[0].Value)
 	assert.Equal(t, "test_host_ip", tagsArray[1].Key)
 	assert.Equal(t, util.GetIPAddress(), tagsArray[1].Value)
@@ -143,7 +145,9 @@ func TestTagRenameV2(t *testing.T) {
 	processorTag := NewProcessorTag(map[string]string{
 		"HOST_NAME": "test_host_name",
 		"HOST_IP":   "test_host_ip",
-	}, false, make(map[string]string), "")
+	}, true, map[string]string{
+		"test_env_tag": "test_env_tag_2",
+	}, "")
 	in := &models.PipelineGroupEvents{
 		Group: &models.GroupInfo{
 			Tags: models.NewTags(),
@@ -152,6 +156,7 @@ func TestTagRenameV2(t *testing.T) {
 	processorTag.ProcessV2(in)
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get("test_host_name"))
 	assert.Equal(t, util.GetIPAddress(), in.Group.Tags.Get("test_host_ip"))
+	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag_2"))
 }
 
 func TestTagDelete(t *testing.T) {
@@ -162,7 +167,7 @@ func TestTagDelete(t *testing.T) {
 	processorTag := NewProcessorTag(map[string]string{
 		"HOST_NAME": "",
 		"HOST_IP":   "",
-	}, false, make(map[string]string), "")
+	}, true, make(map[string]string), "")
 	logCtx := &pipeline.LogWithContext{
 		Context: map[string]interface{}{
 			"tags": make([]*protocol.LogTag, 0),
@@ -170,9 +175,7 @@ func TestTagDelete(t *testing.T) {
 	}
 	processorTag.ProcessV1(logCtx)
 	tagsMap := logCtx.Context["tags"].([]*protocol.LogTag)
-	assert.Equal(t, 1, len(tagsMap))
-	assert.Equal(t, "test_env_tag", tagsMap[0].Key)
-	assert.Equal(t, "test_env_tag_value", tagsMap[0].Value)
+	assert.Equal(t, 0, len(tagsMap))
 }
 
 func TestTagDeleteV2(t *testing.T) {
@@ -183,14 +186,12 @@ func TestTagDeleteV2(t *testing.T) {
 	processorTag := NewProcessorTag(map[string]string{
 		"HOST_NAME": "",
 		"HOST_IP":   "",
-	}, false, make(map[string]string), "")
+	}, true, make(map[string]string), "")
 	in := &models.PipelineGroupEvents{
 		Group: &models.GroupInfo{
 			Tags: models.NewTags(),
 		},
 	}
 	processorTag.ProcessV2(in)
-	assert.Equal(t, "", in.Group.Tags.Get("HOST_NAME"))
-	assert.Equal(t, "", in.Group.Tags.Get("HOST_IP"))
-	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
+	assert.Equal(t, 0, in.Group.Tags.Len())
 }

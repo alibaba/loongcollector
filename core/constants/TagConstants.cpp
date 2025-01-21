@@ -53,13 +53,13 @@ const string& GetDefaultTagKeyString(TagKey key) {
 const string DEFAULT_CONFIG_TAG_KEY_VALUE = "__default__";
 
 ////////////////////////// LOG ////////////////////////
-const string DEFAULT_LOG_TAG_HOST_NAME = "__hostname__";
 const string DEFAULT_LOG_TAG_NAMESPACE = "_namespace_";
 const string DEFAULT_LOG_TAG_POD_NAME = "_pod_name_";
 const string DEFAULT_LOG_TAG_POD_UID = "_pod_uid_";
 const string DEFAULT_LOG_TAG_CONTAINER_NAME = "_container_name_";
 const string DEFAULT_LOG_TAG_CONTAINER_IP = "_container_ip_";
 const string DEFAULT_LOG_TAG_IMAGE_NAME = "_image_name_";
+const string DEFAULT_LOG_TAG_HOST_NAME = "__hostname__";
 const string DEFAULT_LOG_TAG_FILE_OFFSET = "__file_offset__";
 const string DEFAULT_LOG_TAG_FILE_INODE = "__inode__";
 const string DEFAULT_LOG_TAG_FILE_PATH = "__path__";

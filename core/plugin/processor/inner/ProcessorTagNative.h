@@ -37,11 +37,9 @@ private:
     void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
     void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
     std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
-#ifdef __ENTERPRISE__
     // After unmarshalling from json, we cannot determine the map is empty or no such config
     bool mAppendingAllEnvMetaTag = false;
     std::unordered_map<std::string, std::string> mAgentEnvMetaTagKey;
-#endif
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorTagNativeUnittest;

@@ -223,15 +223,13 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         if (!mContext.InitGlobalConfig(*config.mGlobal, extendedParams)) {
             return false;
         }
-        // extended global param includes: tag config
         AddExtendedGlobalParamToGoPipeline(extendedParams, mGoPipelineWithInput);
         AddExtendedGlobalParamToGoPipeline(extendedParams, mGoPipelineWithoutInput);
     }
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithInput);
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
 
-    if (config.ShouldAddNativeTagProcessor()) {
-        LOG_INFO(sLogger, ("add tag processor", "native"));
+    if (config.ShouldAddProcessorTagNative()) {
         unique_ptr<ProcessorInstance> processor
             = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
         Json::Value detail;
@@ -242,14 +240,14 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             // should not happen
             return false;
         }
-        mPipelineInnerProcessor.emplace_back(std::move(processor));
+        mPipelineInnerProcessorLine.emplace_back(std::move(processor));
     } else {
         // processor tag requires tags as input, so it is a special processor, cannot add as plugin
         if (!mGoPipelineWithInput.isNull()) {
-            mGoPipelineWithInput["global"]["EnableProcessorTag"] = true;
+            CopyTagParamToGoPipeline(mGoPipelineWithInput, config.mGlobal);
         }
         if (!mGoPipelineWithoutInput.isNull()) {
-            mGoPipelineWithoutInput["global"]["EnableProcessorTag"] = true;
+            CopyTagParamToGoPipeline(mGoPipelineWithoutInput, config.mGlobal);
         }
     }
 
@@ -402,7 +400,7 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
         p->Process(logGroupList);
     }
-    for (auto& p : mPipelineInnerProcessor) {
+    for (auto& p : mPipelineInnerProcessorLine) {
         p->Process(logGroupList);
     }
     for (auto& p : mProcessorLine) {
@@ -517,6 +515,29 @@ void CollectionPipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline
         Json::Value& global = pipeline["global"];
         global["EnableTimestampNanosecond"] = mContext.GetGlobalConfig().mEnableTimestampNanosecond;
         global["UsingOldContentTag"] = mContext.GetGlobalConfig().mUsingOldContentTag;
+    }
+}
+
+void CollectionPipeline::CopyTagParamToGoPipeline(Json::Value& root, const Json::Value* config) {
+    if (!root.isNull()) {
+        Json::Value& global = root["global"];
+        root["global"]["EnableProcessorTag"] = true;
+        if (config == nullptr) {
+            return;
+        }
+        // PipelineMetaTagKey
+        const string pipelineMetaTagKey = "PipelineMetaTagKey";
+        const Json::Value* itr
+            = config->find(pipelineMetaTagKey.c_str(), pipelineMetaTagKey.c_str() + pipelineMetaTagKey.length());
+        if (itr) {
+            global["PipelineMetaTagKey"] = *itr;
+        }
+        // AgentMetaTagKey
+        const string agentMetaTagKey = "AgentMetaTagKey";
+        itr = config->find(agentMetaTagKey.c_str(), agentMetaTagKey.c_str() + agentMetaTagKey.length());
+        if (itr) {
+            global["AgentMetaTagKey"] = *itr;
+        }
     }
 }
 

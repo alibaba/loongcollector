@@ -108,11 +108,14 @@ bool ContainerInfo::ParseByJSONObj(const Json::Value& params, ContainerInfo& con
             if (tags[i].isString() && tags[i - 1].isString()) {
                 std::string key = tags[i - 1].asString();
                 std::string value = tags[i].asString();
-                // 老版本或者容器元信息
-                if (isOldCheckpoint && containerNameTag.find(key) != containerNameTag.end()) {
-                    containerInfo.AddMetadata(key, value);
-                } else {
+                if (isOldCheckpoint) {
                     containerInfo.mTags.emplace_back(key, value);
+                } else {
+                    if (containerNameTag.find(key) != containerNameTag.end()) {
+                        containerInfo.AddMetadata(key, value);
+                    } else {
+                        containerInfo.mTags.emplace_back(key, value);
+                    }
                 }
             }
         }

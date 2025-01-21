@@ -14,11 +14,7 @@
 
 #include "common/ParamExtractor.h"
 
-#include <unordered_map>
-
 #include "boost/regex.hpp"
-
-#include "constants/TagConstants.h"
 
 using namespace std;
 
@@ -196,12 +192,12 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
     return true;
 }
 
-void ParseDefaultAddedTag(const Json::Value* config,
-                          const string& configField,
-                          const string& defaultTagKeyValue,
-                          const CollectionPipelineContext& context,
-                          const string& pluginType,
-                          string& customTagKey) {
+static void ParseDefaultAddedTag(const Json::Value* config,
+                                 const string& configField,
+                                 const string& defaultTagKeyValue,
+                                 const CollectionPipelineContext& context,
+                                 const string& pluginType,
+                                 string& customTagKey) {
     string errorMsg;
     customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
     if (config && config->isMember(configField)) {
@@ -224,12 +220,12 @@ void ParseDefaultAddedTag(const Json::Value* config,
     }
 }
 
-void ParseOptionalTag(const Json::Value* config,
-                      const string& configField,
-                      const string& defaultTagKeyValue,
-                      const CollectionPipelineContext& context,
-                      const string& pluginType,
-                      string& customTagKey) {
+static void ParseOptionalTag(const Json::Value* config,
+                             const string& configField,
+                             const string& defaultTagKeyValue,
+                             const CollectionPipelineContext& context,
+                             const string& pluginType,
+                             string& customTagKey) {
     string errorMsg;
     if (config && config->isMember(configField)) {
         if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {

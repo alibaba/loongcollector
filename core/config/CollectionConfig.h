@@ -67,7 +67,7 @@ struct CollectionConfig {
         return mHasGoFlusher || ShouldNativeFlusherConnectedByGoPipeline();
     }
 
-    bool ShouldAddNativeTagProcessor() const { return mHasNativeProcessor || (mHasNativeInput && !mHasGoProcessor); }
+    bool ShouldAddProcessorTagNative() const { return mHasNativeProcessor || (mHasNativeInput && !mHasGoProcessor); }
 
     // bool IsProcessRunnerInvolved() const {
     //     // 长期过渡使用，待C++部分的时序聚合能力与Go持平后恢复下面的正式版

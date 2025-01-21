@@ -16,11 +16,10 @@
 
 #pragma once
 #include <string>
-#include <vector>
 
 namespace logtail {
 
-enum TagKey : int {
+enum TagKey {
     FILE_OFFSET_KEY,
     FILE_INODE_TAG_KEY,
     FILE_PATH_TAG_KEY,

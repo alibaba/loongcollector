@@ -58,7 +58,7 @@ flushers:
 * 表1：Tag配置项以及默认值
 |  **配置项**  | **是否默认添加** |  **默认值**  |
 | --- | --- | --- |
-| HOST_NAME | 是 | host.name |
-| HOST_IP | 是 | host.ip |
-| HOST_ID | 是 | host.id |
-| CLOUD_PROVIDER | 是 | cloud.provider |
+| HOST_NAME | 是 | **hostname** |
+| HOST_IP | 是 | **host_ip** |
+| HOST_ID | 是 | **host_id** |
+| CLOUD_PROVIDER | 是 | **cloud_provider** |

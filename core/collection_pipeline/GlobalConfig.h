@@ -19,12 +19,9 @@
 #include <cstdint>
 
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "json/json.h"
-
-#include "constants/TagConstants.h"
 
 namespace logtail {
 

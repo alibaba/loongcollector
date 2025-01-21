@@ -72,7 +72,6 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
     ParseTagKey(tagConfig, "HOST_IP", TagKey::HOST_IP_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
 #endif
 
-#ifdef __ENTERPRISE__
     // AgentEnvMetaTagKey
     const std::string envTagKey = "AgentEnvMetaTagKey";
     const Json::Value* itr = config.find(envTagKey.c_str(), envTagKey.c_str() + envTagKey.length());
@@ -90,7 +89,6 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
                                  mContext->GetRegion());
         }
     }
-#endif
     return true;
 }
 
@@ -125,7 +123,6 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {
-#ifdef __ENTERPRISE__
             if (mAgentEnvMetaTagKey.empty() && mAppendingAllEnvMetaTag) {
                 logGroup.SetTagNoCopy(sEnvTags[i].key(), sEnvTags[i].value());
             } else {
@@ -137,9 +134,6 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
                     }
                 }
             }
-#else
-            logGroup.SetTagNoCopy(sEnvTags[i].key(), sEnvTags[i].value());
-#endif
         }
     }
 
