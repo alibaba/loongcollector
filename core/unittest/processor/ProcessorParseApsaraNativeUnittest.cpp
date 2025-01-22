@@ -533,7 +533,6 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         config["KeepingSourceWhenParseSucceed"] = false;
         config["CopingRawLog"] = false;
         config["RenamedSourceKey"] = "__raw__";
-        config["AppendingLogPositionMeta"] = false;
 
         // run function ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -568,7 +567,6 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         config["RenamedSourceKey"] = "__raw__";
         config["StartPattern"] = "[a-zA-Z0-9]*";
         config["UnmatchedContentTreatment"] = "single_line";
-        config["AppendingLogPositionMeta"] = false;
 
 
         // run function ProcessorSplitMultilineLogStringNative

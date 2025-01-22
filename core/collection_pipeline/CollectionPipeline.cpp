@@ -19,7 +19,10 @@
 #include <chrono>
 #include <cstdint>
 
+#include <memory>
 #include <utility>
+
+#include "json/value.h"
 
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
@@ -33,6 +36,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
+#include "plugin/processor/inner/ProcessorTagNative.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
@@ -225,6 +229,28 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithInput);
     CopyNativeGlobalParamToGoPipeline(mGoPipelineWithoutInput);
 
+    if (config.ShouldAddProcessorTagNative()) {
+        unique_ptr<ProcessorInstance> processor
+            = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, GenNextPluginMeta(false));
+        Json::Value detail;
+        if (config.mGlobal) {
+            detail = *config.mGlobal;
+        }
+        if (!processor->Init(detail, mContext)) {
+            // should not happen
+            return false;
+        }
+        mPipelineInnerProcessorLine.emplace_back(std::move(processor));
+    } else {
+        // processor tag requires tags as input, so it is a special processor, cannot add as plugin
+        if (!mGoPipelineWithInput.isNull()) {
+            CopyTagParamToGoPipeline(mGoPipelineWithInput, config.mGlobal);
+        }
+        if (!mGoPipelineWithoutInput.isNull()) {
+            CopyTagParamToGoPipeline(mGoPipelineWithoutInput, config.mGlobal);
+        }
+    }
+
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.
     if ((inputFile != nullptr || inputContainerStdio != nullptr) && IsFlushingThroughGoPipeline()) {
         mGoPipelineWithoutInput["global"]["DefaultLogQueueSize"]
@@ -374,6 +400,9 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
         p->Process(logGroupList);
     }
+    for (auto& p : mPipelineInnerProcessorLine) {
+        p->Process(logGroupList);
+    }
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
@@ -486,6 +515,29 @@ void CollectionPipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline
         Json::Value& global = pipeline["global"];
         global["EnableTimestampNanosecond"] = mContext.GetGlobalConfig().mEnableTimestampNanosecond;
         global["UsingOldContentTag"] = mContext.GetGlobalConfig().mUsingOldContentTag;
+    }
+}
+
+void CollectionPipeline::CopyTagParamToGoPipeline(Json::Value& root, const Json::Value* config) {
+    if (!root.isNull()) {
+        Json::Value& global = root["global"];
+        root["global"]["EnableProcessorTag"] = true;
+        if (config == nullptr) {
+            return;
+        }
+        // PipelineMetaTagKey
+        const string pipelineMetaTagKey = "PipelineMetaTagKey";
+        const Json::Value* itr
+            = config->find(pipelineMetaTagKey.c_str(), pipelineMetaTagKey.c_str() + pipelineMetaTagKey.length());
+        if (itr) {
+            global["PipelineMetaTagKey"] = *itr;
+        }
+        // AgentMetaTagKey
+        const string agentMetaTagKey = "AgentMetaTagKey";
+        itr = config->find(agentMetaTagKey.c_str(), agentMetaTagKey.c_str() + agentMetaTagKey.length());
+        if (itr) {
+            global["AgentMetaTagKey"] = *itr;
+        }
     }
 }
 

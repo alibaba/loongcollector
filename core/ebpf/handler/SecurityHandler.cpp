@@ -43,12 +43,6 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
     ;
     PipelineEventGroup event_group(source_buffer);
     // aggregate to pipeline event group
-    // set host ips
-    // TODO 后续这两个 key 需要移到 group 的 metadata 里，在 processortagnative 中转成tag
-    const static std::string host_ip_key = "host.ip";
-    const static std::string host_name_key = "host.name";
-    event_group.SetTag(host_ip_key, mHostIp);
-    event_group.SetTag(host_name_key, mHostName);
     for (const auto& x : events) {
         auto* event = event_group.AddLogEvent();
         for (const auto& tag : x->GetAllTags()) {

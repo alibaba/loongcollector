@@ -130,7 +130,6 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         // make config
         Json::Value config = GetCastSensWordConfig("content");
         config["SplitChar"] = "\n";
-        config["AppendingLogPositionMeta"] = false;
 
         // run function ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -159,7 +158,6 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         Json::Value config = GetCastSensWordConfig("content");
         config["StartPattern"] = "[a-zA-Z0-9]*";
         config["UnmatchedContentTreatment"] = "single_line";
-        config["AppendingLogPositionMeta"] = false;
 
         // run function ProcessorSplitMultilineLogStringNative
         ProcessorSplitMultilineLogStringNative processorSplitMultilineLogStringNative;
@@ -232,7 +230,6 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         // make config
         Json::Value config = GetCastSensWordConfig("content");
         config["SplitChar"] = "\n";
-        config["AppendingLogPositionMeta"] = false;
 
         // run function ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -261,7 +258,6 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         Json::Value config = GetCastSensWordConfig("content");
         config["StartPattern"] = "[asf|dbf].*";
         config["UnmatchedContentTreatment"] = "single_line";
-        config["AppendingLogPositionMeta"] = false;
         config["MergeType"] = "regex";
         // run function ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processorSplitLogStringNative;

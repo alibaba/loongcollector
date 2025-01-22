@@ -27,7 +27,6 @@ type GlobalConfig struct {
 	FlushIntervalMs             int
 	DefaultLogQueueSize         int
 	DefaultLogGroupQueueSize    int
-	Tags                        map[string]string
 	// Directory to store prometheus configuration file.
 	LoongcollectorPrometheusAuthorizationPath string
 	// Directory to store loongcollector data, such as checkpoint, etc.
@@ -51,13 +50,18 @@ type GlobalConfig struct {
 	// Network identification from loongcollector.
 	HostIP       string
 	Hostname     string
-	AlwaysOnline bool
 	DelayStopSec int
+	FileTagsPath string
 
 	EnableTimestampNanosecond      bool
 	UsingOldContentTag             bool
 	EnableContainerdUpperDirDetect bool
 	EnableSlsMetricsFormat         bool
+	EnableProcessorTag             bool
+
+	PipelineMetaTagKey     map[string]string
+	AppendingAllEnvMetaTag bool
+	AgentEnvMetaTagKey     map[string]string
 }
 
 // LoongcollectorGlobalConfig is the singleton instance of GlobalConfig.

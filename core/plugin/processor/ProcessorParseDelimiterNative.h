@@ -62,7 +62,7 @@ protected:
 private:
     static const std::string s_mDiscardedFieldKey;
 
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, const GroupMetadata& metadata);
     bool SplitString(const char* buffer,
                      int32_t begIdx,
                      int32_t endIdx,

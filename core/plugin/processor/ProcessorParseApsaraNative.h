@@ -41,8 +41,11 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool
-    ProcessEvent(const StringView& logPath, PipelineEventPtr& e, LogtailTime& lastLogTime, StringView& timeStrCache);
+    bool ProcessEvent(const StringView& logPath,
+                      PipelineEventPtr& e,
+                      LogtailTime& lastLogTime,
+                      StringView& timeStrCache,
+                      const GroupMetadata& metadata);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
     time_t
     ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);

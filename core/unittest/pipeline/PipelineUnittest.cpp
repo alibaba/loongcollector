@@ -197,7 +197,6 @@ void PipelineUnittest::OnSuccessfulInit() const {
     goPipelineWithInputStr = R"(
         {
             "global" : {
-                "AlwaysOnline": true,
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 5,
@@ -216,7 +215,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
             ],
             "extensions": [
                 {
-                    "type": "ext_basicauth/7",
+                    "type": "ext_basicauth/6",
                     "detail": {}
                 }
             ]
@@ -232,19 +231,19 @@ void PipelineUnittest::OnSuccessfulInit() const {
             },
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_http/6",
+                    "type": "flusher_http/5",
                     "detail": {}
                 }
             ],
             "extensions": [
                 {
-                    "type": "ext_basicauth/7",
+                    "type": "ext_basicauth/6",
                     "detail": {}
                 }
             ]
@@ -510,6 +509,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -619,23 +619,24 @@ void PipelineUnittest::OnInitVariousTopology() const {
             "global" : {
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
-                "DefaultLogQueueSize" : 10
+                "DefaultLogQueueSize": 10,
+                "EnableProcessorTag": true
             },
             "processors": [
                 {
-                    "type": "processor_regex/4",
+                    "type": "processor_regex/3",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/6",
+                    "type": "flusher_sls/5",
                     "detail": {
                         "EnableShardHash": false
                     }
@@ -651,6 +652,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -685,9 +687,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -725,6 +728,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -811,19 +815,19 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "processors": [
                 {
-                    "type": "processor_regex/5",
+                    "type": "processor_regex/4",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/6",
+                    "type": "aggregator_default/5",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/7",
+                    "type": "flusher_sls/6",
                     "detail": {
                         "EnableShardHash": false
                     }
@@ -839,6 +843,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -953,6 +958,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -981,9 +987,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -1015,6 +1022,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -1088,13 +1096,13 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_http/6",
+                    "type": "flusher_http/5",
                     "detail": {}
                 }
             ]
@@ -1108,6 +1116,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1205,23 +1214,24 @@ void PipelineUnittest::OnInitVariousTopology() const {
             "global" : {
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
-                "DefaultLogQueueSize" : 10
+                "DefaultLogQueueSize" : 10,
+                "EnableProcessorTag": true
             },
             "processors": [
                 {
-                    "type": "processor_regex/4",
+                    "type": "processor_regex/3",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_http/6",
+                    "type": "flusher_http/5",
                     "detail": {}
                 }
             ]
@@ -1235,6 +1245,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1264,9 +1275,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -1302,6 +1314,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -1378,19 +1391,19 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "processors": [
                 {
-                    "type": "processor_regex/5",
+                    "type": "processor_regex/4",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/6",
+                    "type": "aggregator_default/5",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_http/7",
+                    "type": "flusher_http/6",
                     "detail": {}
                 }
             ]
@@ -1404,6 +1417,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1506,13 +1520,13 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "aggregators": [
                 {
-                    "type": "aggregator_default/4",
+                    "type": "aggregator_default/3",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_http/5",
+                    "type": "flusher_http/4",
                     "detail": {}
                 }
             ]
@@ -1526,6 +1540,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1550,9 +1565,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -1582,6 +1598,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -1658,19 +1675,19 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/6",
+                    "type": "flusher_sls/5",
                     "detail": {
                         "EnableShardHash": false
                     }
                 },
                 {
-                    "type": "flusher_http/7",
+                    "type": "flusher_http/6",
                     "detail": {}
                 }
             ]
@@ -1684,6 +1701,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1805,29 +1823,30 @@ void PipelineUnittest::OnInitVariousTopology() const {
             "global" : {
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
-                "DefaultLogQueueSize" : 10
+                "DefaultLogQueueSize" : 10,
+                "EnableProcessorTag": true
             },
             "processors": [
                 {
-                    "type": "processor_regex/4",
+                    "type": "processor_regex/3",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/5",
+                    "type": "aggregator_default/4",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/6",
+                    "type": "flusher_sls/5",
                     "detail": {
                         "EnableShardHash": false
                     }
                 },
                 {
-                    "type": "flusher_http/7",
+                    "type": "flusher_http/6",
                     "detail": {}
                 }
             ]
@@ -1841,6 +1860,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -1878,9 +1898,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -1922,6 +1943,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -2014,25 +2036,25 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "processors": [
                 {
-                    "type": "processor_regex/5",
+                    "type": "processor_regex/4",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/6",
+                    "type": "aggregator_default/5",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/7",
+                    "type": "flusher_sls/6",
                     "detail": {
                         "EnableShardHash": false
                     }
                 },
                 {
-                    "type": "flusher_http/8",
+                    "type": "flusher_http/7",
                     "detail": {}
                 }
             ]
@@ -2046,6 +2068,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -2172,19 +2195,19 @@ void PipelineUnittest::OnInitVariousTopology() const {
             },
             "aggregators": [
                 {
-                    "type": "aggregator_default/4",
+                    "type": "aggregator_default/3",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/5",
+                    "type": "flusher_sls/4",
                     "detail": {
                         "EnableShardHash": false
                     }
                 },
                 {
-                    "type": "flusher_http/6",
+                    "type": "flusher_http/5",
                     "detail": {}
                 }
             ]
@@ -2198,6 +2221,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(1U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
@@ -2230,9 +2254,10 @@ void PipelineUnittest::OnInitVariousTopology() const {
     )";
     goPipelineWithInputStr = R"(
         {
-            "global": {
+            "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false
+                "UsingOldContentTag": false,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -2268,6 +2293,7 @@ void PipelineUnittest::OnInitVariousTopology() const {
     pipeline.reset(new CollectionPipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(0U, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0U, pipeline->mPipelineInnerProcessorLine.size());
     APSARA_TEST_EQUAL(0U, pipeline->mProcessorLine.size());
     APSARA_TEST_EQUAL(1U, pipeline->GetFlushers().size());
     APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
@@ -2583,7 +2609,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
     goPipelineWithInputStr = R"(
         {
             "global" : {
-                "AlwaysOnline": true,
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
@@ -2645,10 +2670,10 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
     goPipelineWithInputStr = R"(
         {
             "global" : {
-                "AlwaysOnline": true,
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
-                "DefaultLogQueueSize" : 10
+                "DefaultLogQueueSize" : 10,
+                "EnableProcessorTag": true
             },
             "inputs": [
                 {
@@ -2668,23 +2693,24 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             "global" : {
                 "EnableTimestampNanosecond": false,
                 "UsingOldContentTag": false,
-                "DefaultLogQueueSize" : 10
+                "DefaultLogQueueSize" : 10,
+                "EnableProcessorTag": true
             },
             "processors": [
                 {
-                    "type": "processor_regex/5",
+                    "type": "processor_regex/4",
                     "detail": {}
                 }
             ],
             "aggregators": [
                 {
-                    "type": "aggregator_default/6",
+                    "type": "aggregator_default/5",
                     "detail": {}
                 }
             ],
             "flushers": [
                 {
-                    "type": "flusher_sls/7",
+                    "type": "flusher_sls/6",
                     "detail": {
                         "EnableShardHash": false
                     }

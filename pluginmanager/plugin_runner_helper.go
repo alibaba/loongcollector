@@ -20,10 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -93,17 +90,6 @@ func flushOutStore[T FlushData, F FlusherWrapperInterface](lc *LogstoreConfig, s
 	}
 	store.Reset()
 	return true
-}
-
-func loadAdditionalTags(globalConfig *config.GlobalConfig) models.Tags {
-	tags := models.NewTagsWithKeyValues("__hostname__", util.GetHostName())
-	for i := 0; i < len(helper.EnvTags); i += 2 {
-		tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
-	}
-	for key, value := range globalConfig.Tags {
-		tags.Add(key, value)
-	}
-	return tags
 }
 
 func GetFlushStoreLen(runner PluginRunner) int {

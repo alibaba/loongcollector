@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -257,6 +258,11 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	pipeContext := p.ProcessPipeContext
 	pipeChan := p.InputPipeContext.Collector().Observe()
+	var processorTag *ProcessorTag
+	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
+		logger.Info(context.Background(), "add tag processor", "extend")
+		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.FileTagsPath)
+	}
 	for {
 		select {
 		case <-cc.CancelToken():
@@ -264,6 +270,9 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case group := <-pipeChan:
+			if processorTag != nil {
+				processorTag.ProcessV2(group)
+			}
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(group.Events)))
 			pipeEvents := []*models.PipelineGroupEvents{group}
 			for _, processor := range p.ProcessorPlugins {
@@ -344,14 +353,11 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 			}
 			p.LogstoreConfig.Statistics.FlushLogGroupMetric.Add(int64(len(data)))
 
-			// Add tags for each non-empty LogGroup, includes: default hostname tag,
-			// env tags and global tags in config.
 			for _, item := range data {
 				if len(item.Events) == 0 {
 					continue
 				}
 				p.LogstoreConfig.Statistics.FlushLogMetric.Add(int64(len(item.Events)))
-				item.Group.GetTags().Merge(loadAdditionalTags(p.LogstoreConfig.GlobalConfig))
 			}
 
 			// Flush LogGroups to all flushers.

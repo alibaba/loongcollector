@@ -39,10 +39,6 @@ struct FileReaderOptions {
     uint32_t mReadDelayAlertThresholdBytes;
     uint32_t mCloseUnusedReaderIntervalSec;
     uint32_t mRotatorQueueSize;
-    // This param is compound since it controls both reader option and parser option. For simplicity, we put it in
-    // reader option. If option controlling parser is separated from this, the separated option should be placed in
-    // input.
-    bool mAppendingLogPositionMeta = false;
 
     FileReaderOptions();
 

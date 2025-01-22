@@ -123,8 +123,6 @@ void ProcessorParseJsonNativeUnittest::TestMultipleLines() {
             config["CopingRawLog"] = true;
             config["RenamedSourceKey"] = "rawLog";
             config["SplitChar"] = '\0';
-            config["AppendingLogPositionMeta"] = false;
-
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -206,8 +204,6 @@ void ProcessorParseJsonNativeUnittest::TestMultipleLines() {
             config["CopingRawLog"] = true;
             config["RenamedSourceKey"] = "rawLog";
             config["SplitChar"] = '\0';
-            config["AppendingLogPositionMeta"] = false;
-
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;

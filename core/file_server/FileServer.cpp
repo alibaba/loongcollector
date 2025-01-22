@@ -20,6 +20,7 @@
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileTagOptions.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
@@ -194,6 +195,31 @@ void FileServer::RemoveMultilineConfig(const string& name) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameMultilineConfigsMap.erase(name);
 }
+
+// 获取给定名称的Tag配置
+FileTagConfig FileServer::GetFileTagConfig(const string& name) const {
+    ReadLock lock(mReadWriteLock);
+    auto itr = mPipelineNameFileTagConfigsMap.find(name);
+    if (itr != mPipelineNameFileTagConfigsMap.end()) {
+        return itr->second;
+    }
+    return make_pair(nullptr, nullptr);
+}
+
+// 添加Tag配置
+void FileServer::AddFileTagConfig(const std::string& name,
+                                  const FileTagOptions* opts,
+                                  const CollectionPipelineContext* ctx) {
+    WriteLock lock(mReadWriteLock);
+    mPipelineNameFileTagConfigsMap[name] = make_pair(opts, ctx);
+}
+
+// 移除给定名称的Tag配置
+void FileServer::RemoveFileTagConfig(const string& name) {
+    WriteLock lock(mReadWriteLock);
+    mPipelineNameFileTagConfigsMap.erase(name);
+}
+
 
 // 保存容器信息
 void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {

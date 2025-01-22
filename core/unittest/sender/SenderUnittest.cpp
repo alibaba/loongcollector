@@ -2684,72 +2684,6 @@ public:
         LOG_INFO(sLogger, ("TestTooOldFilesIntegrity() end", time(NULL)));
     }
 
-    void TestMergeTruncateInfo() {
-        LOG_INFO(sLogger, ("TestMergeTruncateInfo() begin", time(NULL)));
-
-        std::string truInfo_1("[000-111]");
-        std::string truInfo_2("[222-333]");
-        std::string truInfo_3("[444-555]");
-        std::string truInfo_4("[666-777]");
-        std::string truInfo_5("[888-999]");
-
-        std::string truInfo;
-        truInfo.append(truInfo_1);
-        truInfo.append("," + truInfo_2);
-        truInfo.append("," + truInfo_3);
-        truInfo.append("," + truInfo_4);
-        truInfo.append("," + truInfo_5);
-
-        MergeItem mergeItem(std::string("test_project"),
-                            std::string("test_config_name"),
-                            std::string("test_filename"),
-                            true,
-                            std::string("test_aliuid"),
-                            std::string("test_region"),
-                            123456,
-                            FlusherSLS::Batch::MergeType::LOGSTORE,
-                            std::string("test_shardhashkey"),
-                            123456);
-
-        sls_logs::LogGroup logGroup_1;
-        sls_logs::LogTag* logTag_1 = logGroup_1.add_logtags();
-        logTag_1->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-        logTag_1->set_value(truInfo_1);
-        Aggregator::GetInstance()->MergeTruncateInfo(logGroup_1, &mergeItem);
-
-        sls_logs::LogGroup logGroup_2;
-        sls_logs::LogTag* logTag_2 = logGroup_2.add_logtags();
-        logTag_2->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-        logTag_2->set_value(truInfo_2);
-        Aggregator::GetInstance()->MergeTruncateInfo(logGroup_2, &mergeItem);
-
-        sls_logs::LogGroup logGroup_3;
-        sls_logs::LogTag* logTag_3 = logGroup_3.add_logtags();
-        logTag_3->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-        logTag_3->set_value(truInfo_3);
-        Aggregator::GetInstance()->MergeTruncateInfo(logGroup_3, &mergeItem);
-
-        sls_logs::LogGroup logGroup_4;
-        sls_logs::LogTag* logTag_4 = logGroup_4.add_logtags();
-        logTag_4->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-        logTag_4->set_value(truInfo_4);
-        Aggregator::GetInstance()->MergeTruncateInfo(logGroup_4, &mergeItem);
-
-        sls_logs::LogGroup logGroup_5;
-        sls_logs::LogTag* logTag_5 = logGroup_5.add_logtags();
-        logTag_5->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-        logTag_5->set_value(truInfo_5);
-        Aggregator::GetInstance()->MergeTruncateInfo(logGroup_5, &mergeItem);
-
-        APSARA_TEST_EQUAL(mergeItem.mLogGroup.logtags_size(), 1);
-
-        const sls_logs::LogTag& logTag = mergeItem.mLogGroup.logtags(0);
-        APSARA_TEST_EQUAL(logTag.key(), LOG_RESERVED_KEY_TRUNCATE_INFO);
-        APSARA_TEST_EQUAL(logTag.value(), truInfo);
-
-        LOG_INFO(sLogger, ("TestMergeTruncateInfo() end", time(NULL)));
-    }
-
     void TestGlobalMarkOffset() {
         LOG_INFO(sLogger, ("TestGlobalMarkOffset() begin", time(NULL)));
         // prepare
@@ -2927,7 +2861,6 @@ APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControl, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControlPause, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogstoreFlowControlExpire, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestTooOldFilesIntegrity, gCaseID);
-APSARA_UNIT_TEST_CASE(SenderUnittest, TestMergeTruncateInfo, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestGlobalMarkOffset, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestRealIpSend, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestEmptyRealIp, gCaseID);

@@ -88,11 +88,13 @@ private:
                                const std::string& module,
                                Json::Value& dst);
     void CopyNativeGlobalParamToGoPipeline(Json::Value& root);
+    void CopyTagParamToGoPipeline(Json::Value& root, const Json::Value* config);
     bool ShouldAddPluginToGoPipelineWithInput() const { return mInputs.empty() && mProcessorLine.empty(); }
     void WaitAllItemsInProcessFinished();
 
     std::string mName;
     std::vector<std::unique_ptr<InputInstance>> mInputs;
+    std::vector<std::unique_ptr<ProcessorInstance>> mPipelineInnerProcessorLine;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;
     std::vector<std::unique_ptr<FlusherInstance>> mFlushers;
     Router mRouter;

@@ -207,7 +207,6 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -248,7 +247,6 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -331,7 +329,6 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = true;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -370,7 +367,6 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             config["AllowingShortenedFields"] = true;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -480,7 +476,6 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -520,7 +515,6 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -607,7 +601,6 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -646,7 +639,6 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -728,8 +720,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
-
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -770,7 +760,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -853,7 +842,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -891,7 +879,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -978,7 +965,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -1017,7 +1003,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             config["AllowingShortenedFields"] = false;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
@@ -1099,8 +1084,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
-
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -1142,7 +1125,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["StartPattern"] = "[123|012].*";
             config["MergeType"] = "regex";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -1231,7 +1213,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -1270,7 +1251,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["StartPattern"] = "[123|012].*";
             config["MergeType"] = "regex";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -1363,7 +1343,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["RenamedSourceKey"] = "__raw__";
             config["AllowingShortenedFields"] = false;
             config["SplitChar"] = '\n';
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processor;
@@ -1403,7 +1382,6 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             config["StartPattern"] = "[123|012].*";
             config["MergeType"] = "regex";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitLogStringNative
             ProcessorSplitLogStringNative processorSplitLogStringNative;
@@ -1577,7 +1555,6 @@ HTTP/2.0' '200' '154' 'go-sdk'"
             config["AllowingShortenedFields"] = true;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             std::string pluginId = "testID";
             // run function ProcessorParseDelimiterNative
@@ -1709,7 +1686,6 @@ HTTP/2.0' '200' '154' 'go-sdk'"
             config["AllowingShortenedFields"] = true;
             config["StartPattern"] = "[a-zA-Z0-9]*";
             config["UnmatchedContentTreatment"] = "single_line";
-            config["AppendingLogPositionMeta"] = false;
 
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;

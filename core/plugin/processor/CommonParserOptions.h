@@ -36,7 +36,7 @@ struct CommonParserOptions {
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
     bool ShouldAddSourceContent(bool parseSuccess);
     bool ShouldAddLegacyUnmatchedRawLog(bool parseSuccess);
-    bool ShouldEraseEvent(bool parseSuccess, const LogEvent& sourceEvent);
+    bool ShouldEraseEvent(bool parseSuccess, const LogEvent& sourceEvent, const GroupMetadata& metadata);
 };
 
 } // namespace logtail

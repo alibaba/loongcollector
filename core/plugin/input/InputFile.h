@@ -21,6 +21,7 @@
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
@@ -48,6 +49,7 @@ public:
     ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
+    FileTagOptions mFileTag;
     PluginMetricManagerPtr mPluginMetricManager;
     IntGaugePtr mMonitorFileTotal;
     // others

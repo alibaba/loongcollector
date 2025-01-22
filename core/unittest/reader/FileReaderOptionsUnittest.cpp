@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <json/json.h>
+
 #include <memory>
 #include <string>
 
@@ -59,7 +61,6 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(reader_close_unused_file_time)),
                       config->mCloseUnusedReaderIntervalSec);
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(logreader_max_rotate_queue_size)), config->mRotatorQueueSize);
-    APSARA_TEST_FALSE(config->mAppendingLogPositionMeta);
 
     // valid optional param
     configStr = R"(
@@ -71,8 +72,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
             "ReadDelaySkipThresholdBytes": 1000,
             "ReadDelayAlertThresholdBytes": 100,
             "CloseUnusedReaderIntervalSec": 10,
-            "RotatorQueueSize": 15,
-            "AppendingLogPositionMeta": true
+            "RotatorQueueSize": 15
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -86,7 +86,6 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(100U, config->mReadDelayAlertThresholdBytes);
     APSARA_TEST_EQUAL(10U, config->mCloseUnusedReaderIntervalSec);
     APSARA_TEST_EQUAL(15U, config->mRotatorQueueSize);
-    APSARA_TEST_TRUE(config->mAppendingLogPositionMeta);
 
     // invalid optional param (except for FileEcoding)
     configStr = R"(
@@ -98,8 +97,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
             "ReadDelaySkipThresholdBytes": "1000",
             "ReadDelayAlertThresholdBytes": "100",
             "CloseUnusedReaderIntervalSec": "10",
-            "RotatorQueueSize": "15",
-            "AppendingLogPositionMeta": "true"
+            "RotatorQueueSize": "15"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -114,7 +112,6 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(reader_close_unused_file_time)),
                       config->mCloseUnusedReaderIntervalSec);
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(logreader_max_rotate_queue_size)), config->mRotatorQueueSize);
-    APSARA_TEST_FALSE(config->mAppendingLogPositionMeta);
 
     // FileEncoding
     configStr = R"(

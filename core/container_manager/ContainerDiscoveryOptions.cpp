@@ -259,7 +259,6 @@ void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
     // these param will be overriden if the same param appears in the global module of config, which will be parsed
     // later.
     res["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-    res["global"]["AlwaysOnline"] = Json::Value(true);
 }
 
 } // namespace logtail

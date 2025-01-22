@@ -18,6 +18,7 @@
 
 #include <cstdint>
 
+#include "FileTagOptions.h"
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
@@ -45,6 +46,7 @@ public:
     ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
+    FileTagOptions mFileTag;
     bool mIgnoringStdout = false;
     bool mIgnoringStderr = false;
     bool mIgnoreParseWarning = false;

@@ -85,6 +85,7 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
                                                                            event.mReaderConfig,
                                                                            event.mMultilineConfig,
                                                                            event.mDiscoveryconfig,
+                                                                           event.mTagConfig,
                                                                            event.mEOConcurrency,
                                                                            true));
         if (readerSharePtr == NULL) {
