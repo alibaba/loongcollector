@@ -75,6 +75,7 @@ std::string GetAgentName();
 std::string GetMonitorInfoFileName();
 std::string GetSymLinkName();
 std::string GetAgentPrefix();
+std::string GetFileTagsDir();
 
 template <class T>
 class DoubleBuffer {

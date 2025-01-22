@@ -48,10 +48,13 @@ type GlobalConfig struct {
 	// Checkpoint file name of loongcollector plugin.
 	LoongcollectorCheckPointFile string
 	// Network identification from loongcollector.
-	HostIP       string
-	Hostname     string
-	DelayStopSec int
-	FileTagsPath string
+	HostIP           string
+	Hostname         string
+	AlwaysOnline     bool
+	DelayStopSec     int
+	FileTagsPath     string
+	FileTagsInterval int
+	AgentHostID      string
 
 	EnableTimestampNanosecond      bool
 	UsingOldContentTag             bool

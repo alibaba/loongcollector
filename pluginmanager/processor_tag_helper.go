@@ -28,7 +28,17 @@ func (p *ProcessorTag) parseAllConfigurableTags(pipelineMetaTagKey map[string]st
 func (p *ProcessorTag) addAllConfigurableTags(tagsMap map[string]string) {
 	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
 	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
-	// TODO: add host id and cloud provider
-	p.addTag(TagKeyHostID, "host id", tagsMap)
-	p.addTag(TagKeyCloudProvider, "cloud provider", tagsMap)
+	instanceIdentity := fileConfig.GetInstanceIdentity()
+	if instanceIdentity != nil {
+		if instanceIdentity.InstanceID != "" {
+			p.addTag(TagKeyHostID, instanceIdentity.InstanceID, tagsMap)
+		} else if instanceIdentity.ECSAssistMachineID != "" {
+			p.addTag(TagKeyHostID, instanceIdentity.ECSAssistMachineID, tagsMap)
+		} else if instanceIdentity.RandomHostID != "" {
+			p.addTag(TagKeyHostID, instanceIdentity.RandomHostID, tagsMap)
+		} else if instanceIdentity.GFlagHostID != "" {
+			p.addTag(TagKeyHostID, instanceIdentity.GFlagHostID, tagsMap)
+		}
+		p.addTag(TagKeyCloudProvider, "infra", tagsMap)
+	}
 }

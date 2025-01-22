@@ -203,6 +203,7 @@ func StopBuiltInModulesConfig() {
 		ContainerConfig = nil
 	}
 	CheckPointManager.Stop()
+	StopFileConfig()
 }
 
 // Stop stop the given config. ConfigName is with suffix.

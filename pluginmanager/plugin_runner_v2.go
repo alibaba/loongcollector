@@ -15,7 +15,6 @@
 package pluginmanager
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -260,8 +259,7 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	pipeChan := p.InputPipeContext.Collector().Observe()
 	var processorTag *ProcessorTag
 	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
-		logger.Info(context.Background(), "add tag processor", "extend")
-		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey, globalConfig.FileTagsPath)
+		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey)
 	}
 	for {
 		select {
