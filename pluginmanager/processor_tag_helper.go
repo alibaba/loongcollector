@@ -30,13 +30,14 @@ func (p *ProcessorTag) addAllConfigurableTags(tagsMap map[string]string) {
 	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
 	instanceIdentity := fileConfig.GetInstanceIdentity()
 	if instanceIdentity != nil {
-		if instanceIdentity.InstanceID != "" {
+		switch {
+		case instanceIdentity.InstanceID != "":
 			p.addTag(TagKeyHostID, instanceIdentity.InstanceID, tagsMap)
-		} else if instanceIdentity.ECSAssistMachineID != "" {
+		case instanceIdentity.ECSAssistMachineID != "":
 			p.addTag(TagKeyHostID, instanceIdentity.ECSAssistMachineID, tagsMap)
-		} else if instanceIdentity.RandomHostID != "" {
+		case instanceIdentity.RandomHostID != "":
 			p.addTag(TagKeyHostID, instanceIdentity.RandomHostID, tagsMap)
-		} else if instanceIdentity.GFlagHostID != "" {
+		case instanceIdentity.GFlagHostID != "":
 			p.addTag(TagKeyHostID, instanceIdentity.GFlagHostID, tagsMap)
 		}
 		p.addTag(TagKeyCloudProvider, "infra", tagsMap)

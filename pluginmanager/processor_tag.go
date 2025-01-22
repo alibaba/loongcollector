@@ -72,10 +72,8 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 	// file tags
 	p.addAllConfigurableTags(tagsMap)
 	fileTags := fileConfig.GetFileTags()
-	if fileTags != nil {
-		for k, v := range fileTags {
-			tagsMap[k] = v.(string)
-		}
+	for k, v := range fileTags {
+		tagsMap[k] = v.(string)
 	}
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
@@ -106,10 +104,8 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	}
 	// file tags
 	fileTags := fileConfig.GetFileTags()
-	if fileTags != nil {
-		for k, v := range fileTags {
-			in.Group.Tags.Add(k, v.(string))
-		}
+	for k, v := range fileTags {
+		in.Group.Tags.Add(k, v.(string))
 	}
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {

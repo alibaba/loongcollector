@@ -136,8 +136,8 @@ func (fc *FileConfig) GetInstanceIdentity() *InstanceIdentity {
 }
 
 func (fc *FileConfig) loadInstanceIdentity(gFlagHostID string) {
+	interval := 1
 	for {
-		interval := 1
 		select {
 		case <-fc.fileConfigStopCh:
 			return
@@ -158,12 +158,12 @@ func (fc *FileConfig) loadInstanceIdentity(gFlagHostID string) {
 }
 
 func ReadFile(path string) ([]byte, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "open file failed", err)
 		return nil, err
 	}
-	defer file.Close()
+	defer file.Close() //nolint:gosec
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "read file failed", err)
