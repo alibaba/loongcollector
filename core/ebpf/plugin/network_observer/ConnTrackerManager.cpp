@@ -179,28 +179,6 @@ void ConnTrackerManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
     conn_tracker->RecordActive();
 }
 
-void ConnTrackerManager::Report() {
-    // int count = 0;
-    // while(flag_) {
-    // int n = 0;
-    // for (auto it = conn_trackers_.begin(); it != conn_trackers_.end(); ++it) {
-    //      LOG(INFO) << "[Report] Key: " << it->first << " Value: " << it->second ;
-    // ConnId id = it->first;
-    // std::shared_ptr<ConnTracker> ct = it->second;
-
-    // aggregate
-    // TODO @qianlu.kk wait!!!!
-    //      auto record = ct->GetConnStatsGauge();
-    //      Aggregator::GetInstance().Aggregate(record);
-    // n++;
-    // }
-    // count++;
-    //    LOG(INFO) << "[Report] " << count << " push " << n << " conn stats to aggregator ..." ;
-    // std::this_thread::sleep_for(std::chrono::seconds(report_interval_sec_));
-    // }
-    return;
-}
-
 void ConnTrackerManager::IterationsInternal(int count_) {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
     auto now_ts = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
@@ -369,5 +347,6 @@ void ConnTrackerManager::Start() {
 void ConnTrackerManager::Stop() {
     flag_ = false;
 }
+
 } // namespace ebpf
 } // namespace logtail

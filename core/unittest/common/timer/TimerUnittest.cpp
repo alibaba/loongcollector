@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <vector>
+
 #include "common/timer/Timer.h"
+#include "ebpf/type/PeriodicalEvent.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -31,6 +34,11 @@ struct TimerEventMock : public TimerEvent {
 class TimerUnittest : public ::testing::Test {
 public:
     void TestPushEvent();
+    void TestPeriodicEvent();
+
+private:
+    std::vector<int> mVec;
+    int mStartUid;
 };
 
 void TimerUnittest::TestPushEvent() {
@@ -49,7 +57,33 @@ void TimerUnittest::TestPushEvent() {
     timer.mQueue.pop();
 }
 
+void TimerUnittest::TestPeriodicEvent() {
+    auto now = chrono::steady_clock::now();
+    Timer timer;
+    timer.Init();
+    std::unique_ptr<ebpf::AggregateEvent> event = std::make_unique<ebpf::AggregateEvent>(
+        1, // interval second
+        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
+            this->mVec.push_back(1);
+            return true;
+        },
+        [this](int currentUid) { // validator
+            return currentUid == this->mStartUid;
+        },
+        mStartUid);
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    // update start uid, invalid event schedule ...
+    mStartUid++;
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_TRUE(timer.mQueue.empty());
+    APSARA_TEST_EQUAL(mVec.size(), 5);
+    timer.Stop();
+}
+
 UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
+UNIT_TEST_CASE(TimerUnittest, TestPeriodicEvent)
+
 
 } // namespace logtail
 

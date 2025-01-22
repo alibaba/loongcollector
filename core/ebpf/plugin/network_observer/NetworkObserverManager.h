@@ -105,9 +105,6 @@ private:
 
     bool UpdateParsers(const std::vector<std::string>& protocols);
 
-    int StartAggregator();
-    int StopAggregator();
-
     std::shared_ptr<ConnTrackerManager> mConnTrackerMgr;
 
     // TODO @qianlu.kk modify T for abstract event

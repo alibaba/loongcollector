@@ -550,11 +550,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mEnableSpan = opt->mEnableSpan;
     mEnableMetric = opt->mEnableMetric;
 
-    // TODO @qianlu.kk
-    if (StartAggregator()) {
-        LOG_ERROR(sLogger, ("failed to start aggregator", ""));
-    }
-
     // diff opt
     if (mPreviousOpt) {
         CompareAndUpdate("mDisableConnStats",
@@ -644,13 +639,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     LOG_INFO(sLogger, ("begin to start ebpf ... ", ""));
     this->mFlag = true;
     this->RunInThread();
-    return 0;
-}
-
-int NetworkObserverManager::StartAggregator() {
-    return 0;
-}
-int NetworkObserverManager::StopAggregator() {
     return 0;
 }
 
