@@ -94,7 +94,7 @@ You can report bugs, make suggestions or participate in discussions through [Git
 * Zhihu：[LoongCollector社区](https://www.zhihu.com/column/c_1533139823409270785)
 * DingTalk/WeChat：LoongCollector社区
 
-<img src="docs/cn/.gitbook/assets/chatgroup.png" style="width: 60%; height: 60%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup.png" style="width: 60%; height: 60%" />
 
 ## Our Users
 
