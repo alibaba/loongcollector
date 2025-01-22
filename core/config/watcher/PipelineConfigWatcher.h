@@ -50,7 +50,7 @@ public:
     std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff();
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void SetPipelineManager(const CollectionPipelineManager* pm) { mPipelineManager = pm; }
+    void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }
 #endif
 
 private:
@@ -78,7 +78,6 @@ private:
     bool CheckUnchangedConfig(const std::string& configName,
                               const std::filesystem::path& path,
                               CollectionConfigDiff& pDiff,
-                              TaskConfigDiff& tDiff,
                               SingletonConfigCache& singletonCache);
     void PushPipelineConfig(CollectionConfig&& config,
                             ConfigDiffEnum diffEnum,
@@ -86,7 +85,7 @@ private:
                             SingletonConfigCache& singletonCache);
     void CheckSingletonInput(CollectionConfigDiff& pDiff, SingletonConfigCache& singletonCache);
 
-    const CollectionPipelineManager* mPipelineManager = nullptr;
+    const CollectionPipelineManager* mCollectionPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
