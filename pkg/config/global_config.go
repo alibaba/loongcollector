@@ -52,7 +52,6 @@ type GlobalConfig struct {
 	// Network identification from loongcollector.
 	HostIP           string
 	Hostname         string
-	AlwaysOnline     bool
 	DelayStopSec     int
 	FileTagsPath     string
 	FileTagsInterval int
