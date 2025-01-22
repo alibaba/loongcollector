@@ -33,6 +33,7 @@ GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=loongcollector
 LDFLAGS="${GO_LDFLAGS:-}"' -X "github.com/alibaba/ilogtail/pkg/config.BaseVersion='$VERSION'"'
 BUILD_FLAG=${BUILD_FLAG:-}
+BUILD_TAGS=${BUILD_TAGS:-}
 
 os
 OS_FLAG=$?
@@ -86,4 +87,4 @@ sudo chown ${USER}:${GROUP} ${lib_name}
 cd -
 
 # make plugins stuffs
-go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" $BUILD_FLAG -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main
+go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" $BUILD_FLAG -tags "$BUILD_TAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main

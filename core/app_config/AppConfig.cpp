@@ -380,7 +380,7 @@ std::string GetAgentDataDir() {
     dir = GetProcessExecutionDir();
 #else
     if (BOOL_FLAG(logtail_mode)) {
-        dir = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "checkpoint";
+        dir = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "checkpoint" + PATH_SEPARATOR;
     } else {
         dir = STRING_FLAG(data_dir) + PATH_SEPARATOR;
     }

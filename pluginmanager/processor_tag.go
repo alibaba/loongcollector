@@ -102,8 +102,8 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
-	// file tags
 	fileTags := fileConfig.GetFileTags()
+	// file tags
 	for k, v := range fileTags {
 		in.Group.Tags.Add(k, v.(string))
 	}

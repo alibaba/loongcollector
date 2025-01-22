@@ -45,8 +45,10 @@ type GlobalConfig struct {
 	LoongcollectorPluginLogName string
 	// Tag of loongcollector version.
 	LoongcollectorVersionTag string
+	// Checkpoint dir name of loongcollector plugin.
+	LoongcollectorGoCheckPointDir string
 	// Checkpoint file name of loongcollector plugin.
-	LoongcollectorCheckPointFile string
+	LoongcollectorGoCheckPointFile string
 	// Network identification from loongcollector.
 	HostIP           string
 	Hostname         string
@@ -87,7 +89,8 @@ func newGlobalConfig() (cfg GlobalConfig) {
 		LoongcollectorLogDir:                      "./log/",
 		LoongcollectorPluginLogName:               "go_plugin.LOG",
 		LoongcollectorVersionTag:                  "loongcollector_version",
-		LoongcollectorCheckPointFile:              "go_plugin_checkpoint",
+		LoongcollectorGoCheckPointDir:             "./data/",
+		LoongcollectorGoCheckPointFile:            "go_plugin_checkpoint",
 		LoongcollectorDataDir:                     "./data/",
 		LoongcollectorDebugDir:                    "./debug/",
 		LoongcollectorThirdPartyDir:               "./thirdparty/",
