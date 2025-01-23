@@ -16,6 +16,7 @@
 
 #include "common/JsonUtil.h"
 #include "models/MetricEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -67,30 +68,40 @@ void MetricEventUnittest::TestUntypedSingleValue() {
 }
 
 void MetricEventUnittest::TestUntypedMultiDoubleValues() {
-    UntypedMultiDoubleValues v({{"test-1", 10.0}, {"test-2", 2.0}}, nullptr);
+    UntypedMultiDoubleValues v({{"test-1", {UntypedValueMetricType::MetricTypeCounter, 10.0}},
+                                {"test-2", {UntypedValueMetricType::MetricTypeGauge, 2.0}}},
+                               nullptr);
     mMetricEvent->SetValue(v);
     APSARA_TEST_TRUE(mMetricEvent->Is<UntypedMultiDoubleValues>());
-    double val;
+    UntypedMultiDoubleValue val;
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-1", val));
-    APSARA_TEST_EQUAL(10.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(10.0, val.Value);
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-2", val));
-    APSARA_TEST_EQUAL(2.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
+    APSARA_TEST_EQUAL(2.0, val.Value);
 
-    map<StringView, double> metrics({{"test-3", 15.0}, {"test-4", 24.0}});
+    map<StringView, UntypedMultiDoubleValue> metrics({{"test-3", {UntypedValueMetricType::MetricTypeCounter, 15.0}},
+                                                      {"test-4", {UntypedValueMetricType::MetricTypeGauge, 24.0}}});
     mMetricEvent->SetValue(metrics);
     APSARA_TEST_TRUE(mMetricEvent->Is<UntypedMultiDoubleValues>());
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-3", val));
-    APSARA_TEST_EQUAL(15.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(15.0, val.Value);
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-4", val));
-    APSARA_TEST_EQUAL(24.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
+    APSARA_TEST_EQUAL(24.0, val.Value);
 
-    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"), 6.0);
+    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"),
+                                                                     {UntypedValueMetricType::MetricTypeCounter, 6.0});
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-1", val));
-    APSARA_TEST_EQUAL(6.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(6.0, val.Value);
 
     mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->DelValue("test-4");
     APSARA_TEST_EQUAL(false, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-4", val));
-    APSARA_TEST_EQUAL(6.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(6.0, val.Value);
 }
 
 void MetricEventUnittest::TestTag() {
@@ -160,7 +171,7 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
-    mMetricEvent->SetValue(map<StringView, double>{});
+    mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
     size_t basicSize
         = sizeof(time_t) + sizeof(long) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
     basicSize += 4;
@@ -178,17 +189,19 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 
     // add multi values, and key not existed
-    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"), 5.0);
-    basicSize += 14;
+    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"),
+                                                                     {UntypedValueMetricType::MetricTypeCounter, 5.0});
+    basicSize += 22;
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 
     // add multi values, and key existed
-    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"), 99.0);
+    mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->SetValue(string("test-1"),
+                                                                     {UntypedValueMetricType::MetricTypeCounter, 99.0});
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 
     // delete multi values
     mMetricEvent->MutableValue<UntypedMultiDoubleValues>()->DelValue("test-1");
-    basicSize -= 14;
+    basicSize -= 22;
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
 
@@ -235,7 +248,9 @@ void MetricEventUnittest::TestUntypedSingleValueToJson() {
 void MetricEventUnittest::TestUntypedMultiDoubleValuesToJson() {
     mMetricEvent->SetTimestamp(12345678901, 0);
     mMetricEvent->SetName("test");
-    mMetricEvent->SetValue(map<StringView, double>{{"test-1", 10.0}, {"test-2", 2.0}});
+    mMetricEvent->SetValue(
+        map<StringView, UntypedMultiDoubleValue>{{"test-1", {UntypedValueMetricType::MetricTypeCounter, 10.0}},
+                                                 {"test-2", {UntypedValueMetricType::MetricTypeGauge, 2.0}}});
     mMetricEvent->SetTag(string("key1"), string("value1"));
     Json::Value res = mMetricEvent->ToJson();
 
@@ -251,8 +266,14 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesToJson() {
         "value": {
             "type": "untyped_multi_double_values",
             "detail": {
-                "test-1": 10.0,
-                "test-2": 2.0
+                "test-1": {
+                    "type": "counter",
+                    "value": 10.0
+                },
+                "test-2": {
+                    "type": "gauge",
+                    "value": 2.0
+                }
             }
         }
     })";
@@ -300,24 +321,32 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesFromJson() {
         "value": {
             "type": "untyped_multi_double_values",
             "detail": {
-                "test-1": 10.0,
-                "test-2": 2.0
+                "test-1": {
+                    "type": "counter",
+                    "value": 10.0
+                },
+                "test-2": {
+                    "type": "gauge",
+                    "value": 2.0
+                }
             }
         }
     })";
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
     mMetricEvent->FromJson(eventJson);
-    double val;
+    UntypedMultiDoubleValue val;
 
     APSARA_TEST_EQUAL(12345678901, mMetricEvent->GetTimestamp());
     APSARA_TEST_EQUAL(0L, mMetricEvent->GetTimestampNanosecond().value());
     APSARA_TEST_EQUAL("test", mMetricEvent->GetName());
     APSARA_TEST_TRUE(mMetricEvent->Is<UntypedMultiDoubleValues>());
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-1", val));
-    APSARA_TEST_EQUAL(10.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(10.0, val.Value);
     APSARA_TEST_EQUAL(true, mMetricEvent->GetValue<UntypedMultiDoubleValues>()->GetValue("test-2", val));
-    APSARA_TEST_EQUAL(2.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
+    APSARA_TEST_EQUAL(2.0, val.Value);
     APSARA_TEST_EQUAL("value1", mMetricEvent->GetTag("key1").to_string());
 }
 
@@ -346,18 +375,22 @@ void MetricEventUnittest::TestTagsIterator() {
 
 void MetricEventUnittest::TestCopy() {
     MetricEvent* oldMetricEvent = mEventGroup->AddMetricEvent();
-    oldMetricEvent->SetValue(map<StringView, double>{{"test-1", 10.0}, {"test-2", 2.0}});
+    oldMetricEvent->SetValue(
+        map<StringView, UntypedMultiDoubleValue>{{"test-1", {UntypedValueMetricType::MetricTypeCounter, 10.0}},
+                                                 {"test-2", {UntypedValueMetricType::MetricTypeGauge, 2.0}}});
     APSARA_TEST_EQUAL(1U, mEventGroup->GetEvents().size());
 
     PipelineEventGroup newGroup = mEventGroup->Copy();
     MetricEvent newMetricEvent = newGroup.GetEvents().at(0).Cast<MetricEvent>();
-    double val;
+    UntypedMultiDoubleValue val;
 
     APSARA_TEST_TRUE(newMetricEvent.Is<UntypedMultiDoubleValues>());
     APSARA_TEST_EQUAL(true, newMetricEvent.GetValue<UntypedMultiDoubleValues>()->GetValue("test-1", val));
-    APSARA_TEST_EQUAL(10.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(10.0, val.Value);
     APSARA_TEST_EQUAL(true, newMetricEvent.GetValue<UntypedMultiDoubleValues>()->GetValue("test-2", val));
-    APSARA_TEST_EQUAL(2.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
+    APSARA_TEST_EQUAL(2.0, val.Value);
     APSARA_TEST_NOT_EQUAL(newMetricEvent.GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr,
                           oldMetricEvent->GetValue<UntypedMultiDoubleValues>()->mMetricEventPtr);
 }

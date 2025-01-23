@@ -19,10 +19,12 @@
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
@@ -30,8 +32,6 @@
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "logger/Logger.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -69,8 +69,8 @@ protected:
         // init pipeline and config
         unique_ptr<Json::Value> configJson;
         string configStr, errorMsg;
-        unique_ptr<PipelineConfig> config;
-        unique_ptr<Pipeline> pipeline;
+        unique_ptr<CollectionConfig> config;
+        unique_ptr<CollectionPipeline> pipeline;
 
         // new pipeline
         configStr = R"(
@@ -99,9 +99,9 @@ protected:
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
-        config.reset(new PipelineConfig(mConfigName, std::move(configJson)));
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson)));
         APSARA_TEST_TRUE(config->Parse());
-        pipeline.reset(new Pipeline());
+        pipeline.reset(new CollectionPipeline());
         APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
         ctx.SetPipeline(*pipeline.get());
         ctx.SetConfigName(mConfigName);
@@ -115,6 +115,7 @@ protected:
         FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
+        FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
         ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
         ProcessQueueManager::GetInstance()->EnablePop(mConfigName);
     }
@@ -140,7 +141,8 @@ private:
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
     FileDiscoveryConfig mConfig;
 };
 
@@ -151,8 +153,12 @@ void ForceReadUnittest::TestTimeoutForceRead() {
     {
         // read -> add timeout event -> handle timeout -> valid -> read empty -> not rollback
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -189,8 +195,12 @@ void ForceReadUnittest::TestTimeoutForceRead() {
     {
         // read -> write -> add timeout event -> handle timeout -> valid -> read not empty -> rollback
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -231,8 +241,12 @@ void ForceReadUnittest::TestTimeoutForceRead() {
         // read -> add timeout event -> write -> read -> handle timeout -> event invalid
         LOG_WARNING(sLogger, ("This case is difficult to test", "test"));
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -305,8 +319,12 @@ void ForceReadUnittest::TestFileCloseForceRead() {
     {
         // file close -> handle timeout -> valid -> not rollback
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -349,8 +367,12 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
     {
         // read part -> not add timeout event
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -372,8 +394,12 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
     {
         // read all -> add timeout event
         Init();
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);

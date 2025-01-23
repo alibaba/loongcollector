@@ -42,24 +42,31 @@ struct UntypedSingleValue {
 #endif
 };
 
+enum UntypedValueMetricType { MetricTypeCounter, MetricTypeGauge };
+
+struct UntypedMultiDoubleValue {
+    UntypedValueMetricType MetricType;
+    double Value;
+};
+
 struct UntypedMultiDoubleValues {
-    std::map<StringView, double> mValues;
+    std::map<StringView, UntypedMultiDoubleValue> mValues;
     PipelineEvent* mMetricEventPtr;
 
     UntypedMultiDoubleValues(PipelineEvent* ptr) : mMetricEventPtr(ptr) {}
-    UntypedMultiDoubleValues(std::map<StringView, double> values, PipelineEvent* ptr)
+    UntypedMultiDoubleValues(std::map<StringView, UntypedMultiDoubleValue> values, PipelineEvent* ptr)
         : mValues(values), mMetricEventPtr(ptr) {}
 
-    bool GetValue(StringView key, double& val) const;
+    bool GetValue(StringView key, UntypedMultiDoubleValue& val) const;
     bool HasValue(StringView key) const;
-    void SetValue(const std::string& key, double val);
-    void SetValue(StringView key, double val);
-    void SetValueNoCopy(const StringBuffer& key, double val);
-    void SetValueNoCopy(StringView key, double val);
+    void SetValue(const std::string& key, UntypedMultiDoubleValue val);
+    void SetValue(StringView key, UntypedMultiDoubleValue val);
+    void SetValueNoCopy(const StringBuffer& key, UntypedMultiDoubleValue val);
+    void SetValueNoCopy(StringView key, UntypedMultiDoubleValue val);
     void DelValue(StringView key);
 
-    std::map<StringView, double>::const_iterator ValuesBegin() const;
-    std::map<StringView, double>::const_iterator ValuesEnd() const;
+    std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesBegin() const;
+    std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesEnd() const;
     size_t ValusSize() const;
 
     size_t DataSize() const;

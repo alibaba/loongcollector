@@ -192,4 +192,78 @@ bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) 
     return true;
 }
 
+static void ParseDefaultAddedTag(const Json::Value* config,
+                                 const string& configField,
+                                 const string& defaultTagKeyValue,
+                                 const CollectionPipelineContext& context,
+                                 const string& pluginType,
+                                 string& customTagKey) {
+    string errorMsg;
+    customTagKey = DEFAULT_CONFIG_TAG_KEY_VALUE;
+    if (config && config->isMember(configField)) {
+        if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
+            PARAM_WARNING_DEFAULT(context.GetLogger(),
+                                  context.GetAlarm(),
+                                  errorMsg,
+                                  customTagKey,
+                                  pluginType,
+                                  context.GetConfigName(),
+                                  context.GetProjectName(),
+                                  context.GetLogstoreName(),
+                                  context.GetRegion());
+        }
+        if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+            customTagKey = defaultTagKeyValue;
+        }
+    } else {
+        customTagKey = defaultTagKeyValue;
+    }
+}
+
+static void ParseOptionalTag(const Json::Value* config,
+                             const string& configField,
+                             const string& defaultTagKeyValue,
+                             const CollectionPipelineContext& context,
+                             const string& pluginType,
+                             string& customTagKey) {
+    string errorMsg;
+    if (config && config->isMember(configField)) {
+        if (!GetOptionalStringParam(*config, "Tags." + configField, customTagKey, errorMsg)) {
+            PARAM_WARNING_DEFAULT(context.GetLogger(),
+                                  context.GetAlarm(),
+                                  errorMsg,
+                                  customTagKey,
+                                  pluginType,
+                                  context.GetConfigName(),
+                                  context.GetProjectName(),
+                                  context.GetLogstoreName(),
+                                  context.GetRegion());
+        }
+        if (customTagKey == DEFAULT_CONFIG_TAG_KEY_VALUE) {
+            customTagKey = defaultTagKeyValue;
+        }
+    } else {
+        customTagKey = "";
+    }
+}
+
+// if there is no tag config, config maybe nullptr, will act as default (default added or optional)
+void ParseTagKey(const Json::Value* config,
+                 const string& configField,
+                 TagKey tagKey,
+                 unordered_map<TagKey, string>& tagKeyMap,
+                 const CollectionPipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded) {
+    string customTagKey;
+    if (defaultAdded) {
+        ParseDefaultAddedTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType, customTagKey);
+    } else {
+        ParseOptionalTag(config, configField, GetDefaultTagKeyString(tagKey), context, pluginType, customTagKey);
+    }
+    if (!customTagKey.empty()) {
+        tagKeyMap[tagKey] = customTagKey;
+    }
+}
+
 } // namespace logtail

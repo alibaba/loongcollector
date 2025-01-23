@@ -472,7 +472,7 @@ bool GetNodeFuncType(const std::string& type, FilterNodeFunctionType& func) {
     return true;
 }
 
-bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
+bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const CollectionPipelineContext& mContext) {
     if (BOOST_LIKELY(left && right)) {
         if (op == AND_OPERATOR) {
             return left->Match(contents, mContext) && right->Match(contents, mContext);
@@ -483,7 +483,7 @@ bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineCon
     return false;
 }
 
-bool RegexFilterValueNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
+bool RegexFilterValueNode::Match(const LogEvent& contents, const CollectionPipelineContext& mContext) {
     const auto& content = contents.FindContent(key);
     if (content == contents.end()) {
         return false;
@@ -504,7 +504,7 @@ bool RegexFilterValueNode::Match(const LogEvent& contents, const PipelineContext
     return result;
 }
 
-bool UnaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
+bool UnaryFilterOperatorNode::Match(const LogEvent& contents, const CollectionPipelineContext& mContext) {
     if (BOOST_LIKELY(child.get() != NULL)) {
         return !child->Match(contents, mContext);
     }

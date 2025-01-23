@@ -75,7 +75,7 @@ public:
     static std::string gbkFile;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(JsonLogFileReaderUnittest, TestReadGBK)
@@ -89,9 +89,14 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
     { // buffer size big enough and is json
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
+        FileTagOptions tagOpts;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        JsonLogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        JsonLogFileReader reader(logPathDir,
+                                 gbkFile,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -111,8 +116,13 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        JsonLogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 gbkFile,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         LogFileReader::BUFFER_SIZE = 23;
         size_t BUFFER_SIZE_UTF8 = 25; // "{"first":"iLogtail 为可"
         reader.UpdateReaderManual();
@@ -130,8 +140,13 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        JsonLogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 gbkFile,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -151,8 +166,13 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
     { // buffer size big enough and is json
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
-        JsonLogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 utf8File,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -168,8 +188,13 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
       // should read buffer size
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
-        JsonLogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 utf8File,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         LogFileReader::BUFFER_SIZE = 25;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -185,8 +210,13 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
       // should read until last json
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
-        JsonLogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 utf8File,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -203,8 +233,13 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
     { // read twice
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
-        JsonLogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions tagOpts;
+        JsonLogFileReader reader(logPathDir,
+                                 utf8File,
+                                 DevInode(),
+                                 std::make_pair(&readerOpts, &ctx),
+                                 std::make_pair(&multilineOpts, &ctx),
+                                 std::make_pair(&tagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -232,8 +267,12 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
 class RemoveLastIncompleteLogUnittest : public ::testing::Test {
 public:
     void SetUp() override {
-        mLogFileReader.reset(new JsonLogFileReader(
-            "dir", "file", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx)));
+        mLogFileReader.reset(new JsonLogFileReader("dir",
+                                                   "file",
+                                                   DevInode(),
+                                                   std::make_pair(&readerOpts, &ctx),
+                                                   std::make_pair(&multilineOpts, &ctx),
+                                                   std::make_pair(&tagOpts, &ctx)));
     }
 
     void TestRemoveLastIncompleteLogSingleLine();
@@ -248,7 +287,8 @@ public:
     std::unique_ptr<JsonLogFileReader> mLogFileReader;
     MultilineOptions multilineOpts;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(RemoveLastIncompleteLogUnittest, TestRemoveLastIncompleteLogSingleLine)

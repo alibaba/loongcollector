@@ -109,7 +109,7 @@ void ProcessorParseRegexNative::Process(PipelineEventGroup& logGroup) {
 
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-        if (ProcessEvent(logPath, events[rIdx])) {
+        if (ProcessEvent(logPath, events[rIdx], logGroup.GetAllMetadata())) {
             if (wIdx != rIdx) {
                 events[wIdx] = std::move(events[rIdx]);
             }
@@ -124,7 +124,9 @@ bool ProcessorParseRegexNative::IsSupportedEvent(const PipelineEventPtr& e) cons
     return e.Is<LogEvent>();
 }
 
-bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {
+bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
+                                             PipelineEventPtr& e,
+                                             const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
         mOutFailedEventsTotal->Add(1);
         return true;
@@ -152,7 +154,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
     if (mCommonParserOptions.ShouldAddLegacyUnmatchedRawLog(parseSuccess)) {
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, rawContent, sourceEvent, false);
     }
-    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
+    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
         mDiscardedEventsTotal->Add(1);
         return false;
     }

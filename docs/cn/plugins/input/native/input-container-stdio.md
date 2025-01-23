@@ -22,6 +22,7 @@
 |  ExternalEnvTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
 |  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的容器的标准输出日志。  |
+|  Tags | map | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
 
 * 表1：多行聚合选项
 
@@ -58,7 +59,7 @@
 
 ## 默认Tag字段
 
-所有使用本插件上报的日志Tag均额外携带下列字段。目前暂不支持更改。
+所有使用本插件上报的日志Tag均额外携带下列字段。请使用Tags配置进行更改。
 
 | 字段名称                | 说明                                         |
 | ------------------- | ------------------------------------------ |
@@ -67,7 +68,6 @@
 | \_pod\_name\_       | Pod名                                       |
 | \_namespace\_       | Pod所在的命名空间                                 |
 | \_pod\_uid\_        | Pod的唯一标识                                   |
-
 
 ## 样例
 

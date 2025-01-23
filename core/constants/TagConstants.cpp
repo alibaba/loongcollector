@@ -12,56 +12,78 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TagConstants.h"
+#include "constants/TagConstants.h"
+
+#include <unordered_map>
+
+using namespace std;
 
 namespace logtail {
 
+const string& GetDefaultTagKeyString(TagKey key) {
+    static const unordered_map<TagKey, string> TagKeyDefaultValue = {
+        {TagKey::FILE_OFFSET_KEY, DEFAULT_LOG_TAG_FILE_OFFSET},
+        {TagKey::FILE_INODE_TAG_KEY, DEFAULT_LOG_TAG_FILE_INODE},
+        {TagKey::FILE_PATH_TAG_KEY, DEFAULT_LOG_TAG_FILE_PATH},
+        {TagKey::K8S_NAMESPACE_TAG_KEY, DEFAULT_LOG_TAG_NAMESPACE},
+        {TagKey::K8S_POD_NAME_TAG_KEY, DEFAULT_LOG_TAG_POD_NAME},
+        {TagKey::K8S_POD_UID_TAG_KEY, DEFAULT_LOG_TAG_POD_UID},
+        {TagKey::CONTAINER_NAME_TAG_KEY, DEFAULT_LOG_TAG_CONTAINER_NAME},
+        {TagKey::CONTAINER_IP_TAG_KEY, DEFAULT_LOG_TAG_CONTAINER_IP},
+        {TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, DEFAULT_LOG_TAG_IMAGE_NAME},
+        {TagKey::HOST_NAME_TAG_KEY, DEFAULT_LOG_TAG_HOST_NAME},
+        {TagKey::HOST_ID_TAG_KEY, DEFAULT_LOG_TAG_HOST_ID},
+        {TagKey::CLOUD_PROVIDER_TAG_KEY, DEFAULT_LOG_TAG_CLOUD_PROVIDER},
+#ifndef __ENTERPRISE__
+        {TagKey::HOST_IP_TAG_KEY, DEFAULT_LOG_TAG_HOST_IP},
+#else
+        {TagKey::AGENT_TAG_TAG_KEY, DEFAULT_LOG_TAG_USER_DEFINED_ID},
+#endif
+    };
+    static const string unknown = "unknown_tag_key";
+    auto iter = TagKeyDefaultValue.find(key);
+    if (iter != TagKeyDefaultValue.end()) {
+        return iter->second;
+    } else {
+        return unknown;
+    }
+}
+
 ////////////////////////// COMMON ////////////////////////
-const std::string DEFAULT_TAG_NAMESPACE = "namespace";
-const std::string DEFAULT_TAG_HOST_NAME = "host_name";
-const std::string DEFAULT_TAG_HOST_IP = "host_ip";
-const std::string DEFAULT_TAG_POD_NAME = "pod_name";
-const std::string DEFAULT_TAG_POD_UID = "pod_uid";
-const std::string DEFAULT_TAG_CONTAINER_NAME = "container_name";
-const std::string DEFAULT_TAG_CONTAINER_IP = "container_ip";
-const std::string DEFAULT_TAG_IMAGE_NAME = "image_name";
+const string DEFAULT_CONFIG_TAG_KEY_VALUE = "__default__";
 
 ////////////////////////// LOG ////////////////////////
-#ifndef __ENTERPRISE__ // 开源版
-const std::string DEFAULT_LOG_TAG_HOST_NAME = DEFAULT_TAG_HOST_NAME;
-const std::string DEFAULT_LOG_TAG_NAMESPACE = DEFAULT_TAG_NAMESPACE;
-const std::string DEFAULT_LOG_TAG_POD_NAME = DEFAULT_TAG_POD_NAME;
-const std::string DEFAULT_LOG_TAG_POD_UID = DEFAULT_TAG_POD_UID;
-const std::string DEFAULT_LOG_TAG_CONTAINER_NAME = DEFAULT_TAG_CONTAINER_NAME;
-const std::string DEFAULT_LOG_TAG_CONTAINER_IP = DEFAULT_TAG_CONTAINER_IP;
-const std::string DEFAULT_LOG_TAG_IMAGE_NAME = DEFAULT_TAG_IMAGE_NAME;
-const std::string DEFAULT_LOG_TAG_FILE_OFFSET = "file_offset";
-const std::string DEFAULT_LOG_TAG_FILE_INODE = "file_inode";
-const std::string DEFAULT_LOG_TAG_FILE_PATH = "file_path";
-
-const std::string DEFAULT_LOG_TAG_HOST_IP = DEFAULT_TAG_HOST_IP;
+const string DEFAULT_LOG_TAG_NAMESPACE = "_namespace_";
+const string DEFAULT_LOG_TAG_POD_NAME = "_pod_name_";
+const string DEFAULT_LOG_TAG_POD_UID = "_pod_uid_";
+const string DEFAULT_LOG_TAG_CONTAINER_NAME = "_container_name_";
+const string DEFAULT_LOG_TAG_CONTAINER_IP = "_container_ip_";
+const string DEFAULT_LOG_TAG_IMAGE_NAME = "_image_name_";
+const string DEFAULT_LOG_TAG_HOST_NAME = "__hostname__";
+const string DEFAULT_LOG_TAG_FILE_OFFSET = "__file_offset__";
+const string DEFAULT_LOG_TAG_FILE_INODE = "__inode__";
+const string DEFAULT_LOG_TAG_FILE_PATH = "__path__";
+const string DEFAULT_LOG_TAG_HOST_ID = "__host_id__";
+const string DEFAULT_LOG_TAG_CLOUD_PROVIDER = "__cloud_provider__";
+#ifndef __ENTERPRISE__
+const string DEFAULT_LOG_TAG_HOST_IP = "__host_ip__";
 #else
-const std::string DEFAULT_LOG_TAG_HOST_NAME = "__hostname__";
-const std::string DEFAULT_LOG_TAG_NAMESPACE = "_namespace_";
-const std::string DEFAULT_LOG_TAG_POD_NAME = "_pod_name_";
-const std::string DEFAULT_LOG_TAG_POD_UID = "_pod_uid_";
-const std::string DEFAULT_LOG_TAG_CONTAINER_NAME = "_container_name_";
-const std::string DEFAULT_LOG_TAG_CONTAINER_IP = "_container_ip_";
-const std::string DEFAULT_LOG_TAG_IMAGE_NAME = "_image_name_";
-const std::string DEFAULT_LOG_TAG_FILE_OFFSET = "__file_offset__";
-const std::string DEFAULT_LOG_TAG_FILE_INODE = "__inode__";
-const std::string DEFAULT_LOG_TAG_FILE_PATH = "__path__";
-
-const std::string DEFAULT_LOG_TAG_USER_DEFINED_ID = "__user_defined_id__";
+const string DEFAULT_LOG_TAG_USER_DEFINED_ID = "__user_defined_id__";
 #endif
 
+// only used in pipeline, not serialized
+const string LOG_RESERVED_KEY_SOURCE = "__source__";
+const string LOG_RESERVED_KEY_TOPIC = "__topic__";
+const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
+const string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
+
 ////////////////////////// METRIC ////////////////////////
-const std::string DEFAULT_METRIC_TAG_NAMESPACE = DEFAULT_TAG_NAMESPACE;
-const std::string DEFAULT_METRIC_TAG_POD_NAME = DEFAULT_TAG_POD_NAME;
-const std::string DEFAULT_METRIC_TAG_POD_UID = DEFAULT_TAG_POD_UID;
-const std::string DEFAULT_METRIC_TAG_CONTAINER_NAME = DEFAULT_TAG_CONTAINER_NAME;
-const std::string DEFAULT_METRIC_TAG_CONTAINER_IP = DEFAULT_TAG_CONTAINER_IP;
-const std::string DEFAULT_METRIC_TAG_IMAGE_NAME = DEFAULT_TAG_IMAGE_NAME;
+const string DEFAULT_METRIC_TAG_NAMESPACE = "namespace";
+const string DEFAULT_METRIC_TAG_POD_NAME = "pod_name";
+const string DEFAULT_METRIC_TAG_POD_UID = "pod_uid";
+const string DEFAULT_METRIC_TAG_CONTAINER_NAME = "container_name";
+const string DEFAULT_METRIC_TAG_CONTAINER_IP = "container_ip";
+const string DEFAULT_METRIC_TAG_IMAGE_NAME = "image_name";
 
 ////////////////////////// TRACE ////////////////////////
 

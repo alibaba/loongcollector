@@ -18,13 +18,13 @@
 #include <string>
 #include <vector>
 
-#include "config/PipelineConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "config/CollectionConfig.h"
 #include "config/common_provider/CommonConfigProvider.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/FileServer.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/config/PipelineManagerMock.h"

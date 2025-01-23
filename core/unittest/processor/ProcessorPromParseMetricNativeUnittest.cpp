@@ -35,7 +35,7 @@ public:
     void TestInit();
     void TestProcess();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 void ProcessorParsePrometheusMetricUnittest::TestInit() {

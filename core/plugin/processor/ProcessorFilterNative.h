@@ -19,8 +19,8 @@
 #include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
 
@@ -37,7 +37,7 @@ public:
     virtual ~BaseFilterNode() {}
 
 public:
-    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext) { return true; }
+    virtual bool Match(const LogEvent& contents, const CollectionPipelineContext& mContext) { return true; }
 
 public:
     FilterNodeType GetNodeType() const { return nodeType; }
@@ -56,7 +56,7 @@ public:
     virtual ~BinaryFilterOperatorNode() {}
 
 public:
-    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const CollectionPipelineContext& mContext);
 
 private:
     FilterOperator op;
@@ -73,7 +73,7 @@ public:
     virtual ~RegexFilterValueNode() {}
 
 public:
-    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const CollectionPipelineContext& mContext);
 
 private:
     std::string key;
@@ -88,7 +88,7 @@ public:
     virtual ~UnaryFilterOperatorNode() {}
 
 public:
-    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const CollectionPipelineContext& mContext);
 
 private:
     BaseFilterNodePtr child;

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/plugin/creator/StaticProcessorCreator.h"
-#include "pipeline/plugin/instance/PluginInstance.h"
+#include "collection_pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "collection_pipeline/plugin/instance/PluginInstance.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

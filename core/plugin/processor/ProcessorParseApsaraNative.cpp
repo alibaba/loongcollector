@@ -17,12 +17,12 @@
 #include "plugin/processor/ProcessorParseApsaraNative.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
@@ -94,7 +94,7 @@ void ProcessorParseApsaraNative::Process(PipelineEventGroup& logGroup) {
 
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-        if (ProcessEvent(logPath, events[rIdx], cachedLogTime, timeStrCache)) {
+        if (ProcessEvent(logPath, events[rIdx], cachedLogTime, timeStrCache, logGroup.GetAllMetadata())) {
             if (wIdx != rIdx) {
                 events[wIdx] = std::move(events[rIdx]);
             }
@@ -116,7 +116,8 @@ void ProcessorParseApsaraNative::Process(PipelineEventGroup& logGroup) {
 bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                               PipelineEventPtr& e,
                                               LogtailTime& cachedLogTime,
-                                              StringView& timeStrCache) {
+                                              StringView& timeStrCache,
+                                              const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
         mOutFailedEventsTotal->Add(1);
         return true;
@@ -162,7 +163,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
         if (mCommonParserOptions.ShouldAddLegacyUnmatchedRawLog(false)) {
             AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
         }
-        if (mCommonParserOptions.ShouldEraseEvent(false, sourceEvent)) {
+        if (mCommonParserOptions.ShouldEraseEvent(false, sourceEvent, metadata)) {
             mDiscardedEventsTotal->Add(1);
             return false;
         }

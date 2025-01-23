@@ -19,15 +19,14 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
-#include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
@@ -61,8 +60,8 @@ protected:
     }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void InputFileUnittest::OnSuccessfulInit() {
@@ -200,9 +199,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
         )";
     optionalGoPipelineStr = R"(
             {
-                "global": {
-                    "AlwaysOnline": true
-                },
+                "global": {},
                 "inputs": [
                     {                
                         "type": "metric_container_info/2",
@@ -252,14 +249,12 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\n', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
-        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
     {
         // custom multiline
@@ -282,7 +277,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitMultilineLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitMultilineLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
@@ -293,9 +288,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         APSARA_TEST_TRUE(plugin->mMultiline.mIgnoringUnmatchWarning);
         APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::DISCARD,
                           plugin->mMultiline.mUnmatchedContentTreatment);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
-        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
     }
     {
         // json multiline, first processor is json parser
@@ -313,14 +306,12 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
-        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
     }
     {
@@ -342,14 +333,12 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
         APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
-        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
-        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
         ctx.SetIsFirstProcessorJsonFlag(false);
     }
     {
@@ -367,7 +356,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
@@ -388,7 +377,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
@@ -409,7 +398,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_FALSE(plugin->mEnableRawContent);
@@ -429,7 +418,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(1U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
         auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
         APSARA_TEST_TRUE(plugin->mEnableRawContent);

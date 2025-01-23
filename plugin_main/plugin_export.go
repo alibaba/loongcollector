@@ -116,6 +116,18 @@ func LoadGlobalConfig(jsonStr string) int {
 				retcode = 1
 			}
 			logger.InitLogger()
+			for _, log := range flags.LogsWaitToPrint {
+				switch log.LogType {
+				case flags.LogTypeError:
+					logger.Error(context.Background(), log.Content)
+				case flags.LogTypeInfo:
+					logger.Info(context.Background(), log.Content)
+				case flags.LogTypeDebug:
+					logger.Debug(context.Background(), log.Content)
+				case flags.LogTypeWarning:
+					logger.Warning(context.Background(), log.Content)
+				}
+			}
 			logger.Info(context.Background(), "load global config", jsonStr)
 			config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LoongcollectorGlobalConfig.HostIP)
 		}
@@ -326,6 +338,7 @@ func initPluginBase(cfgStr string) int {
 	initOnce.Do(func() {
 		LoadGlobalConfig(cfgStr)
 		InitHTTPServer()
+		pluginmanager.InitFileConfig(&config.LoongcollectorGlobalConfig)
 		setGCPercentForSlowStart()
 		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)
 		if *flags.DeployMode == flags.DeploySingleton && *flags.EnableKubernetesMeta {

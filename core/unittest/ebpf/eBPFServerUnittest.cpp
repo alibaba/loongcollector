@@ -5,6 +5,8 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "ebpf/Config.h"
@@ -12,8 +14,6 @@
 #include "ebpf/eBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
@@ -97,8 +97,8 @@ private:
         }
     }
     eBPFAdminConfig* config_;
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
     SecurityOptions security_opts;
 };
 

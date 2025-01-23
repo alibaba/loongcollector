@@ -145,51 +145,7 @@ func (m *metaCollector) Start() error {
 }
 
 func (m *metaCollector) Stop() error {
-	if m.serviceK8sMeta.Pod {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD)
-	}
-	if m.serviceK8sMeta.Node {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NODE)
-	}
-	if m.serviceK8sMeta.Service {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE)
-	}
-	if m.serviceK8sMeta.Deployment {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT)
-	}
-	if m.serviceK8sMeta.ReplicaSet {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET)
-	}
-	if m.serviceK8sMeta.DaemonSet {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET)
-	}
-	if m.serviceK8sMeta.StatefulSet {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET)
-	}
-	if m.serviceK8sMeta.Configmap {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP)
-	}
-	if m.serviceK8sMeta.Job {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB)
-	}
-	if m.serviceK8sMeta.CronJob {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB)
-	}
-	if m.serviceK8sMeta.Namespace {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE)
-	}
-	if m.serviceK8sMeta.PersistentVolume {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUME)
-	}
-	if m.serviceK8sMeta.PersistentVolumeClaim {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM)
-	}
-	if m.serviceK8sMeta.StorageClass {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STORAGECLASS)
-	}
-	if m.serviceK8sMeta.Ingress {
-		m.serviceK8sMeta.metaManager.UnRegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS)
-	}
+	m.serviceK8sMeta.metaManager.UnRegisterAllSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName)
 	close(m.stopCh)
 	return nil
 }
@@ -274,7 +230,7 @@ func (m *metaCollector) processEntityLinkCommonPart(logContents models.LogConten
 	logContents.Add(entityCategoryFieldName, defaultEntityLinkCategory)
 }
 
-func (m *metaCollector) processEntityJSONObject(obj map[string]string) string {
+func (m *metaCollector) processEntityJSONObject(obj interface{}) string {
 	if obj == nil {
 		return "{}"
 	}

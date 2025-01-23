@@ -55,19 +55,6 @@ bool ProcessorSplitLogStringNative::Init(const Json::Value& config) {
         mSplitChar = static_cast<char>(splitter);
     }
 
-    // AppendingLogPositionMeta
-    if (!GetOptionalBoolParam(config, "AppendingLogPositionMeta", mAppendingLogPositionMeta, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mAppendingLogPositionMeta,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
-
     // EnableRawContent
     if (!GetOptionalBoolParam(config, "EnableRawContent", mEnableRawContent, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
@@ -160,9 +147,10 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
                 ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data())
                 : content.size() + 1;
             targetEvent->SetPosition(offset, length);
-            if (mAppendingLogPositionMeta) {
+            if (logGroup.HasMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY)) {
                 StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
-                targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+                targetEvent->SetContentNoCopy(logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
+                                              StringView(offsetStr.data, offsetStr.size));
             }
             newEvents.emplace_back(std::move(targetEvent), true, nullptr);
         }

@@ -20,11 +20,11 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "unittest/Unittest.h"
 
@@ -57,8 +57,8 @@ protected:
     }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void create_directory(const std::string& path) {
@@ -182,7 +182,7 @@ void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
     unique_ptr<InputContainerStdio> input;
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
-    Pipeline pipeline;
+    CollectionPipeline pipeline;
     pipeline.mPluginID.store(0);
     ctx.SetPipeline(pipeline);
 
@@ -198,9 +198,7 @@ void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
     )";
     optionalGoPipelineStr = R"(
         {
-            "global": {
-                "AlwaysOnline": true
-            },
+            "global": {},
             "inputs": [
                 {                
                     "type": "metric_container_info/2",

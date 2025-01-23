@@ -175,7 +175,7 @@ void PollingDirFile::PollingIteration() {
             break;
 
         const FileDiscoveryOptions* config = itr->first;
-        const PipelineContext* ctx = itr->second;
+        const CollectionPipelineContext* ctx = itr->second;
         if (!config->IsContainerDiscoveryEnabled()) {
             fsutil::PathStat baseDirStat;
             if (!fsutil::PathStat::stat(config->GetBasePath(), baseDirStat)) {
@@ -221,7 +221,7 @@ void PollingDirFile::PollingIteration() {
             break;
 
         const FileDiscoveryOptions* config = itr->first;
-        const PipelineContext* ctx = itr->second;
+        const CollectionPipelineContext* ctx = itr->second;
         if (!config->IsContainerDiscoveryEnabled()) {
             int32_t lastConfigStatCount = mStatCount;
             if (!PollingWildcardConfigPath(*itr, config->GetWildcardPaths()[0], 0)) {

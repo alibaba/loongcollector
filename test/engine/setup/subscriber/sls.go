@@ -273,11 +273,6 @@ func init() {
 		} else {
 			l.Project = config.TestConfig.Project
 		}
-		if v, ok := spec["logstore"]; ok {
-			l.Logstore = v.(string)
-		} else {
-			l.Logstore = config.TestConfig.Logstore
-		}
 		if v, ok := spec["query_endpoint"]; ok {
 			l.QueryEndpoint = v.(string)
 		} else {
@@ -287,6 +282,11 @@ func init() {
 			l.TelemetryType = v.(string)
 		} else {
 			l.TelemetryType = "logs"
+		}
+		if v, ok := spec["logstore"]; ok {
+			l.Logstore = v.(string)
+		} else {
+			l.Logstore = config.TestConfig.GetLogstore(l.TelemetryType)
 		}
 		l.client = createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, l.QueryEndpoint)
 		return l, nil

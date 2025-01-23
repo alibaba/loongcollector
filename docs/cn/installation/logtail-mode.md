@@ -29,7 +29,7 @@ LoongCollector 提供了 Logtail 兼容模式，可以让您在升级到 LoongCo
 **方式二：环境变量**
 
 ```bash
-export logtail_mode=true
+export LOGTAIL_MODE=true
 ./loongcollector
 ```
 
@@ -42,7 +42,7 @@ export logtail_mode=true
 1. 需要给LoongCollector容器添加环境变量：
 
     ```bash
-    logtail_mode=true
+    LOGTAIL_MODE=true
     ```
 
 2. 需要调整LoongCollector挂载路径映射：

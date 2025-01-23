@@ -61,6 +61,7 @@ func (m *metadataHandler) K8sServerRun(stopCh <-chan struct{}) error {
 
 func (m *metadataHandler) handler(handleFunc func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		defer panicRecover()
 		if !m.metaManager.IsReady() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -157,7 +158,10 @@ func (m *metadataHandler) findPodByServiceIPPort(ip string, port int32) *PodMeta
 	// find pod by service
 	lm := newLabelMatcher(service, labels.SelectorFromSet(service.Spec.Selector))
 	podObjs := m.metaManager.cacheMap[POD].Filter(func(ow *ObjectWrapper) bool {
-		pod := ow.Raw.(*v1.Pod)
+		pod, ok := ow.Raw.(*v1.Pod)
+		if !ok {
+			return false
+		}
 		if pod.Namespace != service.Namespace {
 			return false
 		}
@@ -165,6 +169,9 @@ func (m *metadataHandler) findPodByServiceIPPort(ip string, port int32) *PodMeta
 	}, 1)
 	if len(podObjs) != 0 {
 		podMetadata := m.convertObj2PodResponse(podObjs[0])
+		if podMetadata == nil {
+			return nil
+		}
 		podMetadata.ServiceName = service.Name
 		return podMetadata
 	}
@@ -174,7 +181,10 @@ func (m *metadataHandler) findPodByServiceIPPort(ip string, port int32) *PodMeta
 func (m *metadataHandler) findPodByPodIPPort(ip string, port int32, objs map[string][]*ObjectWrapper) *PodMetadata {
 	if port != 0 {
 		for _, obj := range objs[ip] {
-			pod := obj.Raw.(*v1.Pod)
+			pod, ok := obj.Raw.(*v1.Pod)
+			if !ok {
+				continue
+			}
 			for _, container := range pod.Spec.Containers {
 				portMatch := false
 				for _, realPort := range container.Ports {
@@ -202,7 +212,10 @@ func (m *metadataHandler) findPodByPodIPPort(ip string, port int32, objs map[str
 }
 
 func (m *metadataHandler) convertObj2PodResponse(obj *ObjectWrapper) *PodMetadata {
-	pod := obj.Raw.(*v1.Pod)
+	pod, ok := obj.Raw.(*v1.Pod)
+	if !ok {
+		return nil
+	}
 	podMetadata := m.getCommonPodMetadata(pod)
 	containerIDs := make([]string, 0)
 	for _, container := range pod.Status.ContainerStatuses {
@@ -241,7 +254,10 @@ func (m *metadataHandler) handlePodMetaByContainerID(w http.ResponseWriter, r *h
 func (m *metadataHandler) convertObjs2ContainerResponse(objs []*ObjectWrapper) []*PodMetadata {
 	metadatas := make([]*PodMetadata, 0)
 	for _, obj := range objs {
-		pod := obj.Raw.(*v1.Pod)
+		pod, ok := obj.Raw.(*v1.Pod)
+		if !ok {
+			continue
+		}
 		podMetadata := m.getCommonPodMetadata(pod)
 		podMetadata.PodIP = pod.Status.PodIP
 		metadatas = append(metadatas, podMetadata)
@@ -261,11 +277,18 @@ func (m *metadataHandler) handlePodMetaByHostIP(w http.ResponseWriter, r *http.R
 
 	// Get the metadata
 	metadata := make(map[string]*PodMetadata)
-	objs := m.metaManager.cacheMap[POD].Get(rBody.Keys)
+	queryKeys := make([]string, len(rBody.Keys))
+	for _, key := range rBody.Keys {
+		queryKeys = append(queryKeys, addHostIPIndexPrefex(key))
+	}
+	objs := m.metaManager.cacheMap[POD].Get(queryKeys)
 	for _, obj := range objs {
 		podMetadata := m.convertObjs2HostResponse(obj)
 		for i, meta := range podMetadata {
-			pod := obj[i].Raw.(*v1.Pod)
+			pod, ok := obj[i].Raw.(*v1.Pod)
+			if !ok {
+				continue
+			}
 			metadata[pod.Status.PodIP] = meta
 		}
 	}
@@ -275,7 +298,10 @@ func (m *metadataHandler) handlePodMetaByHostIP(w http.ResponseWriter, r *http.R
 func (m *metadataHandler) convertObjs2HostResponse(objs []*ObjectWrapper) []*PodMetadata {
 	metadatas := make([]*PodMetadata, 0)
 	for _, obj := range objs {
-		pod := obj.Raw.(*v1.Pod)
+		pod, ok := obj.Raw.(*v1.Pod)
+		if !ok {
+			continue
+		}
 		podMetadata := m.getCommonPodMetadata(pod)
 		containerIDs := make([]string, 0)
 		for _, container := range pod.Status.ContainerStatuses {
@@ -318,10 +344,13 @@ func (m *metadataHandler) getCommonPodMetadata(pod *v1.Pod) *PodMetadata {
 			replicasetKey := generateNameWithNamespaceKey(pod.Namespace, podMetadata.WorkloadName)
 			replicasets := m.metaManager.cacheMap[REPLICASET].Get([]string{replicasetKey})
 			for _, replicaset := range replicasets[replicasetKey] {
-				logger.Warning(context.Background(), "ReplicaSet has no owner1", podMetadata.WorkloadName)
-				if len(replicaset.Raw.(*app.ReplicaSet).OwnerReferences) > 0 {
-					podMetadata.WorkloadName = replicaset.Raw.(*app.ReplicaSet).OwnerReferences[0].Name
-					podMetadata.WorkloadKind = strings.ToLower(replicaset.Raw.(*app.ReplicaSet).OwnerReferences[0].Kind)
+				replicaset, ok := replicaset.Raw.(*app.ReplicaSet)
+				if !ok {
+					continue
+				}
+				if len(replicaset.OwnerReferences) > 0 {
+					podMetadata.WorkloadName = replicaset.OwnerReferences[0].Name
+					podMetadata.WorkloadKind = strings.ToLower(replicaset.OwnerReferences[0].Kind)
 					break
 				}
 			}

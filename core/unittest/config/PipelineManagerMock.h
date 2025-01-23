@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/PipelineManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 
 using namespace std;
 
 namespace logtail {
 
-class PipelineMock : public Pipeline {
+class PipelineMock : public CollectionPipeline {
 public:
-    bool Init(PipelineConfig&& config) {
+    bool Init(CollectionConfig&& config) {
         mConfig = std::move(config.mDetail);
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             mMetricsRecordRef,
@@ -33,7 +33,7 @@ public:
     }
 };
 
-class PipelineManagerMock : public PipelineManager {
+class PipelineManagerMock : public CollectionPipelineManager {
 public:
     static PipelineManagerMock* GetInstance() {
         static PipelineManagerMock instance;
@@ -49,8 +49,8 @@ public:
     }
 
 private:
-    shared_ptr<Pipeline> BuildPipeline(PipelineConfig&& config) override {
-        // this should be synchronized with PipelineManager::BuildPipeline, except for the pointer type.
+    shared_ptr<CollectionPipeline> BuildPipeline(CollectionConfig&& config) override {
+        // this should be synchronized with CollectionPipelineManager::BuildPipeline, except for the pointer type.
         shared_ptr<PipelineMock> p = make_shared<PipelineMock>();
         if (!p->Init(std::move(config))) {
             return nullptr;

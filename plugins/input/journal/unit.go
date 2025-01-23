@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -172,12 +173,12 @@ func unitNameMangle(name, suffix string) (string, error) {
 
 	if isDevicePath(name) {
 		// chop off path and put .device on the end
-		return path.Base(path.Clean(name)) + "device", nil
+		return path.Base(filepath.Clean(name)) + "device", nil
 	}
 
 	if pathIsAbsolute(name) {
 		// chop path and put .mount on the end
-		return path.Base(path.Clean(name)) + ".mount", nil
+		return path.Base(filepath.Clean(name)) + ".mount", nil
 	}
 
 	name = doEscapeMangle(name)

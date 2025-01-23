@@ -14,11 +14,11 @@
 
 #include <memory>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "unittest/Unittest.h"
@@ -70,7 +70,7 @@ private:
 
     static ExactlyOnceQueueManager* sManager;
     static vector<RangeCheckpointPtr> sCheckpoints;
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
 
     unique_ptr<ProcessQueueItem> GenerateProcessItem();
     unique_ptr<SenderQueueItem> GenerateSenderItem();
@@ -82,7 +82,7 @@ private:
 const size_t ExactlyOnceQueueManagerUnittest::sDataSize;
 ExactlyOnceQueueManager* ExactlyOnceQueueManagerUnittest::sManager;
 vector<RangeCheckpointPtr> ExactlyOnceQueueManagerUnittest::sCheckpoints;
-PipelineContext ExactlyOnceQueueManagerUnittest::sCtx;
+CollectionPipelineContext ExactlyOnceQueueManagerUnittest::sCtx;
 
 void ExactlyOnceQueueManagerUnittest::TestUpdateQueue() {
     QueueKey key = 0;
@@ -171,16 +171,16 @@ void ExactlyOnceQueueManagerUnittest::TestPushProcessQueue() {
 
     // queue exists
     APSARA_TEST_TRUE(sManager->IsValidToPushProcessQueue(0));
-    APSARA_TEST_EQUAL(0, sManager->PushProcessQueue(0, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::OK, sManager->PushProcessQueue(0, GenerateProcessItem()));
 
     // no queue exists
     APSARA_TEST_FALSE(sManager->IsValidToPushProcessQueue(1));
-    APSARA_TEST_EQUAL(2, sManager->PushProcessQueue(1, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_NOT_EXIST, sManager->PushProcessQueue(1, GenerateProcessItem()));
 
     // invalid to push
     sManager->mProcessQueues[0]->mValidToPush = false;
     APSARA_TEST_FALSE(sManager->IsValidToPushProcessQueue(0));
-    APSARA_TEST_EQUAL(1, sManager->PushProcessQueue(0, GenerateProcessItem()));
+    APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sManager->PushProcessQueue(0, GenerateProcessItem()));
 }
 
 void ExactlyOnceQueueManagerUnittest::TestIsAllProcessQueueEmpty() {
@@ -278,13 +278,13 @@ void ExactlyOnceQueueManagerUnittest::TestIsAllSenderQueueEmpty() {
 }
 
 void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     sManager->CreateOrUpdateQueue(1, 0, ctx, sCheckpoints);
     sManager->CreateOrUpdateQueue(2, 0, ctx, sCheckpoints);
 
-    auto pipeline1 = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline1;
+    auto pipeline1 = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline1;
 
     auto item1 = GenerateProcessItem();
     auto p1 = item1.get();
@@ -308,8 +308,8 @@ void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
     auto p4 = item4.get();
     sManager->PushProcessQueue(2, std::move(item4));
 
-    auto pipeline2 = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline2;
+    auto pipeline2 = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline2;
 
     sManager->DisablePopProcessQueue("test_config", false);
     APSARA_TEST_FALSE(sManager->mProcessQueues[1]->mValidToPop);

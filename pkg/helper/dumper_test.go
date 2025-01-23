@@ -31,9 +31,9 @@ import (
 )
 
 func TestServiceHTTP_doDumpFile(t *testing.T) {
-	_, err := os.Stat(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorDebugDir, "dump"))
+	_, err := os.Stat(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorDebugDir, "dump"))
 	if err == nil {
-		files, findErr := GetFileListByPrefix(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorDebugDir, "dump"), "custom", true, 0)
+		files, findErr := GetFileListByPrefix(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorDebugDir, "dump"), "custom", true, 0)
 		require.NoError(t, findErr)
 		for _, file := range files {
 			_ = os.Remove(file)

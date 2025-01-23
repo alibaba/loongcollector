@@ -2,9 +2,9 @@
 
 #include <string>
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
-#include "pipeline/plugin/interface/Processor.h"
 #include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 

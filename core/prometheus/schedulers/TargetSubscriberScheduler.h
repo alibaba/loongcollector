@@ -23,9 +23,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
-#include "pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
 #include "prometheus/schedulers/BaseScheduler.h"
 #include "prometheus/schedulers/ScrapeConfig.h"

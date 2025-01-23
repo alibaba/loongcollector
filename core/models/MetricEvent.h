@@ -63,7 +63,7 @@ public:
         mValue = T{std::forward<Args>(args)...};
     }
 
-    void SetValue(const std::map<StringView, double>& multiDoubleValues) {
+    void SetValue(const std::map<StringView, UntypedMultiDoubleValue>& multiDoubleValues) {
         mValue = UntypedMultiDoubleValues{multiDoubleValues, this};
     }
 

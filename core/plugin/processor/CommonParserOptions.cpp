@@ -26,7 +26,9 @@ namespace logtail {
 
 const string CommonParserOptions::legacyUnmatchedRawLogKey = "__raw_log__";
 
-bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
+bool CommonParserOptions::Init(const Json::Value& config,
+                               const CollectionPipelineContext& ctx,
+                               const string& pluginType) {
     string errorMsg;
 
     // KeepingSourceWhenParseFail
@@ -95,14 +97,17 @@ bool CommonParserOptions::ShouldAddSourceContent(bool parseSuccess) {
     return (((parseSuccess && mKeepingSourceWhenParseSucceed) || (!parseSuccess && mKeepingSourceWhenParseFail)));
 }
 
-bool CommonParserOptions::ShouldEraseEvent(bool parseSuccess, const LogEvent& sourceEvent) {
+bool CommonParserOptions::ShouldEraseEvent(bool parseSuccess,
+                                           const LogEvent& sourceEvent,
+                                           const GroupMetadata& metadata) {
     if (!parseSuccess && !mKeepingSourceWhenParseFail) {
         if (sourceEvent.Empty()) {
             return true;
         }
         size_t size = sourceEvent.Size();
         // "__file_offset__"
-        if (size == 1 && (sourceEvent.cbegin()->first == LOG_RESERVED_KEY_FILE_OFFSET)) {
+        auto offsetKey = metadata.find(EventGroupMetaKey::LOG_FILE_OFFSET_KEY);
+        if (size == 1 && (offsetKey != metadata.end() && sourceEvent.cbegin()->first == offsetKey->second)) {
             return true;
         } else if (size == 2 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerTimeKey)
                    && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerSourceKey)) {

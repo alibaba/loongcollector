@@ -22,7 +22,6 @@
 #include <thread>
 
 #include "common/Strptime.h"
-#include "pipeline/PipelineContext.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 // Time and timestamp utility.

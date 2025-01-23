@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "common/JsonUtil.h"
+#include "models/PipelineEventGroup.h"
 #include "models/RawEvent.h"
 #include "unittest/Unittest.h"
 

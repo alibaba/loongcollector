@@ -22,18 +22,6 @@ const std::string OS_NAME = "Linux";
 const std::string OS_NAME = "Windows";
 #endif
 
-const std::string LOG_RESERVED_KEY_SOURCE = "__source__";
-const std::string LOG_RESERVED_KEY_TOPIC = "__topic__";
-const std::string LOG_RESERVED_KEY_USER_DEFINED_ID = "__user_defined_id__";
-const std::string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
-const std::string LOG_RESERVED_KEY_HOSTNAME = "__hostname__";
-const std::string LOG_RESERVED_KEY_PATH = "__path__";
-const std::string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
-const std::string LOG_RESERVED_KEY_TRUNCATE_INFO = "__truncate_info__";
-// const std::string LOG_RESERVED_KEY_ALIPAY_ZONE = "__alipay_zone__";
-const std::string LOG_RESERVED_KEY_INODE = "__inode__";
-const std::string LOG_RESERVED_KEY_FILE_OFFSET = "__file_offset__";
-
 const char* SLS_EMPTY_STR_FOR_INDEX = "\01";
 
 // profile project

@@ -6,6 +6,8 @@
 #include "json/json.h"
 
 #include "application/Application.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "file_server/EventDispatcher.h"
@@ -13,8 +15,6 @@
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingEventQueue.h"
 #include "file_server/polling/PollingModify.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
@@ -89,7 +89,7 @@ public:
         FlusherRunner::GetInstance()->Init(); // reference: Application::Start
         PluginRegistry::GetInstance()->LoadPlugins();
         ProcessorRunner::GetInstance()->Init();
-        PipelineManager::GetInstance();
+        CollectionPipelineManager::GetInstance();
         FileServer::GetInstance()->Start();
         PollingDirFile::GetInstance()->Start();
         PollingModify::GetInstance()->Start();
@@ -117,10 +117,10 @@ public:
 
     void TearDown() override {
         FileServer::GetInstance()->Pause();
-        for (auto& p : PipelineManager::GetInstance()->mPipelineNameEntityMap) {
+        for (auto& p : CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap) {
             p.second->Stop(true);
         }
-        PipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
         // EventDispatcher::GetInstance()->CleanEnviroments();
         // ConfigManager::GetInstance()->CleanEnviroments();
         PollingDirFile::GetInstance()->ClearCache();
@@ -183,12 +183,12 @@ private:
         auto testFile2 = gRootDir + testVector.mTestDir1 + PATH_SEPARATOR + "0.log";
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, testVector.mPreservedDirDepth);
-        PipelineConfig pipelineConfig("polling", std::move(configJson));
+        CollectionConfig pipelineConfig("polling", std::move(configJson));
         APSARA_TEST_TRUE_FATAL(pipelineConfig.Parse());
-        auto p = PipelineManager::GetInstance()->BuildPipeline(
-            std::move(pipelineConfig)); // reference: PipelineManager::UpdatePipelines
+        auto p = CollectionPipelineManager::GetInstance()->BuildPipeline(
+            std::move(pipelineConfig)); // reference: CollectionPipelineManager::UpdatePipelines
         APSARA_TEST_FALSE_FATAL(p.get() == nullptr);
-        PipelineManager::GetInstance()->mPipelineNameEntityMap[pipelineConfig.mName] = p;
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap[pipelineConfig.mName] = p;
         p->Start();
         FileServer::GetInstance()->Resume();
 
@@ -272,12 +272,12 @@ public:
         auto testFile = gRootDir + "log/0/0.log";
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, 0);
-        PipelineConfig pipelineConfig("polling", std::move(configJson));
+        CollectionConfig pipelineConfig("polling", std::move(configJson));
         APSARA_TEST_TRUE_FATAL(pipelineConfig.Parse());
-        auto p = PipelineManager::GetInstance()->BuildPipeline(
-            std::move(pipelineConfig)); // reference: PipelineManager::UpdatePipelines
+        auto p = CollectionPipelineManager::GetInstance()->BuildPipeline(
+            std::move(pipelineConfig)); // reference: CollectionPipelineManager::UpdatePipelines
         APSARA_TEST_FALSE_FATAL(p.get() == nullptr);
-        PipelineManager::GetInstance()->mPipelineNameEntityMap[pipelineConfig.mName] = p;
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap[pipelineConfig.mName] = p;
         p->Start();
         FileServer::GetInstance()->Resume();
 

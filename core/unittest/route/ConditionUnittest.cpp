@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "collection_pipeline/route/Condition.h"
 #include "common/JsonUtil.h"
-#include "pipeline/route/Condition.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -27,7 +27,7 @@ public:
     void TestGetResult();
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void ConditionUnittest::TestInit() {
@@ -201,7 +201,7 @@ public:
     void TestCheck();
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void EventTypeConditionUnittest::TestInit() {
@@ -301,7 +301,7 @@ public:
     void TestDiscardTag();
 
 private:
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void TagConditionUnittest::TestInit() {
