@@ -43,17 +43,13 @@ type ProcessorTag struct {
 	pipelineMetaTagKey     map[TagKey]string
 	appendingAllEnvMetaTag bool
 	agentEnvMetaTagKey     map[string]string
-
-	// TODO: file tags, read in background with double buffer
-	fileTagsPath string
 }
 
-func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath string) *ProcessorTag {
+func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string) *ProcessorTag {
 	processorTag := &ProcessorTag{
 		pipelineMetaTagKey:     make(map[TagKey]string),
 		appendingAllEnvMetaTag: appendingAllEnvMetaTag,
 		agentEnvMetaTagKey:     agentEnvMetaTagKey,
-		fileTagsPath:           fileTagsPath,
 	}
 	processorTag.parseAllConfigurableTags(pipelineMetaTagKey)
 	return processorTag
@@ -73,8 +69,13 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 			tagsMap[tag.Key] = tag.Value
 		}
 	}
+	// file tags
 	p.addAllConfigurableTags(tagsMap)
-	// TODO: file tags, read in background with double buffer
+	fileTags := fileConfig.GetFileTags()
+	for k, v := range fileTags {
+		tagsMap[k] = v.(string)
+	}
+	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
 			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
@@ -101,7 +102,11 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
-
+	fileTags := fileConfig.GetFileTags()
+	// file tags
+	for k, v := range fileTags {
+		in.Group.Tags.Add(k, v.(string))
+	}
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {

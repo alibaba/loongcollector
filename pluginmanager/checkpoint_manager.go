@@ -85,14 +85,14 @@ func (p *checkPointManager) Init() error {
 	p.shutdown = make(chan struct{}, 1)
 	p.configCounter = make(map[string]int)
 	p.cleanThreshold = DefaultCleanThreshold
-	logtailDataDir := config.LoongcollectorGlobalConfig.LoongcollectorDataDir
+	logtailDataDir := config.LoongcollectorGlobalConfig.LoongCollectorGoCheckPointDir
 	pathExist, err := util.PathExists(logtailDataDir)
 	var dbPath string
 	if err == nil && pathExist {
 		if *CheckPointFile != "" {
 			dbPath = filepath.Join(logtailDataDir, *CheckPointFile)
 		} else {
-			dbPath = filepath.Join(logtailDataDir, config.LoongcollectorGlobalConfig.LoongcollectorCheckPointFile)
+			dbPath = filepath.Join(logtailDataDir, config.LoongcollectorGlobalConfig.LoongCollectorGoCheckPointFile)
 		}
 	} else {
 		// c++程序如果这个目录创建失败会直接exit，所以这里一般应该不会走进来

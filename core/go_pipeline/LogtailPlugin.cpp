@@ -37,6 +37,8 @@
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
+DECLARE_FLAG_INT32(file_tags_update_interval);
+DECLARE_FLAG_STRING(agent_host_id);
 
 using namespace std;
 using namespace logtail;
@@ -63,19 +65,24 @@ LogtailPlugin::LogtailPlugin() {
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
-    mPluginCfg["LoongcollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
-    mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
-    mPluginCfg["LoongcollectorDataDir"] = GetAgentGoCheckpointDir();
-    mPluginCfg["LoongcollectorLogConfDir"] = GetAgentGoLogConfDir();
-    mPluginCfg["LoongcollectorPluginLogName"] = GetPluginLogName();
-    mPluginCfg["LoongcollectorVersionTag"] = GetVersionTag();
-    mPluginCfg["LoongcollectorCheckPointFile"] = GetGoPluginCheckpoint();
-    mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
-    mPluginCfg["LoongcollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
+    mPluginCfg["LoongCollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    mPluginCfg["LoongCollectorLogDir"] = GetAgentLogDir();
+    mPluginCfg["LoongCollectorDataDir"] = GetAgentDataDir();
+    mPluginCfg["LoongCollectorLogConfDir"] = GetAgentGoLogConfDir();
+    mPluginCfg["LoongCollectorPluginLogName"] = GetPluginLogName();
+    mPluginCfg["LoongCollectorVersionTag"] = GetVersionTag();
+    mPluginCfg["LoongCollectorGoCheckPointDir"] = GetAgentGoCheckpointDir();
+    mPluginCfg["LoongCollectorGoCheckPointFile"] = GetGoPluginCheckpoint();
+    mPluginCfg["LoongCollectorThirdPartyDir"] = GetAgentThirdPartyDir();
+    mPluginCfg["LoongCollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
     mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
-    mPluginCfg["FileTagsPath"] = STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
+    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
+        mPluginCfg["FileTagsPath"] = GetFileTagsDir();
+        mPluginCfg["FileTagsInterval"] = INT32_FLAG(file_tags_update_interval);
+    }
+    mPluginCfg["AgentHostID"] = STRING_FLAG(agent_host_id);
 }
 
 LogtailPlugin::~LogtailPlugin() {

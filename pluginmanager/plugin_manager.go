@@ -57,7 +57,7 @@ var alarmConfigJSON = `{
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
 			"base_version" : "` + config.BaseVersion + `",
-			"` + config.LoongcollectorGlobalConfig.LoongcollectorVersionTag + `" : "` + config.BaseVersion + `"
+			"` + config.LoongcollectorGlobalConfig.LoongCollectorVersionTag + `" : "` + config.BaseVersion + `"
 		}
     },
 	"inputs" : [
@@ -77,7 +77,7 @@ var containerConfigJSON = `{
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
 			"base_version" : "` + config.BaseVersion + `",
-			"` + config.LoongcollectorGlobalConfig.LoongcollectorVersionTag + `" : "` + config.BaseVersion + `"
+			"` + config.LoongcollectorGlobalConfig.LoongCollectorVersionTag + `" : "` + config.BaseVersion + `"
 		}
     },
 	"inputs" : [
@@ -203,6 +203,7 @@ func StopBuiltInModulesConfig() {
 		ContainerConfig = nil
 	}
 	CheckPointManager.Stop()
+	StopFileConfig()
 }
 
 // Stop stop the given config. ConfigName is with suffix.

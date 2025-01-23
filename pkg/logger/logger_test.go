@@ -48,12 +48,12 @@ func init() {
 }
 
 func clean() {
-	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir, "plugin_logger.xml"))
-	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName))
+	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorLogConfDir, "plugin_logger.xml"))
+	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorLogDir, config.LoongcollectorGlobalConfig.LoongCollectorPluginLogName))
 }
 
 func readLog(index int) string {
-	bytes, _ := os.ReadFile(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName))
+	bytes, _ := os.ReadFile(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorLogDir, config.LoongcollectorGlobalConfig.LoongCollectorPluginLogName))
 	logs := strings.Split(string(bytes), "\n")
 	if index > len(logs)-1 {
 		return ""
@@ -108,26 +108,26 @@ func Test_generateDefaultConfig(t *testing.T) {
 	}{
 		{
 			name:       "production",
-			want:       fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "", ""),
+			want:       fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongCollectorLogDir, "", ""),
 			flagSetter: func() {},
 		},
 		{
 			name: "test-debug-level",
-			want: fmt.Sprintf(template, "debug", config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "", ""),
+			want: fmt.Sprintf(template, "debug", config.LoongcollectorGlobalConfig.LoongCollectorLogDir, "", ""),
 			flagSetter: func() {
 				flag.Set(FlagLevelName, "debug")
 			},
 		},
 		{
 			name: "test-wrong-level",
-			want: fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "", ""),
+			want: fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongCollectorLogDir, "", ""),
 			flagSetter: func() {
 				flag.Set(FlagLevelName, "debug111")
 			},
 		},
 		{
 			name: "test-open-console",
-			want: fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "<console/>", ""),
+			want: fmt.Sprintf(template, "info", config.LoongcollectorGlobalConfig.LoongCollectorLogDir, "<console/>", ""),
 			flagSetter: func() {
 				flag.Set(FlagConsoleName, "true")
 			},
