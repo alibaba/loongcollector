@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
-	"go.opentelemetry.io/collector/pdata/pmetric"
 	v1Common "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 
@@ -80,8 +79,8 @@ func exponentialHistogram2Logs(name string, histogram *v1.ExponentialHistogram, 
 	for _, dataPoint := range histogram.GetDataPoints() {
 		labels := defaultLabels.Clone()
 		attrsToLabels(labels, dataPoint.GetAttributes())
-		labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
-		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
+		// labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
+		// labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
 
 		if dataPoint.GetSum() != 0 {
 			logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixSum, labels, int64(dataPoint.GetTimeUnixNano()), dataPoint.GetSum()))
@@ -166,7 +165,7 @@ func sum2Logs(name string, sum *v1.Sum, defaultLabels *helper.MetricLabels) (log
 		attrsToLabels(labels, dataPoint.GetAttributes())
 
 		labels.Append(otlp.TagKeyMetricIsMonotonic, strconv.FormatBool(sum.GetIsMonotonic()))
-		labels.Append(otlp.TagKeyMetricAggregationTemporality, sum.GetAggregationTemporality().String())
+		// labels.Append(otlp.TagKeyMetricAggregationTemporality, sum.GetAggregationTemporality().String())
 
 		for _, exemplar := range dataPoint.GetExemplars() {
 			logs = append(logs, exemplarMetricToLogs(name, exemplar, labels.Clone()))
@@ -184,8 +183,8 @@ func histogram2Logs(name string, histogram *v1.Histogram, defaultLabels *helper.
 		labels := defaultLabels.Clone()
 
 		attrsToLabels(labels, dataPoint.GetAttributes())
-		labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
-		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
+		// labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
+		// labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
 
 		if dataPoint.GetSum() != 0 {
 			logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixSum, labels, int64(dataPoint.GetTimeUnixNano()), dataPoint.GetSum()))
@@ -240,7 +239,7 @@ func gauge2Logs(name string, gauga *v1.Gauge, labels *helper.MetricLabels) (logs
 			logs = append(logs, exemplarMetricToLogs(name, exemplar, newLabels.Clone()))
 		}
 
-		logs = append(logs, newMetricLogFromRaw(name, labels, int64(toTimestamp(dataPoint.TimeUnixNano)), value2Float(dataPoint)))
+		logs = append(logs, newMetricLogFromRaw(name, newLabels.Clone(), int64(toTimestamp(dataPoint.TimeUnixNano)), value2Float(dataPoint)))
 	}
 	return logs
 }
