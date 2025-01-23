@@ -262,6 +262,19 @@ void BaseManager::RecordExitEvent(msg_exit* event_ptr) {
 }
 
 void BaseManager::RecordCloneEvent(msg_clone_event* event_ptr) {
+    // auto currentPid = event_ptr->tgid;
+    // auto currentKtime = event_ptr->ktime;
+    // auto parentPid = event_ptr->parent.pid;
+    // auto parentKtime = event_ptr->parent.ktime;
+    
+    // auto event = std::make_unique<MsgExecveEventUnix>();
+    // LOG_DEBUG(
+    //     sLogger,
+    //     ("begin enqueue pid", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
+    //         "filename", event->process.filename)("raw_args", raw_args)("cwd", cwd)("dockerid", event->kube.docker));
+
+    // mRecordQueue.enqueue(std::move(event));
+
     if (mFlushProcessEvent) {
         auto event = std::make_shared<ProcessEvent>(
             event_ptr->tgid, event_ptr->ktime, KernelEventType::PROCESS_CLONE_EVENT, event_ptr->common.ktime);
