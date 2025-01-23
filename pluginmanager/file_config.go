@@ -80,18 +80,12 @@ func InitFileConfig(config *config.GlobalConfig) {
 		fileTagsPath:           config.FileTagsPath,
 		fileTagsInterval:       config.FileTagsInterval,
 		fileTagsBuffer:         NewDoubleBuffer(),
+		instanceIdentityPath:   filepath.Join(config.LoongCollectorDataDir, InstanceIdentityFilename),
 		instanceIdentityBuffer: NewDoubleBuffer(),
 		fileConfigStopCh:       make(chan struct{}),
 	}
 
-	if fileConfig.fileTagsPath != "" {
-		logger.Info(context.Background(), "file tag discovery", "start")
-		go fileConfig.loadFileTags()
-	}
-
-	logger.Info(context.Background(), "instance identity discovery", "start")
-	fileConfig.instanceIdentityPath = filepath.Join(config.LoongcollectorDataDir, InstanceIdentityFilename)
-	go fileConfig.loadInstanceIdentity(config.AgentHostID)
+	go fileConfig.loadLoop(config.AgentHostID)
 }
 
 func StopFileConfig() {
@@ -106,27 +100,6 @@ func (fc *FileConfig) GetFileTags() map[string]interface{} {
 	return result
 }
 
-func (fc *FileConfig) loadFileTags() {
-	for {
-		select {
-		case <-fc.fileConfigStopCh:
-			return
-		case <-time.After(time.Duration(fc.fileTagsInterval) * time.Second):
-			data, err := ReadFile(fc.fileTagsPath)
-			if err != nil {
-				continue
-			}
-			var fileTags map[string]interface{}
-			err = json.Unmarshal(data, &fileTags)
-			if err != nil {
-				logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "unmarshal file failed", err)
-				continue
-			}
-			fc.fileTagsBuffer.Swap(fileTags)
-		}
-	}
-}
-
 func (fc *FileConfig) GetInstanceIdentity() *InstanceIdentity {
 	result, ok := fc.instanceIdentityBuffer.Get().(InstanceIdentity)
 	if !ok {
@@ -135,29 +108,51 @@ func (fc *FileConfig) GetInstanceIdentity() *InstanceIdentity {
 	return &result
 }
 
-func (fc *FileConfig) loadInstanceIdentity(gFlagHostID string) {
+func (fc *FileConfig) loadLoop(gFlagHostID string) {
+	lastUpdateInstanceIdentity := time.Now()
 	interval := 1
 	for {
 		select {
 		case <-fc.fileConfigStopCh:
 			return
-		case <-time.After(time.Duration(interval) * time.Second):
-			data, err := ReadFile(fc.instanceIdentityPath)
-			var instanceIdentity InstanceIdentity
-			if err == nil {
-				err = json.Unmarshal(data, &instanceIdentity)
+		case <-time.After(time.Duration(math.Min(float64(fc.fileTagsInterval), float64(interval))) * time.Second):
+			if fileConfig.fileTagsPath != "" {
+				data, err := ReadFile(fc.fileTagsPath)
+				if err != nil {
+					continue
+				}
+				var fileTags map[string]interface{}
+				err = json.Unmarshal(data, &fileTags)
 				if err != nil {
 					logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "unmarshal file failed", err)
+					continue
 				}
+				fc.fileTagsBuffer.Swap(fileTags)
 			}
-			instanceIdentity.GFlagHostID = gFlagHostID
-			fc.instanceIdentityBuffer.Swap(instanceIdentity)
-			interval = int(math.Min(float64(interval*2), 3600*24))
+			if time.Now().Sub(lastUpdateInstanceIdentity) > time.Duration(interval)*time.Second {
+				data, err := ReadFile(fc.instanceIdentityPath)
+				var instanceIdentity InstanceIdentity
+				if err == nil {
+					err = json.Unmarshal(data, &instanceIdentity)
+					if err != nil {
+						logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "unmarshal file failed", err)
+					}
+				}
+				instanceIdentity.GFlagHostID = gFlagHostID
+				if fc.instanceIdentityBuffer.Get() == nil || instanceIdentity.InstanceID != fc.instanceIdentityBuffer.Get().(InstanceIdentity).InstanceID {
+					fc.instanceIdentityBuffer.Swap(instanceIdentity)
+				}
+				interval = int(math.Min(float64(interval*2), 3600*24))
+			}
 		}
 	}
 }
 
 func ReadFile(path string) ([]byte, error) {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil, err
+	}
 	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "open file failed", err)

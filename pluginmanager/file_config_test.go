@@ -75,7 +75,7 @@ func TestInstanceIdentity(t *testing.T) {
 		FileTagsPath:          "test.json",
 		FileTagsInterval:      1,
 		AgentHostID:           "test",
-		LoongcollectorDataDir: ".",
+		LoongCollectorDataDir: ".",
 	}
 	InitFileConfig(&globalConfig)
 	testJSON := []byte(`{

@@ -109,9 +109,9 @@ func InitLogger() {
 
 func InitTestLogger(options ...ConfigOption) {
 	once.Do(func() {
-		config.LoongcollectorGlobalConfig.LoongcollectorLogDir = "./"
-		config.LoongcollectorGlobalConfig.LoongcollectorConfDir = "./"
-		config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir = "./"
+		config.LoongcollectorGlobalConfig.LoongCollectorLogDir = "./"
+		config.LoongcollectorGlobalConfig.LoongCollectorConfDir = "./"
+		config.LoongcollectorGlobalConfig.LoongCollectorLogConfDir = "./"
 		initTestLogger(options...)
 		catchStandardOutput()
 	})
@@ -124,7 +124,7 @@ func initNormalLogger() {
 	for _, option := range defaultProductionOptions {
 		option()
 	}
-	confDir := config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir
+	confDir := config.LoongcollectorGlobalConfig.LoongCollectorLogConfDir
 	if _, err := os.Stat(confDir); os.IsNotExist(err) {
 		_ = os.MkdirAll(confDir, os.ModePerm)
 	}
@@ -141,7 +141,7 @@ func initTestLogger(options ...ConfigOption) {
 	for _, option := range options {
 		option()
 	}
-	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir, "plugin_logger.xml"))
+	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorLogConfDir, "plugin_logger.xml"))
 }
 
 func Debug(ctx context.Context, kvPairs ...interface{}) {
@@ -271,7 +271,7 @@ func Flush() {
 
 func setLogConf(logConfig string) {
 	if !retainFlag {
-		_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogConfDir, "plugin_logger.xml"))
+		_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorLogConfDir, "plugin_logger.xml"))
 	}
 	debugFlag = 0
 	logtailLogger = seelog.Disabled
@@ -330,7 +330,7 @@ func generateDefaultConfig() string {
 	if memoryReceiverFlag {
 		memoryReceiverFlagStr = "<custom name=\"memory\" />"
 	}
-	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName, consoleStr, memoryReceiverFlagStr)
+	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongCollectorLogDir, config.LoongcollectorGlobalConfig.LoongCollectorPluginLogName, consoleStr, memoryReceiverFlagStr)
 }
 
 // Close the logger and recover the stdout and stderr

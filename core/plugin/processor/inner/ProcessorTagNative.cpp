@@ -92,6 +92,7 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
     return true;
 }
 
+// should keep same with Go addAllConfigurableTags
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     AddTag(logGroup, TagKey::HOST_NAME_TAG_KEY, LoongCollectorMonitor::GetInstance()->mHostname);
     auto entity = InstanceIdentity::Instance()->GetEntity();

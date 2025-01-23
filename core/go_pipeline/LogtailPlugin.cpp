@@ -68,16 +68,16 @@ LogtailPlugin::LogtailPlugin() {
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
-    mPluginCfg["LoongcollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
-    mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
-    mPluginCfg["LoongcollectorDataDir"] = GetAgentDataDir();
-    mPluginCfg["LoongcollectorLogConfDir"] = GetAgentGoLogConfDir();
-    mPluginCfg["LoongcollectorPluginLogName"] = GetPluginLogName();
-    mPluginCfg["LoongcollectorVersionTag"] = GetVersionTag();
-    mPluginCfg["LoongcollectorGoCheckPointDir"] = GetAgentGoCheckpointDir();
-    mPluginCfg["LoongcollectorGoCheckPointFile"] = GetGoPluginCheckpoint();
-    mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
-    mPluginCfg["LoongcollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
+    mPluginCfg["LoongCollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    mPluginCfg["LoongCollectorLogDir"] = GetAgentLogDir();
+    mPluginCfg["LoongCollectorDataDir"] = GetAgentDataDir();
+    mPluginCfg["LoongCollectorLogConfDir"] = GetAgentGoLogConfDir();
+    mPluginCfg["LoongCollectorPluginLogName"] = GetPluginLogName();
+    mPluginCfg["LoongCollectorVersionTag"] = GetVersionTag();
+    mPluginCfg["LoongCollectorGoCheckPointDir"] = GetAgentGoCheckpointDir();
+    mPluginCfg["LoongCollectorGoCheckPointFile"] = GetGoPluginCheckpoint();
+    mPluginCfg["LoongCollectorThirdPartyDir"] = GetAgentThirdPartyDir();
+    mPluginCfg["LoongCollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
     mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);

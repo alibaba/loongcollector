@@ -65,7 +65,7 @@
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
-DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
+DEFINE_FLAG_INT32(file_tags_update_interval, "second", 60);
 DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);

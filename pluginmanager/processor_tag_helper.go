@@ -25,6 +25,7 @@ func (p *ProcessorTag) parseAllConfigurableTags(pipelineMetaTagKey map[string]st
 	p.parseOptionalTag("CLOUD_PROVIDER", TagKeyCloudProvider, cloudProviderDefaultTagKey, pipelineMetaTagKey)
 }
 
+// should keep same with C++ ProcessorTagNative::Process
 func (p *ProcessorTag) addAllConfigurableTags(tagsMap map[string]string) {
 	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
 	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
