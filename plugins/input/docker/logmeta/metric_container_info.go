@@ -111,6 +111,8 @@ type InputDockerFile struct {
 	matchList                map[string]*helper.DockerInfoDetail
 	CollectingContainersMeta bool
 	firstStart               bool
+
+	forceReleaseStopContainerFile bool
 }
 
 func formatPath(path string) string {
@@ -133,6 +135,8 @@ func (idf *InputDockerFile) Name() string {
 
 func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.context = context
+
+	idf.forceReleaseStopContainerFile = os.Getenv("FORCE_RELEASE_STOP_CONTAINER_FILE") == "true"
 
 	idf.lastContainerInfoCache = make(map[string]ContainerInfoCache)
 
@@ -477,9 +481,14 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			idf.deleteMetric.Add(1)
 			idf.notifyStop(id)
 			idf.deleteMapping(id)
-		} else if c.Status() != helper.ContainerStatusRunning && len(idf.LogPath) > 0 {
-			// input_file时会触发
-			idf.notifyStop(id)
+		} else if c.Status() != helper.ContainerStatusRunning && len(idf.LogPath) > 0 { // input_file时会触发
+			if idf.forceReleaseStopContainerFile {
+				idf.deleteMetric.Add(1)
+				idf.notifyStop(id)
+				idf.deleteMapping(id)
+			} else {
+				idf.notifyStop(id)
+			}
 		}
 	}
 	if allCmd != nil {
