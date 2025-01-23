@@ -215,7 +215,7 @@ bool InitObserverNetworkOption(const Json::Value& config,
 }
 
 void InitSecurityFileFilter(const Json::Value& config,
-                            logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
+                            SecurityFileFilter& thisFileFilter,
                             const CollectionPipelineContext* mContext,
                             const std::string& sName) {
     std::string errorMsg;
@@ -242,7 +242,7 @@ void InitSecurityFileFilter(const Json::Value& config,
 }
 
 void InitSecurityNetworkFilter(const Json::Value& config,
-                               logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
+                               SecurityNetworkFilter& thisNetworkFilter,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     std::string errorMsg;

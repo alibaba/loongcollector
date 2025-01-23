@@ -25,6 +25,7 @@
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
 #include "common/timer/Timer.h"
+#include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
@@ -113,7 +114,7 @@ public:
         return 0;
     }
 
-    void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
+    void UpdateContext(const CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
         std::lock_guard lk(mContextMutex);
         mPipelineCtx = ctx;
         mQueueKey = key;
@@ -145,7 +146,7 @@ protected:
 
     mutable std::mutex mContextMutex;
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    const PipelineContext* mPipelineCtx{nullptr};
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 

@@ -21,9 +21,9 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {

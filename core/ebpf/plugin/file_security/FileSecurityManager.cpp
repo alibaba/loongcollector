@@ -18,9 +18,9 @@
 #include "ebpf/Config.h"
 #include "ebpf/type/PeriodicalEvent.h"
 #include "logger/Logger.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {

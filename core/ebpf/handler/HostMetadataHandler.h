@@ -44,7 +44,7 @@ class HostMetadataHandler : public AbstractHandler {
 public:
     using UpdatePluginCallbackFunc = std::function<bool(
         PluginType, /*UpdataType updateType, */ const std::variant<SecurityOptions*, ObserverNetworkOption*>)>;
-    HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
+    HostMetadataHandler(const CollectionPipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
     ~HostMetadataHandler();
     void RegisterUpdatePluginCallback(UpdatePluginCallbackFunc&& fn) { mUpdateFunc = fn; }
     void DegisterUpdatePluginCallback() { mUpdateFunc = nullptr; }

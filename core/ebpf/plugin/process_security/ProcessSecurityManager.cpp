@@ -26,9 +26,9 @@
 #include "ebpf/plugin/BaseManager.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/PeriodicalEvent.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {

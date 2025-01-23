@@ -23,8 +23,8 @@
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 extern "C" {
 #include <net.h>

@@ -18,14 +18,14 @@
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "metadata/K8sMetadata.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
 
-HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx,
+HostMetadataHandler::HostMetadataHandler(const CollectionPipelineContext* ctx,
                                          QueueKey key,
                                          uint32_t idx,
                                          int intervalSec)
