@@ -53,11 +53,10 @@ type GlobalConfig struct {
 	DelayStopSec int
 	FileTagsPath string
 
-	EnableTimestampNanosecond      bool
-	UsingOldContentTag             bool
-	EnableContainerdUpperDirDetect bool
-	EnableSlsMetricsFormat         bool
-	EnableProcessorTag             bool
+	EnableTimestampNanosecond bool
+	UsingOldContentTag        bool
+	EnableSlsMetricsFormat    bool
+	EnableProcessorTag        bool
 
 	PipelineMetaTagKey     map[string]string
 	AppendingAllEnvMetaTag bool

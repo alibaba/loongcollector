@@ -14,69 +14,6 @@
 
 #include "common/LogtailCommonFlags.h"
 
-// 商业版
-// DEFINE_FLAG_STRING(ilogtail_aliuid_env_name, "aliuid", "ALIYUN_LOGTAIL_USER_ID");
-// DEFINE_FLAG_STRING(ilogtail_user_defined_id_env_name, "user defined id", "ALIYUN_LOGTAIL_USER_DEFINED_ID");
-// DEFINE_FLAG_STRING(logtail_sys_conf_users_dir, "", "users");
-// DEFINE_FLAG_STRING(user_defined_id_file, "", "user_defined_id");
-// DEFINE_FLAG_INT32(default_StreamLog_tcp_port, "", 11111);
-// DEFINE_FLAG_INT32(default_StreamLog_poll_size_in_mb, "", 50);
-// DEFINE_FLAG_INT32(default_StreamLog_recv_size_each_call, "<= 1Mb", 1024);
-// DEFINE_FLAG_INT64(default_StreamLog_fd_send_buffer, "", 512 * 1024);
-// DEFINE_FLAG_INT64(default_StreamLog_fd_send_timeout, "", 10 * 1000 * 1000);
-// DEFINE_FLAG_INT32(StreamLog_line_max_length, "", 10 * 1024 * 1024);
-// DEFINE_FLAG_STRING(logtail_config_address,
-//                    "the target address to which to get config update",
-//                    "http://config.sls.aliyun-inc.com");
-// DEFINE_FLAG_STRING(logtail_send_address,
-//                    "the target address to which to send the log result",
-//                    "http://sls.aliyun-inc.com");
-
-// 移动
-// Windows only has polling, give a bigger tail limit.
-// #if defined(__linux__)
-// DEFINE_FLAG_INT32(default_tail_limit_kb,
-//                   "when first open file, if offset little than this value, move offset to beginning, KB",
-//                   1024);
-// #elif defined(_MSC_VER)
-// DEFINE_FLAG_INT32(default_tail_limit_kb,
-//                   "when first open file, if offset little than this value, move offset to beginning, KB",
-//                   1024 * 50);
-// #endif
-// DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
-// DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
-//                  "if enable containerd upper dir detect when locating rootfs",
-//                  false);
-// DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
-// DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
-// DEFINE_FLAG_BOOL(default_secondary_storage, "default strategy whether enable secondary storage", false);
-// DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer period", 60);
-// DEFINE_FLAG_INT32(log_expire_time, "log expire time", 24 * 3600);
-// DEFINE_FLAG_INT32(max_holded_data_size,
-//                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
-//                   512 * 1024);
-// DEFINE_FLAG_INT32(pub_max_holded_data_size,
-//                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
-//                   512 * 1024);
-// DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
-// DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
-// DEFINE_FLAG_INT32(default_max_inotify_watch_num, "the max allowed inotify watch dir number", 3000);
-// DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
-// DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
-// DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
-
-// 废弃
-// DEFINE_FLAG_STRING(fuse_root_dir, "root dir for fuse file polling", "/home/admin/logs");
-// DEFINE_FLAG_INT32(fuse_dir_max_depth, "max depth from fuse root dir", 100);
-// DEFINE_FLAG_INT32(fuse_file_max_count, "max file total count from fuse root dir", 10000);
-// DEFINE_FLAG_STRING(user_log_config,
-//                    "the configuration file storing user's log collecting parameter",
-//                    "user_log_config.json");
-// DEFINE_FLAG_STRING(local_machine_uuid, "use this value if not empty, for ut/debug", "");
-// DEFINE_FLAG_STRING(logtail_status_snapshot, "status on local disk", "logtail_status_snapshot");
-
-// DEFINE_FLAG_STRING(logtail_line_count_snapshot, "line count file on local disk", "logtail_line_count_snapshot.json");
-// DEFINE_FLAG_STRING(logtail_integrity_snapshot, "integrity file on local disk", "logtail_integrity_snapshot.json");
 
 // app config
 DEFINE_FLAG_STRING(ilogtail_config,
