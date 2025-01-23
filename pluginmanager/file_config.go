@@ -129,7 +129,7 @@ func (fc *FileConfig) loadLoop(gFlagHostID string) {
 				}
 				fc.fileTagsBuffer.Swap(fileTags)
 			}
-			if time.Now().Sub(lastUpdateInstanceIdentity) > time.Duration(interval)*time.Second {
+			if time.Since(lastUpdateInstanceIdentity) > time.Duration(interval)*time.Second {
 				data, err := ReadFile(fc.instanceIdentityPath)
 				var instanceIdentity InstanceIdentity
 				if err == nil {
