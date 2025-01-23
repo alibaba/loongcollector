@@ -85,7 +85,7 @@ func TestInstanceIdentity(t *testing.T) {
         "random-host": "test4",
         "ecs-assist-machine-id": "test5"
     }`)
-	os.WriteFile(InstanceIdentityFilename, testJSON, 0644)
+	os.WriteFile(fileConfig.instanceIdentityPath, testJSON, 0644)
 	time.Sleep(2 * time.Second)
 	identity := fileConfig.GetInstanceIdentity()
 	assert.Equal(t, identity.InstanceID, "test1")
@@ -102,7 +102,7 @@ func TestInstanceIdentity(t *testing.T) {
         "random-host": "test9",
         "ecs-assist-machine-id": "test10"
 	}`)
-	os.WriteFile(InstanceIdentityFilename, testJSON, 0644)
+	os.WriteFile(fileConfig.instanceIdentityPath, testJSON, 0644)
 	time.Sleep(2 * time.Second)
 	identity = fileConfig.GetInstanceIdentity()
 	assert.Equal(t, identity.InstanceID, "test6")

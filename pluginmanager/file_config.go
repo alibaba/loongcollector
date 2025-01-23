@@ -118,16 +118,15 @@ func (fc *FileConfig) loadLoop(gFlagHostID string) {
 		case <-time.After(time.Duration(math.Min(float64(fc.fileTagsInterval), float64(interval))) * time.Second):
 			if fileConfig.fileTagsPath != "" {
 				data, err := ReadFile(fc.fileTagsPath)
-				if err != nil {
-					continue
+				if err == nil {
+					var fileTags map[string]interface{}
+					err = json.Unmarshal(data, &fileTags)
+					if err != nil {
+						logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "unmarshal file failed", err)
+					} else {
+						fc.fileTagsBuffer.Swap(fileTags)
+					}
 				}
-				var fileTags map[string]interface{}
-				err = json.Unmarshal(data, &fileTags)
-				if err != nil {
-					logger.Error(context.Background(), "LOAD_FILE_CONFIG_ALARM", "unmarshal file failed", err)
-					continue
-				}
-				fc.fileTagsBuffer.Swap(fileTags)
 			}
 			if time.Since(lastUpdateInstanceIdentity) > time.Duration(interval)*time.Second {
 				data, err := ReadFile(fc.instanceIdentityPath)
@@ -139,10 +138,14 @@ func (fc *FileConfig) loadLoop(gFlagHostID string) {
 					}
 				}
 				instanceIdentity.GFlagHostID = gFlagHostID
-				if fc.instanceIdentityBuffer.Get() == nil || instanceIdentity.InstanceID != fc.instanceIdentityBuffer.Get().(InstanceIdentity).InstanceID {
+				oldInstanceIdentity := fc.instanceIdentityBuffer.Get()
+				if oldInstanceIdentity == nil || instanceIdentity.InstanceID != oldInstanceIdentity.(InstanceIdentity).InstanceID {
 					fc.instanceIdentityBuffer.Swap(instanceIdentity)
 				}
-				interval = int(math.Min(float64(interval*2), 3600*24))
+				if instanceIdentity.InstanceID != "" {
+					interval = int(math.Min(float64(interval*2), 3600*24))
+				}
+				lastUpdateInstanceIdentity = time.Now()
 			}
 		}
 	}

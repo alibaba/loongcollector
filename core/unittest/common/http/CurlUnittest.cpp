@@ -73,9 +73,9 @@ void CurlUnittest::TestFollowRedirect() {
     APSARA_TEST_EQUAL(404, res.GetStatusCode());
 }
 
-// UNIT_TEST_CASE(CurlUnittest, TestSendHttpRequest)
-// UNIT_TEST_CASE(CurlUnittest, TestCurlTLS)
-// UNIT_TEST_CASE(CurlUnittest, TestFollowRedirect)
+UNIT_TEST_CASE(CurlUnittest, TestSendHttpRequest)
+UNIT_TEST_CASE(CurlUnittest, TestCurlTLS)
+UNIT_TEST_CASE(CurlUnittest, TestFollowRedirect)
 
 } // namespace logtail
 
