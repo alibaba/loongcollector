@@ -38,6 +38,7 @@ extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
 extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;
 extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
 extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
+extern const std::string LOONGCOLLECTOR_ENV_PREFIX;
 
 void CreateAgentDir();
 
@@ -542,6 +543,7 @@ public:
     friend class EnterpriseSLSClientManagerUnittest;
     friend class FlusherRunnerUnittest;
     friend class PipelineUpdateUnittest;
+    friend class ProcessorTagNativeUnittest;
 #endif
 };
 

@@ -20,9 +20,9 @@
 
 #include <vector>
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "constants/Constants.h"
 #include "file_server/MultilineOptions.h"
-#include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {
@@ -33,7 +33,6 @@ public:
 
     std::string mSourceKey = DEFAULT_CONTENT_KEY;
     MultilineOptions mMultiline;
-    bool mAppendingLogPositionMeta = false;
     bool mEnableRawContent = false;
 
     const std::string& Name() const override { return sName; }

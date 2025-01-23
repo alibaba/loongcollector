@@ -27,8 +27,8 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/SafeQueue.h"
-#include "pipeline/queue/SenderQueueItem.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "protobuf/sls/logtail_buffer_meta.pb.h"

@@ -25,7 +25,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/StringTools.h"
+#include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 
@@ -325,4 +327,11 @@ bool IsValidList(const Json::Value& config, const std::string& key, std::string&
 
 bool IsValidMap(const Json::Value& config, const std::string& key, std::string& errorMsg);
 
+void ParseTagKey(const Json::Value* config,
+                 const std::string& configField,
+                 TagKey tagKey,
+                 std::unordered_map<TagKey, std::string>& tagKeyMap,
+                 const CollectionPipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded);
 } // namespace logtail

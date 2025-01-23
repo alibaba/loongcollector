@@ -164,7 +164,7 @@ public:
         ],
         "metadata" :
         {
-            "log.file.path" : "/var/log/message"
+            "log.file.path_resolved" : "/var/log/message"
         },
         "tags" :
         {
@@ -399,7 +399,7 @@ public:
         ],
         "metadata" :
         {
-            "log.file.path" : "/var/log/message"
+            "log.file.path_resolved" : "/var/log/message"
         },
         "tags" :
         {

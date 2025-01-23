@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/batch/TimeoutFlushManager.h"
+#include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -38,11 +38,11 @@ protected:
 
 private:
     static unique_ptr<FlusherMock> sFlusher;
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
 };
 
 unique_ptr<FlusherMock> TimeoutFlushManagerUnittest::sFlusher;
-PipelineContext TimeoutFlushManagerUnittest::sCtx;
+CollectionPipelineContext TimeoutFlushManagerUnittest::sCtx;
 
 void TimeoutFlushManagerUnittest::TestUpdateRecord() {
     // new batch queue

@@ -16,7 +16,9 @@
 
 #pragma once
 
-#include "pipeline/plugin/interface/Processor.h"
+#include "StringView.h"
+#include "TagConstants.h"
+#include "collection_pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
 
@@ -30,6 +32,14 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
+
+private:
+    void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, const std::string& value) const;
+    void AddTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const;
+    std::unordered_map<TagKey, std::string> mPipelineMetaTagKey;
+    // After unmarshalling from json, we cannot determine the map is empty or no such config
+    bool mAppendingAllEnvMetaTag = false;
+    std::unordered_map<std::string, std::string> mAgentEnvMetaTagKey;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorTagNativeUnittest;

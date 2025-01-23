@@ -18,8 +18,8 @@
 
 #include <vector>
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "file_server/MultilineOptions.h"
-#include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {
 

@@ -14,6 +14,9 @@
 
 #include "ebpf/handler/SecurityHandler.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
@@ -21,14 +24,11 @@
 #include "models/PipelineEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
 
-SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
+SecurityHandler::SecurityHandler(const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
     : AbstractHandler(ctx, key, idx) {
     mHostName = GetHostName();
     mHostIp = GetHostIp();
@@ -43,12 +43,6 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
     ;
     PipelineEventGroup event_group(source_buffer);
     // aggregate to pipeline event group
-    // set host ips
-    // TODO 后续这两个 key 需要移到 group 的 metadata 里，在 processortagnative 中转成tag
-    const static std::string host_ip_key = "host.ip";
-    const static std::string host_name_key = "host.name";
-    event_group.SetTag(host_ip_key, mHostIp);
-    event_group.SetTag(host_name_key, mHostName);
     for (const auto& x : events) {
         auto* event = event_group.AddLogEvent();
         for (const auto& tag : x->GetAllTags()) {

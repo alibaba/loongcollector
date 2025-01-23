@@ -77,7 +77,8 @@ public:
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    FileTagOptions fileTagOpts;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
@@ -93,8 +94,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -109,8 +114,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -132,8 +141,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
         multilineOpts.Init(config, ctx, "");
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         LogFileReader::BUFFER_SIZE = 14;
         size_t BUFFER_SIZE_UTF8 = 15; // "ilogtail 为可"
         reader.UpdateReaderManual();
@@ -154,8 +167,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         // reader.mDiscardUnmatch = false;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -178,8 +195,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         // reader.mDiscardUnmatch = false;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -207,8 +228,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         // reader.mDiscardUnmatch = false;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -237,8 +262,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         LogBuffer logBuffer;
@@ -255,8 +284,12 @@ void LogFileReaderUnittest::TestReadGBK() {
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-        LogFileReader reader(
-            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -306,8 +339,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -321,8 +358,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
@@ -344,8 +385,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         LogFileReader::BUFFER_SIZE = 15;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -365,8 +410,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -387,8 +436,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -414,8 +467,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -442,8 +499,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         LogBuffer logBuffer;
@@ -459,8 +520,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader.mLogFileOp.GetFileSize();
@@ -555,7 +620,8 @@ public:
     static std::string gbkFile;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    FileTagOptions fileTagOpts;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogMultiBytesUnittest, TestAlignLastCharacterUTF8);
@@ -572,8 +638,12 @@ void LogMultiBytesUnittest::TestAlignLastCharacterUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader logFileReader(
-            "", "", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader logFileReader("",
+                                    "",
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&fileTagOpts, &ctx));
         std::string expectedLog = "为可观测场景而";
         std::string testLog = expectedLog + "生";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size());
@@ -583,8 +653,13 @@ void LogMultiBytesUnittest::TestAlignLastCharacterUTF8() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader logFileReader(
-            "", "", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        FileTagOptions fileTagOpts;
+        LogFileReader logFileReader("",
+                                    "",
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&fileTagOpts, &ctx));
         std::string expectedLog = "为可观测场景而";
         std::string testLog = expectedLog + "生";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size() + 1);
@@ -597,8 +672,13 @@ void LogMultiBytesUnittest::TestAlignLastCharacterGBK() {
     FileReaderOptions readerOpts;
     readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
     readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-    LogFileReader logFileReader(
-        "", "", DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    FileTagOptions fileTagOpts;
+    LogFileReader logFileReader("",
+                                "",
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(&fileTagOpts, &ctx));
     { // case: no align
         std::string expectedLog
             = "\xce\xaa\xbf\xc9\xb9\xdb\xb2\xe2\xb3\xa1\xbe\xb0\xb6\xf8"; // equal to "为可观测场景而"
@@ -619,8 +699,13 @@ void LogMultiBytesUnittest::TestReadUTF8() {
     MultilineOptions multilineOpts;
     FileReaderOptions readerOpts;
     readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-    LogFileReader reader(
-        logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    FileTagOptions fileTagOpts;
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         DevInode(),
+                         std::make_pair(&readerOpts, &ctx),
+                         std::make_pair(&multilineOpts, &ctx),
+                         std::make_pair(&fileTagOpts, &ctx));
     LogFileReader::BUFFER_SIZE = 13; // equal to "iLogtail 为" plus one illegal byte
     reader.UpdateReaderManual();
     reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -639,8 +724,13 @@ void LogMultiBytesUnittest::TestReadGBK() {
     FileReaderOptions readerOpts;
     readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
     readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
-    LogFileReader reader(
-        logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    FileTagOptions fileTagOpts;
+    LogFileReader reader(logPathDir,
+                         gbkFile,
+                         DevInode(),
+                         std::make_pair(&readerOpts, &ctx),
+                         std::make_pair(&multilineOpts, &ctx),
+                         std::make_pair(&fileTagOpts, &ctx));
     LogFileReader::BUFFER_SIZE = 12; // equal to "iLogtail 为" plus one illegal byte
     size_t BUFFER_SIZE_UTF8 = 12; // "ilogtail 为可"
     reader.UpdateReaderManual();
@@ -680,7 +770,8 @@ public:
     static std::string logPathDir;
     static std::string utf8File;
     FileDiscoveryOptions discoveryOpts;
-    PipelineContext ctx;
+    FileTagOptions fileTagOpts;
+    CollectionPipelineContext ctx;
 };
 
 UNIT_TEST_CASE(LogFileReaderCheckpointUnittest, TestDumpMetaToMem);
@@ -693,8 +784,12 @@ void LogFileReaderCheckpointUnittest::TestDumpMetaToMem() {
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-        LogFileReader reader1(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader1(logPathDir,
+                              utf8File,
+                              DevInode(),
+                              std::make_pair(&readerOpts, &ctx),
+                              std::make_pair(&multilineOpts, &ctx),
+                              std::make_pair(&fileTagOpts, &ctx));
         reader1.UpdateReaderManual();
         reader1.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         int64_t fileSize = reader1.mLogFileOp.GetFileSize();
@@ -708,8 +803,12 @@ void LogFileReaderCheckpointUnittest::TestDumpMetaToMem() {
         APSARA_TEST_GE_FATAL(reader1.mCache.size(), 0UL);
         reader1.DumpMetaToMem(false);
         // second read
-        LogFileReader reader2(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader reader2(logPathDir,
+                              utf8File,
+                              DevInode(),
+                              std::make_pair(&readerOpts, &ctx),
+                              std::make_pair(&multilineOpts, &ctx),
+                              std::make_pair(&fileTagOpts, &ctx));
         reader2.UpdateReaderManual();
         reader2.InitReader(false, LogFileReader::BACKWARD_TO_BEGINNING);
         reader2.CheckFileSignatureAndOffset(true);

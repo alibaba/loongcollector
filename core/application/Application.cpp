@@ -22,6 +22,10 @@
 
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/CrashBackTraceUtil.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
@@ -41,10 +45,6 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
@@ -284,7 +284,7 @@ void Application::Start() { // GCOVR_EXCL_START
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!configDiff.first.IsEmpty()) {
-                PipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
+                CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
             }
             if (!configDiff.second.IsEmpty()) {
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
@@ -357,7 +357,7 @@ void Application::Exit() {
     }
 #endif
 
-    PipelineManager::GetInstance()->StopAllPipelines();
+    CollectionPipelineManager::GetInstance()->StopAllPipelines();
 
     PluginRegistry::GetInstance()->UnloadPlugins();
 

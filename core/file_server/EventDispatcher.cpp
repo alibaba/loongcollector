@@ -53,11 +53,11 @@
 #include "file_server/polling/PollingEventQueue.h"
 #endif
 #include "application/Application.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 
@@ -389,7 +389,8 @@ void EventDispatcher::AddExistedFileEvents(const string& path, int wd) {
 
 EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     CheckPointPtr& checkpoint, map<DevInode, SplitedFilePath>& cachePathDevInodeMap, vector<Event*>& eventVec) {
-    shared_ptr<Pipeline> config = PipelineManager::GetInstance()->FindConfigByName(checkpoint->mConfigName);
+    shared_ptr<CollectionPipeline> config
+        = CollectionPipelineManager::GetInstance()->FindConfigByName(checkpoint->mConfigName);
     if (config == NULL) {
         LOG_INFO(sLogger,
                  ("delete checkpoint", "the corresponding config is deleted")("config", checkpoint->mConfigName)(

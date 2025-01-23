@@ -73,7 +73,7 @@ LoongCollector 是一款集卓越性能、超强稳定性和灵活可编程性�
 
 1. 文件目录布局与文件命名跟 iLogtail 2.0 版本有所变化，如果某些环境对特定目录、文件有所依赖，则需要注意该变化。
 2. 部分自监控指标命名跟 iLogtail 2.0 版本不一致，LoongCollector 重新规范了所有自监控指标的命名和上报方式。
-3. 开发镜像升级，新增部分依赖库。使用 iLogtail 开发镜像开发 Loongcollector 会出现依赖库链接错误。建议使用loongcollector 开发镜像 2.0.5 版本及以上。
+3. 开发镜像升级，新增部分依赖库。使用 iLogtail 开发镜像开发 Loongcollector 会出现依赖库链接错误。建议使用loongcollector 开发镜像 2.1.2 版本及以上。
 
 ### 版本发布时间
 

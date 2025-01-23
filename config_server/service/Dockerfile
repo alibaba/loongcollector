@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.0.5 as build
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.2 as build
 
 USER root
 WORKDIR /src
@@ -21,7 +21,7 @@ RUN go env -w GOPROXY="https://goproxy.cn,direct" && \
     go build -o ConfigServer
 
 FROM centos:centos7.9.2009
-MAINTAINER TomYu yyuuttaaoo@gmail.com
+LABEL maintainer="TomYu <yyuuttaaoo@gmail.com>"
 
 ENV container docker
 

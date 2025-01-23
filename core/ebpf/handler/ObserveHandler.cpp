@@ -18,15 +18,15 @@
 #include <mutex>
 #include <thread>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
 #include "logger/Logger.h"
 #include "models/PipelineEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ProcessQueueItem.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {

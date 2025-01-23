@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "collection_pipeline/batch/Batcher.h"
 #include "common/JsonUtil.h"
-#include "pipeline/batch/Batcher.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -53,7 +53,7 @@ private:
 
     static unique_ptr<FlusherMock> sFlusher;
 
-    PipelineContext mCtx;
+    CollectionPipelineContext mCtx;
 };
 
 unique_ptr<FlusherMock> BatcherUnittest::sFlusher;

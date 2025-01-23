@@ -17,6 +17,7 @@
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "models/RawEvent.h"
 #include "models/SpanEvent.h"
 #include "unittest/Unittest.h"

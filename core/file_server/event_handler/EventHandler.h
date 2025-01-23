@@ -95,6 +95,7 @@ private:
                                             const FileReaderConfig& readerConfig,
                                             const MultilineConfig& multilineConfig,
                                             const FileDiscoveryConfig& discoveryConfig,
+                                            const FileTagConfig& tagConfig,
                                             uint32_t exactlyonceConcurrency = 0,
                                             bool forceBeginingFlag = false);
 

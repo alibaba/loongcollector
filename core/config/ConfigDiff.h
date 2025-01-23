@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "config/CollectionConfig.h"
 #include "config/InstanceConfig.h"
-#include "config/PipelineConfig.h"
 #include "config/TaskConfig.h"
 
 namespace logtail {
@@ -34,7 +34,7 @@ struct ConfigDiff {
     bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
 };
 
-using PipelineConfigDiff = ConfigDiff<PipelineConfig>;
+using CollectionConfigDiff = ConfigDiff<CollectionConfig>;
 using TaskConfigDiff = ConfigDiff<TaskConfig>;
 using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 

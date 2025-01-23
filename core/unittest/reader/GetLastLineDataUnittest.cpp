@@ -66,7 +66,8 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -82,8 +83,12 @@ std::string LastMatchedContainerdTextLineUnittest::utf8File;
 void LastMatchedContainerdTextLineUnittest::TestLastContainerdTextLineSingleLine() {
     {
         MultilineOptions multilineOpts;
-        LogFileReader logFileReader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader logFileReader(logPathDir,
+                                    utf8File,
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&tagOpts, &ctx));
         BaseLineParse* baseLineParsePtr = nullptr;
         baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
         logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -517,8 +522,12 @@ void LastMatchedContainerdTextLineUnittest::TestLastContainerdTextLineSingleLine
 void LastMatchedContainerdTextLineUnittest::TestLastContainerdTextLineMerge() {
     {
         MultilineOptions multilineOpts;
-        LogFileReader logFileReader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader logFileReader(logPathDir,
+                                    utf8File,
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&tagOpts, &ctx));
         BaseLineParse* baseLineParsePtr = nullptr;
         baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
         logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1029,7 +1038,8 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -1044,8 +1054,12 @@ std::string LastMatchedDockerJsonFileUnittest::utf8File;
 void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFile() {
     {
         MultilineOptions multilineOpts;
-        LogFileReader logFileReader(
-            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        LogFileReader logFileReader(logPathDir,
+                                    utf8File,
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&tagOpts, &ctx));
         BaseLineParse* baseLineParsePtr = nullptr;
         baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
         logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1291,7 +1305,8 @@ public:
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
@@ -1306,8 +1321,12 @@ std::string LastMatchedContainerdTextWithDockerJsonUnittest::utf8File;
 
 void LastMatchedContainerdTextWithDockerJsonUnittest::TestContainerdTextWithDockerJson() {
     MultilineOptions multilineOpts;
-    LogFileReader logFileReader(
-        logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader(logPathDir,
+                                utf8File,
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(&tagOpts, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1362,8 +1381,12 @@ void LastMatchedContainerdTextWithDockerJsonUnittest::TestContainerdTextWithDock
 
 void LastMatchedContainerdTextWithDockerJsonUnittest::TestDockerJsonWithContainerdText() {
     MultilineOptions multilineOpts;
-    LogFileReader logFileReader(
-        logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+    LogFileReader logFileReader(logPathDir,
+                                utf8File,
+                                DevInode(),
+                                std::make_pair(&readerOpts, &ctx),
+                                std::make_pair(&multilineOpts, &ctx),
+                                std::make_pair(&tagOpts, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);

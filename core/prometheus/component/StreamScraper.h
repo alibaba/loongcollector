@@ -5,13 +5,13 @@
 #include <utility>
 
 #include "Labels.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/queue/QueueKey.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
 #include <vector>
 
-#include "pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
 #endif
 
 namespace logtail::prom {

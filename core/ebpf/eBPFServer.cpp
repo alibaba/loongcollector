@@ -208,7 +208,7 @@ void eBPFServer::Stop() {
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                                      uint32_t plugin_index,
                                      nami::PluginType type,
-                                     const logtail::PipelineContext* ctx,
+                                     const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
                                      PluginMetricManagerPtr mgr) {
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
@@ -331,7 +331,7 @@ bool eBPFServer::HasRegisteredPlugins() const {
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
                               uint32_t plugin_index,
                               nami::PluginType type,
-                              const PipelineContext* ctx,
+                              const CollectionPipelineContext* ctx,
                               const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
                               PluginMetricManagerPtr mgr) {
     if (!IsSupportedEnv(type)) {
@@ -398,7 +398,7 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, nami::PluginTyp
 }
 
 void eBPFServer::UpdateCBContext(nami::PluginType type,
-                                 const logtail::PipelineContext* ctx,
+                                 const logtail::CollectionPipelineContext* ctx,
                                  logtail::QueueKey key,
                                  int idx) {
     switch (type) {

@@ -21,6 +21,7 @@
 #include <mutex>
 #include <variant>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "ebpf/Config.h"
 #include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
@@ -29,7 +30,6 @@
 #include "ebpf/handler/SecurityHandler.h"
 #include "ebpf/include/export.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "pipeline/PipelineContext.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -73,7 +73,7 @@ public:
     bool EnablePlugin(const std::string& pipeline_name,
                       uint32_t plugin_index,
                       nami::PluginType type,
-                      const logtail::PipelineContext* ctx,
+                      const logtail::CollectionPipelineContext* ctx,
                       const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
                       PluginMetricManagerPtr mgr);
 
@@ -91,13 +91,16 @@ private:
     bool StartPluginInternal(const std::string& pipeline_name,
                              uint32_t plugin_index,
                              nami::PluginType type,
-                             const logtail::PipelineContext* ctx,
+                             const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
                              PluginMetricManagerPtr mgr);
     eBPFServer() = default;
     ~eBPFServer() = default;
 
-    void UpdateCBContext(nami::PluginType type, const logtail::PipelineContext* ctx, logtail::QueueKey key, int idx);
+    void UpdateCBContext(nami::PluginType type,
+                         const logtail::CollectionPipelineContext* ctx,
+                         logtail::QueueKey key,
+                         int idx);
 
     std::unique_ptr<SourceManager> mSourceManager;
     // source manager

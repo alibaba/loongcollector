@@ -17,7 +17,7 @@ package helper
 import (
 	"context"
 	"hash/fnv"
-	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -331,7 +331,7 @@ func isPathSeparator(c byte) bool {
 }
 
 func (did *DockerInfoDetail) FindBestMatchedPath(pth string) (sourcePath, containerPath string) {
-	pth = path.Clean(pth)
+	pth = filepath.Clean(pth)
 	pthSize := len(pth)
 
 	// logger.Debugf(context.Background(), "FindBestMatchedPath for container %s, target path: %s, containerInfo: %+v", did.IDPrefix(), pth, did.ContainerInfo)
@@ -341,7 +341,7 @@ func (did *DockerInfoDetail) FindBestMatchedPath(pth string) (sourcePath, contai
 	for _, mount := range did.ContainerInfo.Mounts {
 		// logger.Debugf("container(%s-%s) mount: source-%s destination-%s", did.IDPrefix(), did.ContainerInfo.Name, mount.Source, mount.Destination)
 
-		dst := path.Clean(mount.Destination)
+		dst := filepath.Clean(mount.Destination)
 		dstSize := len(dst)
 
 		if strings.HasPrefix(pth, dst) &&
@@ -619,7 +619,10 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 	if len(ip) > 0 {
 		containerNameTag["_container_ip_"] = ip
 	}
-
+	for i := range info.Mounts {
+		info.Mounts[i].Source = filepath.Clean(info.Mounts[i].Source)
+		info.Mounts[i].Destination = filepath.Clean(info.Mounts[i].Destination)
+	}
 	did := &DockerInfoDetail{
 		StdoutPath:       info.LogPath,
 		ContainerInfo:    info,

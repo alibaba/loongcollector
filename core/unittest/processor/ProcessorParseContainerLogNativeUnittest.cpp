@@ -24,7 +24,7 @@
 #include "boost/utility/string_view.hpp"
 
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "constants/Constants.h"
 #include "models/LogEvent.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
@@ -55,7 +55,7 @@ public:
     void TestKeepingSourceWhenParseFail();
     void TestParseDockerLog();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestInit);

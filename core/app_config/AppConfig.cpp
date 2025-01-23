@@ -24,6 +24,7 @@
 #include "json/value.h"
 
 #include "RuntimeUtil.h"
+#include "StringTools.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
@@ -836,6 +837,21 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
     try {
         char* value = NULL;
         value = getenv(envKey);
+        if (value != NULL) {
+            T val = StringTo<T>(value);
+            if (val >= minValue) {
+                configValue = val;
+                LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
+                return true;
+            }
+        }
+    } catch (const exception& e) {
+        LOG_WARNING(sLogger, (string("set ") + envKey + " from env failed, exception", e.what()));
+    }
+    try {
+        char* value = NULL;
+        const auto newEnvKey = LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(envKey);
+        value = getenv(newEnvKey.c_str());
         if (value != NULL) {
             T val = StringTo<T>(value);
             if (val >= minValue) {

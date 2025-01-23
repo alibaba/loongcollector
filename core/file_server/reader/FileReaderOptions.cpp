@@ -47,7 +47,9 @@ FileReaderOptions::FileReaderOptions()
       mRotatorQueueSize(static_cast<uint32_t>(INT32_FLAG(logreader_max_rotate_queue_size))) {
 }
 
-bool FileReaderOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
+bool FileReaderOptions::Init(const Json::Value& config,
+                             const CollectionPipelineContext& ctx,
+                             const string& pluginType) {
     string errorMsg;
 
     // FileEncoding
@@ -175,19 +177,6 @@ bool FileReaderOptions::Init(const Json::Value& config, const PipelineContext& c
                               ctx.GetAlarm(),
                               errorMsg,
                               mRotatorQueueSize,
-                              pluginType,
-                              ctx.GetConfigName(),
-                              ctx.GetProjectName(),
-                              ctx.GetLogstoreName(),
-                              ctx.GetRegion());
-    }
-
-    // AppendingLogPositionMeta
-    if (!GetOptionalBoolParam(config, "AppendingLogPositionMeta", mAppendingLogPositionMeta, errorMsg)) {
-        PARAM_WARNING_DEFAULT(ctx.GetLogger(),
-                              ctx.GetAlarm(),
-                              errorMsg,
-                              mAppendingLogPositionMeta,
                               pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),

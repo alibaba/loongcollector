@@ -16,10 +16,10 @@
 
 #include "plugin/processor/ProcessorParseDelimiterNative.h"
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
@@ -192,7 +192,7 @@ void ProcessorParseDelimiterNative::Process(PipelineEventGroup& logGroup) {
 
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-        if (ProcessEvent(logPath, events[rIdx])) {
+        if (ProcessEvent(logPath, events[rIdx], logGroup.GetAllMetadata())) {
             if (wIdx != rIdx) {
                 events[wIdx] = std::move(events[rIdx]);
             }
@@ -203,7 +203,9 @@ void ProcessorParseDelimiterNative::Process(PipelineEventGroup& logGroup) {
     return;
 }
 
-bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {
+bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
+                                                 PipelineEventPtr& e,
+                                                 const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
         mOutFailedEventsTotal->Add(1);
         return true;
@@ -351,7 +353,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
     if (mCommonParserOptions.ShouldAddLegacyUnmatchedRawLog(parseSuccess)) {
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
     }
-    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
+    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
         mDiscardedEventsTotal->Add(1);
         return false;
     }

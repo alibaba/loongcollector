@@ -81,7 +81,7 @@ bool IsConfigEnabled(const string& name, const Json::Value& detail) {
 }
 
 ConfigType GetConfigType(const Json::Value& detail) {
-    return detail.isMember("task") ? ConfigType::Task : ConfigType::Pipeline;
+    return detail.isMember("task") ? ConfigType::Task : ConfigType::Collection;
 }
 
 } // namespace logtail

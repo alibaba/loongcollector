@@ -34,7 +34,7 @@ public:
     void TestAddAutoMetrics();
     void TestHonorLabels();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 void ProcessorPromRelabelMetricNativeUnittest::TestInit() {

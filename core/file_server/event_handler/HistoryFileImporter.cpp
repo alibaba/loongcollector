@@ -15,6 +15,7 @@
 #include "HistoryFileImporter.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/Thread.h"
@@ -22,7 +23,6 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
 namespace logtail {
@@ -85,6 +85,7 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
                                                                            event.mReaderConfig,
                                                                            event.mMultilineConfig,
                                                                            event.mDiscoveryconfig,
+                                                                           event.mTagConfig,
                                                                            event.mEOConcurrency,
                                                                            true));
         if (readerSharePtr == NULL) {

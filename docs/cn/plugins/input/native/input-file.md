@@ -28,6 +28,8 @@
 |  AppendingLogPositionMeta  |  bool  |  否  |  false  |  是否在日志中添加该条日志所属文件的元信息，包括\_\_tag\_\_:\_\_inode\_\_字段和\_\_file\_offset\_\_字段。  |
 |  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的文件。  |
+|  FileOffsetKey | string | 否 | log.file.offset | 用于指定日志文件偏移量的字段名。 |
+|  Tags | map | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
 
 * 表1：多行聚合选项
 
@@ -52,6 +54,18 @@
 |  ExcludeEnv  |  map  |  否  |  空  |  指定需要排除采集容器的环境变量条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为环境变量名，value为环境变量的值，说明如下：<ul><li>如果map中的value为空，则容器环境变量中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器环境变量中存在以key为环境变量名且对应环境变量值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器环境变量中存在以key为环境变量名且以value为环境变量值的情况时，相应的容器会被匹配。</li></ul></ul>       |
 |  IncludeContainerLabel  |  map  |  否  |  空  |  指定待采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
 |  ExcludeContainerLabel  |  map  |  否  |  空  |  指定需要排除采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
+
+* 表3：Tag配置项以及默认值
+|  **配置项**  | **是否默认添加** |  **默认值**  |
+| --- | --- | --- |
+| FileInodeTagKey | 否 | **file_offset** |
+| FilePathTagKey | 是 | **path** |
+| K8sNamespaceTagKey | 是（当EnableContainerDiscovery为true时） | _namespace_ |
+| K8sPodNameTagKey | 是（当EnableContainerDiscovery为true时） | _pod_name_ |
+| K8sPodUidTagKey | 是（当EnableContainerDiscovery为true时） | _pod_uid_ |
+| ContainerNameTagKey | 是（当EnableContainerDiscovery为true时） | _container_name_ |
+| ContainerIpTagKey | 是（当EnableContainerDiscovery为true时） | _container_ip_ |
+| ContainerImageTagKey | 是（当EnableContainerDiscovery为true时） | _image_name_ |
 
 ## 样例
 
@@ -90,8 +104,9 @@ flushers:
 ```
 
 注意：`__tag__` 字段的输出会由于ilogtail版本的不同而存在差别。为了在标准输出中能够准确地观察到 `__tag__`，建议仔细检查以下几点：
-- flusher_stdout 的配置中，设置了 `Tags: true`
-- 如果使用了较新版本的ilogtail，在观察标准输出时，`__tag__`可能会被拆分为一行单独的信息，先于日志的内容输出（这与文档中的示例输出会有差别），请注意不要观察遗漏。
+
+* flusher_stdout 的配置中，设置了 `Tags: true`
+* 如果使用了较新版本的ilogtail，在观察标准输出时，`__tag__`可能会被拆分为一行单独的信息，先于日志的内容输出（这与文档中的示例输出会有差别），请注意不要观察遗漏。
 
 此注意事项适用于后文所有观察 `__tag__` 字段输出的地方。
 

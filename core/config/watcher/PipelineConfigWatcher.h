@@ -26,13 +26,13 @@
 
 namespace logtail {
 
-class PipelineManager;
+class CollectionPipelineManager;
 class TaskPipelineManager;
 
 struct PipelineConfigWithDiffInfo {
-    PipelineConfig config;
+    CollectionConfig config;
     ConfigDiffEnum diffEnum;
-    PipelineConfigWithDiffInfo(PipelineConfig&& config, ConfigDiffEnum diffEnum)
+    PipelineConfigWithDiffInfo(CollectionConfig&& config, ConfigDiffEnum diffEnum)
         : config(std::move(config)), diffEnum(diffEnum) {}
 };
 using SingletonConfigCache = std::unordered_map<std::string, std::vector<std::shared_ptr<PipelineConfigWithDiffInfo>>>;
@@ -47,46 +47,46 @@ public:
         return &instance;
     }
 
-    std::pair<PipelineConfigDiff, TaskConfigDiff> CheckConfigDiff();
+    std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff();
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void SetPipelineManager(const PipelineManager* pm) { mPipelineManager = pm; }
+    void SetPipelineManager(const CollectionPipelineManager* pm) { mPipelineManager = pm; }
 #endif
 
 private:
     PipelineConfigWatcher();
     ~PipelineConfigWatcher() = default;
 
-    void InsertBuiltInPipelines(PipelineConfigDiff& pDiff,
+    void InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
                                 TaskConfigDiff& tDiff,
                                 std::unordered_set<std::string>& configSet,
                                 SingletonConfigCache& singletonCache);
-    void InsertPipelines(PipelineConfigDiff& pDiff,
+    void InsertPipelines(CollectionConfigDiff& pDiff,
                          TaskConfigDiff& tDiff,
                          std::unordered_set<std::string>& configSet,
                          SingletonConfigCache& singletonCache);
     bool CheckAddedConfig(const std::string& configName,
                           std::unique_ptr<Json::Value>&& configDetail,
-                          PipelineConfigDiff& pDiff,
+                          CollectionConfigDiff& pDiff,
                           TaskConfigDiff& tDiff,
                           SingletonConfigCache& singletonCache);
     bool CheckModifiedConfig(const std::string& configName,
                              std::unique_ptr<Json::Value>&& configDetail,
-                             PipelineConfigDiff& pDiff,
+                             CollectionConfigDiff& pDiff,
                              TaskConfigDiff& tDiff,
                              SingletonConfigCache& singletonCache);
     bool CheckUnchangedConfig(const std::string& configName,
                               const std::filesystem::path& path,
-                              PipelineConfigDiff& pDiff,
+                              CollectionConfigDiff& pDiff,
                               TaskConfigDiff& tDiff,
                               SingletonConfigCache& singletonCache);
-    void PushPipelineConfig(PipelineConfig&& config,
+    void PushPipelineConfig(CollectionConfig&& config,
                             ConfigDiffEnum diffEnum,
-                            PipelineConfigDiff& pDiff,
+                            CollectionConfigDiff& pDiff,
                             SingletonConfigCache& singletonCache);
-    void CheckSingletonInput(PipelineConfigDiff& pDiff, SingletonConfigCache& singletonCache);
+    void CheckSingletonInput(CollectionConfigDiff& pDiff, SingletonConfigCache& singletonCache);
 
-    const PipelineManager* mPipelineManager = nullptr;
+    const CollectionPipelineManager* mPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN

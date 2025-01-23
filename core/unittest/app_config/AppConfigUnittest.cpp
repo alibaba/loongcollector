@@ -37,6 +37,8 @@ class AppConfigUnittest : public ::testing::Test {
 public:
     void TestRecurseParseJsonToFlags();
     void TestParseEnvToFlags();
+    void TestLoadSingleValueEnvConfig();
+    void TestLoadStringParameter();
 
 private:
     void writeLogtailConfigJSON(const Json::Value& v) {
@@ -197,8 +199,37 @@ void AppConfigUnittest::TestParseEnvToFlags() {
     }
 }
 
+void AppConfigUnittest::TestLoadSingleValueEnvConfig() {
+    SetEnv("cpu_usage_limit", "0.5");
+    AppConfig::GetInstance()->LoadEnvResourceLimit();
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), 0.5);
+    UnsetEnv("cpu_usage_limit");
+    SetEnv("LOONG_CPU_USAGE_LIMIT", "0.6");
+    AppConfig::GetInstance()->LoadEnvResourceLimit();
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.6));
+    UnsetEnv("LOONG_CPU_USAGE_LIMIT");
+}
+
+void AppConfigUnittest::TestLoadStringParameter() {
+    Json::Value value;
+    std::string res;
+    SetEnv("cpu_usage_limit_env", "0.5");
+    LoadStringParameter(res, value, "cpu_usage_limit", "cpu_usage_limit_env");
+    APSARA_TEST_EQUAL(res, "0.5");
+
+    SetEnv("LOONG_CPU_USAGE_LIMIT", "0.6");
+    LoadStringParameter(res, value, "cpu_usage_limit", "cpu_usage_limit_env");
+    APSARA_TEST_EQUAL(res, "0.6");
+
+    value["cpu_usage_limit"] = "0.7";
+    LoadStringParameter(res, value, "cpu_usage_limit", "cpu_usage_limit_env");
+    APSARA_TEST_EQUAL(res, "0.7");
+}
+
 UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
+UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
+UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
 
 } // namespace logtail
 

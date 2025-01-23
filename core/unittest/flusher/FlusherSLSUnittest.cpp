@@ -18,18 +18,19 @@
 
 #include "json/json.h"
 
+#include "TagConstants.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -90,8 +91,8 @@ protected:
     }
 
 private:
-    Pipeline pipeline;
-    PipelineContext ctx;
+    CollectionPipeline pipeline;
+    CollectionPipelineContext ctx;
 };
 
 void FlusherSLSUnittest::OnSuccessfulInit() {
@@ -677,7 +678,7 @@ void FlusherSLSUnittest::OnFailedInit() {
 }
 
 void FlusherSLSUnittest::OnPipelineUpdate() {
-    PipelineContext ctx1;
+    CollectionPipelineContext ctx1;
     ctx1.SetConfigName("test_config_1");
 
     Json::Value configJson, optionalGoPipeline;
@@ -701,7 +702,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
 
     {
-        PipelineContext ctx2;
+        CollectionPipelineContext ctx2;
         ctx2.SetConfigName("test_config_2");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
@@ -731,7 +732,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         flusher1.Start();
     }
     {
-        PipelineContext ctx2;
+        CollectionPipelineContext ctx2;
         ctx2.SetConfigName("test_config_1");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
@@ -1343,7 +1344,7 @@ void FlusherSLSUnittest::TestSend() {
         )";
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
-        PipelineContext ctx;
+        CollectionPipelineContext ctx;
         ctx.SetConfigName("test_config");
         ctx.SetExactlyOnceFlag(true);
         flusher.SetContext(ctx);
@@ -1367,7 +1368,6 @@ void FlusherSLSUnittest::TestSend() {
             // replayed group
             PipelineEventGroup group(make_shared<SourceBuffer>());
             group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
             group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
             group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
             group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1407,10 +1407,8 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL("topic", logGroup.topic());
             APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
             APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
-            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
-            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
-            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
-            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(0).key());
             APSARA_TEST_EQUAL(1, logGroup.logs_size());
             APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
             APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
@@ -1424,7 +1422,6 @@ void FlusherSLSUnittest::TestSend() {
             flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(1);
             PipelineEventGroup group(make_shared<SourceBuffer>());
             group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
             group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
             group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
             group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1461,10 +1458,8 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL("topic", logGroup.topic());
             APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
             APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
-            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
-            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
-            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
-            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(0).key());
             APSARA_TEST_EQUAL(1, logGroup.logs_size());
             APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
             APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
@@ -1509,7 +1504,6 @@ void FlusherSLSUnittest::TestSend() {
             flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(1);
             PipelineEventGroup group(make_shared<SourceBuffer>());
             group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
             group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
             group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
             group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1541,12 +1535,10 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL("topic", logGroup.topic());
             APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
             APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
-            APSARA_TEST_EQUAL(3, logGroup.logtags_size());
-            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
-            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
-            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
-            APSARA_TEST_EQUAL("tag_key", logGroup.logtags(2).key());
-            APSARA_TEST_EQUAL("tag_value", logGroup.logtags(2).value());
+            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(0).key());
+            APSARA_TEST_EQUAL("tag_key", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL("tag_value", logGroup.logtags(1).value());
             APSARA_TEST_EQUAL(1, logGroup.logs_size());
             APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
             APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
@@ -1591,7 +1583,6 @@ void FlusherSLSUnittest::TestSend() {
 
         PipelineEventGroup group(make_shared<SourceBuffer>());
         group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-        group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
         group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
         group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
         group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1645,10 +1636,8 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL("topic", logGroup.topic());
             APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
             APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
-            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
-            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
-            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
-            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(0).key());
             APSARA_TEST_EQUAL(1, logGroup.logs_size());
             if (i == 0) {
                 APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
@@ -1693,7 +1682,6 @@ void FlusherSLSUnittest::TestFlush() {
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-    group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
     group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1737,7 +1725,6 @@ void FlusherSLSUnittest::TestFlushAll() {
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
-    group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
     group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
@@ -1825,7 +1812,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.mProject = "test_project";
         flusher.mLogstore = "test_logstore";
         flusher.mCompressor = CompressorFactory::GetInstance()->Create(
-            Json::Value(), PipelineContext(), "flusher_sls", "1", CompressType::LZ4);
+            Json::Value(), CollectionPipelineContext(), "flusher_sls", "1", CompressType::LZ4);
 
         APSARA_TEST_TRUE(flusher.Send("content", ""));
 

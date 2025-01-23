@@ -16,16 +16,16 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/JsonUtil.h"
-#include "config/PipelineConfig.h"
+#include "config/CollectionConfig.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
-#include "pipeline/plugin/PluginRegistry.h"
-#include "pipeline/queue/BoundedProcessQueue.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
@@ -154,10 +154,10 @@ protected:
     void TearDown() override {
         LogInput::GetInstance()->CleanEnviroments();
         EventDispatcher::GetInstance()->CleanEnviroments();
-        for (auto& pipeline : PipelineManager::GetInstance()->GetAllPipelines()) {
+        for (auto& pipeline : CollectionPipelineManager::GetInstance()->GetAllPipelines()) {
             pipeline.second->Stop(true);
         }
-        PipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
         if (isFileServerStart) {
             FileServer::GetInstance()->Stop();
         }
@@ -195,7 +195,7 @@ private:
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(g), 0);
         {
             auto manager = ProcessQueueManager::GetInstance();
-            manager->CreateOrUpdateBoundedQueue(key, 0, PipelineContext{});
+            manager->CreateOrUpdateBoundedQueue(key, 0, CollectionPipelineContext{});
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
@@ -218,7 +218,7 @@ private:
             std::move(data), data.size(), flusher, key, "", RawDataType::EVENT_GROUP);
         {
             auto manager = SenderQueueManager::GetInstance();
-            manager->CreateQueue(key, "", PipelineContext{});
+            manager->CreateQueue(key, "", CollectionPipelineContext{});
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
@@ -227,14 +227,14 @@ private:
     }
 
     void BlockProcessor(std::string configName) const {
-        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+        auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
         auto processor
             = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
         processor->Block();
     }
 
     void UnBlockProcessor(std::string configName) const {
-        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+        auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
         auto processor
             = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
         processor->Unblock();
@@ -383,12 +383,13 @@ void PipelineUpdateUnittest::TestFileServerStart() {
         = GeneratePipelineConfigJson(nativeInputFileConfig, nativeProcessorConfig, nativeFlusherConfig);
     Json::Value goPipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = PipelineManagerMock::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig nativePipelineConfigObj
-        = PipelineConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson));
+    CollectionConfigDiff diff;
+    CollectionConfig nativePipelineConfigObj
+        = CollectionConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson));
     nativePipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(nativePipelineConfigObj));
-    PipelineConfig goPipelineConfigObj = PipelineConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
+    CollectionConfig goPipelineConfigObj
+        = CollectionConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
     goPipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(goPipelineConfigObj));
 
@@ -403,9 +404,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -413,7 +414,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
         = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
@@ -430,9 +431,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -458,9 +459,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase2() const {
     const std::string configName = "test2";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -470,9 +471,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase2() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, goFlusherConfig2);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -485,9 +486,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     const std::string configName = "test3";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -495,7 +496,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -504,17 +505,22 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);
@@ -531,9 +537,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -541,7 +547,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockProcess();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -557,9 +563,9 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -587,9 +593,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -597,7 +603,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
         = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
@@ -614,9 +620,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -642,9 +648,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase2() const {
     const std::string configName = "test2";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -654,9 +660,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase2() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -669,9 +675,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     const std::string configName = "test3";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -679,7 +685,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -688,17 +694,22 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);
@@ -715,9 +726,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -725,7 +736,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockProcess();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -741,9 +752,9 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -771,9 +782,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -781,7 +792,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
         = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
@@ -798,9 +809,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -823,9 +834,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -833,7 +844,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
         = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
@@ -850,9 +861,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -864,8 +875,13 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-8", flusher);
     AddDataToSenderQueue(configName, "test-data-9", flusher);
     AddDataToSenderQueue(configName, "test-data-10", flusher);
@@ -882,9 +898,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -892,7 +908,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
         = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
@@ -909,9 +925,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -938,9 +954,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
     const std::string configName = "test4";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -950,9 +966,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -975,9 +991,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
     const std::string configName = "test5";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -987,17 +1003,22 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    auto flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    auto flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                            ->GetAllPipelines()
+                                            .at(configName)
+                                            .get()
+                                            ->GetFlushers()[0]
+                                            .get()
+                                            ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
     AddDataToSenderQueue(configName, "test-data-3", flusher);
@@ -1012,9 +1033,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase6() const {
     const std::string configName = "test6";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1024,9 +1045,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase6() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1047,9 +1068,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
     const std::string configName = "test7";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1057,7 +1078,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -1066,9 +1087,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1092,9 +1113,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
     const std::string configName = "test8";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1102,7 +1123,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -1111,9 +1132,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1130,9 +1151,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
     const std::string configName = "test9";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1140,7 +1161,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher);
     AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -1149,9 +1170,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1174,9 +1195,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1184,7 +1205,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockProcess();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -1200,9 +1221,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1232,9 +1253,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1242,7 +1263,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockProcess();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -1258,9 +1279,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1283,9 +1304,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1293,7 +1314,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockProcess();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -1309,9 +1330,9 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1324,8 +1345,13 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
 
-    flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-8", flusher);
     AddDataToSenderQueue(configName, "test-data-9", flusher);
     AddDataToSenderQueue(configName, "test-data-10", flusher);
@@ -1342,9 +1368,9 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1352,7 +1378,7 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     auto processor
@@ -1371,9 +1397,9 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result1 = async(launch::async, [&]() {
@@ -1407,9 +1433,9 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     const std::string configName = "test1";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1417,7 +1443,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockStop();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -1427,9 +1453,9 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
@@ -1441,8 +1467,13 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
-    flusher = const_cast<Flusher*>(
-        PipelineManager::GetInstance()->GetAllPipelines().at(configName).get()->GetFlushers()[0].get()->GetPlugin());
+    flusher = const_cast<Flusher*>(CollectionPipelineManager::GetInstance()
+                                       ->GetAllPipelines()
+                                       .at(configName)
+                                       .get()
+                                       ->GetFlushers()[0]
+                                       .get()
+                                       ->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher);
     AddDataToSenderQueue(configName, "test-data-5", flusher);
     AddDataToSenderQueue(configName, "test-data-6", flusher);
@@ -1458,9 +1489,9 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
     const std::string configName = "test1";
     // load old pipeline
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1468,7 +1499,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 
     // Add data without trigger
-    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
     LogtailPluginMock::GetInstance()->BlockStop();
     AddDataToSenderQueue(configName, "test-data-1", flusher);
@@ -1478,9 +1509,9 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeFlusherConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate;
-    PipelineConfig pipelineConfigObjUpdate
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
@@ -1498,35 +1529,35 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
 }
 
 void PipelineUpdateUnittest::TestPipelineIsolationCase1() const {
-    PipelineConfigDiff diff;
-    auto pipelineManager = PipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
     // C++ -> C++ -> C++
     Json::Value pipelineConfigJson1
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj1 = PipelineConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    CollectionConfig pipelineConfigObj1 = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
     pipelineConfigObj1.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj1));
     // Go -> Go -> Go
     Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    PipelineConfig pipelineConfigObj2 = PipelineConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    CollectionConfig pipelineConfigObj2 = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
     pipelineConfigObj2.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj2));
     // Go -> Go -> C++
     Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj3 = PipelineConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    CollectionConfig pipelineConfigObj3 = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
     pipelineConfigObj3.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj3));
     // C++ -> Go -> C++
     Json::Value pipelineConfigJson4
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj4 = PipelineConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    CollectionConfig pipelineConfigObj4 = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
     pipelineConfigObj4.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj4));
 
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(4U, pipelineManager->GetAllPipelines().size());
 
-    PipelineConfigDiff diffUpdate;
+    CollectionConfigDiff diffUpdate;
     diffUpdate.mRemoved.push_back("test1");
     auto pipeline = pipelineManager->GetAllPipelines().at("test1");
     auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
@@ -1537,7 +1568,7 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase1() const {
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
     { // add data to Go -> Go -> C++
         std::string configName = "test3";
-        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+        auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
         auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
         AddDataToSenderQueue(configName, "test-data-1", flusher);
         AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -1559,35 +1590,35 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase1() const {
 }
 
 void PipelineUpdateUnittest::TestPipelineIsolationCase2() const {
-    PipelineConfigDiff diff;
-    auto pipelineManager = PipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
     // C++ -> C++ -> C++
     Json::Value pipelineConfigJson1
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj1 = PipelineConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    CollectionConfig pipelineConfigObj1 = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
     pipelineConfigObj1.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj1));
     // Go -> Go -> Go
     Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    PipelineConfig pipelineConfigObj2 = PipelineConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    CollectionConfig pipelineConfigObj2 = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
     pipelineConfigObj2.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj2));
     // Go -> Go -> C++
     Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj3 = PipelineConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    CollectionConfig pipelineConfigObj3 = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
     pipelineConfigObj3.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj3));
     // C++ -> Go -> C++
     Json::Value pipelineConfigJson4
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    PipelineConfig pipelineConfigObj4 = PipelineConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    CollectionConfig pipelineConfigObj4 = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
     pipelineConfigObj4.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj4));
 
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(4U, pipelineManager->GetAllPipelines().size());
 
-    PipelineConfigDiff diffUpdate;
+    CollectionConfigDiff diffUpdate;
     diffUpdate.mRemoved.push_back("test4");
     auto pipeline = pipelineManager->GetAllPipelines().at("test4");
     auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
@@ -1606,7 +1637,7 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase2() const {
     HttpSinkMock::GetInstance()->ClearRequests();
     { // add data to Go -> Go -> C++
         std::string configName = "test3";
-        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+        auto pipeline = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
         auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
         AddDataToSenderQueue(configName, "test-data-1", flusher);
         AddDataToSenderQueue(configName, "test-data-2", flusher);
@@ -1628,9 +1659,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1638,7 +1669,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -1652,16 +1683,16 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-8");
     AddDataToProcessQueue(configName, "test-data-9");
     AddDataToProcessQueue(configName, "test-data-10");
@@ -1670,9 +1701,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1709,9 +1740,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1719,7 +1750,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -1733,24 +1764,24 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
 
     ProcessorRunner::GetInstance()->Init();
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1787,9 +1818,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1797,7 +1828,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -1808,16 +1839,16 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-5");
     AddDataToProcessQueue(configName, "test-data-6");
     AddDataToProcessQueue(configName, "test-data-7");
@@ -1826,9 +1857,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1865,9 +1896,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1875,7 +1906,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -1886,24 +1917,24 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
 
     ProcessorRunner::GetInstance()->Init();
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1940,9 +1971,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1950,7 +1981,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -1959,16 +1990,16 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-5");
     AddDataToProcessQueue(configName, "test-data-6");
     AddDataToProcessQueue(configName, "test-data-7");
@@ -1977,9 +2008,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2015,9 +2046,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2025,7 +2056,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -2034,24 +2065,24 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
 
     ProcessorRunner::GetInstance()->Init();
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2087,9 +2118,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2097,22 +2128,22 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
     AddDataToProcessQueue(configName, "test-data-4");
@@ -2121,9 +2152,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2159,9 +2190,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2169,30 +2200,30 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
 
     ProcessorRunner::GetInstance()->Init();
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2228,9 +2259,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2238,7 +2269,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -2247,15 +2278,15 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
-    auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline2 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher2 = const_cast<Flusher*>(pipeline2->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-4", flusher2);
     AddDataToSenderQueue(configName, "test-data-5", flusher2);
@@ -2265,9 +2296,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     pipelineManager->UpdatePipelines(diffUpdate3);
@@ -2295,9 +2326,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     // load old pipeline
     Json::Value pipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    auto pipelineManager = PipelineManager::GetInstance();
-    PipelineConfigDiff diff;
-    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2305,7 +2336,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     auto flusher1 = const_cast<Flusher*>(pipeline1->GetFlushers()[0].get()->GetPlugin());
     AddDataToSenderQueue(configName, "test-data-1", flusher1);
     AddDataToSenderQueue(configName, "test-data-2", flusher1);
@@ -2314,9 +2345,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate2
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
-    PipelineConfigDiff diffUpdate2;
-    PipelineConfig pipelineConfigObjUpdate2
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2327,9 +2358,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     // load new pipeline
     Json::Value pipelineConfigJsonUpdate3
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
-    PipelineConfigDiff diffUpdate3;
-    PipelineConfig pipelineConfigObjUpdate3
-        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+    CollectionConfigDiff diffUpdate3;
+    CollectionConfig pipelineConfigObjUpdate3
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     pipelineManager->UpdatePipelines(diffUpdate3);

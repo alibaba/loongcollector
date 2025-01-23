@@ -48,7 +48,7 @@ static const std::unordered_map<SecurityProbeType, std::unordered_set<std::strin
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                     nami::ObserverNetworkOption& thisObserverNetworkOption,
-                                    const PipelineContext* mContext,
+                                    const CollectionPipelineContext* mContext,
                                     const std::string& sName) {
     std::string errorMsg;
     // EnableEvent (Optional)
@@ -161,7 +161,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
 }
 
 bool ExtractProbeConfig(const Json::Value& config,
-                        const PipelineContext* mContext,
+                        const CollectionPipelineContext* mContext,
                         const std::string& sName,
                         Json::Value& probeConfig) {
     std::string errorMsg;
@@ -181,7 +181,7 @@ bool ExtractProbeConfig(const Json::Value& config,
 
 bool InitObserverNetworkOption(const Json::Value& config,
                                nami::ObserverNetworkOption& thisObserverNetworkOption,
-                               const PipelineContext* mContext,
+                               const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     Json::Value probeConfig;
     if (!ExtractProbeConfig(config, mContext, sName, probeConfig)) {
@@ -193,7 +193,7 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 void InitSecurityFileFilter(const Json::Value& config,
                             nami::SecurityFileFilter& thisFileFilter,
-                            const PipelineContext* mContext,
+                            const CollectionPipelineContext* mContext,
                             const std::string& sName) {
     std::string errorMsg;
     // FilePathFilter (Optional)
@@ -220,7 +220,7 @@ void InitSecurityFileFilter(const Json::Value& config,
 
 void InitSecurityNetworkFilter(const Json::Value& config,
                                nami::SecurityNetworkFilter& thisNetworkFilter,
-                               const PipelineContext* mContext,
+                               const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     std::string errorMsg;
     // AddrFilter (Optional)
@@ -355,7 +355,7 @@ bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
 
 bool SecurityOptions::Init(SecurityProbeType probeType,
                            const Json::Value& config,
-                           const PipelineContext* mContext,
+                           const CollectionPipelineContext* mContext,
                            const std::string& sName) {
     std::string errorMsg;
 

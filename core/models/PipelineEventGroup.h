@@ -35,10 +35,9 @@ class EventPool;
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/container.md
 enum class EventGroupMetaKey {
     UNKNOWN,
-    LOG_FILE_PATH,
     LOG_FILE_PATH_RESOLVED,
-    LOG_FILE_INODE,
     LOG_FORMAT,
+    LOG_FILE_OFFSET_KEY,
     HAS_PART_LOG,
 
     K8S_CLUSTER_ID,

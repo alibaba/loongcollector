@@ -17,10 +17,10 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
-#include "config/PipelineConfig.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "config/CollectionConfig.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "unittest/Unittest.h"
 
@@ -41,7 +41,7 @@ public:
     void TestProcessEventPreciseTimestampLegacy();
     void TestCheckTime();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestInit);
@@ -661,7 +661,7 @@ public:
     void TestParseLogTimeSecondCache();
     void TestAdjustTimeZone();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTime);

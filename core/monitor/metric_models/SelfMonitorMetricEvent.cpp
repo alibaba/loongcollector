@@ -173,11 +173,13 @@ void SelfMonitorMetricEvent::ReadAsMetricEvent(MetricEvent* metricEventPtr) {
     // values
     metricEventPtr->SetValue(UntypedMultiDoubleValues{{}, nullptr});
     for (auto counter = mCounters.begin(); counter != mCounters.end(); counter++) {
-        metricEventPtr->MutableValue<UntypedMultiDoubleValues>()->SetValue(counter->first, counter->second);
+        metricEventPtr->MutableValue<UntypedMultiDoubleValues>()->SetValue(
+            counter->first, {UntypedValueMetricType::MetricTypeCounter, double(counter->second)});
         counter->second = 0;
     }
     for (auto gauge = mGauges.begin(); gauge != mGauges.end(); gauge++) {
-        metricEventPtr->MutableValue<UntypedMultiDoubleValues>()->SetValue(gauge->first, gauge->second);
+        metricEventPtr->MutableValue<UntypedMultiDoubleValues>()->SetValue(
+            gauge->first, {UntypedValueMetricType::MetricTypeGauge, gauge->second});
     }
     // set flags
     mLastSendInterval = 0;

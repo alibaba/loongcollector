@@ -25,14 +25,14 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/batch/BatchStatus.h"
+#include "collection_pipeline/batch/Batcher.h"
+#include "collection_pipeline/limiter/ConcurrencyLimiter.h"
+#include "collection_pipeline/plugin/interface/HttpFlusher.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/batch/BatchStatus.h"
-#include "pipeline/batch/Batcher.h"
-#include "pipeline/limiter/ConcurrencyLimiter.h"
-#include "pipeline/plugin/interface/HttpFlusher.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/serializer/SLSSerializer.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__

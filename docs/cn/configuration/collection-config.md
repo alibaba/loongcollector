@@ -14,6 +14,7 @@
 | global.InputIntervalMs           | int        | 否        | 1000    | MetricInput采集间隔，单位毫秒。               |
 | global.InputMaxFirstCollectDelayMs| int       | 否        | 10000   | MetricInput启动后, 第一次采集随机等待时长上限，如果采集间隔更小，则以采集间隔为准               |
 | global.EnableTimestampNanosecond | bool       | 否        | false   | 否启用纳秒级时间戳，提高时间精度。               |
+| global.PipelineMetaTagKey        | \[object\] | 否        | 空       | 重命名或删除流水线级别的Tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。可配置项以及默认值参考后文的表1. |
 | inputs                           | \[object\] | 是        | /       | 输入插件列表。目前只允许使用1个输入插件。           |
 | processors                       | \[object\] | 否        | 空       | 处理插件列表。                         |
 | aggregators                      | \[object\] | 否        | 空       | 聚合插件列表。目前最多只能包含1个聚合插件，所有输出插件共享。 |
@@ -53,3 +54,11 @@ flushers:
 ```
 
 其它常见的采集配置可参考源代码中的[`example_config`](https://github.com/alibaba/loongcollector/tree/main/example_config)目录.
+
+* 表1：Tag配置项以及默认值
+|  **配置项**  | **是否默认添加** |  **默认值**  |
+| --- | --- | --- |
+| HOST_NAME | 是 | **hostname** |
+| HOST_IP | 是 | **host_ip** |
+| HOST_ID | 是 | **host_id** |
+| CLOUD_PROVIDER | 是 | **cloud_provider** |

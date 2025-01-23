@@ -26,8 +26,9 @@ public:
                       const std::string& hostLogPathFile,
                       const DevInode& devInode,
                       const FileReaderConfig& readerConfig,
-                      const MultilineConfig& multilineConfig)
-        : LogFileReader(hostLogPathDir, hostLogPathFile, devInode, readerConfig, multilineConfig) {}
+                      const MultilineConfig& multilineConfig,
+                      const FileTagConfig& tagConfig)
+        : LogFileReader(hostLogPathDir, hostLogPathFile, devInode, readerConfig, multilineConfig, tagConfig) {}
 
 protected:
     int32_t RemoveLastIncompleteLog(char* buffer,

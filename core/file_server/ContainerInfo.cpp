@@ -14,20 +14,23 @@
 
 #include "file_server/ContainerInfo.h"
 
-#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "common/StringTools.h"
 #include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
-const std::unordered_set<std::string> containerNameTag = {
-    "_image_name_",
-    "_container_name_",
-    "_pod_name_",
-    "_namespace_",
-    "_pod_uid_",
-    "_container_ip_",
+static const std::unordered_map<std::string, TagKey> containerNameTag = {
+    {"_image_name_", TagKey::CONTAINER_IMAGE_NAME_TAG_KEY},
+    {"_container_name_", TagKey::CONTAINER_NAME_TAG_KEY},
+    {"_pod_name_", TagKey::K8S_POD_NAME_TAG_KEY},
+    {"_namespace_", TagKey::K8S_NAMESPACE_TAG_KEY},
+    {"_pod_uid_", TagKey::K8S_POD_UID_TAG_KEY},
+    {"_container_ip_", TagKey::CONTAINER_IP_TAG_KEY},
 };
 
 bool ContainerInfo::ParseAllByJSONObj(const Json::Value& paramsAll,
@@ -95,10 +98,7 @@ bool ContainerInfo::ParseByJSONObj(const Json::Value& params, ContainerInfo& con
         const Json::Value& metaDatas = params["MetaDatas"];
         for (Json::ArrayIndex i = 1; i < metaDatas.size(); i += 2) {
             if (metaDatas[i].isString() && metaDatas[i - 1].isString()) {
-                sls_logs::LogTag tag;
-                tag.set_key(metaDatas[i - 1].asString());
-                tag.set_value(metaDatas[i].asString());
-                containerInfo.mMetadatas.emplace_back(tag);
+                containerInfo.AddMetadata(metaDatas[i - 1].asString(), metaDatas[i].asString());
             }
         }
     }
@@ -106,16 +106,16 @@ bool ContainerInfo::ParseByJSONObj(const Json::Value& params, ContainerInfo& con
         const Json::Value& tags = params["Tags"];
         for (Json::ArrayIndex i = 1; i < tags.size(); i += 2) {
             if (tags[i].isString() && tags[i - 1].isString()) {
-                sls_logs::LogTag tag;
-                tag.set_key(tags[i - 1].asString());
-                tag.set_value(tags[i].asString());
-                // 不是老版本
-                if (!isOldCheckpoint) {
-                    containerInfo.mTags.emplace_back(tag);
-                } else if (containerNameTag.find(tags[i - 1].asString()) != containerNameTag.end()) {
-                    containerInfo.mMetadatas.emplace_back(tag);
+                std::string key = tags[i - 1].asString();
+                std::string value = tags[i].asString();
+                if (isOldCheckpoint) {
+                    containerInfo.mTags.emplace_back(key, value);
                 } else {
-                    containerInfo.mTags.emplace_back(tag);
+                    if (containerNameTag.find(key) != containerNameTag.end()) {
+                        containerInfo.AddMetadata(key, value);
+                    } else {
+                        containerInfo.mTags.emplace_back(key, value);
+                    }
                 }
             }
         }
@@ -127,6 +127,13 @@ bool ContainerInfo::ParseByJSONObj(const Json::Value& params, ContainerInfo& con
                                                                                             containerInfo.mID));
     }
     return true;
+}
+
+void ContainerInfo::AddMetadata(const std::string& key, const std::string& value) {
+    auto it = containerNameTag.find(key);
+    if (it != containerNameTag.end()) {
+        mMetadatas.emplace_back(it->second, value);
+    }
 }
 
 } // namespace logtail

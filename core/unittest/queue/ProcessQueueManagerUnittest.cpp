@@ -14,12 +14,12 @@
 
 #include <memory>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/QueueParam.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/queue/ExactlyOnceQueueManager.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/QueueParam.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -48,7 +48,7 @@ protected:
 
 private:
     static ProcessQueueManager* sProcessQueueManager;
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
 
     unique_ptr<ProcessQueueItem> GenerateItem() {
         PipelineEventGroup g(make_shared<SourceBuffer>());
@@ -57,13 +57,13 @@ private:
 };
 
 ProcessQueueManager* ProcessQueueManagerUnittest::sProcessQueueManager;
-PipelineContext ProcessQueueManagerUnittest::sCtx;
+CollectionPipelineContext ProcessQueueManagerUnittest::sCtx;
 
 void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
     // create queue
     //   and current index is invalid before creation
     QueueKey key = QueueKeyManager::GetInstance()->GetKey("test_config_1");
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config_1");
     ctx.SetProcessQueueKey(key);
     APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(key, 0, ctx));
@@ -263,7 +263,7 @@ void ProcessQueueManagerUnittest::TestPushQueue() {
 void ProcessQueueManagerUnittest::TestPopItem() {
     unique_ptr<ProcessQueueItem> item;
     string configName;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 
     ctx.SetConfigName("test_config_1");
     QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("test_config_1");
@@ -324,7 +324,7 @@ void ProcessQueueManagerUnittest::TestPopItem() {
 }
 
 void ProcessQueueManagerUnittest::TestIsAllQueueEmpty() {
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config_1");
     QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("test_config_1");
     sProcessQueueManager->CreateOrUpdateBoundedQueue(key1, 0, ctx);
@@ -364,7 +364,7 @@ void ProcessQueueManagerUnittest::TestIsAllQueueEmpty() {
 }
 
 void ProcessQueueManagerUnittest::OnPipelineUpdate() {
-    PipelineContext ctx1, ctx2;
+    CollectionPipelineContext ctx1, ctx2;
     ctx1.SetConfigName("test_config_1");
     ctx2.SetConfigName("test_config_2");
     QueueKey key = QueueKeyManager::GetInstance()->GetKey("test_config_1");
@@ -372,10 +372,10 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, ctx2, vector<RangeCheckpointPtr>(5));
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(2, 0, ctx2, vector<RangeCheckpointPtr>(5));
 
-    auto pipeline1 = make_shared<Pipeline>();
-    auto pipeline2 = make_shared<Pipeline>();
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_1"] = pipeline1;
-    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_2"] = pipeline2;
+    auto pipeline1 = make_shared<CollectionPipeline>();
+    auto pipeline2 = make_shared<CollectionPipeline>();
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_1"] = pipeline1;
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_2"] = pipeline2;
 
     {
         auto item1 = GenerateItem();
@@ -390,8 +390,8 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         auto p2 = item2.get();
         sProcessQueueManager->PushQueue(key, std::move(item2));
 
-        auto pipeline3 = make_shared<Pipeline>();
-        PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_1"] = pipeline3;
+        auto pipeline3 = make_shared<CollectionPipeline>();
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_1"] = pipeline3;
 
         sProcessQueueManager->DisablePop("test_config_1", false);
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
@@ -434,8 +434,8 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         auto p4 = item4.get();
         sProcessQueueManager->PushQueue(2, std::move(item4));
 
-        auto pipeline3 = make_shared<Pipeline>();
-        PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_2"] = pipeline3;
+        auto pipeline3 = make_shared<CollectionPipeline>();
+        CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config_2"] = pipeline3;
 
         sProcessQueueManager->DisablePop("test_config_2", false);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPop);

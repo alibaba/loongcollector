@@ -15,12 +15,12 @@
  */
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/HashUtil.h"
 #include "common/ParamExtractor.h"
 #include "constants/Constants.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
