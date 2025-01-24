@@ -117,6 +117,7 @@ func (p *ProcessorTag) parseDefaultAddedTag(configKey string, tagKey TagKey, def
 	}
 }
 
+//lint:ignore
 func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, defaultKey string, config map[string]string) {
 	if customKey, ok := config[configKey]; ok {
 		if customKey != "" {
