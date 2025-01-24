@@ -132,7 +132,7 @@ public:
     void ForceToSend();
     bool IsLowLevelAlarmValid();
 
-    void FlushAllRegionAlarm(std::vector<PipelineEventGroup> &pipelineEventGroupList);
+    void FlushAllRegionAlarm(std::vector<PipelineEventGroup>& pipelineEventGroupList);
 
 private:
     using AlarmVector = std::vector<std::map<std::string, std::unique_ptr<AlarmMessage>>>;

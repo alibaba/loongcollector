@@ -107,7 +107,7 @@ AlarmManager::AlarmManager() {
     mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
 }
 
-void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup> &pipelineEventGroupList) {
+void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEventGroupList) {
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
@@ -167,7 +167,7 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup> &pipelineEvent
 
                 LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
                 logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
-                                                                               : now.tv_sec);
+                                                                                           : now.tv_sec);
                 logEvent->SetContent("alarm_type", messagePtr->mMessageType);
                 logEvent->SetContent("alarm_message", messagePtr->mMessage);
                 logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));

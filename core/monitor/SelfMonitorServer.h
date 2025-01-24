@@ -36,6 +36,7 @@ public:
     void RemoveMetricPipeline();
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx);
     void RemoveAlarmPipeline();
+
 private:
     SelfMonitorServer();
     ~SelfMonitorServer() = default;
@@ -60,7 +61,7 @@ private:
     void SendAlarms();
 
     mutable ReadWriteLock mAlarmPipelineMux;
-    CollectionPipelineContext* mAlarmPipelineCtx;
+    CollectionPipelineContext* mAlarmPipelineCtx = nullptr;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalMetricsUnittest;
 #endif
