@@ -268,9 +268,6 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    // TODO: this should be refactored to internal pipeline
-    AlarmManager::GetInstance()->Init();
-
     time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
@@ -373,7 +370,6 @@ void Application::Exit() {
 
     LogtailMonitor::GetInstance()->Stop();
     LoongCollectorMonitor::GetInstance()->Stop();
-    AlarmManager::GetInstance()->Stop();
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 

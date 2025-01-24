@@ -40,16 +40,20 @@ void SelfMonitorServer::Init() {
 void SelfMonitorServer::Monitor() {
     LOG_INFO(sLogger, ("self-monitor", "started"));
     int32_t lastMonitorTime = time(NULL);
+    int32_t lastAlarmTime = time(NULL);
     {
         unique_lock<mutex> lock(mThreadRunningMux);
         while (mIsThreadRunning) {
             if (mStopCV.wait_for(lock, std::chrono::seconds(1), [this]() { return !mIsThreadRunning; })) {
                 break;
             }
-            int32_t monitorTime = time(NULL);
-            if ((monitorTime - lastMonitorTime) >= 60) { // 60s
-                lastMonitorTime = monitorTime;
+            int32_t nowTime = time(NULL);
+            if ((nowTime - lastMonitorTime) >= 60) { // 60s
+                lastMonitorTime = nowTime;
                 SendMetrics();
+            }
+            if ((nowTime - lastAlarmTime) >= 3) { // 3s
+                lastAlarmTime = nowTime;
                 SendAlarms();
             }
         }
@@ -59,6 +63,7 @@ void SelfMonitorServer::Monitor() {
 }
 
 void SelfMonitorServer::Stop() {
+    AlarmManager::GetInstance()->ForceToSend();
     {
         lock_guard<mutex> lock(mThreadRunningMux);
         mIsThreadRunning = false;
@@ -170,11 +175,36 @@ void SelfMonitorServer::ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEve
 }
 
 void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx) {
-    lock_guard<mutex> lock(mAlarmPipelineMux);
+    WriteLock lock(mAlarmPipelineMux);
     mAlarmPipelineCtx = ctx;
+    LOG_INFO(sLogger, ("self-monitor alarms pipeline", "updated"));
+}
+
+void SelfMonitorServer::RemoveAlarmPipeline() {
+    WriteLock lock(mAlarmPipelineMux);
+    mAlarmPipelineCtx = nullptr;
+    LOG_INFO(sLogger, ("self-monitor alarms pipeline", "removed"));
 }
 
 void SelfMonitorServer::SendAlarms() {
+    ReadLock lock(mAlarmPipelineMux);
+    if (mAlarmPipelineCtx == nullptr) {
+        return;
+    }
+    // tags: __topic__:__alarm__, __region__:${region}
+    vector<PipelineEventGroup> pipelineEventGroupList;
+    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
+
+    shared_ptr<CollectionPipeline> pipeline
+        = CollectionPipelineManager::GetInstance()->FindConfigByName(mAlarmPipelineCtx->GetConfigName());
+    if (pipeline.get() != nullptr) {
+        for (auto& pipelineEventGroup : pipelineEventGroupList) {
+            if (pipelineEventGroup.GetEvents().size() > 0) {
+                ProcessorRunner::GetInstance()->PushQueue(
+                    pipeline->GetContext().GetProcessQueueKey(), 0, std::move(pipelineEventGroup));
+            }
+        }
+    }
 }
 
 } // namespace logtail

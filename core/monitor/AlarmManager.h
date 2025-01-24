@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "common/Lock.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
@@ -122,9 +123,6 @@ public:
         return &instance;
     }
 
-    void Init();
-    void Stop();
-
     void SendAlarm(const AlarmType alarmType,
                    const std::string& message,
                    const std::string& projectName = "",
@@ -134,16 +132,16 @@ public:
     void ForceToSend();
     bool IsLowLevelAlarmValid();
 
+    void FlushAllRegionAlarm(std::vector<PipelineEventGroup> &pipelineEventGroupList);
+
 private:
     using AlarmVector = std::vector<std::map<std::string, std::unique_ptr<AlarmMessage>>>;
 
     AlarmManager();
     ~AlarmManager() = default;
 
-    bool SendAlarmLoop();
     // without lock
     AlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
-    void SendAllRegionAlarm();
 
     std::future<bool> mThreadRes;
     std::mutex mThreadRunningMux;

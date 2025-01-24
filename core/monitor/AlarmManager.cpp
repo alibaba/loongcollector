@@ -107,49 +107,12 @@ AlarmManager::AlarmManager() {
     mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
 }
 
-void AlarmManager::Init() {
-    mThreadRes = async(launch::async, &AlarmManager::SendAlarmLoop, this);
-}
-
-void AlarmManager::Stop() {
-    ForceToSend();
-    {
-        lock_guard<mutex> lock(mThreadRunningMux);
-        mIsThreadRunning = false;
-    }
-    mStopCV.notify_one();
-    if (!mThreadRes.valid()) {
-        return;
-    }
-    future_status s = mThreadRes.wait_for(chrono::seconds(1));
-    if (s == future_status::ready) {
-        LOG_INFO(sLogger, ("alarm gathering", "stopped successfully"));
-    } else {
-        LOG_WARNING(sLogger, ("alarm gathering", "forced to stopped"));
-    }
-}
-
-bool AlarmManager::SendAlarmLoop() {
-    LOG_INFO(sLogger, ("alarm gathering", "started"));
-    {
-        unique_lock<mutex> lock(mThreadRunningMux);
-        while (mIsThreadRunning) {
-            SendAllRegionAlarm();
-            if (mStopCV.wait_for(lock, std::chrono::seconds(3), [this]() { return !mIsThreadRunning; })) {
-                break;
-            }
-        }
-    }
-    SendAllRegionAlarm();
-    return true;
-}
-
-void AlarmManager::SendAllRegionAlarm() {
+void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup> &pipelineEventGroupList) {
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
     do {
-        LogGroup logGroup;
+        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
         string region;
         {
             PTScopedLock lock(mAlarmBufferMutex);
@@ -163,7 +126,8 @@ void AlarmManager::SendAllRegionAlarm() {
                 ++allAlarmIter;
             }
             region = allAlarmIter->first;
-            // LOG_DEBUG(sLogger, ("1Send Alarm", region)("region", sendRegionIndex));
+            pipelineEventGroup.SetTag("__region__", region);
+
             AlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
             std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;
             // check this region end
@@ -173,8 +137,7 @@ void AlarmManager::SendAllRegionAlarm() {
                 sendAlarmTypeIndex = 0;
                 continue;
             }
-            // LOG_DEBUG(sLogger, ("2Send Alarm", region)("region", sendRegionIndex)("alarm index",
-            // mMessageType[sendAlarmTypeIndex]));
+
             //  check valid
             if (alarmBufferVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM
                 || lastUpdateTimeVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM) {
@@ -187,8 +150,6 @@ void AlarmManager::SendAllRegionAlarm() {
                 continue;
             }
 
-            // LOG_DEBUG(sLogger, ("3Send Alarm", region)("region", sendRegionIndex)("alarm index",
-            // mMessageType[sendAlarmTypeIndex]));
             map<string, unique_ptr<AlarmMessage>>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
             if (alarmMap.size() == 0
                 || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
@@ -196,89 +157,39 @@ void AlarmManager::SendAllRegionAlarm() {
                 ++sendAlarmTypeIndex;
                 continue;
             }
-            // check sender queue status, if invalid jump this region
 
-            string project = GetProfileSender()->GetProfileProjectName(region);
-            QueueKey alarmPrjLogstoreKey
-                = QueueKeyManager::GetInstance()->GetKey("-flusher_sls-" + project + "#" + ALARM_SLS_LOGSTORE_NAME);
-            if (SenderQueueManager::GetInstance()->GetQueue(alarmPrjLogstoreKey) == nullptr) {
-                CollectionPipelineContext ctx;
-                SenderQueueManager::GetInstance()->CreateQueue(
-                    alarmPrjLogstoreKey,
-                    "self_monitor",
-                    ctx,
-                    {{"region", FlusherSLS::GetRegionConcurrencyLimiter(region)},
-                     {"project", FlusherSLS::GetProjectConcurrencyLimiter(project)},
-                     {"logstore", FlusherSLS::GetLogstoreConcurrencyLimiter(project, ALARM_SLS_LOGSTORE_NAME)}});
-            }
-            if (!SenderQueueManager::GetInstance()->IsValidToPush(alarmPrjLogstoreKey)) {
-                // jump this region
-                ++sendRegionIndex;
-                sendAlarmTypeIndex = 0;
-                continue;
-            }
-
-            // LOG_DEBUG(sLogger, ("4Send Alarm", region)("region", sendRegionIndex)("alarm index",
-            // mMessageType[sendAlarmTypeIndex]));
-            logGroup.set_source(LoongCollectorMonitor::mIpAddr);
-            logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
+            pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+            pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, "__alarm__");
             auto now = GetCurrentLogtailTime();
             for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                  ++mapIter) {
                 auto& messagePtr = mapIter->second;
 
-                // LOG_DEBUG(sLogger, ("5Send Alarm", region)("region", sendRegionIndex)("alarm index",
-                // sendAlarmTypeIndex)("msg", messagePtr->mMessage));
-
-                Log* logPtr = logGroup.add_logs();
-                SetLogTime(logPtr,
-                           AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
+                LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
+                logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
                                                                                : now.tv_sec);
-                Log_Content* contentPtr = logPtr->add_contents();
-                contentPtr->set_key("alarm_type");
-                contentPtr->set_value(messagePtr->mMessageType);
-
-                contentPtr = logPtr->add_contents();
-                contentPtr->set_key("alarm_message");
-                contentPtr->set_value(messagePtr->mMessage);
-
-                contentPtr = logPtr->add_contents();
-                contentPtr->set_key("alarm_count");
-                contentPtr->set_value(ToString(messagePtr->mCount));
-
-                contentPtr = logPtr->add_contents();
-                contentPtr->set_key("ip");
-                contentPtr->set_value(LoongCollectorMonitor::mIpAddr);
-
-                contentPtr = logPtr->add_contents();
-                contentPtr->set_key("os");
-                contentPtr->set_value(OS_NAME);
-
-                contentPtr = logPtr->add_contents();
-                contentPtr->set_key("ver");
-                contentPtr->set_value(ILOGTAIL_VERSION);
-
+                logEvent->SetContent("alarm_type", messagePtr->mMessageType);
+                logEvent->SetContent("alarm_message", messagePtr->mMessage);
+                logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
+                logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
+                logEvent->SetContent("os", OS_NAME);
+                logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
                 if (!messagePtr->mProjectName.empty()) {
-                    contentPtr = logPtr->add_contents();
-                    contentPtr->set_key("project_name");
-                    contentPtr->set_value(messagePtr->mProjectName);
+                    logEvent->SetContent("project_name", messagePtr->mProjectName);
                 }
-
                 if (!messagePtr->mCategory.empty()) {
-                    contentPtr = logPtr->add_contents();
-                    contentPtr->set_key("category");
-                    contentPtr->set_value(messagePtr->mCategory);
+                    logEvent->SetContent("category", messagePtr->mCategory);
                 }
             }
             lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
             alarmMap.clear();
             ++sendAlarmTypeIndex;
         }
-        if (logGroup.logs_size() <= 0) {
+        if (pipelineEventGroup.GetEvents().size() <= 0) {
             continue;
         }
         // this is an anonymous send and non lock send
-        GetProfileSender()->SendToProfileProject(region, logGroup);
+        pipelineEventGroupList.emplace_back(std::move(pipelineEventGroup));
     } while (true);
 }
 

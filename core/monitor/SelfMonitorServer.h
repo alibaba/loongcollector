@@ -34,7 +34,8 @@ public:
 
     void UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules);
     void RemoveMetricPipeline();
-    void UpdateAlarmPipeline(CollectionPipelineContext* ctx); // Todo
+    void UpdateAlarmPipeline(CollectionPipelineContext* ctx);
+    void RemoveAlarmPipeline();
 private:
     SelfMonitorServer();
     ~SelfMonitorServer() = default;
@@ -44,20 +45,22 @@ private:
     bool mIsThreadRunning = true;
     std::condition_variable mStopCV;
 
+    // metrics
     void SendMetrics();
     bool ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& event, const SelfMonitorMetricRule& rule);
     void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events);
     void ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEventGroup);
 
+    mutable ReadWriteLock mMetricPipelineLock;
     CollectionPipelineContext* mMetricPipelineCtx = nullptr;
     SelfMonitorMetricRules* mSelfMonitorMetricRules = nullptr;
     SelfMonitorMetricEventMap mSelfMonitorMetricEventMap;
-    mutable ReadWriteLock mMetricPipelineLock;
 
+    // alarms
     void SendAlarms();
 
+    mutable ReadWriteLock mAlarmPipelineMux;
     CollectionPipelineContext* mAlarmPipelineCtx;
-    std::mutex mAlarmPipelineMux;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalMetricsUnittest;
 #endif
