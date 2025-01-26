@@ -612,15 +612,6 @@ void BaseManager::HandleCacheUpdate() {
     std::vector<std::unique_ptr<MsgExecveEventUnix>> items(mMaxBatchConsumeSize);
 
     while (mFlag) {
-        // TODO @qianlu.kk do we need frequency control??
-        // auto now = std::chrono::steady_clock::now();
-        // auto next_window = proc_consumer_freq_mgr_.next();
-        // if (!proc_consumer_freq_mgr_.Expired(now)) {
-        //   std::this_thread::sleep_until(next_window);
-        //   proc_consumer_freq_mgr_.Reset(next_window);
-        // } else {
-        //   proc_consumer_freq_mgr_.Reset(now);
-        // }
         size_t count = mRecordQueue.wait_dequeue_bulk_timed(
             items.data(), mMaxBatchConsumeSize, std::chrono::milliseconds(mMaxWaitTimeMS));
 
@@ -628,22 +619,23 @@ void BaseManager::HandleCacheUpdate() {
             continue;
         std::vector<std::unique_ptr<AbstractSecurityEvent>> outputs;
         for (size_t i = 0; i < count; ++i) {
-            std::unique_ptr<MsgExecveEventUnix>& event = items[i];
+            std::shared_ptr<MsgExecveEventUnix> event = std::move(items[i]);
 
             event->process.user.name = mProcParser.GetUserNameByUid(event->process.uid);
             std::string exec_key = GenerateExecId(event->process.pid, event->process.ktime);
-
-            std::shared_ptr<MsgExecveEventUnix> entity = std::move(event);
-            std::string parent_key = GenerateParentExecId(entity);
-            entity->exec_id = exec_key;
-            entity->parent_exec_id = parent_key;
+            
+            std::string parent_key = GenerateParentExecId(event);
+            event->exec_id = exec_key;
+            event->parent_exec_id = parent_key;
             LOG_DEBUG(sLogger,
-                      ("[RecordExecveEvent][DUMP] begin update cache pid",
-                       entity->process.pid)("ktime", entity->process.ktime)("execId", exec_key)(
-                          "cmdline", mProcParser.GetPIDCmdline(entity->process.pid))(
-                          "filename", mProcParser.GetPIDExePath(entity->process.pid))("args", entity->process.args));
+                      ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)
+                      ("ktime", event->process.ktime)
+                      ("execId", exec_key)
+                      ("cmdline", mProcParser.GetPIDCmdline(event->process.pid))
+                      ("filename", mProcParser.GetPIDExePath(event->process.pid))
+                      ("args", event->process.args));
 
-            UpdateCache(exec_key, entity);
+            UpdateCache(exec_key, event);
         }
 
         items.clear();
@@ -651,17 +643,18 @@ void BaseManager::HandleCacheUpdate() {
     }
 }
 
-// TODO @qianlu.kk
 SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime) {
     SizedMap res;
     auto execId = GenerateExecId(pid, ktime);
+    auto contains = ContainerKey(execId);
     auto proc = LookupCache(execId);
     if (!proc) {
-        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime));
+        LOG_WARNING(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime)("contains", contains)("size", mCache.size()));
         return res;
     }
 
-    auto parentProc = LookupCache(execId);
+    auto parentExecId = GenerateParentExecId(proc);
+    auto parentProc = LookupCache(parentExecId);
 
     // finalize proc tags
     auto execIdSb = sb->CopyString(proc->exec_id);

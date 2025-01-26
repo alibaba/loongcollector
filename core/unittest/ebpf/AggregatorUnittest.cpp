@@ -16,6 +16,7 @@
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "models/PipelineEventGroup.h"
 
 
 DECLARE_FLAG_BOOL(logtail_mode);

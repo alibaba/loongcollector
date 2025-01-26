@@ -48,6 +48,10 @@ public:
           mCommonEventQueue(queue) {}
     ~BaseManager() {}
 
+    bool ContainerKey(const std::string& key) const {
+        return mCache.contains(key);
+    }
+
     // thread-safe
     const std::shared_ptr<MsgExecveEventUnix> LookupCache(const std::string& key) { return mCache.get(key); }
 

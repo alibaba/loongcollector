@@ -191,6 +191,8 @@ void eBPFServer::Init() {
 
     mSourceManager = std::make_shared<SourceManager>();
     mSourceManager->Init();
+
+    mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -276,7 +278,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
     if (type != PluginType::NETWORK_OBSERVE) {
         LOG_INFO(sLogger, ("hostname", mHostName)("mHostPathPrefix", mHostPathPrefix));
-        mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
         auto res = mBaseManager->Init();
         LOG_INFO(sLogger, ("basemanager init ", res));
     }
