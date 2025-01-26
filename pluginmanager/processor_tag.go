@@ -117,20 +117,6 @@ func (p *ProcessorTag) parseDefaultAddedTag(configKey string, tagKey TagKey, def
 	}
 }
 
-//lint:ignore
-func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, defaultKey string, config map[string]string) {
-	if customKey, ok := config[configKey]; ok {
-		if customKey != "" {
-			if customKey == defaultConfigTagKeyValue {
-				p.pipelineMetaTagKey[tagKey] = defaultKey
-			} else {
-				p.pipelineMetaTagKey[tagKey] = customKey
-			}
-		}
-		// empty value means delete
-	}
-}
-
 func (p *ProcessorTag) addTag(tagKey TagKey, value string, tags map[string]string) {
 	if key, ok := p.pipelineMetaTagKey[tagKey]; ok {
 		if key != "" {
