@@ -126,7 +126,7 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
                 ++allAlarmIter;
             }
             region = allAlarmIter->first;
-            pipelineEventGroup.SetTag("__region__", region);
+            pipelineEventGroup.SetMetadata(EventGroupMetaKey::TARGET_REGION, region);
 
             AlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
             std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;

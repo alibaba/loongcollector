@@ -60,6 +60,8 @@ enum class EventGroupMetaKey {
     PROMETHEUS_STREAM_ID,
     PROMETHEUS_STREAM_TOTAL,
 
+    TARGET_REGION,
+
     SOURCE_ID
 };
 

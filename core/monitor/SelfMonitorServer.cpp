@@ -191,7 +191,8 @@ void SelfMonitorServer::SendAlarms() {
     if (mAlarmPipelineCtx == nullptr) {
         return;
     }
-    // tags: __topic__:__alarm__, __region__:${region}
+    // tags: __topic__:__alarm__
+    // metadata: __region__:${region}
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 

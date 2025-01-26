@@ -143,18 +143,16 @@ private:
     // without lock
     AlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
 
-    std::future<bool> mThreadRes;
-    std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = true;
-    std::condition_variable mStopCV;
-
-
     std::vector<std::string> mMessageType;
     std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
     PTMutex mAlarmBufferMutex;
 
     std::atomic_int mLastLowLevelTime{0};
     std::atomic_int mLastLowLevelCount{0};
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class AlarmManagerUnittest;
+#endif
 };
 
 } // namespace logtail
