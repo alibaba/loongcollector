@@ -61,6 +61,7 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 			tagsMap[tag.Key] = tag.Value
 		}
 	}
+	p.addAllConfigurableTags(tagsMap)
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
