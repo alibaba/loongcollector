@@ -133,6 +133,7 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
 }
 
 vector<filesystem::path> InputStaticFile::GetFiles() const {
+    // TODO: avoid loop
     vector<filesystem::path> res;
     vector<filesystem::path> baseDirs;
     if (!mEnableContainerDiscovery) {
