@@ -18,6 +18,7 @@
 
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
+#include "file_server/StaticFileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "prometheus/PrometheusInputRunner.h"
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -39,6 +40,7 @@ namespace logtail {
 CollectionPipelineManager::CollectionPipelineManager()
     : mInputRunners({
           PrometheusInputRunner::GetInstance(),
+          StaticFileServer::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
           ebpf::eBPFServer::GetInstance(),
 #endif
@@ -177,6 +179,12 @@ string CollectionPipelineManager::GetPluginStatistics() const {
         }
     }
     return root.toStyledString();
+}
+
+void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
+    for (auto& item : mInputRunners) {
+        item->ClearUnusedCheckpoints();
+    }
 }
 
 void CollectionPipelineManager::StopAllPipelines() {

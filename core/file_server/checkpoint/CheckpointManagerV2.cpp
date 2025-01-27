@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "CheckpointManagerV2.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 
-#include <leveldb/write_batch.h>
+#include "leveldb/write_batch.h"
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"

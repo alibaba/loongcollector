@@ -41,6 +41,7 @@ public:
     const std::shared_ptr<CollectionPipeline>& FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
+    void ClearInputUnusedCheckpoints();
     // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;

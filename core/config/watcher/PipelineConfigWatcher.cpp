@@ -235,7 +235,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                     LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", configName));
                     continue;
                 }
-                if (!CheckAddedConfig(configName, std::move(detail), pDiff, tDiff, singletonCache)) {
+                if (!CheckAddedConfig(configName, path, std::move(detail), pDiff, tDiff, singletonCache)) {
                     continue;
                 }
             } else if (iter->second.first != size || iter->second.second != mTime) {
@@ -274,7 +274,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                     }
                     continue;
                 }
-                if (!CheckModifiedConfig(configName, std::move(detail), pDiff, tDiff, singletonCache)) {
+                if (!CheckModifiedConfig(configName, path, std::move(detail), pDiff, tDiff, singletonCache)) {
                     continue;
                 }
             } else {
@@ -286,13 +286,14 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
 }
 
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
+                                             const filesystem::path& filepath,
                                              unique_ptr<Json::Value>&& configDetail,
                                              CollectionConfigDiff& pDiff,
                                              TaskConfigDiff& tDiff,
                                              SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
         case ConfigType::Collection: {
-            CollectionConfig config(configName, std::move(configDetail));
+            CollectionConfig config(configName, std::move(configDetail), filepath);
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
                 AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
@@ -309,7 +310,7 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
             break;
         }
         case ConfigType::Task: {
-            TaskConfig config(configName, std::move(configDetail));
+            TaskConfig config(configName, std::move(configDetail), filepath);
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
                 AlarmManager::GetInstance()->SendAlarm(
@@ -326,6 +327,7 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
 }
 
 bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
+                                                const filesystem::path& filepath,
                                                 unique_ptr<Json::Value>&& configDetail,
                                                 CollectionConfigDiff& pDiff,
                                                 TaskConfigDiff& tDiff,
@@ -334,7 +336,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
         case ConfigType::Collection: {
             shared_ptr<CollectionPipeline> p = mCollectionPipelineManager->FindConfigByName(configName);
             if (!p) {
-                CollectionConfig config(configName, std::move(configDetail));
+                CollectionConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing invalid config modified and remains invalid",
@@ -353,7 +355,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                           "prepare to build pipeline")("config", configName));
                 PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
             } else if (*configDetail != p->GetConfig()) {
-                CollectionConfig config(configName, std::move(configDetail));
+                CollectionConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing valid config modified and becomes invalid",
@@ -379,7 +381,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
         case ConfigType::Task: {
             auto& p = mTaskPipelineManager->FindPipelineByName(configName);
             if (!p) {
-                TaskConfig config(configName, std::move(configDetail));
+                TaskConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing invalid config modified and remains invalid",
@@ -395,7 +397,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                          ("existing invalid config modified and passed topology check",
                           "prepare to build task")("config", configName));
             } else if (*configDetail != p->GetConfig()) {
-                TaskConfig config(configName, std::move(configDetail));
+                TaskConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
                               ("existing valid config modified and becomes invalid",
@@ -420,7 +422,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
 }
 
 bool PipelineConfigWatcher::CheckUnchangedConfig(const string& configName,
-                                                 const filesystem::path& path,
+                                                 const filesystem::path& filepath,
                                                  CollectionConfigDiff& pDiff,
                                                  SingletonConfigCache& singletonCache) {
     if (mTaskPipelineManager->FindPipelineByName(configName)) {
@@ -431,14 +433,14 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const string& configName,
     if (pipeline) {
         // if this pipeline is selected in the end, we simply pass it, thus, the config here is just a dummy
         unique_ptr<Json::Value> configDetail = make_unique<Json::Value>();
-        CollectionConfig config(configName, std::move(configDetail));
+        CollectionConfig config(configName, std::move(configDetail), filepath);
         config.mCreateTime = pipeline->GetContext().GetCreateTime();
         config.mSingletonInput = pipeline->GetSingletonInput();
         PushPipelineConfig(std::move(config), ConfigDiffEnum::Unchanged, pDiff, singletonCache);
     } else {
         // low priority singleton input in last config update, sort it again
         unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-        if (!LoadConfigDetailFromFile(path, *detail)) {
+        if (!LoadConfigDetailFromFile(filepath, *detail)) {
             return false;
         }
         if (!IsConfigEnabled(configName, *detail)) {
@@ -446,7 +448,7 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const string& configName,
                       ("existing disabled config file unchanged", "skip current object")("config", configName));
             return false;
         }
-        CollectionConfig config(configName, std::move(detail));
+        CollectionConfig config(configName, std::move(detail), filepath);
         if (!config.Parse()) {
             LOG_DEBUG(sLogger, ("existing invalid config file unchanged", "skip current object")("config", configName));
             return false;

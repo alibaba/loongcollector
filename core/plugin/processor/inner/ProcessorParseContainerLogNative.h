@@ -17,6 +17,7 @@
 #pragma once
 
 #include "collection_pipeline/plugin/interface/Processor.h"
+#include "constants/Constants.h"
 #include "models/LogEvent.h"
 
 namespace logtail {

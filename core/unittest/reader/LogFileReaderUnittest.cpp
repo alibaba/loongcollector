@@ -16,7 +16,7 @@
 
 #include <fstream>
 
-#include "checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/memory/SourceBuffer.h"

@@ -420,23 +420,45 @@ void FileDiscoveryOptions::ParseWildcardPath() {
     }
 }
 
-bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dirPath) const {
+bool FileDiscoveryOptions::IsFilenameMatched(const std::string& filename) const {
+    return fnmatch(mFilePattern.c_str(), filename.c_str(), 0) == 0;
+}
+
+bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
     if (!mHasBlacklist) {
         return false;
     }
 
     for (auto& dp : mDirPathBlacklist) {
-        if (_IsSubPath(dp, dirPath)) {
+        if (_IsSubPath(dp, dir)) {
             return true;
         }
     }
     for (auto& dp : mWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dirPath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(dp.c_str(), dir.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& dp : mMLWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dirPath.c_str(), 0)) {
+        if (0 == fnmatch(dp.c_str(), dir.c_str(), 0)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) const {
+    if (!mHasBlacklist) {
+        return false;
+    }       
+
+    for (auto& fp : mFilePathBlacklist) {
+        if (0 == fnmatch(fp.c_str(), filepath.c_str(), FNM_PATHNAME)) {
+            return true;
+        }
+    }
+    for (auto& fp : mMLFilePathBlacklist) {
+        if (0 == fnmatch(fp.c_str(), filepath.c_str(), 0)) {
             return true;
         }
     }
@@ -470,7 +492,7 @@ bool FileDiscoveryOptions::IsObjectInBlacklist(const string& path, const string&
     return false;
 }
 
-bool FileDiscoveryOptions::IsFileNameInBlacklist(const string& fileName) const {
+bool FileDiscoveryOptions::IsFilenameInBlacklist(const string& fileName) const {
     if (!mHasBlacklist) {
         return false;
     }
@@ -491,7 +513,7 @@ bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const
     if (!name.empty()) {
         if (fnmatch(mFilePattern.c_str(), name.c_str(), 0) != 0)
             return false;
-        if (IsFileNameInBlacklist(name)) {
+        if (IsFilenameInBlacklist(name)) {
             return false;
         }
     }

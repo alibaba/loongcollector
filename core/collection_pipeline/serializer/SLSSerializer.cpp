@@ -20,6 +20,7 @@
 
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
+#include "constants/Constants.h"
 #include "constants/SpanConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"

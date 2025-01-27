@@ -47,7 +47,7 @@
 
 #include "boost/regex.hpp"
 
-#include "checkpoint/CheckpointManagerV2.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include "common/Lock.h"

@@ -70,6 +70,19 @@ std::string ToString(const std::vector<std::string>& vec) {
     return ret;
 }
 
+std::string ToString(const std::vector<std::filesystem::path>& vec) {
+    if (vec.empty())
+        return "";
+
+    auto iter = vec.begin();
+    std::string ret = iter->string();
+    ++iter;
+    for (; iter != vec.end(); ++iter) {
+        ret += "," + iter->string();
+    }
+    return ret;
+}
+
 template <>
 bool StringTo<bool>(const std::string& str) {
     return str == "true";

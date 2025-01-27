@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "unittest/Unittest.h"

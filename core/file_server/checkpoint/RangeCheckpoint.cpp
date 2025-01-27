@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "RangeCheckpoint.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 
-#include "CheckpointManagerV2.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 
 namespace logtail {
 

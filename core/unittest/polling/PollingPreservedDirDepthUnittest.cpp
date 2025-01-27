@@ -183,7 +183,7 @@ private:
         auto testFile2 = gRootDir + testVector.mTestDir1 + PATH_SEPARATOR + "0.log";
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, testVector.mPreservedDirDepth);
-        CollectionConfig pipelineConfig("polling", std::move(configJson));
+        CollectionConfig pipelineConfig("polling", std::move(configJson), "/fake/path");
         APSARA_TEST_TRUE_FATAL(pipelineConfig.Parse());
         auto p = CollectionPipelineManager::GetInstance()->BuildPipeline(
             std::move(pipelineConfig)); // reference: CollectionPipelineManager::UpdatePipelines
@@ -272,7 +272,7 @@ public:
         auto testFile = gRootDir + "log/0/0.log";
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, 0);
-        CollectionConfig pipelineConfig("polling", std::move(configJson));
+        CollectionConfig pipelineConfig("polling", std::move(configJson), "/fake/path");
         APSARA_TEST_TRUE_FATAL(pipelineConfig.Parse());
         auto p = CollectionPipelineManager::GetInstance()->BuildPipeline(
             std::move(pipelineConfig)); // reference: CollectionPipelineManager::UpdatePipelines

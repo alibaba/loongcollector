@@ -21,7 +21,6 @@
 #include <thread>
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
@@ -36,11 +35,13 @@
 #include "common/version.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
+#include "config/OnetimeConfigManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
@@ -271,7 +272,10 @@ void Application::Start() { // GCOVR_EXCL_START
     // TODO: this should be refactored to internal pipeline
     AlarmManager::GetInstance()->Init();
 
-    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
+    OnetimeConfigManager::GetInstance()->LoadCheckpointFile();
+
+    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0,
+           lastCheckUnunsedCheckpointsTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
@@ -289,6 +293,10 @@ void Application::Start() { // GCOVR_EXCL_START
             if (!configDiff.second.IsEmpty()) {
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
             }
+            if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
+                OnetimeConfigManager::GetInstance()->DumpCheckpointFile();
+            }
+
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!instanceConfigDiff.IsEmpty()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
@@ -306,6 +314,11 @@ void Application::Start() { // GCOVR_EXCL_START
             // this should be called in the same thread as config update
             SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
+        }
+        if (curTime - lastCheckUnunsedCheckpointsTime >= 60) {
+            CollectionPipelineManager::GetInstance()->ClearInputUnusedCheckpoints();
+            OnetimeConfigManager::GetInstance()->ClearUnusedCheckpoints();
+            lastCheckUnunsedCheckpointsTime = curTime;
         }
         if (curTime - lastUpdateMetricTime >= 40) {
             CheckCriticalCondition(curTime);

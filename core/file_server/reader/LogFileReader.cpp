@@ -36,8 +36,6 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "checkpoint/CheckPointManager.h"
-#include "checkpoint/CheckpointManagerV2.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
@@ -51,6 +49,8 @@
 #include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/reader/GloablFileDescriptorManager.h"
@@ -962,7 +962,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
     LOG_DEBUG(sLogger,
               ("read log file", mRealLogPath)("last file pos", mLastFilePos)("last file size", mLastFileSize)(
                   "read size", mLastFilePos - lastFilePos));
-    if (HasDataInCache() && GetLastReadPos() == mLastFileSize) {
+    if (event && HasDataInCache() && GetLastReadPos() == mLastFileSize) {
         LOG_DEBUG(sLogger, ("add timeout event", mRealLogPath));
         auto event = CreateFlushTimeoutEvent();
         BlockedEventManager::GetInstance()->UpdateBlockEvent(
