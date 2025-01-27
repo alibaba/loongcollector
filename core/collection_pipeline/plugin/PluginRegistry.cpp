@@ -94,8 +94,11 @@ void PluginRegistry::UnloadPlugins() {
 
 unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name,
                                                       const PluginInstance::PluginMeta& pluginMeta) {
-    return unique_ptr<InputInstance>(
-        static_cast<InputInstance*>(Create(CONTINUOUS_INPUT_PLUGIN, name, pluginMeta).release()));
+    auto res = Create(CONTINUOUS_INPUT_PLUGIN, name, pluginMeta);
+    if (!res) {
+        res = Create(ONETIME_INPUT_PLUGIN, name, pluginMeta);
+    }
+    return unique_ptr<InputInstance>(static_cast<InputInstance*>(res.release()));
 }
 
 unique_ptr<ProcessorInstance> PluginRegistry::CreateProcessor(const string& name,
