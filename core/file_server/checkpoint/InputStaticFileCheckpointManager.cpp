@@ -180,7 +180,16 @@ bool InputStaticFileCheckpointManager::InvalidateCurrentFileCheckpoint(const str
         // should not happen
         return false;
     }
-    return it->second.InvalidateCurrentFileCheckpoint();
+    if (!it->second.InvalidateCurrentFileCheckpoint()) {
+        return false;
+    }
+    if (!DumpCheckpointFile(it->second)) {
+        LOG_WARNING(sLogger,
+                    ("failed to update file checkpoint",
+                     "failed to dump checkpoint file")("config", configName)("input idx", idx));
+        return false;
+    }
+    return true;
 }
 
 bool InputStaticFileCheckpointManager::GetCurrentFileFingerprint(const string& configName,
