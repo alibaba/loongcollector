@@ -17,10 +17,10 @@
 #include "leveldb/write_batch.h"
 
 #include "app_config/AppConfig.h"
-#include "file_server/checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 

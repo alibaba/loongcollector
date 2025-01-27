@@ -243,7 +243,8 @@ bool CollectionConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, mExpireTime.has_value())) {
+                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType,
+                                                                                    mExpireTime.has_value())) {
                     PARAM_ERROR_RETURN(
                         sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
                 }

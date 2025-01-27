@@ -18,8 +18,8 @@
 #include <random>
 
 #include "AppConfig.h"
-#include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "common/FileSystemUtil.h"
+#include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

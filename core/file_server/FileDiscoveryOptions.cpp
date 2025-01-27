@@ -450,7 +450,7 @@ bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
 bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) const {
     if (!mHasBlacklist) {
         return false;
-    }       
+    }
 
     for (auto& fp : mFilePathBlacklist) {
         if (0 == fnmatch(fp.c_str(), filepath.c_str(), FNM_PATHNAME)) {

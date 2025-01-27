@@ -16,11 +16,11 @@
 
 #include <fstream>
 
-#include "file_server/checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "unittest/Unittest.h"
