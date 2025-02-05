@@ -30,9 +30,7 @@ class AlarmManagerUnittest : public ::testing::Test {
 public:
     void SetUp() {}
 
-    void TearDown() {
-
-    }
+    void TearDown() {}
 
     void TestSendAlarm();
     void TestFlushAllRegionAlarm();
@@ -51,7 +49,8 @@ void AlarmManagerUnittest::TestSendAlarm() {
 
         AlarmManager::GetInstance()->SendAlarm(alarmType, message, projectName, category, region);
         // Assuming we have a method to retrieve alarms for testing
-        AlarmManager::AlarmVector& alarmBufferVec = *AlarmManager::GetInstance()->MakesureLogtailAlarmMapVecUnlocked(region);
+        AlarmManager::AlarmVector& alarmBufferVec
+            = *AlarmManager::GetInstance()->MakesureLogtailAlarmMapVecUnlocked(region);
 
         std::string key = projectName + "_" + category;
         APSARA_TEST_EQUAL(1U, alarmBufferVec[alarmType].size());
@@ -59,7 +58,8 @@ void AlarmManagerUnittest::TestSendAlarm() {
         APSARA_TEST_EQUAL(category, alarmBufferVec[alarmType][key]->mCategory);
         APSARA_TEST_EQUAL(1, alarmBufferVec[alarmType][key]->mCount);
         APSARA_TEST_EQUAL(message, alarmBufferVec[alarmType][key]->mMessage);
-        APSARA_TEST_EQUAL(AlarmManager::GetInstance()->mMessageType[alarmType], alarmBufferVec[alarmType][key]->mMessageType);
+        APSARA_TEST_EQUAL(AlarmManager::GetInstance()->mMessageType[alarmType],
+                          alarmBufferVec[alarmType][key]->mMessageType);
         APSARA_TEST_EQUAL(projectName, alarmBufferVec[alarmType][key]->mProjectName);
     }
 }

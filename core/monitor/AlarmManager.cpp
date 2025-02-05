@@ -14,7 +14,7 @@
 
 #include "AlarmManager.h"
 
-#include "Monitor.h"
+#include "SelfMonitorServer.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
@@ -159,7 +159,8 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             }
 
             pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-            pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, "__alarm__");
+            pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                           SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
             auto now = GetCurrentLogtailTime();
             for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                  ++mapIter) {

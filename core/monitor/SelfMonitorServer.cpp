@@ -18,12 +18,14 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
-#include "monitor/Monitor.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
 
 namespace logtail {
+
+const string INTERNAL_DATA_TYPE_ALARM = "__metric__";
+const string INTERNAL_DATA_TYPE_METRIC = "__alarm__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
@@ -108,7 +110,8 @@ void SelfMonitorServer::SendMetrics() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, "__metric__");
+    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, INTERNAL_DATA_TYPE_METRIC); // todo: delete this tag
+    pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
     shared_ptr<CollectionPipeline> pipeline

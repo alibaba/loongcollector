@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "Monitor.h"
 #include "collection_pipeline/CollectionPipeline.h"
 
 namespace logtail {
@@ -36,6 +37,9 @@ public:
     void RemoveMetricPipeline();
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx);
     void RemoveAlarmPipeline();
+
+    static const std::string INTERNAL_DATA_TYPE_ALARM;
+    static const std::string INTERNAL_DATA_TYPE_METRIC;
 
 private:
     SelfMonitorServer();

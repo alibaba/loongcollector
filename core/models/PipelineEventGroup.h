@@ -62,7 +62,9 @@ enum class EventGroupMetaKey {
 
     TARGET_REGION,
 
-    SOURCE_ID
+    SOURCE_ID,
+
+    INTERNAL_DATA_TYPE
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;
