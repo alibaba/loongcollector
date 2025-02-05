@@ -24,8 +24,8 @@ using namespace std;
 
 namespace logtail {
 
-const string INTERNAL_DATA_TYPE_ALARM = "__metric__";
-const string INTERNAL_DATA_TYPE_METRIC = "__alarm__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__alarm__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
