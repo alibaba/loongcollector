@@ -2573,9 +2573,10 @@ bool LogFileReader::UpdateContainerInfo() {
                       containerInfo->mRealBaseDir.size());
         SetContainerID(containerInfo->mID);
         mContainerStopped = containerInfo->mStopped;
-        mExtraTags.clear();
-        AddExtraTags(containerInfo->mMetadatas);
-        AddExtraTags(containerInfo->mTags);
+        mContainerMetadatas.clear();
+        mContainerExtraTags.clear();
+        SetContainerMetadatas(containerInfo->mMetadatas);
+        SetContainerExtraTags(containerInfo->mTags);
         return true;
     }
     return false;

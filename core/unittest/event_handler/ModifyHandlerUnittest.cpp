@@ -114,7 +114,7 @@ protected:
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
-            [](ContainerInfo& containerInfo, const PipelineContext* ctx, const FileDiscoveryOptions* opts) {
+            [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
                 containerInfo.mRealBaseDir = containerInfo.mUpperDir;
                 return true;
             });
