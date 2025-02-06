@@ -135,7 +135,6 @@ bool CollectionConfig::Parse() {
         mGlobal = itr;
         GetExpireTimeIfOneTime(*mGlobal);
     }
-    mExpireTime.has_value();
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
