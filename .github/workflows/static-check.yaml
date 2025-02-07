@@ -88,7 +88,7 @@ jobs:
         with:
           clang-format-version: '18'
           check-path: 'core'
-          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|ebpf/driver/coolbpf'
           include-regex: '.*\.(cpp|h)$'
 
       - name: Go Plugin Lint

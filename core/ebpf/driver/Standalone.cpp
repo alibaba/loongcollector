@@ -48,7 +48,7 @@ public:
 
     bool init() {
         // load libsockettrace.so
-        handle = dlopen("./libebpf_driver.so", RTLD_NOW);
+        handle = dlopen("./libEbpfDriver.so", RTLD_NOW);
         if (!handle) {
             std::cerr << "dlopen error: " << dlerror() << std::endl;
             return false;

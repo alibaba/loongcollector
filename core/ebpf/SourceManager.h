@@ -35,7 +35,7 @@ namespace ebpf {
 
 class SourceManager {
 public:
-    const std::string mDriverLibName = "ebpf_driver";
+    const std::string mDriverLibName = "EbpfDriver";
 
     SourceManager(const SourceManager&) = delete;
     SourceManager& operator=(const SourceManager&) = delete;

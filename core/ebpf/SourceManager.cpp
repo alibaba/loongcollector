@@ -136,16 +136,16 @@ void SourceManager::Init() {
         vsnprintf(buffer, 1023, format, args);
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
-                LOG_WARNING(sLogger, ("module", "ebpf_driver")("msg", buffer));
+                LOG_WARNING(sLogger, ("module", "EbpfDriver")("msg", buffer));
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
-                LOG_INFO(sLogger, ("module", "ebpf_driver")("msg", buffer));
+                LOG_INFO(sLogger, ("module", "EbpfDriver")("msg", buffer));
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
-                LOG_DEBUG(sLogger, ("module", "ebpf_driver")("msg", buffer));
+                LOG_DEBUG(sLogger, ("module", "EbpfDriver")("msg", buffer));
                 break;
             default:
-                LOG_INFO(sLogger, ("module", "ebpf_driver")("level", int(level))("msg", buffer));
+                LOG_INFO(sLogger, ("module", "EbpfDriver")("level", int(level))("msg", buffer));
                 break;
         }
         return 0;

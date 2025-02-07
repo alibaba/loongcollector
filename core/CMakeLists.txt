@@ -92,7 +92,6 @@ endif ()
 # To be compatible with low version Linux.
 if (ENABLE_COMPATIBLE_MODE)
     message(STATUS "Enable compatible mode.")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c90")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--wrap=memcpy")
     add_definitions(-DENABLE_COMPATIBLE_MODE)
 endif ()
