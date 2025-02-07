@@ -109,8 +109,8 @@ void Application::Init() {
 #ifdef __ENTERPRISE__
     if (!InstanceIdentity::Instance()->InitFromFile()) {
         InstanceIdentity::Instance()->InitFromNetwork();
-        InstanceIdentity::Instance()->DumpInstanceIdentity();
     }
+    InstanceIdentity::Instance()->DumpInstanceIdentity();
 #endif
     // Initialize basic information: IP, hostname, etc.
     LoongCollectorMonitor::GetInstance();
