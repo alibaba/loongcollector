@@ -239,7 +239,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
         )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
-    PluginInstance::PluginMeta meta = ctx.GetPipeline().GenNextPluginMeta(false);
+    meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, meta.mPluginID);
