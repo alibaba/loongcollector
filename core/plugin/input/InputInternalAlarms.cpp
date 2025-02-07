@@ -16,6 +16,8 @@
 
 #include "plugin/input/InputInternalAlarms.h"
 
+#include "monitor/SelfMonitorServer.h"
+
 namespace logtail {
 
 const std::string InputInternalAlarms::sName = "input_internal_alarms";
@@ -25,7 +27,7 @@ bool InputInternalAlarms::Init(const Json::Value& config, Json::Value& optionalG
 }
 
 bool InputInternalAlarms::Start() {
-    SelfMonitorServer::GetInstance()->UpdateAlarmPipeline(mContext);
+    SelfMonitorServer::GetInstance()->UpdateAlarmPipeline(mContext, mIndex);
     return true;
 }
 

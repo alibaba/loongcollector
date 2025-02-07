@@ -16,7 +16,6 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "runner/ProcessorRunner.h"
 
@@ -82,9 +81,12 @@ void SelfMonitorServer::Stop() {
     }
 }
 
-void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules) {
+void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx,
+                                             size_t inputIndex,
+                                             SelfMonitorMetricRules* rules) {
     WriteLock lock(mMetricPipelineLock);
     mMetricPipelineCtx = ctx;
+    mMetricInputIndex = inputIndex;
     mSelfMonitorMetricRules = rules;
     LOG_INFO(sLogger, ("self-monitor metrics pipeline", "updated"));
 }
@@ -92,6 +94,7 @@ void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx, Sel
 void SelfMonitorServer::RemoveMetricPipeline() {
     WriteLock lock(mMetricPipelineLock);
     mMetricPipelineCtx = nullptr;
+    mMetricInputIndex = 0;
     mSelfMonitorMetricRules = nullptr;
     LOG_INFO(sLogger, ("self-monitor metrics pipeline", "removed"));
 }
@@ -114,13 +117,9 @@ void SelfMonitorServer::SendMetrics() {
     pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
-    shared_ptr<CollectionPipeline> pipeline
-        = CollectionPipelineManager::GetInstance()->FindConfigByName(mMetricPipelineCtx->GetConfigName());
-    if (pipeline.get() != nullptr) {
-        if (pipelineEventGroup.GetEvents().size() > 0) {
-            ProcessorRunner::GetInstance()->PushQueue(
-                pipeline->GetContext().GetProcessQueueKey(), 0, std::move(pipelineEventGroup));
-        }
+    if (pipelineEventGroup.GetEvents().size() > 0) {
+        ProcessorRunner::GetInstance()->PushQueue(
+            mMetricPipelineCtx->GetProcessQueueKey(), mMetricInputIndex, std::move(pipelineEventGroup));
     }
 }
 
@@ -177,36 +176,36 @@ void SelfMonitorServer::ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEve
     }
 }
 
-void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx) {
+void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
     WriteLock lock(mAlarmPipelineMux);
     mAlarmPipelineCtx = ctx;
+    mAlarmInputIndex = inputIndex;
     LOG_INFO(sLogger, ("self-monitor alarms pipeline", "updated"));
 }
 
 void SelfMonitorServer::RemoveAlarmPipeline() {
     WriteLock lock(mAlarmPipelineMux);
     mAlarmPipelineCtx = nullptr;
+    mAlarmInputIndex = 0;
     LOG_INFO(sLogger, ("self-monitor alarms pipeline", "removed"));
 }
 
 void SelfMonitorServer::SendAlarms() {
+    // metadata:
+    // INTERNAL_DATA_TARGET_REGION:${region}
+    // INTERNAL_DATA_TYPE:__alarm__
+    vector<PipelineEventGroup> pipelineEventGroupList;
+    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
+
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {
         return;
     }
-    // tags: __topic__:__alarm__
-    // metadata: __region__:${region}
-    vector<PipelineEventGroup> pipelineEventGroupList;
-    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
-    shared_ptr<CollectionPipeline> pipeline
-        = CollectionPipelineManager::GetInstance()->FindConfigByName(mAlarmPipelineCtx->GetConfigName());
-    if (pipeline.get() != nullptr) {
-        for (auto& pipelineEventGroup : pipelineEventGroupList) {
-            if (pipelineEventGroup.GetEvents().size() > 0) {
-                ProcessorRunner::GetInstance()->PushQueue(
-                    pipeline->GetContext().GetProcessQueueKey(), 0, std::move(pipelineEventGroup));
-            }
+    for (auto& pipelineEventGroup : pipelineEventGroupList) {
+        if (pipelineEventGroup.GetEvents().size() > 0) {
+            ProcessorRunner::GetInstance()->PushQueue(
+                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
 }

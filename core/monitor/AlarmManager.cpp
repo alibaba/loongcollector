@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "AlarmManager.h"
+#include "monitor/AlarmManager.h"
 
-#include "SelfMonitorServer.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
@@ -24,6 +23,7 @@
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
+#include "monitor/SelfMonitorServer.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 
@@ -112,80 +112,78 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
     do {
-        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
-        string region;
-        {
-            PTScopedLock lock(mAlarmBufferMutex);
-            if (mAllAlarmMap.size() <= sendRegionIndex) {
-                break;
-            }
-            auto allAlarmIter = mAllAlarmMap.begin();
-            size_t iterIndex = 0;
-            while (iterIndex != sendRegionIndex) {
-                ++iterIndex;
-                ++allAlarmIter;
-            }
-            region = allAlarmIter->first;
-            pipelineEventGroup.SetMetadata(EventGroupMetaKey::TARGET_REGION, region);
-
-            AlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
-            std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;
-            // check this region end
-            if (sendAlarmTypeIndex >= alarmBufferVec.size()) {
-                // jump this region
-                ++sendRegionIndex;
-                sendAlarmTypeIndex = 0;
-                continue;
-            }
-
-            //  check valid
-            if (alarmBufferVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM
-                || lastUpdateTimeVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM) {
-                LOG_ERROR(sLogger,
-                          ("invalid alarm item", region)("alarm vec", alarmBufferVec.size())("update vec",
-                                                                                             lastUpdateTimeVec.size()));
-                // jump this region
-                ++sendRegionIndex;
-                sendAlarmTypeIndex = 0;
-                continue;
-            }
-
-            map<string, unique_ptr<AlarmMessage>>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
-            if (alarmMap.size() == 0
-                || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
-                // go next alarm type
-                ++sendAlarmTypeIndex;
-                continue;
-            }
-
-            pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-            pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
-                                           SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
-            auto now = GetCurrentLogtailTime();
-            for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
-                 ++mapIter) {
-                auto& messagePtr = mapIter->second;
-
-                LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
-                logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
-                                                                                           : now.tv_sec);
-                logEvent->SetContent("alarm_type", messagePtr->mMessageType);
-                logEvent->SetContent("alarm_message", messagePtr->mMessage);
-                logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
-                logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
-                logEvent->SetContent("os", OS_NAME);
-                logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
-                if (!messagePtr->mProjectName.empty()) {
-                    logEvent->SetContent("project_name", messagePtr->mProjectName);
-                }
-                if (!messagePtr->mCategory.empty()) {
-                    logEvent->SetContent("category", messagePtr->mCategory);
-                }
-            }
-            lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
-            alarmMap.clear();
-            ++sendAlarmTypeIndex;
+        PTScopedLock lock(mAlarmBufferMutex);
+        if (mAllAlarmMap.size() <= sendRegionIndex) {
+            break;
         }
+        auto allAlarmIter = mAllAlarmMap.begin();
+        size_t iterIndex = 0;
+        while (iterIndex != sendRegionIndex) {
+            ++iterIndex;
+            ++allAlarmIter;
+        }
+        string region = allAlarmIter->first;
+
+        AlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
+        std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;
+        // check this region end
+        if (sendAlarmTypeIndex >= alarmBufferVec.size()) {
+            // jump this region
+            ++sendRegionIndex;
+            sendAlarmTypeIndex = 0;
+            continue;
+        }
+
+        //  check valid
+        if (alarmBufferVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM
+            || lastUpdateTimeVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM) {
+            LOG_ERROR(sLogger,
+                      ("invalid alarm item", region)("alarm vec", alarmBufferVec.size())("update vec",
+                                                                                         lastUpdateTimeVec.size()));
+            // jump this region
+            ++sendRegionIndex;
+            sendAlarmTypeIndex = 0;
+            continue;
+        }
+
+        map<string, unique_ptr<AlarmMessage>>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
+        if (alarmMap.size() == 0
+            || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
+            // go next alarm type
+            ++sendAlarmTypeIndex;
+            continue;
+        }
+
+        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
+        pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                       SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
+        auto now = GetCurrentLogtailTime();
+        for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
+             ++mapIter) {
+            auto& messagePtr = mapIter->second;
+
+            LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
+            logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
+                                                                                       : now.tv_sec);
+            logEvent->SetContent("alarm_type", messagePtr->mMessageType);
+            logEvent->SetContent("alarm_message", messagePtr->mMessage);
+            logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
+            logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
+            logEvent->SetContent("os", OS_NAME);
+            logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
+            if (!messagePtr->mProjectName.empty()) {
+                logEvent->SetContent("project_name", messagePtr->mProjectName);
+            }
+            if (!messagePtr->mCategory.empty()) {
+                logEvent->SetContent("category", messagePtr->mCategory);
+            }
+        }
+        lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
+        alarmMap.clear();
+        ++sendAlarmTypeIndex;
+
         if (pipelineEventGroup.GetEvents().size() <= 0) {
             continue;
         }

@@ -60,11 +60,10 @@ enum class EventGroupMetaKey {
     PROMETHEUS_STREAM_ID,
     PROMETHEUS_STREAM_TOTAL,
 
-    TARGET_REGION,
+    INTERNAL_DATA_TARGET_REGION,
+    INTERNAL_DATA_TYPE,
 
-    SOURCE_ID,
-
-    INTERNAL_DATA_TYPE
+    SOURCE_ID
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;

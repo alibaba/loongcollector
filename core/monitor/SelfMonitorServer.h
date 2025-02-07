@@ -18,7 +18,7 @@
 
 #include <string>
 
-#include "Monitor.h"
+#include "monitor/Monitor.h"
 #include "collection_pipeline/CollectionPipeline.h"
 
 namespace logtail {
@@ -33,9 +33,9 @@ public:
     void Monitor();
     void Stop();
 
-    void UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules);
+    void UpdateMetricPipeline(CollectionPipelineContext* ctx, size_t inputIndex, SelfMonitorMetricRules* rules);
     void RemoveMetricPipeline();
-    void UpdateAlarmPipeline(CollectionPipelineContext* ctx);
+    void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
     static const std::string INTERNAL_DATA_TYPE_ALARM;
@@ -58,6 +58,7 @@ private:
 
     mutable ReadWriteLock mMetricPipelineLock;
     CollectionPipelineContext* mMetricPipelineCtx = nullptr;
+    size_t mMetricInputIndex = 0;
     SelfMonitorMetricRules* mSelfMonitorMetricRules = nullptr;
     SelfMonitorMetricEventMap mSelfMonitorMetricEventMap;
 
@@ -66,6 +67,7 @@ private:
 
     mutable ReadWriteLock mAlarmPipelineMux;
     CollectionPipelineContext* mAlarmPipelineCtx = nullptr;
+    size_t mAlarmInputIndex = 0;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalAlarmsUnittest;
     friend class InputInternalMetricsUnittest;
