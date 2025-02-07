@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "monitor/Monitor.h"
 #include "collection_pipeline/CollectionPipeline.h"
+#include "monitor/Monitor.h"
 
 namespace logtail {
 
