@@ -48,6 +48,11 @@ size_t StreamScraper::MetricWriteCallback(char* buffer, size_t size, size_t nmem
 
     if (begin < sizes) {
         body->mCache.append(buffer + begin, sizes - begin);
+        // limit the last line cache size to 8K bytes
+        if (body->mCache.size() > 8192) {
+            LOG_WARNING(sLogger, ("stream scraper", "cache is too large, drop it."));
+            body->mCache.clear();
+        }
     }
     body->mRawSize += sizes;
     body->mCurrStreamSize += sizes;

@@ -73,6 +73,7 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
 
     const auto& networkStatus = response.GetNetworkStatus();
     string scrapeState;
+    mUpState = false;
     if (networkStatus.mCode != NetworkCode::Ok) {
         // not 0 means curl error
         scrapeState = prom::NetworkCodeToState(networkStatus.mCode);
@@ -81,10 +82,10 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     } else {
         // 0 means success
         scrapeState = prom::NetworkCodeToState(NetworkCode::Ok);
+        mUpState = true;
     }
 
     mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
-    mUpState = response.GetStatusCode() == 200;
     if (response.GetStatusCode() != 200) {
         LOG_WARNING(sLogger,
                     ("scrape failed, status code",
@@ -92,9 +93,11 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     }
 
     auto mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
-    auto mUpState = response.GetStatusCode() == 200;
     streamScraper->mStreamIndex++;
-    streamScraper->FlushCache();
+
+    if (mUpState) {
+        streamScraper->FlushCache();
+    }
     streamScraper->SetAutoMetricMeta(mScrapeDurationSeconds, mUpState, scrapeState);
     streamScraper->SendMetrics();
     streamScraper->Reset();
