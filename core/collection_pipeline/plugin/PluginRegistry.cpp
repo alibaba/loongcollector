@@ -109,9 +109,14 @@ unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name,
 }
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
+#ifndef __ANDROID__
     // If the plugin is not a C++ plugin, iLogtail core considers it is a go plugin.
     // Go PluginManager validates the go plugins instead of C++ core.
     return !IsValidNativeInputPlugin(name) && !IsValidNativeProcessorPlugin(name) && !IsValidNativeFlusherPlugin(name);
+#else
+    // android does not support go plugins
+    return false;
+#endif
 }
 
 bool PluginRegistry::IsValidNativeInputPlugin(const string& name) const {
