@@ -205,6 +205,13 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
         }
         {
+            // timestamp invalid
+            string res, errorMsg;
+            auto batch = CreateBatchedMetricEvents(false, 0, false, false);
+            batch.mEvents[0]->SetTimestamp(123);
+            APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        }
+        {
             // empty metric value
             string res, errorMsg;
             APSARA_TEST_FALSE(serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, true, false), res, errorMsg));
