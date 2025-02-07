@@ -338,7 +338,6 @@ func initPluginBase(cfgStr string) int {
 	initOnce.Do(func() {
 		LoadGlobalConfig(cfgStr)
 		InitHTTPServer()
-		pluginmanager.InitFileConfig(&config.LoongcollectorGlobalConfig)
 		setGCPercentForSlowStart()
 		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)
 		if *flags.DeployMode == flags.DeploySingleton && *flags.EnableKubernetesMeta {
