@@ -172,7 +172,7 @@ class ProcessEvent : public CommonEvent {
 public:
     ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
         : CommonEvent(pid, ktime, type, timestamp) {}
-    virtual PluginType GetPluginType() const { return PluginType::PROCESS_SECURITY; };
+    virtual PluginType GetPluginType() const { return PluginType::PROCESS_SECURITY; }
 };
 
 class ProcessExitEvent : public ProcessEvent {

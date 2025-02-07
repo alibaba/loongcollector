@@ -276,8 +276,10 @@ void BaseManager::RecordCloneEvent(msg_clone_event* event_ptr) {
     // mRecordQueue.enqueue(std::move(event));
 
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessEvent>(
-            event_ptr->tgid, event_ptr->ktime, KernelEventType::PROCESS_CLONE_EVENT, event_ptr->common.ktime);
+        auto tgid = event_ptr->tgid;
+        auto ktime = event_ptr->ktime;
+        auto commonKtime = event_ptr->common.ktime;
+        auto event = std::make_shared<ProcessEvent>(tgid, ktime, KernelEventType::PROCESS_CLONE_EVENT, commonKtime);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }

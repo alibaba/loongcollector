@@ -30,7 +30,7 @@ if (LINUX)
     add_custom_target(
         install_coolbpf ALL
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
-        DEPENDS coolbpf
+        DEPENDS coolbpf coolbpf_static
     )
 
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
