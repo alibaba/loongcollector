@@ -78,11 +78,6 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
-    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-        mPluginCfg["FileTagsPath"] = GetFileTagsDir();
-        mPluginCfg["FileTagsInterval"] = INT32_FLAG(file_tags_update_interval);
-    }
-    mPluginCfg["AgentHostID"] = STRING_FLAG(agent_host_id);
 }
 
 LogtailPlugin::~LogtailPlugin() {
