@@ -415,6 +415,14 @@ public:
     std::vector<std::shared_ptr<AbstractAppRecord>> mRecords;
 };
 
+class AppLogGroup {
+public:
+    AppLogGroup() {}
+    ~AppLogGroup() {}
+
+    std::vector<std::shared_ptr<AbstractAppRecord>> mRecords;
+};
+
 
 } // namespace ebpf
 } // namespace logtail

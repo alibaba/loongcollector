@@ -664,11 +664,9 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
     res.Insert(kParentExecId.log_key(), StringView(pExecIdSb.data, pExecIdSb.size));
 
     // finalize parent tags
-    // std::string args = utf8::replace_invalid(proc->process.args);
-    // std::string binary = utf8::replace_invalid(proc->process.filename);
 
-    std::string args = ""; // TODO
-    std::string binary = ""; // TODO
+    std::string args = proc->process.args; // TODO
+    std::string binary = proc->process.filename; // TODO
     std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
     std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
     std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
@@ -724,10 +722,8 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
         cap["effective"] = effective;
         cap["inheritable"] = inheritable;
 
-        std::string args = ""; // TODO
-        std::string binary = ""; // TODO
-        // std::string args = utf8::replace_invalid(parentProc->process.args);
-        // std::string binary = utf8::replace_invalid(parentProc->process.filename);
+        std::string args = parentProc->process.filename; // TODO
+        std::string binary = parentProc->process.filename; // TODO
 
         Json::Value j;
         j["exec_id"] = parentProc->exec_id;
@@ -760,11 +756,9 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
 
     auto parentExecId = GenerateParentExecId(proc);
     auto parentProc = LookupCache(execId);
-    // finalize parent tags
-    // std::string args = utf8::replace_invalid(proc->process.args);
-    // std::string binary = utf8::replace_invalid(proc->process.filename);
-    std::string args = ""; // TODO
-    std::string binary = ""; // TODO
+    // finalize proc tags
+    std::string args = proc->process.args; // TODO
+    std::string binary = proc->process.args; // TODO
     std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
     std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
     std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
@@ -806,10 +800,8 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
         cap["effective"] = effective;
         cap["inheritable"] = inheritable;
 
-        std::string args = ""; // TODO
-        std::string binary = ""; // TODO
-        // std::string args = utf8::replace_invalid(parentProc->process.args);
-        // std::string binary = utf8::replace_invalid(parentProc->process.filename);
+        std::string args = parentProc->process.args; // TODO
+        std::string binary = parentProc->process.filename; // TODO
 
         Json::Value j;
         j["exec_id"] = parentProc->exec_id;

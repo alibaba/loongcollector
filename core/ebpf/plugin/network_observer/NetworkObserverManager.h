@@ -113,23 +113,17 @@ private:
 
     mutable std::atomic_long mDataEventsDropTotal = 0;
 
-    mutable std::atomic_int64_t mConntrackerNum_ = 0;
-    mutable std::atomic_int64_t mRecvConnStatEventsTotal_ = 0;
-    mutable std::atomic_int64_t mRecvCtrlEventsTotal_ = 0;
-    mutable std::atomic_int64_t mRecvHttpDataEventsTotal_ = 0;
-    mutable std::atomic_int64_t mLostConnStatEventsTotal_ = 0;
-    mutable std::atomic_int64_t mLostCtrlEventsTotal_ = 0;
-    mutable std::atomic_int64_t mLostDataEventsTotal_ = 0;
+    mutable std::atomic_int64_t mConntrackerNum = 0;
+    mutable std::atomic_int64_t mRecvConnStatEventsTotal = 0;
+    mutable std::atomic_int64_t mRecvCtrlEventsTotal = 0;
+    mutable std::atomic_int64_t mRecvHttpDataEventsTotal = 0;
+    mutable std::atomic_int64_t mLostConnStatEventsTotal = 0;
+    mutable std::atomic_int64_t mLostCtrlEventsTotal = 0;
+    mutable std::atomic_int64_t mLostDataEventsTotal = 0;
 
-    mutable std::atomic_int64_t mParseHttpRecordsSuccessTotal_ = 0;
-    mutable std::atomic_int64_t mParseHttpRecordsFailedTotal_ = 0;
-    mutable std::atomic_int64_t mAggMapEntitiesNum_ = 0;
-
-    int mConsumeWaitMs_ = 200;
-    int mConsumeBatchMax_ = 4096;
-    int mMetricConsumeWaitMs_ = 200;
-    int mMetricConsumeBatchMax_ = 4096;
-    bool mIsProd_ = false;
+    mutable std::atomic_int64_t mParseHttpRecordsSuccessTotal = 0;
+    mutable std::atomic_int64_t mParseHttpRecordsFailedTotal = 0;
+    mutable std::atomic_int64_t mAggMapEntitiesNum = 0;
 
     double mSampleRate = 1.0;
 
@@ -167,6 +161,9 @@ private:
 
     ReadWriteLock mSpanAggLock;
     std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
+
+    ReadWriteLock mLogAggLock;
+    std::unique_ptr<SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>>> mLogAggregator;
 
 
     template <typename T, typename Func>
