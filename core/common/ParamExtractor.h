@@ -308,14 +308,14 @@ bool GetMandatoryListParam(const Json::Value& config,
                            std::string& errorMsg) {
     errorMsg.clear();
     if (!config.isMember(ExtractCurrentKey(key))) {
-        errorMsg = "madatory param " + key + " is missing";
+        errorMsg = "mandatory param " + key + " is missing";
         return false;
     }
     if (!GetOptionalListParam<T>(config, key, param, errorMsg)) {
         return false;
     }
     if (param.empty()) {
-        errorMsg = "madatory list param " + key + " is empty";
+        errorMsg = "mandatory list param " + key + " is empty";
         return false;
     }
     return true;

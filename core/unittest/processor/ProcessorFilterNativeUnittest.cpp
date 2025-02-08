@@ -701,7 +701,7 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
             tmp = rand() & 0xff;
             tmp |= 0x80;
             tmp &= 0xbf;
-        } while (tmp == 32 || tmp == 9); // tmp shoud be 10xx xxxx;
+        } while (tmp == 32 || tmp == 9); // tmp should be 10xx xxxx;
         characterSet[i] = std::string(1, tmp);
         isBlunk[i][0] = true;
     }
