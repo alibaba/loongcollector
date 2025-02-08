@@ -17,7 +17,6 @@ package netping
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
