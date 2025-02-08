@@ -233,7 +233,12 @@ unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name,
 }
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
+#ifndef __ANDROID__
     return mGoPlugins.find(name) != mGoPlugins.end();
+#else
+    // android does not support go plugins
+    return false;
+#endif
 }
 
 bool PluginRegistry::IsValidNativeInputPlugin(const string& name) const {
