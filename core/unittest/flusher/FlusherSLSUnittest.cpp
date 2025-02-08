@@ -960,7 +960,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                 "Type": "flusher_sls",
                 "TelemetryType": "arms_traces",
                 "Project": "test_project",
-                "Region": "test_region",
+                "Region": "test_region-b",
                 "Endpoint": "test_endpoint",
                 "Match": {
                     "Type": "tag",
@@ -974,7 +974,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                 "Type": "flusher_sls",
                 "TelemetryType": "arms_metrics",
                 "Project": "test_project",
-                "Region": "test_region",
+                "Region": "test_region-b",
                 "Endpoint": "test_endpoint",
                 "Match": {
                     "Type": "tag",
@@ -988,7 +988,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                 "Type": "flusher_sls",
                 "TelemetryType": "arms_agentinfo",
                 "Project": "test_project",
-                "Region": "test_region",
+                "Region": "test_region-b",
                 "Endpoint": "test_endpoint",
                 "Match": {
                     "Type": "tag",
@@ -1010,7 +1010,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
             flusherAPM.SetContext(ctx);
             flusherAPM.SetMetricsRecordRef(FlusherSLS::sName, "flusher_sls_for_apm");
             APSARA_TEST_TRUE(flusherAPM.Init(configJsonAPM, optionalGoPipeline));
-
+#ifdef __ENTERPRISE__
+            flusherAPM.mCandidateHostsInfo->SelectBestHost();
+#endif
             // normal
             SLSSenderQueueItem item("hello, world!",
                                     rawSize,
@@ -1032,8 +1034,15 @@ void FlusherSLSUnittest::TestBuildRequest() {
             APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
             APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
             APSARA_TEST_EQUAL(body, req->mBody);
+#ifdef __ENTERPRISE__
+            APSARA_TEST_FALSE(req->mHTTPSFlag);
+            APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
+            APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+#else
             APSARA_TEST_TRUE(req->mHTTPSFlag);
             APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHeader[HOST]);
+            APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+#endif
         }
     }
     {
