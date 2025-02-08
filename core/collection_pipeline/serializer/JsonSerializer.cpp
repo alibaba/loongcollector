@@ -43,6 +43,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
     }
 
     // TODO: should support nano second
+    ostringstream oss;
     switch (eventType) {
         case PipelineEvent::Type::LOG:
             for (const auto& item : group.mEvents) {
@@ -58,7 +59,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                res = Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson);
             }
             break;
         case PipelineEvent::Type::METRIC:
@@ -90,12 +91,12 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
-                        values[value->first.to_string()] = value->second;
+                        values[value->first.to_string()] = value->second.Value;
                     }
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                res = Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson);
             }
             break;
         case PipelineEvent::Type::SPAN:
@@ -116,12 +117,13 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 eventJson[DEFAULT_CONTENT_KEY] = e.GetContent().to_string();
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                res = Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson);
             }
             break;
         default:
             break;
     }
+    res = oss.str();
     return true;
 }
 

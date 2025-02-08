@@ -18,10 +18,10 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
 #include "constants/SpanConstants.h"
-#include "pipeline/serializer/JsonSerializer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"
 
