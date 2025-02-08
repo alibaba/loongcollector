@@ -62,11 +62,11 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
         }
     }
     ParseTagKey(tagConfig, "HOST_NAME", TagKey::HOST_NAME_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
-    ParseTagKey(tagConfig, "HOST_ID", TagKey::HOST_ID_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
-    ParseTagKey(
-        tagConfig, "CLOUD_PROVIDER", TagKey::CLOUD_PROVIDER_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
 
 #ifdef __ENTERPRISE__
+    ParseTagKey(tagConfig, "HOST_ID", TagKey::HOST_ID_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, false);
+    ParseTagKey(
+        tagConfig, "CLOUD_PROVIDER", TagKey::CLOUD_PROVIDER_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, false);
     ParseTagKey(tagConfig, "AGENT_TAG", TagKey::AGENT_TAG_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
 #else
     ParseTagKey(tagConfig, "HOST_IP", TagKey::HOST_IP_TAG_KEY, mPipelineMetaTagKey, *mContext, sName, true);
