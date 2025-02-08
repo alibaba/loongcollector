@@ -28,16 +28,11 @@ inline constexpr char kUpgrade[] = "Upgrade";
 
 std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::unique_ptr<NetDataEvent> data_event) {
     // 处理 HTTP 协议数据
-    //  LOG(INFO) << "Parsing HTTP data, request_msg: " << data_event->req_msg.data() <<
-    //            "  response_msg: " << data_event->resp_msg.data() << " tgid:" << data_event->conn_id.tgid << " fd:" <<
-    //            data_event->conn_id.fd << " start:" << data_event->conn_id.start;
     std::vector<std::unique_ptr<AbstractRecord>> records;
     ConnId conn_id = data_event->conn_id;
     auto record = std::make_unique<HttpRecord>(std::move(conn_id));
     record->SetEndTs(data_event->end_ts);
     record->SetStartTs(data_event->start_ts);
-    //   LOG(INFO) << "HTTP Parser DUMP conn_id ["  << conn_id.tgid << " fd:" << conn_id.fd << " start:" <<
-    //   conn_id.start;
     if (data_event->req_msg.length() > 0) {
         Message result;
         std::string_view buf = data_event->req_msg;
@@ -62,17 +57,6 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::uniq
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
         }
-
-
-        // DLOG(INFO) << "===============================HTTP Parser====================";
-        // DLOG(INFO) << "================Request Parsed result==========";
-        // LOG(INFO) << "[HTTPProtocolParser]: Request Path: " << record->GetPath();
-        // DLOG(INFO) << "Request Body: " << record->GetReqBody();
-        // DLOG(INFO) << "HTTP Method: " << record->GetMethod();
-        // DLOG(INFO) << "Http Protocol version " << record->GetProtocolVersion();
-        // for (auto& h : result.headers) {
-        //     DLOG(INFO) << "Request Header: " << h.first << ": " << h.second;
-        // }
     }
 
     if (data_event->resp_msg.length() > 0) {
@@ -89,40 +73,9 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::uniq
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
         }
-
-        // DLOG(INFO) << "Kernel Event: "<< data_event->resp_msg;
-        // DLOG(INFO) << "================Response Parsed result==========";
-        // DLOG(INFO) << "Resp Body: " << record->GetRespBody();
-        // DLOG(INFO) << "Resp Body Size: " << result.body_size;
-        // DLOG(INFO) << "HTTP Status: " << record->GetStatusCode();
-        // DLOG(INFO) << "Http Protocol version " << record->GetProtocolVersion();
-        // for (auto& h : result.headers) {
-        //     DLOG(INFO) << "Resp Header: " << h.first << ": " << h.second;
-        // }
     }
 
-    //  std::cout << "====================================================" << std::endl;
-    //  std::cout << "Status Code: " << record->GetStatusCode() << std::endl;
-    //  std::cout << "Path: " << record->GetSpanName() << std::endl;
-    //  std::cout << "Request Body: " << record->GetReqBody() << std::endl;
-    //  std::cout << "Response Body: " << record->GetRespBody() << std::endl;
-    //  std::cout << "HTTP Method: " << record->GetMethod() << std::endl;
-    //  std::cout << "Protocol Version: " << record->GetProtocolVersion() << std::endl;
-    //  std::cout << "Request Headers:" << std::endl;
-    //  auto header_map = record->GetReqHeaderMap();
-    //  for (const auto& pair : header_map) {
-    //    std::cout << "  " << pair.first << ": " << pair.second << std::endl;
-    //  }
-    //  std::cout << "Resp Headers:" << std::endl;
-    //  header_map = record->GetRespHeaderMap();
-    //  for (const auto& pair : header_map) {
-    //    std::cout << "  " << pair.first << ": " << pair.second << std::endl;
-    //  }
-    //  std::cout << "====================================================" << std::endl;
-
-
     records.push_back(std::move(record));
-    //   DLOG(INFO) << "===============================HTTP Parse End====================";
 
     return records;
 }
@@ -358,9 +311,6 @@ ParseState ParseResponseBody(std::string_view* buf, Message* result, bool closed
     result->body = *buf;
     buf->remove_prefix(buf->size());
 
-    // LOG_FIRST_N(WARNING, 10)
-    //     << "HTTP message with no Content-Length or Transfer-Encoding may produce "
-    //       "incomplete message bodies.";
     return ParseState::kSuccess;
 
     return ParseState::kNeedsMoreData;

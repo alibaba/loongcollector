@@ -51,11 +51,10 @@ public:
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() { Destroy(); }
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
-    explicit NetworkObserverManager(std::shared_ptr<BaseManager>& baseMgr,
-                                    std::shared_ptr<SourceManager> sourceManager,
-                                    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                    std::shared_ptr<Timer> scheduler)
-        : AbstractManager(baseMgr, sourceManager, queue, scheduler) {}
+    NetworkObserverManager(std::shared_ptr<BaseManager>& baseMgr,
+                           std::shared_ptr<SourceManager> sourceManager,
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           std::shared_ptr<Timer> scheduler);
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
     int Destroy() override;
@@ -152,18 +151,18 @@ private:
     std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
 
     ReadWriteLock mAppAggLock;
-    std::unique_ptr<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>> mAppAggregator;
+    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> mAppAggregator;
 
 
     ReadWriteLock mNetAggLock;
-    std::unique_ptr<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>> mNetAggregator;
+    SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>> mNetAggregator;
 
 
     ReadWriteLock mSpanAggLock;
-    std::unique_ptr<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>> mSpanAggregator;
+    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> mSpanAggregator;
 
     ReadWriteLock mLogAggLock;
-    std::unique_ptr<SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>>> mLogAggregator;
+    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> mLogAggregator;
 
 
     template <typename T, typename Func>

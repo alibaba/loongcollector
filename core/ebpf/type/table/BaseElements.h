@@ -318,27 +318,27 @@ constexpr DataElement kContainerId = {
 };
 
 // for processes
-constexpr DataElement kProcessId = {"", "", "", "process.id", "", AggregationType::Level0};
+constexpr DataElement kProcessId = {"process.id", "", "", "process.id", "", AggregationType::Level0};
 
-constexpr DataElement kKtime = {"", "", "", "ktime", "", AggregationType::Level0};
+constexpr DataElement kKtime = {"ktime", "", "", "ktime", "", AggregationType::Level0};
 
-constexpr DataElement kExecId = {"", "", "", "exec_id", "", AggregationType::NoAggregate};
+constexpr DataElement kExecId = {"exec_id", "", "", "exec_id", "", AggregationType::NoAggregate};
 
-constexpr DataElement kParentExecId = {"", "", "", "parent_exec_id", "", AggregationType::NoAggregate};
+constexpr DataElement kParentExecId = {"parent_exec_id", "", "", "parent_exec_id", "", AggregationType::NoAggregate};
 
-constexpr DataElement kUser = {"", "", "", "user", "", AggregationType::NoAggregate};
+constexpr DataElement kUser = {"user", "", "", "user", "", AggregationType::NoAggregate};
 
-constexpr DataElement kUid = {"", "", "", "uid", "", AggregationType::NoAggregate};
+constexpr DataElement kUid = {"uid", "", "", "uid", "", AggregationType::NoAggregate};
 
-constexpr DataElement kBinary = {"", "", "", "binary", "", AggregationType::NoAggregate};
+constexpr DataElement kBinary = {"binary", "", "", "binary", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCWD = {"", "", "", "cwd", "", AggregationType::NoAggregate};
+constexpr DataElement kCWD = {"cwd", "", "", "cwd", "", AggregationType::NoAggregate};
 
-constexpr DataElement kArguments = {"", "", "", "arguments", "", AggregationType::NoAggregate};
+constexpr DataElement kArguments = {"arguments", "", "", "arguments", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCap = {"", "", "", "cap", "", AggregationType::NoAggregate};
+constexpr DataElement kCap = {"cap", "", "", "cap", "", AggregationType::NoAggregate};
 
-constexpr DataElement kCallName = {"", "", "", "call_name", "", AggregationType::NoAggregate};
+constexpr DataElement kCallName = {"call_name", "", "", "call_name", "", AggregationType::NoAggregate};
 
 constexpr DataElement kEventType
     = {"event_type", "event_type", "event_type", "event_type", "", AggregationType::NoAggregate};
@@ -352,20 +352,20 @@ constexpr DataElement kParentProcess
 // for network
 constexpr DataElement kSaddr
     = {"source.addr", "saddr", "saddr", "saddr", "source address", AggregationType::NoAggregate};
-constexpr DataElement kDaddr = {"", "", "", "daddr", "dest address", AggregationType::NoAggregate};
-constexpr DataElement kSport = {"", "", "", "sport", "source port", AggregationType::NoAggregate};
-constexpr DataElement kState = {"", "", "", "state", "connection state", AggregationType::NoAggregate};
-constexpr DataElement kDport = {"", "", "", "dport", "dest port", AggregationType::NoAggregate};
+constexpr DataElement kDaddr = {"dest.addr", "", "", "daddr", "dest address", AggregationType::NoAggregate};
+constexpr DataElement kSport = {"source.port", "", "", "sport", "source port", AggregationType::NoAggregate};
+constexpr DataElement kState = {"state", "", "", "state", "connection state", AggregationType::NoAggregate};
+constexpr DataElement kDport = {"dest.port", "", "", "dport", "dest port", AggregationType::NoAggregate};
 
-constexpr DataElement kL4Protocol = {"", "", "", "protocol", "L4 protocol", AggregationType::NoAggregate};
+constexpr DataElement kL4Protocol = {"protocol", "", "", "protocol", "L4 protocol", AggregationType::NoAggregate};
 
 constexpr DataElement kNetwork
-    = {"", "", "", "network", "value is json for saddr and daddr ... ", AggregationType::NoAggregate};
+    = {"network", "", "", "network", "value is json for saddr and daddr ... ", AggregationType::NoAggregate};
 
 // for file
-constexpr DataElement kFilePath = {"", "", "", "path", "file path", AggregationType::NoAggregate};
+constexpr DataElement kFilePath = {"path", "", "", "path", "file path", AggregationType::NoAggregate};
 
-constexpr DataElement kFile = {"", "", "", "file", "value is json for path ... ", AggregationType::NoAggregate};
+constexpr DataElement kFile = {"file", "", "", "file", "value is json for path ... ", AggregationType::NoAggregate};
 
 } // namespace ebpf
 } // namespace logtail

@@ -16,6 +16,8 @@
 
 #include <random>
 
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
@@ -23,8 +25,6 @@
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
-#include "collection_pipeline/queue/ProcessQueueItem.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 extern "C" {
 #include <net.h>
@@ -32,6 +32,73 @@ extern "C" {
 
 namespace logtail {
 namespace ebpf {
+
+NetworkObserverManager::NetworkObserverManager(std::shared_ptr<BaseManager>& baseMgr,
+                                               std::shared_ptr<SourceManager> sourceManager,
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               std::shared_ptr<Timer> scheduler)
+    : AbstractManager(baseMgr, sourceManager, queue, scheduler),
+      mAppAggregator(
+          4096,
+          [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractAppRecord>& other) {
+              base->m2xxCount += other->GetStatusCode() / 100 == 2;
+              base->m3xxCount += other->GetStatusCode() / 100 == 3;
+              base->m4xxCount += other->GetStatusCode() / 100 == 4;
+              base->m5xxCount += other->GetStatusCode() / 100 == 5;
+              base->mCount++;
+              base->mErrCount += other->IsError();
+              base->mSlowCount += other->IsSlow();
+              base->mSum += double(other->GetLatencyMs() / 1000);
+          },
+          [this](const std::shared_ptr<AbstractAppRecord>& in) {
+              auto data = std::make_unique<AppMetricData>(in->GetConnId(), in->GetSpanName());
+              auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(in->GetConnId());
+
+              data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.name())];
+              data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())];
+              data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHost.name())];
+              data->mIp = ctAttrs[kConnTrackerTable.ColIndex(kIp.name())];
+
+              data->mWorkloadKind = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.name())];
+              data->mWorkloadName = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.name())];
+
+              data->mRpcType = ctAttrs[kConnTrackerTable.ColIndex(kRpcType.name())];
+              data->mCallType = ctAttrs[kConnTrackerTable.ColIndex(kCallType.name())];
+              data->mCallKind = ctAttrs[kConnTrackerTable.ColIndex(kCallKind.name())];
+
+              data->mDestId = ctAttrs[kConnTrackerTable.ColIndex(kDestId.name())];
+              data->mEndpoint = ctAttrs[kConnTrackerTable.ColIndex(kEndpoint.name())];
+              data->mNamespace = ctAttrs[kConnTrackerTable.ColIndex(kNamespace.name())];
+
+              return data;
+          }),
+      mNetAggregator(
+          4096,
+          [this](std::unique_ptr<NetMetricData>& base, const std::shared_ptr<ConnStatsRecord>& other) {
+              // TODO aggregate
+              base->mDropCount += other->drop_count_;
+              base->mRetransCount += other->retrans_count_;
+              base->mRecvBytes += other->recv_bytes_;
+              base->mSendBytes += other->send_bytes_;
+              base->mRecvPkts += other->recv_packets_;
+              base->mSendPkts += other->send_packets_;
+          },
+          [this](const std::shared_ptr<ConnStatsRecord>& in) {
+              return std::make_unique<NetMetricData>(in->GetConnId());
+          }),
+      mSpanAggregator(
+          4096,
+          [this](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<AbstractAppRecord>& other) {
+              base->mRecords.push_back(other);
+          },
+          [this](const std::shared_ptr<AbstractAppRecord>& in) { return std::make_unique<AppSpanGroup>(); }),
+      mLogAggregator(
+          4096,
+          [this](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<AbstractAppRecord>& other) {
+              base->mRecords.push_back(other);
+          },
+          [this](const std::shared_ptr<AbstractAppRecord>& in) { return std::make_unique<AppLogGroup>(); }) {
+}
 
 // done
 std::array<size_t, 2>
@@ -157,70 +224,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     // TODO @qianlu.kk init converger later ...
 
-    mAppAggregator = std::make_unique<SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>>>(
-        4096,
-        [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-            base->m2xxCount += other->GetStatusCode() / 100 == 2;
-            base->m3xxCount += other->GetStatusCode() / 100 == 3;
-            base->m4xxCount += other->GetStatusCode() / 100 == 4;
-            base->m5xxCount += other->GetStatusCode() / 100 == 5;
-            base->mCount++;
-            base->mErrCount += other->IsError();
-            base->mSlowCount += other->IsSlow();
-            base->mSum += double(other->GetLatencyMs() / 1000);
-        },
-        [this](const std::shared_ptr<AbstractAppRecord>& in) {
-            auto data = std::make_unique<AppMetricData>(in->GetConnId(), in->GetSpanName());
-            auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(in->GetConnId());
-
-            data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.name())];
-            data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())];
-            data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHost.name())];
-            data->mIp = ctAttrs[kConnTrackerTable.ColIndex(kIp.name())];
-
-            data->mWorkloadKind = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.name())];
-            data->mWorkloadName = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.name())];
-
-            data->mRpcType = ctAttrs[kConnTrackerTable.ColIndex(kRpcType.name())];
-            data->mCallType = ctAttrs[kConnTrackerTable.ColIndex(kCallType.name())];
-            data->mCallKind = ctAttrs[kConnTrackerTable.ColIndex(kCallKind.name())];
-
-            data->mDestId = ctAttrs[kConnTrackerTable.ColIndex(kDestId.name())];
-            data->mEndpoint = ctAttrs[kConnTrackerTable.ColIndex(kEndpoint.name())];
-            data->mNamespace = ctAttrs[kConnTrackerTable.ColIndex(kNamespace.name())];
-
-            return data;
-        });
-
-    mNetAggregator = std::make_unique<SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>>>(
-        4096,
-        [this](std::unique_ptr<NetMetricData>& base, const std::shared_ptr<ConnStatsRecord>& other) {
-            // TODO aggregate
-            base->mDropCount += other->drop_count_;
-            base->mRetransCount += other->retrans_count_;
-            base->mRecvBytes += other->recv_bytes_;
-            base->mSendBytes += other->send_bytes_;
-            base->mRecvPkts += other->recv_packets_;
-            base->mSendPkts += other->send_packets_;
-        },
-        [this](const std::shared_ptr<ConnStatsRecord>& in) {
-            return std::make_unique<NetMetricData>(in->GetConnId());
-        });
-
-    mSpanAggregator = std::make_unique<SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>>>(
-        4096,
-        [this](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-            base->mRecords.push_back(other);
-        },
-        [this](const std::shared_ptr<AbstractAppRecord>& in) { return std::make_unique<AppSpanGroup>(); });
-    
-    mLogAggregator = std::make_unique<SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>>>(
-        4096,
-        [this](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-            base->mRecords.push_back(other);
-        },
-        [this](const std::shared_ptr<AbstractAppRecord>& in) { return std::make_unique<AppLogGroup>(); });
-
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
         1,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
@@ -232,7 +235,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto aggTree = std::move(this->mSpanAggregator);
             lk.unlock();
 
-            auto nodes = aggTree->GetNodesWithAggDepth(1);
+            auto nodes = aggTree.GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -245,7 +248,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
                 bool init = false;
                 bool needPush = false;
-                aggTree->ForEach(node, [&](const AppSpanGroup* group) {
+                aggTree.ForEach(node, [&](const AppSpanGroup* group) {
                     // set process tag
                     if (group->mRecords.empty()) {
                         LOG_DEBUG(sLogger, ("", "no records .."));
@@ -338,7 +341,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
                 }
             }
-            aggTree->Clear();
+            aggTree.Clear();
 
             return true;
         },
@@ -365,7 +368,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto aggTree = std::move(this->mLogAggregator);
             lk.unlock();
 
-            auto nodes = aggTree->GetNodesWithAggDepth(1);
+            auto nodes = aggTree.GetNodesWithAggDepth(1);
             LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
             if (nodes.empty()) {
                 LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -378,7 +381,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                 PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
                 bool init = false;
                 bool needPush = false;
-                aggTree->ForEach(node, [&](const AppLogGroup* group) {
+                aggTree.ForEach(node, [&](const AppLogGroup* group) {
                     // set process tag
                     if (group->mRecords.empty()) {
                         LOG_DEBUG(sLogger, ("", "no records .."));
@@ -390,8 +393,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                             auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
                             auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
                             if (ct == nullptr) {
-                                LOG_DEBUG(sLogger,
-                                        ("ct is null, skip, spanname ", record->GetSpanName()));
+                                LOG_DEBUG(sLogger, ("ct is null, skip, spanname ", record->GetSpanName()));
                                 continue;
                             }
                             // set conn tracker attrs ...
@@ -468,7 +470,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
                     LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
                 }
             }
-            aggTree->Clear();
+            aggTree.Clear();
 
             return true;
         },
@@ -492,7 +494,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         auto aggTree = std::move(this->mAppAggregator);
         lk.unlock();
 
-        auto nodes = aggTree->GetNodesWithAggDepth(1);
+        auto nodes = aggTree.GetNodesWithAggDepth(1);
         LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
         if (nodes.empty()) {
             LOG_DEBUG(sLogger, ("empty nodes...", ""));
@@ -516,7 +518,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             bool needPush = false;
 
             bool init = false;
-            aggTree->ForEach(node, [&](const AppMetricData* group) {
+            aggTree.ForEach(node, [&](const AppMetricData* group) {
                 // instance dim
                 if (group->mAppId.size()) {
                     needPush = true;
@@ -660,7 +662,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
         }
 
-        aggTree->Clear();
+        aggTree.Clear();
 
         return true;
     };
@@ -818,12 +820,12 @@ void NetworkObserverManager::ConsumeRecordsAsTrace(std::vector<std::shared_ptr<A
                 continue;
             }
 
-            if (mSpanAggregator) {
+            {
                 WriteLock lk(mSpanAggLock);
-                auto res = mSpanAggregator->Aggregate(appRecord, GenerateAggKeyForSpan(appRecord));
+                auto res = mSpanAggregator.Aggregate(appRecord, GenerateAggKeyForSpan(appRecord));
                 LOG_DEBUG(sLogger, ("agg res", res));
             }
-            
+
             continue;
         }
     }
@@ -850,9 +852,9 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(std::vector<std::shared_ptr<
             LOG_WARNING(sLogger,
                         ("app meta ready, rollback:",
                          record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
-            if (mAppAggregator) {
+            {
                 WriteLock lk(mAppAggLock);
-                auto res = mAppAggregator->Aggregate(appRecord, GenerateAggKeyForAppMetric(appRecord));
+                auto res = mAppAggregator.Aggregate(appRecord, GenerateAggKeyForAppMetric(appRecord));
                 LOG_DEBUG(sLogger, ("agg res", res));
             }
             continue;
@@ -880,7 +882,6 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(std::vector<std::shared_ptr<
 
 void NetworkObserverManager::ConsumeRecordsAsEvent(std::vector<std::shared_ptr<AbstractRecord>>& records,
                                                    size_t count) {
-    
     for (size_t i = 0; i < count; i++) {
         auto record = records[i];
         // handle app record ...
@@ -895,12 +896,12 @@ void NetworkObserverManager::ConsumeRecordsAsEvent(std::vector<std::shared_ptr<A
                 continue;
             }
 
-            if (mLogAggregator) {
+            {
                 WriteLock lk(mLogAggLock);
-                auto res = mLogAggregator->Aggregate(appRecord, GenerateAggKeyForLog(appRecord));
+                auto res = mLogAggregator.Aggregate(appRecord, GenerateAggKeyForLog(appRecord));
                 LOG_DEBUG(sLogger, ("agg res", res));
             }
-            
+
             continue;
         }
     }
@@ -969,13 +970,13 @@ void NetworkObserverManager::PollBufferWrapper() {
 
         mConnTrackerMgr->IterationsInternal(cnt++);
 
-        LOG_DEBUG(sLogger,
-                  ("===== statistic =====>> total data events:",
-                   mRecvHttpDataEventsTotal.load())(" total conn stats events:", mRecvConnStatEventsTotal.load())(
-                      " total ctrl events:", mRecvCtrlEventsTotal.load())(" lost data events:",
-                                                                           mLostDataEventsTotal.load())(
-                      " lost stats events:", mLostConnStatEventsTotal.load())(" lost ctrl events:",
-                                                                               mLostCtrlEventsTotal.load()));
+        LOG_DEBUG(
+            sLogger,
+            ("===== statistic =====>> total data events:",
+             mRecvHttpDataEventsTotal.load())(" total conn stats events:", mRecvConnStatEventsTotal.load())(
+                " total ctrl events:", mRecvCtrlEventsTotal.load())(" lost data events:", mLostDataEventsTotal.load())(
+                " lost stats events:", mLostConnStatEventsTotal.load())(" lost ctrl events:",
+                                                                        mLostCtrlEventsTotal.load()));
     }
 }
 

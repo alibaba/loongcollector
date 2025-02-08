@@ -4,38 +4,33 @@
 #include <iostream>
 #include <random>
 
+#include "common/queue/blockingconcurrentqueue.h"
+#include "ebpf/util/Consumer.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
-#include "ebpf/util/Consumer.h"
-#include "common/queue/blockingconcurrentqueue.h"
 
 DECLARE_FLAG_BOOL(logtail_mode);
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class ConsumerUnittest : public testing::Test {
 public:
-    ConsumerUnittest() 
-        : queue_(moodycamel::BlockingConcurrentQueue<int>(1024)), 
-        consumer_(queue_, std::chrono::milliseconds(100), [&](const std::vector<int>& items, size_t count) {
-            LOG_INFO(sLogger, ("count", count));
-            for (size_t i = 0; i < count; ++i) {
-                processed_items_.push_back(items[i]);
-            }
-            return true;
-        }) {}
+    ConsumerUnittest()
+        : queue_(moodycamel::BlockingConcurrentQueue<int>(1024)),
+          consumer_(queue_, std::chrono::milliseconds(100), [&](const std::vector<int>& items, size_t count) {
+              LOG_INFO(sLogger, ("count", count));
+              for (size_t i = 0; i < count; ++i) {
+                  processed_items_.push_back(items[i]);
+              }
+              return true;
+          }) {}
 
     void BasicFunctionality();
     void SuspendAndResume();
 
 protected:
-    void SetUp() override {
-        consumer_.start();
-    }
-    void TearDown() override {
-        consumer_.stop();
-    }
+    void SetUp() override { consumer_.start(); }
+    void TearDown() override { consumer_.stop(); }
 
 private:
     moodycamel::BlockingConcurrentQueue<int> queue_;
@@ -86,7 +81,7 @@ void ConsumerUnittest::SuspendAndResume() {
 UNIT_TEST_CASE(ConsumerUnittest, BasicFunctionality);
 UNIT_TEST_CASE(ConsumerUnittest, SuspendAndResume);
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+
 
 UNIT_TEST_MAIN

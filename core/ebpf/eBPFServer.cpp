@@ -237,7 +237,7 @@ void eBPFServer::Stop() {
     }
 }
 
-// maybe update or create 
+// maybe update or create
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                                      uint32_t plugin_index,
                                      PluginType type,
@@ -471,17 +471,18 @@ void eBPFServer::PollPerfBuffers() {
     mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
         auto now = std::chrono::steady_clock::now();
-        auto next_window = mFrequencyMgr.Next();
+        auto nextWindow = mFrequencyMgr.Next();
         if (!mFrequencyMgr.Expired(now)) {
-            std::this_thread::sleep_until(next_window);
-            mFrequencyMgr.Reset(next_window);
+            std::this_thread::sleep_until(nextWindow);
+            mFrequencyMgr.Reset(nextWindow);
         } else {
             mFrequencyMgr.Reset(now);
         }
         for (int i = 0; i < int(PluginType::MAX); i++) {
             auto plugin = GetPluginManager(PluginType(i));
-            if (!plugin || !plugin->IsRunning())
+            if (!plugin || !plugin->IsRunning()) {
                 continue;
+            }
             int cnt = plugin->PollPerfBuffer();
             LOG_DEBUG(sLogger,
                       ("poll buffer for ", magic_enum::enum_name(PluginType(i)))("cnt", cnt)("running status",
