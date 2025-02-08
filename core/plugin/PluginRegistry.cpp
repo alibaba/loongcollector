@@ -14,10 +14,6 @@
 
 #include "plugin/PluginRegistry.h"
 
-#include <dirent.h>
-#include <dlfcn.h>
-#include <unistd.h>
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
