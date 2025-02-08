@@ -59,7 +59,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson) << endl;
             }
             break;
         case PipelineEvent::Type::METRIC:
@@ -96,7 +96,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson) << endl;
             }
             break;
         case PipelineEvent::Type::SPAN:
@@ -117,7 +117,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 eventJson[DEFAULT_CONTENT_KEY] = e.GetContent().to_string();
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson) << endl;
             }
             break;
         default:
