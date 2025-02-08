@@ -282,7 +282,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         input.reset(new InputFile());
         input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputFile::sName, "1");
+        input->SetMetricsRecordRef(InputFile::sName, "1", "1", "1");
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
         APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
         APSARA_TEST_FALSE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
