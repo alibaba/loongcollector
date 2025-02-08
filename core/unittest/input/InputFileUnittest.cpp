@@ -205,6 +205,25 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
     APSARA_TEST_TRUE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
     APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
+
+    // not in container but with flag set
+    AppConfig::GetInstance()->mPurageContainerMode = false;
+    configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": [],
+                "EnableContainerDiscovery": true
+            }
+        )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    input.reset(new InputFile());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef(InputFile::sName, "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
+    APSARA_TEST_FALSE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
+    AppConfig::GetInstance()->mPurageContainerMode = true;
 }
 
 void InputFileUnittest::OnPipelineUpdate() {
