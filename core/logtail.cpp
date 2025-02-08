@@ -46,7 +46,6 @@ DECLARE_FLAG_STRING(metrics_report_method);
 DECLARE_FLAG_INT32(data_server_port);
 DECLARE_FLAG_BOOL(enable_env_ref_in_config);
 DECLARE_FLAG_BOOL(enable_sls_metrics_format);
-DECLARE_FLAG_BOOL(enable_containerd_upper_dir_detect);
 DECLARE_FLAG_BOOL(logtail_mode);
 
 void HandleSigtermSignal(int signum, siginfo_t* info, void* context) {
@@ -84,7 +83,6 @@ static void overwrite_community_edition_flags() {
     STRING_FLAG(metrics_report_method) = "";
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
-    BOOL_FLAG(enable_containerd_upper_dir_detect) = true;
     BOOL_FLAG(enable_sls_metrics_format) = false;
 }
 

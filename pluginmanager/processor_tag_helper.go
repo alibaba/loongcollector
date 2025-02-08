@@ -18,17 +18,19 @@ package pluginmanager
 
 import "github.com/alibaba/ilogtail/pkg/util"
 
+const (
+	hostNameDefaultTagKey    = "__hostname__"
+	hostIPDefaultTagKey      = "__host_ip__"
+	defaultConfigTagKeyValue = "__default__"
+)
+
 func (p *ProcessorTag) parseAllConfigurableTags(pipelineMetaTagKey map[string]string) {
 	p.parseDefaultAddedTag("HOST_NAME", TagKeyHostName, hostNameDefaultTagKey, pipelineMetaTagKey)
 	p.parseDefaultAddedTag("HOST_IP", TagKeyHostIP, hostIPDefaultTagKey, pipelineMetaTagKey)
-	p.parseOptionalTag("HOST_ID", TagKeyHostID, hostIDDefaultTagKey, pipelineMetaTagKey)
-	p.parseOptionalTag("CLOUD_PROVIDER", TagKeyCloudProvider, cloudProviderDefaultTagKey, pipelineMetaTagKey)
 }
 
+// should keep same with C++ ProcessorTagNative::Process
 func (p *ProcessorTag) addAllConfigurableTags(tagsMap map[string]string) {
 	p.addTag(TagKeyHostName, util.GetHostName(), tagsMap)
 	p.addTag(TagKeyHostIP, util.GetIPAddress(), tagsMap)
-	// TODO: add host id and cloud provider
-	p.addTag(TagKeyHostID, "host id", tagsMap)
-	p.addTag(TagKeyCloudProvider, "cloud provider", tagsMap)
 }

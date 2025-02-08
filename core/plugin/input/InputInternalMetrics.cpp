@@ -50,7 +50,7 @@ bool InputInternalMetrics::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputInternalMetrics::Start() {
-    SelfMonitorServer::GetInstance()->UpdateMetricPipeline(mContext, &mSelfMonitorMetricRules);
+    SelfMonitorServer::GetInstance()->UpdateMetricPipeline(mContext, mIndex, &mSelfMonitorMetricRules);
     return true;
 }
 

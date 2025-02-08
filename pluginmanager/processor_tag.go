@@ -30,30 +30,18 @@ const (
 	TagKeyCloudProvider
 )
 
-const (
-	hostNameDefaultTagKey      = "__hostname__"
-	hostIPDefaultTagKey        = "__host_ip__"
-	hostIDDefaultTagKey        = "__host_id__"
-	cloudProviderDefaultTagKey = "__cloud_provider__"
-	defaultConfigTagKeyValue   = "__default__"
-)
-
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
 type ProcessorTag struct {
 	pipelineMetaTagKey     map[TagKey]string
 	appendingAllEnvMetaTag bool
 	agentEnvMetaTagKey     map[string]string
-
-	// TODO: file tags, read in background with double buffer
-	fileTagsPath string
 }
 
-func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string, fileTagsPath string) *ProcessorTag {
+func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTag bool, agentEnvMetaTagKey map[string]string) *ProcessorTag {
 	processorTag := &ProcessorTag{
 		pipelineMetaTagKey:     make(map[TagKey]string),
 		appendingAllEnvMetaTag: appendingAllEnvMetaTag,
 		agentEnvMetaTagKey:     agentEnvMetaTagKey,
-		fileTagsPath:           fileTagsPath,
 	}
 	processorTag.parseAllConfigurableTags(pipelineMetaTagKey)
 	return processorTag
@@ -74,7 +62,7 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 		}
 	}
 	p.addAllConfigurableTags(tagsMap)
-	// TODO: file tags, read in background with double buffer
+	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
 			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
@@ -101,7 +89,6 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
-
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
@@ -128,19 +115,6 @@ func (p *ProcessorTag) parseDefaultAddedTag(configKey string, tagKey TagKey, def
 		// empty value means delete
 	} else {
 		p.pipelineMetaTagKey[tagKey] = defaultKey
-	}
-}
-
-func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, defaultKey string, config map[string]string) {
-	if customKey, ok := config[configKey]; ok {
-		if customKey != "" {
-			if customKey == defaultConfigTagKeyValue {
-				p.pipelineMetaTagKey[tagKey] = defaultKey
-			} else {
-				p.pipelineMetaTagKey[tagKey] = customKey
-			}
-		}
-		// empty value means delete
 	}
 }
 

@@ -313,6 +313,11 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
     time_t timestamp = (int64_t)milliTimestamp / 1000;
     auto ns = ((int64_t)milliTimestamp % 1000) * 1000000;
     if (mHonorTimestamps) {
+        // limit length of timestamp to 10 digits
+        if (timestamp < 1000000000) {
+            HandleError("invalid timestamp");
+            return;
+        }
         metricEvent.SetTimestamp(timestamp, ns);
     } else {
         metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);

@@ -33,6 +33,7 @@
 #include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
@@ -109,9 +110,14 @@ unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name,
 }
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
+#ifndef __ANDROID__
     // If the plugin is not a C++ plugin, iLogtail core considers it is a go plugin.
     // Go PluginManager validates the go plugins instead of C++ core.
     return !IsValidNativeInputPlugin(name) && !IsValidNativeProcessorPlugin(name) && !IsValidNativeFlusherPlugin(name);
+#else
+    // android does not support go plugins
+    return false;
+#endif
 }
 
 bool PluginRegistry::IsValidNativeInputPlugin(const string& name) const {
@@ -129,6 +135,7 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
     RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
+    RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
