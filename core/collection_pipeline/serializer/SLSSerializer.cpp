@@ -195,9 +195,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::RAW:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<RawEvent>();
-                if (e.GetContent().empty()) {
-                    continue;
-                }
                 size_t contentSZ = GetLogContentSize(DEFAULT_CONTENT_KEY.size(), e.GetContent().size());
                 logGroupSZ += GetLogSize(contentSZ, enableNs && e.GetTimestampNanosecond(), logSZ[i]);
             }
@@ -294,9 +291,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::RAW:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<RawEvent>();
-                if (e.GetContent().empty()) {
-                    continue;
-                }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
                 serializer.AddLogContent(DEFAULT_CONTENT_KEY, e.GetContent());

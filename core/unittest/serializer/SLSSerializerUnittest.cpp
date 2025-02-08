@@ -366,12 +366,17 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedRawEvents(false, true, true), res, errorMsg));
             sls_logs::LogGroup logGroup;
             APSARA_TEST_TRUE(logGroup.ParseFromString(res));
-            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(2, logGroup.logs_size());
             APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
             APSARA_TEST_STREQ("content", logGroup.logs(0).contents(0).key().c_str());
             APSARA_TEST_STREQ("value", logGroup.logs(0).contents(0).value().c_str());
             APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
             APSARA_TEST_FALSE(logGroup.logs(0).has_time_ns());
+            APSARA_TEST_EQUAL(1, logGroup.logs(1).contents_size());
+            APSARA_TEST_STREQ("content", logGroup.logs(1).contents(0).key().c_str());
+            APSARA_TEST_STREQ("", logGroup.logs(1).contents(0).value().c_str());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(1).time());
+            APSARA_TEST_FALSE(logGroup.logs(1).has_time_ns());
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -382,7 +387,21 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         {
             // only empty event
             string res, errorMsg;
-            APSARA_TEST_FALSE(serializer.DoSerialize(CreateBatchedRawEvents(false, true, false), res, errorMsg));
+            APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedRawEvents(false, true, false), res, errorMsg));
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
+            APSARA_TEST_STREQ("content", logGroup.logs(0).contents(0).key().c_str());
+            APSARA_TEST_STREQ("", logGroup.logs(0).contents(0).value().c_str());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_FALSE(logGroup.logs(0).has_time_ns());
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
+            APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
+            APSARA_TEST_STREQ("machine_uuid", logGroup.machineuuid().c_str());
+            APSARA_TEST_STREQ("source", logGroup.source().c_str());
+            APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
         }
     }
     {
