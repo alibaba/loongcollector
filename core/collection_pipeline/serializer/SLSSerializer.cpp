@@ -232,6 +232,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::LOG:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<LogEvent>();
+                if (e.Empty()) {
+                    continue;
+                }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
                 for (const auto& kv : e) {
@@ -291,6 +294,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::RAW:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<RawEvent>();
+                if (e.GetContent().empty()) {
+                    continue;
+                }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
                 serializer.AddLogContent(DEFAULT_CONTENT_KEY, e.GetContent());
