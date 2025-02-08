@@ -129,9 +129,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                     metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
                 } else {
                     // untyped multi value is not supported
-                    LOG_ERROR(sLogger,
-                              ("unexpected error",
-                               "invalid metric event type")("config", mFlusher->GetContext().GetConfigName()));
+                    LOG_WARNING(sLogger,
+                                ("invalid metric event type", "discard event")("config",
+                                                                               mFlusher->GetContext().GetConfigName()));
                     continue;
                 }
                 metricEventContentCache[i].second = GetMetricLabelSize(e);
