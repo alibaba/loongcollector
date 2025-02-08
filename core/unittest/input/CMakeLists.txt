@@ -36,6 +36,9 @@ target_link_libraries(input_ebpf_network_security_unittest unittest_base)
 add_executable(input_ebpf_network_observer_unittest InputNetworkObserverUnittest.cpp)
 target_link_libraries(input_ebpf_network_observer_unittest unittest_base)
 
+add_executable(input_internal_alarms_unittest InputInternalAlarmsUnittest.cpp)
+target_link_libraries(input_internal_alarms_unittest ${UT_BASE_TARGET})
+
 add_executable(input_internal_metrics_unittest InputInternalMetricsUnittest.cpp)
 target_link_libraries(input_internal_metrics_unittest ${UT_BASE_TARGET})
 
@@ -47,4 +50,5 @@ gtest_discover_tests(input_ebpf_file_security_unittest)
 gtest_discover_tests(input_ebpf_process_security_unittest)
 gtest_discover_tests(input_ebpf_network_security_unittest)
 gtest_discover_tests(input_ebpf_network_observer_unittest)
+gtest_discover_tests(input_internal_alarms_unittest)
 gtest_discover_tests(input_internal_metrics_unittest)

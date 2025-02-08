@@ -13,7 +13,10 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.22)
-project(metric_manager_unittest)
+project(self_monitor_unittest)
+
+add_executable(alarm_manager_unittest AlarmManagerUnittest.cpp)
+target_link_libraries(alarm_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(metric_manager_unittest MetricManagerUnittest.cpp)
 target_link_libraries(metric_manager_unittest ${UT_BASE_TARGET})
@@ -25,6 +28,7 @@ add_executable(self_monitor_metric_event_unittest SelfMonitorMetricEventUnittest
 target_link_libraries(self_monitor_metric_event_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
+gtest_discover_tests(alarm_manager_unittest)
 gtest_discover_tests(metric_manager_unittest)
 gtest_discover_tests(plugin_metric_manager_unittest)
 gtest_discover_tests(self_monitor_metric_event_unittest)
