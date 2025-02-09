@@ -77,7 +77,7 @@ private:
 
     unique_ptr<SenderQueueItem> GenerateItem(bool isSLS = false);
 
-    // cannot be static member, because its constructor relies on logger, which is initiallized after main starts
+    // cannot be static member, because its constructor relies on logger, which is initialized after main starts
     FlusherSLS mFlusher;
 };
 

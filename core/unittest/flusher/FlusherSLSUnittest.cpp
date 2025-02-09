@@ -244,7 +244,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #ifdef __ENTERPRISE__
     // EndpointMode && Endpoint
     EnterpriseSLSClientManager::GetInstance()->Clear();
-    // Endpoint ignored in acclerate mode
+    // Endpoint ignored in accelerate mode
     configStr = R"(
         {
             "Type": "flusher_sls",
