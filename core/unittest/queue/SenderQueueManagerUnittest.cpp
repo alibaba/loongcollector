@@ -179,7 +179,7 @@ void SenderQueueManagerUnittest::TestPushQueue() {
 }
 
 void SenderQueueManagerUnittest::TestGetAvailableItems() {
-    // prepare nomal queue
+    // prepare normal queue
     sManager->CreateQueue(
         0, sFlusherId, sCtx, {{"region", FlusherSLS::GetRegionConcurrencyLimiter(mFlusher.mRegion)}}, sMaxRate);
     for (size_t i = 0; i <= sManager->mDefaultQueueParam.GetCapacity(); ++i) {

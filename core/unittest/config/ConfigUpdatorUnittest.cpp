@@ -2524,7 +2524,7 @@ void ConfigUpdatorUnittest::TestValidWildcardPath() {
             bfs::create_directories(mRootDir + dirs[i]);
         } catch (std::exception& e) {
             LOG_WARNING(sLogger,
-                        ("bfs::create_directories faile", (bfs::path(mRootDir) / dirs[i]).string())("error", e.what()));
+                        ("bfs::create_directories failed", (bfs::path(mRootDir) / dirs[i]).string())("error", e.what()));
         }
     }
     sleep(INT32_FLAG(check_base_dir_interval) + 1);

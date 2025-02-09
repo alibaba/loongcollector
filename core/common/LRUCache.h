@@ -141,7 +141,7 @@ public:
         prune();
     }
     /**
-      for backward compatibity. redirects to tryGetCopy()
+      for backward compatibility. redirects to tryGetCopy()
     */
     bool tryGet(const Key& kIn, Value& vOut) { return tryGetCopy(kIn, vOut); }
 
