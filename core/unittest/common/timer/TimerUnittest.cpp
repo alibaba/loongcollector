@@ -38,7 +38,7 @@ public:
 
 private:
     std::vector<int> mVec;
-    int mStartUid;
+    int mStartUid = 0;
 };
 
 void TimerUnittest::TestPushEvent() {
@@ -68,10 +68,10 @@ void TimerUnittest::TestPeriodicEvent() {
             return true;
         },
         [this](int currentUid) { // validator
-            return currentUid == this->mStartUid;
+            return currentUid != this->mStartUid;
         },
         mStartUid);
-
+    timer.PushEvent(std::move(event));
     std::this_thread::sleep_for(std::chrono::seconds(5));
     // update start uid, invalid event schedule ...
     mStartUid++;
