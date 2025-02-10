@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ExceptionBase.h"
 #include "common/JsonUtil.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/ProcessorFilterNative.h"
 #include "unittest/Unittest.h"
 
@@ -32,7 +32,7 @@ public:
     void TestBaseFilter();
     void TestFilterNoneUtf8();
 
-    PipelineContext mContext;
+    CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, OnSuccessfulInit)
@@ -677,9 +677,9 @@ static const char UTF8_BYTE_PREFIX = 0x80;
 static const char UTF8_BYTE_MASK = 0xc0;
 
 void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
-    const int caseCharacterNum = 80; // ten charactor for every situation
+    const int caseCharacterNum = 80; // ten character for every situation
     std::string characterSet[caseCharacterNum];
-    bool isBlunk[caseCharacterNum][4]; // every charactor has 4 byte atmost
+    bool isBlunk[caseCharacterNum][4]; // every character has 4 byte at most
 
     // generate one byte utf8;
 
@@ -701,7 +701,7 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
             tmp = rand() & 0xff;
             tmp |= 0x80;
             tmp &= 0xbf;
-        } while (tmp == 32 || tmp == 9); // tmp shoud be 10xx xxxx;
+        } while (tmp == 32 || tmp == 9); // tmp should be 10xx xxxx;
         characterSet[i] = std::string(1, tmp);
         isBlunk[i][0] = true;
     }
@@ -752,7 +752,7 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
         isBlunk[index][0] = true;
         isBlunk[index][1] = false;
     }
-    // five case of the situation thar only the format is utf8, but not unicode;
+    // five case of the situation that only the format is utf8, but not unicode;
 
     for (int index = 35; index < 40; ++index) {
         randArr1[index - 30] &= 0xe1; // unicode must in rand [0x80,0x7fff]; ant two byte has 11 bits ,so the

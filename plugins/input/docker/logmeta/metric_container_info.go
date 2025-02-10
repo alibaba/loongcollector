@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -111,12 +111,15 @@ type InputDockerFile struct {
 	matchList                map[string]*helper.DockerInfoDetail
 	CollectingContainersMeta bool
 	firstStart               bool
+
+	forceReleaseStopContainerFile bool
 }
 
 func formatPath(path string) string {
 	if len(path) == 0 {
 		return path
 	}
+	path = filepath.Clean(path)
 	if path[len(path)-1] == '/' {
 		return path[0 : len(path)-1]
 	}
@@ -132,6 +135,8 @@ func (idf *InputDockerFile) Name() string {
 
 func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.context = context
+
+	idf.forceReleaseStopContainerFile = os.Getenv("FORCE_RELEASE_STOP_CONTAINER_FILE") == "true"
 
 	idf.lastContainerInfoCache = make(map[string]ContainerInfoCache)
 
@@ -211,8 +216,8 @@ func (idf *InputDockerFile) Description() string {
 func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, containerInfo ContainerInfoCache, allCmd *DockerFileUpdateCmdAll) {
 	var cmd DockerFileUpdateCmd
 	cmd.ID = info.ContainerInfo.ID
-	cmd.UpperDir = path.Clean(containerInfo.UpperDir)
-	cmd.LogPath = path.Clean(containerInfo.LogPath)
+	cmd.UpperDir = filepath.Clean(containerInfo.UpperDir)
+	cmd.LogPath = filepath.Clean(containerInfo.LogPath)
 	// tags
 	tags := info.GetExternalTags(idf.ExternalEnvTag, idf.ExternalK8sLabelTag)
 	cmd.Tags = make([]string, 0, len(tags)*2)
@@ -229,8 +234,8 @@ func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, c
 	cmd.Mounts = make([]Mount, 0, len(containerInfo.Mounts))
 	for _, mount := range containerInfo.Mounts {
 		cmd.Mounts = append(cmd.Mounts, Mount{
-			Source:      path.Clean(mount.Source),
-			Destination: path.Clean(mount.Destination),
+			Source:      filepath.Clean(mount.Source),
+			Destination: filepath.Clean(mount.Destination),
 		})
 	}
 	cmdBuf, _ := json.Marshal(&cmd)
@@ -280,7 +285,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 }
 
 func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, allCmd *DockerFileUpdateCmdAll) {
-	logPath := path.Clean(info.StdoutPath)
+	logPath := filepath.Clean(info.StdoutPath)
 	id := info.ContainerInfo.ID
 	mounts := info.ContainerInfo.Mounts
 	upperDir := info.DefaultRootPath
@@ -476,9 +481,14 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			idf.deleteMetric.Add(1)
 			idf.notifyStop(id)
 			idf.deleteMapping(id)
-		} else if c.Status() != helper.ContainerStatusRunning && len(idf.LogPath) > 0 {
-			// input_file时会触发
-			idf.notifyStop(id)
+		} else if c.Status() != helper.ContainerStatusRunning && len(idf.LogPath) > 0 { // input_file时会触发
+			if idf.forceReleaseStopContainerFile {
+				idf.deleteMetric.Add(1)
+				idf.notifyStop(id)
+				idf.deleteMapping(id)
+			} else {
+				idf.notifyStop(id)
+			}
 		}
 	}
 	if allCmd != nil {

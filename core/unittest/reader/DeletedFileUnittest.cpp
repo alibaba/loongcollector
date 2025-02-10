@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <utility>
+
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
@@ -32,7 +34,8 @@ protected:
                                        hostLogPathFile,
                                        DevInode(),
                                        make_pair(&readerOpts, &ctx),
-                                       make_pair(&multilineOpts, &ctx)));
+                                       make_pair(&multilineOpts, &ctx),
+                                       make_pair(nullptr, &ctx)));
     }
 
     void TearDown() override { INT32_FLAG(force_release_deleted_file_fd_timeout) = -1; }
@@ -41,7 +44,8 @@ private:
     LogFileReaderPtr reader;
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
-    PipelineContext ctx;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
     string hostLogPathDir = ".";
     string hostLogPathFile = "DeletedFileUnittest.txt";
 };

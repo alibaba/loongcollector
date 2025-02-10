@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +33,7 @@ import (
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
-	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -173,7 +174,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	var containerdClient *containerd.Client
-	if config.LoongcollectorGlobalConfig.EnableContainerdUpperDirDetect {
+	if *flags.EnableContainerdUpperDirDetect {
 		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
 		if err == nil {
 			_, err = containerdClient.Version(context.Background())
@@ -290,8 +291,8 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 				hostnamePath = mount.Source
 			}
 			dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
-				Source:      mount.Source,
-				Destination: mount.Destination,
+				Source:      filepath.Clean(mount.Source),
+				Destination: filepath.Clean(mount.Destination),
 				Driver:      mount.Type,
 			})
 		}

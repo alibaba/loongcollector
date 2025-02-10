@@ -18,8 +18,8 @@
 
 #include <unordered_set>
 
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/FeedbackInterface.h"
-#include "pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

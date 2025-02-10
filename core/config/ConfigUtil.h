@@ -23,11 +23,11 @@
 
 namespace logtail {
 
-enum class ConfigType { Pipeline, Task };
+enum class ConfigType { Collection, Task };
 
 bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
 bool ParseConfigDetail(const std::string& content,
-                       const std::string& extenstion,
+                       const std::string& extension,
                        Json::Value& detail,
                        std::string& errorMsg);
 bool IsConfigEnabled(const std::string& name, const Json::Value& detail);

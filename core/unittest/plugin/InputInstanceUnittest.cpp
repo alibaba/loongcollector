@@ -14,8 +14,8 @@
 
 #include <memory>
 
-#include "pipeline/plugin/creator/StaticProcessorCreator.h"
-#include "pipeline/plugin/instance/InputInstance.h"
+#include "collection_pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "collection_pipeline/plugin/instance/InputInstance.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -44,8 +44,8 @@ void InputInstanceUnittest::TestName() const {
 void InputInstanceUnittest::TestInit() const {
     unique_ptr<InputInstance> input = make_unique<InputInstance>(new InputMock(), PluginInstance::PluginMeta("0"));
     Json::Value config, opt;
-    Pipeline pipeline;
-    PipelineContext context;
+    CollectionPipeline pipeline;
+    CollectionPipelineContext context;
     context.SetPipeline(pipeline);
     APSARA_TEST_TRUE(input->Init(config, context, 0U, opt));
     APSARA_TEST_EQUAL(&context, &input->GetPlugin()->GetContext());

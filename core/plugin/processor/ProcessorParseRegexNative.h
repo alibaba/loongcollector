@@ -20,8 +20,8 @@
 
 #include "boost/regex.hpp"
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {
@@ -47,7 +47,7 @@ protected:
 
 private:
     /// @return false if data need to be discarded
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, const GroupMetadata& metadata);
     bool WholeLineModeParser(LogEvent& sourceEvent, const std::string& key);
     bool RegexLogLineParser(LogEvent& sourceEvent,
                             const boost::regex& reg,

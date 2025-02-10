@@ -30,7 +30,7 @@ func (a *AgentManager) Init() {
 	go a.updateAgentMessage(setting.GetSetting().AgentUpdateInterval)
 }
 
-// batch write message from agent to databse
+// batch write message from agent to database
 
 const (
 	optHeartbeat string = "HEARTBEAT"

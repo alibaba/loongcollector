@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/queue/ExactlyOnceSenderQueue.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/ExactlyOnceSenderQueue.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
@@ -51,7 +51,7 @@ protected:
     void TearDown() override { sFeedback.Clear(); }
 
 private:
-    static PipelineContext sCtx;
+    static CollectionPipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const size_t sDataSize = 10;
 
@@ -60,12 +60,12 @@ private:
 
     unique_ptr<SenderQueueItem> GenerateItem(int32_t idx = -1);
 
-    // cannot be static member, because its constructor relies on logger, which is initiallized after main starts
+    // cannot be static member, because its constructor relies on logger, which is initialized after main starts
     FlusherSLS mFlusher;
     unique_ptr<ExactlyOnceSenderQueue> mQueue;
 };
 
-PipelineContext ExactlyOnceSenderQueueUnittest::sCtx;
+CollectionPipelineContext ExactlyOnceSenderQueueUnittest::sCtx;
 const size_t ExactlyOnceSenderQueueUnittest::sDataSize;
 FeedbackInterfaceMock ExactlyOnceSenderQueueUnittest::sFeedback;
 vector<RangeCheckpointPtr> ExactlyOnceSenderQueueUnittest::sCheckpoints;

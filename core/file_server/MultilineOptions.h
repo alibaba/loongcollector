@@ -22,7 +22,7 @@
 #include "boost/regex.hpp"
 #include "json/json.h"
 
-#include "pipeline/PipelineContext.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail {
 
@@ -31,7 +31,7 @@ public:
     enum class Mode { CUSTOM, JSON };
     enum class UnmatchedContentTreatment { DISCARD, SINGLE_LINE };
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
+    bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
     const std::shared_ptr<boost::regex>& GetStartPatternReg() const { return mStartPatternRegPtr; }
     const std::shared_ptr<boost::regex>& GetContinuePatternReg() const { return mContinuePatternRegPtr; }
     const std::shared_ptr<boost::regex>& GetEndPatternReg() const { return mEndPatternRegPtr; }
@@ -56,6 +56,6 @@ private:
 const std::string&
 UnmatchedContentTreatmentToString(MultilineOptions::UnmatchedContentTreatment unmatchedContentTreatment);
 
-using MultilineConfig = std::pair<const MultilineOptions*, const PipelineContext*>;
+using MultilineConfig = std::pair<const MultilineOptions*, const CollectionPipelineContext*>;
 
 } // namespace logtail

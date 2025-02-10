@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "common/JsonUtil.h"
+#include "models/MetricEvent.h"
+#include "models/MetricValue.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -64,13 +67,17 @@ private:
 
 void UntypedMultiDoubleValuesUnittest::TestToJson() {
     UntypedMultiDoubleValues value(mMetricEvent.get());
-    value.SetValue(string("test-1"), 10.0);
-    value.SetValue(string("test-2"), 2.0);
+    value.SetValue(string("test-1"), {UntypedValueMetricType::MetricTypeCounter, 10.0});
+    value.SetValue(string("test-2"), {UntypedValueMetricType::MetricTypeGauge, 2.0});
     Json::Value res = value.ToJson();
 
     Json::Value valueJson;
-    valueJson["test-1"] = 10.0;
-    valueJson["test-2"] = 2.0;
+    valueJson["test-1"] = Json::Value();
+    valueJson["test-1"]["type"] = "counter";
+    valueJson["test-1"]["value"] = 10.0;
+    valueJson["test-2"] = Json::Value();
+    valueJson["test-2"]["type"] = "gauge";
+    valueJson["test-2"]["value"] = 2.0;
 
     APSARA_TEST_TRUE(valueJson == res);
 }
@@ -78,15 +85,21 @@ void UntypedMultiDoubleValuesUnittest::TestToJson() {
 void UntypedMultiDoubleValuesUnittest::TestFromJson() {
     UntypedMultiDoubleValues value(mMetricEvent.get());
     Json::Value valueJson;
-    valueJson["test-1"] = 10.0;
-    valueJson["test-2"] = 2.0;
+    valueJson["test-1"] = Json::Value();
+    valueJson["test-1"]["type"] = "counter";
+    valueJson["test-1"]["value"] = 10.0;
+    valueJson["test-2"] = Json::Value();
+    valueJson["test-2"]["type"] = "gauge";
+    valueJson["test-2"]["value"] = 2.0;
     value.FromJson(valueJson);
-    double val;
+    UntypedMultiDoubleValue val;
 
     APSARA_TEST_EQUAL(true, value.GetValue("test-1", val));
-    APSARA_TEST_EQUAL(10.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeCounter, val.MetricType);
+    APSARA_TEST_EQUAL(10.0, val.Value);
     APSARA_TEST_EQUAL(true, value.GetValue("test-2", val));
-    APSARA_TEST_EQUAL(2.0, val);
+    APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
+    APSARA_TEST_EQUAL(2.0, val.Value);
 }
 
 UNIT_TEST_CASE(UntypedMultiDoubleValuesUnittest, TestToJson)

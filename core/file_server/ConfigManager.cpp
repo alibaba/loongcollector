@@ -32,6 +32,8 @@
 
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/CompressTools.h"
 #include "common/ErrorUtil.h"
 #include "common/ExceptionBase.h"
@@ -47,8 +49,6 @@
 #include "file_server/FileServer.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "monitor/AlarmManager.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
 
 using namespace std;
 

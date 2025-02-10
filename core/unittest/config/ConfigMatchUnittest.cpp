@@ -485,7 +485,7 @@ public:
                            PS + "C" + PS + "c" + PS + "cc" + PS + "ccc"};
         bool result[12] = {true, true, true, true, true, true, true, false, false, true, true, false};
 
-        LOG_INFO(sLogger, ("case 1", "child directory create dynamicly"));
+        LOG_INFO(sLogger, ("case 1", "child directory create dynamically"));
         MockMaxDepthConfigs();
         int32_t idx = 0;
         for (; idx < 3; idx++) {
@@ -1047,7 +1047,7 @@ void ConfigMatchUnittest::TestChinesePathAndFilePattern() {
     filePattern = EncodingConverter::GetInstance()->FromACPToUTF8(filePattern);
 #endif
     {
-        PipelineConfig cfg(
+        CollectionConfig cfg(
             basePath, filePattern, LogType::REGEX_LOG, "log", ".*", "", "", "project", true, 3, 3, "logstore");
         fsutil::Dir dir(pathRoot);
         APSARA_TEST_TRUE(dir.Open());

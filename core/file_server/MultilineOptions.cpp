@@ -19,7 +19,7 @@
 using namespace std;
 
 namespace logtail {
-bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
+bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
     string errorMsg;
 
     // Mode

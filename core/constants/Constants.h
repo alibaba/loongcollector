@@ -22,19 +22,6 @@ namespace logtail {
 // OS name, Linux, Windows.
 extern const std::string OS_NAME;
 
-// Resevered key in log.
-extern const std::string LOG_RESERVED_KEY_SOURCE;
-extern const std::string LOG_RESERVED_KEY_TOPIC;
-extern const std::string LOG_RESERVED_KEY_USER_DEFINED_ID;
-extern const std::string LOG_RESERVED_KEY_MACHINE_UUID;
-extern const std::string LOG_RESERVED_KEY_HOSTNAME;
-extern const std::string LOG_RESERVED_KEY_PATH;
-extern const std::string LOG_RESERVED_KEY_PACKAGE_ID;
-extern const std::string LOG_RESERVED_KEY_TRUNCATE_INFO;
-// extern const std::string LOG_RESERVED_KEY_ALIPAY_ZONE;
-extern const std::string LOG_RESERVED_KEY_INODE;
-extern const std::string LOG_RESERVED_KEY_FILE_OFFSET;
-
 extern const char* SLS_EMPTY_STR_FOR_INDEX;
 
 // profile project

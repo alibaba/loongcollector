@@ -27,7 +27,7 @@
 namespace logtail {
 class EventPool;
 
-// referrences
+// references
 // https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs.md
@@ -35,10 +35,9 @@ class EventPool;
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/container.md
 enum class EventGroupMetaKey {
     UNKNOWN,
-    LOG_FILE_PATH,
     LOG_FILE_PATH_RESOLVED,
-    LOG_FILE_INODE,
     LOG_FORMAT,
+    LOG_FILE_OFFSET_KEY,
     HAS_PART_LOG,
 
     K8S_CLUSTER_ID,
@@ -60,6 +59,9 @@ enum class EventGroupMetaKey {
     PROMETHEUS_UP_STATE,
     PROMETHEUS_STREAM_ID,
     PROMETHEUS_STREAM_TOTAL,
+
+    INTERNAL_DATA_TARGET_REGION,
+    INTERNAL_DATA_TYPE,
 
     HOST_MONITOR_COLLECT_INTERVAL,
 

@@ -17,9 +17,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/MultilineOptions.h"
-#include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -32,7 +32,7 @@ public:
 
 private:
     const string pluginType = "test";
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void MultilineOptionsUnittest::OnSuccessfulInit() const {

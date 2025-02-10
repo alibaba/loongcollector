@@ -22,7 +22,6 @@
 #include <thread>
 
 #include "common/Strptime.h"
-#include "pipeline/PipelineContext.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 // Time and timestamp utility.
@@ -40,7 +39,7 @@ struct PreciseTimestampConfig {
 
 typedef timespec LogtailTime;
 
-// Convert @tm to string accroding to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
+// Convert @tm to string according to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
 std::string ConvertToTimeStamp(const time_t& tm, const std::string& format = "%Y%m%d%H%M%S");
 std::string GetTimeStamp(time_t tm, const std::string& format = "%Y%m%d%H%M%S");
 

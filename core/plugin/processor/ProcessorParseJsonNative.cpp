@@ -20,10 +20,10 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
@@ -92,7 +92,7 @@ void ProcessorParseJsonNative::Process(PipelineEventGroup& logGroup) {
 
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-        if (ProcessEvent(logPath, events[rIdx])) {
+        if (ProcessEvent(logPath, events[rIdx], logGroup.GetAllMetadata())) {
             if (wIdx != rIdx) {
                 events[wIdx] = std::move(events[rIdx]);
             }
@@ -102,7 +102,9 @@ void ProcessorParseJsonNative::Process(PipelineEventGroup& logGroup) {
     events.resize(wIdx);
 }
 
-bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {
+bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath,
+                                            PipelineEventPtr& e,
+                                            const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
         mOutFailedEventsTotal->Add(1);
         return true;
@@ -127,7 +129,7 @@ bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath, PipelineE
     if (mCommonParserOptions.ShouldAddLegacyUnmatchedRawLog(parseSuccess)) {
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, rawContent, sourceEvent, false);
     }
-    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
+    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
         mDiscardedEventsTotal->Add(1);
         return false;
     }

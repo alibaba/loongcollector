@@ -25,7 +25,7 @@ namespace ebpf {
 
 class SecurityHandler : public AbstractHandler {
 public:
-    SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx);
+    SecurityHandler(const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t idx);
     void handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events);
 
 private:

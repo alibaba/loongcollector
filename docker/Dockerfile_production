@@ -21,7 +21,7 @@ RUN tar -xzf loongcollector-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
 
 
 FROM centos:centos7.9.2009
-MAINTAINER TomYu yyuuttaaoo@gmail.com
+LABEL maintainer="TomYu <yyuuttaaoo@gmail.com>"
 
 ENV container docker
 

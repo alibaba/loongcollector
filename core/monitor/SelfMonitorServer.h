@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <string>
 
-#include "Pipeline.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "monitor/Monitor.h"
 
 namespace logtail {
 
@@ -30,9 +33,14 @@ public:
     void Monitor();
     void Stop();
 
-    void UpdateMetricPipeline(PipelineContext* ctx, SelfMonitorMetricRules* rules);
+    void UpdateMetricPipeline(CollectionPipelineContext* ctx, size_t inputIndex, SelfMonitorMetricRules* rules);
     void RemoveMetricPipeline();
-    void UpdateAlarmPipeline(PipelineContext* ctx); // Todo
+    void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
+    void RemoveAlarmPipeline();
+
+    static const std::string INTERNAL_DATA_TYPE_ALARM;
+    static const std::string INTERNAL_DATA_TYPE_METRIC;
+
 private:
     SelfMonitorServer();
     ~SelfMonitorServer() = default;
@@ -42,21 +50,26 @@ private:
     bool mIsThreadRunning = true;
     std::condition_variable mStopCV;
 
+    // metrics
     void SendMetrics();
     bool ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& event, const SelfMonitorMetricRule& rule);
     void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events);
     void ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEventGroup);
 
-    PipelineContext* mMetricPipelineCtx = nullptr;
+    mutable ReadWriteLock mMetricPipelineLock;
+    CollectionPipelineContext* mMetricPipelineCtx = nullptr;
+    size_t mMetricInputIndex = 0;
     SelfMonitorMetricRules* mSelfMonitorMetricRules = nullptr;
     SelfMonitorMetricEventMap mSelfMonitorMetricEventMap;
-    mutable ReadWriteLock mMetricPipelineLock;
 
+    // alarms
     void SendAlarms();
 
-    PipelineContext* mAlarmPipelineCtx;
-    std::mutex mAlarmPipelineMux;
+    mutable ReadWriteLock mAlarmPipelineMux;
+    CollectionPipelineContext* mAlarmPipelineCtx = nullptr;
+    size_t mAlarmInputIndex = 0;
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputInternalAlarmsUnittest;
     friend class InputInternalMetricsUnittest;
 #endif
 };

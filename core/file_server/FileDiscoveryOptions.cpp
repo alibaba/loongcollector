@@ -90,8 +90,9 @@ static bool isNotSubPath(const string& basePath, const string& path) {
     return basePathSize > 1 && pathSize > basePathSize && path[checkPos] != PATH_SEPARATOR[0];
 }
 
-bool FileDiscoveryOptions::CompareByPathLength(pair<const FileDiscoveryOptions*, const PipelineContext*> left,
-                                               pair<const FileDiscoveryOptions*, const PipelineContext*> right) {
+bool FileDiscoveryOptions::CompareByPathLength(
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
     int32_t leftDepth = 0;
     int32_t rightDepth = 0;
     for (size_t i = 0; i < (left.first->mBasePath).size(); ++i) {
@@ -108,8 +109,8 @@ bool FileDiscoveryOptions::CompareByPathLength(pair<const FileDiscoveryOptions*,
 }
 
 bool FileDiscoveryOptions::CompareByDepthAndCreateTime(
-    pair<const FileDiscoveryOptions*, const PipelineContext*> left,
-    pair<const FileDiscoveryOptions*, const PipelineContext*> right) {
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
     int32_t leftDepth = 0;
     int32_t rightDepth = 0;
     for (size_t i = 0; i < (left.first->mBasePath).size(); ++i) {
@@ -131,7 +132,9 @@ bool FileDiscoveryOptions::CompareByDepthAndCreateTime(
     return false;
 }
 
-bool FileDiscoveryOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
+bool FileDiscoveryOptions::Init(const Json::Value& config,
+                                const CollectionPipelineContext& ctx,
+                                const string& pluginType) {
     string errorMsg;
 
     // FilePaths + MaxDirSearchDepth
@@ -653,7 +656,7 @@ ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& log
     return NULL;
 }
 
-bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, const PipelineContext* ctx) {
+bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext* ctx) {
     if (!mEnableContainerDiscovery)
         return true;
 
@@ -707,7 +710,7 @@ bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, co
     return true;
 }
 
-bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, const PipelineContext* ctx) {
+bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext* ctx) {
     if (!mContainerInfos)
         return false;
 

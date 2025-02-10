@@ -25,14 +25,14 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/batch/BatchStatus.h"
+#include "collection_pipeline/batch/Batcher.h"
+#include "collection_pipeline/limiter/ConcurrencyLimiter.h"
+#include "collection_pipeline/plugin/interface/HttpFlusher.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
-#include "pipeline/batch/BatchStatus.h"
-#include "pipeline/batch/Batcher.h"
-#include "pipeline/limiter/ConcurrencyLimiter.h"
-#include "pipeline/plugin/interface/HttpFlusher.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/serializer/SLSSerializer.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
@@ -78,6 +78,8 @@ public:
 
     // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
+
+    std::string GetSubpath() const { return mSubpath; }
 
     std::string mProject;
     std::string mLogstore;
@@ -130,6 +132,13 @@ private:
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
                                                                       SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
+                                                                 const std::string& accessKeySecret,
+                                                                 SLSClientManager::AuthType type,
+                                                                 SLSSenderQueueItem* item,
+                                                                 const std::string& subPath) const;
+
+    std::string mSubpath;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;

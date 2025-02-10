@@ -29,7 +29,6 @@
 #include "common/StringTools.h"
 #include "common/Strptime.h"
 #include "logger/Logger.h"
-#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 

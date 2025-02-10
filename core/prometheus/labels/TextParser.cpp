@@ -177,7 +177,7 @@ void TextParser::HandleLabelValue(MetricEvent& metricEvent) {
             }
             if (mPos + 1 < mLine.size()) {
                 // check next char, if it is valid escape char, we can consume two chars and push one escaped char
-                // if not, we neet to push the two chars
+                // if not, we need to push the two chars
                 // valid escape char: \", \\, \n
                 switch (mLine[lPos + 1]) {
                     case '\\':
@@ -313,6 +313,11 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
     time_t timestamp = (int64_t)milliTimestamp / 1000;
     auto ns = ((int64_t)milliTimestamp % 1000) * 1000000;
     if (mHonorTimestamps) {
+        // limit length of timestamp to 10 digits
+        if (timestamp < 1000000000) {
+            HandleError("invalid timestamp");
+            return;
+        }
         metricEvent.SetTimestamp(timestamp, ns);
     } else {
         metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);

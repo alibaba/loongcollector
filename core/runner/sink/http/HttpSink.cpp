@@ -15,14 +15,14 @@
 #include "runner/sink/http/HttpSink.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/plugin/interface/HttpFlusher.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/plugin/interface/HttpFlusher.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SenderQueueItem.h"
 #include "runner/FlusherRunner.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/HttpSinkMock.h"
@@ -147,6 +147,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
 
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
+    request->mLastSendTime = chrono::system_clock::now();
 
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
@@ -291,6 +292,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                         ++request->mTryCnt;
                         AddRequestToClient(unique_ptr<HttpSinkRequest>(request));
                         ++runningHandlers;
+                        mSendingItemsTotal->Add(1);
                         requestReused = true;
                     } else {
                         auto errMsg = curl_easy_strerror(msg->data.result);

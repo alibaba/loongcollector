@@ -42,15 +42,15 @@ func (c *ConfigManager) CreateConfig(req *proto.CreateConfigRequest, res *proto.
 		}
 		config := value.(*model.ConfigDetail)
 
-		if !config.DelTag { // exsit
+		if !config.DelTag { // exist
 			res.Code = proto.RespCode_INVALID_PARAMETER
 			res.Message = fmt.Sprintf("Config %s already exists.", req.ConfigDetail.Name)
 			return common.ConfigAlreadyExist.Status, res
 		}
 		// exist but has delete tag
-		verison := config.Version
+		version := config.Version
 		config.ParseProto(req.ConfigDetail)
-		config.Version = verison + 1
+		config.Version = version + 1
 		config.DelTag = false
 
 		updateErr := s.Update(common.TypeConfigDetail, config.Name, config)

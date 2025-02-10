@@ -20,15 +20,15 @@
 #include <string>
 
 #include "BaseScheduler.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/http/HttpResponse.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
 #include "prometheus/component/StreamScraper.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
-#include "pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
 #endif
 
 namespace logtail {
@@ -58,8 +58,6 @@ public:
 private:
     std::unique_ptr<TimerEvent> BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime);
 
-    prom::StreamScraper mPromStreamScraper;
-
     std::shared_ptr<ScrapeConfig> mScrapeConfigPtr;
     std::string mHash;
     std::string mHost;
@@ -68,6 +66,9 @@ private:
 
     // pipeline
     QueueKey mQueueKey;
+    size_t mInputIndex;
+
+    Labels mTargetLabels;
 
     // auto metrics
     uint64_t mScrapeTimestampMilliSec = 0;

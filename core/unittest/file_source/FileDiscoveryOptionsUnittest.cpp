@@ -18,9 +18,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
-#include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -35,7 +35,7 @@ public:
 
 private:
     const string pluginType = "test";
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
 };
 
 void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
@@ -221,7 +221,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 
-    // invlaid filepath
+    // invalid filepath
     filePath = filesystem::current_path();
     configStr = R"(
         {
@@ -237,7 +237,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
 void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     unique_ptr<FileDiscoveryOptions> config;
     Json::Value configJson;
-    PipelineContext ctx;
+    CollectionPipelineContext ctx;
     filesystem::path filePath;
 
     // no wildcard

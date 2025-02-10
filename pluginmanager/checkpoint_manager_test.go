@@ -24,7 +24,7 @@ import (
 )
 
 func MkdirDataDir() {
-	os.MkdirAll(config.LoongcollectorGlobalConfig.LoongcollectorDataDir, 0750)
+	os.MkdirAll(config.LoongcollectorGlobalConfig.LoongCollectorGoCheckPointDir, 0750)
 }
 
 func Test_checkPointManager_SaveGetCheckpoint(t *testing.T) {

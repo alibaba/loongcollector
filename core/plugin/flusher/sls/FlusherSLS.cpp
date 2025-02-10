@@ -15,6 +15,11 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/batch/FlushStrategy.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/EndpointUtil.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -22,11 +27,6 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/batch/FlushStrategy.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -294,16 +294,57 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // TelemetryType
+    string telemetryType;
+    if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              "logs",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    } else if (telemetryType == "metrics") {
+        // TelemetryType set to metrics
+        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
+                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    } else if (telemetryType == "arms_agentinfo") {
+        mSubpath = APM_AGENTINFOS_URL;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
+    } else if (telemetryType == "arms_metrics") {
+        mSubpath = APM_METRICS_URL;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS;
+    } else if (telemetryType == "arms_traces") {
+        mSubpath = APM_TRACES_URL;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES;
+    } else if (!telemetryType.empty() && telemetryType != "logs") {
+        // TelemetryType invalid
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "string param TelemetryType is not valid",
+                              "logs",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
     // Logstore
-    if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+        // log and metric
+        if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        }
     }
 
     // Region
@@ -409,32 +450,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 #endif
 
-    // TelemetryType
-    string telemetryType;
-    if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              "logs",
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    } else if (telemetryType == "metrics") {
-        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
-                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
-    } else if (!telemetryType.empty() && telemetryType != "logs") {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              "string param TelemetryType is not valid",
-                              "logs",
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
 
     // Batch
     const char* key = "Batch";
@@ -465,25 +480,17 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // ShardHashKeys
-    if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    } else if (!mShardHashKeys.empty() && mContext->IsExactlyOnceEnabled()) {
-        mShardHashKeys.clear();
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             "exactly once enabled when ShardHashKeys is not empty",
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
+    if (mTelemetryType == sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS && !mContext->IsExactlyOnceEnabled()) {
+        if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
     }
 
     DefaultFlushStrategyOptions strategy{
@@ -491,9 +498,13 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
-    if (!mBatcher.Init(
-            itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
-        // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
+    if (!mBatcher.Init(itr ? *itr : Json::Value(),
+                       this,
+                       strategy,
+                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
+                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS)) {
+        // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
+        // enable group batch
         return false;
     }
 
@@ -663,6 +674,11 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
             req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
             break;
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
+            break;
         default:
             break;
     }
@@ -677,6 +693,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
+    string hostname = data->mCurrentHost;
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
@@ -771,7 +788,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 mUnauthErrorCnt->Add(1);
             }
         } else if (sendResult == SEND_PARAMETER_INVALID) {
-            failDetail << "invalid paramters";
+            failDetail << "invalid parameters";
             suggestion << "check input parameters";
             operation = DefaultOperation(item->mTryCnt);
             if (mParamsErrorCnt) {
@@ -893,9 +910,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
     }
 #ifdef __ENTERPRISE__
-    bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
+    bool hasNetworkError = sendResult == SEND_NETWORK_ERROR;
     EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
-        mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
+        mProject, mCandidateHostsInfo->GetMode(), hostname, !hasNetworkError);
     mCandidateHostsInfo->SelectBestHost();
 
     if (!hasNetworkError) {
@@ -930,7 +947,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     if (!HasContext()) {
         key = QueueKeyManager::GetInstance()->GetKey(mProject + "-" + mLogstore);
         if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
-            PipelineContext ctx;
+            CollectionPipelineContext ctx;
             SenderQueueManager::GetInstance()->CreateQueue(
                 key, "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
         }
@@ -951,9 +968,10 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
             detail[itr.name()] = *itr;
         }
     }
-    if (!detail.empty()) {
+    if (mContext->IsFlushingThroughGoPipeline()) {
         Json::Value plugin(Json::objectValue);
-        plugin["type"] = Pipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
+        plugin["type"]
+            = CollectionPipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
         plugin["detail"] = detail;
         res["flushers"].append(plugin);
     }
@@ -1233,6 +1251,41 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
                                         path,
+                                        "",
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
+}
+
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
+                                                                    const string& accessKeySecret,
+                                                                    SLSClientManager::AuthType type,
+                                                                    SLSSenderQueueItem* item,
+                                                                    const std::string& subPath) const {
+    string query;
+    map<string, string> header;
+    PreparePostAPMBackendRequest(accessKeyId,
+                                 accessKeySecret,
+                                 type,
+                                 item->mCurrentHost,
+                                 item->mRealIpFlag,
+                                 mProject,
+                                 item->mLogstore,
+                                 CompressTypeToString(mCompressor->GetCompressType()),
+                                 item->mType,
+                                 item->mData,
+                                 item->mRawSize,
+                                 mSubpath,
+                                 query,
+                                 header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        subPath,
                                         "",
                                         header,
                                         item->mData,

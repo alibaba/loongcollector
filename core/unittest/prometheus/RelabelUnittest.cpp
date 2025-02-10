@@ -39,6 +39,7 @@ public:
     void TestReplace();
     void TestKeep();
     void TestDrop();
+    void TestDropMetric();
     void TestDropEqual();
     void TestHashMod();
     void TestLabelDrop();
@@ -189,6 +190,31 @@ void RelabelConfigUnittest::TestDrop() {
                 "source_labels": [
                     "__meta_kubernetes_pod_ip"
                 ]
+        }]
+    )";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    configList = RelabelConfigList();
+    APSARA_TEST_TRUE(configList.Init(configJson));
+    auto result = labels;
+    vector<string> toDelete;
+    APSARA_TEST_FALSE(configList.Process(result, toDelete));
+}
+
+void RelabelConfigUnittest::TestDropMetric() {
+    Json::Value configJson;
+    string configStr;
+    string errorMsg;
+    RelabelConfigList configList;
+    Labels labels;
+    labels.Set("__meta_kubernetes_pod_ip", "172.17.0.3");
+    labels.Set("__meta_kubernetes_pod_label_app", "node-exporter");
+    labels.Set("__name__", "node_cpu_seconds_total");
+    // single relabel drop
+    configStr = R"(
+        [{
+                "action": "dropmetric",
+                "match_list": ["test_1","node_cpu_seconds_total"]
         }]
     )";
 
@@ -495,6 +521,7 @@ UNIT_TEST_CASE(ActionConverterUnittest, TestActionToString)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestRelabelConfig)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestReplace)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestDrop)
+UNIT_TEST_CASE(RelabelConfigUnittest, TestDropMetric)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestKeep)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestHashMod)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestLabelMap)

@@ -15,8 +15,8 @@
  */
 #pragma once
 
+#include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/LogEvent.h"
-#include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
 
 namespace logtail {
@@ -42,7 +42,7 @@ private:
                            PipelineEventPtr& e,
                            bool& sourceKeyOverwritten);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, const GroupMetadata& metadata);
 
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;

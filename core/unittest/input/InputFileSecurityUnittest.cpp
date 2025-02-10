@@ -17,11 +17,11 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "unittest/Unittest.h"
 
@@ -48,8 +48,8 @@ protected:
     }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void InputFileSecurityUnittest::TestName() {

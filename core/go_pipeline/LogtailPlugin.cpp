@@ -17,6 +17,8 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
@@ -28,17 +30,15 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"
 #endif
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
-DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
-                 "if enable containerd upper dir detect when locating rootfs",
-                 false);
+DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
+DECLARE_FLAG_INT32(file_tags_update_interval);
+DECLARE_FLAG_STRING(agent_host_id);
 
 using namespace std;
 using namespace logtail;
@@ -65,18 +65,18 @@ LogtailPlugin::LogtailPlugin() {
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
-    mPluginCfg["LoongcollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
-    mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
-    mPluginCfg["LoongcollectorDataDir"] = GetAgentGoCheckpointDir();
-    mPluginCfg["LoongcollectorLogConfDir"] = GetAgentGoLogConfDir();
-    mPluginCfg["LoongcollectorPluginLogName"] = GetPluginLogName();
-    mPluginCfg["LoongcollectorVersionTag"] = GetVersionTag();
-    mPluginCfg["LoongcollectorCheckPointFile"] = GetGoPluginCheckpoint();
-    mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
-    mPluginCfg["LoongcollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
+    mPluginCfg["LoongCollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    mPluginCfg["LoongCollectorLogDir"] = GetAgentLogDir();
+    mPluginCfg["LoongCollectorDataDir"] = GetAgentDataDir();
+    mPluginCfg["LoongCollectorLogConfDir"] = GetAgentGoLogConfDir();
+    mPluginCfg["LoongCollectorPluginLogName"] = GetPluginLogName();
+    mPluginCfg["LoongCollectorVersionTag"] = GetVersionTag();
+    mPluginCfg["LoongCollectorGoCheckPointDir"] = GetAgentGoCheckpointDir();
+    mPluginCfg["LoongCollectorGoCheckPointFile"] = GetGoPluginCheckpoint();
+    mPluginCfg["LoongCollectorThirdPartyDir"] = GetAgentThirdPartyDir();
+    mPluginCfg["LoongCollectorPrometheusAuthorizationPath"] = GetAgentPrometheusAuthorizationPath();
     mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
     mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
-    mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
 }
 
@@ -270,7 +270,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
             return 0;
         }
     } else {
-        shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindConfigByName(configNameStr);
+        shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
             LOG_INFO(sLogger,
                      ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)(

@@ -33,6 +33,7 @@ struct HistoryFileEvent {
     FileDiscoveryConfig mDiscoveryconfig;
     FileReaderConfig mReaderConfig;
     MultilineConfig mMultilineConfig;
+    FileTagConfig mTagConfig;
     uint32_t mEOConcurrency = 0;
 
     HistoryFileEvent() : mStartPos(0) {}

@@ -25,19 +25,20 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "file_server/ContainerInfo.h"
-#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
 class FileDiscoveryOptions {
 public:
-    static bool CompareByPathLength(std::pair<const FileDiscoveryOptions*, const PipelineContext*> left,
-                                    std::pair<const FileDiscoveryOptions*, const PipelineContext*> right);
-    static bool CompareByDepthAndCreateTime(std::pair<const FileDiscoveryOptions*, const PipelineContext*> left,
-                                            std::pair<const FileDiscoveryOptions*, const PipelineContext*> right);
+    static bool CompareByPathLength(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+                                    std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
+    static bool
+    CompareByDepthAndCreateTime(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
+                                std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
+    bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
     const std::string& GetBasePath() const { return mBasePath; }
     const std::string& GetFilePattern() const { return mFilePattern; }
     const std::vector<std::string>& GetWildcardPaths() const { return mWildcardPaths; }
@@ -47,7 +48,7 @@ public:
     const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
     void SetContainerInfo(const std::shared_ptr<std::vector<ContainerInfo>>& info) { mContainerInfos = info; }
     void SetDeduceAndSetContainerBaseDirFunc(bool (*f)(ContainerInfo&,
-                                                       const PipelineContext*,
+                                                       const CollectionPipelineContext*,
                                                        const FileDiscoveryOptions*)) {
         mDeduceAndSetContainerBaseDirFunc = f;
     }
@@ -56,8 +57,8 @@ public:
     bool IsMatch(const std::string& path, const std::string& name) const;
     bool IsTimeout(const std::string& path) const;
     bool WithinMaxDepth(const std::string& path) const;
-    bool IsSameContainerInfo(const Json::Value& paramsJSON, const PipelineContext*);
-    bool UpdateContainerInfo(const Json::Value& paramsJSON, const PipelineContext*);
+    bool IsSameContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext*);
+    bool UpdateContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext*);
     bool DeleteContainerInfo(const Json::Value& paramsJSON);
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
     // 过渡使用
@@ -111,7 +112,7 @@ private:
     bool mEnableContainerDiscovery = false;
     std::shared_ptr<std::vector<ContainerInfo>> mContainerInfos; // must not be null if container discovery is enabled
     bool (*mDeduceAndSetContainerBaseDirFunc)(ContainerInfo& containerInfo,
-                                              const PipelineContext*,
+                                              const CollectionPipelineContext*,
                                               const FileDiscoveryOptions*)
         = nullptr;
 
@@ -123,6 +124,6 @@ private:
 #endif
 };
 
-using FileDiscoveryConfig = std::pair<FileDiscoveryOptions*, const PipelineContext*>;
+using FileDiscoveryConfig = std::pair<FileDiscoveryOptions*, const CollectionPipelineContext*>;
 
 } // namespace logtail

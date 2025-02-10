@@ -24,6 +24,10 @@ extern const std::string LOGSTORES;
 extern const std::string METRICSTORES;
 extern const std::string HEALTH;
 
+extern const std::string APM_METRICS_URL;
+extern const std::string APM_TRACES_URL;
+extern const std::string APM_AGENTINFOS_URL;
+
 extern const std::string CONTENT_MD5;
 
 extern const std::string LOGTAIL_USER_AGENT;

@@ -134,18 +134,16 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 	if cache, ok := m.cacheMap[resourceType]; ok {
 		cache.RegisterSendFunc(configName, func(events []*K8sMetaEvent) {
 			sendFunc(events)
-			linkTypeList := make([]string, 0)
 			m.registerLock.RLock()
-			if m.linkRegisterMap[configName] != nil {
-				linkTypeList = append(linkTypeList, m.linkRegisterMap[configName]...)
-			}
-			m.registerLock.RUnlock()
-			for _, linkType := range linkTypeList {
-				linkEvents := m.linkGenerator.GenerateLinks(events, linkType)
-				if linkEvents != nil {
-					sendFunc(linkEvents)
+			for _, linkType := range m.linkRegisterMap[configName] {
+				if strings.HasPrefix(linkType, resourceType) {
+					linkEvents := m.linkGenerator.GenerateLinks(events, linkType)
+					if linkEvents != nil {
+						sendFunc(linkEvents)
+					}
 				}
 			}
+			m.registerLock.RUnlock()
 		}, interval)
 		m.registerLock.Lock()
 		if cnt, ok := m.projectNames[projectName]; ok {
@@ -169,36 +167,20 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 	}
 }
 
-func (m *MetaManager) UnRegisterSendFunc(projectName, configName, resourceType string) {
-	if cache, ok := m.cacheMap[resourceType]; ok {
+func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
+	for _, cache := range m.cacheMap {
 		cache.UnRegisterSendFunc(configName)
-		m.registerLock.Lock()
-		if cnt, ok := m.projectNames[projectName]; ok {
-			if cnt == 1 {
-				delete(m.projectNames, projectName)
-			} else {
-				m.projectNames[projectName] = cnt - 1
-			}
-		}
-		// unregister link
-		if !isEntity(resourceType) {
-			if registeredLink, ok := m.linkRegisterMap[configName]; ok {
-				idx := -1
-				for i, v := range registeredLink {
-					if resourceType == v {
-						idx = i
-						break
-					}
-				}
-				if idx != -1 {
-					m.linkRegisterMap[configName] = append(registeredLink[:idx], registeredLink[idx+1:]...)
-				}
-			}
-		}
-		m.registerLock.Unlock()
-	} else {
-		logger.Error(context.Background(), "ENTITY_PIPELINE_UNREGISTER_ERROR", "resourceType not support", resourceType)
 	}
+	m.registerLock.Lock()
+	if cnt, ok := m.projectNames[projectName]; ok {
+		if cnt == 1 {
+			delete(m.projectNames, projectName)
+		} else {
+			m.projectNames[projectName] = cnt - 1
+		}
+	}
+	delete(m.linkRegisterMap, configName)
+	m.registerLock.Unlock()
 }
 
 func GetMetaManagerMetrics() []map[string]string {

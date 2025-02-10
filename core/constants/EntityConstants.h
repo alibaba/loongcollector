@@ -18,14 +18,14 @@
 
 namespace logtail {
 
+extern const std::string DEFAULT_VALUE_DOMAIN_ACS;
+extern const std::string DEFAULT_VALUE_DOMAIN_INFRA;
 extern const std::string DEFAULT_ENV_KEY_HOST_TYPE;
 extern const std::string DEFAULT_HOST_TYPE_ECS;
 extern const std::string DEFAULT_HOST_TYPE_HOST;
 extern const std::string DEFAULT_CONTENT_KEY_ENTITY_TYPE;
 extern const std::string DEFAULT_CONTENT_KEY_ENTITY_ID;
 extern const std::string DEFAULT_CONTENT_KEY_DOMAIN;
-extern const std::string DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
-extern const std::string DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
 extern const std::string DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME;
 extern const std::string DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME;
 extern const std::string DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS;

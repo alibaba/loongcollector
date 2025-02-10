@@ -22,7 +22,7 @@ namespace logtail {
 
 class LZ4Compressor : public Compressor {
 public:
-    LZ4Compressor(CompressType type) : Compressor(type){};
+    explicit LZ4Compressor(CompressType type) : Compressor(type) {}
 
 #ifdef APSARA_UNIT_TEST_MAIN
     bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) override;

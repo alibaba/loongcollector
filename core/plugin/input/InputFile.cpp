@@ -18,18 +18,17 @@
 
 #include "StringTools.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
-#include "pipeline/plugin/PluginRegistry.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
-#include "plugin/processor/inner/ProcessorTagNative.h"
 
 using namespace std;
 
@@ -41,7 +40,7 @@ namespace logtail {
 const string InputFile::sName = "input_file";
 
 bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
-                                             const PipelineContext*,
+                                             const CollectionPipelineContext*,
                                              const FileDiscoveryOptions* fileDiscovery) {
     string logPath = GetLogPath(fileDiscovery);
     return SetContainerBaseDir(containerInfo, logPath);
@@ -70,14 +69,16 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     } else if (mEnableContainerDiscovery && !AppConfig::GetInstance()->IsPurageContainerMode()) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           "iLogtail is not in container, but container discovery is required",
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+        mEnableContainerDiscovery = false;
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "iLogtail is not in container, but container discovery is required",
+                              false,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
     }
     if (mEnableContainerDiscovery) {
         if (!mContainerDiscovery.Init(config, *mContext, sName)) {
@@ -113,6 +114,11 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         } else if (!mMultiline.Init(*itr, *mContext, sName)) {
             return false;
         }
+    }
+
+    // Tag
+    if (!mFileTag.Init(config, *mContext, sName, mEnableContainerDiscovery)) {
+        return false;
     }
 
     // MaxCheckpointDirSearchDepth
@@ -181,6 +187,7 @@ bool InputFile::Start() {
     FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
     FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
     FileServer::GetInstance()->AddMultilineConfig(mContext->GetConfigName(), &mMultiline, mContext);
+    FileServer::GetInstance()->AddFileTagConfig(mContext->GetConfigName(), &mFileTag, mContext);
     FileServer::GetInstance()->AddExactlyOnceConcurrency(mContext->GetConfigName(), mExactlyOnceConcurrency);
     return true;
 }
@@ -192,6 +199,7 @@ bool InputFile::Stop(bool isPipelineRemoving) {
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
+    FileServer::GetInstance()->RemoveFileTagConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveExactlyOnceConcurrency(mContext->GetConfigName());
     FileServer::GetInstance()->RemovePluginMetricManager(mContext->GetConfigName());
     return true;
@@ -206,7 +214,6 @@ bool InputFile::CreateInnerProcessors() {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["SplitChar"] = Json::Value('\0');
-            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
         } else if (mMultiline.IsMultiline()) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitMultilineLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -214,7 +221,6 @@ bool InputFile::CreateInnerProcessors() {
             detail["StartPattern"] = Json::Value(mMultiline.mStartPattern);
             detail["ContinuePattern"] = Json::Value(mMultiline.mContinuePattern);
             detail["EndPattern"] = Json::Value(mMultiline.mEndPattern);
-            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
             detail["IgnoringUnmatchWarning"] = Json::Value(mMultiline.mIgnoringUnmatchWarning);
             if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::DISCARD) {
                 detail["UnmatchedContentTreatment"] = Json::Value("discard");
@@ -225,21 +231,10 @@ bool InputFile::CreateInnerProcessors() {
         } else {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
-            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
         }
         detail["EnableRawContent"]
             = Json::Value(!mContext->HasNativeProcessors() && !mContext->IsExactlyOnceEnabled()
-                          && !mContext->IsFlushingThroughGoPipeline() && !mFileReader.mAppendingLogPositionMeta);
-        if (!processor->Init(detail, *mContext)) {
-            // should not happen
-            return false;
-        }
-        mInnerProcessors.emplace_back(std::move(processor));
-    }
-    {
-        Json::Value detail;
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName,
-                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+                          && !mContext->IsFlushingThroughGoPipeline() && !mFileTag.EnableLogPositionMeta());
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

@@ -19,9 +19,9 @@
 
 #include "PluginRegistry.h"
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
-#include "pipeline/Pipeline.h"
-#include "pipeline/PipelineContext.h"
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
@@ -53,8 +53,8 @@ protected:
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void InputPrometheusUnittest::OnSuccessfulInit() {

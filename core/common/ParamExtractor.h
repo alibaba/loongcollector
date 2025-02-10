@@ -25,7 +25,9 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/StringTools.h"
+#include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 
@@ -306,14 +308,14 @@ bool GetMandatoryListParam(const Json::Value& config,
                            std::string& errorMsg) {
     errorMsg.clear();
     if (!config.isMember(ExtractCurrentKey(key))) {
-        errorMsg = "madatory param " + key + " is missing";
+        errorMsg = "mandatory param " + key + " is missing";
         return false;
     }
     if (!GetOptionalListParam<T>(config, key, param, errorMsg)) {
         return false;
     }
     if (param.empty()) {
-        errorMsg = "madatory list param " + key + " is empty";
+        errorMsg = "mandatory list param " + key + " is empty";
         return false;
     }
     return true;
@@ -325,4 +327,11 @@ bool IsValidList(const Json::Value& config, const std::string& key, std::string&
 
 bool IsValidMap(const Json::Value& config, const std::string& key, std::string& errorMsg);
 
+void ParseTagKey(const Json::Value* config,
+                 const std::string& configField,
+                 TagKey tagKey,
+                 std::unordered_map<TagKey, std::string>& tagKeyMap,
+                 const CollectionPipelineContext& context,
+                 const std::string& pluginType,
+                 bool defaultAdded);
 } // namespace logtail

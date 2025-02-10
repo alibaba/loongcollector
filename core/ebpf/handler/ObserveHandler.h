@@ -24,32 +24,37 @@ namespace ebpf {
 
 class MeterHandler : public AbstractHandler {
 public:
-    MeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
+    MeterHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : AbstractHandler(ctx, key, idx) {}
 
     virtual void handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>&, uint64_t) = 0;
 };
 
 class OtelMeterHandler : public MeterHandler {
 public:
-    OtelMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
+    OtelMeterHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : MeterHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) override;
 };
 
 class SpanHandler : public AbstractHandler {
 public:
-    SpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
+    SpanHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : AbstractHandler(ctx, key, idx) {}
     virtual void handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&) = 0;
 };
 
 class OtelSpanHandler : public SpanHandler {
 public:
-    OtelSpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
+    OtelSpanHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : SpanHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&) override;
 };
 
 class EventHandler : public AbstractHandler {
 public:
-    EventHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
+    EventHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : AbstractHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&);
 };
 
@@ -57,13 +62,15 @@ public:
 
 class ArmsMeterHandler : public MeterHandler {
 public:
-    ArmsMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
+    ArmsMeterHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : MeterHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) override;
 };
 
 class ArmsSpanHandler : public SpanHandler {
 public:
-    ArmsSpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
+    ArmsSpanHandler(const logtail::CollectionPipelineContext* ctx, QueueKey key, uint32_t idx)
+        : SpanHandler(ctx, key, idx) {}
     void handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&) override;
 };
 

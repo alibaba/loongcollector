@@ -112,6 +112,7 @@ func TestPrometheusFlusher_ShouldInitSuccess_GivenNecessaryConfig(t *testing.T) 
 // 2. “同一个 *models.PipelineGroupEvents”，从实际使用场景看，一般有 1至多组 tags，这里先考虑 仅1组tags 的情况
 func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWithV2Model_OnlyOneGroupOfTags(t *testing.T) {
 	Convey("Given correct data with []*models.PipelineGroupEvents type", t, func() {
+		var mu sync.Mutex
 		var actualWriteRequests []*prompb.WriteRequest
 		endpoint := "http://localhost:9090/write"
 		expectedUsername, expectedPassword := "user", "password"
@@ -143,6 +144,8 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 				return httpmock.NewStringResponse(http.StatusBadRequest, "Invalid Write Request"), fmt.Errorf("parse prometheus write request error: %w", err)
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
 			actualWriteRequests = append(actualWriteRequests, wr)
 
 			return httpmock.NewStringResponse(http.StatusOK, "ok"), nil
@@ -275,6 +278,7 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 // 2. “同一个 *models.PipelineGroupEvents”，从实际使用场景看，一般有 1至多组 tags，这里考虑 多组tags 的情况
 func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWithV2Model_MultiGroupsOfTags(t *testing.T) {
 	Convey("Given correct data with []*models.PipelineGroupEvents type", t, func() {
+		var mu sync.Mutex
 		var actualWriteRequests []*prompb.WriteRequest
 		endpoint := "http://localhost:9090/write"
 		expectedUsername, expectedPassword := "user", "password"
@@ -304,6 +308,8 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 				return httpmock.NewStringResponse(http.StatusBadRequest, "Invalid Write Request"), fmt.Errorf("parse prometheus write request error: %w", err)
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
 			actualWriteRequests = append(actualWriteRequests, wr)
 
 			return httpmock.NewStringResponse(http.StatusOK, "ok"), nil
@@ -422,6 +428,7 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 // 2. “同一个 *models.PipelineGroupEvents”，从实际使用场景看，一般有 1至多组 tags，这里考虑 多组tags 的情况
 func TestPrometheusFlusher_ShouldNotWriteToRemoteStorage_GivenIncorrectDataWithV2Model_MultiGroupsOfTags(t *testing.T) {
 	Convey("Given incorrect data with []*models.PipelineGroupEvents type", t, func() {
+		var mu sync.Mutex
 		var actualWriteRequests []*prompb.WriteRequest
 		endpoint := "http://localhost:9090/write"
 		expectedUsername, expectedPassword := "user", "password"
@@ -451,6 +458,8 @@ func TestPrometheusFlusher_ShouldNotWriteToRemoteStorage_GivenIncorrectDataWithV
 				return httpmock.NewStringResponse(http.StatusBadRequest, "Invalid Write Request"), fmt.Errorf("parse prometheus write request error: %w", err)
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
 			actualWriteRequests = append(actualWriteRequests, wr)
 
 			return httpmock.NewStringResponse(http.StatusOK, "ok"), nil
