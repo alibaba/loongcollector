@@ -888,6 +888,191 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
 #endif
     }
+    // arms_traces telemetry type
+    {
+        flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES;
+        flusher.mSubpath = APM_TRACES_URL;
+        // normal
+        SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
+
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
+        APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_FALSE(req->mHTTPSFlag);
+#else
+        APSARA_TEST_TRUE(req->mHTTPSFlag);
+#endif
+        APSARA_TEST_EQUAL(APM_TRACES_URL, req->mUrl);
+        APSARA_TEST_EQUAL("", req->mQueryString);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+#else
+        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHeader[HOST]);
+#endif
+        APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
+        APSARA_TEST_FALSE(req->mHeader[DATE].empty());
+        APSARA_TEST_EQUAL(TYPE_LOG_PROTOBUF, req->mHeader[CONTENT_TYPE]);
+        APSARA_TEST_EQUAL(bodyLenStr, req->mHeader[CONTENT_LENGTH]);
+        APSARA_TEST_EQUAL(CalcMD5(req->mBody), req->mHeader[CONTENT_MD5]);
+        APSARA_TEST_EQUAL(LOG_API_VERSION, req->mHeader[X_LOG_APIVERSION]);
+        APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
+        APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
+        APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
+#endif
+        APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
+        APSARA_TEST_EQUAL(body, req->mBody);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHost);
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(80, req->mPort);
+#else
+        APSARA_TEST_EQUAL(443, req->mPort);
+#endif
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
+        APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
+        APSARA_TEST_FALSE(req->mFollowRedirects);
+        APSARA_TEST_EQUAL(&item, req->mItem);
+        APSARA_TEST_FALSE(item.mRealIpFlag);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+#endif
+    }
+    // arms_metrics telemetry type
+    {
+        flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS;
+        flusher.mSubpath = APM_METRICS_URL;
+        // normal
+        SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
+
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
+        APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_FALSE(req->mHTTPSFlag);
+#else
+        APSARA_TEST_TRUE(req->mHTTPSFlag);
+#endif
+        APSARA_TEST_EQUAL(APM_METRICS_URL, req->mUrl);
+        APSARA_TEST_EQUAL("", req->mQueryString);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+#else
+        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHeader[HOST]);
+#endif
+        APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
+        APSARA_TEST_FALSE(req->mHeader[DATE].empty());
+        APSARA_TEST_EQUAL(TYPE_LOG_PROTOBUF, req->mHeader[CONTENT_TYPE]);
+        APSARA_TEST_EQUAL(bodyLenStr, req->mHeader[CONTENT_LENGTH]);
+        APSARA_TEST_EQUAL(CalcMD5(req->mBody), req->mHeader[CONTENT_MD5]);
+        APSARA_TEST_EQUAL(LOG_API_VERSION, req->mHeader[X_LOG_APIVERSION]);
+        APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
+        APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
+        APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
+#endif
+        APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
+        APSARA_TEST_EQUAL(body, req->mBody);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHost);
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(80, req->mPort);
+#else
+        APSARA_TEST_EQUAL(443, req->mPort);
+#endif
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
+        APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
+        APSARA_TEST_FALSE(req->mFollowRedirects);
+        APSARA_TEST_EQUAL(&item, req->mItem);
+        APSARA_TEST_FALSE(item.mRealIpFlag);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+#endif
+    }
+    // arms_agentinfo telemetry type
+    {
+        flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
+        flusher.mSubpath = APM_AGENTINFOS_URL;
+        // normal
+        SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
+
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
+        APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_FALSE(req->mHTTPSFlag);
+#else
+        APSARA_TEST_TRUE(req->mHTTPSFlag);
+#endif
+        APSARA_TEST_EQUAL(APM_AGENTINFOS_URL, req->mUrl);
+        APSARA_TEST_EQUAL("", req->mQueryString);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+#else
+        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHeader[HOST]);
+#endif
+        APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
+        APSARA_TEST_FALSE(req->mHeader[DATE].empty());
+        APSARA_TEST_EQUAL(TYPE_LOG_PROTOBUF, req->mHeader[CONTENT_TYPE]);
+        APSARA_TEST_EQUAL(bodyLenStr, req->mHeader[CONTENT_LENGTH]);
+        APSARA_TEST_EQUAL(CalcMD5(req->mBody), req->mHeader[CONTENT_MD5]);
+        APSARA_TEST_EQUAL(LOG_API_VERSION, req->mHeader[X_LOG_APIVERSION]);
+        APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
+        APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
+        APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
+#endif
+        APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
+        APSARA_TEST_EQUAL(body, req->mBody);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHost);
+#endif
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL(80, req->mPort);
+#else
+        APSARA_TEST_EQUAL(443, req->mPort);
+#endif
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
+        APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
+        APSARA_TEST_FALSE(req->mFollowRedirects);
+        APSARA_TEST_EQUAL(&item, req->mItem);
+        APSARA_TEST_FALSE(item.mRealIpFlag);
+#ifdef __ENTERPRISE__
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+#else
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+#endif
+    }
+    flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+
     {
         // event group list
         SLSSenderQueueItem item("hello, world!",
@@ -949,92 +1134,6 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
 #endif
-    }
-    {
-        // APM backend
-        Json::Value configJsonAPM, optionalGoPipelineAPM;
-        string errorMsgAPM;
-        // apm
-        std::vector<std::string> apmConfigStr = {R"(
-            {
-                "Type": "flusher_sls",
-                "TelemetryType": "arms_traces",
-                "Project": "test_project",
-                "Region": "test_region",
-                "Endpoint": "test_endpoint",
-                "Match": {
-                    "Type": "tag",
-                    "Key": "data_type",
-                    "Value": "trace"
-                }
-            }
-        )",
-                                                 R"(
-            {
-                "Type": "flusher_sls",
-                "TelemetryType": "arms_metrics",
-                "Project": "test_project",
-                "Region": "test_region",
-                "Endpoint": "test_endpoint",
-                "Match": {
-                    "Type": "tag",
-                    "Key": "data_type",
-                    "Value": "metric"
-                }
-            }
-        )",
-                                                 R"(
-            {
-                "Type": "flusher_sls",
-                "TelemetryType": "arms_agentinfo",
-                "Project": "test_project",
-                "Region": "test_region",
-                "Endpoint": "test_endpoint",
-                "Match": {
-                    "Type": "tag",
-                    "Key": "data_type",
-                    "Value": "agent_info"
-                }
-            }
-        )"};
-        std::vector<std::string> apmSubpath = {APM_TRACES_URL, APM_METRICS_URL, APM_AGENTINFOS_URL};
-        std::vector<sls_logs::SlsTelemetryType> apmTelemetryTypes = {
-            sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_TRACES,
-            sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_METRICS,
-            sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_APM_AGENTINFOS,
-        };
-        for (size_t zz = 0; zz < apmConfigStr.size(); zz++) {
-            std::string configStrAPM = apmConfigStr[zz];
-            APSARA_TEST_TRUE(ParseJsonTable(configStrAPM, configJsonAPM, errorMsgAPM));
-            FlusherSLS flusherAPM;
-            flusherAPM.SetContext(ctx);
-            flusherAPM.SetMetricsRecordRef(FlusherSLS::sName, "flusher_sls_for_apm");
-            APSARA_TEST_TRUE(flusherAPM.Init(configJsonAPM, optionalGoPipeline));
-
-            // normal
-            SLSSenderQueueItem item("hello, world!",
-                                    rawSize,
-                                    &flusherAPM,
-                                    flusherAPM.GetQueueKey(),
-                                    flusherAPM.mLogstore,
-                                    RawDataType::EVENT_GROUP);
-            APSARA_TEST_TRUE(flusherAPM.BuildRequest(&item, req, &keepItem, &errMsg));
-            APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
-            APSARA_TEST_EQUAL(apmSubpath[zz], req->mUrl);
-            APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
-            APSARA_TEST_FALSE(req->mHeader[DATE].empty());
-            APSARA_TEST_EQUAL(TYPE_LOG_PROTOBUF, req->mHeader[CONTENT_TYPE]);
-            APSARA_TEST_EQUAL(bodyLenStr, req->mHeader[CONTENT_LENGTH]);
-            APSARA_TEST_EQUAL(CalcMD5(req->mBody), req->mHeader[CONTENT_MD5]);
-            APSARA_TEST_EQUAL(LOG_API_VERSION, req->mHeader[X_LOG_APIVERSION]);
-            APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
-            APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
-            APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
-            APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
-            APSARA_TEST_EQUAL(body, req->mBody);
-            APSARA_TEST_TRUE(req->mHTTPSFlag);
-            APSARA_TEST_EQUAL("test_project.test_endpoint", req->mHeader[HOST]);
-        }
     }
     {
         // shard hash
