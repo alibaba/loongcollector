@@ -645,7 +645,7 @@ public:
             }
         }
 #if defined(__linux__)
-        // fifo file doesnot have event
+        // fifo file does not have event
         pEvent = PollingEventQueue::GetInstance()->FindEvent(gRootDir, fifoFileName);
         APSARA_TEST_TRUE(pEvent == NULL);
         // soft link has event when deleted

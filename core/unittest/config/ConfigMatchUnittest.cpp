@@ -485,7 +485,7 @@ public:
                            PS + "C" + PS + "c" + PS + "cc" + PS + "ccc"};
         bool result[12] = {true, true, true, true, true, true, true, false, false, true, true, false};
 
-        LOG_INFO(sLogger, ("case 1", "child directory create dynamicly"));
+        LOG_INFO(sLogger, ("case 1", "child directory create dynamically"));
         MockMaxDepthConfigs();
         int32_t idx = 0;
         for (; idx < 3; idx++) {
