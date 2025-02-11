@@ -389,4 +389,3 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 - [Logtail技术分享二](https://www.sohu.com/a/205324880_465959)
 - [Filebeat 配置](https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-input-container.html)
 - [Filebeat 容器化部署](https://www.elastic.co/guide/en/beats/filebeat/current/running-on-kubernetes.html)
-- [iLogtail 使用指南](https://github.com/alibaba/loongcollector/blob/main/docs/zh/setup/README.md)
