@@ -140,6 +140,7 @@ void LogtailMonitor::Monitor() {
     LOG_INFO(sLogger, ("profiling", "started"));
     int32_t lastMonitorTime = time(NULL), lastCheckHardLimitTime = time(nullptr);
     CpuStat curCpuStat;
+    bool shouldSuicide = false;
     {
         unique_lock<mutex> lock(mThreadRunningMux);
         while (mIsThreadRunning) {
@@ -181,6 +182,8 @@ void LogtailMonitor::Monitor() {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",
                                "prepare restart Logtail")("mem_rss", mMemStat.mRss));
+                    mIsThreadRunning = false;
+                    shouldSuicide = true;
                     break;
                 }
             }
@@ -206,10 +209,14 @@ void LogtailMonitor::Monitor() {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds upper limit for some time",
                                "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
+                    mIsThreadRunning = false;
+                    shouldSuicide = true;
                     break;
                 }
 
-                if (IsHostIpChanged()) { 
+                if (IsHostIpChanged()) {
+                    mIsThreadRunning = false;
+                    shouldSuicide = true;
                     break;
                 }
 
@@ -221,7 +228,9 @@ void LogtailMonitor::Monitor() {
             }
         }
     }
-    Suicide();
+    if (shouldSuicide) {
+        Suicide();
+    }
 }
 
 bool LogtailMonitor::SendStatusProfile(bool suicide) {
@@ -402,7 +411,6 @@ bool LogtailMonitor::IsHostIpChanged() {
 
 void LogtailMonitor::Suicide() {
     SendStatusProfile(true);
-    mIsThreadRunning = false;
     Application::GetInstance()->SetSigTermSignalFlag(true);
     sleep(60);
     _exit(1);
