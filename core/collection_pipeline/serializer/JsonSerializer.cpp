@@ -15,6 +15,7 @@
 #include "collection_pipeline/serializer/JsonSerializer.h"
 
 #include "constants/SpanConstants.h"
+// TODO: the following dependencies should be removed
 #include "protobuf/sls/LogGroupSerializer.h"
 
 using namespace std;
@@ -41,11 +42,12 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         groupTags[tag.first.to_string()] = tag.second.to_string();
     }
 
-    std::ostringstream oss;
+    // TODO: should support nano second
+    ostringstream oss;
     switch (eventType) {
         case PipelineEvent::Type::LOG:
-            for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& e = group.mEvents[i].Cast<LogEvent>();
+            for (const auto& item : group.mEvents) {
+                const auto& e = item.Cast<LogEvent>();
                 Json::Value eventJson;
                 // tags
                 eventJson.copy(groupTags);
@@ -57,12 +59,13 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson) << endl;
             }
             break;
         case PipelineEvent::Type::METRIC:
-            for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& e = group.mEvents[i].Cast<MetricEvent>();
+            // TODO: key should support custom key
+            for (const auto& item : group.mEvents) {
+                const auto& e = item.Cast<MetricEvent>();
                 if (e.Is<std::monostate>()) {
                     continue;
                 }
@@ -72,9 +75,10 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 // time
                 eventJson[JSON_KEY_TIME] = e.GetTimestamp();
                 // __labels__
-                eventJson[METRIC_RESERVED_KEY_LABELS] = Json::Value();
+                eventJson[METRIC_RESERVED_KEY_LABELS] = Json::objectValue;
+                auto& labels = eventJson[METRIC_RESERVED_KEY_LABELS];
                 for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                    eventJson[METRIC_RESERVED_KEY_LABELS][tag->first.to_string()] = tag->second.to_string();
+                    labels[tag->first.to_string()] = tag->second.to_string();
                 }
                 // __name__
                 eventJson[METRIC_RESERVED_KEY_NAME] = e.GetName().to_string();
@@ -82,27 +86,39 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 if (e.Is<UntypedSingleValue>()) {
                     eventJson[METRIC_RESERVED_KEY_VALUE] = e.GetValue<UntypedSingleValue>()->mValue;
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
-                    eventJson[METRIC_RESERVED_KEY_VALUE] = Json::Value();
+                    eventJson[METRIC_RESERVED_KEY_VALUE] = Json::objectValue;
+                    auto& values = eventJson[METRIC_RESERVED_KEY_VALUE];
                     for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
-                        eventJson[METRIC_RESERVED_KEY_VALUE][value->first.to_string()] = value->second.Value;
+                        values[value->first.to_string()] = value->second.Value;
                     }
                 }
                 Json::StreamWriterBuilder writer;
                 writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson);
+                oss << Json::writeString(writer, eventJson) << endl;
             }
             break;
         case PipelineEvent::Type::SPAN:
+            // TODO: implement span serializer
             LOG_ERROR(
                 sLogger,
                 ("invalid event type", "span type is not supported")("config", mFlusher->GetContext().GetConfigName()));
             break;
         case PipelineEvent::Type::RAW:
-            LOG_ERROR(
-                sLogger,
-                ("invalid event type", "raw type is not supported")("config", mFlusher->GetContext().GetConfigName()));
+            for (const auto& item : group.mEvents) {
+                const auto& e = item.Cast<RawEvent>();
+                Json::Value eventJson;
+                // tags
+                eventJson.copy(groupTags);
+                // time
+                eventJson[JSON_KEY_TIME] = e.GetTimestamp();
+                // content
+                eventJson[DEFAULT_CONTENT_KEY] = e.GetContent().to_string();
+                Json::StreamWriterBuilder writer;
+                writer["indentation"] = "";
+                oss << Json::writeString(writer, eventJson) << endl;
+            }
             break;
         default:
             break;

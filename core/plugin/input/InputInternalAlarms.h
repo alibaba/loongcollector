@@ -16,21 +16,19 @@
 
 #pragma once
 
-#include <filesystem>
-#include <string>
-
-#include "json/json.h"
+#include "collection_pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
-enum class ConfigType { Collection, Task };
+class InputInternalAlarms : public Input {
+public:
+    static const std::string sName;
 
-bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
-bool ParseConfigDetail(const std::string& content,
-                       const std::string& extension,
-                       Json::Value& detail,
-                       std::string& errorMsg);
-bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
-ConfigType GetConfigType(const Json::Value& detail);
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
+    bool Start() override;
+    bool Stop(bool isPipelineRemoving) override;
+    bool SupportAck() const override { return true; }
+};
 
 } // namespace logtail

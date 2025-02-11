@@ -54,6 +54,7 @@ const std::string sOwnerAccountIdKey = "owner-account-id";
 const std::string sRegionIdKey = "region-id";
 const std::string sRandomHostIdKey = "random-hostid";
 const std::string sECSAssistMachineIdKey = "ecs-assist-machine-id";
+const std::string sCustomHostIdKey = "custom-hostid";
 
 
 #if defined(_MSC_VER)
@@ -262,7 +263,7 @@ std::string GetHostIpByHostName() {
             continue;
         }
         auto tmp = std::string(ipStr);
-        // According to RFC 1918 (http://www.faqs.org/rfcs/rfc1918.html), private IP ranges are as bellow:
+        // According to RFC 1918 (http://www.faqs.org/rfcs/rfc1918.html), private IP ranges are as below:
         //   10.0.0.0        -   10.255.255.255  (10/8 prefix)
         //   172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
         //   192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
@@ -551,6 +552,10 @@ void InstanceIdentity::DumpInstanceIdentity() {
         mInstanceIdentityJson.clear();
         mInstanceIdentityJson[sECSAssistMachineIdKey] = mSerialNumber;
         dumpInstanceIdentityToFile();
+    } else if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::CUSTOM) {
+        mInstanceIdentityJson.clear();
+        mInstanceIdentityJson[sCustomHostIdKey] = STRING_FLAG(agent_host_id);
+        dumpInstanceIdentityToFile();
     }
 }
 
@@ -589,9 +594,14 @@ bool InstanceIdentity::InitFromFile() {
                            && mInstanceIdentityJson[sECSAssistMachineIdKey].isString()) {
                     // 存在 ecs-assist-machine-id，则认为instanceIdentity是ready的
                     initSuccess = true;
+                } else if (mInstanceIdentityJson.isMember(sCustomHostIdKey)
+                           && mInstanceIdentityJson[sCustomHostIdKey].isString()) {
+                    // 存在 custom-hostid，则认为instanceIdentity是ready的
+                    initSuccess = true;
                 } else {
                     LOG_ERROR(sLogger,
-                              ("instanceIdentity is ready, but no random-hostid and ecs meta found, file",
+                              ("instanceIdentity is ready, but no ecs meta, random-hostid, ecs-assist-machine-id or "
+                               "custom-hostid found, file",
                                mInstanceIdentityFile)("instanceIdentity", instanceIdentityStr));
                 }
             }
@@ -626,13 +636,26 @@ bool InstanceIdentity::UpdateInstanceIdentity(const ECSMeta& meta) {
 
 void InstanceIdentity::dumpInstanceIdentityToFile() {
     std::string errMsg;
-    if (!WriteFile(mInstanceIdentityFile, mInstanceIdentityJson.toStyledString(), errMsg)) {
-        LOG_ERROR(sLogger, ("failed to write instanceIdentity to file", mInstanceIdentityFile)("error", errMsg));
-    } else {
-        LOG_INFO(sLogger,
-                 ("write instanceIdentity to file success, fileName",
-                  mInstanceIdentityFile)("instanceIdentity", mInstanceIdentityJson.toStyledString()));
+    std::string tmpFile = mInstanceIdentityFile + ".tmp";
+    if (!WriteFile(tmpFile, mInstanceIdentityJson.toStyledString(), errMsg)) {
+        LOG_ERROR(sLogger, ("failed to write instanceIdentity to tmp file", tmpFile)("error", errMsg));
+        return;
     }
+#if defined(_MSC_VER)
+    // The rename on Windows will fail if the destination is existing.
+    remove(mInstanceIdentityFile.c_str());
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+#endif
+    if (rename(tmpFile.c_str(), mInstanceIdentityFile.c_str()) != 0) {
+        errMsg = std::strerror(errno);
+        LOG_ERROR(sLogger,
+                  ("failed to rename tmp file to target", tmpFile)("target", mInstanceIdentityFile)("error", errMsg));
+        return;
+    }
+
+    LOG_INFO(sLogger,
+             ("write instanceIdentity to file success, fileName",
+              mInstanceIdentityFile)("instanceIdentity", mInstanceIdentityJson.toStyledString()));
 }
 
 void InstanceIdentity::updateHostId(const ECSMeta& meta) {

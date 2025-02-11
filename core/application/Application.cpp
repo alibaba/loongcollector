@@ -110,8 +110,8 @@ void Application::Init() {
 #ifdef __ENTERPRISE__
     if (!InstanceIdentity::Instance()->InitFromFile()) {
         InstanceIdentity::Instance()->InitFromNetwork();
-        InstanceIdentity::Instance()->DumpInstanceIdentity();
     }
+    InstanceIdentity::Instance()->DumpInstanceIdentity();
 #endif
     // Initialize basic information: IP, hostname, etc.
     LoongCollectorMonitor::GetInstance();
@@ -269,9 +269,6 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    // TODO: this should be refactored to internal pipeline
-    AlarmManager::GetInstance()->Init();
-
     OnetimeConfigManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0,
@@ -386,7 +383,6 @@ void Application::Exit() {
 
     LogtailMonitor::GetInstance()->Stop();
     LoongCollectorMonitor::GetInstance()->Stop();
-    AlarmManager::GetInstance()->Stop();
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 

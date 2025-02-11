@@ -734,7 +734,7 @@ protected:
                 }
             }
         }
-        // can't put this code block in for, if hava multi loggroup, the sendClosure will be destroyed multi times.
+        // can't put this code block in for, if have multi loggroup, the sendClosure will be destroyed multi times.
         if (gNetWorkStat && !projectDisabled) {
             // printf("[#MockAsyncSend] success %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
 
@@ -1127,7 +1127,7 @@ public:
         }
         sleep(20);
 
-        // 4 enabeld projects (half) can send logs, so:
+        // 4 enabled projects (half) can send logs, so:
         // - 4000 logs are received.
         // - at least 4 projects have send failures.
         // - only 4 enabled projects' clients are normal (CanSend).
@@ -1219,7 +1219,7 @@ public:
         }
         sleep(20);
 
-        // 4 enabeld projects (half) can send logs, so:
+        // 4 enabled projects (half) can send logs, so:
         // - 4000 logs are received.
         // - at least 4 projects have send failures.
         // - only 4 enabled projects' clients are normal (CanSend).
@@ -1554,7 +1554,7 @@ public:
         sleep(5);
         APSARA_TEST_TRUE(sender->FlushOut(5 * 1000)); // this operation will write buffer file
         sleep(INT32_FLAG(buffer_file_alive_interval) - 4);
-        // Data sent failed will be writen to secondary, so there is a local file.
+        // Data sent failed will be written to secondary, so there is a local file.
         filesToSend.clear();
         sender->LoadFileToSend(time(NULL), filesToSend);
         APSARA_TEST_EQUAL(filesToSend.size(), 1);
@@ -2797,7 +2797,7 @@ public:
         }
         WaitForFileBeenRead();
         sleep(11);
-        LOG_INFO(sLogger, ("print map info", "after rorating c.log"));
+        LOG_INFO(sLogger, ("print map info", "after rotating c.log"));
         PrintMapInfo();
 
         LOG_INFO(sLogger, ("check map status", "3"));

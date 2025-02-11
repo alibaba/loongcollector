@@ -14,23 +14,28 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "plugin/input/InputInternalAlarms.h"
 
-#include <filesystem>
-#include <string>
-
-#include "json/json.h"
+#include "monitor/SelfMonitorServer.h"
 
 namespace logtail {
 
-enum class ConfigType { Collection, Task };
+const std::string InputInternalAlarms::sName = "input_internal_alarms";
 
-bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
-bool ParseConfigDetail(const std::string& content,
-                       const std::string& extension,
-                       Json::Value& detail,
-                       std::string& errorMsg);
-bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
-ConfigType GetConfigType(const Json::Value& detail);
+bool InputInternalAlarms::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    return true;
+}
+
+bool InputInternalAlarms::Start() {
+    SelfMonitorServer::GetInstance()->UpdateAlarmPipeline(mContext, mIndex);
+    return true;
+}
+
+bool InputInternalAlarms::Stop(bool isPipelineRemoving) {
+    if (isPipelineRemoving) {
+        SelfMonitorServer::GetInstance()->RemoveAlarmPipeline();
+    }
+    return true;
+}
 
 } // namespace logtail

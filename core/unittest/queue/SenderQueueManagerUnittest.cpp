@@ -77,7 +77,7 @@ private:
 
     unique_ptr<SenderQueueItem> GenerateItem(bool isSLS = false);
 
-    // cannot be static member, because its constructor relies on logger, which is initiallized after main starts
+    // cannot be static member, because its constructor relies on logger, which is initialized after main starts
     FlusherSLS mFlusher;
 };
 
@@ -179,7 +179,7 @@ void SenderQueueManagerUnittest::TestPushQueue() {
 }
 
 void SenderQueueManagerUnittest::TestGetAvailableItems() {
-    // prepare nomal queue
+    // prepare normal queue
     sManager->CreateQueue(
         0, sFlusherId, sCtx, {{"region", FlusherSLS::GetRegionConcurrencyLimiter(mFlusher.mRegion)}}, sMaxRate);
     for (size_t i = 0; i <= sManager->mDefaultQueueParam.GetCapacity(); ++i) {

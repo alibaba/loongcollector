@@ -16,14 +16,15 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
-#include "monitor/Monitor.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
 
 namespace logtail {
+
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__alarm__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
@@ -40,16 +41,20 @@ void SelfMonitorServer::Init() {
 void SelfMonitorServer::Monitor() {
     LOG_INFO(sLogger, ("self-monitor", "started"));
     int32_t lastMonitorTime = time(NULL);
+    int32_t lastAlarmTime = time(NULL);
     {
         unique_lock<mutex> lock(mThreadRunningMux);
         while (mIsThreadRunning) {
             if (mStopCV.wait_for(lock, std::chrono::seconds(1), [this]() { return !mIsThreadRunning; })) {
                 break;
             }
-            int32_t monitorTime = time(NULL);
-            if ((monitorTime - lastMonitorTime) >= 60) { // 60s
-                lastMonitorTime = monitorTime;
+            int32_t nowTime = time(NULL);
+            if ((nowTime - lastMonitorTime) >= 60) { // 60s
+                lastMonitorTime = nowTime;
                 SendMetrics();
+            }
+            if ((nowTime - lastAlarmTime) >= 3) { // 3s
+                lastAlarmTime = nowTime;
                 SendAlarms();
             }
         }
@@ -59,6 +64,7 @@ void SelfMonitorServer::Monitor() {
 }
 
 void SelfMonitorServer::Stop() {
+    AlarmManager::GetInstance()->ForceToSend();
     {
         lock_guard<mutex> lock(mThreadRunningMux);
         mIsThreadRunning = false;
@@ -75,9 +81,12 @@ void SelfMonitorServer::Stop() {
     }
 }
 
-void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx, SelfMonitorMetricRules* rules) {
+void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx,
+                                             size_t inputIndex,
+                                             SelfMonitorMetricRules* rules) {
     WriteLock lock(mMetricPipelineLock);
     mMetricPipelineCtx = ctx;
+    mMetricInputIndex = inputIndex;
     mSelfMonitorMetricRules = rules;
     LOG_INFO(sLogger, ("self-monitor metrics pipeline", "updated"));
 }
@@ -85,6 +94,7 @@ void SelfMonitorServer::UpdateMetricPipeline(CollectionPipelineContext* ctx, Sel
 void SelfMonitorServer::RemoveMetricPipeline() {
     WriteLock lock(mMetricPipelineLock);
     mMetricPipelineCtx = nullptr;
+    mMetricInputIndex = 0;
     mSelfMonitorMetricRules = nullptr;
     LOG_INFO(sLogger, ("self-monitor metrics pipeline", "removed"));
 }
@@ -103,16 +113,13 @@ void SelfMonitorServer::SendMetrics() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, "__metric__");
+    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, INTERNAL_DATA_TYPE_METRIC); // todo: delete this tag
+    pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
-    shared_ptr<CollectionPipeline> pipeline
-        = CollectionPipelineManager::GetInstance()->FindConfigByName(mMetricPipelineCtx->GetConfigName());
-    if (pipeline.get() != nullptr) {
-        if (pipelineEventGroup.GetEvents().size() > 0) {
-            ProcessorRunner::GetInstance()->PushQueue(
-                pipeline->GetContext().GetProcessQueueKey(), 0, std::move(pipelineEventGroup));
-        }
+    if (pipelineEventGroup.GetEvents().size() > 0) {
+        ProcessorRunner::GetInstance()->PushQueue(
+            mMetricPipelineCtx->GetProcessQueueKey(), mMetricInputIndex, std::move(pipelineEventGroup));
     }
 }
 
@@ -169,12 +176,38 @@ void SelfMonitorServer::ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEve
     }
 }
 
-void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx) {
-    lock_guard<mutex> lock(mAlarmPipelineMux);
+void SelfMonitorServer::UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
+    WriteLock lock(mAlarmPipelineMux);
     mAlarmPipelineCtx = ctx;
+    mAlarmInputIndex = inputIndex;
+    LOG_INFO(sLogger, ("self-monitor alarms pipeline", "updated"));
+}
+
+void SelfMonitorServer::RemoveAlarmPipeline() {
+    WriteLock lock(mAlarmPipelineMux);
+    mAlarmPipelineCtx = nullptr;
+    mAlarmInputIndex = 0;
+    LOG_INFO(sLogger, ("self-monitor alarms pipeline", "removed"));
 }
 
 void SelfMonitorServer::SendAlarms() {
+    // metadata:
+    // INTERNAL_DATA_TARGET_REGION:${region}
+    // INTERNAL_DATA_TYPE:__alarm__
+    vector<PipelineEventGroup> pipelineEventGroupList;
+    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
+
+    ReadLock lock(mAlarmPipelineMux);
+    if (mAlarmPipelineCtx == nullptr) {
+        return;
+    }
+
+    for (auto& pipelineEventGroup : pipelineEventGroupList) {
+        if (pipelineEventGroup.GetEvents().size() > 0) {
+            ProcessorRunner::GetInstance()->PushQueue(
+                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
+        }
+    }
 }
 
 } // namespace logtail

@@ -30,14 +30,6 @@ const (
 	TagKeyCloudProvider
 )
 
-const (
-	hostNameDefaultTagKey      = "__hostname__"
-	hostIPDefaultTagKey        = "__host_ip__"
-	hostIDDefaultTagKey        = "__host_id__"
-	cloudProviderDefaultTagKey = "__cloud_provider__"
-	defaultConfigTagKeyValue   = "__default__"
-)
-
 // Processor interface cannot meet the requirements of tag processing, so we need to create a special ProcessorTag struct
 type ProcessorTag struct {
 	pipelineMetaTagKey     map[TagKey]string
@@ -69,12 +61,7 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 			tagsMap[tag.Key] = tag.Value
 		}
 	}
-	// file tags
 	p.addAllConfigurableTags(tagsMap)
-	fileTags := fileConfig.GetFileTags()
-	for k, v := range fileTags {
-		tagsMap[k] = v.(string)
-	}
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
@@ -102,11 +89,6 @@ func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
 	for k, v := range tagsMap {
 		in.Group.Tags.Add(k, v)
 	}
-	fileTags := fileConfig.GetFileTags()
-	// file tags
-	for k, v := range fileTags {
-		in.Group.Tags.Add(k, v.(string))
-	}
 	// env tags
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
@@ -133,19 +115,6 @@ func (p *ProcessorTag) parseDefaultAddedTag(configKey string, tagKey TagKey, def
 		// empty value means delete
 	} else {
 		p.pipelineMetaTagKey[tagKey] = defaultKey
-	}
-}
-
-func (p *ProcessorTag) parseOptionalTag(configKey string, tagKey TagKey, defaultKey string, config map[string]string) {
-	if customKey, ok := config[configKey]; ok {
-		if customKey != "" {
-			if customKey == defaultConfigTagKeyValue {
-				p.pipelineMetaTagKey[tagKey] = defaultKey
-			} else {
-				p.pipelineMetaTagKey[tagKey] = customKey
-			}
-		}
-		// empty value means delete
 	}
 }
 
