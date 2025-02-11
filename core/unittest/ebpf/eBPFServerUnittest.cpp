@@ -26,8 +26,12 @@ namespace logtail {
 namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
 public:
-    eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
-    ~eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Stop(); }
+    eBPFServerUnittest() { 
+        ebpf::eBPFServer::GetInstance()->Init();
+    }
+    ~eBPFServerUnittest() { 
+        ebpf::eBPFServer::GetInstance()->Stop(); 
+    }
 
     // for start and stop single
     void TestNetworkObserver();
@@ -70,7 +74,29 @@ public:
         }
     }
 
-    eBPFAdminConfig* config_;
+protected:
+    void SetUp() override {
+        mConfig = std::make_shared<eBPFAdminConfig>();
+        mConfig->mReceiveEventChanCap = 4096;
+        mConfig->mAdminConfig.mDebugMode = false;
+        mConfig->mAdminConfig.mLogLevel = "warn";
+        mConfig->mAdminConfig.mPushAllSpan = false;
+        mConfig->mAggregationConfig.mAggWindowSecond = 15;
+        mConfig->mConverageConfig.mStrategy = "combine";
+        mConfig->mSampleConfig.mStrategy = "fixedRate";
+        mConfig->mSampleConfig.mConfig.mRate = 0.01;
+        mConfig->mSocketProbeConfig.mSlowRequestThresholdMs = 500;
+        mConfig->mSocketProbeConfig.mMaxConnTrackers = 10000;
+        mConfig->mSocketProbeConfig.mMaxBandWidthMbPerSec = 30;
+        mConfig->mSocketProbeConfig.mMaxRawRecordPerSec = 100000;
+        mConfig->mProfileProbeConfig.mProfileSampleRate = 10;
+        mConfig->mProfileProbeConfig.mProfileUploadDuration = 10;
+        mConfig->mProcessProbeConfig.mEnableOOMDetect = false;
+    }
+
+    void TearDown() override { mConfig.reset(); }
+
+    std::shared_ptr<eBPFAdminConfig> mConfig;
     //     CollectionPipeline p;
     CollectionPipelineContext ctx;
     //     SecurityOptions security_opts;
@@ -425,22 +451,22 @@ void eBPFServerUnittest::TestLoadEbpfParametersV1() {
     AppConfig* app_config = AppConfig::GetInstance();
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
     auto configjson = app_config->GetConfig();
-    config_->LoadEbpfConfig(configjson);
-    APSARA_TEST_EQUAL(config_->GetReceiveEventChanCap(), 1024);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mDebugMode, true);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mLogLevel, "error");
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mPushAllSpan, true);
-    APSARA_TEST_EQUAL(config_->GetAggregationConfig().mAggWindowSecond, 8);
-    APSARA_TEST_EQUAL(config_->GetConverageConfig().mStrategy, "combine1");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mStrategy, "fixedRate1");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mConfig.mRate, 0.001);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mSlowRequestThresholdMs, 5000);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxConnTrackers, 100000);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 300);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxRawRecordPerSec, 1000000);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileSampleRate, 100);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileUploadDuration, 100);
-    APSARA_TEST_EQUAL(config_->GetProcessProbeConfig().mEnableOOMDetect, true);
+    mConfig->LoadEbpfConfig(configjson);
+    APSARA_TEST_EQUAL(mConfig->GetReceiveEventChanCap(), 1024);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mDebugMode, true);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mLogLevel, "error");
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mPushAllSpan, true);
+    APSARA_TEST_EQUAL(mConfig->GetAggregationConfig().mAggWindowSecond, 8);
+    APSARA_TEST_EQUAL(mConfig->GetConverageConfig().mStrategy, "combine1");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mStrategy, "fixedRate1");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mConfig.mRate, 0.001);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mSlowRequestThresholdMs, 5000);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxConnTrackers, 100000);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 300);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxRawRecordPerSec, 1000000);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileSampleRate, 100);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileUploadDuration, 100);
+    APSARA_TEST_EQUAL(mConfig->GetProcessProbeConfig().mEnableOOMDetect, true);
 }
 
 void eBPFServerUnittest::TestDefaultAndLoadEbpfParameters() {
@@ -480,22 +506,22 @@ void eBPFServerUnittest::TestDefaultAndLoadEbpfParameters() {
     AppConfig* app_config = AppConfig::GetInstance();
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
     auto configjson = app_config->GetConfig();
-    config_->LoadEbpfConfig(configjson);
-    APSARA_TEST_EQUAL(config_->GetReceiveEventChanCap(), 1024);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mDebugMode, false);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mLogLevel, "warn");
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mPushAllSpan, false);
-    APSARA_TEST_EQUAL(config_->GetAggregationConfig().mAggWindowSecond, 15);
-    APSARA_TEST_EQUAL(config_->GetConverageConfig().mStrategy, "combine");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mStrategy, "fixedRate1");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mConfig.mRate, 0.001);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mSlowRequestThresholdMs, 5000);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxConnTrackers, 100000);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 300);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxRawRecordPerSec, 1000000);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileSampleRate, 100);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileUploadDuration, 100);
-    APSARA_TEST_EQUAL(config_->GetProcessProbeConfig().mEnableOOMDetect, true);
+    mConfig->LoadEbpfConfig(configjson);
+    APSARA_TEST_EQUAL(mConfig->GetReceiveEventChanCap(), 1024);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mDebugMode, false);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mLogLevel, "warn");
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mPushAllSpan, false);
+    APSARA_TEST_EQUAL(mConfig->GetAggregationConfig().mAggWindowSecond, 15);
+    APSARA_TEST_EQUAL(mConfig->GetConverageConfig().mStrategy, "combine");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mStrategy, "fixedRate1");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mConfig.mRate, 0.001);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mSlowRequestThresholdMs, 5000);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxConnTrackers, 100000);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 300);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxRawRecordPerSec, 1000000);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileSampleRate, 100);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileUploadDuration, 100);
+    APSARA_TEST_EQUAL(mConfig->GetProcessProbeConfig().mEnableOOMDetect, true);
 }
 
 void eBPFServerUnittest::TestDefaultEbpfParameters() {
@@ -505,23 +531,23 @@ void eBPFServerUnittest::TestDefaultEbpfParameters() {
     AppConfig* app_config = AppConfig::GetInstance();
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
     auto configjson = app_config->GetConfig();
-    config_->LoadEbpfConfig(configjson);
+    mConfig->LoadEbpfConfig(configjson);
 
-    APSARA_TEST_EQUAL(config_->GetReceiveEventChanCap(), 4096);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mDebugMode, false);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mLogLevel, "warn");
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mPushAllSpan, false);
-    APSARA_TEST_EQUAL(config_->GetAggregationConfig().mAggWindowSecond, 15);
-    APSARA_TEST_EQUAL(config_->GetConverageConfig().mStrategy, "combine");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mStrategy, "fixedRate");
-    APSARA_TEST_EQUAL(config_->GetSampleConfig().mConfig.mRate, 0.01);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mSlowRequestThresholdMs, 500);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxConnTrackers, 10000);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 30);
-    APSARA_TEST_EQUAL(config_->GetSocketProbeConfig().mMaxRawRecordPerSec, 100000);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileSampleRate, 10);
-    APSARA_TEST_EQUAL(config_->GetProfileProbeConfig().mProfileUploadDuration, 10);
-    APSARA_TEST_EQUAL(config_->GetProcessProbeConfig().mEnableOOMDetect, false);
+    APSARA_TEST_EQUAL(mConfig->GetReceiveEventChanCap(), 4096);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mDebugMode, false);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mLogLevel, "warn");
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mPushAllSpan, false);
+    APSARA_TEST_EQUAL(mConfig->GetAggregationConfig().mAggWindowSecond, 15);
+    APSARA_TEST_EQUAL(mConfig->GetConverageConfig().mStrategy, "combine");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mStrategy, "fixedRate");
+    APSARA_TEST_EQUAL(mConfig->GetSampleConfig().mConfig.mRate, 0.01);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mSlowRequestThresholdMs, 500);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxConnTrackers, 10000);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxBandWidthMbPerSec, 30);
+    APSARA_TEST_EQUAL(mConfig->GetSocketProbeConfig().mMaxRawRecordPerSec, 100000);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileSampleRate, 10);
+    APSARA_TEST_EQUAL(mConfig->GetProfileProbeConfig().mProfileUploadDuration, 10);
+    APSARA_TEST_EQUAL(mConfig->GetProcessProbeConfig().mEnableOOMDetect, false);
 }
 
 void eBPFServerUnittest::TestLoadEbpfParametersV2() {
@@ -537,8 +563,8 @@ void eBPFServerUnittest::TestEbpfParameters() {
     AppConfig* appConfig = AppConfig::GetInstance();
     appConfig->LoadAppConfig(STRING_FLAG(ilogtail_config));
 
-    APSARA_TEST_EQUAL(config_->GetReceiveEventChanCap(), 4096);
-    APSARA_TEST_EQUAL(config_->GetAdminConfig().mDebugMode, false);
+    APSARA_TEST_EQUAL(mConfig->GetReceiveEventChanCap(), 4096);
+    APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mDebugMode, false);
 }
 
 void eBPFServerUnittest::TestEnvManager() {

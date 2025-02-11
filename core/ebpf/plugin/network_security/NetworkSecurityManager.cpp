@@ -58,7 +58,7 @@ void HandleNetworkKernelEventLoss(void* ctx, int cpu, __u64 num) {
 }
 
 void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
-    KernelEventType type;
+    KernelEventType type = KernelEventType::TCP_SENDMSG_EVENT;
     switch (event->func) {
         case TRACEPOINT_FUNC_TCP_SENDMSG:
             type = KernelEventType::TCP_SENDMSG_EVENT;
@@ -70,7 +70,7 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
             type = KernelEventType::TCP_CLOSE_EVENT;
             break;
         default:
-            break;
+            return;
     }
     auto evt = std::make_shared<NetworkEvent>(event->key.pid,
                                               event->key.ktime,
