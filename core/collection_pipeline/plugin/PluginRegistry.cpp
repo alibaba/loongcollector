@@ -92,13 +92,15 @@ void PluginRegistry::UnloadPlugins() {
     mPluginDict.clear();
 }
 
-unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name,
-                                                      const PluginInstance::PluginMeta& pluginMeta) {
-    auto res = Create(CONTINUOUS_INPUT_PLUGIN, name, pluginMeta);
-    if (!res) {
-        res = Create(ONETIME_INPUT_PLUGIN, name, pluginMeta);
+unique_ptr<InputInstance>
+PluginRegistry::CreateInput(const string& name, bool isOnetime, const PluginInstance::PluginMeta& pluginMeta) {
+    if (isOnetime) {
+        return unique_ptr<InputInstance>(
+            static_cast<InputInstance*>(Create(ONETIME_INPUT_PLUGIN, name, pluginMeta).release()));
+    } else {
+        return unique_ptr<InputInstance>(
+            static_cast<InputInstance*>(Create(CONTINUOUS_INPUT_PLUGIN, name, pluginMeta).release()));
     }
-    return unique_ptr<InputInstance>(static_cast<InputInstance*>(res.release()));
 }
 
 unique_ptr<ProcessorInstance> PluginRegistry::CreateProcessor(const string& name,

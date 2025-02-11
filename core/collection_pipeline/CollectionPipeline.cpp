@@ -104,8 +104,8 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     for (size_t i = 0; i < config.mInputs.size(); ++i) {
         const Json::Value& detail = *config.mInputs[i];
         string pluginType = detail["Type"].asString();
-        unique_ptr<InputInstance> input
-            = PluginRegistry::GetInstance()->CreateInput(pluginType, GenNextPluginMeta(false));
+        unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(
+            pluginType, config.mExpireTime.has_value(), GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {

@@ -39,7 +39,7 @@ protected:
 };
 
 void PluginRegistryUnittest::TestCreateInput() const {
-    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, {"0"});
+    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, false, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
     APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
 }

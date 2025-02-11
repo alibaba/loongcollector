@@ -33,14 +33,11 @@ OnetimeConfigStatus OnetimeConfigManager::GetOnetimeConfigStatusFromCheckpoint(c
                                                                                uint64_t hash,
                                                                                uint32_t* expireTime) {
     auto it = mConfigExpireTimeCheckpoint.find(configName);
-    if (it == mConfigExpireTimeCheckpoint.end()) {
+    if (it == mConfigExpireTimeCheckpoint.end() || it->second.first != hash) {
         return OnetimeConfigStatus::NEW;
     }
     OnetimeConfigStatus status = OnetimeConfigStatus::OBSOLETE;
-    if (it->second.first != hash) {
-        status = OnetimeConfigStatus::NEW;
-    } else if (time(nullptr) + 10 < it->second.second) {
-        // we give 10 seconds buffer in case a pipeline is stopped immediately after creation
+    if (time(nullptr) < it->second.second) {
         status = OnetimeConfigStatus::OLD;
     }
     if (expireTime) {

@@ -2740,7 +2740,7 @@ void PipelineUnittest::TestProcess() const {
     ctx.SetPipeline(pipeline);
     Json::Value tmp;
 
-    auto input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, pipeline.GenNextPluginMeta(false));
+    auto input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, false, pipeline.GenNextPluginMeta(false));
     input->Init(Json::Value(), ctx, 0, tmp);
     pipeline.mInputs.emplace_back(std::move(input));
     auto processor

@@ -45,7 +45,8 @@ public:
 
     void LoadPlugins();
     void UnloadPlugins();
-    std::unique_ptr<InputInstance> CreateInput(const std::string& name, const PluginInstance::PluginMeta& pluginMeta);
+    std::unique_ptr<InputInstance>
+    CreateInput(const std::string& name, bool isOnetime, const PluginInstance::PluginMeta& pluginMeta);
     std::unique_ptr<ProcessorInstance> CreateProcessor(const std::string& name,
                                                        const PluginInstance::PluginMeta& pluginMeta);
     std::unique_ptr<FlusherInstance> CreateFlusher(const std::string& name,

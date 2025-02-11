@@ -39,9 +39,9 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
     if (skipExisted) {
         error_code ec;
         if (filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
-            LOG_WARNING(sLogger,
-                        ("delete obsolete checkpoint file succeeded",
-                         "config has changed")("config", configName)("input idx", idx));
+            LOG_INFO(sLogger,
+                     ("delete obsolete checkpoint file succeeded", "config has changed")("config",
+                                                                                         configName)("input idx", idx));
         } else if (ec) {
             LOG_WARNING(sLogger,
                         ("failed to delete obsolete checkpoint file", "skip")("config", configName)("input idx", idx)(

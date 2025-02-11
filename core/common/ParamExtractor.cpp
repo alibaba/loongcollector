@@ -61,11 +61,11 @@ bool GetOptionalUInt64Param(const Json::Value& config, const string& key, uint64
     string curKey = ExtractCurrentKey(key);
     const Json::Value* itr = config.find(curKey.c_str(), curKey.c_str() + curKey.length());
     if (itr != nullptr) {
-        if (!itr->isUInt()) {
+        if (!itr->isUInt64()) {
             errorMsg = "param " + key + " is not of type uint64";
             return false;
         }
-        param = itr->asUInt();
+        param = itr->asUInt64();
     }
     return true;
 }
