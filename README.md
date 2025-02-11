@@ -4,12 +4,12 @@
 
 LoongCollector was born for observable scenarios and has many production-level features such as lightweight, high performance, and automated configuration, which are widely used internally by Alibaba Group and tens of thousands of external Alibaba Cloud customers. You can deploy it in physical machines, Kubernetes and other environments to collect telemetry data, such as logs, traces and metrics.
 
-[![GitHub contributors](https://img.shields.io/github/contributors/alibaba/ilogtail)](https://github.com/alibaba/loongcollector/contributors)
-[![GitHub stars](https://img.shields.io/github/stars/alibaba/ilogtail)](https://github.com/alibaba/loongcollector/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/alibaba/ilogtail)](https://github.com/alibaba/loongcollector/issues)
-[![GitHub license](https://img.shields.io/github/license/alibaba/ilogtail)](https://github.com/alibaba/loongcollector/blob/main/LICENSE)
+[![GitHub contributors](https://img.shields.io/github/contributors/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/contributors)
+[![GitHub stars](https://img.shields.io/github/stars/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/issues)
+[![GitHub license](https://img.shields.io/github/license/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/blob/main/LICENSE)
 [![Coverity Scan Build Status](https://img.shields.io/coverity/scan/28764.svg)](https://scan.coverity.com/projects/alibaba-ilogtail)
-[![Coverage Status](https://codecov.io/gh/alibaba/ilogtail/branch/main/graph/badge.svg)](https://codecov.io/gh/alibaba/ilogtail)
+[![Coverage Status](https://codecov.io/gh/alibaba/loongcollector/branch/main/graph/badge.svg)](https://codecov.io/gh/alibaba/loongcollector)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alibaba/loongcollector)](https://goreportcard.com/report/github.com/alibaba/loongcollector)
 
 ## Abstract
