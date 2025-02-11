@@ -16,6 +16,7 @@
 
 #include "constants/SpanConstants.h"
 // TODO: the following dependencies should be removed
+#include "constants/Constants.h"
 #include "protobuf/sls/LogGroupSerializer.h"
 
 using namespace std;
