@@ -183,8 +183,7 @@ int GetFileLines(const std::filesystem::path& filename,
                  std::vector<std::string>& res,
                  bool enableEmptyLine,
                  std::string* errorMessage) {
-    return GetLines(
-        filename, enableEmptyLine, [&res](const std::string& s) { res.push_back(s); }, errorMessage);
+    return GetLines(filename, enableEmptyLine, [&res](const std::string& s) { res.push_back(s); }, errorMessage);
 }
 
 bool OverwriteFile(const std::string& fileName, const std::string& content) {
