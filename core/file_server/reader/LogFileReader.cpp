@@ -204,7 +204,6 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     mLogstore = readerConfig.second->GetLogstoreName();
     mConfigName = readerConfig.second->GetConfigName();
     mRegion = readerConfig.second->GetRegion();
-    mMetricInited = false;
 
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = GetParser<RawTextParser>(0);
@@ -212,7 +211,6 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
 }
 
 void LogFileReader::SetMetrics() {
-    mMetricInited = false;
     mMetricLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
                      {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
                      {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
@@ -228,7 +226,6 @@ void LogFileReader::SetMetrics() {
     mOutSizeBytes = mMetricsRecordRef->GetCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
     mSourceSizeBytes = mMetricsRecordRef->GetIntGauge(METRIC_PLUGIN_SOURCE_SIZE_BYTES);
     mSourceReadOffsetBytes = mMetricsRecordRef->GetIntGauge(METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES);
-    mMetricInited = true;
 }
 
 void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray) {
@@ -2144,13 +2141,11 @@ std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
 }
 
 void LogFileReader::ReportMetrics(uint64_t readSize) {
-    if (mMetricInited) {
-        mOutEventsTotal->Add(1);
-        mOutEventGroupsTotal->Add(1);
-        mOutSizeBytes->Add(readSize);
-        mSourceReadOffsetBytes->Set(GetLastFilePos());
-        mSourceSizeBytes->Set(GetFileSize());
-    }
+    ADD_COUNTER(mOutEventsTotal, 1);
+    ADD_COUNTER(mOutEventGroupsTotal, 1);
+    ADD_COUNTER(mOutSizeBytes, readSize);
+    SET_GAUGE(mSourceReadOffsetBytes, GetLastFilePos());
+    SET_GAUGE(mSourceSizeBytes, GetFileSize());
 }
 
 

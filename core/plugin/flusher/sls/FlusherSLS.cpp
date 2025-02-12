@@ -602,9 +602,7 @@ bool FlusherSLS::FlushAll() {
 }
 
 bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem, string* errMsg) {
-    if (mSendCnt) {
-        mSendCnt->Add(1);
-    }
+    ADD_COUNTER(mSendCnt, 1);
 
     SLSClientManager::AuthType type;
     string accessKeyId, accessKeySecret;
@@ -686,9 +684,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 }
 
 void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item) {
-    if (mSendDoneCnt) {
-        mSendDoneCnt->Add(1);
-    }
+    ADD_COUNTER(mSendDoneCnt, 1);
     SLSResponse slsResponse = ParseHttpResponse(response);
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
@@ -719,9 +715,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
         GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
         SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
-        if (mSuccessCnt) {
-            mSuccessCnt->Add(1);
-        }
+        ADD_COUNTER(mSuccessCnt, 1);
         DealSenderQueueItemAfterSend(item, false);
     } else {
         OperationOnFail operation;
@@ -730,14 +724,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         if (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR) {
             if (sendResult == SEND_NETWORK_ERROR) {
                 failDetail << "network error";
-                if (mNetworkErrorCnt) {
-                    mNetworkErrorCnt->Add(1);
-                }
+                ADD_COUNTER(mNetworkErrorCnt, 1);
             } else {
                 failDetail << "server error";
-                if (mServerErrorCnt) {
-                    mServerErrorCnt->Add(1);
-                }
+                ADD_COUNTER(mServerErrorCnt, 1);
             }
             suggestion << "check network connection to endpoint";
 #ifdef __ENTERPRISE__
@@ -758,9 +748,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnFail(curSystemTime);
                 GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
                 GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
-                if (mShardWriteQuotaErrorCnt) {
-                    mShardWriteQuotaErrorCnt->Add(1);
-                }
+                ADD_COUNTER(mShardWriteQuotaErrorCnt, 1);
             } else {
                 failDetail << "project write quota exceed";
                 suggestion << "Submit quota modification request. "
@@ -768,9 +756,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 GetProjectConcurrencyLimiter(mProject)->OnFail(curSystemTime);
                 GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
                 GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
-                if (mProjectQuotaErrorCnt) {
-                    mProjectQuotaErrorCnt->Add(1);
-                }
+                ADD_COUNTER(mProjectQuotaErrorCnt, 1);
             }
             AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
                                                    "error_code: " + slsResponse.mErrorCode
@@ -784,21 +770,15 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             failDetail << "write unauthorized";
             suggestion << "check access keys provided";
             operation = OperationOnFail::RETRY_LATER;
-            if (mUnauthErrorCnt) {
-                mUnauthErrorCnt->Add(1);
-            }
+            ADD_COUNTER(mUnauthErrorCnt, 1);
         } else if (sendResult == SEND_PARAMETER_INVALID) {
             failDetail << "invalid parameters";
             suggestion << "check input parameters";
             operation = DefaultOperation(item->mTryCnt);
-            if (mParamsErrorCnt) {
-                mParamsErrorCnt->Add(1);
-            }
+            ADD_COUNTER(mParamsErrorCnt, 1);
         } else if (sendResult == SEND_INVALID_SEQUENCE_ID) {
             failDetail << "invalid exactly-once sequence id";
-            if (mSequenceIDErrorCnt) {
-                mSequenceIDErrorCnt->Add(1);
-            }
+            ADD_COUNTER(mSequenceIDErrorCnt, 1);
             do {
                 auto& cpt = data->mExactlyOnceCheckpoint;
                 if (!cpt) {
@@ -837,9 +817,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             failDetail << "write request expired, will retry";
             suggestion << "check local system time";
             operation = OperationOnFail::RETRY_IMMEDIATELY;
-            if (mRequestExpiredErrorCnt) {
-                mRequestExpiredErrorCnt->Add(1);
-            }
+            ADD_COUNTER(mRequestExpiredErrorCnt, 1);
         } else {
             failDetail << "other error";
             suggestion << "no suggestion";
@@ -848,9 +826,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             // then we record error and retry latter
             // when retry times > unknow_error_try_max, we will drop this data
             operation = DefaultOperation(item->mTryCnt);
-            if (mOtherErrorCnt) {
-                mOtherErrorCnt->Add(1);
-            }
+            ADD_COUNTER(mOtherErrorCnt, 1);
         }
         if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mFirstEnqueTime).count()
             > INT32_FLAG(discard_send_fail_interval)) {
@@ -887,9 +863,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 DealSenderQueueItemAfterSend(item, true);
                 break;
             case OperationOnFail::DISCARD:
-                if (mDiscardCnt) {
-                    mDiscardCnt->Add(1);
-                }
+                ADD_COUNTER(mDiscardCnt, 1);
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {

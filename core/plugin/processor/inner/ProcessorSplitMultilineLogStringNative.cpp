@@ -91,8 +91,8 @@ void ProcessorSplitMultilineLogStringNative::Process(PipelineEventGroup& logGrou
     for (PipelineEventPtr& e : logGroup.MutableEvents()) {
         ProcessEvent(logGroup, logPath, std::move(e), newEvents, &inputLines, &unmatchLines);
     }
-    mMatchedLinesTotal->Add(inputLines - unmatchLines);
-    mUnmatchedLinesTotal->Add(unmatchLines);
+    ADD_COUNTER(mMatchedLinesTotal, inputLines - unmatchLines);
+    ADD_COUNTER(mUnmatchedLinesTotal, unmatchLines);
     logGroup.SwapEvents(newEvents);
 }
 
@@ -177,7 +177,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                 // case: continue + end
                 CreateNewEvent(content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents);
                 multiStartIndex = content.data() + content.size() + 1;
-                mMatchedEventsTotal->Add(1);
+                ADD_COUNTER(mMatchedEventsTotal, 1);
             } else {
                 HandleUnmatchLogs(
                     content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents, logPath, unmatchLines);
@@ -201,7 +201,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                                        sourceEvent,
                                        logGroup,
                                        newEvents);
-                        mMatchedEventsTotal->Add(1);
+                        ADD_COUNTER(mMatchedEventsTotal, 1);
                     } else {
                         HandleUnmatchLogs(
                             StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
@@ -228,7 +228,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                         } else {
                             multiStartIndex = content.data() + content.size() + 1;
                         }
-                        mMatchedEventsTotal->Add(1);
+                        ADD_COUNTER(mMatchedEventsTotal, 1);
                         // if only end pattern is given, start another log automatically
                     }
                     // no continue pattern given, and the current line in not matched against the end pattern,
@@ -245,7 +245,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                                        logGroup,
                                        newEvents);
                         multiStartIndex = content.data();
-                        mMatchedEventsTotal->Add(1);
+                        ADD_COUNTER(mMatchedEventsTotal, 1);
                     }
                 } else {
                     // case: start + continue
@@ -256,7 +256,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                                    sourceEvent,
                                    logGroup,
                                    newEvents);
-                    mMatchedEventsTotal->Add(1);
+                    ADD_COUNTER(mMatchedEventsTotal, 1);
                     if (!BoostRegexSearch(
                             content.data(), content.size(), *mMultiline.GetStartPatternReg(), exception)) {
                         // when no end pattern is given, the only chance to enter unmatched state is when both
@@ -283,7 +283,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                            sourceEvent,
                            logGroup,
                            newEvents);
-            mMatchedEventsTotal->Add(1);
+            ADD_COUNTER(mMatchedEventsTotal, 1);
         } else {
             HandleUnmatchLogs(StringView(multiStartIndex, sourceVal.data() + sourceVal.size() - multiStartIndex),
                               true,

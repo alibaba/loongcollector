@@ -384,17 +384,18 @@ void CollectionPipeline::Start() {
         input->Start();
     }
 
-    mStartTime->Set(chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
+    SET_GAUGE(mStartTime,
+              chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
     // #endif
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
 void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputIndex) {
     for (const auto& logGroup : logGroupList) {
-        mProcessorsInEventsTotal->Add(logGroup.GetEvents().size());
-        mProcessorsInSizeBytes->Add(logGroup.DataSize());
+        ADD_COUNTER(mProcessorsInEventsTotal, logGroup.GetEvents().size());
+        ADD_COUNTER(mProcessorsInSizeBytes, logGroup.DataSize());
     }
-    mProcessorsInGroupsTotal->Add(logGroupList.size());
+    ADD_COUNTER(mProcessorsInGroupsTotal, logGroupList.size())
 
     auto before = chrono::system_clock::now();
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
@@ -406,15 +407,15 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
-    mProcessorsTotalProcessTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mProcessorsTotalProcessTimeMs, chrono::system_clock::now() - before);
 }
 
 bool CollectionPipeline::Send(vector<PipelineEventGroup>&& groupList) {
     for (const auto& group : groupList) {
-        mFlushersInEventsTotal->Add(group.GetEvents().size());
-        mFlushersInSizeBytes->Add(group.DataSize());
+        ADD_COUNTER(mFlushersInEventsTotal, group.GetEvents().size());
+        ADD_COUNTER(mFlushersInSizeBytes, group.DataSize());
     }
-    mFlushersInGroupsTotal->Add(groupList.size());
+    ADD_COUNTER(mFlushersInGroupsTotal, groupList.size());
 
     auto before = chrono::system_clock::now();
     bool allSucceeded = true;
@@ -434,7 +435,7 @@ bool CollectionPipeline::Send(vector<PipelineEventGroup>&& groupList) {
             allSucceeded = mFlushers[item.first]->Send(std::move(item.second)) && allSucceeded;
         }
     }
-    mFlushersTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mFlushersTotalPackageTimeMs, chrono::system_clock::now() - before);
     return allSucceeded;
 }
 

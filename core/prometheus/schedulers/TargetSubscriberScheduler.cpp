@@ -81,8 +81,8 @@ void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t 
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> newScrapeSchedulerSet
         = BuildScrapeSchedulerSet(targetGroup);
     UpdateScrapeScheduler(newScrapeSchedulerSet);
-    mPromSubscriberTargets->Set(mScrapeSchedulerMap.size());
-    mTotalDelayMs->Add(GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    SET_GAUGE(mPromSubscriberTargets, mScrapeSchedulerMap.size());
+    ADD_COUNTER(mTotalDelayMs, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
 }
 
 void TargetSubscriberScheduler::UpdateScrapeScheduler(

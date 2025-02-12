@@ -102,7 +102,7 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     streamScraper->SendMetrics();
     streamScraper->Reset();
 
-    mPluginTotalDelayMs->Add(scrapeDurationMilliSeconds);
+    ADD_COUNTER(mPluginTotalDelayMs, scrapeDurationMilliSeconds);
 }
 
 
@@ -129,7 +129,7 @@ void ScrapeScheduler::ScheduleNext() {
             return true;
         }
         this->DelayExecTime(1);
-        this->mPromDelayTotal->Add(1);
+        ADD_COUNTER(this->mPromDelayTotal, 1);
         this->ScheduleNext();
         return false;
     });

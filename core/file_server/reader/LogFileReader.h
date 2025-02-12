@@ -562,7 +562,6 @@ protected:
     std::string mRegion;
 
     MetricLabels mMetricLabels;
-    bool mMetricInited;
     ReentrantMetricsRecordRef mMetricsRecordRef;
     CounterPtr mOutEventsTotal;
     CounterPtr mOutEventGroupsTotal;

@@ -40,20 +40,20 @@ bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     mQueue.push_back(std::move(item));
     ChangeStateIfNeededAfterPush();
 
-    mInItemsTotal->Add(1);
-    mInItemDataSizeBytes->Add(size);
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Add(size);
-    mValidToPushFlag->Set(IsValidToPush());
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemDataSizeBytes, size);
+    SET_GAUGE(mQueueSizeTotal, Size());
+    ADD_COUNTER(mQueueDataSizeByte, size);
+    SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
 bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
-    mFetchTimesCnt->Add(1);
+    ADD_COUNTER(mFetchTimesCnt, 1);
     if (Empty()) {
         return false;
     }
-    mValidFetchTimesCnt->Add(1);
+    ADD_COUNTER(mValidFetchTimesCnt, 1);
     if (!IsValidToPop()) {
         return false;
     }
@@ -64,11 +64,11 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
         GiveFeedback();
     }
 
-    mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(chrono::system_clock::now() - item->mEnqueTime);
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
-    mValidToPushFlag->Set(IsValidToPush());
+    ADD_COUNTER(mOutItemsTotal, 1);
+    ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - item->mEnqueTime);
+    SET_GAUGE(mQueueSizeTotal, Size());
+    SUB_GAUGE(mQueueDataSizeByte, item->mEventGroup.DataSize());
+    SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
