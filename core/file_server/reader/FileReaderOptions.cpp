@@ -32,7 +32,7 @@ DEFINE_FLAG_INT32(default_tail_limit_kb,
 #endif
 DEFINE_FLAG_INT32(default_reader_flush_timeout, "", 60);
 DEFINE_FLAG_INT32(delay_bytes_upperlimit,
-                  "if (total_file_size - current_readed_size) exceed uppperlimit, send READ_LOG_DELAY_ALARM, bytes",
+                  "if (total_file_size - current_readed_size) exceed upperlimit, send READ_LOG_DELAY_ALARM, bytes",
                   200 * 1024 * 1024);
 DEFINE_FLAG_INT32(reader_close_unused_file_time, "second ", 60);
 DEFINE_FLAG_INT32(logreader_max_rotate_queue_size, "", 20);

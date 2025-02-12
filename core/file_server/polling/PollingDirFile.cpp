@@ -142,7 +142,7 @@ void PollingDirFile::Polling() {
 
 void PollingDirFile::PollingIteration() {
     LOG_DEBUG(sLogger, ("start dir file polling, mCurrentRound", mCurrentRound));
-    PTScopedLock thradLock(mPollingThreadLock);
+    PTScopedLock threadLock(mPollingThreadLock);
     mStatCount = 0;
     mNewFileVec.clear();
     ++mCurrentRound;
@@ -256,8 +256,8 @@ void PollingDirFile::PollingIteration() {
 }
 
 // Last Modified Time (LMD) of directory changes when a file or a subdirectory is added,
-// removed or renamed. Howerver, modifying the content of a file within it will not update
-// LMD, and add/remove/rename file/directory in its subdirectory will also not upadte LMD.
+// removed or renamed. However, modifying the content of a file within it will not update
+// LMD, and add/remove/rename file/directory in its subdirectory will also not update LMD.
 // NOTE: So, we can not find changes in subdirectories of the directory according to LMD.
 bool PollingDirFile::CheckAndUpdateDirMatchCache(const string& dirPath,
                                                  const fsutil::PathStat& statBuf,
@@ -393,7 +393,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_DEBUG(sLogger, ("Open dir error, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
                                                    pConfig.second->GetProjectName(),
@@ -558,7 +558,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_DEBUG(sLogger, ("Open dir fail, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
                                                    pConfig.second->GetProjectName(),

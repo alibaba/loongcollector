@@ -167,7 +167,7 @@ public:
     //  */
     // bool HandleReadException(int eventFd, int length, int hdrLength);
 
-    // /** Read Messsage on domain socket
+    // /** Read Message on domain socket
     //  *
     //  * @param eventFd
     //  *
@@ -179,7 +179,7 @@ public:
     // bool ReadDSPacketHdr(int eventFd);
     // bool ReadDSPacket(int eventFd);
 
-    // /** Enter the event loop, dispatch to the approiate handler when an event occurs.
+    // /** Enter the event loop, dispatch to the appropriate handler when an event occurs.
     //  * Propagate timeout.
     //  *
     //  * @return true on success; false on failure
