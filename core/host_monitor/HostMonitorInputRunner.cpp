@@ -27,24 +27,26 @@
 
 #include "HostMonitorTimerEvent.h"
 #include "ProcessEntityCollector.h"
+#include "common/Flags.h"
 #include "common/timer/Timer.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 
+DEFINE_FLAG_INT32(host_monitor_thread_pool_size, "host monitor thread pool size", 3);
 
 namespace logtail {
 
-HostMonitorInputRunner::HostMonitorInputRunner() : mThreadPool(ThreadPool(3)) {
+HostMonitorInputRunner::HostMonitorInputRunner() : mThreadPool(ThreadPool(INT32_FLAG(host_monitor_thread_pool_size))) {
     RegisterCollector<ProcessEntityCollector>();
 }
 
-void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& newCollectors,
+void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& newCollectorNames,
                                              QueueKey processQueueKey,
                                              int inputIndex,
                                              int interval) {
     std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
-    for (auto& collector : newCollectors) {
+    for (auto& collector : newCollectorNames) {
         auto iter = mRegisteredCollectorMap.find(collector);
         if (iter == mRegisteredCollectorMap.end()) {
             LOG_ERROR(sLogger, ("host monitor", "collector not support")("collector", collector));
@@ -117,8 +119,6 @@ void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point 
                                           HostMonitorTimerEvent::CollectConfig& config) {
     auto collectFn = [this, config, execTime]() mutable {
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
-        group.SetMetadata(EventGroupMetaKey::HOST_MONITOR_COLLECT_INTERVAL, std::to_string(config.mInterval.count()));
-
         std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
         auto collector = mRegisteredCollectorMap.find(config.mCollectorName);
         if (collector == mRegisteredCollectorMap.end()) {
@@ -133,7 +133,7 @@ void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point 
                                                                                                 config.mCollectorName));
             return;
         }
-        collector->second.GetCollector()->Collect(group);
+        collector->second.GetCollector()->Collect(group, config);
         LOG_DEBUG(
             sLogger,
             ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));

@@ -27,10 +27,10 @@
 #include <utility>
 #include <vector>
 
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/ThreadPool.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/BaseCollector.h"
-#include "pipeline/queue/QueueKey.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -64,7 +64,7 @@ public:
     }
 
     // Only support singleton mode
-    void UpdateCollector(const std::vector<std::string>& collectorNames,
+    void UpdateCollector(const std::vector<std::string>& newCollectorNames,
                          QueueKey processQueueKey,
                          int inputIndex,
                          int interval);

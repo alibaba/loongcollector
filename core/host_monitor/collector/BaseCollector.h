@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include "PipelineEventGroup.h"
+#include "host_monitor/HostMonitorTimerEvent.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
@@ -25,7 +26,7 @@ public:
     BaseCollector() = default;
     virtual ~BaseCollector() = default;
 
-    virtual void Collect(PipelineEventGroup& group) = 0;
+    virtual void Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) = 0;
     virtual const std::string& Name() const = 0;
 
 protected:

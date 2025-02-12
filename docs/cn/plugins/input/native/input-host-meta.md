@@ -23,6 +23,9 @@
 enable: true
 inputs:
   - Type: input_host_meta
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
 ```
 
 * 输出

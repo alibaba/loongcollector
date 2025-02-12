@@ -27,16 +27,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "Flags.h"
-#include "Logger.h"
-#include "MachineInfoUtil.h"
-#include "StringTools.h"
 #include "constants/EntityConstants.h"
-#include "host_monitor/Constants.h"
 #include "host_monitor/collector/BaseCollector.h"
-
-DECLARE_FLAG_INT32(process_collect_silent_count);
-DECLARE_FLAG_INT32(host_monitor_default_interval);
+#include "models/StringView.h"
 
 using namespace std::chrono;
 
@@ -147,7 +140,7 @@ public:
     ProcessEntityCollector();
     ~ProcessEntityCollector() override = default;
 
-    void Collect(PipelineEventGroup& group) override;
+    void Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
@@ -159,11 +152,11 @@ private:
     ProcessStatPtr ParseProcessStat(pid_t pid, std::string& line);
     bool WalkAllProcess(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
 
-    const std::string GetProcessEntityID(StringView pid, StringView createTime, const std::string& hostEntityID);
+    const std::string GetProcessEntityID(StringView pid, StringView createTime, StringView hostEntityID);
     void FetchDomainInfo(std::string& domain,
                          std::string& entityType,
-                         std::string& hostEntityID,
-                         std::string& hostEntityType);
+                         std::string& hostEntityType,
+                         StringView& hostEntityID);
 
     steady_clock::time_point mProcessSortTime;
     std::vector<ProcessStatPtr> mSortProcessStats;

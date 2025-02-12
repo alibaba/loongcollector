@@ -18,7 +18,6 @@
 
 #include "HostMonitorInputRunner.h"
 #include "HostMonitorTimerEvent.h"
-#include "Logger.h"
 #include "ProcessQueueItem.h"
 #include "ProcessQueueManager.h"
 #include "QueueKey.h"
@@ -71,7 +70,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     runner->mRegisteredCollectorMap.find(MockCollector::sName)->second.Enable();
     std::string configName = "test";
     auto queueKey = QueueKeyManager::GetInstance()->GetKey(configName);
-    auto ctx = PipelineContext();
+    auto ctx = CollectionPipelineContext();
     ctx.SetConfigName(configName);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
 

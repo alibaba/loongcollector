@@ -25,7 +25,7 @@ public:
     MockCollector() = default;
     ~MockCollector() = default;
 
-    void Collect(PipelineEventGroup& group) {
+    void Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) override {
         auto event = group.AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);

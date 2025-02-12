@@ -14,12 +14,17 @@
 
 #include "InputHostMeta.h"
 
+#include <algorithm>
+
 #include "json/value.h"
 
-#include "HostMonitorInputRunner.h"
-#include "Logger.h"
-#include "ParamExtractor.h"
+#include "Flags.h"
+#include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
+#include "host_monitor/HostMonitorInputRunner.h"
+#include "logger/Logger.h"
+
+DEFINE_FLAG_INT32(host_monitor_collect_min_interval, "host monitor collect min interval", 15);
 
 namespace logtail {
 
@@ -38,6 +43,7 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     }
+    mInterval = std::max(mInterval, INT32_FLAG(host_monitor_collect_min_interval));
     return true;
 }
 

@@ -30,14 +30,20 @@
 #include <utility>
 #include <vector>
 
-#include "FileSystemUtil.h"
-#include "Flags.h"
-#include "Logger.h"
-#include "PipelineEventGroup.h"
-#include "StringTools.h"
+#include "common/FileSystemUtil.h"
+#include "common/Flags.h"
 #include "common/HashUtil.h"
+#include "common/MachineInfoUtil.h"
+#include "common/StringTools.h"
 #include "constants/EntityConstants.h"
+#include "host_monitor/Constants.h"
 #include "host_monitor/SystemInformationTools.h"
+#include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
+#include "models/StringView.h"
+
+DEFINE_FLAG_INT32(process_collect_silent_count, "number of process scanned between a sleep", 1000);
+DECLARE_FLAG_INT32(host_monitor_collect_min_interval);
 
 namespace logtail {
 
@@ -56,7 +62,7 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
     }
 };
 
-void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
+void ProcessEntityCollector::Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) {
     if (!mValidState) {
         return;
     }
@@ -71,8 +77,9 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
             = std::to_string(duration_cast<seconds>(process->startTime.time_since_epoch()).count());
 
         // common fields
-        std::string domain, entityType, hostEntityID, hostEntityType;
-        FetchDomainInfo(domain, entityType, hostEntityID, hostEntityType);
+        std::string domain, entityType, hostEntityType;
+        StringView hostEntityID;
+        FetchDomainInfo(domain, entityType, hostEntityType, hostEntityID);
         event->SetContent(DEFAULT_CONTENT_KEY_DOMAIN, domain);
         event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_TYPE, entityType);
         auto entityID = GetProcessEntityID(std::to_string(process->pid), processCreateTime, hostEntityID);
@@ -80,17 +87,7 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
 
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
-        auto interval = group.GetMetadata(EventGroupMetaKey::HOST_MONITOR_COLLECT_INTERVAL);
-        int keepAliveSeconds = INT32_FLAG(host_monitor_default_interval) * 2;
-        if (!interval.empty()) {
-            try {
-                keepAliveSeconds = std::stoi(interval.data()) * 2;
-            } catch (const std::exception& e) {
-                LOG_ERROR(sLogger,
-                          ("process entity collector",
-                           "invalid interval")("interval", interval)("use default interval instead", keepAliveSeconds));
-            }
-        }
+        int keepAliveSeconds = collectConfig.mInterval.count() * 2;
         event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
 
         // custom fields
@@ -290,7 +287,7 @@ bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
 }
 
 const std::string
-ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime, const std::string& hostEntityID) {
+ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime, StringView hostEntityID) {
     std::ostringstream oss;
     oss << hostEntityID << pid << createTime;
     auto bigID = CalcMD5(oss.str());
@@ -300,19 +297,20 @@ ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime
 
 void ProcessEntityCollector::FetchDomainInfo(std::string& domain,
                                              std::string& entityType,
-                                             std::string& hostEntityID,
-                                             std::string& hostEntityType) {
-    ECSMeta metaObj = HostIdentifier::Instance()->GetECSMeta();
-    if (metaObj.isValid) {
-        domain = DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
+                                             std::string& hostEntityType,
+                                             StringView& hostEntityID) {
+    auto entity = InstanceIdentity::Instance()->GetEntity();
+    if (entity != nullptr) {
+        ECSMeta meta = entity->GetECSMeta();
+        if (meta.GetInstanceID().empty()) {
+            domain = DEFAULT_VALUE_DOMAIN_INFRA;
+            hostEntityType = DEFAULT_HOST_TYPE_HOST;
+        } else {
+            domain = DEFAULT_VALUE_DOMAIN_ACS;
+            hostEntityType = DEFAULT_HOST_TYPE_ECS;
+        }
         entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_ECS_PROCESS;
-        hostEntityID = metaObj.instanceID;
-        hostEntityType = DEFAULT_HOST_TYPE_ECS;
-    } else {
-        domain = DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
-        entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_HOST_PROCESS;
-        hostEntityID = HostIdentifier::Instance()->GetHostId().id;
-        hostEntityType = DEFAULT_HOST_TYPE_HOST;
+        hostEntityID = entity->GetHostID();
     }
 }
 

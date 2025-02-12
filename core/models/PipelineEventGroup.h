@@ -63,8 +63,6 @@ enum class EventGroupMetaKey {
     INTERNAL_DATA_TARGET_REGION,
     INTERNAL_DATA_TYPE,
 
-    HOST_MONITOR_COLLECT_INTERVAL,
-
     SOURCE_ID
 };
 

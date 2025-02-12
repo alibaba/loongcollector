@@ -15,8 +15,8 @@
 #include <json/json.h>
 
 #include "PluginRegistry.h"
+#include "collection_pipeline/CollectionPipeline.h"
 #include "common/JsonUtil.h"
-#include "pipeline/Pipeline.h"
 #include "plugin/input/InputHostMeta.h"
 #include "unittest/Unittest.h"
 
@@ -43,8 +43,8 @@ protected:
     }
 
 private:
-    Pipeline p;
-    PipelineContext ctx;
+    CollectionPipeline p;
+    CollectionPipelineContext ctx;
 };
 
 void InputHostMetaUnittest::TestName() {

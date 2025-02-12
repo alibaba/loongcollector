@@ -16,8 +16,9 @@
 
 #include "EntityConstants.h"
 
-namespace logtail {
+using namespace std;
 
+namespace logtail {
 
 const string DEFAULT_VALUE_DOMAIN_ACS = "acs";
 const string DEFAULT_VALUE_DOMAIN_INFRA = "infra";
