@@ -148,7 +148,7 @@ private:
     std::future<void> mThreadRes;
     std::mutex mThreadRunningMux;
     bool mIsThreadRunning = true;
-    std::atomic_bool mShouldSuicide = false;
+    std::atomic_bool mShouldSuicide;
     std::condition_variable mStopCV;
 
     // Control report status profile frequency.

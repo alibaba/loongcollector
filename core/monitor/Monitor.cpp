@@ -94,6 +94,7 @@ LogtailMonitor* LogtailMonitor::GetInstance() {
 bool LogtailMonitor::Init() {
     mScaledCpuUsageUpLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
     mStatusCount = 0;
+    mShouldSuicide.store(false);
 
     // Reset process and realtime CPU statistics.
     mCpuStat.Reset();
