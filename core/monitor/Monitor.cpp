@@ -94,6 +94,7 @@ LogtailMonitor* LogtailMonitor::GetInstance() {
 bool LogtailMonitor::Init() {
     mScaledCpuUsageUpLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
     mStatusCount = 0;
+    mShouldSuicide.store(false);
 
     // Reset process and realtime CPU statistics.
     mCpuStat.Reset();
@@ -129,7 +130,7 @@ void LogtailMonitor::Stop() {
         return;
     }
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
-    if (s == future_status::ready) {
+    if (s == future_status::ready || mShouldSuicide.load()) {
         LOG_INFO(sLogger, ("profiling", "stopped successfully"));
     } else {
         LOG_WARNING(sLogger, ("profiling", "forced to stopped"));
@@ -181,7 +182,8 @@ void LogtailMonitor::Monitor() {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",
                                "prepare restart Logtail")("mem_rss", mMemStat.mRss));
-                    Suicide();
+                    mShouldSuicide.store(true);
+                    break;
                 }
             }
 
@@ -206,11 +208,13 @@ void LogtailMonitor::Monitor() {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds upper limit for some time",
                                "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
-                    Suicide();
+                    mShouldSuicide.store(true);
+                    break;
                 }
 
                 if (IsHostIpChanged()) {
-                    Suicide();
+                    mShouldSuicide.store(true);
+                    break;
                 }
 
                 SendStatusProfile(false);
@@ -221,7 +225,9 @@ void LogtailMonitor::Monitor() {
             }
         }
     }
-    SendStatusProfile(true);
+    if (mShouldSuicide.load()) {
+        Suicide();
+    }
 }
 
 bool LogtailMonitor::SendStatusProfile(bool suicide) {
@@ -402,7 +408,6 @@ bool LogtailMonitor::IsHostIpChanged() {
 
 void LogtailMonitor::Suicide() {
     SendStatusProfile(true);
-    mIsThreadRunning = false;
     Application::GetInstance()->SetSigTermSignalFlag(true);
     sleep(60);
     _exit(1);

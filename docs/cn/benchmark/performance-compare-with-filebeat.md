@@ -2,7 +2,7 @@
 
 ## 前言
 
-前段时间, iLogtail（[https://github.com/alibaba/ilogtail](https://github.com/alibaba/ilogtail)）阿里千万实例可观测采集器开源，其中介绍了iLogtail采集性能可以达到单核100MB/s，相比开源采集Agent有5-10倍性能优势。很多小伙伴好奇iLogtail具体的性能数据和资源消耗如何，本文将针对目前业界使用度较高且性能相对较优的Agent FileBeat进行对比，测试这两个Agent在不同压力场景下的表现如何。
+前段时间, iLogtail（[https://github.com/alibaba/loongcollector](https://github.com/alibaba/loongcollector)）阿里千万实例可观测采集器开源，其中介绍了iLogtail采集性能可以达到单核100MB/s，相比开源采集Agent有5-10倍性能优势。很多小伙伴好奇iLogtail具体的性能数据和资源消耗如何，本文将针对目前业界使用度较高且性能相对较优的Agent FileBeat进行对比，测试这两个Agent在不同压力场景下的表现如何。
 
 ## 测试试验描述
 
@@ -380,7 +380,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 ## **结语**
 
-综上所述，在动态性极高的Kubernetes 环境下，iLogtail不会因为采用Daemonset 的部署模型带来的多配置问题，造成内存大幅度膨胀，而且在静态文件采集方面，iLogtail 拥有5倍左右的性能优势，而对于标准输出流采集，由于iLogtail 的采集机制，iLogtail 拥有约10倍左右的性能优势。但是相比于Filebeat 或Fluentd 等老牌开源产品，在文档建设与社区建设上还欠缺很多，欢迎对iLogtail 感兴趣的小伙伴一起参与进来，共同打造易用且高性能的[iLogtail](https://github.com/alibaba/ilogtail) 产品。
+综上所述，在动态性极高的Kubernetes 环境下，iLogtail不会因为采用Daemonset 的部署模型带来的多配置问题，造成内存大幅度膨胀，而且在静态文件采集方面，iLogtail 拥有5倍左右的性能优势，而对于标准输出流采集，由于iLogtail 的采集机制，iLogtail 拥有约10倍左右的性能优势。但是相比于Filebeat 或Fluentd 等老牌开源产品，在文档建设与社区建设上还欠缺很多，欢迎对iLogtail 感兴趣的小伙伴一起参与进来，共同打造易用且高性能的[iLogtail](https://github.com/alibaba/loongcollector) 产品。
 ![image.png](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-contact.png?versionId=CAEQOhiBgICQkM6b8xciIDcxZTU5M2FjMDAzODQ1Njg5NjI3ZDc4M2FhOTZkNWNk#clientId=uc89d3166-a47e-4&crop=0&crop=0&crop=1&crop=1&from=paste&id=u5ada78db&margin=%5Bobject%20Object%5D&name=image.png&originHeight=708&originWidth=8014&originalType=url&ratio=1&rotation=0&showTitle=false&size=910470&status=done&style=none&taskId=u41750091-879b-49c9-8d6c-3264841a093&title=)
 
 ## **参考文献**
@@ -389,4 +389,3 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 - [Logtail技术分享二](https://www.sohu.com/a/205324880_465959)
 - [Filebeat 配置](https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-input-container.html)
 - [Filebeat 容器化部署](https://www.elastic.co/guide/en/beats/filebeat/current/running-on-kubernetes.html)
-- [iLogtail 使用指南](https://github.com/alibaba/ilogtail/blob/main/docs/zh/setup/README.md)
