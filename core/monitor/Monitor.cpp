@@ -129,7 +129,7 @@ void LogtailMonitor::Stop() {
         return;
     }
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
-    if (s == future_status::ready) {
+    if (s == future_status::ready || mShouldSuicide.load()) {
         LOG_INFO(sLogger, ("profiling", "stopped successfully"));
     } else {
         LOG_WARNING(sLogger, ("profiling", "forced to stopped"));
@@ -140,7 +140,6 @@ void LogtailMonitor::Monitor() {
     LOG_INFO(sLogger, ("profiling", "started"));
     int32_t lastMonitorTime = time(NULL), lastCheckHardLimitTime = time(nullptr);
     CpuStat curCpuStat;
-    bool shouldSuicide = false;
     {
         unique_lock<mutex> lock(mThreadRunningMux);
         while (mIsThreadRunning) {
@@ -183,7 +182,7 @@ void LogtailMonitor::Monitor() {
                               ("Resource used by program exceeds hard limit",
                                "prepare restart Logtail")("mem_rss", mMemStat.mRss));
                     mIsThreadRunning = false;
-                    shouldSuicide = true;
+                    mShouldSuicide.store(true);
                     break;
                 }
             }
@@ -210,13 +209,13 @@ void LogtailMonitor::Monitor() {
                               ("Resource used by program exceeds upper limit for some time",
                                "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
                     mIsThreadRunning = false;
-                    shouldSuicide = true;
+                    mShouldSuicide.store(true);
                     break;
                 }
 
                 if (IsHostIpChanged()) {
                     mIsThreadRunning = false;
-                    shouldSuicide = true;
+                    mShouldSuicide.store(true);
                     break;
                 }
 
@@ -228,7 +227,7 @@ void LogtailMonitor::Monitor() {
             }
         }
     }
-    if (shouldSuicide) {
+    if (mShouldSuicide.load()) {
         Suicide();
     }
 }
