@@ -163,8 +163,8 @@ void PollingDirFile::PollingIteration() {
     LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(nameConfigMap.size());
     {
         ScopedSpinLock lock(mCacheLock);
-        mPollingDirCacheSize->Set(mDirCacheMap.size());
-        mPollingFileCacheSize->Set(mFileCacheMap.size());
+        SET_GAUGE(mPollingDirCacheSize, mDirCacheMap.size());
+        SET_GAUGE(mPollingFileCacheSize, mFileCacheMap.size());
     }
 
     // Iterate all normal configs, make sure stat count will not exceed limit.

@@ -262,7 +262,7 @@ void PollingModify::PollingIteration() {
     vector<SplitedFilePath> deletedFileVec;
     vector<Event*> pollingEventVec;
     int32_t statCount = 0;
-    mPollingModifySize->Set(mModifyCacheMap.size());
+    SET_GAUGE(mPollingModifySize, mModifyCacheMap.size());
     for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
         if (!mRuningFlag || mHoldOnFlag)
             break;

@@ -84,13 +84,13 @@ void BaseBPFMonitor::InitMetricInner() {
 void BaseBPFMonitor::UpdateMetricInner(nami::eBPFStatistics& currStat) {
     if (!currStat.updated_)
         return;
-    mProcessCacheEntitiesNum->Set(currStat.process_cache_entities_num_);
-    mRecvKernelEventsTotal->Add(currStat.recv_kernel_events_total_);
-    mLossKernelEventsTotal->Add(currStat.loss_kernel_events_total_);
-    mProcessCacheMissTotal->Add(currStat.miss_process_cache_total_);
-    mPushMetricsTotal->Add(currStat.push_metrics_total_);
-    mPushSpansTotal->Add(currStat.push_spans_total_);
-    mPushEventsTotal->Add(currStat.push_events_total_);
+    SET_GAUGE(mProcessCacheEntitiesNum, currStat.process_cache_entities_num_);
+    ADD_COUNTER(mRecvKernelEventsTotal, currStat.recv_kernel_events_total_);
+    ADD_COUNTER(mLossKernelEventsTotal, currStat.loss_kernel_events_total_);
+    ADD_COUNTER(mProcessCacheMissTotal, currStat.miss_process_cache_total_);
+    ADD_COUNTER(mPushMetricsTotal, currStat.push_metrics_total_);
+    ADD_COUNTER(mPushSpansTotal, currStat.push_spans_total_);
+    ADD_COUNTER(mPushEventsTotal, currStat.push_events_total_);
 }
 
 /////////////////////////// NetworkObserverSelfMonitor ///////////////////////////
@@ -163,16 +163,16 @@ void NetworkObserverSelfMonitor::HandleStatistic(nami::eBPFStatistics& stats) {
     assert(stats.plugin_type_ == nami::PluginType::NETWORK_OBSERVE);
     nami::NetworkObserverStatistics* currNetworkStatsPtr = static_cast<nami::NetworkObserverStatistics*>(&stats);
 
-    mRecvConnStatsTotal->Add(currNetworkStatsPtr->recv_conn_stat_events_total_);
-    mRecvCtrlEventsTotal->Add(currNetworkStatsPtr->recv_ctrl_events_total_);
-    mRecvHTTPDataEventsTotal->Add(currNetworkStatsPtr->recv_http_data_events_total_);
+    ADD_COUNTER(mRecvConnStatsTotal, currNetworkStatsPtr->recv_conn_stat_events_total_);
+    ADD_COUNTER(mRecvCtrlEventsTotal, currNetworkStatsPtr->recv_ctrl_events_total_);
+    ADD_COUNTER(mRecvHTTPDataEventsTotal, currNetworkStatsPtr->recv_http_data_events_total_);
 
     // cache relative metric
-    mConnTrackerNum->Set(currNetworkStatsPtr->conntracker_num_);
+    SET_GAUGE(mConnTrackerNum, currNetworkStatsPtr->conntracker_num_);
 
-    mParseHTTPEventsSuccessTotal->Add(currNetworkStatsPtr->parse_http_records_success_total_);
-    mParseHTTPEventsFailTotal->Add(currNetworkStatsPtr->parse_http_records_failed_total_);
-    mAggMapEntitiesNum->Set(currNetworkStatsPtr->agg_map_entities_num_);
+    ADD_COUNTER(mParseHTTPEventsSuccessTotal, currNetworkStatsPtr->parse_http_records_success_total_);
+    ADD_COUNTER(mParseHTTPEventsFailTotal, currNetworkStatsPtr->parse_http_records_failed_total_);
+    SET_GAUGE(mAggMapEntitiesNum, currNetworkStatsPtr->agg_map_entities_num_);
 }
 
 eBPFSelfMonitorMgr::eBPFSelfMonitorMgr() = default;

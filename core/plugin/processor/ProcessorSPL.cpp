@@ -119,20 +119,20 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
     ResultCode result = mSPLPipelinePtr->Execute(std::move(logGroup), logGroupList, pipelineStats, mContext);
 
     if (result != ResultCode::OK) {
-        mSplExcuteErrorCount->Add(1);
+        ADD_COUNTER(mSplExcuteErrorCount, 1);
         if (result == ResultCode::TIMEOUT_ERROR) {
-            mSplExcuteTimeoutErrorCount->Add(1);
+            ADD_COUNTER(mSplExcuteTimeoutErrorCount, 1);
         } else if (result == ResultCode::MEM_EXCEEDED) {
-            mSplExcuteMemoryExceedErrorCount->Add(1);
+            ADD_COUNTER(mSplExcuteMemoryExceedErrorCount, 1);
         }
     } else {
-        mProcessMicros->Add(pipelineStats.processMicros_);
-        mInputMicros->Add(pipelineStats.inputMicros_);
-        mOutputMicros->Add(pipelineStats.outputMicros_);
-        mMemPeakBytes->Set(pipelineStats.memPeakBytes_);
-        mTotalTaskCount->Add(pipelineStats.totalTaskCount_);
-        mSuccTaskCount->Add(pipelineStats.succTaskCount_);
-        mFailTaskCount->Add(pipelineStats.failTaskCount_);
+        ADD_COUNTER(mProcessMicros, pipelineStats.processMicros_);
+        ADD_COUNTER(mInputMicros, pipelineStats.inputMicros_);
+        ADD_COUNTER(mOutputMicros, pipelineStats.outputMicros_);
+        SET_GAUGE(mMemPeakBytes, pipelineStats.memPeakBytes_);
+        ADD_COUNTER(mTotalTaskCount, pipelineStats.totalTaskCount_);
+        ADD_COUNTER(mSuccTaskCount, pipelineStats.succTaskCount_);
+        ADD_COUNTER(mFailTaskCount, pipelineStats.failTaskCount_);
     }
 
     return;

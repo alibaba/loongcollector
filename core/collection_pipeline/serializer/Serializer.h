@@ -67,19 +67,19 @@ public:
 
     bool DoSerialize(T&& p, std::string& output, std::string& errorMsg) {
         auto inputSize = GetInputSize(p);
-        mInItemsTotal->Add(1);
-        mInItemSizeBytes->Add(inputSize);
+        ADD_COUNTER(mInItemsTotal, 1);
+        ADD_COUNTER(mInItemSizeBytes, inputSize);
 
         auto before = std::chrono::system_clock::now();
         auto res = Serialize(std::move(p), output, errorMsg);
-        mTotalProcessMs->Add(std::chrono::system_clock::now() - before);
+        ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
 
         if (res) {
-            mOutItemsTotal->Add(1);
-            mOutItemSizeBytes->Add(output.size());
+            ADD_COUNTER(mOutItemsTotal, 1);
+            ADD_COUNTER(mOutItemSizeBytes, output.size());
         } else {
-            mDiscardedItemsTotal->Add(1);
-            mDiscardedItemSizeBytes->Add(inputSize);
+            ADD_COUNTER(mDiscardedItemsTotal, 1);
+            ADD_COUNTER(mDiscardedItemSizeBytes, inputSize);
         }
         return res;
     }
