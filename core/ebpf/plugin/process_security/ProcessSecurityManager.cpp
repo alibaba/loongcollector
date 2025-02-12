@@ -98,10 +98,10 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
                         LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                         return;
                     }
-                    for (auto innerEvent : group->mInnerEvents) {
+                    for (const auto& innerEvent : group->mInnerEvents) {
                         auto* logEvent = eventGroup.AddLogEvent();
-                        for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
-                            logEvent->SetContentNoCopy(it->first, it->second);
+                        for (auto& it : processTags.mInner) {
+                            logEvent->SetContentNoCopy(it.first, it.second);
                         }
                         auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));

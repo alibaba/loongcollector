@@ -23,7 +23,8 @@ static inline int GetCallNameIdx(const std::string& call_name) {
         return SECURE_FUNC_TRACEPOINT_FUNC_TCP_CONNECT;
     else if (call_name == "tcp_sendmsg")
         return SECURE_FUNC_TRACEPOINT_FUNC_TCP_SENDMSG;
-    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[GetCallNameIdx] unknown call name: %s \n", call_name);
+    ebpf_log(
+        logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[GetCallNameIdx] unknown call name: %s \n", call_name.c_str());
     return -1;
 }
 

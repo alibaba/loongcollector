@@ -69,8 +69,6 @@ void CleanPluginPbs(logtail::ebpf::PluginType type) {
 }
 
 std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> wrapper = logtail::ebpf::BPFWrapper<security_bpf>::Create();
-std::atomic<bool> gflag;
-std::vector<std::thread> pws;
 void SetCoolBpfConfig(int32_t opt, int32_t value) {
     int32_t* params[] = {&value};
     int32_t paramsLen[] = {4};
@@ -126,9 +124,9 @@ int setup_perfbuffers(logtail::ebpf::PluginConfig* arg) {
                                                  static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
             if (!pb) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                         "plugin type:%s: create perfbuffer fail, name:%s, size:%d\n",
-                         magic_enum::enum_name(arg->mPluginType),
-                         spec.mName,
+                         "plugin type:%s: create perfbuffer fail, name:%s, size:%ld\n",
+                         magic_enum::enum_name(arg->mPluginType).data(),
+                         spec.mName.c_str(),
                          spec.mSize);
                 return 1;
             }
@@ -190,7 +188,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             if (config->mEnableCidFilter) {
                 if (config->mCidOffset <= 0) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "offset invalid!! skip cid filter... offset",
+                             "offset invalid!! skip cid filter... offset %d\n",
                              config->mCidOffset);
                 }
                 SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, config->mCidOffset);
@@ -231,7 +229,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
-                                 cn);
+                                 cn.c_str());
                         return 1;
                     }
                 }
@@ -279,7 +277,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
-                                 cn);
+                                 cn.c_str());
                         return 1;
                     }
                 }
@@ -375,7 +373,7 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
         }
         int ret = wrapper->PollPerfBuffer(x, max_events, timeout_ms);
         if (ret < 0 && errno != EINTR) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "poll perf buffer failed ... ");
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "poll perf buffer failed ...\n");
         } else {
             cnt += ret;
         }
@@ -457,7 +455,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security delete filter for callname %s failed.\n",
-                                 cn);
+                                 cn.c_str());
                         return 1;
                     }
 
@@ -465,7 +463,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security: create filter for callname %s falied.\n",
-                                 cn);
+                                 cn.c_str());
                     }
                 }
             }
@@ -481,13 +479,13 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: delete filter for callname %s falied.\n",
-                                 cn);
+                                 cn.c_str());
                     }
                     ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.filter_);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: create filter for callname %s falied\n",
-                                 cn);
+                                 cn.c_str());
                     }
                 }
             }
@@ -496,7 +494,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
         default:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[update plugin] %s plugin type not supported.\n",
-                     magic_enum::enum_name(arg->mPluginType));
+                     magic_enum::enum_name(arg->mPluginType).data());
             break;
     }
 
@@ -561,7 +559,7 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[stop plugin] network security: delete filter for callname %s falied\n",
-                             cn);
+                             cn.c_str());
                 }
             }
             // 3. delete perf buffer
@@ -587,7 +585,7 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[stop plugin] file security: delete filter for callname %s falied\n",
-                             cn);
+                             cn.c_str());
                 }
             }
 

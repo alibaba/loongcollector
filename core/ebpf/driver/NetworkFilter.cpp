@@ -43,8 +43,8 @@ bool ConvertIPv4StrToBytes(const std::string& ipv4Str, uint32_t& v4addr) {
     }
     v4addr = addr.s_addr;
     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-             "[ConvertIPv4StrToBytes] ipv4 str:%s, addr:%d, addr.s_addr:%d \n",
-             ipv4Str,
+             "[ConvertIPv4StrToBytes] ipv4 str:%s, addr:%u, addr.s_addr:%u \n",
+             ipv4Str.c_str(),
              v4addr,
              addr.s_addr);
     return true;
@@ -109,13 +109,13 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg4 : addr4_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv4 prefix trie addr: %d mask: %u\n",
                          arg4.addr,
                          arg4.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4_idx, &arg4, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %u\n",
                              arg4.addr,
                              arg4.prefix);
                     continue;
@@ -131,13 +131,13 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg6 : addr6_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv6 prefix trie addr: %d mask: %u\n",
                          arg6.addr,
                          arg6.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6_idx, &arg6, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %u\n",
                              arg6.addr,
                              arg6.prefix);
                     continue;
@@ -199,13 +199,13 @@ int SetSaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg4 : addr4_tries) {
                 uint8_t val = 0;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv4 prefix trie addr: %d mask: %u\n",
                          arg4.addr,
                          arg4.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4_idx, &arg4, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %u\n",
                              arg4.addr,
                              arg4.prefix);
                     continue;
@@ -221,13 +221,13 @@ int SetSaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg6 : addr6_tries) {
                 uint8_t val = 0;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv6 prefix trie addr: %d mask: %u\n",
                          arg6.addr,
                          arg6.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6_idx, &arg6, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %u\n",
                              arg6.addr,
                              arg6.prefix);
                     continue;
@@ -288,14 +288,14 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg4 : addr4_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: %d mask: %d inner map idx: %d\n",
+                         "[before update] ipv4 prefix trie addr: %d mask: %u inner map idx: %d\n",
                          arg4.addr,
                          arg4.prefix,
                          ipv4_idx);
                 ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4_idx, &arg4, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %u\n",
                              arg4.addr,
                              arg4.prefix);
                     continue;
@@ -311,13 +311,13 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg6 : addr6_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv6 prefix trie addr: %d mask: %u\n",
                          arg6.addr,
                          arg6.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6_idx, &arg6, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %u\n",
                              arg6.addr,
                              arg6.prefix);
                     continue;
@@ -378,14 +378,14 @@ int SetDaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg4 : addr4_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: %d mask: %d inner map idx: %d\n",
+                         "[before update] ipv4 prefix trie addr: %d mask: %u inner map idx: %d\n",
                          arg4.addr,
                          arg4.prefix,
                          ipv4_idx);
                 ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4_idx, &arg4, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv4 prefix trie data failed! addr: %u mask: %u\n",
                              arg4.addr,
                              arg4.prefix);
                     continue;
@@ -401,13 +401,13 @@ int SetDaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>> wrapper,
             for (auto arg6 : addr6_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: %d mask: %d\n",
+                         "[before update] ipv6 prefix trie addr: %d mask: %u\n",
                          arg6.addr,
                          arg6.prefix);
                 ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6_idx, &arg6, &val, 0);
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %d\n",
+                             "[update failed] ipv6 prefix trie data failed! addr: %s mask: %u\n",
                              arg6.addr,
                              arg6.prefix);
                     continue;
@@ -643,16 +643,16 @@ int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>> wra
             case FILTER_TYPE_NOT_DADDR: {
                 auto v4 = filter.map_idx[0];
                 auto v6 = filter.map_idx[1];
-                if (v4 != -1) {
+                if (v4 != __u32(-1)) {
                     wrapper->DeleteInnerMap<Addr4Map>("addr4lpm_maps", &v4);
                     IdAllocator::GetInstance()->ReleaseId<Addr4Map>(v4);
                 }
-                if (v6 != -1) {
+                if (v6 != __u32(-1)) {
                     wrapper->DeleteInnerMap<Addr6Map>("addr6lpm_maps", &v6);
                     IdAllocator::GetInstance()->ReleaseId<Addr6Map>(v6);
                 }
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "release filter for type: %d mapIdx: [%d:%d]\n",
+                         "release filter for type: %d mapIdx: [%u:%u]\n",
                          static_cast<int>(filter.filter_type),
                          v4,
                          v6);
@@ -666,7 +666,7 @@ int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>> wra
                 wrapper->DeleteInnerMap<PortMap>("port_maps", &idx);
                 IdAllocator::GetInstance()->ReleaseId<PortMap>(idx);
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "release filter for type: %d mapIdx: %d\n",
+                         "release filter for type: %d mapIdx: %u\n",
                          static_cast<int>(filter.filter_type),
                          idx);
                 break;

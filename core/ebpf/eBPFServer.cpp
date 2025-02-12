@@ -442,10 +442,9 @@ void eBPFServer::UpdatePipelineName(PluginType type, const std::string& name, co
     std::lock_guard<std::mutex> lk(mMtx);
     mLoadedPipeline[int(type)] = name;
     mPluginProject[int(type)] = project;
-    return;
 }
 
-bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type) {
+bool eBPFServer::SuspendPlugin(const std::string&, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return false;
     }

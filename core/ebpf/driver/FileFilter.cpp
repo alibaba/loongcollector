@@ -24,8 +24,8 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                                 const std::string& call_name,
                                 const std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> config) {
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-             "[CreateFilterForCallname] EnableCallName:%s, idx:%d, hold:%d \n",
-             call_name,
+             "[CreateFilterForCallname] EnableCallName:%s, idx:%ld, hold:%d \n",
+             call_name.c_str(),
              config.index(),
              std::holds_alternative<SecurityFileFilter>(config));
     int ret = 0;
@@ -67,7 +67,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
 
         // LOG(INFO) << "filter not empty!";
         for (int i = 0; i < filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
-            auto& x = filter->mFilePathList[i];
+            const auto& x = filter->mFilePathList[i];
 
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[CreateFilterForCallname] begin to update map in map for filter detail, idx: %d, path: %s\n",
@@ -81,14 +81,14 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
             prefix_trie.prefixlen = x.length() * 8; // in bits
             uint8_t val = 1;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CreateFilterForCallname][before update] prefix trie data: %s prefix_len: %d\n",
+                     "[CreateFilterForCallname][before update] prefix trie data: %s prefix_len: %u\n",
                      prefix_trie.data,
                      prefix_trie.prefixlen);
             ret = wrapper->UpdateInnerMapElem<StringPrefixMap>(
                 std::string("string_prefix_maps"), &idx, &prefix_trie, &val, 0);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                         "[CreateFilterForCallname][update failed] prefix trie data: %s prefix_len: %d\n",
+                         "[CreateFilterForCallname][update failed] prefix trie data: %s prefix_len: %u\n",
                          prefix_trie.data,
                          prefix_trie.prefixlen);
                 continue;
@@ -131,7 +131,7 @@ int DeleteFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         wrapper->DeleteInnerMap<StringPrefixMap>("string_prefix_maps", &outter_key);
         IdAllocator::GetInstance()->ReleaseId<StringPrefixMap>(outter_key);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "[DeleteFilterForCallname] release filter for type: %d mapIdx: %d\n",
+                 "[DeleteFilterForCallname] release filter for type: %d mapIdx: %u\n",
                  static_cast<int>(filter.filter_type),
                  outter_key);
     }

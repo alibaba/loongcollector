@@ -617,8 +617,9 @@ void BaseManager::HandleCacheUpdate() {
         size_t count = mRecordQueue.wait_dequeue_bulk_timed(
             items.data(), mMaxBatchConsumeSize, std::chrono::milliseconds(mMaxWaitTimeMS));
 
-        if (!count)
+        if (!count) {
             continue;
+        }
         std::vector<std::unique_ptr<AbstractSecurityEvent>> outputs;
         for (size_t i = 0; i < count; ++i) {
             std::shared_ptr<MsgExecveEventUnix> event = std::move(items[i]);
@@ -648,7 +649,7 @@ void BaseManager::HandleCacheUpdate() {
 SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime) {
     SizedMap res;
     auto execId = GenerateExecId(pid, ktime);
-    auto contains = ContainerKey(execId);
+    auto contains = ContainsKey(execId);
     auto proc = LookupCache(execId);
     if (!proc) {
         LOG_WARNING(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime)("contains", contains)("size", mCache.size()));

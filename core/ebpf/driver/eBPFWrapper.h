@@ -14,7 +14,6 @@ extern "C" {
 
 #include <atomic>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <string>
 #include <thread>
@@ -23,7 +22,6 @@ extern "C" {
 
 #include "BPFMapTraits.h"
 #include "Log.h"
-#include "NetworkObserver.h"
 
 namespace logtail {
 namespace ebpf {
@@ -43,8 +41,6 @@ public:
     std::string name_;
     bool attach_;
 };
-
-void* PerfThreadWoker(void* ctx, const std::string& name, std::atomic<bool>& flag);
 
 class BPFWrapperBase {
 public:
@@ -337,12 +333,12 @@ public:
         int map_fd = SearchMapFd(map_name);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][UpdateBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name,
+                 map_name.c_str(),
                  map_fd);
         if (map_fd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][UpdateBPFHashMap] find hash map failed for: %s \n",
-                     map_name);
+                     map_name.c_str());
             return 1;
         }
         return bpf_map_update_elem(map_fd, key, value, flag);
@@ -355,12 +351,12 @@ public:
         int map_fd = SearchMapFd(map_name);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][LookupBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name,
+                 map_name.c_str(),
                  map_fd);
         if (map_fd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][LookupBPFHashMap] find hash map failed for: %s \n",
-                     map_name);
+                     map_name.c_str());
             return 1;
         }
         return bpf_map_lookup_elem(map_fd, key, value);
@@ -373,12 +369,12 @@ public:
         int map_fd = SearchMapFd(map_name);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][RemoveBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name,
+                 map_name.c_str(),
                  map_fd);
         if (map_fd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][RemoveBPFHashMap] find hash map failed for: %s \n",
-                     map_name);
+                     map_name.c_str());
             return 1;
         }
         bpf_map_delete_elem(map_fd, key);
@@ -392,14 +388,6 @@ public:
 
     int PollPerfBuffer(void* pb, int max_events, int timeout_ms) {
         return perf_buffer__poll((struct perf_buffer*)pb, timeout_ms);
-        // if (err < 0 && err != -EINTR)
-        // {
-        //     std::cout << "error polling perf buffer: " << strerror(-err) << std::endl;
-        //     goto cleanup;
-        // }
-
-        // if (err == -EINTR)
-        //     goto cleanup;
     }
 
     void* CreatePerfBuffer(
@@ -427,41 +415,11 @@ public:
         if (!pb) {
             err = -errno;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[BPFWrapper][CreatePerfBuffer] failed to open perf buffer: %d \n",
+                     "[BPFWrapper][CreatePerfBuffer] failed to open perf buffer: %ld \n",
                      err);
             return nullptr;
         }
         return pb;
-    }
-
-    /**
-     * Attach perf buffers
-     */
-    std::vector<std::thread>
-    AttachPerfBuffers(void* ctx, std::vector<PerfBufferOps>& perf_buffer_ops, std::atomic<bool>& flag) {
-        std::vector<std::thread> res;
-        for (auto op : perf_buffer_ops) {
-            int map_fd = SearchMapFd(op.name_);
-            //       LOG(INFO) << "[BPFWrapper] find " << op.name_ << " fd:" << map_fd ;
-            if (map_fd < 0) {
-                //         LOG(INFO) << "[BPFWrapper] find perf map failed for " << op.name_ ;
-                continue;
-            }
-            struct perf_thread_arguments* perf_args
-                = static_cast<struct perf_thread_arguments*>(calloc(1, sizeof(struct perf_thread_arguments)));
-            if (!perf_args) {
-                return {};
-            }
-
-            perf_args->mapfd = map_fd;
-            perf_args->sample_cb = op.sample_cb;
-            perf_args->lost_cb = op.lost_cb;
-            perf_args->ctx = ctx;
-            perf_args->pg_cnt = op.size_;
-            res.emplace_back(std::thread(PerfThreadWoker, (void*)perf_args, op.name_, std::ref(flag)));
-        }
-
-        return res;
     }
 
     int DetachAllPerfBuffers() { return 0; }
@@ -470,12 +428,13 @@ public:
      * Destroy skel and release resources.
      */
     void Destroy() {
-        if (!inited_)
+        if (!inited_) {
             return;
+        }
         //     LOG(INFO) << "begin to destroy bpf wrapper";
         // clear all links first
         for (auto& it : links_) {
-            auto link = it.second;
+            auto* link = it.second;
             auto err = bpf_link__destroy(link);
             if (err) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
@@ -508,7 +467,7 @@ public:
         return bpf_program__fd(it->second);
     }
 
-    int SearchInnerMapFd(int outter_fd, int outter_key) { return 0; }
+    // int SearchInnerMapFd(int outter_fd, int outter_key) { return 0; }
 
     int SearchMapFd(const std::string& name) {
         auto it = bpf_maps_.find(name);
@@ -535,6 +494,7 @@ public:
         return true;
     }
 
+private:
     // {map_name, map_fd}
     std::map<std::string, bpf_map*> bpf_maps_;
     // {map_name, prog_fd}
