@@ -83,6 +83,7 @@ private:
     std::atomic<uint64_t> mUnRegisterMs;
 
     // self monitor
+    bool mStartSelfMonitor = false;
     ReadWriteLock mProjectRWLock;
     std::map<std::string, std::string> mJobNameToProjectNameMap;
     MetricsRecordRef mMetricsRecordRef;
