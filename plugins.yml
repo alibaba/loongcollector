@@ -111,6 +111,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/processor/strptime"
     - import: "github.com/alibaba/ilogtail/plugins/processor/stringreplace"
     - import: "github.com/alibaba/ilogtail/plugins/input/debugfile"
+    - import: "github.com/alibaba/ilogtail/plugins/flusher/mqtt"
   linux:
     - import: "github.com/alibaba/ilogtail/plugins/input/command"
     - import: "github.com/alibaba/ilogtail/plugins/input/gpu"
