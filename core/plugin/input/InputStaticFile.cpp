@@ -122,8 +122,12 @@ bool InputStaticFile::Start() {
         // TODO: get container info
         // mFileDiscovery.SetContainerInfo();
     }
+    optional<vector<filesystem::path>> files;
+    if (!mContext->IsFromCheckpoint()) {
+        files = GetFiles();
+    }
     StaticFileServer::GetInstance()->AddInput(
-        mContext->GetConfigName(), mIndex, GetFiles(), &mFileDiscovery, &mFileReader, &mMultiline, &mFileTag, mContext);
+        mContext->GetConfigName(), mIndex, files, &mFileDiscovery, &mFileReader, &mMultiline, &mFileTag, mContext);
     return true;
 }
 

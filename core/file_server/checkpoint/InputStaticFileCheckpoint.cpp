@@ -76,6 +76,7 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
         case FileStatus::READING:
             fileCpt.mOffset = offset;
             fileCpt.mSize = size;
+            fileCpt.mLastUpdateTime = time(nullptr);
             if (offset == size) {
                 fileCpt.mStatus = FileStatus::FINISHED;
                 needDump = true;
@@ -85,12 +86,10 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
                              "device", fileCpt.mDevInode.dev)("inode", fileCpt.mDevInode.inode)(
                              "signature hash", fileCpt.mSignatureHash)("signature size", fileCpt.mSignatureSize)("size",
                                                                                                                  size));
-                ++mCurrentFileIndex;
-            }
-            fileCpt.mLastUpdateTime = time(nullptr);
-            if (mCurrentFileIndex == mFileCheckpoints.size()) {
-                mStatus = StaticFileReadingStatus::FINISHED;
-                LOG_INFO(sLogger, ("all files read done, config", mConfigName)("input idx", mInputIdx));
+                if (++mCurrentFileIndex == mFileCheckpoints.size()) {
+                    mStatus = StaticFileReadingStatus::FINISHED;
+                    LOG_INFO(sLogger, ("all files read done, config", mConfigName)("input idx", mInputIdx));
+                }
             }
             return true;
         default:
@@ -116,8 +115,7 @@ bool InputStaticFileCheckpoint::InvalidateCurrentFileCheckpoint() {
                     "filepath", fileCpt.mFilePath.string())("device", fileCpt.mDevInode.dev)(
                     "inode", fileCpt.mDevInode.inode)("signature hash", fileCpt.mSignatureHash)(
                     "signature size", fileCpt.mSignatureSize)("read offset", fileCpt.mOffset));
-    ++mCurrentFileIndex;
-    if (mCurrentFileIndex == mFileCheckpoints.size()) {
+    if (++mCurrentFileIndex == mFileCheckpoints.size()) {
         mStatus = StaticFileReadingStatus::FINISHED;
         LOG_INFO(sLogger, ("all files read done, config", mConfigName)("input idx", mInputIdx));
     }
@@ -237,7 +235,7 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         *errMsg = "mandatory param files is missing";
         return false;
     }
-    if (it->isArray()) {
+    if (!it->isArray()) {
         *errMsg = "mandatory param files is not of type array";
         return false;
     }

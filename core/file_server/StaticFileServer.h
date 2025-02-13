@@ -21,6 +21,7 @@
 #include <future>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -52,7 +53,7 @@ public:
 
     void AddInput(const std::string& configName,
                   size_t idx,
-                  const std::vector<std::filesystem::path>& files,
+                  const std::optional<std::vector<std::filesystem::path>>& files,
                   FileDiscoveryOptions* fileDiscoveryOpts,
                   const FileReaderOptions* fileReaderOpts,
                   const MultilineOptions* multilineOpts,

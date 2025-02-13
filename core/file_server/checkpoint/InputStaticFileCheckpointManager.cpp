@@ -25,40 +25,58 @@ using namespace std;
 namespace logtail {
 
 static string GetCheckpointFileName(const string& configName, size_t idx) {
-    return configName + "%" + to_string(idx) + ".json";
+    return configName + "@" + to_string(idx) + ".json";
 }
 
 InputStaticFileCheckpointManager::InputStaticFileCheckpointManager()
     : mCheckpointRootPath(filesystem::path(GetAgentDataDir()) / "input_static_file") {
+    error_code ec;
+    if (!filesystem::create_directories(mCheckpointRootPath, ec) && ec) {
+        LOG_ERROR(sLogger,
+                  ("failed to create checkpoint root path",
+                   mCheckpointRootPath.string())("error code", ec.value())("error msg", ec.message()));
+    }
 }
 
 bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName,
                                                         size_t idx,
-                                                        const vector<filesystem::path>& files,
-                                                        bool skipExisted) {
-    if (skipExisted) {
-        error_code ec;
-        if (filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
-            LOG_INFO(sLogger,
-                     ("delete obsolete checkpoint file succeeded", "config has changed")("config",
-                                                                                         configName)("input idx", idx));
-        } else if (ec) {
-            LOG_WARNING(sLogger,
-                        ("failed to delete obsolete checkpoint file", "skip")("config", configName)("input idx", idx)(
-                            "error code", ec.value())("error msg", ec.message()));
-        }
-    } else {
+                                                        const optional<vector<filesystem::path>>& files) {
+    if (!files.has_value()) {
         InputStaticFileCheckpoint cpt;
         if (RetrieveCheckpointFromFile(configName, idx, &cpt)) {
             lock_guard<mutex> lock(mUpdateMux);
             mInputCheckpointMap.try_emplace(make_pair(configName, idx), std::move(cpt));
             LOG_INFO(sLogger, ("load checkpoint from file succeeded, config", configName)("input idx", idx));
             return true;
+        } else {
+            lock_guard<mutex> lock(mUpdateMux);
+            auto it
+                = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, vector<FileCheckpoint>())
+                      .first;
+            it->second.SetAbort();
+            LOG_WARNING(sLogger,
+                        ("failed to load checkpoint from file", "abort")("config", configName)("input idx", idx));
+            if (!DumpCheckpointFile(it->second)) {
+                LOG_WARNING(sLogger,
+                            ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
+            }
+            return false;
         }
     }
 
+    error_code ec;
+    if (filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
+        LOG_INFO(sLogger,
+                 ("delete obsolete checkpoint file succeeded", "config has changed")("config", configName)("input idx",
+                                                                                                           idx));
+    } else if (ec) {
+        LOG_WARNING(sLogger,
+                    ("failed to delete obsolete checkpoint file", "skip")("config", configName)("input idx", idx)(
+                        "error code", ec.value())("error msg", ec.message()));
+    }
+
     vector<FileCheckpoint> fileCpts;
-    for (const auto& file : files) {
+    for (const auto& file : files.value()) {
         auto devInode = GetFileDevInode(file.string());
         if (!devInode.IsValid()) {
             LOG_WARNING(sLogger,
@@ -97,7 +115,10 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
              ("create checkpoint succeeded, config", configName)("input idx", idx)("file count", fileCpts.size()));
     {
         lock_guard<mutex> lock(mUpdateMux);
-        mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, move(fileCpts));
+        auto it = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, move(fileCpts)).first;
+        if (!DumpCheckpointFile(it->second)) {
+            LOG_WARNING(sLogger, ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
+        }
         // auto it = mInputCheckpointMap.find(make_pair(configName, idx));
         // if (it != mInputCheckpointMap.end()) {
         //     mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, move(fileCpts));
@@ -142,7 +163,6 @@ bool InputStaticFileCheckpointManager::DeleteCheckpoint(const string& configName
                         ("failed to delete checkpoint file",
                          "skip")("config", configName)("input idx", idx)("error msg", "file not existed"));
         }
-        return false;
     }
     return true;
 }
@@ -250,9 +270,9 @@ void InputStaticFileCheckpointManager::GetAllCheckpointFileNames() {
             continue;
         }
 
-        uint64_t hash = 0;
+        uint64_t inputIdx = 0;
         try {
-            hash = stoull(cptKey.substr(idx + 1));
+            inputIdx = stoull(cptKey.substr(idx + 1));
         } catch (const std::invalid_argument&) {
             LOG_WARNING(sLogger,
                         ("invalid checkpoint file name: input idx is not digit", "skip")("filepath", filepath));
@@ -263,7 +283,7 @@ void InputStaticFileCheckpointManager::GetAllCheckpointFileNames() {
             continue;
         }
         string configName = cptKey.substr(0, idx);
-        mCheckpointFileNamesOnInit.emplace(configName, hash);
+        mCheckpointFileNamesOnInit.emplace(configName, inputIdx);
     }
     LOG_INFO(sLogger, ("get all checkpoint file names succeeded, file count", mCheckpointFileNamesOnInit.size()));
 }
@@ -295,10 +315,11 @@ bool InputStaticFileCheckpointManager::RetrieveCheckpointFromFile(const string& 
     }
     auto it = mCheckpointFileNamesOnInit.find(make_pair(configName, idx));
     if (it == mCheckpointFileNamesOnInit.end()) {
+        LOG_WARNING(sLogger, ("no checkpoint file found, config", configName)("input idx", idx));
         return false;
     }
     mCheckpointFileNamesOnInit.erase(it);
-    return LoadCheckpointFile(GetCheckpointFileName(configName, idx), cpt);
+    return LoadCheckpointFile(mCheckpointRootPath / GetCheckpointFileName(configName, idx), cpt);
 }
 
 

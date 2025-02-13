@@ -76,13 +76,13 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
 
 void StaticFileServer::AddInput(const string& configName,
                                 size_t idx,
-                                const vector<filesystem::path>& files,
+                                const optional<vector<filesystem::path>>& files,
                                 FileDiscoveryOptions* fileDiscoveryOpts,
                                 const FileReaderOptions* fileReaderOpts,
                                 const MultilineOptions* multilineOpts,
                                 const FileTagOptions* fileTagOpts,
                                 const CollectionPipelineContext* ctx) {
-    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files, !ctx->IsFromCheckpoint());
+    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files);
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileDiscoveryOpts, ctx));

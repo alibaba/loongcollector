@@ -55,6 +55,10 @@ private:
     std::vector<FileCheckpoint> mFileCheckpoints;
     size_t mCurrentFileIndex = 0;
     StaticFileReadingStatus mStatus = StaticFileReadingStatus::RUNNING;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputStaticFileCheckpointManagerUnittest;
+#endif
 };
 
 } // namespace logtail

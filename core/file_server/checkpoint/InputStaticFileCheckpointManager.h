@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -43,8 +44,7 @@ public:
 
     bool CreateCheckpoint(const std::string& configName,
                           size_t idx,
-                          const std::vector<std::filesystem::path>& files,
-                          bool ignoreExisted);
+                          const std::optional<std::vector<std::filesystem::path>>& files = std::nullopt);
     bool DeleteCheckpoint(const std::string& configName, size_t idx);
     bool UpdateCurrentFileCheckpoint(const std::string& configName, size_t idx, uint64_t offset, uint64_t size);
     bool InvalidateCurrentFileCheckpoint(const std::string& configName, size_t idx);
@@ -73,6 +73,10 @@ private:
 
     // only accessed by main thread
     std::set<std::pair<std::string, size_t>> mCheckpointFileNamesOnInit;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputStaticFileCheckpointManagerUnittest;
+#endif
 };
 
 } // namespace logtail
