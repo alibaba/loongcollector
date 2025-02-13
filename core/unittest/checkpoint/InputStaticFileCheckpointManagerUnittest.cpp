@@ -66,9 +66,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     }
 
     // prepare checkpoint files
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config_2@0.json");
-    }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config_2@0.json"); }
     {
         ofstream fout(sManager->mCheckpointRootPath / "test_config_3@0.json");
         string cptStr = R"({
@@ -201,7 +199,8 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
 void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     // prepare logs
     filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
+    vector<filesystem::path> files{
+        "./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
     vector<string> contents{string(2000, 'a') + "\n", string(200, 'b') + "\n", string(500, 'c') + "\n"};
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
@@ -340,24 +339,12 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
 void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     // valid checkpoint root path
     filesystem::create_directories(sManager->mCheckpointRootPath / "dir");
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml");
-    }
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json");
-    }
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json");
-    }
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json");
-    }
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json");
-    }
-    {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config@1.json");
-    }
+    { ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@1.json"); }
     sManager->GetAllCheckpointFileNames();
     APSARA_TEST_EQUAL(2U, sManager->mCheckpointFileNamesOnInit.size());
     APSARA_TEST_NOT_EQUAL(sManager->mCheckpointFileNamesOnInit.end(),
@@ -376,9 +363,7 @@ void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     EXPECT_NO_THROW(sManager->GetAllCheckpointFileNames());
 
     // invalid checkpoint root path
-    {
-        ofstream fout(sManager->mCheckpointRootPath);
-    }
+    { ofstream fout(sManager->mCheckpointRootPath); }
     EXPECT_NO_THROW(sManager->GetAllCheckpointFileNames());
 }
 
@@ -469,9 +454,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     filesystem::remove_all(cptPath);
     // empty file
-    {
-        ofstream fout(cptPath);
-    }
+    { ofstream fout(cptPath); }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     // invalid json
     {

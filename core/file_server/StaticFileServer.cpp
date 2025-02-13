@@ -145,7 +145,7 @@ void StaticFileServer::ReadFiles() {
                     bool moreData = reader->ReadLog(*logBuffer, nullptr);
                     auto group = LogFileReader::GenerateEventGroup(reader, logBuffer.get());
                     if (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), inputIdx, std::move(group))) {
-                        // should not happend, since only thread is pushing to the queue
+                        // should not happend, since only one thread is pushing to the queue
                         LOG_ERROR(sLogger,
                                   ("failed to push to process queue", "discard data")("config", configName)(
                                       "input idx", inputIdx)("filepath", reader->GetHostLogPath()));
