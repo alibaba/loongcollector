@@ -73,9 +73,8 @@ void ConcurrencyLimiter::Increase() {
     if (mCurrentConcurrency != mMaxConcurrency) {
         ++mCurrentConcurrency;
         if (mCurrentConcurrency == mMaxConcurrency) {
-            LOG_DEBUG(
-                sLogger,
-                ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrentConcurrency));
+            LOG_DEBUG(sLogger,
+                      ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrentConcurrency));
         } else {
             LOG_DEBUG(sLogger,
                       ("increase send concurrency, type",
