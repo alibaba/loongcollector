@@ -201,6 +201,7 @@ bool InputStaticFileCheckpointManager::InvalidateCurrentFileCheckpoint(const str
         return false;
     }
     if (!it->second.InvalidateCurrentFileCheckpoint()) {
+        // should not happen
         return false;
     }
     if (!DumpCheckpointFile(it->second)) {

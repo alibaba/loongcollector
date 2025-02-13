@@ -61,6 +61,10 @@ public:
                   const CollectionPipelineContext* ctx);
     void RemoveInput(const std::string& configName, size_t idx);
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    void Clear();
+#endif
+
 private:
     StaticFileServer() = default;
     ~StaticFileServer() = default;
@@ -93,6 +97,10 @@ private:
     std::map<std::pair<std::string, size_t>, FileTagConfig> mInputFileTagConfigsMap;
     std::multimap<std::string, size_t> mAddedInputs;
     std::set<std::pair<std::string, size_t>> mDeletedInputs;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class StaticFileServerUnittest;
+#endif
 };
 
 } // namespace logtail

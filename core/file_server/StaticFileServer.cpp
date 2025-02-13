@@ -255,4 +255,17 @@ FileTagConfig StaticFileServer::GetFileTagConfig(const std::string& name, size_t
     return it->second;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+void StaticFileServer::Clear() {
+    lock_guard<mutex> lock(mUpdateMux);
+    mInputFileDiscoveryConfigsMap.clear();
+    mInputFileReaderConfigsMap.clear();
+    mInputMultilineConfigsMap.clear();
+    mInputFileTagConfigsMap.clear();
+    mPipelineNameReadersMap.clear();
+    mAddedInputs.clear();
+    mDeletedInputs.clear();
+}
+#endif
+
 } // namespace logtail
