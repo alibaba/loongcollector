@@ -238,7 +238,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
 - [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
-- [github.com/99designs/go-keychain](https://pkg.go.dev/github.com/99designs/go-keychain?tab=licenses)
 - [github.com/gabriel-vasile/mimetype](https://pkg.go.dev/github.com/gabriel-vasile/mimetype?tab=licenses)
 - [github.com/go-playground/locales](https://pkg.go.dev/github.com/go-playground/locales?tab=licenses)
 - [github.com/go-playground/universal-translator](https://pkg.go.dev/github.com/go-playground/universal-translator?tab=licenses)
