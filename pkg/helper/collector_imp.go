@@ -143,22 +143,22 @@ func (p *defaultPipelineContext) Collector() pipeline.PipelineCollector {
 	return p.collector
 }
 
-func NewObservePipelineConext(queueSize int) pipeline.PipelineContext {
-	return newPipelineConext(&observePipeCollector{
+func NewObservePipelineContext(queueSize int) pipeline.PipelineContext {
+	return newPipelineContext(&observePipeCollector{
 		groupChan: make(chan *models.PipelineGroupEvents, queueSize),
 	})
 }
 
-func NewGroupedPipelineConext() pipeline.PipelineContext {
-	return newPipelineConext(&groupedPipeCollector{
+func NewGroupedPipelineContext() pipeline.PipelineContext {
+	return newPipelineContext(&groupedPipeCollector{
 		groupEvents: make(map[*models.GroupInfo][]models.PipelineEvent),
 	})
 }
 
-func NewNoopPipelineConext() pipeline.PipelineContext {
-	return newPipelineConext(&noopPipeCollector{})
+func NewNoopPipelineContext() pipeline.PipelineContext {
+	return newPipelineContext(&noopPipeCollector{})
 }
 
-func newPipelineConext(collector pipeline.PipelineCollector) pipeline.PipelineContext {
+func newPipelineContext(collector pipeline.PipelineCollector) pipeline.PipelineContext {
 	return &defaultPipelineContext{collector: collector}
 }
