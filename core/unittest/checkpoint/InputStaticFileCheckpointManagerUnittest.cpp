@@ -334,6 +334,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
         FileFingerprint fp;
         APSARA_TEST_FALSE(sManager->GetCurrentFileFingerprint("test_config_2", 0, &fp));
     }
+    filesystem::remove_all("test_logs");
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
