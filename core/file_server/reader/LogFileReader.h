@@ -357,7 +357,7 @@ public:
 
     void SetReaderArray(LogFileReaderPtrArray* readerArray);
 
-    // // some Reader will overide these functions (eg. JsonLogFileReader)
+    // // some Reader will override these functions (eg. JsonLogFileReader)
     // virtual bool ParseLogLine(StringView buffer,
     //                           sls_logs::LogGroup& logGroup,
     //                           ParseLogError& error,
@@ -737,7 +737,7 @@ struct LogBuffer {
     std::unique_ptr<SourceBuffer> sourcebuffer;
 
     LogBuffer() : sourcebuffer(new SourceBuffer()) {}
-    void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }
+    void SetDependency(const LogFileReaderPtr& reader) { logFileReader = reader; }
 };
 
 } // namespace logtail

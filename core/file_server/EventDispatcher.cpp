@@ -757,7 +757,7 @@ void EventDispatcher::CheckSymbolicLink() {
             UnregisterAllDir(path);
         } else {
             fsutil::PathStat statBuf;
-            if (!fsutil::PathStat::stat(path, statBuf)) // check path refrence to
+            if (!fsutil::PathStat::stat(path, statBuf)) // check path reference to
             {
                 // when "b" was removed, there will be no inotify event
                 LOG_WARNING(sLogger, ("existed symbolic link invalid, remove inotify monitor", path));
@@ -765,7 +765,7 @@ void EventDispatcher::CheckSymbolicLink() {
                 mBrokenLinkSet.insert(path);
             } else if (statBuf.IsDir()) {
                 // when "c" or "b" was removed, a will be put into broken link set
-                // then the directory "c" or "b" be created with no IN_CRETATE event, should add inotify monitor for "a"
+                // then the directory "c" or "b" be created with no IN_CREATE event, should add inotify monitor for "a"
                 // again
                 if (mBrokenLinkSet.find(path) != mBrokenLinkSet.end()) {
                     mBrokenLinkSet.erase(path);
@@ -821,7 +821,7 @@ void EventDispatcher::UnregisterEventHandler(const string& path) {
         fsutil::PathStat lstatBuf;
         if (fsutil::PathStat::lstat(path, lstatBuf)) // TODO: Need review, might be a bug.
         {
-            // path(symbolic link) existed, the dir it refrence to is deleted
+            // path(symbolic link) existed, the dir it reference to is deleted
             mBrokenLinkSet.insert(path);
         }
     }
@@ -891,7 +891,7 @@ void EventDispatcher::HandleTimeout() {
             // mHandler may remove what itr points to, thus change the layout of the map container
             // what follows may not work
             // Event ev(source, string(), EVENT_TIMEOUT);
-            // mTimoutHandler->Handle(ev);
+            // mTimeoutHandler->Handle(ev);
             sources.push_back(&(mWdDirInfoMap[itr->first]->mPath));
         }
     }
@@ -910,7 +910,7 @@ void EventDispatcher::HandleTimeout() {
 void EventDispatcher::PropagateTimeout(const std::string& path) {
     auto pathpos = mPathWdMap.find(path);
     if (pathpos == mPathWdMap.end()) {
-        // walkarond of bug#5760293, should find the scenarios
+        // workaround of bug#5760293, should find the scenarios
         AlarmManager::GetInstance()->SendAlarm(INVALID_MEMORY_ACCESS_ALARM,
                                                "PropagateTimeout access invalid key of mPathWdMap, path : " + path);
         LOG_ERROR(sLogger, ("PropagateTimeout access invalid key of mPathWdMap, path", path));

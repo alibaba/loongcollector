@@ -230,7 +230,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     }
 
     auto token = username + ":" + password;
-    auto token64 = Base64Enconde(token);
+    auto token64 = Base64Encode(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
     return true;
 }

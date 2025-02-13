@@ -985,7 +985,7 @@ void LogFileReader::OnOpenFileError() {
                           "log path", mRealLogPath)("file device", ToString(mDevInode.dev))(
                           "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
                           "file signature size", mLastFileSignatureSize)("last file position", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(LOGFILE_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGFILE_PERMISSION_ALARM,
                                                    string("Failed to open log file because of permission: ")
                                                        + mHostLogPath,
                                                    GetProject(),
@@ -1158,7 +1158,7 @@ void LogFileReader::CloseFilePtr() {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
 
-        // if mHostLogPath is symbolic link, then we should not update it accrding to /dev/fd/xx
+        // if mHostLogPath is symbolic link, then we should not update it according to /dev/fd/xx
         if (!mSymbolicLinkFlag) {
             // retrieve file path from file descriptor in order to open it later
             // this is important when file is moved when rotating
@@ -1802,7 +1802,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     char* stringBuffer = stringMemory.data; // utf8 buffer
     if (resultCharCount == 0) {
         if (readCharCount < originReadCount) {
-            // skip unconvertable part, put rollbacked part in cache
+            // skip unconvertible part, put rollbacked part in cache
             mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
         } else {
             mCache.clear();

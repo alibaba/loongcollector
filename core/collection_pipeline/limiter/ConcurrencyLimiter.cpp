@@ -23,12 +23,12 @@ namespace logtail {
 #ifdef APSARA_UNIT_TEST_MAIN
 uint32_t ConcurrencyLimiter::GetCurrentLimit() const {
     lock_guard<mutex> lock(mLimiterMux);
-    return mCurrenctConcurrency;
+    return mCurrentConcurrency;
 }
 
 void ConcurrencyLimiter::SetCurrentLimit(uint32_t limit) {
     lock_guard<mutex> lock(mLimiterMux);
-    mCurrenctConcurrency = limit;
+    mCurrentConcurrency = limit;
 }
 
 void ConcurrencyLimiter::SetInSendingCount(uint32_t count) {
@@ -46,7 +46,7 @@ uint32_t ConcurrencyLimiter::GetStatisticThreshold() const {
 
 bool ConcurrencyLimiter::IsValidToPop() {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency > mInSendingCnt.load()) {
+    if (mCurrentConcurrency > mInSendingCnt.load()) {
         return true;
     }
     return false;
@@ -70,30 +70,30 @@ void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point currentTim
 
 void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency != mMaxConcurrency) {
-        ++mCurrenctConcurrency;
-        if (mCurrenctConcurrency == mMaxConcurrency) {
+    if (mCurrentConcurrency != mMaxConcurrency) {
+        ++mCurrentConcurrency;
+        if (mCurrentConcurrency == mMaxConcurrency) {
             LOG_DEBUG(
                 sLogger,
-                ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
+                ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrentConcurrency));
         } else {
             LOG_DEBUG(sLogger,
                       ("increase send concurrency, type",
-                       mDescription)("from", mCurrenctConcurrency - 1)("to", mCurrenctConcurrency));
+                       mDescription)("from", mCurrentConcurrency - 1)("to", mCurrentConcurrency));
         }
     }
 }
 
 void ConcurrencyLimiter::Decrease(double fallBackRatio) {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency != mMinConcurrency) {
-        auto old = mCurrenctConcurrency;
-        mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * fallBackRatio), mMinConcurrency);
-        LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
+    if (mCurrentConcurrency != mMinConcurrency) {
+        auto old = mCurrentConcurrency;
+        mCurrentConcurrency = std::max(static_cast<uint32_t>(mCurrentConcurrency * fallBackRatio), mMinConcurrency);
+        LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrentConcurrency));
     } else {
         if (mMinConcurrency == 0) {
-            mCurrenctConcurrency = 1;
-            LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrenctConcurrency));
+            mCurrentConcurrency = 1;
+            LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrentConcurrency));
         }
     }
 }
