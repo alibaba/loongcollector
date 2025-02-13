@@ -234,6 +234,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/valyala/fastjson](https://pkg.go.dev/github.com/valyala/fastjson?tab=licenses)
 - [github.com/valyala/fastrand](https://pkg.go.dev/github.com/valyala/fastrand?tab=licenses)
 - [github.com/valyala/fasttemplate](https://pkg.go.dev/github.com/valyala/fasttemplate?tab=licenses)
+- [github.com/valyala/gozstd](https://pkg.go.dev/github.com/valyala/gozstd?tab=licenses)
 - [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
 - [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
