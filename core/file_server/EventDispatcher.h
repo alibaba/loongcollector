@@ -288,7 +288,7 @@ protected:
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
 
-    void CleanEnviroments();
+    void CleanEnvironments();
     int32_t GetInotifyWatcherCount();
 #endif
 };

@@ -815,11 +815,11 @@ void ModifyHandler::Handle(const Event& event) {
 
             // When loginput thread hold on, we should repush this event back.
             // If we don't repush and this file has no modify event, this reader will never been read.
-            if (LogInput::GetInstance()->IsInterupt()) {
+            if (LogInput::GetInstance()->IsInterrupt()) {
                 if (hasMoreData) {
                     LOG_INFO(
                         sLogger,
-                        ("read log interupt but has more data, reason", "log input thread hold on")(
+                        ("read log interrupt but has more data, reason", "log input thread hold on")(
                             "action", "repush modify event to event queue")("begin time", beginTime)(
                             "path", event.GetSource())("file", event.GetObject())("inode", reader->GetDevInode().inode)(
                             "offset", reader->GetLastFilePos())("size", reader->GetFileSize()));

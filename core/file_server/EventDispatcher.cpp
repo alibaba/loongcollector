@@ -1005,7 +1005,7 @@ bool EventDispatcher::IsAllFileRead() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-void EventDispatcher::CleanEnviroments() {
+void EventDispatcher::CleanEnvironments() {
     // mMainThreadRunning = false;
     sleep(2); // INT32_FLAG(ilogtail_epoll_time_out) + 1
     mPathWdMap.clear();
