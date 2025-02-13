@@ -93,8 +93,8 @@ func GetAgentStat() []map[string]string {
 	metric := map[string]string{}
 	// key is the metric key in runtime/metrics, value is agent's metric key
 	metricNames := map[string]string{
-		// mem. All memory mapped by the Go runtime into the current process as read-write. Note that this does not include memory mapped by code called via cgo or via the syscall package. Sum of all metrics in /memory/classes.
-		"/memory/classes/total:bytes": helper.MetricAgentMemoryGo,
+		// mem. Memory occupied by live objects and dead objects that have not yet been marked free by the garbage collector.
+		"/memory/classes/heap/objects:bytes": helper.MetricAgentMemoryGo,
 		// go routines cnt. Count of live goroutines.
 		"/sched/goroutines:goroutines": helper.MetricAgentGoRoutinesTotal,
 	}
