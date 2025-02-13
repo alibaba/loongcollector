@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <array>
+#include <map>
 #include <atomic>
 #include <queue>
 #include <regex>
@@ -30,6 +30,8 @@
 #include "models/PipelineEventGroup.h"
 #include "util/FrequencyManager.h"
 
+#include "ebpf/driver/coolbpf/src/security/data_msg.h"
+
 namespace logtail {
 namespace ebpf {
 
@@ -42,6 +44,7 @@ public:
                 moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
         : mSourceManager(sm),
           mCache(65535, 1024),
+        //   mDataCache(1024, 256),
           mProcParser(hostPathPrefix),
           mHostName(hostName),
           mHostPathPrefix(hostPathPrefix),
@@ -64,9 +67,11 @@ public:
     int SyncAllProc();
     int PushExecveEvent(const std::shared_ptr<Procs> proc);
 
-    void RecordExecveEvent(msg_execve_event* event_ptr);
-    void RecordExitEvent(msg_exit* event_ptr);
-    void RecordCloneEvent(msg_clone_event* event_ptr);
+    void RecordExecveEvent(msg_execve_event* eventPtr);
+    void PostHandlerExecveEvent(msg_execve_event*, std::unique_ptr<MsgExecveEventUnix>&&);
+    void RecordExitEvent(msg_exit* eventPtr);
+    void RecordCloneEvent(msg_clone_event* eventPtr);
+    void RecordDataEvent(msg_data* eventPtr);
 
     std::string GenerateExecId(uint32_t pid, uint64_t ktime);
     std::string GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix> event);
@@ -79,6 +84,9 @@ public:
 
     void PollPerfBuffers();
 
+    void DataAdd(msg_data* data);
+    std::string DataGet(data_event_desc*);
+
     bool Init();
     void Stop();
 
@@ -89,6 +97,9 @@ private:
     std::atomic_bool mFlag = false;
     std::shared_ptr<SourceManager> mSourceManager = nullptr;
     lru11::Cache<std::string, std::shared_ptr<MsgExecveEventUnix>, std::mutex> mCache;
+    std::map<data_event_id, std::string> mDataCache;
+    
+    // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>, std::shared_ptr<std::string>>> mDataCache;
     ProcParser mProcParser;
     std::string mHostName;
     std::string mHostPathPrefix;

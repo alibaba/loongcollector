@@ -115,7 +115,12 @@ struct MsgProcess {
     std::string args;
     std::string cmdline;
     std::string cwd;
+    std::string binary;
     MsgUserRecord user;
+#ifdef APSARA_UNIT_TEST_MAIN
+    std::string testFileName;
+    std::string testCmdline;
+#endif
 };
 
 class MsgExecveEventUnix {
