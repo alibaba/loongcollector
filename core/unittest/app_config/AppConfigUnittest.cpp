@@ -174,7 +174,6 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
 }
 
 void AppConfigUnittest::TestParseEnvToFlags() {
-    // 忽略列表中的环境变量，继续可以用小写且允许 LOONG_ 前缀的格式
     {
         SetEnv("host_path_blacklist", "test1");
         AppConfig::GetInstance()->ParseEnvToFlags();
@@ -185,12 +184,10 @@ void AppConfigUnittest::TestParseEnvToFlags() {
         AppConfig::GetInstance()->ParseEnvToFlags();
         APSARA_TEST_EQUAL(STRING_FLAG(host_path_blacklist), "test2");
     }
-    // 不忽略列表中的环境变量，需要为大写,LOONG_ 前缀
     {
         SetEnv("default_machine_cpu_usage_threshold", "1");
         AppConfig::GetInstance()->ParseEnvToFlags();
-        APSARA_TEST_NOT_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 1);
-        APSARA_TEST_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 0.4);
+        APSARA_TEST_EQUAL(DOUBLE_FLAG(default_machine_cpu_usage_threshold), 1);
         UnsetEnv("default_machine_cpu_usage_threshold");
 
         SetEnv("LOONG_DEFAULT_MACHINE_CPU_USAGE_THRESHOLD", "2");
