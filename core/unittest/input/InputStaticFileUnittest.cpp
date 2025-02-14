@@ -34,6 +34,7 @@ public:
     void OnFailedInit();
     void TestCreateInnerProcessors();
     void OnPipelineUpdate();
+    void TestGetFiles();
 
 protected:
     static void SetUpTestCase() {
@@ -482,10 +483,14 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
     filesystem::remove_all("test_logs");
 }
 
+void InputStaticFileUnittest::TestGetFiles() {
+}
+
 UNIT_TEST_CASE(InputStaticFileUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(InputStaticFileUnittest, TestGetFiles)
 
 } // namespace logtail
 
