@@ -44,7 +44,7 @@ APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestBootTimeDiff, 0);
 
 void TimeUtilUnittest::TestBootTimeDiff() {
-    auto diff =GetTimeDiffFromBoot();
+    auto diff =GetTimeDiffFromMonotonic();
     uint64_t num = static_cast<uint64_t>(diff.count());
     APSARA_TEST_GE(num, (uint64_t)0);
 }

@@ -30,6 +30,7 @@
 
 #include "Logger.h"
 #include "ProcParser.h"
+#include "common/StringTools.h"
 
 namespace logtail {
 
@@ -126,8 +127,8 @@ std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename, c
     if (!ifs) {
         return "";
     }
-    std::string line = "";
-    std::string res = "";
+    std::string line;
+    std::string res;
     while (std::getline(ifs, line)) {
         if (delimiter == "") {
             res += std::move(line);
@@ -158,30 +159,19 @@ std::string ProcParser::GetPIDEnviron(uint32_t pid) const {
     return ReadPIDFile(pid, "environ", "");
 }
 
-// Helper functions to split strings
-std::vector<std::string> ProcParser::split(const std::string& str, char delimiter) const {
-    std::vector<std::string> tokens;
-    std::stringstream ss(str);
-    std::string token;
-    while (std::getline(ss, token, delimiter)) {
-        tokens.push_back(token);
-    }
-    return tokens;
-}
-
 std::tuple<std::string, int> ProcParser::ProcsContainerIdOffset(const std::string& subdir) const {
     size_t p = subdir.rfind(':') + 1;
-    std::vector<std::string> fields = split(subdir, ':');
+    std::vector<std::string> fields = SplitString(subdir, ":");
     std::string idStr = fields.back();
     size_t off = idStr.rfind('-') + 1;
-    std::vector<std::string> s = split(idStr, '-');
+    std::vector<std::string> s = SplitString(idStr, "-");
     return {s.back(), static_cast<int>(off + p)};
 }
 
 std::tuple<std::string, int>
 ProcParser::LookupContainerId(const std::string& cgroup, bool bpfSource, bool walkParent) const {
     bool idTruncated = false;
-    std::vector<std::string> subDirs = split(cgroup, '/');
+    std::vector<std::string> subDirs = SplitString(cgroup, "/");
     std::string subdir = subDirs.back();
 
     if (subdir.find("syscont-cgroup-root") != std::string::npos) {
@@ -220,7 +210,7 @@ ProcParser::LookupContainerId(const std::string& cgroup, bool bpfSource, bool wa
 }
 
 std::tuple<std::string, int> ProcParser::ProcsFindDockerId(const std::string& cgroups) const {
-    std::vector<std::string> cgrpPaths = split(cgroups, '\n');
+    std::vector<std::string> cgrpPaths = SplitString(cgroups, "\n");
     for (const auto& s : cgrpPaths) {
         if (s.find("pods") != std::string::npos || s.find("docker") != std::string::npos
             || s.find("libpod") != std::string::npos) {
@@ -370,7 +360,7 @@ uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& ns_str) cons
         return 0;
     }
 
-    std::vector<std::string> fields = split(netStr, ':');
+    std::vector<std::string> fields = SplitString(netStr, ":");
     if (fields.size() < 2) {
         LOG_WARNING(sLogger, ("parsing namespace fields less than 2, net str ", netStr)("netns", netns));
         return 0;
@@ -455,7 +445,7 @@ std::shared_ptr<Status> ProcParser::GetStatus(uint32_t pid) const {
 
 std::tuple<std::string, std::string> ProcParser::ProcsFilename(const std::string& args) {
     std::string filename = args;
-    std::string cmds = "";
+    std::string cmds;
     size_t idx = args.find('\0');
 
     if (idx == std::string::npos) {
@@ -463,11 +453,6 @@ std::tuple<std::string, std::string> ProcParser::ProcsFilename(const std::string
     } else {
         cmds = args.substr(idx);
         filename = args.substr(0, idx);
-        //    if (idx == 0) {
-        //      filename = "";
-        //    } else {
-        //
-        //    }
     }
 
     return std::make_tuple(cmds, filename);

@@ -386,7 +386,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
     if (prev_pipeline == pipeline_name) {
         UpdatePipelineName(type, "", "");
     } else {
-        LOG_WARNING(sLogger, ("prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
+        LOG_WARNING(sLogger, ("the specified config is not running, prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
     }
 

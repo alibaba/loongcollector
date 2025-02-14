@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <coolbpf/net.h>
+#include "ebpf/driver/coolbpf/src/net.h"
 #include <cstddef>
 
 #include <list>

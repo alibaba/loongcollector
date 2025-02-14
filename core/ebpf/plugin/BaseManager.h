@@ -60,7 +60,7 @@ public:
     void ReleaseCache(const std::string& key) { mCache.remove(key); }
 
     // thread-safe
-    void UpdateCache(const std::string& key, std::shared_ptr<MsgExecveEventUnix> value) { mCache.insert(key, value); }
+    void UpdateCache(const std::string& key, std::shared_ptr<MsgExecveEventUnix>& value) { mCache.insert(key, value); }
 
     std::vector<std::shared_ptr<Procs>> ListRunningProcs();
     int WriteProcToBPFMap(const std::shared_ptr<Procs>& proc);

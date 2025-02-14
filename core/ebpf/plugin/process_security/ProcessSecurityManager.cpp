@@ -48,6 +48,98 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& bas
           }) {
 }
 
+bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime) {
+    if (!mFlag || mSuspendFlag) {
+        return false;
+    }
+
+    WriteLock lk(mLock);
+    // TODO
+    auto aggTree = std::move(mAggregateTree);
+    lk.unlock();
+
+    // read aggregator
+    auto nodes = aggTree.GetNodesWithAggDepth(1);
+    LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+    if (nodes.empty()) {
+        LOG_DEBUG(sLogger, ("empty nodes...", ""));
+        return true;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    for (auto& node : nodes) {
+        LOG_DEBUG(sLogger, ("child num", node->child.size()));
+        // convert to a item and push to process queue
+        aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
+            SizedMap processTags;
+            // represent a process ...
+            auto bm = GetBaseManager();
+            if (bm == nullptr) {
+                LOG_WARNING(sLogger, ("basemanager is null", ""));
+                return;
+            }
+            processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+            if (processTags.mInner.empty()) {
+                LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
+                return;
+            }
+            for (const auto& innerEvent : group->mInnerEvents) {
+                auto* logEvent = eventGroup.AddLogEvent();
+                for (auto& it : processTags.mInner) {
+                    logEvent->SetContentNoCopy(it.first, it.second);
+                }
+                auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                logEvent->SetTimestamp(seconds.count(), ts);
+                switch (innerEvent->mEventType) {
+                    case KernelEventType::PROCESS_EXECVE_EVENT: {
+                        logEvent->SetContent("call_name", std::string("execve"));
+                        logEvent->SetContent("event_type", std::string("execve"));
+                        break;
+                    }
+                    case KernelEventType::PROCESS_EXIT_EVENT: {
+                        auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
+                        if (exitEvent == nullptr) {
+                            LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
+                            continue;
+                        }
+                        logEvent->SetContent("call_name", std::string("exit"));
+                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
+                        logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
+                        break;
+                    }
+                    case KernelEventType::PROCESS_CLONE_EVENT: {
+                        logEvent->SetContent("call_name", std::string("clone"));
+                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        });
+    }
+    {
+        std::lock_guard lk(mContextMutex);
+        if (this->mPipelineCtx == nullptr) {
+            return true;
+        }
+        LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+        std::unique_ptr<ProcessQueueItem> item
+            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[ProcessSecurityEvent] push queue failed!", ""));
+        }
+    }
+    aggTree.Clear();
+
+    return true;
+}
+
 int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>) {
     // just set timer ...
     // register base manager ...
@@ -60,104 +152,18 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
         LOG_WARNING(sLogger, ("basemanager is null", ""));
         return 1;
     }
+
     bm->MarkProcessEventFlushStatus(true);
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            if (!this->mFlag || this->mSuspendFlag) {
-                return false;
-            }
-
-            WriteLock lk(this->mLock);
-            auto aggTree = std::move(this->mAggregateTree);
-            lk.unlock();
-
-            // read aggregator
-            auto nodes = aggTree.GetNodesWithAggDepth(1);
-            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
-            if (nodes.empty()) {
-                LOG_DEBUG(sLogger, ("empty nodes...", ""));
-                return true;
-            }
-
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            for (auto& node : nodes) {
-                LOG_DEBUG(sLogger, ("child num", node->child.size()));
-                // convert to a item and push to process queue
-                aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-                    SizedMap processTags;
-                    // represent a process ...
-                    auto bm = GetBaseManager();
-                    if (bm == nullptr) {
-                        LOG_WARNING(sLogger, ("basemanager is null", ""));
-                        return;
-                    }
-                    processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
-                    if (processTags.mInner.empty()) {
-                        LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
-                        return;
-                    }
-                    for (const auto& innerEvent : group->mInnerEvents) {
-                        auto* logEvent = eventGroup.AddLogEvent();
-                        for (auto& it : processTags.mInner) {
-                            logEvent->SetContentNoCopy(it.first, it.second);
-                        }
-                        auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
-                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                        logEvent->SetTimestamp(seconds.count(), ts);
-                        switch (innerEvent->mEventType) {
-                            case KernelEventType::PROCESS_EXECVE_EVENT: {
-                                logEvent->SetContent("call_name", std::string("execve"));
-                                logEvent->SetContent("event_type", std::string("execve"));
-                                break;
-                            }
-                            case KernelEventType::PROCESS_EXIT_EVENT: {
-                                auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
-                                if (exitEvent == nullptr) {
-                                    LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
-                                    continue;
-                                }
-                                logEvent->SetContent("call_name", std::string("exit"));
-                                logEvent->SetContent("event_type", std::string("kprobe"));
-                                logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
-                                logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
-                                break;
-                            }
-                            case KernelEventType::PROCESS_CLONE_EVENT: {
-                                logEvent->SetContent("call_name", std::string("clone"));
-                                logEvent->SetContent("event_type", std::string("kprobe"));
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                    }
-                });
-            }
-            {
-                std::lock_guard lk(mContextMutex);
-                if (this->mPipelineCtx == nullptr) {
-                    return true;
-                }
-                LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-                std::unique_ptr<ProcessQueueItem> item
-                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                    LOG_WARNING(sLogger,
-                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                    "[ProcessSecurityEvent] push queue failed!", ""));
-                }
-            }
-            aggTree.Clear();
-
-            return true;
+            return this->ConsumeAggregateTree(execTime);
         },
         [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
-                LOG_WARNING(sLogger,
-                            ("stop schedule, invalid, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
+                LOG_INFO(sLogger,
+                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
                                                                                                      this->mStartUid));
             }
             return isStop;

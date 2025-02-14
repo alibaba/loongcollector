@@ -52,8 +52,8 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
         containerCache(cidCacheSize, 20), 
         externalIpCache(externalIpCacheSize, 20),
         mFetchIntervalSeconds(fetchIntervalSec) {
-    mServiceHost = STRING_FLAG(loong_collector_singleton_service);
-    mServicePort = INT32_FLAG(loong_collector_singleton_port);
+    mServiceHost = STRING_FLAG(singleton_service);
+    mServicePort = INT32_FLAG(singleton_port);
     // TODO @qianlu.kk 
     const char* value = getenv("_node_ip_");
     if (value != NULL) {

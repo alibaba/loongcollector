@@ -20,7 +20,7 @@
 #include "ebpf/include/export.h"
 
 extern "C" {
-#include <coolbpf/net.h>
+#include "ebpf/driver/coolbpf/src/net.h"
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <coolbpf/security/msg_type.h>

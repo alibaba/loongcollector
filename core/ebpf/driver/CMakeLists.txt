@@ -36,13 +36,9 @@ if (LINUX)
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
     file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+
     add_library(EbpfDriver SHARED ${LIB_SOURCE_FILES})
     target_link_libraries(EbpfDriver coolbpf)
     add_dependencies(EbpfDriver install_coolbpf)
     target_link_options(EbpfDriver PRIVATE "-Wl,-rpath=.:${DEFAULT_DEPS_ROOT}/lib")
-
-    add_executable(standalone Standalone.cpp)
-    add_dependencies(standalone install_coolbpf)
-    add_dependencies(standalone EbpfDriver)
-    target_link_libraries(standalone pthread z dl)
 endif ()

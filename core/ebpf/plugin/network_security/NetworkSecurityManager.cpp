@@ -237,8 +237,8 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
         [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
-                LOG_WARNING(sLogger,
-                            ("stop schedule, invalid, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
+                LOG_INFO(sLogger,
+                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
                                                                                                      this->mStartUid));
             }
             return isStop;

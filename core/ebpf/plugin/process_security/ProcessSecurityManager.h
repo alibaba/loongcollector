@@ -51,6 +51,8 @@ public:
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
+    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+
     // process perfbuffer was polled by baseManager ...
     virtual int PollPerfBuffer() override { return 0; }
 

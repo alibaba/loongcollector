@@ -14,15 +14,18 @@
 
 #include "BaseManager.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <queue>
 #include <regex>
 #include <set>
 #include <unordered_map>
-#include <algorithm>
 
 #include "json/value.h"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #include "common/CapabilityUtil.h"
 #include "common/EncodingUtil.h"
@@ -30,8 +33,10 @@
 #include "common/LRUCache.h"
 #include "common/ProcParser.h"
 #include "common/magic_enum.hpp"
+#include "ebpf/driver/coolbpf/src/security/bpf_common.h"
 #include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 #include "ebpf/driver/coolbpf/src/security/data_msg.h"
+#include "ebpf/driver/coolbpf/src/security/msg_type.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "ebpf/util/ExecIdUtil.h"
@@ -57,11 +62,13 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
     switch (common->op) {
         case MSG_OP_CLONE: {
             auto event = static_cast<struct msg_clone_event*>(data);
+            // TODO enqueue
             bm->RecordCloneEvent(event);
             break;
         }
         case MSG_OP_EXIT: {
             auto event = static_cast<struct msg_exit*>(data);
+            // TODO set into delete queue ...
             bm->RecordExitEvent(event);
             break;
         }
@@ -73,11 +80,6 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
         case MSG_OP_DATA: {
             auto eventPtr = static_cast<msg_data*>(data);
             bm->RecordDataEvent(eventPtr);
-            // TODO
-            break;
-        }
-        case MSG_OP_THROTTLE: {
-            // auto event_ptr = static_cast<msg_throttle*>(data);
             // TODO
             break;
         }
@@ -176,11 +178,13 @@ void BaseManager::DataAdd(msg_data* dataPtr) {
     if (size <= MSG_DATA_ARG_LEN) {
         // std::vector<uint64_t> key = {dataPtr->id.pid, dataPtr->id.time};
         auto data = std::string(dataPtr->arg, size);
-        
+
         auto res = mDataCache.count(dataPtr->id);
         if (res) {
             std::string prevData = mDataCache[dataPtr->id];
-            LOG_DEBUG(sLogger, ("already have data, pid", dataPtr->id.pid)("ktime", dataPtr->id.time)("prevData", prevData)("data", data));
+            LOG_DEBUG(sLogger,
+                      ("already have data, pid", dataPtr->id.pid)("ktime", dataPtr->id.time)("prevData",
+                                                                                             prevData)("data", data));
             mDataCache[dataPtr->id] = prevData + data;
         } else {
             LOG_DEBUG(sLogger, ("no prev data, pid", dataPtr->id.pid)("ktime", dataPtr->id.time)("data", data));
@@ -198,9 +202,9 @@ std::string BaseManager::DataGet(data_event_desc* desc) {
     }
     std::string data = mDataCache[desc->id];
     mDataCache.erase(desc->id);
-    
+
     if (data.size() != desc->size - desc->leftover) {
-        LOG_WARNING(sLogger, ("size bad! data size", data.size()) ("expect", desc->size - desc->leftover));
+        LOG_WARNING(sLogger, ("size bad! data size", data.size())("expect", desc->size - desc->leftover));
         return "";
     }
 
@@ -208,9 +212,9 @@ std::string BaseManager::DataGet(data_event_desc* desc) {
 }
 
 void BaseManager::RecordDataEvent(msg_data* eventPtr) {
-    LOG_DEBUG(sLogger, ("[receive_data_event] size", eventPtr->common.size)
-        ("pid", eventPtr->id.pid)("time", eventPtr->id.time)
-        ("data", std::string(eventPtr->arg, eventPtr->common.size - offsetof(msg_data, arg))));
+    LOG_DEBUG(sLogger,
+              ("[receive_data_event] size", eventPtr->common.size)("pid", eventPtr->id.pid)("time", eventPtr->id.time)(
+                  "data", std::string(eventPtr->arg, eventPtr->common.size - offsetof(msg_data, arg))));
     DataAdd(eventPtr);
 }
 
@@ -267,7 +271,7 @@ std::tuple<std::string, std::string> ArgsDecoder(const std::string& args, uint32
         return std::make_tuple(std::move(arguments), std::move(cwd));
     }
 
-    for (size_t i = 0; i < argTokens.size() - hasCWD; i ++) {
+    for (size_t i = 0; i < argTokens.size() - hasCWD; i++) {
         if (argTokens[i].find(' ') != std::string::npos) {
             arguments += ("\"" + argTokens[i] + "\"");
         } else {
@@ -282,7 +286,6 @@ std::tuple<std::string, std::string> ArgsDecoder(const std::string& args, uint32
     LOG_DEBUG(sLogger, ("arg", args)("cwd", cwd)("arguments", arguments)("flag", flags));
 
     return std::make_tuple(std::move(arguments), std::move(cwd));
-
 }
 
 void BaseManager::RecordExecveEvent(msg_execve_event* eventPtr) {
@@ -311,7 +314,7 @@ void BaseManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     event->process.testFileName = mProcParser.GetPIDExePath(event->process.pid);
     event->process.testCmdline = mProcParser.GetPIDCmdline(event->process.pid);
 #endif
-    
+
 
     // args && filename
 
@@ -337,7 +340,9 @@ void BaseManager::RecordExecveEvent(msg_execve_event* eventPtr) {
             return;
         }
         auto* desc = reinterpret_cast<data_event_desc*>(argStart);
-        LOG_DEBUG(sLogger, ("EVENT_DATA_FILENAME, size", desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
+        LOG_DEBUG(sLogger,
+                  ("EVENT_DATA_FILENAME, size",
+                   desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
         auto data = DataGet(desc);
         if (data.empty()) {
             PostHandlerExecveEvent(eventPtr, std::move(event));
@@ -348,7 +353,7 @@ void BaseManager::RecordExecveEvent(msg_execve_event* eventPtr) {
         size -= sizeof(data_event_desc);
     } else if ((eventPtr->process.flags & EVENT_ERROR_FILENAME) == 0) {
         // args 中找第一个 \0 的索引 idx
-        for (uint32_t i = 0 ; i < size; i ++) {
+        for (uint32_t i = 0; i < size; i++) {
             if (argStart[i] == '\0') {
                 event->process.filename = std::string(argStart, i);
                 argStart += (i + 1);
@@ -361,13 +366,15 @@ void BaseManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     // cmd args
     if (eventPtr->process.flags & EVENT_DATA_ARGS) {
         auto* desc = reinterpret_cast<data_event_desc*>(argStart);
-        LOG_DEBUG(sLogger, ("EVENT_DATA_FILENAME, size", desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
+        LOG_DEBUG(sLogger,
+                  ("EVENT_DATA_FILENAME, size",
+                   desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
         auto data = DataGet(desc);
         if (data.empty()) {
             PostHandlerExecveEvent(eventPtr, std::move(event));
             return;
         }
-        // cwd 
+        // cwd
         event->process.cwd = std::string(argStart + sizeof(data_event_desc), size - sizeof(data_event_desc));
         event->process.args = data + "\0" + event->process.cwd;
     } else {
@@ -382,12 +389,11 @@ void BaseManager::PostHandlerExecveEvent(msg_execve_event* eventPtr, std::unique
     LOG_DEBUG(
         sLogger,
         ("before ArgsDecoder", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
-            "filename", event->process.filename)("dockerid", event->kube.docker)
-            ("raw_args", event->process.args)("cwd", event->process.cwd)("flag", eventPtr->process.flags)
-            ("procParser.exePath", event->process.testFileName)("procParser.cmdLine", event->process.testCmdline)
-            );
+            "filename", event->process.filename)("dockerid", event->kube.docker)("raw_args", event->process.args)(
+            "cwd", event->process.cwd)("flag", eventPtr->process.flags)(
+            "procParser.exePath", event->process.testFileName)("procParser.cmdLine", event->process.testCmdline));
 #endif
-    
+
     auto [args, cwd] = ArgsDecoder(event->process.args, event->process.flags);
     event->process.args = args;
     event->process.cwd = cwd;
@@ -399,15 +405,15 @@ void BaseManager::PostHandlerExecveEvent(msg_execve_event* eventPtr, std::unique
             event->process.binary = event->process.cwd + '/' + event->process.filename;
         }
     } else {
-        LOG_WARNING(sLogger, ("filename is empty, should not happen. pid", event->process.pid) ("ktime", event->process.ktime));
+        LOG_WARNING(sLogger,
+                    ("filename is empty, should not happen. pid", event->process.pid)("ktime", event->process.ktime));
     }
-    
+
     LOG_DEBUG(
         sLogger,
         ("begin enqueue pid", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
-            "filename", event->process.filename)("dockerid", event->kube.docker)
-            ("args", event->process.args)("cwd", event->process.cwd)("flag", eventPtr->process.flags)
-            );
+            "filename", event->process.filename)("dockerid", event->kube.docker)("args", event->process.args)(
+            "cwd", event->process.cwd)("flag", eventPtr->process.flags));
 
     mRecordQueue.enqueue(std::move(event));
 
@@ -443,7 +449,7 @@ void BaseManager::RecordCloneEvent(msg_clone_event* event_ptr) {
     // auto currentKtime = event_ptr->ktime;
     // auto parentPid = event_ptr->parent.pid;
     // auto parentKtime = event_ptr->parent.ktime;
-    
+
     // auto event = std::make_unique<MsgExecveEventUnix>();
     // LOG_DEBUG(
     //     sLogger,
@@ -538,11 +544,11 @@ std::vector<std::shared_ptr<Procs>> BaseManager::ListRunningProcs() {
             nspid = 0;
         }
 
-        std::string parent_cmdline = "";
-        std::string parent_comm = "";
+        std::string parent_cmdline;
+        std::string parent_comm;
         std::vector<std::string> parent_stats;
         uint64_t parent_ktime = 0;
-        std::string parent_exe_path = "";
+        std::string parent_exe_path;
         uint32_t parent_nspid = 0;
         if (_ppid) {
             parent_cmdline = mProcParser.GetPIDCmdline(_ppid);
@@ -797,25 +803,22 @@ void BaseManager::HandleCacheUpdate() {
         if (!count) {
             continue;
         }
-        std::vector<std::unique_ptr<AbstractSecurityEvent>> outputs;
+        
         for (size_t i = 0; i < count; ++i) {
             // set args
-
             std::shared_ptr<MsgExecveEventUnix> event = std::move(items[i]);
 
             event->process.user.name = mProcParser.GetUserNameByUid(event->process.uid);
             std::string exec_key = GenerateExecId(event->process.pid, event->process.ktime);
-            
+
             std::string parent_key = GenerateParentExecId(event);
             event->exec_id = exec_key;
             event->parent_exec_id = parent_key;
-            LOG_DEBUG(sLogger,
-                      ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)
-                      ("ktime", event->process.ktime)
-                      ("execId", exec_key)
-                      ("cmdline", mProcParser.GetPIDCmdline(event->process.pid))
-                      ("filename", mProcParser.GetPIDExePath(event->process.pid))
-                      ("args", event->process.args));
+            LOG_DEBUG(
+                sLogger,
+                ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)("ktime", event->process.ktime)(
+                    "execId", exec_key)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
+                    "filename", mProcParser.GetPIDExePath(event->process.pid))("args", event->process.args));
 
             UpdateCache(exec_key, event);
         }
@@ -828,10 +831,11 @@ void BaseManager::HandleCacheUpdate() {
 SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime) {
     SizedMap res;
     auto execId = GenerateExecId(pid, ktime);
-    auto contains = ContainsKey(execId);
     auto proc = LookupCache(execId);
     if (!proc) {
-        LOG_WARNING(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime)("contains", contains)("size", mCache.size()));
+        LOG_WARNING(sLogger,
+                    ("cannot find proc in cache, execId",
+                     execId)("pid", pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));
         return res;
     }
 
@@ -853,14 +857,19 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
     std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
     std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
 
-    Json::Value cap;
-    cap["permitted"] = permitted;
-    cap["effective"] = effective;
-    cap["inheritable"] = inheritable;
+    rapidjson::Document::AllocatorType allocator;
+    rapidjson::Value cap(rapidjson::kObjectType);
 
-    Json::StreamWriterBuilder writer;
+    cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
+    cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
+    cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
 
-    std::string capStr = Json::writeString(writer, cap);
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+    cap.Accept(writer);
+
+    std::string capStr = buffer.GetString();
 
     // event_type, added by xxx_security_manager
     // call_name, added by xxx_security_manager
@@ -899,28 +908,40 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
         std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
         std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
 
-        Json::Value cap;
-        cap["permitted"] = permitted;
-        cap["effective"] = effective;
-        cap["inheritable"] = inheritable;
+        rapidjson::Document d;
+        d.SetObject();
 
-        std::string args = parentProc->process.filename; // TODO
-        std::string binary = parentProc->process.filename; // TODO
+        rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
 
-        Json::Value j;
-        j["exec_id"] = parentProc->exec_id;
-        j["parent_exec_id"] = parentProc->parent_exec_id;
-        j["pid"] = std::to_string(parentProc->process.pid);
-        j["uid"] = std::to_string(parentProc->process.uid);
-        j["user"] = parentProc->process.user.name;
-        j["binary"] = binary;
-        j["arguments"] = args;
-        j["cwd"] = parentProc->process.cwd;
-        j["ktime"] = std::to_string(parentProc->process.ktime);
-        j["cap"] = Json::writeString(Json::StreamWriterBuilder(), cap);
+        d.AddMember("exec_id", rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator), allocator);
+        d.AddMember(
+            "parent_exec_id", rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator), allocator);
+        d.AddMember(
+            "pid", rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator), allocator);
+        d.AddMember(
+            "uid", rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator), allocator);
+        d.AddMember("user", rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator), allocator);
+        d.AddMember("binary", rapidjson::Value().SetString(binary.c_str(), allocator), allocator);
+        d.AddMember("arguments", rapidjson::Value().SetString(args.c_str(), allocator), allocator);
+        d.AddMember("cwd", rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator), allocator);
+        d.AddMember("ktime",
+                    rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
+                    allocator);
 
-        Json::StreamWriterBuilder writer;
-        std::string result = Json::writeString(writer, j);
+        rapidjson::Value cap(rapidjson::kObjectType);
+
+        cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
+        cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
+        cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
+
+        d.AddMember("cap", cap, allocator);
+
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        d.Accept(writer);
+
+        std::string result = buffer.GetString();
+
         auto parentSb = sb->CopyString(result);
         res.Insert(kParentProcess.log_key(), StringView(parentSb.data, parentSb.size));
     }
@@ -945,14 +966,19 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
     std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
     std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
 
-    Json::Value cap;
-    cap["permitted"] = permitted;
-    cap["effective"] = effective;
-    cap["inheritable"] = inheritable;
+    rapidjson::Document::AllocatorType allocator;
+    rapidjson::Value cap(rapidjson::kObjectType);
 
-    Json::StreamWriterBuilder writer;
+    cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
+    cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
+    cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
 
-    std::string capStr = Json::writeString(writer, cap);
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+    cap.Accept(writer);
+
+    std::string capStr = buffer.GetString();
 
     // event_type, added by xxx_security_manager
     // call_name, added by xxx_security_manager
@@ -977,28 +1003,39 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
         std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
         std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
 
-        Json::Value cap;
-        cap["permitted"] = permitted;
-        cap["effective"] = effective;
-        cap["inheritable"] = inheritable;
+        rapidjson::Document d;
+        d.SetObject();
 
-        std::string args = parentProc->process.args; // TODO
-        std::string binary = parentProc->process.filename; // TODO
+        rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
 
-        Json::Value j;
-        j["exec_id"] = parentProc->exec_id;
-        j["parent_exec_id"] = parentProc->parent_exec_id;
-        j["pid"] = std::to_string(parentProc->process.pid);
-        j["uid"] = std::to_string(parentProc->process.uid);
-        j["user"] = parentProc->process.user.name;
-        j["binary"] = binary;
-        j["arguments"] = args;
-        j["cwd"] = parentProc->process.cwd;
-        j["ktime"] = std::to_string(parentProc->process.ktime);
-        j["cap"] = Json::writeString(Json::StreamWriterBuilder(), cap);
+        d.AddMember("exec_id", rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator), allocator);
+        d.AddMember(
+            "parent_exec_id", rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator), allocator);
+        d.AddMember(
+            "pid", rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator), allocator);
+        d.AddMember(
+            "uid", rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator), allocator);
+        d.AddMember("user", rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator), allocator);
+        d.AddMember("binary", rapidjson::Value().SetString(binary.c_str(), allocator), allocator);
+        d.AddMember("arguments", rapidjson::Value().SetString(args.c_str(), allocator), allocator);
+        d.AddMember("cwd", rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator), allocator);
+        d.AddMember("ktime",
+                    rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
+                    allocator);
 
-        Json::StreamWriterBuilder writer;
-        std::string result = Json::writeString(writer, j);
+        rapidjson::Value cap(rapidjson::kObjectType);
+
+        cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
+        cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
+        cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
+
+        d.AddMember("cap", cap, allocator);
+
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        d.Accept(writer);
+
+        std::string result = buffer.GetString();
         eventGroup.SetTag("parent_process", result);
     }
     return true;

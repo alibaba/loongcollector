@@ -24,8 +24,8 @@
 #include "BaseManager.h"
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
-#include "common/timer/Timer.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
@@ -154,7 +154,7 @@ protected:
     // static ...
     std::chrono::nanoseconds mTimeDiff;
     std::condition_variable mRunnerCV;
-    int mStartUid = 0;
+    std::atomic_int mStartUid = 0;
 };
 
 } // namespace ebpf

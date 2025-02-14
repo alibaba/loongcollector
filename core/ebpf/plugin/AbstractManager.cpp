@@ -26,7 +26,7 @@ AbstractManager::AbstractManager(std::shared_ptr<BaseManager> bm,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                  std::shared_ptr<Timer> scheduler)
     : mBaseManager(bm), mSourceManager(sourceManager), mCommonEventQueue(queue), mScheduler(scheduler) {
-    mTimeDiff = GetTimeDiffFromBoot();
+    mTimeDiff = GetTimeDiffFromMonotonic();
 }
 
 int AbstractManager::GetCallNameIdx(const std::string& callName) {

@@ -26,8 +26,8 @@
 #include "common/Flags.h"
 #include "common/LRUCache.h"
 
-DECLARE_FLAG_STRING(loong_collector_singleton_service);
-DECLARE_FLAG_INT32(loong_collector_singleton_port);
+DECLARE_FLAG_STRING(singleton_service);
+DECLARE_FLAG_INT32(singleton_port);
 
 namespace logtail {
 

@@ -36,10 +36,6 @@ template class WorkerFunc<std::unique_ptr<NetDataEvent>, std::unique_ptr<Abstrac
 
 class NetworkObserverManager : public AbstractManager {
 public:
-    using LogHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchEvent>>&)>;
-    using MeterHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>&)>;
-    using SpanHandler = std::function<void(const std::vector<std::unique_ptr<ApplicationBatchSpan>>&)>;
-
     static std::shared_ptr<NetworkObserverManager>
     Create(std::shared_ptr<BaseManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,

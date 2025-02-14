@@ -405,12 +405,12 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
     return result;
 }
 
-std::chrono::nanoseconds GetTimeDiffFromBoot() {
+std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
 #if defined(__linux__)
     struct timespec t;
-    int ret = clock_gettime(CLOCK_BOOTTIME, &t);
+    int ret = clock_gettime(CLOCK_MONOTONIC, &t);
     if (ret != 0) {
-        LOG_ERROR(sLogger, ("failed to get boottime, ret", ret));
+        LOG_ERROR(sLogger, ("failed to get monotonic, ret", ret));
         return std::chrono::nanoseconds(0);
     }
     auto now = std::chrono::system_clock::now();
