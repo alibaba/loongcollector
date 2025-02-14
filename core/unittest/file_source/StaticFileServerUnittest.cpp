@@ -28,6 +28,7 @@ class StaticFileServerUnittest : public testing::Test {
 public:
     void TestGetNextAvailableReader() const;
     void TestUpdateInputs() const;
+    void TestClearUnusedCheckpoints() const;
 
 protected:
     static void SetUpTestCase() {
@@ -104,28 +105,88 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
 
     sServer->UpdateInputs();
 
-    // file 1 existed
-    APSARA_TEST_NOT_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
-    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 2001, 2001);
-
-    // file 2 not existed && file 3 signature changed
-    filesystem::remove(cptFiles[1]);
     {
-        ofstream fout(cptFiles[2]);
-        fout << string(10, 'd') << endl;
+        // file 1 existed
+        APSARA_TEST_NOT_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
+        auto const& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
+        APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
+        APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
     }
-    APSARA_TEST_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
-    APSARA_TEST_EQUAL(1U, sServer->mDeletedInputs.size());
-    APSARA_TEST_NOT_EQUAL(sServer->mDeletedInputs.end(), sServer->mDeletedInputs.find(make_pair("test_config", 0)));
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 2001, 2001);
+    {
+        // file 2 not existed && file 3 signature changed
+        filesystem::remove(cptFiles[1]);
+        {
+            ofstream fout(cptFiles[2]);
+            fout << string(10, 'd') << endl;
+        }
+        APSARA_TEST_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
+        APSARA_TEST_EQUAL(1U, sServer->mDeletedInputs.size());
+        APSARA_TEST_NOT_EQUAL(sServer->mDeletedInputs.end(), sServer->mDeletedInputs.find(make_pair("test_config", 0)));
+        auto const& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
+        APSARA_TEST_EQUAL(StaticFileReadingStatus::FINISHED, cpt.mStatus);
+        APSARA_TEST_EQUAL(FileStatus::FINISHED, cpt.mFileCheckpoints[0].mStatus);
+        APSARA_TEST_EQUAL(FileStatus::ABORT, cpt.mFileCheckpoints[1].mStatus);
+        APSARA_TEST_EQUAL(FileStatus::ABORT, cpt.mFileCheckpoints[2].mStatus);
+    }
 
+    sServer->UpdateInputs();
+    APSARA_TEST_EQUAL(0U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_EQUAL(0U, sServer->mDeletedInputs.size());
+
+    input.Stop(true);
     filesystem::remove_all("test_logs");
 }
 
 void StaticFileServerUnittest::TestUpdateInputs() const {
+    // new config
+    sServer->AddInput("test_config_1", 0, nullopt, nullptr, nullptr, nullptr, nullptr, nullptr);
+    sServer->AddInput("test_config_2", 0, nullopt, nullptr, nullptr, nullptr, nullptr, nullptr);
+    sServer->AddInput("test_config_2", 1, nullopt, nullptr, nullptr, nullptr, nullptr, nullptr);
+    sServer->UpdateInputs();
+    APSARA_TEST_EQUAL(3U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_1"));
+    APSARA_TEST_EQUAL(2U, sServer->mPipelineNameReadersMap.count("test_config_2"));
+    APSARA_TEST_TRUE(sServer->mAddedInputs.empty());
+    APSARA_TEST_TRUE(sServer->HasRegisteredPlugins());
+
+    // update config
+    sServer->RemoveInput("test_config_2", 0);
+    sServer->RemoveInput("test_config_2", 1);
+    sServer->AddInput("test_config_2", 0, nullopt, nullptr, nullptr, nullptr, nullptr, nullptr);
+    sServer->UpdateInputs();
+    APSARA_TEST_EQUAL(2U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_1"));
+    APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_2"));
+    APSARA_TEST_TRUE(sServer->mDeletedInputs.empty());
+    APSARA_TEST_TRUE(sServer->mAddedInputs.empty());
+    APSARA_TEST_TRUE(sServer->HasRegisteredPlugins());
+
+    // delete config
+    sServer->RemoveInput("test_config_1", 0);
+    sServer->RemoveInput("test_config_2", 0);
+    sServer->UpdateInputs();
+    APSARA_TEST_EQUAL(0U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_TRUE(sServer->mDeletedInputs.empty());
+    APSARA_TEST_FALSE(sServer->HasRegisteredPlugins());
+}
+
+void StaticFileServerUnittest::TestClearUnusedCheckpoints() const {
+    INT32_FLAG(unused_checkpoints_clear_interval_sec) = 0;
+
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json"); }
+    sManager->GetAllCheckpointFileNames();
+    APSARA_TEST_FALSE(sManager->mCheckpointFileNamesOnInit.empty());
+
+    sServer->ClearUnusedCheckpoints();
+    APSARA_TEST_TRUE(sServer->mIsUnusedCheckpointsCleared);
+    APSARA_TEST_TRUE(sManager->mCheckpointFileNamesOnInit.empty());
+    INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
 
 UNIT_TEST_CASE(StaticFileServerUnittest, TestGetNextAvailableReader)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestUpdateInputs)
+UNIT_TEST_CASE(StaticFileServerUnittest, TestClearUnusedCheckpoints)
 
 } // namespace logtail
 

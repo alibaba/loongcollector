@@ -226,6 +226,7 @@ void StaticFileServer::UpdateInputs() {
 FileDiscoveryConfig StaticFileServer::GetFileDiscoveryConfig(const std::string& name, size_t idx) const {
     auto it = mInputFileDiscoveryConfigsMap.find(make_pair(name, idx));
     if (it == mInputFileDiscoveryConfigsMap.end()) {
+        // should not happen
         return make_pair(nullptr, nullptr);
     }
     return it->second;
@@ -234,6 +235,7 @@ FileDiscoveryConfig StaticFileServer::GetFileDiscoveryConfig(const std::string& 
 FileReaderConfig StaticFileServer::GetFileReaderConfig(const std::string& name, size_t idx) const {
     auto it = mInputFileReaderConfigsMap.find(make_pair(name, idx));
     if (it == mInputFileReaderConfigsMap.end()) {
+        // should not happen
         return make_pair(nullptr, nullptr);
     }
     return it->second;
@@ -242,6 +244,7 @@ FileReaderConfig StaticFileServer::GetFileReaderConfig(const std::string& name, 
 MultilineConfig StaticFileServer::GetMultilineConfig(const std::string& name, size_t idx) const {
     auto it = mInputMultilineConfigsMap.find(make_pair(name, idx));
     if (it == mInputMultilineConfigsMap.end()) {
+        // should not happen
         return make_pair(nullptr, nullptr);
     }
     return it->second;
@@ -250,6 +253,7 @@ MultilineConfig StaticFileServer::GetMultilineConfig(const std::string& name, si
 FileTagConfig StaticFileServer::GetFileTagConfig(const std::string& name, size_t idx) const {
     auto it = mInputFileTagConfigsMap.find(make_pair(name, idx));
     if (it == mInputFileTagConfigsMap.end()) {
+        // should not happen
         return make_pair(nullptr, nullptr);
     }
     return it->second;
