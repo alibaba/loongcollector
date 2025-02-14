@@ -33,20 +33,23 @@ const string& FileStatusToString(FileStatus status) {
             static const string abortStr = "abort";
             return abortStr;
         default:
-            static const string emptyStr = "";
-            return emptyStr;
+            // should not happen
+            static const string unknownStr = "unknown";
+            return unknownStr;
     }
 }
 
 FileStatus GetFileStatusFromString(const string& statusStr) {
-    if (statusStr == "reading") {
+    if (statusStr == "waiting") {
+        return FileStatus::WAITING;
+    } else if (statusStr == "reading") {
         return FileStatus::READING;
     } else if (statusStr == "finished") {
         return FileStatus::FINISHED;
     } else if (statusStr == "abort") {
         return FileStatus::ABORT;
     } else {
-        return FileStatus::WAITING;
+        return FileStatus::UNKNOWN;
     }
 }
 

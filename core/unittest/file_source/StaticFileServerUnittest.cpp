@@ -98,7 +98,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     input.Start();
 
     vector<filesystem::path> cptFiles;
-    for (const auto& item: sManager->mInputCheckpointMap.at(make_pair("test_config", 0)).mFileCheckpoints) {
+    for (const auto& item : sManager->mInputCheckpointMap.at(make_pair("test_config", 0)).mFileCheckpoints) {
         cptFiles.push_back(item.mFilePath);
     }
 

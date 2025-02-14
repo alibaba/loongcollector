@@ -28,6 +28,7 @@
 namespace logtail {
 
 enum class StaticFileReadingStatus {
+    UNKNOWN,
     RUNNING,
     FINISHED,
     ABORT,

@@ -26,6 +26,7 @@
 namespace logtail {
 
 enum class FileStatus {
+    UNKNOWN,
     WAITING,
     READING,
     FINISHED,

@@ -34,18 +34,21 @@ static const string& StaticFileReadingStatusToString(StaticFileReadingStatus sta
             static const string abortStr = "abort";
             return abortStr;
         default:
-            static const string emptyStr = "";
-            return emptyStr;
+            // should not happen
+            static const string unknownStr = "unknown";
+            return unknownStr;
     }
 }
 
 static StaticFileReadingStatus GetStaticFileReadingStatusFromString(const string& statusStr) {
-    if (statusStr == "finished") {
+    if (statusStr == "running") {
+        return StaticFileReadingStatus::RUNNING;
+    } else if (statusStr == "finished") {
         return StaticFileReadingStatus::FINISHED;
     } else if (statusStr == "abort") {
         return StaticFileReadingStatus::ABORT;
     } else {
-        return StaticFileReadingStatus::RUNNING;
+        return StaticFileReadingStatus::UNKNOWN;
     }
 }
 
@@ -190,6 +193,9 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
             case FileStatus::ABORT:
                 file["abort_time"] = cpt.mLastUpdateTime;
                 break;
+            default:
+                // should not happen
+                break;
         }
     }
     *res = root.toStyledString();
@@ -219,6 +225,10 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         return false;
     }
     mStatus = GetStaticFileReadingStatusFromString(statusStr);
+    if (mStatus == StaticFileReadingStatus::UNKNOWN) {
+        *errMsg = "mandatory string param status is not valid";
+        return false;
+    }
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         if (!GetMandatoryUInt64Param(res, "current_file_index", mCurrentFileIndex, *errMsg)) {
             return false;
@@ -245,82 +255,84 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
     }
     for (Json::Value::ArrayIndex i = 0; i < it->size(); ++i) {
         const Json::Value& fileCpt = (*it)[i];
+        string outerKey = "files[" + ToString(i) + "]";
         if (!fileCpt.isObject()) {
-            *errMsg = "mandatory param files[" + ToString(i) + "] is not of type object";
+            *errMsg = "mandatory param " + outerKey + " is not of type object";
             return false;
         }
         FileCheckpoint cpt;
         string filepath;
-        if (!GetMandatoryStringParam(fileCpt, "filepath", filepath, *errMsg)) {
+        if (!GetMandatoryStringParam(fileCpt, outerKey + ".filepath", filepath, *errMsg)) {
             return false;
         }
         cpt.mFilePath = filepath;
 
         string statusStr;
-        if (!GetMandatoryStringParam(fileCpt, "status", statusStr, *errMsg)) {
+        if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
             return false;
         }
         cpt.mStatus = GetFileStatusFromString(statusStr);
 
         switch (cpt.mStatus) {
             case FileStatus::WAITING:
-                if (!GetMandatoryUInt64Param(fileCpt, "dev", cpt.mDevInode.dev, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".dev", cpt.mDevInode.dev, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "inode", cpt.mDevInode.inode, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".inode", cpt.mDevInode.inode, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "sig_hash", cpt.mSignatureHash, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".sig_hash", cpt.mSignatureHash, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUIntParam(fileCpt, "sig_size", cpt.mSignatureSize, *errMsg)) {
+                if (!GetMandatoryUIntParam(fileCpt, outerKey + ".sig_size", cpt.mSignatureSize, *errMsg)) {
                     return false;
                 }
                 break;
             case FileStatus::READING:
-                if (!GetMandatoryUInt64Param(fileCpt, "dev", cpt.mDevInode.dev, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".dev", cpt.mDevInode.dev, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "inode", cpt.mDevInode.inode, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".inode", cpt.mDevInode.inode, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "sig_hash", cpt.mSignatureHash, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".sig_hash", cpt.mSignatureHash, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUIntParam(fileCpt, "sig_size", cpt.mSignatureSize, *errMsg)) {
+                if (!GetMandatoryUIntParam(fileCpt, outerKey + ".sig_size", cpt.mSignatureSize, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "size", cpt.mSize, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".size", cpt.mSize, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryUInt64Param(fileCpt, "offset", cpt.mOffset, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".offset", cpt.mOffset, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryIntParam(fileCpt, "start_time", cpt.mStartTime, *errMsg)) {
+                if (!GetMandatoryIntParam(fileCpt, outerKey + ".start_time", cpt.mStartTime, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryIntParam(fileCpt, "last_read_time", cpt.mLastUpdateTime, *errMsg)) {
+                if (!GetMandatoryIntParam(fileCpt, outerKey + ".last_read_time", cpt.mLastUpdateTime, *errMsg)) {
                     return false;
                 }
                 break;
             case FileStatus::FINISHED:
-                if (!GetMandatoryUInt64Param(fileCpt, "size", cpt.mSize, *errMsg)) {
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".size", cpt.mSize, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryIntParam(fileCpt, "start_time", cpt.mStartTime, *errMsg)) {
+                if (!GetMandatoryIntParam(fileCpt, outerKey + ".start_time", cpt.mStartTime, *errMsg)) {
                     return false;
                 }
-                if (!GetMandatoryIntParam(fileCpt, "finish_time", cpt.mLastUpdateTime, *errMsg)) {
+                if (!GetMandatoryIntParam(fileCpt, outerKey + ".finish_time", cpt.mLastUpdateTime, *errMsg)) {
                     return false;
                 }
                 break;
             case FileStatus::ABORT:
-                if (!GetMandatoryIntParam(fileCpt, "abort_time", cpt.mLastUpdateTime, *errMsg)) {
+                if (!GetMandatoryIntParam(fileCpt, outerKey + ".abort_time", cpt.mLastUpdateTime, *errMsg)) {
                     return false;
                 }
                 break;
             default:
-                break;
+                *errMsg = "mandatory string param " + outerKey + ".status is not valid";
+                return false;
         }
         mFileCheckpoints.emplace_back(std::move(cpt));
     }

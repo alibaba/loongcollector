@@ -529,6 +529,13 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
         }
         {
             auto copy = validCptJson;
+            copy["status"] = "unknown";
+            ofstream fout(cptPath);
+            fout << copy.toStyledString();
+        }
+        APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
+        {
+            auto copy = validCptJson;
             copy["files"] = Json::objectValue;
             ofstream fout(cptPath);
             fout << copy.toStyledString();
@@ -541,19 +548,37 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             fout << copy.toStyledString();
         }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
+        {
+            auto copy = validCptJson;
+            copy["files"][0] = Json::arrayValue;
+            ofstream fout(cptPath);
+            fout << copy.toStyledString();
+        }
+        APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     }
     {
         // common invalid file key
-        vector<string> keys{"filepath", "status"};
-        for (const auto& key : keys) {
+        {
+            vector<string> keys{"filepath", "status"};
+            for (const auto& key : keys) {
+                auto copy = validCptJson;
+                copy["files"][0].removeMember(key);
+                {
+                    ofstream fout(cptPath);
+                    fout << copy.toStyledString();
+                }
+                APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
+            }
+        }
+        {
             auto copy = validCptJson;
-            copy["files"][0].removeMember(key);
+            copy["files"][0]["status"] = "unknown";
             {
                 ofstream fout(cptPath);
                 fout << copy.toStyledString();
             }
-            APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
         }
+        APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     }
     {
         // invalid finished file key
