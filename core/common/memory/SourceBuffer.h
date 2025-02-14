@@ -128,8 +128,8 @@ private:
     }
 
 private:
-    const uint32_t mFirstChunkSize = 4096;
-    const uint32_t mChunkSizeLimit = 1024 * 128;
+    uint32_t mFirstChunkSize = 4096;
+    uint32_t mChunkSizeLimit = 1024 * 128;
 
     // The allocated memory chunks
     std::vector<uint8_t*> mAllocatedChunks;

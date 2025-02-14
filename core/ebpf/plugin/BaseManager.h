@@ -97,8 +97,19 @@ private:
     std::atomic_bool mFlag = false;
     std::shared_ptr<SourceManager> mSourceManager = nullptr;
     lru11::Cache<std::string, std::shared_ptr<MsgExecveEventUnix>, std::mutex> mCache;
-    std::map<data_event_id, std::string> mDataCache;
-    
+
+    struct DataEventIdHash {
+        std::size_t operator()(const data_event_id& deid) const { return deid.pid ^ deid.time << 32; }
+    };
+
+    struct DataEventIdEqual {
+        bool operator()(const data_event_id& lhs, const data_event_id& rhs) const {
+            return lhs.pid == rhs.pid && lhs.time == rhs.time;
+        }
+    };
+
+    std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual> mDataCache;
+
     // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>, std::shared_ptr<std::string>>> mDataCache;
     ProcParser mProcParser;
     std::string mHostName;

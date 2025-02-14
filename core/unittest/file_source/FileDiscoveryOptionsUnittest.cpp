@@ -221,7 +221,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 
-    // invlaid filepath
+    // invalid filepath
     filePath = filesystem::current_path();
     configStr = R"(
         {

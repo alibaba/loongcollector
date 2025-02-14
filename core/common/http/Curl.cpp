@@ -323,7 +323,7 @@ void HandleCompletedAsynRequests(CURLM* multiCurl, int& runningHandlers) {
                                   ("failed to send http request", "retry immediately")("request address",
                                                                                        request)("host", request->mHost)(
                                       "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
-                        // free first，becase mPrivateData will be reset in AddRequestToMultiCurlHandler
+                        // free first，because mPrivateData will be reset in AddRequestToMultiCurlHandler
                         if (request->mPrivateData) {
                             curl_slist_free_all((curl_slist*)request->mPrivateData);
                             request->mPrivateData = nullptr;

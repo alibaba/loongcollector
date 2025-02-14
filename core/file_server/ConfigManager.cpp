@@ -154,7 +154,7 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -327,7 +327,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -491,7 +491,7 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         int err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),
@@ -542,7 +542,7 @@ bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryC
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
                                                config.second->GetProjectName(),
                                                config.second->GetLogstoreName(),

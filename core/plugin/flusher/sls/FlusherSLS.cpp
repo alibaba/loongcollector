@@ -788,7 +788,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 mUnauthErrorCnt->Add(1);
             }
         } else if (sendResult == SEND_PARAMETER_INVALID) {
-            failDetail << "invalid paramters";
+            failDetail << "invalid parameters";
             suggestion << "check input parameters";
             operation = DefaultOperation(item->mTryCnt);
             if (mParamsErrorCnt) {

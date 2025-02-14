@@ -36,7 +36,7 @@ DEFINE_FLAG_INT32(modify_check_interval, "modify check interval ms", 1000);
 DEFINE_FLAG_INT32(ignore_file_modify_timeout, "if file modify time is up to XXX seconds, ignore it", 180);
 DEFINE_FLAG_INT32(modify_stat_count, "sleep when dir file stat count up to", 100);
 DEFINE_FLAG_INT32(modify_stat_sleepMs, "sleep time when dir file stat up to 1000, ms", 10);
-DEFINE_FLAG_INT32(modify_cache_max, "max modify chache size, if exceed, delete 0.2 oldest", 100000);
+DEFINE_FLAG_INT32(modify_cache_max, "max modify cache size, if exceed, delete 0.2 oldest", 100000);
 DEFINE_FLAG_INT32(modify_cache_make_space_interval, "second", 600);
 
 namespace logtail {
