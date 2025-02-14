@@ -181,6 +181,8 @@ void StaticFileServerUnittest::TestClearUnusedCheckpoints() const {
     sServer->ClearUnusedCheckpoints();
     APSARA_TEST_TRUE(sServer->mIsUnusedCheckpointsCleared);
     APSARA_TEST_TRUE(sManager->mCheckpointFileNamesOnInit.empty());
+
+    sServer->ClearUnusedCheckpoints();
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
 

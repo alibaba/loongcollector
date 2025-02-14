@@ -69,6 +69,7 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
         mInputFileDiscoveryConfigsMap.erase(make_pair(configName, idx));
         mInputFileReaderConfigsMap.erase(make_pair(configName, idx));
         mInputMultilineConfigsMap.erase(make_pair(configName, idx));
+        mInputFileTagConfigsMap.erase(make_pair(configName, idx));
         mDeletedInputs.emplace(configName, idx);
     }
     InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);

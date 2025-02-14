@@ -80,6 +80,7 @@ bool InputStaticFile::Init(const Json::Value& config, Json::Value& optionalGoPip
     }
     if (mEnableContainerDiscovery) {
         if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+            // should not happen
             return false;
         }
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
@@ -106,11 +107,13 @@ bool InputStaticFile::Init(const Json::Value& config, Json::Value& optionalGoPip
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
         } else if (!mMultiline.Init(*itr, *mContext, sName)) {
+            // should not happen
             return false;
         }
     }
 
     if (!mFileTag.Init(config, *mContext, sName, mEnableContainerDiscovery)) {
+        // should not happen
         return false;
     }
 

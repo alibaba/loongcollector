@@ -544,6 +544,7 @@ public:
     friend class FlusherRunnerUnittest;
     friend class PipelineUpdateUnittest;
     friend class ProcessorTagNativeUnittest;
+    friend class InputStaticFileUnittest;
 #endif
 };
 
