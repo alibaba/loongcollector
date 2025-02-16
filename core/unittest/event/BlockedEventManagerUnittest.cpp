@@ -16,6 +16,7 @@
 #include "unittest/Unittest.h"
 
 using namespace std;
+#undef GetObject
 
 namespace logtail {
 

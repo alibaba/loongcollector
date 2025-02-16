@@ -45,7 +45,7 @@ public:
 
     void SetUp() override {
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }

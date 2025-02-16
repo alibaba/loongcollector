@@ -24,6 +24,7 @@
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
 using namespace std;
+#undef GetObject
 
 namespace logtail {
 
