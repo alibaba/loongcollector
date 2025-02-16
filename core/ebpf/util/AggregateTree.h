@@ -51,6 +51,7 @@ private:
 #endif
 public:
     AggTree() {}
+    AggTree(std::unique_ptr<AggNode<Data, KeyType>>&& data) : root_node_(std::move(data)) {}
     AggTree(size_t max_nodes,
             const std::function<void(std::unique_ptr<Data>&, const Value&)>& aggregate,
             const std::function<std::unique_ptr<Data>(const Value& n)>& generate)
@@ -66,6 +67,12 @@ public:
           aggregate_(other.aggregate_),
           generate_(other.generate_) {
         other.Clear();
+    }
+
+    std::unique_ptr<AggNode<Data, KeyType>> GetRootNodeAndClear() {
+        auto res = std::move(root_node_);
+        Clear();
+        return res;
     }
 
     template <class ContainerType>
@@ -101,7 +108,6 @@ public:
         GetNodes(1, root_node_, i, ans);
         return ans;
     }
-
 
     void ForEach(const std::function<void(const Data*)>& call) { ForEach(root_node_.get(), call); }
 

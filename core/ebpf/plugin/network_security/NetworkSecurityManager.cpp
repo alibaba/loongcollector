@@ -120,7 +120,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(this->mLock);
-    auto aggTree = std::move(this->mAggregateTree);
+    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -139,6 +139,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
         bool init = false;
         SizedMap processTags;
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
+            LOG_DEBUG(sLogger, ("step", "enter for each"));
             // set process tag
             if (!init) {
                 auto bm = GetBaseManager();
@@ -146,15 +147,18 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                     LOG_WARNING(sLogger, ("basemanager is null", ""));
                     return;
                 }
+                LOG_DEBUG(sLogger, ("step", "before finalize process tags")("pid", group->mPid)("ktime",group->mKtime));
                 processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
                 init = true;
             }
+            LOG_DEBUG(sLogger, ("step", "after finalize process tags"));
             // attach process tags
             if (processTags.mInner.empty()) {
                 LOG_ERROR(sLogger,
                             ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
+            LOG_DEBUG(sLogger, ("step", "after attach process tags"));
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));

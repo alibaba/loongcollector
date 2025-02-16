@@ -54,8 +54,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(mLock);
-    // TODO
-    auto aggTree = std::move(mAggregateTree);
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
     lk.unlock();
 
     // read aggregator
@@ -200,6 +199,9 @@ std::array<size_t, 1> GenerateAggKey(const std::shared_ptr<ProcessEvent> event) 
 }
 
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
+    if (!event) {
+        return 1;
+    }
     auto processEvent = std::dynamic_pointer_cast<ProcessEvent>(event);
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",

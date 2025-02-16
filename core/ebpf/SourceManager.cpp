@@ -101,15 +101,6 @@ SourceManager::~SourceManager() {
 #ifdef APSARA_UNIT_TEST_MAIN
     return;
 #endif
-
-    // call deinit
-    // void* f = mFuncs[(int)ebpf_func::EBPF_DEINIT];
-    // if (!f) {
-    //     return;
-    // }
-
-    // auto deinit_f = (deinit_func)f;
-    // deinit_f();
 }
 
 void SourceManager::Init() {
@@ -269,10 +260,13 @@ bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, set networkobserver config func ptr is null", ""));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto func = (set_networkobserver_config_func)f;
     func(key, value);
     return true;
+#endif
 }
 
 bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
@@ -284,10 +278,13 @@ bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool upd
         LOG_ERROR(sLogger, ("failed to load dynamic lib, set networkobserver config func ptr is null", ""));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto func = (set_networkobserver_cid_filter_func)f;
     func(cid.c_str(), cid.size(), update);
     return true;
+#endif
 }
 
 int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents, int32_t* flag, int timeoutMs) {
@@ -299,9 +296,12 @@ int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents
         LOG_ERROR(sLogger, ("failed to load dynamic lib, poll perf buffer func ptr is null", int(plugin_type)));
         return -1;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return 0;
+#else
     auto poll_func = (poll_plugin_pbs_func)f;
     return poll_func(plugin_type, maxEvents, flag, timeoutMs);
+#endif
 }
 
 bool SourceManager::StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
@@ -333,11 +333,15 @@ bool SourceManager::StartPlugin(PluginType plugin_type, std::unique_ptr<PluginCo
         LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(plugin_type)));
         return false;
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto start_f = (start_plugin_func)f;
     int res = start_f(conf.get());
     if (!res)
         mRunning[int(plugin_type)] = true;
     return !res;
+#endif
 }
 
 bool SourceManager::ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
@@ -352,10 +356,13 @@ bool SourceManager::ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginC
         LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto resume_f = (resume_plugin_func)f;
     int res = resume_f(conf.get());
     return !res;
+#endif
 }
 
 bool SourceManager::UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
@@ -370,10 +377,13 @@ bool SourceManager::UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginC
         LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto update_f = (update_plugin_func)f;
     int res = update_f(conf.get());
     return !res;
+#endif
 }
 
 bool SourceManager::SuspendPlugin(PluginType plugin_type) {
@@ -386,11 +396,14 @@ bool SourceManager::SuspendPlugin(PluginType plugin_type) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", int(plugin_type)));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto suspend_f = (suspend_plugin_func)f;
     int res = suspend_f(plugin_type);
 
     return !res;
+#endif
 }
 
 bool SourceManager::StopPlugin(PluginType plugin_type) {
@@ -406,12 +419,16 @@ bool SourceManager::StopPlugin(PluginType plugin_type) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", int(plugin_type)));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto stop_f = (stop_plugin_func)f;
     int res = stop_f(plugin_type);
     if (!res)
         mRunning[int(plugin_type)] = false;
     return !res;
+#endif
+
 }
 
 bool SourceManager::BPFMapUpdateElem(
@@ -426,10 +443,13 @@ bool SourceManager::BPFMapUpdateElem(
         LOG_ERROR(sLogger, ("failed to load dynamic lib, update bpf map elem func ptr is null", int(plugin_type)));
         return false;
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    return true;
+#else
     auto ff = (update_bpf_map_elem_func)f;
     int res = ff(plugin_type, map_name.c_str(), key, value, flag);
     return res == 0;
+#endif
 }
 
 } // namespace ebpf

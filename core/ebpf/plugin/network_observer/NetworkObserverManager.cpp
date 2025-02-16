@@ -232,7 +232,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
 
             WriteLock lk(mSpanAggLock);
-            auto aggTree = std::move(this->mSpanAggregator);
+            SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mSpanAggregator.GetRootNodeAndClear());
             lk.unlock();
 
             auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -364,8 +364,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
 
             WriteLock lk(mLogAggLock);
-
-            auto aggTree = std::move(this->mLogAggregator);
+            SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mLogAggregator.GetRootNodeAndClear());
             lk.unlock();
 
             auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -491,7 +490,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         }
 
         WriteLock lk(this->mAppAggLock);
-        auto aggTree = std::move(this->mAppAggregator);
+        SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> aggTree(this->mAppAggregator.GetRootNodeAndClear());
         lk.unlock();
 
         auto nodes = aggTree.GetNodesWithAggDepth(1);

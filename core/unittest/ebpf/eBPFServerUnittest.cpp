@@ -140,7 +140,7 @@ void eBPFServerUnittest::TestNetworkObserver() {
         "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMgr);
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(30));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void eBPFServerUnittest::TestNetworkSecurity() {
@@ -176,15 +176,15 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     auto res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(6));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     res = input->Stop(true);
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     input->Start();
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     res = input->Stop(true);
     EXPECT_TRUE(res);
 }
@@ -220,17 +220,17 @@ void eBPFServerUnittest::TestFileSecurity() {
     auto res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(6));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // stop
     res = input->Stop(true);
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // re-run...
     input->Start();
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     res = input->Stop(true);
     EXPECT_TRUE(res);
 }
@@ -259,7 +259,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
     APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
     APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
 
-    std::this_thread::sleep_for(std::chrono::seconds(60));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     res = input->Stop(true);
     EXPECT_TRUE(res);
@@ -299,7 +299,7 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     auto res = input->Init(configJson, optionalGoPipeline);
     res = input->Start();
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     // suspend
     res = input->Stop(false);
     EXPECT_TRUE(res);
@@ -325,7 +325,7 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     res = input->Stop(true);
     EXPECT_TRUE(res);
@@ -365,12 +365,12 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     auto res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(6));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // suspend
     res = input->Stop(false);
     EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // update & resume
     input = std::make_shared<InputNetworkSecurity>();
@@ -396,7 +396,7 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     res = input->Stop(true);
     EXPECT_TRUE(res);

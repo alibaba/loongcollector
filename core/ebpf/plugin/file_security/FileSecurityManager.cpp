@@ -100,7 +100,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     }
 
     WriteLock lk(this->mLock);
-    auto aggTree = std::move(this->mAggregateTree);
+    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);

@@ -27,3 +27,5 @@ add_unittest(consumer_unittest ConsumerUnittest.cpp)
 add_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
 add_unittest(table_unittest TableUnittest.cpp)
 add_unittest(protocol_parser_unittest ProtocolParserUnittest.cpp)
+add_unittest(manager_unittest ManagerUnittest.cpp)
+
