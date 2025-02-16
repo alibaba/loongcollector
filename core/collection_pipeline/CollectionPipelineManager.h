@@ -77,6 +77,8 @@ private:
     friend class CommonConfigProviderUnittest;
     friend class FlusherUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
+    friend class PollingPreservedDirDepthUnittest;
 #endif
 };
 
