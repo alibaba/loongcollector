@@ -17,8 +17,7 @@ project(common_unittest)
 
 add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
         FileSystemUtilUnittest.h
-        DevInodeUnittest.h
-        TimeUtilUnittest.h)
+        DevInodeUnittest.h)
 target_link_libraries(common_simple_utils_unittest ${UT_BASE_TARGET})
 
 add_executable(common_logfileoperator_unittest LogFileOperatorUnittest.cpp)

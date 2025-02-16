@@ -87,6 +87,13 @@ void TimeUtilUnittest::TestDeduceYear() {
     }
 }
 
+#if defined(_MSC_VER)
+char* strptime(const char* s, const char* f, struct tm* tm) {
+    // TODO: windows
+    return nullptr;
+}
+#endif
+
 void TimeUtilUnittest::TestStrptime() {
     struct Case {
         std::string buf;
@@ -114,9 +121,8 @@ void TimeUtilUnittest::TestStrptime() {
         LogtailTime o2;
         int nanosecondLength;
         auto ret1 = strptime(c.buf.c_str(), c.format.c_str(), &o1);
+        EXPECT_TRUE(ret1 != NULL) << "FAILED: " + c.buf;
         auto ret2 = Strptime(c.buf.c_str(), c.format.c_str(), &o2, nanosecondLength, c.specifiedYear);
-
-        EXPECT_TRUE(ret1 != NULL);
         EXPECT_TRUE(ret2 != NULL);
         o1.tm_year = c.expectedYear - 1900;
         EXPECT_EQ(mktime(&o1), o2.tv_sec) << "FAILED: " + c.buf;
@@ -135,7 +141,9 @@ void TimeUtilUnittest::TestNativeStrptimeFormat() {
     EXPECT_EQ(2019, result.tm_year + 1900);
     EXPECT_EQ(2, result.tm_mon + 1);
     EXPECT_EQ(25, result.tm_mday);
+#if defined(__linux__)
     EXPECT_EQ(0, result.tm_hour - result.tm_gmtoff / 3600);
+#endif
     EXPECT_EQ(19, result.tm_min);
     EXPECT_EQ(59, result.tm_sec);
 }
@@ -194,9 +202,8 @@ void TimeUtilUnittest::TestStrptimeNanosecond() {
         long nanosecond = 0;
         int nanosecondLength;
         auto ret1 = strptime_ns(c.buf1.c_str(), c.format1.c_str(), &o1, &nanosecond, &nanosecondLength);
-        auto ret2 = strptime(c.buf2.c_str(), c.format2.c_str(), &o2);
-
         EXPECT_TRUE(ret1 != NULL) << "FAILED: " + c.buf1;
+        auto ret2 = strptime(c.buf2.c_str(), c.format2.c_str(), &o2);
         EXPECT_TRUE(ret2 != NULL) << "FAILED: " + c.buf2;
         EXPECT_EQ(mktime(&o1), mktime(&o2)) << "FAILED: " + c.buf1;
         EXPECT_EQ(nanosecond, c.expectedNanosecond) << "FAILED: " + c.buf1;

@@ -139,7 +139,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
                     }
                 ]
             }
-        )";
+            )";
         }
         { ofstream fout("dir2/config.json"); }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();

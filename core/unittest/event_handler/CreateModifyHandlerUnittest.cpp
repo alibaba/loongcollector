@@ -198,7 +198,10 @@ void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
 std::string CreateModifyHandlerUnittest::gRootDir;
 std::string CreateModifyHandlerUnittest::gLogName;
 
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(CreateModifyHandlerUnittest, TestHandleContainerStoppedEvent);
+#endif
 } // end of namespace logtail
 
 int main(int argc, char** argv) {

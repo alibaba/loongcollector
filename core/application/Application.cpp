@@ -58,9 +58,15 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
+#elif defined(_MSC_VER)
+#include "common/WindowsDaemonUtil.h"
+#include "direct.h"
 #endif
 #else
 #include "provider/Provider.h"
+#if defined(_MSC_VER)
+#include "direct.h"
+#endif
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
@@ -379,7 +385,7 @@ void Application::Exit() {
 
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
 
-#if defined(_MSC_VER)
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif
     LOG_INFO(sLogger, ("exit", "bye!"));

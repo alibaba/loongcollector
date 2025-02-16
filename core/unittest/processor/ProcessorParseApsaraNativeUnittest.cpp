@@ -51,6 +51,9 @@ public:
 };
 
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestInit);
+// TODO: windows
+// need implement windwos Strptime.
+#if !defined(_MSC_VER)
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessWholeLine);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessWholeLinePart);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessKeyOverwritten);
@@ -62,6 +65,7 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestMultipleLines);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventMicrosecondUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraEasyReadLogTimeParser);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraLogLineParser);
+#endif
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};

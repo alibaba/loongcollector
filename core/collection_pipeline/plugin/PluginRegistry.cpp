@@ -17,9 +17,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if !defined(_MSC_VER)
 #include <dirent.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#endif
 
 #include <string>
 
@@ -28,18 +30,18 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
-#include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
-#include "plugin/input/InputHostMeta.h"
-#include "plugin/input/InputHostMonitor.h"
-#include "plugin/input/InputPrometheus.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-// #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputContainerStdio.h"
+#include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputHostMeta.h"
+#include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputPrometheus.h"
 #endif
 #include "collection_pipeline/plugin/creator/CProcessor.h"
 #include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
@@ -69,10 +71,6 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
-DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", false);
-DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
-DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
 
 using namespace std;
 
@@ -140,25 +138,16 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
+    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
-    if (BOOL_FLAG(enable_ebpf_network_observer)) {
-        RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
-    }
-    if (BOOL_FLAG(enable_ebpf_process_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
-    }
-    // if (BOOL_FLAG(enable_ebpf_file_secure)) {
-    //     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
-    // }
-    if (BOOL_FLAG(enable_ebpf_network_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
-    }
-    RegisterInputCreator(new StaticInputCreator<InputHostMeta>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
