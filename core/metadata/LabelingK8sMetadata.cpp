@@ -16,19 +16,19 @@
 
 #include "LabelingK8sMetadata.h"
 
-#include <vector>
+#include <boost/utility/string_view.hpp>
 #include <string>
+#include <vector>
+
+#include "K8sMetadata.h"
 #include "common/ParamExtractor.h"
+#include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/SpanEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include <boost/utility/string_view.hpp>
-#include "K8sMetadata.h"
 
-#include "constants/TagConstants.h"
-
-using logtail::StringView; 
+using logtail::StringView;
 
 namespace logtail {
 
@@ -39,7 +39,7 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     EventsContainer& events = logGroup.MutableEvents();
     std::vector<std::string> containerVec;
     std::vector<std::string> remoteIpVec;
-    std::vector<size_t>  cotainerNotTag;
+    std::vector<size_t> cotainerNotTag;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
         if (!ProcessEvent(events[rIdx], containerVec, remoteIpVec)) {
             cotainerNotTag.push_back(rIdx);
@@ -47,11 +47,13 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     }
     bool remoteStatus;
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (k8sMetadata.GetByContainerIdsFromServer(containerVec, remoteStatus).size() != containerVec.size())) {
+    if (containerVec.empty()
+        || (k8sMetadata.GetByContainerIdsFromServer(containerVec, remoteStatus).size() != containerVec.size())) {
         return;
     }
 
-    if (remoteIpVec.empty() || (k8sMetadata.GetByIpsFromServer(remoteIpVec, remoteStatus).size() != remoteIpVec.size())) {
+    if (remoteIpVec.empty()
+        || (k8sMetadata.GetByIpsFromServer(remoteIpVec, remoteStatus).size() != remoteIpVec.size())) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
@@ -60,7 +62,9 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     return;
 }
 
-bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec) {
+bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e,
+                                       std::vector<std::string>& containerVec,
+                                       std::vector<std::string>& remoteIpVec) {
     if (!IsSupportedEvent(e)) {
         return true;
     }
@@ -75,9 +79,11 @@ bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e, std::vector<std::str
 }
 
 template <typename Event>
-bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec) {
+bool LabelingK8sMetadata::AddLabels(Event& e,
+                                    std::vector<std::string>& containerVec,
+                                    std::vector<std::string>& remoteIpVec) {
     bool res = true;
-    
+
     auto& k8sMetadata = K8sMetadata::GetInstance();
     StringView containerIdViewKey(containerIdKeyFromTags);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};

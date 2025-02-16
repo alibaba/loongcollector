@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <map>
 #include <atomic>
+#include <map>
 #include <queue>
 #include <regex>
 #include <set>
@@ -25,12 +25,11 @@
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
+#include "ebpf/driver/coolbpf/src/security/data_msg.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "util/FrequencyManager.h"
-
-#include "ebpf/driver/coolbpf/src/security/data_msg.h"
 
 namespace logtail {
 namespace ebpf {
@@ -44,7 +43,7 @@ public:
                 moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
         : mSourceManager(sm),
           mCache(65535, 1024),
-        //   mDataCache(1024, 256),
+          //   mDataCache(1024, 256),
           mProcParser(hostPathPrefix),
           mHostName(hostName),
           mHostPathPrefix(hostPathPrefix),
@@ -110,7 +109,8 @@ private:
 
     std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual> mDataCache;
 
-    // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>, std::shared_ptr<std::string>>> mDataCache;
+    // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>,
+    // std::shared_ptr<std::string>>> mDataCache;
     ProcParser mProcParser;
     std::string mHostName;
     std::string mHostPathPrefix;

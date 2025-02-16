@@ -19,9 +19,7 @@ public:
     // void TestMove();
 
 protected:
-    void SetUp() override {
-        
-    }
+    void SetUp() override {}
     void TearDown() override {}
 
 private:

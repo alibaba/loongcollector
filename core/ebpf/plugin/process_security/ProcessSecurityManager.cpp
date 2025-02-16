@@ -18,6 +18,9 @@
 #include <mutex>
 #include <thread>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
@@ -26,9 +29,6 @@
 #include "ebpf/plugin/BaseManager.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/PeriodicalEvent.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
-#include "collection_pipeline/queue/ProcessQueueItem.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -162,8 +162,7 @@ int ProcessSecurityManager::Init(const std::variant<SecurityOptions*, logtail::e
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },

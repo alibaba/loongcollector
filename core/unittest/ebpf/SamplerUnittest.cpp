@@ -4,10 +4,10 @@
 #include <iostream>
 #include <random>
 
+#include "ebpf/util/TraceId.h"
+#include "ebpf/util/sampler/Sampler.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
-#include "ebpf/util/sampler/Sampler.h"
-#include "ebpf/util/TraceId.h"
 
 
 DECLARE_FLAG_BOOL(logtail_mode);
@@ -23,8 +23,7 @@ public:
 
 
 protected:
-    void SetUp() override {
-    }
+    void SetUp() override {}
     void TearDown() override {}
 
 private:
@@ -69,7 +68,6 @@ void SamplerUnittest::TestRandFromSpanID() {
     ASSERT_LE(realPortion, 0.011);
     APSARA_TEST_GE(realPortion, 0.009);
     APSARA_TEST_LE(realPortion, 0.011);
-
 }
 void SamplerUnittest::TestSampleAll() {
     sampler_ = std::make_unique<HashRatioSampler>(1);

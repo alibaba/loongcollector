@@ -17,6 +17,7 @@
 #include "NetworkUtil.h"
 
 #include <cstdint>
+
 #include <string>
 #include <vector>
 
@@ -27,25 +28,26 @@
 namespace logtail {
 
 const std::vector<std::string> tcpStateString = {
-      "UNKNOWN_STATE",
-      "TCP_ESTABLISHED",
-      "TCP_SYN_SENT",
-      "TCP_SYN_RECV",
-      "TCP_FIN_WAIT1",
-      "TCP_FIN_WAIT2",
-      "TCP_TIME_WAIT",
-      "TCP_CLOSE",
-      "TCP_CLOSE_WAIT",
-      "TCP_LAST_ACK",
-      "TCP_LISTEN",
-      "TCP_CLOSING",
-      "TCP_NEW_SYN_RECV",
-      "TCP_MAX_STATES",
+    "UNKNOWN_STATE",
+    "TCP_ESTABLISHED",
+    "TCP_SYN_SENT",
+    "TCP_SYN_RECV",
+    "TCP_FIN_WAIT1",
+    "TCP_FIN_WAIT2",
+    "TCP_TIME_WAIT",
+    "TCP_CLOSE",
+    "TCP_CLOSE_WAIT",
+    "TCP_LAST_ACK",
+    "TCP_LISTEN",
+    "TCP_CLOSING",
+    "TCP_NEW_SYN_RECV",
+    "TCP_MAX_STATES",
 };
 
 std::string GetStateString(uint16_t state) {
-  if (state >= tcpStateString.size()) return "INVALID_STATE";
-  return tcpStateString[state];
+    if (state >= tcpStateString.size())
+        return "INVALID_STATE";
+    return tcpStateString[state];
 }
 
 std::string GetAddrString(uint32_t ad) {
@@ -53,7 +55,7 @@ std::string GetAddrString(uint32_t ad) {
     auto addr = ntohl(ad);
     struct in_addr ip_addr;
     ip_addr.s_addr = htonl(addr);
-    char *ip_str = inet_ntoa(ip_addr);
+    char* ip_str = inet_ntoa(ip_addr);
     return std::string(ip_str);
 #else
     return "";
@@ -61,29 +63,37 @@ std::string GetAddrString(uint32_t ad) {
 }
 std::string GetFamilyString(uint16_t family) {
 #if defined(__linux__)
-  if (family == AF_INET) {
-    return "AF_INET";
-  } else if (family == AF_INET6) {
-    return "AF_INET6";
-  } else if (family == AF_UNIX) {
-    return "AF_UNIX";
-  } else {
-    return std::to_string(family);
-  }
+    if (family == AF_INET) {
+        return "AF_INET";
+    } else if (family == AF_INET6) {
+        return "AF_INET6";
+    } else if (family == AF_UNIX) {
+        return "AF_UNIX";
+    } else {
+        return std::to_string(family);
+    }
 #else
     return "";
 #endif
 }
 std::string GetProtocolString(uint16_t protocol) {
-  switch (protocol) {
-    case 1:  return "ICMP";
-    case 2:  return "IGMP";
-    case 4:  return "IP";
-    case 6:  return "TCP";
-    case 17: return "UDP";
-    case 41: return "ENCAP";
-    case 89: return "OSPF";
-    default: return "Unknown";
-  }
+    switch (protocol) {
+        case 1:
+            return "ICMP";
+        case 2:
+            return "IGMP";
+        case 4:
+            return "IP";
+        case 6:
+            return "TCP";
+        case 17:
+            return "UDP";
+        case 41:
+            return "ENCAP";
+        case 89:
+            return "OSPF";
+        default:
+            return "Unknown";
+    }
 }
-}
+} // namespace logtail

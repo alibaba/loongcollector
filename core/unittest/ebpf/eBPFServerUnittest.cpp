@@ -26,12 +26,8 @@ namespace logtail {
 namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
 public:
-    eBPFServerUnittest() { 
-        ebpf::eBPFServer::GetInstance()->Init();
-    }
-    ~eBPFServerUnittest() { 
-        ebpf::eBPFServer::GetInstance()->Stop(); 
-    }
+    eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
+    ~eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Stop(); }
 
     // for start and stop single
     void TestNetworkObserver();

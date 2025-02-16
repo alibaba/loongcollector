@@ -51,13 +51,18 @@ bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputProcessSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, logtail::ebpf::PluginType::PROCESS_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::PROCESS_SECURITY,
+                                                         mContext,
+                                                         &mSecurityOptions,
+                                                         mPluginMgr);
 }
 
 bool InputProcessSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::PROCESS_SECURITY);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::PROCESS_SECURITY);
         return true;
     }
     return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),

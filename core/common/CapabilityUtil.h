@@ -22,4 +22,4 @@ std::string GetCapabilities(uint64_t capInt);
 
 std::string GetCapability(int32_t capInt);
 
-}
+} // namespace logtail

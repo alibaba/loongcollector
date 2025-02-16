@@ -232,7 +232,8 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
 
             WriteLock lk(mSpanAggLock);
-            SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mSpanAggregator.GetRootNodeAndClear());
+            SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> aggTree(
+                this->mSpanAggregator.GetRootNodeAndClear());
             lk.unlock();
 
             auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -349,8 +350,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },
@@ -364,7 +364,8 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             }
 
             WriteLock lk(mLogAggLock);
-            SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mLogAggregator.GetRootNodeAndClear());
+            SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> aggTree(
+                this->mLogAggregator.GetRootNodeAndClear());
             lk.unlock();
 
             auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -477,8 +478,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },
@@ -490,7 +490,8 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         }
 
         WriteLock lk(this->mAppAggLock);
-        SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> aggTree(this->mAppAggregator.GetRootNodeAndClear());
+        SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> aggTree(
+            this->mAppAggregator.GetRootNodeAndClear());
         lk.unlock();
 
         auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -673,8 +674,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },

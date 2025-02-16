@@ -14,13 +14,13 @@
 
 #include "FileSecurityManager.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/type/PeriodicalEvent.h"
 #include "logger/Logger.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
-#include "collection_pipeline/queue/ProcessQueueItem.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -129,8 +129,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 init = true;
             }
             if (processTags.mInner.empty()) {
-                LOG_ERROR(sLogger,
-                            ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
+                LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
 
@@ -199,8 +198,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },

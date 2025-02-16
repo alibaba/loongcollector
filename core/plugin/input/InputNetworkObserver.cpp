@@ -58,16 +58,22 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputNetworkObserver::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, logtail::ebpf::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::NETWORK_OBSERVE,
+                                                         mContext,
+                                                         &mNetworkOption,
+                                                         mPluginMgr);
 }
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::NETWORK_OBSERVE);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::NETWORK_OBSERVE);
+    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+                                                          logtail::ebpf::PluginType::NETWORK_OBSERVE);
 }
 
 } // namespace logtail

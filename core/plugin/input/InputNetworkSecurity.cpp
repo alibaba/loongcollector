@@ -55,13 +55,18 @@ bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputNetworkSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, logtail::ebpf::PluginType::NETWORK_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::NETWORK_SECURITY,
+                                                         mContext,
+                                                         &mSecurityOptions,
+                                                         mPluginMgr);
 }
 
 bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::NETWORK_SECURITY);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::NETWORK_SECURITY);
         return true;
     }
     return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),

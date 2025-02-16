@@ -14,6 +14,9 @@
 
 #include "NetworkSecurityManager.h"
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
@@ -21,9 +24,6 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
-#include "collection_pipeline/queue/ProcessQueueItem.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -147,15 +147,15 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                     LOG_WARNING(sLogger, ("basemanager is null", ""));
                     return;
                 }
-                LOG_DEBUG(sLogger, ("step", "before finalize process tags")("pid", group->mPid)("ktime",group->mKtime));
+                LOG_DEBUG(sLogger,
+                          ("step", "before finalize process tags")("pid", group->mPid)("ktime", group->mKtime));
                 processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
                 init = true;
             }
             LOG_DEBUG(sLogger, ("step", "after finalize process tags"));
             // attach process tags
             if (processTags.mInner.empty()) {
-                LOG_ERROR(sLogger,
-                            ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
+                LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
             LOG_DEBUG(sLogger, ("step", "after attach process tags"));
@@ -246,8 +246,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
             if (isStop) {
                 LOG_INFO(sLogger,
-                            ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid",
-                                                                                                     this->mStartUid));
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
             }
             return isStop;
         },

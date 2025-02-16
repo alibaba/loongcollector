@@ -52,13 +52,18 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
 }
 
 bool InputFileSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, logtail::ebpf::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::FILE_SECURITY,
+                                                         mContext,
+                                                         &mSecurityOptions,
+                                                         mPluginMgr);
 }
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
     // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);

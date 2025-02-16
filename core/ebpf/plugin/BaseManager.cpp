@@ -803,7 +803,7 @@ void BaseManager::HandleCacheUpdate() {
         if (!count) {
             continue;
         }
-        
+
         for (size_t i = 0; i < count; ++i) {
             // set args
             std::shared_ptr<MsgExecveEventUnix> event = std::move(items[i]);

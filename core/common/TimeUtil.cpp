@@ -21,9 +21,9 @@
 #include <atomic>
 #include <limits>
 #if defined(__linux__)
+#include <ctime>
 #include <sys/sysinfo.h>
 #include <utmp.h>
-#include <ctime>
 #endif
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"

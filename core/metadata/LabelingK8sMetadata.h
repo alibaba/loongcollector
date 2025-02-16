@@ -20,18 +20,20 @@
 
 namespace logtail {
 
-    const static std::string containerIdKeyFromTags = "container.id";
-    const static std::string remoteIpKeyFromTag = "remote_ip";
+const static std::string containerIdKeyFromTags = "container.id";
+const static std::string remoteIpKeyFromTag = "remote_ip";
 
-    class LabelingK8sMetadata {
-    public:
-        void AddLabelToLogGroup(PipelineEventGroup& logGroup);
-        bool ProcessEvent(PipelineEventPtr& e,  std::vector<std::string>& container_vec,  std::vector<std::string>& remote_ip_vec);
-        // 声明模板函数
-        template <typename Event>
-        bool AddLabels(Event& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec);
-    protected:
-        bool IsSupportedEvent(const PipelineEventPtr& e) const;   
-    };
+class LabelingK8sMetadata {
+public:
+    void AddLabelToLogGroup(PipelineEventGroup& logGroup);
+    bool
+    ProcessEvent(PipelineEventPtr& e, std::vector<std::string>& container_vec, std::vector<std::string>& remote_ip_vec);
+    // 声明模板函数
+    template <typename Event>
+    bool AddLabels(Event& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec);
+
+protected:
+    bool IsSupportedEvent(const PipelineEventPtr& e) const;
+};
 
 } // namespace logtail
