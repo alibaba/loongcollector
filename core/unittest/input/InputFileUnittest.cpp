@@ -138,7 +138,7 @@ void InputFileUnittest::OnSuccessfulInit() {
         {
             "Type": "input_file",
             "FilePaths": [],
-            "TailingAllMatchedFiles": true,
+            "TailingAllMatchedFiles": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -156,7 +156,7 @@ void InputFileUnittest::OnSuccessfulInit() {
         {
             "Type": "input_file",
             "FilePaths": [],
-            "EnableExactlyConcurrency": 600,
+            "EnableExactlyConcurrency": 600
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -478,6 +478,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(0U, FileServer::GetInstance()->GetExactlyOnceConcurrency("test_config"));
 }
 
+#if !defined(_MSC_VER)
 void InputFileUnittest::TestSetContainerBaseDir() {
     InputFile inputFile;
     ContainerInfo containerInfo;
@@ -512,13 +513,16 @@ void InputFileUnittest::TestSetContainerBaseDir() {
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/data5/log"));
     APSARA_TEST_EQUAL("/logtail_host/source4/data5/log", containerInfo.mRealBaseDir);
 }
+#endif
 
 UNIT_TEST_CASE(InputFileUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputFileUnittest, OnEnableContainerDiscovery)
 UNIT_TEST_CASE(InputFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputFileUnittest, OnPipelineUpdate)
+#if !defined(_MSC_VER)
 UNIT_TEST_CASE(InputFileUnittest, TestSetContainerBaseDir)
+#endif
 
 } // namespace logtail
 

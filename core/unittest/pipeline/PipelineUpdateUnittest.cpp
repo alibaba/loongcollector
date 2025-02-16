@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "Application.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -143,7 +144,11 @@ protected:
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
     }
 
-    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+    static void TearDownTestCase() {
+        PluginRegistry::GetInstance()->UnloadPlugins();
+        Application::GetInstance()->SetSigTermSignalFlag(true);
+        FileServer::GetInstance()->Stop();
+    }
 
     void SetUp() override {
         LogInput::GetInstance()->CleanEnviroments();
@@ -158,9 +163,9 @@ protected:
             pipeline.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        if (isFileServerStart) {
-            FileServer::GetInstance()->Stop();
-        }
+        //if (isFileServerStart) {
+        //    FileServer::GetInstance()->Stop();
+        //}
         ProcessorRunner::GetInstance()->Stop();
         FlusherRunner::GetInstance()->Stop();
         HttpSink::GetInstance()->Stop();

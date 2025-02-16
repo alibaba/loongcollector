@@ -200,9 +200,8 @@ AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(cons
     // string region;
     auto iter = mAllAlarmMap.find(region);
     if (iter == mAllAlarmMap.end()) {
-        auto pMapVec = std::make_shared<AlarmVector>();
-        // need resize to init this obj
-        pMapVec->resize(ALL_LOGTAIL_ALARM_NUM);
+        // in windows, AlarmVector item move constructor is not noexcept, can't call resize.
+        auto pMapVec = std::make_shared<AlarmVector>(ALL_LOGTAIL_ALARM_NUM);
 
         int32_t now = time(NULL);
         std::vector<int32_t> lastUpdateTime;

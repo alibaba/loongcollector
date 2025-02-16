@@ -18,6 +18,7 @@
 
 #include <list>
 #include <memory>
+#include <vector>
 
 #include "common/StringView.h"
 

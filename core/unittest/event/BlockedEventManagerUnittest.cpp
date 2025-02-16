@@ -17,6 +17,11 @@
 
 using namespace std;
 
+#if defined(_MSC_VER)
+// GetObject is a preprocessor definition in "windows.h"
+#undef GetObject
+#endif
+
 namespace logtail {
 
 class BlockedEventManagerUnittest : public testing::Test {
