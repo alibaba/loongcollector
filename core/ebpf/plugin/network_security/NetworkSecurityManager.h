@@ -49,6 +49,8 @@ public:
 
     void RecordNetworkEvent(tcp_data_t* event);
 
+    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;

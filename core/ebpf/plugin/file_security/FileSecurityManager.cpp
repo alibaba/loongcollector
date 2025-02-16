@@ -94,6 +94,98 @@ FileSecurityManager::FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
           }) {
 }
 
+bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime) {
+    if (!this->mFlag || this->mSuspendFlag) {
+        return false;
+    }
+
+    WriteLock lk(this->mLock);
+    auto aggTree = std::move(this->mAggregateTree);
+    lk.unlock();
+
+    auto nodes = aggTree.GetNodesWithAggDepth(1);
+    LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+    if (nodes.empty()) {
+        LOG_DEBUG(sLogger, ("empty nodes...", ""));
+        return true;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    for (auto& node : nodes) {
+        LOG_DEBUG(sLogger, ("child num", node->child.size()));
+        // convert to a item and push to process queue
+        SizedMap processTags;
+        bool init = false;
+        aggTree.ForEach(node, [&](const FileEventGroup* group) {
+            // set process tag
+            if (!init) {
+                auto bm = GetBaseManager();
+                if (bm == nullptr) {
+                    LOG_WARNING(sLogger, ("basemanager is null", ""));
+                    return;
+                }
+                processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                init = true;
+            }
+            if (processTags.mInner.empty()) {
+                LOG_ERROR(sLogger,
+                            ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
+                return;
+            }
+
+            for (auto innerEvent : group->mInnerEvents) {
+                auto* logEvent = eventGroup.AddLogEvent();
+                // attach process tags
+                for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
+                    logEvent->SetContentNoCopy(it->first, it->second);
+                }
+                auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                // set timestamp
+                logEvent->SetTimestamp(seconds.count(), ts);
+                logEvent->SetContent("path", group->mPath);
+                // set callnames
+                switch (innerEvent->mEventType) {
+                    case KernelEventType::FILE_PATH_TRUNCATE: {
+                        logEvent->SetContent("call_name", std::string("security_path_truncate"));
+                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        break;
+                    }
+                    case KernelEventType::FILE_MMAP: {
+                        logEvent->SetContent("call_name", std::string("security_mmap_file"));
+                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        break;
+                    }
+                    case KernelEventType::FILE_PERMISSION_EVENT: {
+                        logEvent->SetContent("call_name", std::string("security_file_permission"));
+                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        });
+    }
+    {
+        std::lock_guard lk(mContextMutex);
+        if (this->mPipelineCtx == nullptr) {
+            return true;
+        }
+        LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+        std::unique_ptr<ProcessQueueItem> item
+            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[FileSecurityEvent] push queue failed!", ""));
+        }
+    }
+    aggTree.Clear();
+    return true;
+}
+
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     // set init flag ...
     mFlag = true;
@@ -101,95 +193,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            if (!this->mFlag || this->mSuspendFlag) {
-                return false;
-            }
-
-            WriteLock lk(this->mLock);
-            auto aggTree = std::move(this->mAggregateTree);
-            lk.unlock();
-
-            auto nodes = aggTree.GetNodesWithAggDepth(1);
-            LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
-            if (nodes.empty()) {
-                LOG_DEBUG(sLogger, ("empty nodes...", ""));
-                return true;
-            }
-
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            for (auto& node : nodes) {
-                LOG_DEBUG(sLogger, ("child num", node->child.size()));
-                // convert to a item and push to process queue
-                SizedMap processTags;
-                bool init = false;
-                aggTree.ForEach(node, [&](const FileEventGroup* group) {
-                    // set process tag
-                    if (!init) {
-                        auto bm = GetBaseManager();
-                        if (bm == nullptr) {
-                            LOG_WARNING(sLogger, ("basemanager is null", ""));
-                            return;
-                        }
-                        processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
-                        init = true;
-                    }
-                    if (processTags.mInner.empty()) {
-                        LOG_ERROR(sLogger,
-                                  ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
-                        return;
-                    }
-
-                    for (auto innerEvent : group->mInnerEvents) {
-                        auto* logEvent = eventGroup.AddLogEvent();
-                        // attach process tags
-                        for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
-                            logEvent->SetContentNoCopy(it->first, it->second);
-                        }
-                        auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
-                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                        // set timestamp
-                        logEvent->SetTimestamp(seconds.count(), ts);
-                        logEvent->SetContent("path", group->mPath);
-                        // set callnames
-                        switch (innerEvent->mEventType) {
-                            case KernelEventType::FILE_PATH_TRUNCATE: {
-                                logEvent->SetContent("call_name", std::string("security_path_truncate"));
-                                logEvent->SetContent("event_type", std::string("kprobe"));
-                                break;
-                            }
-                            case KernelEventType::FILE_MMAP: {
-                                logEvent->SetContent("call_name", std::string("security_mmap_file"));
-                                logEvent->SetContent("event_type", std::string("kprobe"));
-                                break;
-                            }
-                            case KernelEventType::FILE_PERMISSION_EVENT: {
-                                logEvent->SetContent("call_name", std::string("security_file_permission"));
-                                logEvent->SetContent("event_type", std::string("kprobe"));
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                    }
-                });
-            }
-            {
-                std::lock_guard lk(mContextMutex);
-                if (this->mPipelineCtx == nullptr) {
-                    return true;
-                }
-                LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-                std::unique_ptr<ProcessQueueItem> item
-                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-                if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                    LOG_WARNING(sLogger,
-                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                    "[FileSecurityEvent] push queue failed!", ""));
-                }
-            }
-            aggTree.Clear();
-            return true;
+            return this->ConsumeAggregateTree(execTime);
         },
         [this](int currentUid) { // validator
             auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;

@@ -50,6 +50,8 @@ public:
 
     void RecordFileEvent(file_data_t* event);
 
+    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+
     virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
 
     virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
