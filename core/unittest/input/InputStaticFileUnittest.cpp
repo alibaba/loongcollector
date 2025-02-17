@@ -537,14 +537,14 @@ void InputStaticFileUnittest::TestGetFiles() {
     }
     {
         // the last subdir before ** is const
-        filesystem::create_directories("test_logs/dir1/valid_dir");
-        filesystem::create_directories("test_logs/dir2/valid_dir");
+        filesystem::create_directories("test_logs/dir1/dir/valid_dir");
+        filesystem::create_directories("test_logs/dir2/dir/valid_dir");
         filesystem::create_directories("test_logs/unmatched_dir");
         { ofstream fout("test_logs/invalid_dir"); }
-        { ofstream fout("test_logs/dir1/valid_dir/test1.log"); }
-        { ofstream fout("test_logs/dir2/valid_dir/test2.log"); }
+        { ofstream fout("test_logs/dir1/dir/valid_dir/test1.log"); }
+        { ofstream fout("test_logs/dir2/dir/valid_dir/test2.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/dir*/valid_dir/**/*.log");
+        filesystem::path filePath = filesystem::absolute("test_logs/dir*/dir/valid_dir/**/*.log");
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -557,14 +557,14 @@ void InputStaticFileUnittest::TestGetFiles() {
     }
     {
         // the last subdir before ** is wildcard
-        filesystem::create_directories("test_logs/a/dir1");
-        filesystem::create_directories("test_logs/a/dir2");
-        filesystem::create_directories("test_logs/a/unmatched_dir");
-        { ofstream fout("test_logs/a/invalid_dir"); }
-        { ofstream fout("test_logs/a/dir1/test1.log"); }
-        { ofstream fout("test_logs/a/dir2/test2.log"); }
+        filesystem::create_directories("test_logs/dir1");
+        filesystem::create_directories("test_logs/dir2");
+        filesystem::create_directories("test_logs/unmatched_dir");
+        { ofstream fout("test_logs/invalid_dir"); }
+        { ofstream fout("test_logs/dir1/test1.log"); }
+        { ofstream fout("test_logs/dir2/test2.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/a/dir*/**/*.log");
+        filesystem::path filePath = filesystem::absolute("test_logs/dir*/**/*.log");
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -593,7 +593,7 @@ void InputStaticFileUnittest::TestGetFiles() {
     }
     {
         // invalid base path
-        { ofstream fout("invalid_dir"); }
+        { ofstream fout("test_logs"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
         Json::Value configJson;
@@ -604,7 +604,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove("invalid_dir");
+        filesystem::remove("test_logs");
     }
     {
         // normal
@@ -649,6 +649,8 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.SetMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         APSARA_TEST_EQUAL(1U, input.GetFiles().size());
+
+        filesystem::remove_all("test_logs");
     }
 }
 
