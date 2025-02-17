@@ -14,6 +14,4 @@
 
 #include "collection_pipeline/batch/FlushStrategy.h"
 
-using namespace std;
-
 namespace logtail {} // namespace logtail
