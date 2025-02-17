@@ -53,7 +53,7 @@ void AlarmManagerUnittest::TestSendAlarm() {
         AlarmManager::AlarmVector& alarmBufferVec
             = *AlarmManager::GetInstance()->MakesureLogtailAlarmMapVecUnlocked(region);
 
-        std::string key = projectName + "_" + category;
+        std::string key = projectName + "_" + category + "_" + config;
         APSARA_TEST_EQUAL(1U, alarmBufferVec[alarmType].size());
         APSARA_TEST_EQUAL(true, alarmBufferVec[alarmType].find(key) != alarmBufferVec[alarmType].end());
         APSARA_TEST_EQUAL(category, alarmBufferVec[alarmType][key]->mCategory);
