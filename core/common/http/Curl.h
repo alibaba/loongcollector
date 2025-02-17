@@ -20,6 +20,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "curl/curl.h"

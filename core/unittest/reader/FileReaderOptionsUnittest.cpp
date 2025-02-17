@@ -116,7 +116,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     // FileEncoding
     configStr = R"(
         {
-            "FileEncoding": "utf16",
+            "FileEncoding": "utf16"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
