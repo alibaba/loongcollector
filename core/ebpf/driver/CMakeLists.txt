@@ -26,10 +26,10 @@ if (LINUX)
     set(ENABLE_PROFILE OFF)
     set(BUILD_TESTING OFF)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
-    add_subdirectory(coolbpf)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/coolbpf ${CMAKE_BINARY_DIR}/third_party/coolbpf)
     add_custom_target(
         install_coolbpf ALL
-        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/third_party/coolbpf
         DEPENDS coolbpf coolbpf_static
     )
 
@@ -37,8 +37,9 @@ if (LINUX)
 
     file(GLOB LIB_SOURCE_FILES *.cpp *.h)
 
-    add_library(EbpfDriver SHARED ${LIB_SOURCE_FILES})
-    target_link_libraries(EbpfDriver coolbpf)
-    add_dependencies(EbpfDriver install_coolbpf)
-    target_link_options(EbpfDriver PRIVATE "-Wl,-rpath=.:${DEFAULT_DEPS_ROOT}/lib")
+    add_library(${EBPF_DIRVER_TARGET} SHARED ${LIB_SOURCE_FILES})
+    target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf)
+    add_dependencies(${EBPF_DIRVER_TARGET} install_coolbpf)
+    target_link_options(${EBPF_DIRVER_TARGET} PRIVATE -Wl,-rpath=".:${DEFAULT_DEPS_ROOT}/lib")
+    target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC -Werror)
 endif ()

@@ -43,7 +43,7 @@ add_executable(input_internal_metrics_unittest InputInternalMetricsUnittest.cpp)
 target_link_libraries(input_internal_metrics_unittest ${UT_BASE_TARGET})
 
 set(EBPF_DRIVER_DIR "${CMAKE_BINARY_DIR}/ebpf/driver")
-set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/ebpf/driver/coolbpf/src")
+set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/third_party/coolbpf/src")
 
 add_custom_command(TARGET input_ebpf_process_security_unittest POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy

@@ -14,15 +14,13 @@
 
 #pragma once
 
+#include <coolbpf/net.h>
 #include <cstddef>
 
-#include <list>
 #include <map>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
-#include "ebpf/driver/coolbpf/src/net.h"
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/HttpTable.h"
 #include "ebpf/type/table/NetTable.h"
@@ -234,7 +232,7 @@ public:
     ~AbstractNetRecord() override {}
     AggregateType GetAggregateType() const override { return AggregateType::NETWORK; }
 
-    const ConnId GetConnId() const { return conn_id_; }
+    ConnId GetConnId() const { return conn_id_; }
 
     std::string GetSpanName() override { return "xx"; }
     AbstractNetRecord(ConnId&& conn_id) : conn_id_(conn_id) {}
@@ -277,7 +275,7 @@ public:
 // is L7, while ConnStatsRecord is L5.
 class AbstractAppRecord : public AbstractNetRecord {
 public:
-    AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {}
+    explicit AbstractAppRecord(ConnId&& connId) : AbstractNetRecord(std::move(connId)) {}
 
     void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
     void SetSpanId(const std::string& spanId) { mSpanId = spanId; }

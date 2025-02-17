@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
+#include <coolbpf/security/bpf_process_event_type.h>
+#include <coolbpf/security/type.h>
 
-#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
-#include "ebpf/include/export.h"
+#include <string>
+#include <vector>
 
 namespace logtail {
 namespace ebpf {

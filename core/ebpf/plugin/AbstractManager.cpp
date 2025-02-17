@@ -14,8 +14,9 @@
 
 #include "AbstractManager.h"
 
+#include <coolbpf/security/type.h>
+
 #include "common/TimeUtil.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "logger/Logger.h"
 
 namespace logtail {

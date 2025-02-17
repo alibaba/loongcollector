@@ -23,10 +23,9 @@ extern "C" {
 #include <unistd.h>
 
 #include <atomic>
-#include <functional>
 #include <map>
+#include <memory>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -38,18 +37,18 @@ namespace ebpf {
 struct PerfBufferOps {
 public:
     PerfBufferOps(const std::string& name, ssize_t size, perf_buffer_sample_fn scb, perf_buffer_lost_fn lcb)
-        : name_(name), size_(size), sample_cb(scb), lost_cb(lcb) {}
-    std::string name_;
-    ssize_t size_;
-    perf_buffer_sample_fn sample_cb;
-    perf_buffer_lost_fn lost_cb;
+        : name(name), size(size), sampleCb(scb), lostCb(lcb) {}
+    std::string name;
+    ssize_t size;
+    perf_buffer_sample_fn sampleCb;
+    perf_buffer_lost_fn lostCb;
 };
 
 struct AttachProgOps {
 public:
-    AttachProgOps(const std::string& name, bool attach) : name_(name), attach_(attach) {}
-    std::string name_;
-    bool attach_;
+    AttachProgOps(const std::string& name, bool attach) : name(name), attach(attach) {}
+    std::string name;
+    bool attach;
 };
 
 class BPFWrapperBase {
@@ -66,26 +65,27 @@ public:
      * Init will open and load bpf object, and fill caches for maps and progs
      */
     int Init() {
-        if (inited_)
+        if (mInited) {
             return 0;
-        inited_ = true;
-        skel_ = T::open_and_load();
-        flag_ = true;
-        if (!skel_) {
+        }
+        mInited = true;
+        mSkel = T::open_and_load();
+        mFlag = true;
+        if (!mSkel) {
             //       LOG(WARNING) << "[BPFWrapper] failed to load BPF Object";
             return 1;
         }
         //     LOG(INFO) << "[BPFWrapper] successfully load BPF Object";
-        bpf_map* map;
-        bpf_object__for_each_map(map, skel_->obj) {
+        bpf_map* map = nullptr;
+        bpf_object__for_each_map(map, mSkel->obj) {
             const char* name = bpf_map__name(map);
-            bpf_maps_[name] = map;
+            mBpfMaps[name] = map;
             // bpf_map__fd(map);
         }
-        struct bpf_program* prog;
-        bpf_object__for_each_program(prog, skel_->obj) {
+        struct bpf_program* prog = nullptr;
+        bpf_object__for_each_program(prog, mSkel->obj) {
             const char* name = bpf_program__name(prog);
-            bpf_progs_[name] = prog;
+            mBpfProgs[name] = prog;
             // bpf_program__fd(prog);
         }
         return 0;
@@ -95,12 +95,13 @@ public:
      * attach bpf programs
      */
     int DynamicAttachBPFObject(const std::vector<AttachProgOps>& ops) {
-        int err;
-        for (auto op : ops) {
-            if (!op.attach_)
+        int err = 0;
+        for (const auto& op : ops) {
+            if (!op.attach) {
                 continue;
-            auto it = bpf_progs_.find(op.name_);
-            if (it == bpf_progs_.end() || it->second == nullptr) {
+            }
+            auto it = mBpfProgs.find(op.name);
+            if (it == mBpfProgs.end() || it->second == nullptr) {
                 //         LOG(WARNING) << "failed to find bpf program, name:" << op.name_;
                 continue;
             }
@@ -110,9 +111,8 @@ public:
             if (err) {
                 //         LOG(WARNING) << op.name_ << " failed to attach prog, err: " << err;
                 continue;
-            } else {
-                links_.insert({op.name_, link});
             }
+            mLinks.insert({op.name, link});
         }
 
         return 0;
@@ -122,14 +122,14 @@ public:
      * detach bpf programs
      */
     int DynamicDetachBPFObject(const std::vector<AttachProgOps>& ops) {
-        for (auto op : ops) {
-            auto it = links_.find(op.name_);
-            if (it == links_.end()) {
+        for (const auto& op : ops) {
+            auto it = mLinks.find(op.name);
+            if (it == mLinks.end()) {
                 //         LOG(INFO) << op.name_ << " was not attached.";
                 continue;
             }
 
-            auto link = it->second;
+            auto* link = it->second;
             // do detach
             auto err = bpf_link__destroy(link);
             if (err) {
@@ -137,7 +137,7 @@ public:
                 continue;
             }
             // remove from map
-            links_.erase(it);
+            mLinks.erase(it);
         }
 
         return 0;
@@ -146,25 +146,24 @@ public:
     /**
      * set tail calls
      */
-    int SetTailCall(const std::string& map_name, const std::vector<std::string>& functions) {
-        int map_fd = SearchMapFd(map_name);
+    int SetTailCall(const std::string& mapName, const std::vector<std::string>& functions) {
+        int mapFd = SearchMapFd(mapName);
         //     LOG(INFO) << "[BPFWrapper] find " << map_name << " fd:" << map_fd ;
-        if (map_fd < 0) {
+        if (mapFd < 0) {
             //       LOG(INFO) << "[BPFWrapper] find prog map failed for " << map_name ;
             return 1;
         }
 
-        for (int i = 0; i < functions.size(); i++) {
-            auto func = functions[i];
-            int tmp = i;
-            int func_fd = SearchProgFd(func);
-            if (func_fd <= 0) {
+        for (int i = 0; i < (int)functions.size(); i++) {
+            const auto& func = functions[i];
+            int funcFd = SearchProgFd(func);
+            if (funcFd <= 0) {
                 //         LOG(INFO) << "[BPFWrapper] search prog " << func << " fd failed, skip update elem. fd:" <<
                 //         func_fd ;
                 continue;
             }
 
-            int ret = bpf_map_update_elem(map_fd, &tmp, &func_fd, 0);
+            int ret = bpf_map_update_elem(mapFd, &i, &funcFd, 0);
             if (ret) {
                 //         LOG(INFO) << "[BPFWrapper] update prog map " << map_name << " failed for " << func << ",
                 //         err:" << ret ;
@@ -174,45 +173,46 @@ public:
     }
 
     template <typename MapInMapType>
-    int DeleteInnerMap(const std::string& outter_map_name, void* outter_key) {
-        int map_fd = SearchMapFd(outter_map_name);
+    int DeleteInnerMap(const std::string& outterMapName, void* outterKey) {
+        int mapFd = SearchMapFd(outterMapName);
         //     LOG(INFO) << "[BPFWrapper] find " << outter_map_name << " fd:" << map_fd ;
-        if (map_fd < 0) {
+        if (mapFd < 0) {
             //       LOG(INFO) << "[BPFWrapper] find outter map failed for " << outter_map_name ;
             return 1;
         }
 
         // delete bpf map
-        bpf_map_delete_elem(map_fd, outter_key);
+        bpf_map_delete_elem(mapFd, outterKey);
 
-        int* key = static_cast<int*>(outter_key);
+        int* key = static_cast<int*>(outterKey);
 
         // get inner map fd from outter map fd and outter key
         // close fd for inner map
-        int inner_fd = -1;
-        if (map_in_map_fds_[map_fd].count(*key)) {
-            inner_fd = map_in_map_fds_[map_fd][*key];
+        int innerFd = -1;
+        if (mApInMapFds[mapFd].count(*key)) {
+            innerFd = mApInMapFds[mapFd][*key];
         }
         //     LOG(INFO) << "[FindInnerMapFd] outter map name:" << outter_map_name << " outter map fd:" << map_fd << "
         //     outter key:" << (*key) << " inner_fd:" << inner_fd;
 
-        if (inner_fd > 0)
-            close(inner_fd);
+        if (innerFd > 0) {
+            close(innerFd);
+        }
 
         return 0;
     }
 
     template <typename MapInMapType>
-    int DeleteInnerMapElem(const std::string& outter_map_name, void* outter_key, void* inner_key) {
-        int map_fd = SearchMapFd(outter_map_name);
+    int DeleteInnerMapElem(const std::string& outterMapName, void* outterKey, void* innerKey) {
+        int mapFd = SearchMapFd(outterMapName);
         //     LOG(INFO) << "[BPFWrapper] find " << outter_map_name << " fd:" << map_fd ;
-        if (map_fd < 0) {
+        if (mapFd < 0) {
             //       LOG(INFO) << "[BPFWrapper] find outter map failed for " << outter_map_name ;
             return 1;
         }
-        int inner_map_fd = -1;
-        uint32_t inner_map_id = 0;
-        int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
+        int innerMapFd = -1;
+        uint32_t innerMapId = 0;
+        int ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
         if (ret) {
             //       LOG(WARNING) << "failed to lookup inner map id, skip delete element. outter map name: "
             // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
@@ -220,32 +220,32 @@ public:
             return 0;
         }
 
-        inner_map_fd = bpf_map_get_fd_by_id(inner_map_id);
-        if (inner_map_fd < 0) {
+        innerMapFd = bpf_map_get_fd_by_id(innerMapId);
+        if (innerMapFd < 0) {
             //       LOG(ERROR) << "inner map fd less than 0, outter map name: " << outter_map_name;
             return 1;
         }
 
-        ret = bpf_map_delete_elem(inner_map_fd, inner_key);
+        ret = bpf_map_delete_elem(innerMapFd, innerKey);
         //     LOG(INFO) << "delete from inner map, inner map fd:" << inner_map_fd << " inner map id:" << inner_map_id
         //     << " ret:" << ret;
 
-        close(inner_map_fd);
+        close(innerMapFd);
 
         return ret;
     }
 
     template <typename MapInMapType>
-    int LookupInnerMapElem(const std::string& outter_map_name, void* outter_key, void* inner_key, void* inner_val) {
-        int map_fd = SearchMapFd(outter_map_name);
+    int LookupInnerMapElem(const std::string& outterMapName, void* outterKey, void* innerKey, void* innerVal) {
+        int mapFd = SearchMapFd(outterMapName);
         //     LOG(INFO) << "[BPFWrapper] find " << outter_map_name << " fd:" << map_fd ;
-        if (map_fd < 0) {
+        if (mapFd < 0) {
             //       LOG(INFO) << "[BPFWrapper] find outter map failed for " << outter_map_name ;
             return 1;
         }
-        int inner_map_fd = -1;
-        uint32_t inner_map_id = 0;
-        int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
+        int innerMapFd = -1;
+        uint32_t innerMapId = 0;
+        int ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
         if (ret) {
             //       LOG(WARNING) << "failed to lookup inner map id. outter map name: "
             // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
@@ -253,38 +253,38 @@ public:
             return 1;
         }
 
-        inner_map_fd = bpf_map_get_fd_by_id(inner_map_id);
-        if (inner_map_fd < 0) {
+        innerMapFd = bpf_map_get_fd_by_id(innerMapId);
+        if (innerMapFd < 0) {
             //       LOG(ERROR) << "inner map fd less than 0, outter map name: " << outter_map_name;
             return 1;
         }
 
-        ret = bpf_map_lookup_elem(inner_map_fd, inner_key, inner_val);
+        ret = bpf_map_lookup_elem(innerMapFd, innerKey, innerVal);
         //     LOG(INFO) << "lookup from inner map, inner map fd:" << inner_map_fd << " inner map id:" << inner_map_id
         //     << " ret:" << ret;
 
-        close(inner_map_fd);
+        close(innerMapFd);
 
         return ret;
     }
 
     template <typename MapInMapType>
     int UpdateInnerMapElem(
-        const std::string& outter_map_name, void* outter_key, void* inner_key, void* inner_value, uint64_t flag) {
-        int map_fd = SearchMapFd(outter_map_name);
+        const std::string& outterMapName, void* outterKey, void* innerKey, void* innerValue, uint64_t flag) {
+        int mapFd = SearchMapFd(outterMapName);
         //     LOG(INFO) << "[BPFWrapper] find " << outter_map_name << " fd:" << map_fd ;
-        if (map_fd < 0) {
+        if (mapFd < 0) {
             //       LOG(INFO) << "[BPFWrapper] find outter map failed for " << outter_map_name ;
             return 1;
         }
-        int inner_map_fd = -1;
-        uint32_t inner_map_id = 0;
-        int ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
+        int innerMapFd = -1;
+        uint32_t innerMapId = 0;
+        int ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
         if (ret) {
             //       LOG(INFO) << "failed to lookup inner map fd, begin to init outter map. outter map name: "
             // << outter_map_name << " errno: " << ret << " inner_map_id:" << inner_map_id;
             struct bpf_map_create_opts* popt = nullptr;
-            struct bpf_map_create_opts opt;
+            struct bpf_map_create_opts opt {};
             if (BPFMapTraits<MapInMapType>::map_flag != -1) {
                 ::memset(&opt, 0, sizeof(struct bpf_map_create_opts));
                 // opt.map_extra = ;
@@ -305,33 +305,33 @@ public:
                 return 1;
             }
 
-            int* key = static_cast<int*>(outter_key);
-            map_in_map_fds_[map_fd][*key] = fd;
+            int* key = static_cast<int*>(outterKey);
+            mApInMapFds[mapFd][*key] = fd;
 
-            ret = bpf_map_update_elem(map_fd, outter_key, &fd, BPF_ANY);
+            ret = bpf_map_update_elem(mapFd, outterKey, &fd, BPF_ANY);
             //       LOG(INFO) << "successfully create bpf map, fd:" << fd << " outter key:" << *(key) << " update res:"
             //       << ret;
             close(fd);
         }
 
-        ret = bpf_map_lookup_elem(map_fd, outter_key, &inner_map_id);
+        ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
         if (ret) {
             //       LOG(WARNING) << "failed to lookup inner map fd. outter map name: "
             // << outter_map_name << " errno: " << ret << " inner_map_fd:" << inner_map_fd;
             return 1;
         }
 
-        inner_map_fd = bpf_map_get_fd_by_id(inner_map_id);
-        if (inner_map_fd < 0) {
+        innerMapFd = bpf_map_get_fd_by_id(innerMapId);
+        if (innerMapFd < 0) {
             //       LOG(WARNING) << "inner map fd less than 0, outter map name: " << outter_map_name;
             return 1;
         }
 
-        ret = bpf_map_update_elem(inner_map_fd, inner_key, inner_value, flag);
+        ret = bpf_map_update_elem(innerMapFd, innerKey, innerValue, flag);
         //     LOG(INFO) << "insert to inner map, inner map fd:" << inner_map_fd << " inner map id:" << inner_map_id <<
         //     " ret:" << ret;
 
-        close(inner_map_fd);
+        close(innerMapFd);
 
         return ret;
     }
@@ -339,81 +339,78 @@ public:
     /**
      * update elements from bpf map
      */
-    int UpdateBPFHashMap(const std::string& map_name, void* key, void* value, uint64_t flag) {
-        int map_fd = SearchMapFd(map_name);
+    int UpdateBPFHashMap(const std::string& mapName, void* key, void* value, uint64_t flag) {
+        int mapFd = SearchMapFd(mapName);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][UpdateBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name.c_str(),
-                 map_fd);
-        if (map_fd < 0) {
+                 mapName.c_str(),
+                 mapFd);
+        if (mapFd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][UpdateBPFHashMap] find hash map failed for: %s \n",
-                     map_name.c_str());
+                     mapName.c_str());
             return 1;
         }
-        return bpf_map_update_elem(map_fd, key, value, flag);
+        return bpf_map_update_elem(mapFd, key, value, flag);
     }
 
     /**
      * lookup element from bpf map
      */
-    int LookupBPFHashMap(const std::string& map_name, void* key, void* value) {
-        int map_fd = SearchMapFd(map_name);
+    int LookupBPFHashMap(const std::string& mapName, void* key, void* value) {
+        int mapFd = SearchMapFd(mapName);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][LookupBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name.c_str(),
-                 map_fd);
-        if (map_fd < 0) {
+                 mapName.c_str(),
+                 mapFd);
+        if (mapFd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][LookupBPFHashMap] find hash map failed for: %s \n",
-                     map_name.c_str());
+                     mapName.c_str());
             return 1;
         }
-        return bpf_map_lookup_elem(map_fd, key, value);
+        return bpf_map_lookup_elem(mapFd, key, value);
     }
 
     /**
      * remove element from bpf map
      */
-    int RemoveBPFHashMap(const std::string& map_name, void* key) {
-        int map_fd = SearchMapFd(map_name);
+    int RemoveBPFHashMap(const std::string& mapName, void* key) {
+        int mapFd = SearchMapFd(mapName);
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                  "[BPFWrapper][RemoveBPFHashMap] find map name: %s map fd: %d \n",
-                 map_name.c_str(),
-                 map_fd);
-        if (map_fd < 0) {
+                 mapName.c_str(),
+                 mapFd);
+        if (mapFd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][RemoveBPFHashMap] find hash map failed for: %s \n",
-                     map_name.c_str());
+                     mapName.c_str());
             return 1;
         }
-        bpf_map_delete_elem(map_fd, key);
+        bpf_map_delete_elem(mapFd, key);
         return 0;
     }
 
-    void DeletePerfBuffer(void* pb) {
-        struct perf_buffer* pb_ptr = static_cast<struct perf_buffer*>(pb);
-        perf_buffer__free((struct perf_buffer*)pb);
-    }
+    void DeletePerfBuffer(void* pb) { perf_buffer__free((struct perf_buffer*)pb); }
 
-    int PollPerfBuffer(void* pb, int max_events, int timeout_ms) {
-        return perf_buffer__poll((struct perf_buffer*)pb, timeout_ms);
+    int PollPerfBuffer(void* pb, int /*maxEvents*/, int timeoutMs) {
+        return perf_buffer__poll((struct perf_buffer*)pb, timeoutMs);
     }
 
     void* CreatePerfBuffer(
-        const std::string& name, int page_cnt, void* ctx, perf_buffer_sample_fn data_cb, perf_buffer_lost_fn loss_cb) {
+        const std::string& name, int pageCnt, void* ctx, perf_buffer_sample_fn dataCb, perf_buffer_lost_fn lossCb) {
         int mapFd = SearchMapFd(name);
         if (mapFd < 0) {
             return nullptr;
         }
 
-        struct perf_buffer_opts pb_opts = {};
-        pb_opts.sample_cb = data_cb;
-        pb_opts.ctx = ctx;
-        pb_opts.lost_cb = loss_cb;
+        struct perf_buffer_opts pbOpts = {};
+        pbOpts.sample_cb = dataCb;
+        pbOpts.ctx = ctx;
+        pbOpts.lost_cb = lossCb;
 
         struct perf_buffer* pb = NULL;
-        pb = perf_buffer__new(mapFd, page_cnt == 0 ? 128 : page_cnt, &pb_opts);
+        pb = perf_buffer__new(mapFd, pageCnt == 0 ? 128 : pageCnt, &pbOpts);
         auto err = libbpf_get_error(pb);
         if (err) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
@@ -438,12 +435,12 @@ public:
      * Destroy skel and release resources.
      */
     void Destroy() {
-        if (!inited_) {
+        if (!mInited) {
             return;
         }
         //     LOG(INFO) << "begin to destroy bpf wrapper";
         // clear all links first
-        for (auto& it : links_) {
+        for (auto& it : mLinks) {
             auto* link = it.second;
             auto err = bpf_link__destroy(link);
             if (err) {
@@ -453,23 +450,23 @@ public:
             }
         }
 
-        links_.clear();
-        bpf_maps_.clear();
-        bpf_progs_.clear();
+        mLinks.clear();
+        mBpfMaps.clear();
+        mBpfProgs.clear();
 
         // destroy skel
-        T::destroy(skel_);
+        T::destroy(mSkel);
 
         // stop perf threads ...
-        flag_ = false;
+        mFlag = false;
         DetachAllPerfBuffers();
-        inited_ = false;
+        mInited = false;
     }
     // pin map
 
     int SearchProgFd(const std::string& name) {
-        auto it = bpf_progs_.find(name);
-        if (it == bpf_progs_.end()) {
+        auto it = mBpfProgs.find(name);
+        if (it == mBpfProgs.end()) {
             //       LOG(WARNING) << "failed to find prog by name: " << name;
             return -1;
         }
@@ -480,8 +477,8 @@ public:
     // int SearchInnerMapFd(int outter_fd, int outter_key) { return 0; }
 
     int SearchMapFd(const std::string& name) {
-        auto it = bpf_maps_.find(name);
-        if (it == bpf_maps_.end()) {
+        auto it = mBpfMaps.find(name);
+        if (it == mBpfMaps.end()) {
             //       LOG(WARNING) << "failed to find bpf map by name: " << name;
             return -1;
         }
@@ -491,9 +488,8 @@ public:
 
     int GetBPFMapFdById(int id) { return bpf_map_get_fd_by_id(id); }
 
-    bool
-    CreateBPFMap(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, unsigned int map_flags) {
-        bpf_create_map(map_type, key_size, value_size, max_entries, map_flags);
+    bool CreateBPFMap(enum bpf_map_type mapType, int keySize, int valueSize, int maxEntries, unsigned int mapFlags) {
+        bpf_create_map(mapType, keySize, valueSize, maxEntries, mapFlags);
         return true;
     }
 
@@ -506,18 +502,18 @@ public:
 
 private:
     // {map_name, map_fd}
-    std::map<std::string, bpf_map*> bpf_maps_;
+    std::map<std::string, bpf_map*> mBpfMaps;
     // {map_name, prog_fd}
-    std::map<std::string, bpf_program*> bpf_progs_;
+    std::map<std::string, bpf_program*> mBpfProgs;
 
-    std::map<std::string, bpf_link*> links_;
+    std::map<std::string, bpf_link*> mLinks;
 
-    std::unordered_map<int, std::unordered_map<int, int>> map_in_map_fds_;
+    std::unordered_map<int, std::unordered_map<int, int>> mApInMapFds;
 
-    T* skel_ = nullptr;
-    volatile bool inited_ = false;
+    T* mSkel = nullptr;
+    volatile bool mInited = false;
     // std::vector<std::thread> perf_threads_;
-    std::atomic_bool flag_ = false;
+    std::atomic_bool mFlag = false;
     // links, used for strore bpf programs
     friend class NetworkSecurityManager;
 };

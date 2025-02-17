@@ -14,9 +14,10 @@
 
 #include "ProcessSecurityManager.h"
 
+#include <coolbpf/security/type.h>
+
 #include <memory>
 #include <mutex>
-#include <thread>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -24,10 +25,8 @@
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
-#include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/PeriodicalEvent.h"
 
 namespace logtail {

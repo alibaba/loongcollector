@@ -35,12 +35,12 @@ namespace logtail {
 namespace ebpf {
 
 int CreateNetworkFilterForCallname(
-    std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> wrapper,
-    const std::string& call_name,
-    const std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> config);
+    std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>>& wrapper,
+    const std::string& callName,
+    const std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter>& newConfig);
 
-int DeleteNetworkFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> wrapper,
-                                   const std::string& call_name);
+int DeleteNetworkFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>>& wrapper,
+                                   const std::string& callName);
 
 } // namespace ebpf
 } // namespace logtail

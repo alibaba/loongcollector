@@ -4,17 +4,12 @@
 
 #pragma once
 
-#include <functional>
-#include <future>
-#include <iostream>
-#include <map>
-#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
 
 extern "C" {
-#include "ebpf/driver/coolbpf/src/net.h"
+#include <coolbpf/net.h>
 }
 
 namespace logtail {

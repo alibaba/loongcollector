@@ -14,8 +14,9 @@
 
 #pragma once
 
+#include <coolbpf/security/type.h>
+
 #include "Log.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
 
 namespace logtail {
 namespace ebpf {

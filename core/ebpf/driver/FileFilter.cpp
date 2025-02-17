@@ -80,7 +80,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         kernel_filters.filters[0] = k_filter;
 
         // LOG(INFO) << "filter not empty!";
-        for (int i = 0; i < filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
+        for (int i = 0; i < (int)filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
             const auto& x = filter->mFilePathList[i];
 
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,

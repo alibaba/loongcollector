@@ -222,6 +222,7 @@ endif ()
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
 # Build eBPF dependencies
+set(EBPF_DIRVER_TARGET "EbpfDriver")
 add_subdirectory(ebpf/driver)
 
 # Link libraries.

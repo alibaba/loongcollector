@@ -4,7 +4,7 @@ project(ebpf_unittest)
 include(GoogleTest)
 
 set(EBPF_DRIVER_DIR "${CMAKE_BINARY_DIR}/ebpf/driver")
-set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/ebpf/driver/coolbpf/src")
+set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/third_party/coolbpf/src")
 
 function(add_unittest target_name source_file)
     add_executable(${target_name} ${source_file})

@@ -14,16 +14,14 @@
 
 #pragma once
 
+#include <coolbpf/security/type.h>
+
 #include <memory>
-#include <mutex>
-#include <thread>
 
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
-#include "ebpf/driver/coolbpf/src/security/type.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/BaseManager.h"
-#include "ebpf/type/NetworkObserverEvent.h"
 
 namespace logtail {
 namespace ebpf {

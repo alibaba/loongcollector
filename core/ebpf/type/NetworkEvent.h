@@ -1,14 +1,12 @@
 #pragma once
 
+#include <coolbpf/security/bpf_process_event_type.h>
 #include <cstdint>
-#include <stddef.h>
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "CommonDataEvent.h"
-#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
 
 namespace logtail {
 namespace ebpf {

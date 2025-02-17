@@ -14,17 +14,14 @@
 
 #include "ebpf/SourceManager.h"
 
-#include <filesystem>
 #include <memory>
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/driver/NetworkObserver.h"
-#include "ebpf/include/SysAkApi.h"
 #include "logger/Logger.h"
 
 namespace logtail {

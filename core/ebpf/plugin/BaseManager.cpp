@@ -14,29 +14,24 @@
 
 #include "BaseManager.h"
 
+#include <coolbpf/security/bpf_common.h>
+#include <coolbpf/security/bpf_process_event_type.h>
+#include <coolbpf/security/data_msg.h>
+#include <coolbpf/security/msg_type.h>
+
 #include <algorithm>
-#include <array>
 #include <atomic>
-#include <queue>
 #include <regex>
-#include <set>
 #include <unordered_map>
 
-#include "json/value.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
 #include "common/CapabilityUtil.h"
 #include "common/EncodingUtil.h"
-#include "common/JsonUtil.h"
 #include "common/LRUCache.h"
 #include "common/ProcParser.h"
-#include "common/magic_enum.hpp"
-#include "ebpf/driver/coolbpf/src/security/bpf_common.h"
-#include "ebpf/driver/coolbpf/src/security/bpf_process_event_type.h"
-#include "ebpf/driver/coolbpf/src/security/data_msg.h"
-#include "ebpf/driver/coolbpf/src/security/msg_type.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "logger/Logger.h"
