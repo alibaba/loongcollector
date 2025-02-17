@@ -26,7 +26,7 @@ public:
     // val是数量
     int val = 0;
 
-    explicit HT(int val) : val(val) {};
+    explicit HT(int val) : val(val) {}
 };
 
 namespace logtail {

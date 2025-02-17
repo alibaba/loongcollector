@@ -277,7 +277,7 @@ public:
 // is L7, while ConnStatsRecord is L5.
 class AbstractAppRecord : public AbstractNetRecord {
 public:
-    AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {};
+    AbstractAppRecord(ConnId&& conn_id) : AbstractNetRecord(std::move(conn_id)) {}
 
     void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
     void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
