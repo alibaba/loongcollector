@@ -121,9 +121,10 @@ void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
     AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
                                            msgBase + ", current count: " + ToString(diffCount) + " total count:"
                                                + ToString(mStatCount) + " path: " + config.first->GetBasePath(),
+                                           config.second->GetRegion(),
                                            config.second->GetProjectName(),
-                                           config.second->GetLogstoreName(),
-                                           config.second->GetRegion());
+                                           config.second->GetConfigName(),
+                                           config.second->GetLogstoreName());
 }
 
 void PollingDirFile::Polling() {
@@ -396,7 +397,9 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetConfigName(),
                                                    pConfig.second->GetLogstoreName());
             LOG_ERROR(sLogger, ("Open dir error", dirPath.c_str())("error", ErrnoToString(err)));
         }
@@ -419,8 +422,12 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             AlarmManager::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
-                    + " total count:" + ToString(mStatCount) + " path: " + dirPath + " project:"
-                    + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName());
+                    + " total count:" + ToString(mStatCount) + " path: " + dirPath
+                    + " project:" + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName(),
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -433,7 +440,10 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
                 string("this dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
                     + " total count:" + ToString(mStatCount) + " path: " + dirPath
                     + " project:" + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName(),
-                pConfig.second->GetRegion());
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -561,7 +571,9 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetConfigName(),
                                                    pConfig.second->GetLogstoreName());
             LOG_WARNING(sLogger, ("Open dir fail", dirPath.c_str())("errno", err));
         }
@@ -581,9 +593,10 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
                                                    string("too many sub directoried for path:" + dirPath
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + pConfig.first->GetBasePath()),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
-                                                   pConfig.second->GetLogstoreName(),
-                                                   pConfig.second->GetRegion());
+                                                   pConfig.second->GetConfigName(),
+                                                   pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -598,7 +611,11 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, total count:" + ToString(mStatCount)
                        + " path: " + dirPath + " project:" + pConfig.second->GetProjectName()
-                       + " logstore:" + pConfig.second->GetLogstoreName()));
+                       + " logstore:" + pConfig.second->GetLogstoreName()),
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 

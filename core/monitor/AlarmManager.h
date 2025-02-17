@@ -104,15 +104,22 @@ struct AlarmMessage {
     std::string mMessageType;
     std::string mProjectName;
     std::string mCategory;
+    std::string mConfig;
     std::string mMessage;
     int32_t mCount;
 
     AlarmMessage(const std::string& type,
                  const std::string& projectName,
                  const std::string& category,
+                 const std::string& config,
                  const std::string& message,
                  const int32_t count)
-        : mMessageType(type), mProjectName(projectName), mCategory(category), mMessage(message), mCount(count) {}
+        : mMessageType(type),
+          mProjectName(projectName),
+          mCategory(category),
+          mConfig(config),
+          mMessage(message),
+          mCount(count) {}
     void IncCount(int32_t inc = 1) { mCount += inc; }
 };
 
@@ -125,9 +132,10 @@ public:
 
     void SendAlarm(const AlarmType alarmType,
                    const std::string& message,
+                   const std::string& region = "",
                    const std::string& projectName = "",
-                   const std::string& category = "",
-                   const std::string& region = "");
+                   const std::string& config = "",
+                   const std::string& category = "");
     // only be called when prepare to exit
     void ForceToSend();
     bool IsLowLevelAlarmValid();

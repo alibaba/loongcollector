@@ -157,9 +157,10 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
             AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse json fail:") + buffer.to_string(),
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;
@@ -170,9 +171,10 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
             AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("invalid json object:") + buffer.to_string(),
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;

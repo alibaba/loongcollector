@@ -78,9 +78,10 @@ bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineConte
             ctx.GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
                                      errorMsg
                                          + ": ignore param TopicType and TopicFormat, config: " + ctx.GetConfigName(),
+                                     ctx.GetRegion(),
                                      ctx.GetProjectName(),
-                                     ctx.GetLogstoreName(),
-                                     ctx.GetRegion());
+                                     ctx.GetConfigName(),
+                                     ctx.GetLogstoreName());
         } else if (mTopicType == TopicType::FILEPATH && !NormalizeTopicRegFormat(mTopicFormat)) {
             mTopicType = TopicType::NONE;
             mTopicFormat.clear();
@@ -92,9 +93,10 @@ bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineConte
                 CATEGORY_CONFIG_ALARM,
                 "string param TopicFormat is not valid: ignore param TopicType and TopicFormat, config: "
                     + ctx.GetConfigName(),
+                ctx.GetRegion(),
                 ctx.GetProjectName(),
-                ctx.GetLogstoreName(),
-                ctx.GetRegion());
+                ctx.GetConfigName(),
+                ctx.GetLogstoreName());
         }
     }
 
