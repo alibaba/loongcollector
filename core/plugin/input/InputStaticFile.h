@@ -20,7 +20,9 @@
 
 #include <filesystem>
 #include <vector>
+#include <set>
 
+#include "common/DevInode.h"
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
@@ -55,6 +57,7 @@ private:
     void GetFiles(const std::filesystem::path& dir,
                   uint32_t depth,
                   const std::string* containerBaseDir,
+                  std::set<DevInode>& visitedDir,
                   std::vector<std::filesystem::path>& files) const;
     bool CreateInnerProcessors();
 

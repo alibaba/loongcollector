@@ -35,6 +35,7 @@ public:
     void TestCreateInnerProcessors();
     void OnPipelineUpdate();
     void TestGetFiles();
+    void OnEnableContainerDiscovery();
 
 protected:
     static void SetUpTestCase() {
@@ -79,7 +80,7 @@ void InputStaticFileUnittest::OnSuccessfulInit() {
     // only mandatory param
     configStr = R"(
         {
-            "Type": "input_file",
+            "Type": "input_static_file_onetime",
             "FilePaths": []
         }
     )";
@@ -98,7 +99,7 @@ void InputStaticFileUnittest::OnSuccessfulInit() {
     AppConfig::GetInstance()->mPurageContainerMode = true;
     configStr = R"(
         {
-            "Type": "input_file",
+            "Type": "input_static_file_onetime",
             "FilePaths": [],
             "EnableContainerDiscovery": true,
             "Multiline": {}
@@ -118,7 +119,7 @@ void InputStaticFileUnittest::OnSuccessfulInit() {
     // invalid optional param
     configStr = R"(
         {
-            "Type": "input_file",
+            "Type": "input_static_file_onetime",
             "FilePaths": [],
             "EnableContainerDiscovery": "true",
             "Multiline": []
@@ -149,7 +150,7 @@ void InputStaticFileUnittest::OnFailedInit() {
     // file encoding not valid
     configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "FileEncoding": "unknown"
             }
@@ -164,7 +165,7 @@ void InputStaticFileUnittest::OnFailedInit() {
     // not in container but EnableContainerDiscovery is set
     configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "EnableContainerDiscovery": true
             }
@@ -186,7 +187,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         // no multiline
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "AppendingLogPositionMeta": true
             }
@@ -208,7 +209,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         // custom multiline
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "Multiline": {
                     "StartPattern": "\\d+",
@@ -243,7 +244,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         ctx.SetIsFirstProcessorJsonFlag(true);
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "AppendingLogPositionMeta": true
             }
@@ -267,7 +268,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         ctx.SetIsFirstProcessorJsonFlag(true);
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": [],
                 "Multiline": {
                     "Mode": "JSON"
@@ -294,7 +295,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         ctx.SetHasNativeProcessorsFlag(true);
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -315,7 +316,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         ctx.SetExactlyOnceFlag(true);
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -336,7 +337,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         ctx.SetIsFlushingThroughGoPipelineFlag(true);
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -356,7 +357,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
         // enable raw content
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -386,7 +387,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         // new config
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -449,7 +450,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
 
         configStr = R"(
             {
-                "Type": "input_file",
+                "Type": "input_static_file_onetime",
                 "FilePaths": []
             }
         )";
@@ -484,6 +485,159 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
 }
 
 void InputStaticFileUnittest::TestGetFiles() {
+    unique_ptr<InputStaticFile> input;
+    Json::Value optionalGoPipeline;
+
+    // wildcard dir
+    {
+        // invalid base dir
+        filesystem::create_directories("invalid_dir");
+
+        filesystem::path filePath = filesystem::absolute("test_logs/*/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_TRUE(input.GetFiles().empty());
+
+        filesystem::remove_all("invalid_dir");
+    }
+    {
+        // non-existing const subdir
+        filesystem::create_directories("test_logs/dir");
+
+        filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_TRUE(input.GetFiles().empty());
+
+        filesystem::remove_all("test_logs");
+    }
+    {
+        // invalid const subdir
+        filesystem::create_directories("test_logs/dir");
+        { ofstream fout("test_logs/dir/invalid_dir"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_TRUE(input.GetFiles().empty());
+
+        filesystem::remove_all("test_logs");
+    }
+    {
+        // the last subdir before ** is const
+        filesystem::create_directories("test_logs/dir1/valid_dir");
+        filesystem::create_directories("test_logs/dir2/valid_dir");
+        filesystem::create_directories("test_logs/unmatched_dir");
+        { ofstream fout("test_logs/invalid_dir"); }
+        { ofstream fout("test_logs/dir1/valid_dir/test1.log"); }
+        { ofstream fout("test_logs/dir2/valid_dir/test2.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/dir*/valid_dir/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
+
+        filesystem::remove_all("test_logs");
+    }
+    {
+        // the last subdir before ** is wildcard
+        filesystem::create_directories("test_logs/dir1");
+        filesystem::create_directories("test_logs/dir2");
+        filesystem::create_directories("test_logs/unmatched_dir");
+        { ofstream fout("test_logs/invalid_dir"); }
+        { ofstream fout("test_logs/dir1/test1.log"); }
+        { ofstream fout("test_logs/dir2/test2.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/dir*/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
+
+        filesystem::remove_all("test_logs");
+    }
+    // recursive dir search
+    {
+        // non-existing base path
+        filesystem::create_directories("invalid_dir");
+
+        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_TRUE(input.GetFiles().empty());
+
+        filesystem::remove_all("invalid_dir");
+    }
+    {
+        // normal
+        filesystem::create_directories("test_logs/dir1/dir2");
+        filesystem::create_directories("test_logs/exclude_dir");
+        { ofstream fout("test_logs/test0.log"); }
+        { ofstream fout("test_logs/exclude_file.log"); }
+        { ofstream fout("test_logs/dir1/test1.log"); }
+        { ofstream fout("test_logs/dir1/unmatched_file"); }
+        { ofstream fout("test_logs/dir1/exclude_filepath.log"); }
+        { ofstream fout("test_logs/dir1/dir2/test2.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        filesystem::path excludeFilePath = filesystem::absolute("test_logs/dir*/exlcude_filepath.log");
+        filesystem::path excludeDir = filesystem::absolute("test_logs/exclude*");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        configJson["MaxDirSearchDepth"] = Json::Value(1);
+        configJson["ExcludeFilePaths"].append(Json::Value(excludeFilePath.string()));
+        configJson["ExcludeFiles"].append(Json::Value("exclude*.log"));
+        configJson["ExcludeDirs"].append(Json::Value(excludeDir.string()));
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
+
+        filesystem::remove_all("test_logs");
+    }
+    {
+        // loop caused by symlink
+        filesystem::create_directories("test_logs/dir1/dir2");
+        filesystem::create_directory_symlink(filesystem::absolute("test_logs/dir1"), "test_logs/dir1/dir2/dir3");
+        { ofstream fout("test_logs/dir1/test.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        Json::Value configJson;
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        configJson["MaxDirSearchDepth"] = Json::Value(100);
+        InputStaticFile input;
+        input.SetContext(ctx);
+        input.SetMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+        APSARA_TEST_EQUAL(1U, input.GetFiles().size());
+    }
+}
+
+void InputStaticFileUnittest::OnEnableContainerDiscovery() {
 }
 
 UNIT_TEST_CASE(InputStaticFileUnittest, OnSuccessfulInit)
@@ -491,6 +645,7 @@ UNIT_TEST_CASE(InputStaticFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnPipelineUpdate)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestGetFiles)
+UNIT_TEST_CASE(InputStaticFileUnittest, OnEnableContainerDiscovery)
 
 } // namespace logtail
 

@@ -140,14 +140,13 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
 }
 
 vector<filesystem::path> InputStaticFile::GetFiles() const {
-    // TODO: avoid loop
     vector<filesystem::path> res;
     vector<filesystem::path> baseDirs;
     if (!mEnableContainerDiscovery) {
         if (mFileDiscovery.GetWildcardPaths().empty()) {
             baseDirs.emplace_back(mFileDiscovery.GetBasePath());
         } else {
-            GetValidBaseDirs(mFileDiscovery.GetBasePath(), 0, baseDirs);
+            GetValidBaseDirs(mFileDiscovery.GetWildcardPaths()[0], 0, baseDirs);
             if (baseDirs.empty()) {
                 LOG_WARNING(sLogger,
                             ("no files found", "base dir path invalid")("base dir", mFileDiscovery.GetBasePath())(
@@ -155,13 +154,16 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
                 return res;
             }
         }
+        set<DevInode> visitedDirs;
         for (const auto& dir : baseDirs) {
             if (IsValidDir(dir)) {
-                GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, nullptr, res);
+                GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, nullptr, visitedDirs, res);
             }
         }
         LOG_INFO(sLogger, ("total files cnt", res.size())("files", ToString(res))("config", mContext->GetConfigName()));
     } else {
+        // TODO: support symlink in container
+        set<DevInode> visitedDirs;
         for (const auto& item : *mFileDiscovery.GetContainerInfo()) {
             baseDirs.clear();
             if (mFileDiscovery.GetWildcardPaths().empty()) {
@@ -178,7 +180,7 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
             auto prevCnt = res.size();
             for (const auto& dir : baseDirs) {
                 if (IsValidDir(dir)) {
-                    GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &item.mRealBaseDir, res);
+                    GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &item.mRealBaseDir, visitedDirs, res);
                 }
             }
             if (res.size() > prevCnt) {
@@ -203,6 +205,10 @@ void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
     bool finish = false;
     if (depth + 2 == mFileDiscovery.GetWildcardPaths().size()) {
         finish = true;
+    }
+
+    if (depth == 0 && !IsValidDir(mFileDiscovery.GetWildcardPaths()[depth])) {
+        return;
     }
 
     const auto& subdir = mFileDiscovery.GetConstWildcardPaths()[depth];
@@ -239,6 +245,7 @@ void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
 void InputStaticFile::GetFiles(const filesystem::path& dir,
                                uint32_t depth,
                                const string* containerBaseDir,
+                               set<DevInode>& visitedDir,
                                vector<filesystem::path>& files) const {
     error_code ec;
     for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
@@ -255,9 +262,15 @@ void InputStaticFile::GetFiles(const filesystem::path& dir,
                 files.emplace_back(path);
             }
         } else if (filesystem::is_directory(status)) {
+            auto devInode = GetFileDevInode(path.string());
+            if (!devInode.IsValid() || visitedDir.find(devInode) != visitedDir.end()) {
+                // avoid loop
+                continue;
+            }
+            visitedDir.emplace(devInode);
             if (depth > 0 && !AppConfig::GetInstance()->IsHostPathMatchBlacklist(path.string())
                 && !mFileDiscovery.IsDirectoryInBlacklist(pathStr)) {
-                GetFiles(path, depth - 1, containerBaseDir, files);
+                GetFiles(path, depth - 1, containerBaseDir, visitedDir, files);
             }
         }
     }
