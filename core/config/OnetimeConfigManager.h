@@ -74,6 +74,10 @@ private:
 
     std::filesystem::path mCheckpointFilePath;
     std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class OnetimeConfigManagerUnittest;
+#endif
 };
 
 } // namespace logtail
