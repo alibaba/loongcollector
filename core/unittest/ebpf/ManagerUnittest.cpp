@@ -452,9 +452,172 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
         APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
     }
 
+    // add cache
+    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    execveEvent->process.pid = 1234;
+    execveEvent->process.ktime = 5678;
+    execveEvent->process.uid = 1000;
+    execveEvent->process.binary = "test_binary";
+    execveEvent->process.cmdline = "test_cmdline";
+    execveEvent->process.filename = "test_filename";
+    execveEvent->process.args = "test_arg";
+    execveEvent->process.cmdline = "test_cmdline";
+    auto msg = std::make_unique<MsgExecveEvent>();
+    msg->cleanup_process.ktime = 0;
+    msg->parent.pid = 2345;
+    msg->parent.ktime = 6789;
+    execveEvent->msg = std::move(msg);
+
+    // 测试缓存更新
+    mBaseManager->UpdateCache(key, execveEvent);
+
+    auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    pExecveEvent->process.pid = 2345;
+    pExecveEvent->process.ktime = 6789;
+    pExecveEvent->process.uid = 1000;
+    pExecveEvent->process.binary = "test_binary";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->process.filename = "test_filename";
+    pExecveEvent->process.args = "test_arg";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
+
+    mBaseManager->UpdateCache(pkey, pExecveEvent);
+
     // 触发聚合
-    // auto execTime = std::chrono::steady_clock::now();
-    // APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+    auto execTime = std::chrono::steady_clock::now();
+    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+
+    manager->Destroy();
+}
+
+void ManagerUnittest::TestProcessSecurityManagerAggregation() {
+    auto manager = std::make_shared<ProcessSecurityManager>(mBaseManager, mSourceManager, mEventQueue, mTimer);
+    SecurityOptions options;
+    manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    // 创建多个相关的进程事件
+    std::vector<std::shared_ptr<ProcessEvent>> events;
+
+    // 同一连接的多个事件
+    for (int i = 0; i < 3; ++i) {
+        events.push_back(
+            std::make_shared<ProcessEvent>(1234, // pid
+                                           5678, // ktime
+                                           KernelEventType::PROCESS_CLONE_EVENT, // type
+                                           std::chrono::system_clock::now().time_since_epoch().count() + i // timestamp
+                                           ));
+    }
+
+    // 处理所有事件
+    for (const auto& event : events) {
+        APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
+    }
+
+    // add cache
+    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    execveEvent->process.pid = 1234;
+    execveEvent->process.ktime = 5678;
+    execveEvent->process.uid = 1000;
+    execveEvent->process.binary = "test_binary";
+    execveEvent->process.cmdline = "test_cmdline";
+    execveEvent->process.filename = "test_filename";
+    execveEvent->process.args = "test_arg";
+    execveEvent->process.cmdline = "test_cmdline";
+    auto msg = std::make_unique<MsgExecveEvent>();
+    msg->cleanup_process.ktime = 0;
+    msg->parent.pid = 2345;
+    msg->parent.ktime = 6789;
+    execveEvent->msg = std::move(msg);
+
+    // 测试缓存更新
+    mBaseManager->UpdateCache(key, execveEvent);
+
+    auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    pExecveEvent->process.pid = 2345;
+    pExecveEvent->process.ktime = 6789;
+    pExecveEvent->process.uid = 1000;
+    pExecveEvent->process.binary = "test_binary";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->process.filename = "test_filename";
+    pExecveEvent->process.args = "test_arg";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
+
+    mBaseManager->UpdateCache(pkey, pExecveEvent);
+
+    // 触发聚合
+    auto execTime = std::chrono::steady_clock::now();
+    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+
+    manager->Destroy();
+}
+
+void ManagerUnittest::TestFileSecurityManagerAggregation() {
+    auto manager = std::make_shared<FileSecurityManager>(mBaseManager, mSourceManager, mEventQueue, mTimer);
+    SecurityOptions options;
+    manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    // 创建多个相关的文件事件
+    std::vector<std::shared_ptr<FileEvent>> events;
+
+    // 同一连接的多个事件
+    for (int i = 0; i < 3; ++i) {
+        events.push_back(
+            std::make_shared<FileEvent>(1234, // pid
+                                        5678, // ktime
+                                        KernelEventType::FILE_PATH_TRUNCATE, // type
+                                        std::chrono::system_clock::now().time_since_epoch().count() + i, // timestamp
+                                        "/test/" + std::to_string(i) // path
+                                        ));
+    }
+
+    // 处理所有事件
+    for (const auto& event : events) {
+        APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
+    }
+
+    // add cache
+    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    execveEvent->process.pid = 1234;
+    execveEvent->process.ktime = 5678;
+    execveEvent->process.uid = 1000;
+    execveEvent->process.binary = "test_binary";
+    execveEvent->process.cmdline = "test_cmdline";
+    execveEvent->process.filename = "test_filename";
+    execveEvent->process.args = "test_arg";
+    execveEvent->process.cmdline = "test_cmdline";
+    auto msg = std::make_unique<MsgExecveEvent>();
+    msg->cleanup_process.ktime = 0;
+    msg->parent.pid = 2345;
+    msg->parent.ktime = 6789;
+    execveEvent->msg = std::move(msg);
+
+    // 测试缓存更新
+    mBaseManager->UpdateCache(key, execveEvent);
+
+    auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
+    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    pExecveEvent->process.pid = 2345;
+    pExecveEvent->process.ktime = 6789;
+    pExecveEvent->process.uid = 1000;
+    pExecveEvent->process.binary = "test_binary";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->process.filename = "test_filename";
+    pExecveEvent->process.args = "test_arg";
+    pExecveEvent->process.cmdline = "test_cmdline";
+    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
+
+    mBaseManager->UpdateCache(pkey, pExecveEvent);
+
+    // 触发聚合
+    auto execTime = std::chrono::steady_clock::now();
+    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
 
     manager->Destroy();
 }
@@ -473,6 +636,9 @@ UNIT_TEST_CASE(ManagerUnittest, TestBaseManagerProcessTags);
 // UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerBasic);
 UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerEventHandling);
 UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerAggregation);
+UNIT_TEST_CASE(ManagerUnittest, TestProcessSecurityManagerAggregation);
+UNIT_TEST_CASE(ManagerUnittest, TestFileSecurityManagerAggregation);
+
 
 } // namespace ebpf
 } // namespace logtail

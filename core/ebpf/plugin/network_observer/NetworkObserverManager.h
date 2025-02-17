@@ -96,6 +96,10 @@ private:
     void ConsumeRecordsAsMetric(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
     void ConsumeRecordsAsTrace(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
 
+    bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+
     void RunInThread();
 
     bool UpdateParsers(const std::vector<std::string>& protocols);

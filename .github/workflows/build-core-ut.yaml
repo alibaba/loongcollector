@@ -86,7 +86,7 @@ jobs:
         run: docker run --privileged -v /sys:/sys -v /:/logtail_host -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd) && make unittest_core"
 
       - name: Unit Test Coverage
-        run: docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --merge-mode-functions=separate --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*\.pb\.cc\" -e \".*\.pb\.h\" -e \".*unittest.*\" -e \".*sdk.*\" -e \".*logger.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*runner.*\"" -e \".*coolbpf.*\"
+        run: docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --merge-mode-functions=separate --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*\.pb\.cc\" -e \".*\.pb\.h\" -e \".*unittest.*\" -e \".*sdk.*\" -e \".*logger.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*runner.*\" -e \".*coolbpf.*\"
 
       - name: Setup Python3.10
         uses: actions/setup-python@v5

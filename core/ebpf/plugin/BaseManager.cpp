@@ -39,7 +39,6 @@
 #include "ebpf/driver/coolbpf/src/security/msg_type.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
-#include "ebpf/util/ExecIdUtil.h"
 #include "logger/Logger.h"
 #include "util/FrequencyManager.h"
 
@@ -780,6 +779,9 @@ int BaseManager::PushExecveEvent(const std::shared_ptr<Procs> proc) {
 }
 
 std::string BaseManager::GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix> event) {
+    if (!event->msg) {
+        return "";
+    }
     if (event->msg->cleanup_process.ktime == 0 || event->process.flags & EVENT_CLONE) {
         return GenerateExecId(event->msg->parent.pid, event->msg->parent.ktime);
     } else {

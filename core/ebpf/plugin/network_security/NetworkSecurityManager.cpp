@@ -158,7 +158,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
-            LOG_DEBUG(sLogger, ("step", "after attach process tags"));
+            LOG_DEBUG(sLogger, ("step: after attach process tags, tag size", processTags.DataSize()));
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));
