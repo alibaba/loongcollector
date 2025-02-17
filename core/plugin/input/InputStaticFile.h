@@ -19,11 +19,11 @@
 #include <cstdint>
 
 #include <filesystem>
-#include <vector>
 #include <set>
+#include <vector>
 
-#include "common/DevInode.h"
 #include "collection_pipeline/plugin/interface/Input.h"
+#include "common/DevInode.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileTagOptions.h"
