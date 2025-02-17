@@ -1028,6 +1028,9 @@ void NetworkObserverManager::Stop() {
         this->mRecordConsume.join();
     }
     LOG_INFO(sLogger, ("destroy stage", "release consumer thread"));
+
+    // destroy worker pool ...
+    mWorkerPool.reset();
 }
 
 int NetworkObserverManager::Destroy() {

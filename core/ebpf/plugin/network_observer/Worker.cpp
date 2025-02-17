@@ -27,6 +27,9 @@ namespace ebpf {
 
 int count_ = 0;
 void NetDataHandler::operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue& resQueue) {
+    if (!evt) {
+        return;
+    }
     LOG_DEBUG(sLogger, ("[NetDataHandler] begin to handle data event ... total count", ++count_));
 
     // get protocol

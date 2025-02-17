@@ -1,8 +1,9 @@
 #pragma once
-#include <unordered_map>
-#include <string>
-#include <vector>
 #include <ctime>
+
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace logtail {
 
@@ -13,7 +14,7 @@ struct k8sContainerInfo {
     std::string serviceName;
     std::string workloadKind;
     std::string workloadName;
-    // ??? 
+    // ???
     std::time_t timestamp;
     std::string appId;
     std::string appName;
@@ -23,4 +24,4 @@ struct k8sContainerInfo {
     std::vector<std::string> containerIds;
 };
 
-}
+} // namespace logtail

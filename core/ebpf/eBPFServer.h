@@ -91,6 +91,8 @@ public:
 
     std::string GetAllProjects();
 
+    bool CheckIfNeedStopBaseManager() const;
+
     void PollPerfBuffers();
     void HandlerEvents();
 
@@ -107,10 +109,8 @@ private:
     eBPFServer() = default;
     ~eBPFServer() = default;
 
-    void UpdateCBContext(PluginType type,
-                         const logtail::CollectionPipelineContext* ctx,
-                         logtail::QueueKey key,
-                         int idx);
+    void
+    UpdateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
 
     std::shared_ptr<SourceManager> mSourceManager;
 

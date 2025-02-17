@@ -378,6 +378,19 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options, mgr);
 }
 
+bool eBPFServer::CheckIfNeedStopBaseManager() const {
+    std::lock_guard<std::mutex> lk(mMtx);
+    auto nsMgr = mPlugins[static_cast<int>(PluginType::NETWORK_SECURITY)];
+    auto psMgr = mPlugins[static_cast<int>(PluginType::PROCESS_SECURITY)];
+    auto fsMgr = mPlugins[static_cast<int>(PluginType::FILE_SECURITY)];
+    if ((nsMgr && nsMgr->IsRunning()) || (psMgr && psMgr->IsRunning()) || (fsMgr && fsMgr->IsRunning())) {
+        return false;
+    } else {
+        LOG_INFO(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
+        return true;
+    }
+}
+
 bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
@@ -386,7 +399,9 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
     if (prev_pipeline == pipeline_name) {
         UpdatePipelineName(type, "", "");
     } else {
-        LOG_WARNING(sLogger, ("the specified config is not running, prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
+        LOG_WARNING(
+            sLogger,
+            ("the specified config is not running, prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
     }
 
@@ -401,12 +416,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
                 || type == PluginType::FILE_SECURITY) {
                 // check if we need stop basemanager
-                auto nsMgr = GetPluginManager(PluginType::NETWORK_SECURITY);
-                auto psMgr = GetPluginManager(PluginType::PROCESS_SECURITY);
-                auto fsMgr = GetPluginManager(PluginType::FILE_SECURITY);
-                if ((!nsMgr || !nsMgr->IsRunning()) && (!psMgr || !psMgr->IsRunning())
-                    && (!fsMgr || !fsMgr->IsRunning())) {
-                    LOG_WARNING(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
+                if (CheckIfNeedStopBaseManager()) {
                     mBaseManager->Stop();
                 }
             }

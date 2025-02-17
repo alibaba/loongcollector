@@ -37,7 +37,7 @@ protected:
 
 class PeriodicalTimerEvent : public TimerEvent {
 public:
-    PeriodicalTimerEvent(int intervalSec) 
+    PeriodicalTimerEvent(int intervalSec)
         : TimerEvent(std::chrono::steady_clock::now() + std::chrono::seconds(intervalSec)), mIntervalSec(intervalSec) {}
     virtual ~PeriodicalTimerEvent() = default;
 

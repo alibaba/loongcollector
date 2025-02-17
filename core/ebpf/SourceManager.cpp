@@ -428,7 +428,6 @@ bool SourceManager::StopPlugin(PluginType plugin_type) {
         mRunning[int(plugin_type)] = false;
     return !res;
 #endif
-
 }
 
 bool SourceManager::BPFMapUpdateElem(

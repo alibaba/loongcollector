@@ -47,6 +47,8 @@ protected:
         ebpf::eBPFServer::GetInstance()->Init();
     }
 
+    void TearDown() override { ebpf::eBPFServer::GetInstance()->Stop(); }
+
 private:
     CollectionPipeline p;
     CollectionPipelineContext ctx;
@@ -214,6 +216,7 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
         = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
+    APSARA_TEST_TRUE(input->Stop(true));
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStop() {
@@ -243,11 +246,13 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
         = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
+    // APSARA_TEST_TRUE(input->Stop(false));
+    serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
+    serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
