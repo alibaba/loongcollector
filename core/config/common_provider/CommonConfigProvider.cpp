@@ -422,20 +422,16 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
             filesystem::remove(filePath, ec);
             ConfigFeedbackReceiver::GetInstance().UnregisterContinuousPipelineConfig(config.name());
         } else {
-            if (!DumpConfigFile(config, sourceDir)) {
-                ConfigInfo info;
-                info.name = config.name();
-                info.version = config.version();
-                info.status = ConfigFeedbackStatus::FAILED;
-                info.detail = config.detail();
-                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
-                continue;
-            }
             ConfigInfo info;
             info.name = config.name();
             info.version = config.version();
-            info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = config.detail();
+            if (!DumpConfigFile(config, sourceDir)) {
+                info.status = ConfigFeedbackStatus::FAILED;
+                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
+                continue;
+            }
+            info.status = ConfigFeedbackStatus::APPLYING;
             mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
@@ -470,20 +466,16 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
                 filesystem::remove(filePath, ec);
                 ConfigFeedbackReceiver::GetInstance().UnregisterInstanceConfig(config.name());
             } else {
-                if (!DumpConfigFile(config, sourceDir)) {
-                    ConfigInfo info;
-                    info.name = config.name();
-                    info.version = config.version();
-                    info.status = ConfigFeedbackStatus::FAILED;
-                    info.detail = config.detail();
-                    mInstanceConfigInfoMap[config.name()] = std::move(info);
-                    continue;
-                }
                 ConfigInfo info;
                 info.name = config.name();
                 info.version = config.version();
-                info.status = ConfigFeedbackStatus::APPLYING;
                 info.detail = config.detail();
+                if (!DumpConfigFile(config, sourceDir)) {
+                    info.status = ConfigFeedbackStatus::FAILED;
+                    mInstanceConfigInfoMap[config.name()] = std::move(info);
+                    continue;
+                }
+                info.status = ConfigFeedbackStatus::APPLYING;
                 mInstanceConfigInfoMap[config.name()] = std::move(info);
                 ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
             }
