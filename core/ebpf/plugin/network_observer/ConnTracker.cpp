@@ -25,13 +25,13 @@ extern "C" {
 namespace logtail {
 namespace ebpf {
 
-const std::string EXTERNAL_STR = EXTERNAL_STR;
-const std::string LOCALHOST_STR = LOCALHOST_STR;
+const std::string EXTERNAL_STR = "external";
+const std::string LOCALHOST_STR = "localhost";
 const std::string HTTP_STR = "http";
 const std::string RPC_25_STR = "25";
 const std::string RPC_0_STR = "0";
 const std::string HTTP_CLIENT_STR = "http_client";
-const std::string UNKNOWN_STR = UNKNOWN_STR;
+const std::string UNKNOWN_STR = "unknown";
 const std::string IPV4_STR = "ipv4";
 const std::string IPV6_STR = "ipv6";
 

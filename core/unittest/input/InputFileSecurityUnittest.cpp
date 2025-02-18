@@ -186,7 +186,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
-    APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].call_names_.size()); // default callname
+    APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStart() {
