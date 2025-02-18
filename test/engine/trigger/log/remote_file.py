@@ -130,13 +130,14 @@ def main():
     parser.add_argument('--count', type=int, default=100, help='Log Count')
     parser.add_argument('--interval', type=int, default=1, help='Log Interval (ms), < 0 means no interval')
     parser.add_argument('--custom', type=parse_custom_arg_to_dict, help='Custom Args, in the format of json')
+    parser.add_argument('--rotate', type=int, default=30, help='Rotate Interval (s)')
 
     args = parser.parse_args()
 
     logger = logging.getLogger('log_generator')
     logger.setLevel(logging.INFO)
     # 快速轮转来模拟比较极端的情况
-    handler = TimedRotatingFileHandler(args.path, when="s", interval=5, backupCount=3)
+    handler = TimedRotatingFileHandler(args.path, when="s", interval=args.rotate, backupCount=3)
     formatter = logging.Formatter('%(message)s')
     handler.setFormatter(formatter)
     handler.flush = lambda: handler.stream.flush()
