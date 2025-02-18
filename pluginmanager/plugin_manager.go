@@ -148,6 +148,7 @@ func StopAllPipelines(withInput bool) error {
 	defer panicRecover("Run plugin")
 
 	LogtailConfigLock.Lock()
+	disabledConfigNames := make(map[string]struct{})
 	for configName, logstoreConfig := range LogtailConfig {
 		matchFlag := false
 		if withInput {
@@ -162,6 +163,7 @@ func StopAllPipelines(withInput bool) error {
 		if matchFlag {
 			logger.Info(logstoreConfig.Context.GetRuntimeContext(), "Stop config", configName)
 			if hasStopped := timeoutStop(logstoreConfig, true); !hasStopped {
+				disabledConfigNames[configName] = struct{}{}
 				// TODO: This alarm can not be sent to server in current alarm design.
 				logger.Error(logstoreConfig.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
 					"timeout when stop config, goroutine might leak")
@@ -172,55 +174,64 @@ func StopAllPipelines(withInput bool) error {
 			}
 		}
 	}
+	for key, value := range LogtailConfig {
+		if _, ok := disabledConfigNames[key]; !ok {
+			DeleteLogstoreConfig(value)
+		}
+		delete(LogtailConfig, key)
+	}
 	LogtailConfig = make(map[string]*LogstoreConfig)
 	LogtailConfigLock.Unlock()
-
 	return nil
+}
+
+func DeleteLogstoreConfig(config *LogstoreConfig) {
+	if actualObject, ok := config.Context.(*ContextImp); ok {
+		actualObject.logstoreC = nil
+	}
+	config.Context = nil
+	if runner, ok := config.PluginRunner.(*pluginv1Runner); ok {
+		for _, obj := range runner.MetricPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.ServicePlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.ProcessorPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.AggregatorPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.FlusherPlugins {
+			obj.Config = nil
+		}
+		runner.LogstoreConfig = nil
+	} else if runner, ok := config.PluginRunner.(*pluginv2Runner); ok {
+		for _, obj := range runner.MetricPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.ServicePlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.ProcessorPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.AggregatorPlugins {
+			obj.Config = nil
+		}
+		for _, obj := range runner.FlusherPlugins {
+			obj.Config = nil
+		}
+		runner.LogstoreConfig = nil
+	}
+	config.PluginRunner = nil
 }
 
 func DeleteLogstoreConfigFromLogtailConfig(configName string) {
 	LogtailConfigLock.Lock()
 	if config, ok := LogtailConfig[configName]; ok {
-		if actualObject, ok := config.Context.(*ContextImp); ok {
-			actualObject.logstoreC = nil
-		}
-		config.Context = nil
-		if runner, ok := config.PluginRunner.(*pluginv1Runner); ok {
-			for _, obj := range runner.MetricPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.ServicePlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.ProcessorPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.AggregatorPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.FlusherPlugins {
-				obj.Config = nil
-			}
-			runner.LogstoreConfig = nil
-		} else if runner, ok := config.PluginRunner.(*pluginv2Runner); ok {
-			for _, obj := range runner.MetricPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.ServicePlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.ProcessorPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.AggregatorPlugins {
-				obj.Config = nil
-			}
-			for _, obj := range runner.FlusherPlugins {
-				obj.Config = nil
-			}
-			runner.LogstoreConfig = nil
-		}
-		config.PluginRunner = nil
+		DeleteLogstoreConfig(config)
 		delete(LogtailConfig, configName)
 	}
 	LogtailConfigLock.Unlock()
@@ -263,9 +274,14 @@ func Stop(configName string, removedFlag bool) error {
 			DisabledLogtailConfigLock.Lock()
 			DisabledLogtailConfig[config.ConfigNameWithSuffix] = config
 			DisabledLogtailConfigLock.Unlock()
+
+			LogtailConfigLock.Lock()
+			delete(LogtailConfig, configName)
+			LogtailConfigLock.Unlock()
+		} else {
+			logger.Info(config.Context.GetRuntimeContext(), "Stop config now", configName)
+			DeleteLogstoreConfigFromLogtailConfig(configName)
 		}
-		logger.Info(config.Context.GetRuntimeContext(), "Stop config now", configName)
-		DeleteLogstoreConfigFromLogtailConfig(configName)
 		return nil
 	}
 	LogtailConfigLock.RUnlock()
