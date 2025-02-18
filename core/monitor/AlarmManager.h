@@ -127,7 +127,8 @@ public:
                    const std::string& message,
                    const std::string& projectName = "",
                    const std::string& category = "",
-                   const std::string& region = "");
+                   const std::string& region = "",
+                   const int32_t count = 1);
     // only be called when prepare to exit
     void ForceToSend();
     bool IsLowLevelAlarmValid();
@@ -144,6 +145,26 @@ private:
     AlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
 
     std::vector<std::string> mMessageType;
+    // {
+    //   key: ${region},
+    //   value: [
+    //     [
+    //       index: ${alarmType}
+    //       value: {
+    //         key: ${project}_${logstore}_${config}
+    //         value: {
+    //           ${alarmType},
+    //           ${project},
+    //           ${logstore},
+    //           ${config},
+    //           ${message},
+    //           ${count},
+    //         }
+    //       }
+    //     ],
+    //     ${lastUpdateTime},
+    //    ]
+    //  }
     std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
     PTMutex mAlarmBufferMutex;
 

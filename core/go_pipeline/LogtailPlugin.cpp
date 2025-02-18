@@ -30,6 +30,7 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -55,12 +56,6 @@ LogtailPlugin::LogtailPlugin() {
     mStartFun = NULL;
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
-    mPluginAlarmConfig.mLogstore = "logtail_alarm";
-    mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
-    mPluginProfileConfig.mLogstore = "shennong_log_profile";
-    mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginProfileConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -235,8 +230,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             int32_t lines,
                             const char* shardHash,
                             int shardHashSize) {
-    static FlusherSLS* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
-    static FlusherSLS* profileConfig = &(LogtailPlugin::GetInstance()->mPluginProfileConfig);
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
@@ -248,21 +241,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
 
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
-    if (configNameStr == alarmConfig->mLogstore) {
-        pConfig = alarmConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == profileConfig->mLogstore) {
-        pConfig = profileConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == containerConfig->mLogstore) {
+    if (configNameStr == containerConfig->mLogstore) {
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
@@ -467,6 +446,12 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load GetGoMetrics error, Message", error));
             return mPluginValid;
         }
+        // 获取golang部分告警信息
+        mGetGoAlarmsFun = (GetGoAlarmsFun)loader.LoadMethod("GetGoAlarms", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetGoAlarms error, Message", error));
+            return mPluginValid;
+        }
 
         mPluginBasePtr = loader.Release();
     }
@@ -563,7 +548,7 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
         if (metrics != nullptr) {
             for (int i = 0; i < metrics->count; ++i) {
                 std::map<std::string, std::string> item;
-                InnerPluginMetric* innerpm = metrics->metrics[i];
+                InnerGoMetric* innerpm = metrics->metrics[i];
                 if (innerpm != nullptr) {
                     for (int j = 0; j < innerpm->count; ++j) {
                         InnerKeyValue* innerkv = innerpm->keyValues[j];
@@ -581,6 +566,32 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
             }
             free(metrics->metrics);
             free(metrics);
+        }
+    }
+}
+
+void LogtailPlugin::GetGoAlarms() {
+    if (mGetGoAlarmsFun != nullptr) {
+        auto alarms = mGetGoAlarmsFun();
+        if (alarms != nullptr) {
+            for (int i = 0; i < alarms->count; i++) {
+                InnerGoAlarm* alarm = alarms->alarms[i];
+                if (alarm != nullptr) {
+                    AlarmManager::GetInstance()->SendAlarm(AlarmType(alarm->alarmType),
+                                                           alarm->message,
+                                                           alarm->project,
+                                                           alarm->logstore,
+                                                           FlusherSLS::GetProjectRegion(alarm->project),
+                                                           alarm->count);
+                    free(alarm->project);
+                    free(alarm->config);
+                    free(alarm->logstore);
+                    free(alarm->message);
+                    free(alarm);
+                }
+            }
+            free(alarms->alarms);
+            free(alarms);
         }
     }
 }

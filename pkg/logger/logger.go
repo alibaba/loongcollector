@@ -186,26 +186,26 @@ func Infof(ctx context.Context, format string, params ...interface{}) {
 	}
 }
 
-func Warning(ctx context.Context, alarmType string, kvPairs ...interface{}) {
+func Warning(ctx context.Context, alarmType util.AlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Warningf(ctx context.Context, alarmType string, format string, params ...interface{}) {
+func Warningf(ctx context.Context, alarmType util.AlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -213,38 +213,38 @@ func Warningf(ctx context.Context, alarmType string, format string, params ...in
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Error(ctx context.Context, alarmType string, kvPairs ...interface{}) {
+func Error(ctx context.Context, alarmType util.AlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Errorf(ctx context.Context, alarmType string, format string, params ...interface{}) {
+func Errorf(ctx context.Context, alarmType util.AlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -252,12 +252,12 @@ func Errorf(ctx context.Context, alarmType string, format string, params ...inte
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}

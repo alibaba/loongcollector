@@ -67,12 +67,12 @@ typedef struct {
 typedef struct {
     KeyValue** keyValues;
     int count;
-} PluginMetric;
+} GoMetric;
 
 typedef struct {
-    PluginMetric** metrics;
+    GoMetric** metrics;
     int count;
-} PluginMetrics;
+} GoMetrics;
 
 static KeyValue** makeKeyValueArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
@@ -82,13 +82,36 @@ static void setArrayKeyValue(KeyValue **a, KeyValue *s, int n) {
     a[n] = s;
 }
 
-static PluginMetric** makePluginMetricArray(int size) {
+static GoMetric** makeGoMetricArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
 }
 
-static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
+static void setArrayGoMetric(GoMetric **a, GoMetric *s, int n) {
     a[n] = s;
 }
+
+typedef struct {
+	int alarmType;
+    char* project;
+    char* logstore;
+	char* config;
+	char* message;
+	int count;
+} GoAlarm;
+
+typedef struct {
+	GoAlarm** alarms;
+	int count;
+} GoAlarms;
+
+static GoAlarm** makeGoAlarmArray(int size) {
+    return malloc(sizeof(GoAlarm*) * size);
+}
+
+static void setArrayGoAlarm(GoAlarm **a, GoAlarm *s, int n) {
+    a[n] = s;
+}
+
 */
 import "C" //nolint:typecheck
 
@@ -301,18 +324,18 @@ func GetContainerMeta(containerID string) *C.struct_containerMeta {
 }
 
 //export GetGoMetrics
-func GetGoMetrics(metricType string) *C.PluginMetrics {
+func GetGoMetrics(metricType string) *C.GoMetrics {
 	results := pluginmanager.GetMetrics(metricType)
 	// 统计所有键值对的总数，用于分配内存
 	numMetrics := len(results)
 
-	cPluginMetrics := (*C.PluginMetrics)(C.malloc(C.sizeof_PluginMetrics))
-	cPluginMetrics.count = C.int(numMetrics)
-	cPluginMetrics.metrics = C.makePluginMetricArray(cPluginMetrics.count)
-	// 填充 PluginMetrics 中的 keyValues
+	cGoMetrics := (*C.GoMetrics)(C.malloc(C.sizeof_GoMetrics))
+	cGoMetrics.count = C.int(numMetrics)
+	cGoMetrics.metrics = C.makeGoMetricArray(cGoMetrics.count)
+	// 填充 GoMetrics 中的 keyValues
 	for i, metric := range results {
 		metricLen := len(metric)
-		cMetric := (*C.PluginMetric)(C.malloc(C.sizeof_PluginMetric))
+		cMetric := (*C.GoMetric)(C.malloc(C.sizeof_GoMetric))
 		cMetric.count = C.int(metricLen)
 		cMetric.keyValues = C.makeKeyValueArray(cMetric.count)
 
@@ -327,9 +350,31 @@ func GetGoMetrics(metricType string) *C.PluginMetrics {
 			C.setArrayKeyValue(cMetric.keyValues, cKeyValue, C.int(j))
 			j++
 		}
-		C.setArrayPluginMetric(cPluginMetrics.metrics, cMetric, C.int(i))
+		C.setArrayGoMetric(cGoMetrics.metrics, cMetric, C.int(i))
 	}
-	return cPluginMetrics
+	return cGoMetrics
+}
+
+//export GetGoAlarms
+func GetGoAlarms() *C.GoAlarms {
+	results := pluginmanager.GetAlarms()
+	// 统计所有键值对的总数，用于分配内存
+	numAlarms := len(results)
+
+	cGoAlarms := (*C.GoAlarms)(C.malloc(C.sizeof_GoAlarms))
+	cGoAlarms.count = C.int(numAlarms)
+	cGoAlarms.alarms = C.makeGoAlarmArray(cGoAlarms.count)
+	for i, alarm := range results {
+		cAlarm := (*C.GoAlarm)(C.malloc(C.sizeof_GoAlarm))
+		cAlarm.alarmType = C.int(alarm.AlarmType)
+		cAlarm.project = C.CString(alarm.Project)
+		cAlarm.logstore = C.CString(alarm.Logstore)
+		cAlarm.config = C.CString(alarm.Config)
+		cAlarm.message = C.CString(alarm.Message)
+		cAlarm.count = C.int(alarm.Count)
+		C.setArrayGoAlarm(cGoAlarms.alarms, cAlarm, C.int(i))
+	}
+	return cGoAlarms
 }
 
 func initPluginBase(cfgStr string) int {
@@ -353,9 +398,6 @@ func initPluginBase(cfgStr string) int {
 		if err := pluginmanager.Init(); err != nil {
 			logger.Error(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
 			rst = 1
-		}
-		if pluginmanager.AlarmConfig != nil {
-			pluginmanager.AlarmConfig.Start()
 		}
 		if pluginmanager.ContainerConfig != nil {
 			pluginmanager.ContainerConfig.Start()

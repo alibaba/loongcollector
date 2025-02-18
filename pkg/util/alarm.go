@@ -15,11 +15,7 @@
 package util
 
 import (
-	"strconv"
 	"sync"
-	"time"
-
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 var GlobalAlarm *Alarm
@@ -40,12 +36,24 @@ func DeleteAlarm(key string) {
 	delete(RegisterAlarms, key)
 }
 
-func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
+func RegisterAlarmsSerializeToMessage() []InternalAlarmMessage {
 	regMu.Lock()
 	defer regMu.Unlock()
+
+	alarmMessages := []InternalAlarmMessage{}
 	for _, alarm := range RegisterAlarms {
-		alarm.SerializeToPb(logGroup)
+		alarmMessages = append(alarmMessages, alarm.SerializeToMessage()...)
 	}
+	return alarmMessages
+}
+
+type InternalAlarmMessage struct {
+	AlarmType int
+	Project   string
+	Logstore  string
+	Config    string
+	Message   string
+	Count     int
 }
 
 type AlarmItem struct {
@@ -54,29 +62,32 @@ type AlarmItem struct {
 }
 
 type Alarm struct {
-	AlarmMap map[string]*AlarmItem
+	AlarmMap map[AlarmType]*AlarmItem
 	Project  string
 	Logstore string
+	Config   string
 }
 
-func (p *Alarm) Init(project, logstore string) {
+func (p *Alarm) Init(project, logstore, config string) {
 	mu.Lock()
-	p.AlarmMap = make(map[string]*AlarmItem)
+	p.AlarmMap = make(map[AlarmType]*AlarmItem)
 	p.Project = project
 	p.Logstore = logstore
+	p.Config = config
 	mu.Unlock()
 }
 
-func (p *Alarm) Update(project, logstore string) {
+func (p *Alarm) Update(project, logstore, config string) {
 	mu.Lock()
 	defer mu.Unlock()
 	p.Project = project
 	p.Logstore = logstore
+	p.Config = config
 }
 
-func (p *Alarm) Record(alarmType, message string) {
+func (p *Alarm) Record(alarmType AlarmType, message string) {
 	// donot record empty alarmType
-	if len(alarmType) == 0 {
+	if alarmType < 0 || alarmType >= ALL_LOGTAIL_ALARM_NUM {
 		return
 	}
 	mu.Lock()
@@ -90,31 +101,31 @@ func (p *Alarm) Record(alarmType, message string) {
 	mu.Unlock()
 }
 
-func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
-	nowTime := time.Now()
+func (p *Alarm) SerializeToMessage() []InternalAlarmMessage {
+	alarmMessages := []InternalAlarmMessage{}
 	mu.Lock()
 	for alarmType, item := range p.AlarmMap {
 		if item.Count == 0 {
 			continue
 		}
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project_name", Value: p.Project})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: p.Logstore})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: alarmType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: GetIPAddress()})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
-		logGroup.Logs = append(logGroup.Logs, log)
+		alarmMessages = append(alarmMessages, InternalAlarmMessage{
+			AlarmType: int(alarmType),
+			Project:   p.Project,
+			Logstore:  p.Logstore,
+			Config:    p.Config,
+			Message:   item.Message,
+			Count:     item.Count,
+		})
 		// clear after serialize
 		item.Count = 0
 		item.Message = ""
 	}
 	mu.Unlock()
+	return alarmMessages
 }
 
 func init() {
 	GlobalAlarm = new(Alarm)
-	GlobalAlarm.Init("", "")
+	GlobalAlarm.Init("", "", "")
 	RegisterAlarms = make(map[string]*Alarm)
 }

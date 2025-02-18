@@ -93,7 +93,7 @@ type LogstoreConfig struct {
 	LogstoreKey          int64
 	FlushOutFlag         atomic.Bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
-	//   is offered in configuration, see build-in AlarmConfig.
+	//   is offered in configuration
 	GlobalConfig *config.GlobalConfig
 
 	Version      ConfigVersion

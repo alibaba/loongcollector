@@ -87,12 +87,26 @@ typedef struct {
 typedef struct {
     InnerKeyValue** keyValues;
     int count;
-} InnerPluginMetric;
+} InnerGoMetric;
 
 typedef struct {
-    InnerPluginMetric** metrics;
+    InnerGoMetric** metrics;
     int count;
-} InnerPluginMetrics;
+} InnerGoMetrics;
+
+typedef struct {
+	int alarmType;
+    char* project;
+    char* logstore;
+	char* config;
+	char* message;
+	int count;
+} InnerGoAlarm;
+
+typedef struct {
+	InnerGoAlarm** alarms;
+	int count;
+} InnerGoAlarms;
 
 struct K8sContainerMeta {
     std::string PodName;
@@ -144,7 +158,8 @@ typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
 typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
 typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
-typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
+typedef InnerGoMetrics* (*GetGoMetricsFun)(GoString metricType);
+typedef InnerGoAlarms* (*GetGoAlarmsFun)();
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -257,6 +272,7 @@ public:
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
     void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
+    void GetGoAlarms();
 
 private:
     void* mPluginBasePtr;
@@ -270,13 +286,12 @@ private:
     StopBuiltInModulesFun mStopBuiltInModulesFun;
     StartFun mStartFun;
     volatile bool mPluginValid;
-    logtail::FlusherSLS mPluginAlarmConfig;
-    logtail::FlusherSLS mPluginProfileConfig;
     logtail::FlusherSLS mPluginContainerConfig;
     ProcessLogsFun mProcessLogsFun;
     ProcessLogGroupFun mProcessLogGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetGoMetricsFun mGetGoMetricsFun;
+    GetGoAlarmsFun mGetGoAlarmsFun;
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;
