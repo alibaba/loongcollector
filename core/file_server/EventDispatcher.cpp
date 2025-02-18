@@ -635,6 +635,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
                                                  cpt.real_path(),
                                                  1,
                                                  0,
+                                                 "",
                                                  0);
             const auto result = validateCheckpoint(v1Cpt, cachePathDevInodeMap, eventVec);
             switch (result) {
@@ -835,11 +836,12 @@ void EventDispatcher::UnregisterEventHandler(const string& path) {
     LOG_INFO(sLogger, ("remove the watcher for dir", path)("wd", wd));
 }
 
-void EventDispatcher::StopAllDir(const string& baseDir) {
+void EventDispatcher::StopAllDir(const string& baseDir, const string& containerID) {
     LOG_DEBUG(sLogger, ("Stop all sub dir", baseDir));
     auto subDirAndHandlers = FindAllSubDirAndHandler(baseDir);
     for (auto& subDirAndHandler : subDirAndHandlers) {
         Event e(subDirAndHandler.first, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
+        e.SetContainerID(containerID);
         subDirAndHandler.second->Handle(e);
     }
 }

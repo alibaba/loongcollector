@@ -15,8 +15,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(event_handler_unittest)
 
-# add_executable(create_modify_handler_unittest CreateModifyHandlerUnittest.cpp)
-# target_link_libraries(create_modify_handler_unittest ${UT_BASE_TARGET})
+add_executable(create_modify_handler_unittest CreateModifyHandlerUnittest.cpp)
+target_link_libraries(create_modify_handler_unittest ${UT_BASE_TARGET})
 
 add_executable(modify_handler_unittest ModifyHandlerUnittest.cpp)
 target_link_libraries(modify_handler_unittest ${UT_BASE_TARGET})
@@ -25,5 +25,6 @@ add_executable(log_input_unittest LogInputUnittest.cpp)
 target_link_libraries(log_input_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
+gtest_discover_tests(create_modify_handler_unittest)
 gtest_discover_tests(modify_handler_unittest)
 gtest_discover_tests(log_input_unittest)

@@ -320,7 +320,7 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
             string path = source;
             if (object.size() > 0)
                 path += PATH_SEPARATOR + object;
-            dispatcher->StopAllDir(path);
+            dispatcher->StopAllDir(path, ev->GetContainerID());
         } else {
             EventHandler* handler = dispatcher->GetHandler(source.c_str());
             if (handler) {

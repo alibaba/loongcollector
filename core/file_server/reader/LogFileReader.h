@@ -296,6 +296,12 @@ public:
 
     time_t GetContainerStoppedTime() const { return mContainerStoppedTime; }
 
+    std::string GetContainerID() const { return mContainerID; }
+
+    void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
+
+    bool UpdateContainerInfo();
+
     bool IsFileOpened() const { return mLogFileOp.IsOpen(); }
 
     bool ShouldForceReleaseDeletedFileFd();
@@ -516,6 +522,7 @@ protected:
     bool mFileDeleted = false;
     time_t mDeletedTime = 0;
     bool mContainerStopped = false;
+    std::string mContainerID;
     time_t mContainerStoppedTime = 0;
     time_t mReadStoppedContainerAlarmTime = 0;
     int32_t mReadDelayTime = 0;
