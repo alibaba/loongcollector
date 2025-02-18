@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // ensure ExtensionGroupInfoFilter implements the extensions.FlushInterceptor interface
@@ -53,7 +54,7 @@ func (e *ExtensionGroupInfoFilter) Init(context pipeline.Context) error {
 	for k, v := range e.Tags {
 		reg, err := regexp.Compile(v.Pattern)
 		if err != nil {
-			logger.Error(context.GetRuntimeContext(), "EXTENSION_FILTER_ALARM", "regex compile tags err, pattern", v, "error", err)
+			logger.Error(context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "regex compile tags err, pattern", v, "error", err)
 			return err
 		}
 		v.Reg = reg
@@ -63,7 +64,7 @@ func (e *ExtensionGroupInfoFilter) Init(context pipeline.Context) error {
 	for k, v := range e.Metas {
 		reg, err := regexp.Compile(v.Pattern)
 		if err != nil {
-			logger.Error(context.GetRuntimeContext(), "EXTENSION_FILTER_ALARM", "regex compile metas err, pattern", v, "error", err)
+			logger.Error(context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "regex compile metas err, pattern", v, "error", err)
 			return err
 		}
 		v.Reg = reg

@@ -17,6 +17,7 @@ package helper
 import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"context"
 	"runtime"
@@ -26,7 +27,7 @@ func panicRecover(cxt context.Context, key string) {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(cxt, "PLUGIN_RUNTIME_ALARM", "key", key, "panicked", err, "stack", string(trace))
+		logger.Error(cxt, util.PLUGIN_RUNTIME_ALARM, "key", key, "panicked", err, "stack", string(trace))
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
@@ -159,12 +160,12 @@ func (m *Manager) Start(p *GoProfile) error {
 		if err := m.discoveryManager.ApplyConfig(map[string]discovery.Configs{
 			c.JobName: c.ServiceDiscoveryConfigs,
 		}); err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "apply discovery config error", err.Error())
+			logger.Error(context.Background(), util.PLUGIN_RUNTIME_ALARM, "apply discovery config error", err.Error())
 		}
 		err := m.discoveryManager.Run()
 		logger.Debug(context.Background(), "finish discovery manager")
 		if err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "discovery err", err.Error())
+			logger.Error(context.Background(), util.PLUGIN_RUNTIME_ALARM, "discovery err", err.Error())
 		}
 	}()
 	go func() {
@@ -172,7 +173,7 @@ func (m *Manager) Start(p *GoProfile) error {
 		err := m.scrapeManager.Run(m.discoveryManager.SyncCh())
 		logger.Debug(context.Background(), "finish scrape manager")
 		if err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "scrape err", err.Error())
+			logger.Error(context.Background(), util.PLUGIN_RUNTIME_ALARM, "scrape err", err.Error())
 		}
 	}()
 	return nil

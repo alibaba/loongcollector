@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorRename struct {
@@ -99,7 +100,7 @@ func (p *ProcessorRename) processLog(log *protocol.Log) {
 			}
 		}
 		if len(p.noKeyErrorArray) != 0 {
-			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", p.noKeyErrorArray)
+			logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key %v", p.noKeyErrorArray)
 		}
 	}
 }
@@ -118,7 +119,7 @@ func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context pipeli
 	}
 	context.Collector().Collect(in.Group, in.Events...)
 	if p.NoKeyError && len(p.noKeyErrorArray) != 0 {
-		logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", p.noKeyErrorArray)
+		logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key %v", p.noKeyErrorArray)
 	}
 }
 

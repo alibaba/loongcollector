@@ -36,6 +36,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/httpserver"
 )
 
@@ -131,7 +132,7 @@ func (s *Server) start() error {
 	if s.Protocals.GRPC != nil {
 		ops, err := s.Protocals.GRPC.GetServerOption()
 		if err != nil {
-			logger.Warningf(s.context.GetRuntimeContext(), "SERVICE_OTLP_INVALID_GRPC_SERVER_CONFIG", "inavlid grpc server config: %v, err: %v", s.Protocals.GRPC, err)
+			logger.Warningf(s.context.GetRuntimeContext(), util.PLUGIN_START_ALARM, "inavlid grpc server config: %v, err: %v", s.Protocals.GRPC, err)
 		}
 		grpcServer := grpc.NewServer(
 			ops...,
@@ -214,21 +215,21 @@ func (s *Server) registerHTTPLogsComsumer(serveMux *http.ServeMux, decoder exten
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "READ_BODY_FAIL_ALARM", "read body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "read body failed", err, "request", r.URL.String())
 			return
 		}
 
 		otlpLogReq := plogotlp.NewExportRequest()
 		otlpLogReq, err = opentelemetry.DecodeOtlpRequest(otlpLogReq, data, r)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "decode body failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
 
 		otlpResp, err := s.logsReceiver.Export(r.Context(), otlpLogReq)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "EXPORT_REQ_FAIL_ALARM", "export logs failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "export logs failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
@@ -236,7 +237,7 @@ func (s *Server) registerHTTPLogsComsumer(serveMux *http.ServeMux, decoder exten
 		msg, contentType, err := marshalResp(otlpResp, r)
 
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "MARSHAL_RESP_FAIL_ALARM", "marshal resp failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "marshal resp failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
@@ -249,28 +250,28 @@ func (s *Server) registerHTTPMetricsComsumer(serveMux *http.ServeMux, decoder ex
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "READ_BODY_FAIL_ALARM", "read body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "read body failed", err, "request", r.URL.String())
 			return
 		}
 
 		otlpMetricReq := pmetricotlp.NewExportRequest()
 		otlpMetricReq, err = opentelemetry.DecodeOtlpRequest(otlpMetricReq, data, r)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "decode body failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
 
 		otlpResp, err := s.metricsReceiver.Export(r.Context(), otlpMetricReq)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "EXPORT_REQ_FAIL_ALARM", "export metrics failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "export metrics failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
 
 		msg, contentType, err := marshalResp(otlpResp, r)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "MARSHAL_RESP_FAIL_ALARM", "marshal resp failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "marshal resp failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
@@ -283,21 +284,21 @@ func (s *Server) registerHTTPTracesComsumer(serveMux *http.ServeMux, decoder ext
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "READ_BODY_FAIL_ALARM", "read body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "read body failed", err, "request", r.URL.String())
 			return
 		}
 
 		otlpTraceReq := ptraceotlp.NewExportRequest()
 		otlpTraceReq, err = opentelemetry.DecodeOtlpRequest(otlpTraceReq, data, r)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "decode body failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
 
 		otlpResp, err := s.tracesReceiver.Export(r.Context(), otlpTraceReq)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "EXPORT_REQ_FAIL_ALARM", "export traces failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "export traces failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}
@@ -305,7 +306,7 @@ func (s *Server) registerHTTPTracesComsumer(serveMux *http.ServeMux, decoder ext
 		msg, contentType, err := marshalResp(otlpResp, r)
 
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "MARSHAL_RESP_FAIL_ALARM", "marshal resp failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "marshal resp failed", err, "request", r.URL.String())
 			httpserver.BadRequest(w)
 			return
 		}

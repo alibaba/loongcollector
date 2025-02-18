@@ -123,7 +123,7 @@ func (p *ProcessorAnchor) ProcessLog(log *protocol.Log) {
 		}
 	}
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "ANCHOR_FIND_ALARM", "anchor cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "anchor cannot find key", p.SourceKey)
 	}
 	p.logPairMetric.Add(int64(len(log.Contents) - beginLen + 1))
 }
@@ -175,7 +175,7 @@ func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
 		startIndex := strings.Index(*val, anchor.Start)
 		if startIndex < 0 {
 			if p.NoAnchorError {
-				logger.Warning(p.context.GetRuntimeContext(), "ANCHOR_FIND_ALARM", "anchor no start", anchor.Start, "content", util.CutString(*val, 1024))
+				logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "anchor no start", anchor.Start, "content", util.CutString(*val, 1024))
 			}
 			continue
 		}
@@ -183,7 +183,7 @@ func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
 		stopIndex := strings.Index((*val)[startIndex:], anchor.Stop)
 		if stopIndex < 0 {
 			if p.NoAnchorError {
-				logger.Warning(p.context.GetRuntimeContext(), "ANCHOR_FIND_ALARM", "anchor no stop", anchor.Stop, "content", util.CutString(*val, 1024))
+				logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "anchor no stop", anchor.Stop, "content", util.CutString(*val, 1024))
 			}
 			continue
 		} else {
@@ -218,7 +218,7 @@ func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
 				})
 			}
 			if err != nil && !anchor.IgnoreJSONError {
-				logger.Warning(p.context.GetRuntimeContext(), "ANCHOR_JSON_ALARM", "process json error", err, "content", (*val)[startIndex:stopIndex])
+				logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "process json error", err, "content", (*val)[startIndex:stopIndex])
 			}
 		}
 	}

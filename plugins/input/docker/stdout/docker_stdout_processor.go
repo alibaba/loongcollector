@@ -184,19 +184,19 @@ func parseDockerJSONLog(line []byte) (*LogMessage, error) {
 
 func (p *DockerStdoutProcessor) ParseContainerLogLine(line []byte) *LogMessage {
 	if len(line) == 0 {
-		logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse docker line error", "empty line")
+		logger.Warning(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "parse docker line error", "empty line")
 		return &LogMessage{}
 	}
 	if line[0] == '{' {
 		log, err := parseDockerJSONLog(line)
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse json docker line error", err.Error(), "line", util.CutString(string(line), 512))
+			logger.Warning(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "parse json docker line error", err.Error(), "line", util.CutString(string(line), 512))
 		}
 		return log
 	}
 	log, err := parseCRILog(line)
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse cri docker line error", err.Error(), "line", util.CutString(string(line), 512))
+		logger.Warning(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "parse cri docker line error", err.Error(), "line", util.CutString(string(line), 512))
 	}
 	return log
 }

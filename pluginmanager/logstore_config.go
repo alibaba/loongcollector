@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
 
@@ -264,7 +265,7 @@ func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string
 	log := &protocol.Log{}
 	err := log.Unmarshal(logByte)
 	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
+		logger.Error(lc.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM,
 			"cannot process logs passed by core, err", err)
 		return -1
 	}
@@ -286,7 +287,7 @@ func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
 	logGroup := &protocol.LogGroup{}
 	err := logGroup.Unmarshal(logByte)
 	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
+		logger.Error(lc.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM,
 			"cannot process log group passed by core, err", err)
 		return -1
 	}
@@ -680,7 +681,7 @@ func UnloadPartiallyLoadedConfig(configName string) error {
 		ToStartPipelineConfigWithoutInput = nil
 		return nil
 	}
-	logger.Error(context.Background(), "unload config", "config not found", configName)
+	logger.Error(context.Background(), util.CATEGORY_CONFIG_ALARM, "unload config", "config not found", configName)
 	return fmt.Errorf("config not found")
 }
 
@@ -736,7 +737,7 @@ func loadService(pluginMeta *pipeline.PluginMeta, logstoreConfig *LogstoreConfig
 func loadProcessor(pluginMeta *pipeline.PluginMeta, priority int, logstoreConfig *LogstoreConfig, configInterface interface{}) (err error) {
 	creator, existFlag := pipeline.Processors[pluginMeta.PluginType]
 	if !existFlag || creator == nil {
-		logger.Error(logstoreConfig.Context.GetRuntimeContext(), "INVALID_PROCESSOR_TYPE", "invalid processor type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
+		logger.Error(logstoreConfig.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM, "invalid processor type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
 		return nil
 	}
 	processor := creator()
@@ -749,7 +750,7 @@ func loadProcessor(pluginMeta *pipeline.PluginMeta, priority int, logstoreConfig
 func loadAggregator(pluginMeta *pipeline.PluginMeta, logstoreConfig *LogstoreConfig, configInterface interface{}) (err error) {
 	creator, existFlag := pipeline.Aggregators[pluginMeta.PluginType]
 	if !existFlag || creator == nil {
-		logger.Error(logstoreConfig.Context.GetRuntimeContext(), "INVALID_AGGREGATOR_TYPE", "invalid aggregator type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
+		logger.Error(logstoreConfig.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM, "invalid aggregator type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
 		return nil
 	}
 	aggregator := creator()

@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const pluginType = "metric_meta_kubernetes"
@@ -79,7 +80,7 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	in.informerStopChan = make(chan struct{})
 	in.context = context
 	if in.IntervalMs < 5000 {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_FETCH_INTERVAL_ALARM", "interval", "must over than 5000 ms")
+		logger.Warning(in.context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "interval", "must over than 5000 ms")
 		in.IntervalMs = defaultIntervalMs
 	}
 	// When kubeConfigPath is empty, cluster config would be read.
@@ -120,7 +121,7 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	} else {
 		selector, err := labels.Parse(in.LabelSelectors)
 		if err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_LABEL_SELECTOR_ERROR", "error", err)
+			logger.Error(in.context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "error", err)
 			selector = labels.Everything()
 		}
 		in.selector = selector
@@ -202,7 +203,7 @@ func (in *InputKubernetesMeta) Collect(collector pipeline.Collector) error {
 	for _, c := range in.collectors {
 		nodes, err := c.collect(c.lister, in.selector)
 		if err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_COLLECT_ERROR", "error", err)
+			logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "error", err)
 			continue
 		}
 		if len(nodes) == 0 {

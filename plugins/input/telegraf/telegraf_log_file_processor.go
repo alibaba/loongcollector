@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type Processor struct {
@@ -33,14 +34,14 @@ func (p *Processor) Process(fileBlock []byte, noChangeInterval time.Duration) in
 		originalLine := fileBlock[nowIndex : nextIndex+1]
 		separator := bytes.IndexByte(originalLine, ' ')
 		if separator == -1 {
-			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "illegal log", string(originalLine))
+			logger.Warning(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "illegal log", string(originalLine))
 			continue
 		}
 		timePart := originalLine[0:separator]
 		thisLine := originalLine[separator+1:]
 		separator = bytes.IndexByte(thisLine, ' ')
 		if separator == -1 {
-			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "illegal log", string(originalLine))
+			logger.Warning(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "illegal log", string(originalLine))
 			continue
 		}
 		levelPart := thisLine[0:separator]
@@ -51,11 +52,11 @@ func (p *Processor) Process(fileBlock []byte, noChangeInterval time.Duration) in
 		case 'I':
 			logger.Info(telegrafManager.GetContext(), "time", string(timePart), "log", string(thisLine))
 		case 'W':
-			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "time", string(timePart), "log", string(thisLine))
+			logger.Warning(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "time", string(timePart), "log", string(thisLine))
 		case 'E':
-			logger.Error(telegrafManager.GetContext(), TelegrafAlarmType, "time", string(timePart), "log", string(thisLine))
+			logger.Error(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "time", string(timePart), "log", string(thisLine))
 		default:
-			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "illegal log", string(originalLine))
+			logger.Warning(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "illegal log", string(originalLine))
 		}
 		processedCount = nextIndex + 1
 		nowIndex = nextIndex + 1

@@ -102,7 +102,7 @@ func (p *AggregatorSkywalking) Add(log *protocol.Log, ctx map[string]interface{}
 		case "otlp.name":
 			return p.logAgg.Add(log, ctx)
 		default:
-			logger.Warning(p.context.GetRuntimeContext(), "SKYWALKING_TOPIC_NOT_RECOGNIZED", "error", "topic not recognized", "topic", routeKey.Value)
+			logger.Warning(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "error", "topic not recognized", "topic", routeKey.Value)
 			return p.logAgg.Add(log, ctx)
 		}
 	}

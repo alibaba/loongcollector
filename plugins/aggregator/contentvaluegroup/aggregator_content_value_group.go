@@ -129,7 +129,7 @@ func (g *AggregatorContentValueGroup) getOrCreateGroupAggs(log *protocol.Log) (*
 
 	agg := baseagg.NewAggregatorBase()
 	if _, err := agg.Init(g.context, groupQueue); err != nil {
-		logger.Error(g.context.GetRuntimeContext(), "AGG_GROUP_ALARM", "aggregator group fail to create agg for group", groupKVs)
+		logger.Error(g.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "aggregator group fail to create agg for group", groupKVs)
 		return nil, err
 	}
 	agg.InitInner(
@@ -176,7 +176,7 @@ func (g *AggregatorContentValueGroup) getGroupKVs(log *protocol.Log) map[string]
 	for _, key := range g.GroupKeys {
 		val, found := g.findLogContent(log, key)
 		if !found && g.ErrIfKeyNotFound {
-			logger.Warning(g.context.GetRuntimeContext(), "AGG_GROUP_ALARM", "aggregator group fail to find key in log content,key", key)
+			logger.Warning(g.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "aggregator group fail to find key in log content,key", key)
 		}
 		group[key] = val
 	}

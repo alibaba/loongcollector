@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LogCollector struct {
@@ -57,7 +58,7 @@ func newTelegrafLogReader(agentDirPath string, logPath string, drop bool) *helpe
 	if drop {
 		info, err := os.Stat(checkPoint.Path)
 		if err != nil {
-			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "stat log file error, path", checkPoint.Path, "error", err.Error())
+			logger.Warning(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "stat log file error, path", checkPoint.Path, "error", err.Error())
 		} else {
 			checkPoint.Offset = info.Size()
 			checkPoint.State = helper.GetOSState(info)
@@ -66,7 +67,7 @@ func newTelegrafLogReader(agentDirPath string, logPath string, drop bool) *helpe
 
 	reader, err := helper.NewLogFileReader(telegrafManager.GetContext(), checkPoint, helper.DefaultLogFileReaderConfig, new(Processor))
 	if err != nil {
-		logger.Error(telegrafManager.GetContext(), TelegrafAlarmType, "path", checkPoint.Path, "create telegraf log reader error", err)
+		logger.Error(telegrafManager.GetContext(), util.PLUGIN_RUNTIME_ALARM, "path", checkPoint.Path, "create telegraf log reader error", err)
 		return nil
 	}
 	return reader

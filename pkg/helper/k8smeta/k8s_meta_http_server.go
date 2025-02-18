@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type requestBody struct {
@@ -242,7 +243,7 @@ func (m *metadataHandler) handlePodMetaByContainerID(w http.ResponseWriter, r *h
 	for key, obj := range objs {
 		podMetadata := m.convertObjs2ContainerResponse(obj)
 		if len(podMetadata) > 1 {
-			logger.Warning(context.Background(), "Multiple pods found for unique container ID", key)
+			logger.Warning(context.Background(), util.KUBERNETES_META_ALARM, "Multiple pods found for unique container ID", key)
 		}
 		if len(podMetadata) > 0 {
 			metadata[key] = podMetadata[0]
@@ -334,7 +335,7 @@ func (m *metadataHandler) getCommonPodMetadata(pod *v1.Pod) *PodMetadata {
 	if len(pod.GetOwnerReferences()) == 0 {
 		podMetadata.WorkloadName = ""
 		podMetadata.WorkloadKind = ""
-		logger.Warning(context.Background(), "Pod has no owner", pod.Name)
+		logger.Warning(context.Background(), util.KUBERNETES_META_ALARM, "Pod has no owner", pod.Name)
 	} else {
 		reference := pod.GetOwnerReferences()[0]
 		podMetadata.WorkloadName = reference.Name
@@ -355,7 +356,7 @@ func (m *metadataHandler) getCommonPodMetadata(pod *v1.Pod) *PodMetadata {
 				}
 			}
 			if podMetadata.WorkloadKind == "replicaset" {
-				logger.Warning(context.Background(), "ReplicaSet has no owner", podMetadata.WorkloadName)
+				logger.Warning(context.Background(), util.KUBERNETES_META_ALARM, "ReplicaSet has no owner", podMetadata.WorkloadName)
 			}
 		}
 	}

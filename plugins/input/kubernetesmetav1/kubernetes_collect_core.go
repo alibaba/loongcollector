@@ -27,6 +27,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var (
@@ -51,7 +52,7 @@ func ExtractPodWorkloadName(name string) string {
 func (in *InputKubernetesMeta) collectPods(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	pods, err := lister.(core.PodLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	nodes = make([]*helper.MetaNode, 0, len(pods))
@@ -96,7 +97,7 @@ func (in *InputKubernetesMeta) collectPods(lister interface{}, selector labels.S
 func (in *InputKubernetesMeta) collectNodes(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	k8sNodes, err := lister.(core.NodeLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	if in.Node {
@@ -156,7 +157,7 @@ func (in *InputKubernetesMeta) collectNodes(lister interface{}, selector labels.
 func (in *InputKubernetesMeta) collectServices(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	services, err := lister.(core.ServiceLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	if in.Service {
@@ -202,7 +203,7 @@ func (in *InputKubernetesMeta) collectNamespaces(lister interface{}, selector la
 	}
 	namespaces, err := lister.(core.NamespaceLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	nodes = make([]*helper.MetaNode, 0, len(namespaces))
@@ -221,7 +222,7 @@ func (in *InputKubernetesMeta) collectPersistentVolumeClaims(lister interface{},
 	}
 	persistentVolumeClaims, err := lister.(core.PersistentVolumeClaimLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	getStorageClass := func(pvc *api.PersistentVolumeClaim) string {
@@ -261,7 +262,7 @@ func (in *InputKubernetesMeta) collectPersistentVolume(lister interface{}, selec
 	}
 	persistentVolumes, err := lister.(core.PersistentVolumeLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	getDriver := func(pv *api.PersistentVolume) string {
@@ -305,7 +306,7 @@ func (in *InputKubernetesMeta) collectConfigmaps(lister interface{}, selector la
 
 	configmaps, err := lister.(core.ConfigMapLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.KUBERNETES_META_ALARM, "err", err)
 		return
 	}
 	nodes = make([]*helper.MetaNode, 0, len(configmaps))

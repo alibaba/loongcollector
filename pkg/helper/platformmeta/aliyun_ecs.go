@@ -140,7 +140,7 @@ func (m *ECSManager) fetchAPI() {
 	now := time.Now()
 	if now.Sub(m.ecsLastFetchTokenTime).Seconds() > float64(m.ecsTokenExpireTime)*3/4 {
 		if err := m.fetchToken(); err != nil {
-			logger.Error(context.Background(), "ECS_ALARM", "read token error", err)
+			logger.Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "read token error", err)
 			return
 		}
 		m.ecsLastFetchTokenTime = now
@@ -156,7 +156,7 @@ func (m *ECSManager) fetchAPI() {
 		go func() {
 			val, err := AlibabaCloudEcsPlatformReadMetaVal(api, m.ecsToken)
 			if err != nil && err != error404 {
-				logger.Error(context.Background(), "ECS_ALARM", "read meta error", err)
+				logger.Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "read meta error", err)
 				m.resChan <- false
 				return
 			}

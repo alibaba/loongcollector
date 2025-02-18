@@ -79,7 +79,7 @@ func (p *ProcessorSplitString) SplitValue(log *protocol.Log, value string) {
 
 	if len(splitValues) < len(p.SplitKeys) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), "SPLIT_LOG_ALARM", "split keys not match, split len", len(splitValues), "log", util.CutString(value, 1024))
+			logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "split keys not match, split len", len(splitValues), "log", util.CutString(value, 1024))
 		}
 		for i, val := range splitValues {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[i], Value: val})
@@ -115,7 +115,7 @@ func (p *ProcessorSplitString) ProcessLogs(logArray []*protocol.Log) []*protocol
 			}
 		}
 		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "SPLIT_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key", p.SourceKey)
 		}
 	}
 

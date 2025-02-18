@@ -369,7 +369,7 @@ func GetFlusherConfiguration() (flusherCategory string, flusherOptions map[strin
 			m := make(map[string]interface{})
 			err := json.Unmarshal(cfg, &m)
 			if err != nil {
-				logger.Error(context.Background(), "DEFAULT_FLUSHER_ALARM", "err", err)
+				logger.Error(context.Background(), util.CATEGORY_CONFIG_ALARM, "DEFAULT_FLUSHER_ALARM. err", err)
 				return "", nil, false
 			}
 			c, ok := m["type"].(string)

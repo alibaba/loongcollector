@@ -30,6 +30,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	// third-party
 	g "github.com/gosnmp/gosnmp"
@@ -471,7 +472,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 			err := func() error {
 				err := thisGsAgent.Connect()
 				if err != nil {
-					logger.Errorf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", "%v", err)
+					logger.Errorf(context.Background(), util.PLUGIN_START_ALARM, "%v", err)
 					return err
 				}
 
@@ -547,9 +548,9 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 					translatedType := Asn1BER2String(variable.Type)
 
 					if translatedType == "Null" || translatedType == "" {
-						logger.Warning(context.Background(), "result of %v is probably empty", s.fieldContents[i].Name)
+						logger.Warning(context.Background(), util.PLUGIN_START_ALARM, "result of %v is probably empty", s.fieldContents[i].Name)
 						if s.Version == 1 {
-							logger.Warning(context.Background(), "snmp v1 will not return any `GET` result while one of them is empty, please check `Oids`, `Fields`, `Tables` or change `Version` into `2`")
+							logger.Warning(context.Background(), util.PLUGIN_START_ALARM, "snmp v1 will not return any `GET` result while one of them is empty, please check `Oids`, `Fields`, `Tables` or change `Version` into `2`")
 						}
 					}
 
@@ -565,7 +566,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 				return nil
 			}()
 			if err != nil {
-				logger.Errorf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", fmt.Sprintf("%v", err))
+				logger.Errorf(context.Background(), util.PLUGIN_START_ALARM, fmt.Sprintf("%v", err))
 			}
 		}()
 	}

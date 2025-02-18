@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type Processor struct {
@@ -62,14 +63,14 @@ func (p *Processor) flush() {
 	}
 	switch p.level {
 	case "WARN":
-		logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "log", p.content.String())
+		logger.Warning(manager.managerMeta.GetContext(), util.PLUGIN_RUNTIME_ALARM, "log", p.content.String())
 	case "ERROR":
-		logger.Error(manager.managerMeta.GetContext(), JMXAlarmType, "log", p.content.String())
+		logger.Error(manager.managerMeta.GetContext(), util.PLUGIN_RUNTIME_ALARM, "log", p.content.String())
 	case "INFO":
 		logger.Info(manager.managerMeta.GetContext(), "log", p.content.String())
 	case "DEBUG":
 		logger.Debug(manager.managerMeta.GetContext(), "log", p.content.String())
 	default:
-		logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "illegal log", p.content.String())
+		logger.Warning(manager.managerMeta.GetContext(), util.PLUGIN_RUNTIME_ALARM, "illegal log", p.content.String())
 	}
 }

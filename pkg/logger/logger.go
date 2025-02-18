@@ -377,7 +377,7 @@ func catchStandardOutput() {
 					time.Sleep(100 * time.Millisecond)
 					continue
 				} else if errRead != nil {
-					Error(context.Background(), "CATCH_STANDARD_OUTPUT_ALARM", "err", errRead)
+					Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "err", errRead)
 					break
 				}
 				logger(line)
@@ -399,7 +399,7 @@ func catchStandardOutput() {
 			_, _ = fmt.Fprint(os.Stdout, "recover stdout\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDOUT_ALARM", "err", err)
+		Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "err", err)
 		return
 	}
 	err = catch(
@@ -409,14 +409,14 @@ func catchStandardOutput() {
 			return
 		},
 		func(text []byte) {
-			Error(context.Background(), "STDERR_ALARM", "stderr", string(text))
+			Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "stderr", string(text))
 		},
 		func(old *os.File) {
 			os.Stderr = old
 			_, _ = fmt.Fprint(os.Stderr, "recover stderr\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDERR_ALARM", "err", err)
+		Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "err", err)
 	}
 }
 
