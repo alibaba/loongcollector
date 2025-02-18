@@ -34,14 +34,14 @@ public:
     static const std::string sTcpCloseValue;
     static const std::string sTcpConnectValue;
 
-    NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
+    NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            std::shared_ptr<Timer> scheduler);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
-    Create(std::shared_ptr<BaseManager>& mgr,
+    Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::shared_ptr<Timer> scheduler) {

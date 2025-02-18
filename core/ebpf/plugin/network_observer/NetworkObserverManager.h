@@ -22,7 +22,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/FrequencyManager.h"
@@ -37,7 +37,7 @@ template class WorkerFunc<std::unique_ptr<NetDataEvent>, std::unique_ptr<Abstrac
 class NetworkObserverManager : public AbstractManager {
 public:
     static std::shared_ptr<NetworkObserverManager>
-    Create(std::shared_ptr<BaseManager>& mgr,
+    Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::shared_ptr<Timer> scheduler) {
@@ -47,7 +47,7 @@ public:
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() { Destroy(); }
     virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
-    NetworkObserverManager(std::shared_ptr<BaseManager>& baseMgr,
+    NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            std::shared_ptr<Timer> scheduler);

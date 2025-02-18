@@ -24,7 +24,7 @@ extern "C" {
 #include <coolbpf/security/msg_type.h>
 #include <sys/resource.h>
 
-#include "NetworkObserver.h"
+#include "ebpf/driver/EbpfDriver.h"
 }
 
 #include "FileFilter.h"

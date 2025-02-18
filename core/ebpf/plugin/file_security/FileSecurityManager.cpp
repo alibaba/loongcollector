@@ -82,7 +82,7 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
     mCommonEventQueue.enqueue(std::move(evt));
 }
 
-FileSecurityManager::FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+FileSecurityManager::FileSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                          std::shared_ptr<SourceManager> sourceManager,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          std::shared_ptr<Timer> scheduler)

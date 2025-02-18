@@ -28,7 +28,7 @@
 #include "ConnTracker.h"
 #include "Worker.h"
 #include "common/Lock.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 extern "C" {
 #include <net.h>
 };

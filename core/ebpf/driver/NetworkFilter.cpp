@@ -17,7 +17,6 @@ extern "C" {
 #include <coolbpf/coolbpf.h>
 };
 
-#include <coolbpf/security.skel.h>
 #include <unistd.h>
 
 #include <string>

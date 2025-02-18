@@ -20,51 +20,51 @@
 
 namespace logtail {
 
-static constexpr std::array<const char*, 41> CAPABILITY_STRINGS = {{"CAP_CHOWN",
-                                                                    "DAC_OVERRIDE",
-                                                                    "CAP_DAC_READ_SEARCH",
-                                                                    "CAP_FOWNER",
-                                                                    "CAP_FSETID",
-                                                                    "CAP_KILL",
-                                                                    "CAP_SETGID",
-                                                                    "CAP_SETUID",
-                                                                    "CAP_SETPCAP",
-                                                                    "CAP_LINUX_IMMUTABLE",
-                                                                    "CAP_NET_BIND_SERVICE",
-                                                                    "CAP_NET_BROADCAST",
-                                                                    "CAP_NET_ADMIN",
-                                                                    "CAP_NET_RAW",
-                                                                    "CAP_IPC_LOCK",
-                                                                    "CAP_IPC_OWNER",
-                                                                    "CAP_SYS_MODULE",
-                                                                    "CAP_SYS_RAWIO",
-                                                                    "CAP_SYS_CHROOT",
-                                                                    "CAP_SYS_PTRACE",
-                                                                    "CAP_SYS_PACCT",
-                                                                    "CAP_SYS_ADMIN",
-                                                                    "CAP_SYS_BOOT",
-                                                                    "CAP_SYS_NICE",
-                                                                    "CAP_SYS_RESOURCE",
-                                                                    "CAP_SYS_TIME",
-                                                                    "CAP_SYS_TTY_CONFIG",
-                                                                    "CAP_MKNOD",
-                                                                    "CAP_LEASE",
-                                                                    "CAP_AUDIT_WRITE",
-                                                                    "CAP_AUDIT_CONTROL",
-                                                                    "CAP_SETFCAP",
-                                                                    "CAP_MAC_OVERRIDE",
-                                                                    "CAP_MAC_ADMIN",
-                                                                    "CAP_SYSLOG",
-                                                                    "CAP_WAKE_ALARM",
-                                                                    "CAP_BLOCK_SUSPEND",
-                                                                    "CAP_AUDIT_READ",
-                                                                    "CAP_PERFMON",
-                                                                    "CAP_BPF",
-                                                                    "CAP_CHECKPOINT_RESTORE"}};
+static const std::array<std::string, 41> CAPABILITY_STRINGS = {{"CAP_CHOWN",
+                                                                "DAC_OVERRIDE",
+                                                                "CAP_DAC_READ_SEARCH",
+                                                                "CAP_FOWNER",
+                                                                "CAP_FSETID",
+                                                                "CAP_KILL",
+                                                                "CAP_SETGID",
+                                                                "CAP_SETUID",
+                                                                "CAP_SETPCAP",
+                                                                "CAP_LINUX_IMMUTABLE",
+                                                                "CAP_NET_BIND_SERVICE",
+                                                                "CAP_NET_BROADCAST",
+                                                                "CAP_NET_ADMIN",
+                                                                "CAP_NET_RAW",
+                                                                "CAP_IPC_LOCK",
+                                                                "CAP_IPC_OWNER",
+                                                                "CAP_SYS_MODULE",
+                                                                "CAP_SYS_RAWIO",
+                                                                "CAP_SYS_CHROOT",
+                                                                "CAP_SYS_PTRACE",
+                                                                "CAP_SYS_PACCT",
+                                                                "CAP_SYS_ADMIN",
+                                                                "CAP_SYS_BOOT",
+                                                                "CAP_SYS_NICE",
+                                                                "CAP_SYS_RESOURCE",
+                                                                "CAP_SYS_TIME",
+                                                                "CAP_SYS_TTY_CONFIG",
+                                                                "CAP_MKNOD",
+                                                                "CAP_LEASE",
+                                                                "CAP_AUDIT_WRITE",
+                                                                "CAP_AUDIT_CONTROL",
+                                                                "CAP_SETFCAP",
+                                                                "CAP_MAC_OVERRIDE",
+                                                                "CAP_MAC_ADMIN",
+                                                                "CAP_SYSLOG",
+                                                                "CAP_WAKE_ALARM",
+                                                                "CAP_BLOCK_SUSPEND",
+                                                                "CAP_AUDIT_READ",
+                                                                "CAP_PERFMON",
+                                                                "CAP_BPF",
+                                                                "CAP_CHECKPOINT_RESTORE"}};
 
 static constexpr int32_t CAP_LAST_CAP = 40;
 
-std::string GetCapability(int32_t capInt) {
+const std::string& GetCapability(int32_t capInt) {
     if (capInt < 0 || capInt > CAP_LAST_CAP) {
         throw std::invalid_argument("invalid capability value " + std::to_string(capInt));
     }
@@ -79,7 +79,7 @@ std::string GetCapabilities(uint64_t capInt) {
     std::string result;
     result.reserve(CAP_LAST_CAP * 16);
 
-    for (uint64_t i = 0; i < 64 && i <= CAP_LAST_CAP; ++i) {
+    for (uint64_t i = 0; i <= CAP_LAST_CAP; ++i) {
         if ((1ULL << i) & capInt) {
             if (!result.empty()) {
                 result.append(1, ' ');

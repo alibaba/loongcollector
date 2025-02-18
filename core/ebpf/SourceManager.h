@@ -20,14 +20,10 @@
 
 #include <array>
 #include <atomic>
-#include <iostream>
-#include <map>
+#include <memory>
 #include <string>
-#include <thread>
-#include <vector>
 
 #include "common/DynamicLibHelper.h"
-#include "ebpf/driver/NetworkObserver.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {

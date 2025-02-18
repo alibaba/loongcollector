@@ -20,7 +20,7 @@
 #include "common/TimeUtil.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/plugin/network_observer/NetworkObserverManager.h"
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/NetworkObserverEvent.h"

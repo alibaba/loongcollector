@@ -23,8 +23,8 @@
 namespace logtail {
 
 std::string GetAddrString(uint32_t addr);
-std::string GetFamilyString(uint16_t family);
-std::string GetProtocolString(uint16_t protocol);
-std::string GetStateString(uint16_t state);
+const std::string& GetFamilyString(uint16_t family);
+const std::string& GetProtocolString(uint16_t protocol);
+const std::string& GetStateString(uint16_t state);
 
 } // namespace logtail

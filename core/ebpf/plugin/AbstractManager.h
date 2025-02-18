@@ -21,7 +21,6 @@
 #include <set>
 #include <unordered_map>
 
-#include "BaseManager.h"
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -29,6 +28,7 @@
 #include "ebpf/Config.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/SecurityEvent.h"
 #include "ebpf/util/AggregateTree.h"
@@ -43,7 +43,7 @@ public:
     static const std::string sKprobeValue;
 
     AbstractManager() = delete;
-    explicit AbstractManager(std::shared_ptr<BaseManager>,
+    explicit AbstractManager(std::shared_ptr<ProcessCacheManager>,
                              std::shared_ptr<SourceManager> sourceManager,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                              std::shared_ptr<Timer> scheduler);
@@ -112,12 +112,12 @@ public:
         mPluginIndex = index;
     }
 
-    void UpdateBaseManager(std::shared_ptr<BaseManager> other) {
+    void UpdateBaseManager(std::shared_ptr<ProcessCacheManager> other) {
         WriteLock lk(mBaseMgrLock);
         mBaseManager = other;
     }
 
-    std::shared_ptr<BaseManager> GetBaseManager() const {
+    std::shared_ptr<ProcessCacheManager> GetBaseManager() const {
         ReadLock lk(mBaseMgrLock);
         return mBaseManager;
     }
@@ -128,7 +128,7 @@ public:
 
 private:
     mutable ReadWriteLock mBaseMgrLock;
-    std::shared_ptr<BaseManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mBaseManager;
 
 protected:
     std::shared_ptr<SourceManager> mSourceManager;

@@ -21,7 +21,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -34,13 +34,13 @@ public:
     static const std::string sExitValue;
 
     ProcessSecurityManager() = delete;
-    ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+    ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            std::shared_ptr<Timer> scheduler);
 
     static std::shared_ptr<ProcessSecurityManager>
-    Create(std::shared_ptr<BaseManager>& mgr,
+    Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::shared_ptr<Timer> scheduler) {

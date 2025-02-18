@@ -21,7 +21,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/FileEvent.h"
 
 namespace logtail {
@@ -34,13 +34,13 @@ public:
     static const std::string sPermissionValue;
 
     FileSecurityManager() = delete;
-    FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+    FileSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                         std::shared_ptr<SourceManager> sourceManager,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         std::shared_ptr<Timer> scheduler);
 
     static std::shared_ptr<FileSecurityManager>
-    Create(std::shared_ptr<BaseManager>& mgr,
+    Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            std::shared_ptr<Timer> scheduler) {

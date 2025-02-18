@@ -27,7 +27,7 @@ const std::string AbstractManager::sEventTypeKey = "event_type";
 const std::string AbstractManager::sKprobeValue = "kprobe";
 
 
-AbstractManager::AbstractManager(std::shared_ptr<BaseManager> bm,
+AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> bm,
                                  std::shared_ptr<SourceManager> sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                  std::shared_ptr<Timer> scheduler)

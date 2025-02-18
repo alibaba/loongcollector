@@ -192,7 +192,7 @@ void eBPFServer::Init() {
     mSourceManager = std::make_shared<SourceManager>();
     mSourceManager->Init();
 
-    mBaseManager = std::make_shared<BaseManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
+    mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);

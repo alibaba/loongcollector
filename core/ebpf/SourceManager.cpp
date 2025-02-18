@@ -21,7 +21,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
-#include "ebpf/driver/NetworkObserver.h"
+#include "ebpf/driver/EbpfDriver.h"
 #include "logger/Logger.h"
 
 namespace logtail {

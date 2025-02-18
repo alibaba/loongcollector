@@ -33,13 +33,13 @@
 namespace logtail {
 namespace ebpf {
 
-class BaseManager {
+class ProcessCacheManager {
 public:
-    BaseManager() = delete;
-    BaseManager(std::shared_ptr<SourceManager> sm,
-                const std::string& hostName,
-                const std::string& hostPathPrefix,
-                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    ProcessCacheManager() = delete;
+    ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
+                        const std::string& hostName,
+                        const std::string& hostPathPrefix,
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
         : mSourceManager(sm),
           mCache(65535, 1024),
           //   mDataCache(1024, 256),
@@ -47,12 +47,12 @@ public:
           mHostName(hostName),
           mHostPathPrefix(hostPathPrefix),
           mCommonEventQueue(queue) {}
-    ~BaseManager() {}
+    ~ProcessCacheManager() {}
 
     bool ContainsKey(const std::string& key) const { return mCache.contains(key); }
 
     // thread-safe
-    const std::shared_ptr<MsgExecveEventUnix> LookupCache(const std::string& key) { return mCache.get(key); }
+    std::shared_ptr<MsgExecveEventUnix> LookupCache(const std::string& key) { return mCache.get(key); }
 
     // thread-safe
     void ReleaseCache(const std::string& key) { mCache.remove(key); }
@@ -63,7 +63,7 @@ public:
     std::vector<std::shared_ptr<Procs>> ListRunningProcs();
     int WriteProcToBPFMap(const std::shared_ptr<Procs>& proc);
     int SyncAllProc();
-    int PushExecveEvent(const std::shared_ptr<Procs> proc);
+    int PushExecveEvent(const std::shared_ptr<Procs>& proc);
 
     void RecordExecveEvent(msg_execve_event* eventPtr);
     void PostHandlerExecveEvent(msg_execve_event*, std::unique_ptr<MsgExecveEventUnix>&&);
@@ -76,7 +76,7 @@ public:
 
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
-    SizedMap FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint32_t pid, uint64_t ktime);
+    SizedMap FinalizeProcessTags(std::shared_ptr<SourceBuffer>& sb, uint32_t pid, uint64_t ktime);
 
     bool FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime);
 

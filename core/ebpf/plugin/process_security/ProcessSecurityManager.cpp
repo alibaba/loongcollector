@@ -26,7 +26,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/PeriodicalEvent.h"
 
 namespace logtail {
@@ -38,7 +38,7 @@ const std::string ProcessSecurityManager::sExecveValue = "value";
 const std::string ProcessSecurityManager::sCloneValue = "clone";
 const std::string ProcessSecurityManager::sExitValue = "exit";
 
-ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
+ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                std::shared_ptr<Timer> scheduler)

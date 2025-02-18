@@ -26,41 +26,42 @@
 
 namespace logtail {
 
-static constexpr std::array<const char*, 14> TCP_STATE_STRINGS = {{"UNKNOWN_STATE",
-                                                                   "TCP_ESTABLISHED",
-                                                                   "TCP_SYN_SENT",
-                                                                   "TCP_SYN_RECV",
-                                                                   "TCP_FIN_WAIT1",
-                                                                   "TCP_FIN_WAIT2",
-                                                                   "TCP_TIME_WAIT",
-                                                                   "TCP_CLOSE",
-                                                                   "TCP_CLOSE_WAIT",
-                                                                   "TCP_LAST_ACK",
-                                                                   "TCP_LISTEN",
-                                                                   "TCP_CLOSING",
-                                                                   "TCP_NEW_SYN_RECV",
-                                                                   "TCP_MAX_STATES"}};
+static const std::array<std::string, 14> TCP_STATE_STRINGS = {{"UNKNOWN_STATE",
+                                                               "TCP_ESTABLISHED",
+                                                               "TCP_SYN_SENT",
+                                                               "TCP_SYN_RECV",
+                                                               "TCP_FIN_WAIT1",
+                                                               "TCP_FIN_WAIT2",
+                                                               "TCP_TIME_WAIT",
+                                                               "TCP_CLOSE",
+                                                               "TCP_CLOSE_WAIT",
+                                                               "TCP_LAST_ACK",
+                                                               "TCP_LISTEN",
+                                                               "TCP_CLOSING",
+                                                               "TCP_NEW_SYN_RECV",
+                                                               "TCP_MAX_STATES"}};
 
-static constexpr const char* INVALID_STATE = "INVALID_STATE";
-static constexpr const char* EMPTY_STRING = "";
+static const std::string INVALID_STATE = "INVALID_STATE";
+static const std::string EMPTY_STRING = "";
 
-static constexpr const char* PROTOCOL_ICMP = "ICMP";
-static constexpr const char* PROTOCOL_IGMP = "IGMP";
-static constexpr const char* PROTOCOL_IP = "IP";
-static constexpr const char* PROTOCOL_TCP = "TCP";
-static constexpr const char* PROTOCOL_UDP = "UDP";
-static constexpr const char* PROTOCOL_ENCAPSULATION = "ENCAP";
-static constexpr const char* PROTOCOL_OSPF = "OSPF";
-static constexpr const char* PROTOCOL_UNKNOWN = "Unknown";
+static const std::string PROTOCOL_ICMP = "ICMP";
+static const std::string PROTOCOL_IGMP = "IGMP";
+static const std::string PROTOCOL_IP = "IP";
+static const std::string PROTOCOL_TCP = "TCP";
+static const std::string PROTOCOL_UDP = "UDP";
+static const std::string PROTOCOL_ENCAPSULATION = "ENCAP";
+static const std::string PROTOCOL_OSPF = "OSPF";
+static const std::string PROTOCOL_UNKNOWN = "Unknown";
 
-static constexpr const char* FAMILY_INET = "AF_INET";
-static constexpr const char* FAMILY_INET6 = "AF_INET6";
-static constexpr const char* FAMILY_UNIX = "AF_UNIX";
-static constexpr const char* FAMILY_UNKNOWN = "UNKNOWN_FAMILY";
+static const std::string FAMILY_INET = "AF_INET";
+static const std::string FAMILY_INET6 = "AF_INET6";
+static const std::string FAMILY_UNIX = "AF_UNIX";
+static const std::string FAMILY_UNKNOWN = "UNKNOWN_FAMILY";
 
-std::string GetStateString(uint16_t state) {
-    if (state >= TCP_STATE_STRINGS.size())
+const std::string& GetStateString(uint16_t state) {
+    if (state >= TCP_STATE_STRINGS.size()) {
         return INVALID_STATE;
+    }
     return TCP_STATE_STRINGS[state];
 }
 
@@ -77,7 +78,7 @@ std::string GetAddrString(uint32_t ad) {
     return EMPTY_STRING;
 }
 
-std::string GetFamilyString(uint16_t family) {
+const std::string& GetFamilyString(uint16_t family) {
 #if defined(__linux__)
     switch (family) {
         case AF_INET:
@@ -94,7 +95,7 @@ std::string GetFamilyString(uint16_t family) {
 #endif
 }
 
-std::string GetProtocolString(uint16_t protocol) {
+const std::string& GetProtocolString(uint16_t protocol) {
     switch (protocol) {
         case 1:
             return PROTOCOL_ICMP;

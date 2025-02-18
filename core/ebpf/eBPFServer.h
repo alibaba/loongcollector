@@ -30,7 +30,7 @@
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/BaseManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
@@ -135,7 +135,7 @@ private:
     CounterPtr mSuspendPluginTotal;
 
     // hold some managers ...
-    std::shared_ptr<BaseManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mBaseManager;
 
     std::shared_ptr<Timer> mScheduler;
 

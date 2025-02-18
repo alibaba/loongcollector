@@ -16,18 +16,16 @@
 
 extern "C" {
 #include <bpf/libbpf.h>
-#include <coolbpf/coolbpf.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#include <coolbpf/security.skel.h>
+#pragma GCC diagnostic pop
 };
 
-#include <coolbpf/security.skel.h>
 #include <unistd.h>
 
 #include <string>
-#include <vector>
 
-#include "BPFMapTraits.h"
-#include "IdAllocator.h"
-#include "Log.h"
 #include "eBPFWrapper.h"
 #include "ebpf/include/export.h"
 

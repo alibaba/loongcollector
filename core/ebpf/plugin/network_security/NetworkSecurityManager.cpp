@@ -94,7 +94,7 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 }
 
 
-NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
+NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                std::shared_ptr<Timer> scheduler)
