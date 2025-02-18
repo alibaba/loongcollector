@@ -25,6 +25,16 @@ extern "C" {
 namespace logtail {
 namespace ebpf {
 
+const std::string EXTERNAL_STR = EXTERNAL_STR;
+const std::string LOCALHOST_STR = LOCALHOST_STR;
+const std::string HTTP_STR = "http";
+const std::string RPC_25_STR = "25";
+const std::string RPC_0_STR = "0";
+const std::string HTTP_CLIENT_STR = "http_client";
+const std::string UNKNOWN_STR = UNKNOWN_STR;
+const std::string IPV4_STR = "ipv4";
+const std::string IPV6_STR = "ipv6";
+
 std::regex ConnTracker::rgx_ = std::regex("[a-f0-9]{64}");
 
 bool ConnTracker::MetaAttachReadyForApp() {
@@ -100,14 +110,14 @@ void ConnTracker::UpdateProtocol(ProtocolType protocol) {
         protocol_ = protocol;
         attrs_[kConnTrackerTable.ColIndex(kProtocol.name())] = std::string(magic_enum::enum_name(protocol_));
         if (role == support_role_e::IsClient) {
-            attrs_[kConnTrackerTable.ColIndex(kRpcType.name())] = "25";
-            attrs_[kConnTrackerTable.ColIndex(kCallKind.name())] = "http_client";
-            attrs_[kConnTrackerTable.ColIndex(kCallType.name())] = "http_client";
+            attrs_[kConnTrackerTable.ColIndex(kRpcType.name())] = RPC_25_STR;
+            attrs_[kConnTrackerTable.ColIndex(kCallKind.name())] = HTTP_CLIENT_STR;
+            attrs_[kConnTrackerTable.ColIndex(kCallType.name())] = HTTP_CLIENT_STR;
             protocol_set_ = true;
         } else if (role == support_role_e::IsServer) {
-            attrs_[kConnTrackerTable.ColIndex(kRpcType.name())] = "0";
-            attrs_[kConnTrackerTable.ColIndex(kCallKind.name())] = "http";
-            attrs_[kConnTrackerTable.ColIndex(kCallType.name())] = "http";
+            attrs_[kConnTrackerTable.ColIndex(kRpcType.name())] = RPC_0_STR;
+            attrs_[kConnTrackerTable.ColIndex(kCallKind.name())] = HTTP_STR;
+            attrs_[kConnTrackerTable.ColIndex(kCallType.name())] = HTTP_STR;
             protocol_set_ = true;
         }
 
@@ -146,13 +156,13 @@ void ConnTracker::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
 
 void ConnTracker::UpdatePeerPodMetaForExternal() {
     WriteLock lock(mReadWriteLock);
-    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = "external";
-    attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = "external";
+    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = EXTERNAL_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = EXTERNAL_STR;
     if (role == IsClient) {
         attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = dip_;
         attrs_[kConnTrackerTable.ColIndex(kEndpoint.name())] = dip_;
@@ -161,26 +171,26 @@ void ConnTracker::UpdatePeerPodMetaForExternal() {
 }
 void ConnTracker::UpdatePeerPodMetaForLocalhost() {
     WriteLock lock(mReadWriteLock);
-    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "localhost";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "localhost";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "localhost";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = "localhost";
-    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = "localhost";
+    attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = LOCALHOST_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = LOCALHOST_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = LOCALHOST_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = LOCALHOST_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = LOCALHOST_STR;
     if (role == IsClient) {
-        attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = "localhost";
+        attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = LOCALHOST_STR;
         attrs_[kConnTrackerTable.ColIndex(kEndpoint.name())] = dip_;
     }
     MarkPeerPodMetaAttached();
 }
 void ConnTracker::UpdateSelfPodMetaForUnknown() {
     WriteLock lock(mReadWriteLock);
-    attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPodIp.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kWorkloadName.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kWorkloadKind.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kNamespace.name())] = "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kHost.name())] = "unknown";
+    attrs_[kConnTrackerTable.ColIndex(kAppName.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kAppId.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPodIp.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kWorkloadName.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kWorkloadKind.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kNamespace.name())] = UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kHost.name())] = UNKNOWN_STR;
     MarkPodMetaAttached();
 }
 
@@ -188,13 +198,13 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
     WriteLock lock(mReadWriteLock);
     if (!pod) {
         // no meta info ...
-        attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = "external";
-        attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = "external";
+        attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = EXTERNAL_STR;
+        attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())] = EXTERNAL_STR;
         MarkPeerPodMetaAttached();
         return;
     }
@@ -211,16 +221,16 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
     }
 
     attrs_[kConnTrackerTable.ColIndex(kPeerAppName.name())]
-        = peer_arms_app_name_.size() ? peer_arms_app_name_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_pod_name_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_pod_ip_ : "unknown";
+        = peer_arms_app_name_.size() ? peer_arms_app_name_ : UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodName.name())] = peer_pod_name_.size() ? peer_pod_name_ : UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerPodIp.name())] = peer_pod_ip_.size() ? peer_pod_ip_ : UNKNOWN_STR;
     attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadName.name())]
-        = peer_workload_name_.size() ? peer_workload_name_ : "unknown";
+        = peer_workload_name_.size() ? peer_workload_name_ : UNKNOWN_STR;
     attrs_[kConnTrackerTable.ColIndex(kPeerWorkloadKind.name())]
-        = peer_workload_kind_.size() ? peer_workload_kind_ : "unknown";
-    attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_namespace_ : "unknown";
+        = peer_workload_kind_.size() ? peer_workload_kind_ : UNKNOWN_STR;
+    attrs_[kConnTrackerTable.ColIndex(kPeerNamespace.name())] = peer_namespace_.size() ? peer_namespace_ : UNKNOWN_STR;
     attrs_[kConnTrackerTable.ColIndex(kPeerServiceName.name())]
-        = peer_service_name_.size() ? peer_service_name_ : "unknown";
+        = peer_service_name_.size() ? peer_service_name_ : UNKNOWN_STR;
 
     if (role == IsClient) {
         if (peer_arms_app_name_.size()) {
@@ -230,7 +240,7 @@ void ConnTracker::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod
         } else if (peer_service_name_.size()) {
             attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = peer_service_name_;
         } else {
-            attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = "unknown";
+            attrs_[kConnTrackerTable.ColIndex(kDestId.name())] = UNKNOWN_STR;
         }
 
         attrs_[kConnTrackerTable.ColIndex(kEndpoint.name())] = dip_;
@@ -382,9 +392,9 @@ void ConnTracker::UpdateSocketInfo(struct conn_stats_event_t* event) {
     daddr_ = dip_ + ":" + std::to_string(dport_);
     net_ns_ = si.netns;
     if (si.family == AF_INET) {
-        family_ = "ipv4";
+        family_ = IPV4_STR;
     } else if (si.family == AF_INET6) {
-        family_ = "ipv6";
+        family_ = IPV6_STR;
     }
 
     if (!net_meta_attached_) {

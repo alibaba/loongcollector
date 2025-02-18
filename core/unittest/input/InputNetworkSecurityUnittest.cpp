@@ -91,7 +91,7 @@ void InputNetworkSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
     logtail::ebpf::SecurityNetworkFilter thisFilter1
-        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
     APSARA_TEST_EQUAL(1, thisFilter1.mDestPortList.size());
@@ -126,7 +126,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
     logtail::ebpf::SecurityNetworkFilter thisFilter1
-        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
     APSARA_TEST_EQUAL(0, thisFilter1.mDestPortList.size());
@@ -152,7 +152,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter5
-        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL(thisFilter5.mDestAddrList.size(), 0);
     APSARA_TEST_EQUAL(thisFilter5.mDestPortList.size(), 0);
     APSARA_TEST_EQUAL(thisFilter5.mSourceAddrBlackList.size(), 0);
@@ -180,7 +180,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter6
-        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL(2, thisFilter6.mDestAddrList.size());
 }
 

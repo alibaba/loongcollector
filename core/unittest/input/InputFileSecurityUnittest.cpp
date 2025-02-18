@@ -91,7 +91,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter1
-        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("/etc", thisFilter1.mFilePathList[0]);
     APSARA_TEST_EQUAL("/bin", thisFilter1.mFilePathList[1]);
 
@@ -116,7 +116,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter2
-        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter2.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter2.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter2.mFilePathList[2]);
@@ -144,7 +144,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter
-        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL(0, thisFilter.mFilePathList.size());
 
     // invalid optional param
@@ -167,7 +167,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter1
-        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL(0, thisFilter1.mFilePathList.size());
 
     // lose mandatory param

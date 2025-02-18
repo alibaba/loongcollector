@@ -303,7 +303,7 @@ void ManagerUnittest::TestBaseManagerProcessTags() {
     execveEvent->process.uid = 1000;
     execveEvent->process.binary = "test_binary";
     auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_process.ktime = 0;
+    msg->cleanup_key.ktime = 0;
     msg->parent.pid = 2345;
     msg->parent.ktime = 6789;
     execveEvent->msg = std::move(msg);
@@ -464,7 +464,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
     auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_process.ktime = 0;
+    msg->cleanup_key.ktime = 0;
     msg->parent.pid = 2345;
     msg->parent.ktime = 6789;
     execveEvent->msg = std::move(msg);
@@ -528,7 +528,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
     auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_process.ktime = 0;
+    msg->cleanup_key.ktime = 0;
     msg->parent.pid = 2345;
     msg->parent.ktime = 6789;
     execveEvent->msg = std::move(msg);
@@ -593,7 +593,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
     auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_process.ktime = 0;
+    msg->cleanup_key.ktime = 0;
     msg->parent.pid = 2345;
     msg->parent.ktime = 6789;
     execveEvent->msg = std::move(msg);

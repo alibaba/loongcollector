@@ -734,16 +734,16 @@ int BaseManager::PushExecveEvent(const std::shared_ptr<Procs> proc) {
         }
         event->msg->parent.pid = proc->ppid;
         event->msg->parent.ktime = proc->pktime;
-        event->msg->namespaces.uts_inum = proc->uts_ns;
-        event->msg->namespaces.ipc_inum = proc->ipc_ns;
-        event->msg->namespaces.mnt_inum = proc->mnt_ns;
-        event->msg->namespaces.pid_inum = proc->pid_ns;
-        event->msg->namespaces.pid_child_inum = proc->pid_for_children_ns;
-        event->msg->namespaces.net_inum = proc->net_ns;
-        event->msg->namespaces.time_inum = proc->time_ns;
-        event->msg->namespaces.time_child_inum = proc->time_for_children_ns;
-        event->msg->namespaces.cgroup_inum = proc->cgroup_ns;
-        event->msg->namespaces.user_inum = proc->user_ns;
+        event->msg->ns.uts_inum = proc->uts_ns;
+        event->msg->ns.ipc_inum = proc->ipc_ns;
+        event->msg->ns.mnt_inum = proc->mnt_ns;
+        event->msg->ns.pid_inum = proc->pid_ns;
+        event->msg->ns.pid_for_children_inum = proc->pid_for_children_ns;
+        event->msg->ns.net_inum = proc->net_ns;
+        event->msg->ns.time_inum = proc->time_ns;
+        event->msg->ns.time_for_children_inum = proc->time_for_children_ns;
+        event->msg->ns.cgroup_inum = proc->cgroup_ns;
+        event->msg->ns.user_inum = proc->user_ns;
         event->process.size = proc->size;
         event->process.pid = proc->pid;
         event->process.tid = proc->tid;
@@ -758,9 +758,9 @@ int BaseManager::PushExecveEvent(const std::shared_ptr<Procs> proc) {
         event->msg->creds.egid = proc->gids[1];
         event->msg->creds.fsuid = proc->gids[2];
         event->msg->creds.fsgid = proc->gids[3];
-        event->msg->creds.cap.permitted = proc->permitted;
-        event->msg->creds.cap.effective = proc->effective;
-        event->msg->creds.cap.inheritable = proc->inheritable;
+        event->msg->creds.caps.permitted = proc->permitted;
+        event->msg->creds.caps.effective = proc->effective;
+        event->msg->creds.caps.inheritable = proc->inheritable;
         event->process.flags = proc->flags | flags;
         event->process.ktime = proc->ktime;
         event->msg->common.ktime = proc->ktime;
@@ -779,10 +779,10 @@ std::string BaseManager::GenerateParentExecId(const std::shared_ptr<MsgExecveEve
     if (!event->msg) {
         return "";
     }
-    if (event->msg->cleanup_process.ktime == 0 || event->process.flags & EVENT_CLONE) {
+    if (event->msg->cleanup_key.ktime == 0 || event->process.flags & EVENT_CLONE) {
         return GenerateExecId(event->msg->parent.pid, event->msg->parent.ktime);
     } else {
-        return GenerateExecId(event->msg->cleanup_process.pid, event->msg->cleanup_process.ktime);
+        return GenerateExecId(event->msg->cleanup_key.pid, event->msg->cleanup_key.ktime);
     }
 }
 
@@ -852,9 +852,9 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
 
     std::string args = proc->process.args; // TODO
     std::string binary = proc->process.filename; // TODO
-    std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
-    std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
-    std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
+    std::string permitted = GetCapabilities(proc->msg->creds.caps.permitted);
+    std::string effective = GetCapabilities(proc->msg->creds.caps.effective);
+    std::string inheritable = GetCapabilities(proc->msg->creds.caps.inheritable);
 
     rapidjson::Document::AllocatorType allocator;
     rapidjson::Value cap(rapidjson::kObjectType);
@@ -902,9 +902,9 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
         res.Insert(kParentProcess.log_key(), StringView(UNKOWN_STR));
         return res;
     } else {
-        std::string permitted = GetCapabilities(parentProc->msg->creds.cap.permitted);
-        std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
-        std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
+        std::string permitted = GetCapabilities(parentProc->msg->creds.caps.permitted);
+        std::string effective = GetCapabilities(parentProc->msg->creds.caps.effective);
+        std::string inheritable = GetCapabilities(parentProc->msg->creds.caps.inheritable);
 
         rapidjson::Document d;
         d.SetObject();
@@ -960,9 +960,9 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
     // finalize proc tags
     std::string args = proc->process.args; // TODO
     std::string binary = proc->process.args; // TODO
-    std::string permitted = GetCapabilities(proc->msg->creds.cap.permitted);
-    std::string effective = GetCapabilities(proc->msg->creds.cap.effective);
-    std::string inheritable = GetCapabilities(proc->msg->creds.cap.inheritable);
+    std::string permitted = GetCapabilities(proc->msg->creds.caps.permitted);
+    std::string effective = GetCapabilities(proc->msg->creds.caps.effective);
+    std::string inheritable = GetCapabilities(proc->msg->creds.caps.inheritable);
 
     rapidjson::Document::AllocatorType allocator;
     rapidjson::Value cap(rapidjson::kObjectType);
@@ -994,12 +994,12 @@ bool BaseManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t p
 
     // for parent
     if (!parentProc) {
-        eventGroup.SetTag("parent_process", std::string("unknown"));
+        eventGroup.SetTag("parent_process", UNKOWN_STR);
         return true;
     } else {
-        std::string permitted = GetCapabilities(parentProc->msg->creds.cap.permitted);
-        std::string effective = GetCapabilities(parentProc->msg->creds.cap.effective);
-        std::string inheritable = GetCapabilities(parentProc->msg->creds.cap.inheritable);
+        std::string permitted = GetCapabilities(parentProc->msg->creds.caps.permitted);
+        std::string effective = GetCapabilities(parentProc->msg->creds.caps.effective);
+        std::string inheritable = GetCapabilities(parentProc->msg->creds.caps.inheritable);
 
         rapidjson::Document d;
         d.SetObject();
