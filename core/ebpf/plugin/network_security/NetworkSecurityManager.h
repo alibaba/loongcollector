@@ -30,6 +30,10 @@ namespace ebpf {
 
 class NetworkSecurityManager : public AbstractManager {
 public:
+    static const std::string sTcpSendMsgValue;
+    static const std::string sTcpCloseValue;
+    static const std::string sTcpConnectValue;
+
     NetworkSecurityManager(std::shared_ptr<BaseManager>& base,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -68,7 +72,7 @@ public:
 
 private:
     ReadWriteLock mLock;
-    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> mAggregateTree; // guard by mLock
+    SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree; // guard by mLock
 };
 
 } // namespace ebpf

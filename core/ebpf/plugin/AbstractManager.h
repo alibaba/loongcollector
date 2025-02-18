@@ -33,17 +33,15 @@
 #include "ebpf/type/SecurityEvent.h"
 #include "ebpf/util/AggregateTree.h"
 
-// #include "driver/bpf_wrapper.h"
-// #include "common/agg_tree.h"
-// #include "type/security_event.h"
-
 namespace logtail {
 namespace ebpf {
 
 class AbstractManager {
 public:
-    using configType
-        = std::variant<std::monostate, logtail::ebpf::SecurityFileFilter, logtail::ebpf::SecurityNetworkFilter>;
+    static const std::string sCallNameKey;
+    static const std::string sEventTypeKey;
+    static const std::string sKprobeValue;
+
     AbstractManager() = delete;
     explicit AbstractManager(std::shared_ptr<BaseManager>,
                              std::shared_ptr<SourceManager> sourceManager,
@@ -71,15 +69,9 @@ public:
 
     virtual logtail::ebpf::PluginType GetPluginType() = 0;
 
-    // virtual void InitAggregateTree() {
-    //     aggregate_tree_ = nullptr;
-    // }
-
     virtual int Suspend() {
         WriteLock lock(mMtx);
-        // flag_ = false;
         mSuspendFlag = true;
-        mRunnerCV.notify_all();
         bool ret = mSourceManager->SuspendPlugin(GetPluginType());
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(GetPluginType())));
@@ -92,7 +84,6 @@ public:
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;
-            mRunnerCV.notify_all();
         }
         bool ret = mSourceManager->ResumePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
@@ -150,10 +141,8 @@ protected:
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 
-    // std::unique_ptr<SIZETAggTree<BaseSecurityNode, std::unique_ptr<BaseSecurityEvent>>> mAggregateTree;
     // static ...
     std::chrono::nanoseconds mTimeDiff;
-    std::condition_variable mRunnerCV;
     std::atomic_int mStartUid = 0;
 };
 

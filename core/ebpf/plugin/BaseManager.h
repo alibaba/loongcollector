@@ -17,8 +17,8 @@
 #include <coolbpf/security/data_msg.h>
 
 #include <atomic>
-#include <regex>
 #include <future>
+#include <regex>
 #include <unordered_map>
 
 #include "common/LRUCache.h"
@@ -72,7 +72,7 @@ public:
     void RecordDataEvent(msg_data* eventPtr);
 
     std::string GenerateExecId(uint32_t pid, uint64_t ktime);
-    std::string GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix> event);
+    std::string GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix>& event);
 
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 

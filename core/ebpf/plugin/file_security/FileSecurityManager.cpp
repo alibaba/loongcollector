@@ -25,6 +25,10 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string FileSecurityManager::sPathKey = "path";
+const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
+const std::string FileSecurityManager::sTruncateValue = "security_path_truncate";
+const std::string FileSecurityManager::sPermissionValue = "security_file_permission";
 
 void HandleFileKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
     if (!ctx) {
@@ -53,7 +57,6 @@ void HandleFileKernelEventLoss(void* ctx, int cpu, __u64 num) {
 
     return;
 }
-
 
 void FileSecurityManager::RecordFileEvent(file_data_t* event) {
     KernelEventType type;
@@ -86,10 +89,11 @@ FileSecurityManager::FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
     : AbstractManager(baseMgr, sourceManager, queue, scheduler),
       mAggregateTree(
           4096,
-          [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
+          [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(std::move(other));
           },
-          [this](const std::shared_ptr<FileEvent>& in) {
+          [](const std::shared_ptr<CommonEvent>& ce) {
+              FileEvent* in = static_cast<FileEvent*>(ce.get());
               return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
           }) {
 }
@@ -100,7 +104,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     }
 
     WriteLock lk(this->mLock);
-    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> aggTree = this->mAggregateTree.GetAndReset();
+    SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -133,7 +137,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 return;
             }
 
-            for (auto innerEvent : group->mInnerEvents) {
+            for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
                 // attach process tags
                 for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
@@ -143,22 +147,28 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                 // set timestamp
                 logEvent->SetTimestamp(seconds.count(), ts);
-                logEvent->SetContent("path", group->mPath);
+                logEvent->SetContent(FileSecurityManager::sPathKey, group->mPath);
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
-                        logEvent->SetContent("call_name", std::string("security_path_truncate"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_MMAP: {
-                        logEvent->SetContent("call_name", std::string("security_mmap_file"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(FileSecurityManager::sMmapValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
-                        logEvent->SetContent("call_name", std::string("security_file_permission"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     default:
@@ -221,7 +231,8 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     return mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
 }
 
-std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
+std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
+    FileEvent* event = static_cast<FileEvent*>(ce.get());
     // calculate agg key
     std::array<size_t, 2> hash_result;
     hash_result.fill(0UL);
@@ -236,7 +247,7 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
-    auto fileEvent = std::dynamic_pointer_cast<FileEvent>(event);
+    FileEvent* fileEvent = static_cast<FileEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(
                   "eventType", magic_enum::enum_name(event->mEventType)));
@@ -249,10 +260,10 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     }
 
     // calculate agg key
-    std::array<size_t, 2> hash_result = GenerateAggKey(fileEvent);
+    std::array<size_t, 2> hash_result = GenerateAggKeyForFileEvent(event);
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(fileEvent, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, hash_result);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
     return 0;

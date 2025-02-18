@@ -18,8 +18,7 @@
 
 #include <cstdint>
 
-#include <string>
-#include <vector>
+#include <array>
 
 #if defined(__linux__)
 #include <arpa/inet.h>
@@ -27,27 +26,42 @@
 
 namespace logtail {
 
-const std::vector<std::string> tcpStateString = {
-    "UNKNOWN_STATE",
-    "TCP_ESTABLISHED",
-    "TCP_SYN_SENT",
-    "TCP_SYN_RECV",
-    "TCP_FIN_WAIT1",
-    "TCP_FIN_WAIT2",
-    "TCP_TIME_WAIT",
-    "TCP_CLOSE",
-    "TCP_CLOSE_WAIT",
-    "TCP_LAST_ACK",
-    "TCP_LISTEN",
-    "TCP_CLOSING",
-    "TCP_NEW_SYN_RECV",
-    "TCP_MAX_STATES",
-};
+static constexpr std::array<const char*, 14> TCP_STATE_STRINGS = {{"UNKNOWN_STATE",
+                                                                   "TCP_ESTABLISHED",
+                                                                   "TCP_SYN_SENT",
+                                                                   "TCP_SYN_RECV",
+                                                                   "TCP_FIN_WAIT1",
+                                                                   "TCP_FIN_WAIT2",
+                                                                   "TCP_TIME_WAIT",
+                                                                   "TCP_CLOSE",
+                                                                   "TCP_CLOSE_WAIT",
+                                                                   "TCP_LAST_ACK",
+                                                                   "TCP_LISTEN",
+                                                                   "TCP_CLOSING",
+                                                                   "TCP_NEW_SYN_RECV",
+                                                                   "TCP_MAX_STATES"}};
+
+static constexpr const char* INVALID_STATE = "INVALID_STATE";
+static constexpr const char* EMPTY_STRING = "";
+
+static constexpr const char* PROTOCOL_ICMP = "ICMP";
+static constexpr const char* PROTOCOL_IGMP = "IGMP";
+static constexpr const char* PROTOCOL_IP = "IP";
+static constexpr const char* PROTOCOL_TCP = "TCP";
+static constexpr const char* PROTOCOL_UDP = "UDP";
+static constexpr const char* PROTOCOL_ENCAPSULATION = "ENCAP";
+static constexpr const char* PROTOCOL_OSPF = "OSPF";
+static constexpr const char* PROTOCOL_UNKNOWN = "Unknown";
+
+static constexpr const char* FAMILY_INET = "AF_INET";
+static constexpr const char* FAMILY_INET6 = "AF_INET6";
+static constexpr const char* FAMILY_UNIX = "AF_UNIX";
+static constexpr const char* FAMILY_UNKNOWN = "UNKNOWN_FAMILY";
 
 std::string GetStateString(uint16_t state) {
-    if (state >= tcpStateString.size())
-        return "INVALID_STATE";
-    return tcpStateString[state];
+    if (state >= TCP_STATE_STRINGS.size())
+        return INVALID_STATE;
+    return TCP_STATE_STRINGS[state];
 }
 
 std::string GetAddrString(uint32_t ad) {
@@ -55,45 +69,50 @@ std::string GetAddrString(uint32_t ad) {
     auto addr = ntohl(ad);
     struct in_addr ip_addr;
     ip_addr.s_addr = htonl(addr);
-    char* ip_str = inet_ntoa(ip_addr);
-    return std::string(ip_str);
-#else
-    return "";
+    char ip_str[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN)) {
+        return ip_str;
+    }
 #endif
+    return EMPTY_STRING;
 }
+
 std::string GetFamilyString(uint16_t family) {
 #if defined(__linux__)
-    if (family == AF_INET) {
-        return "AF_INET";
-    } else if (family == AF_INET6) {
-        return "AF_INET6";
-    } else if (family == AF_UNIX) {
-        return "AF_UNIX";
-    } else {
-        return std::to_string(family);
+    switch (family) {
+        case AF_INET:
+            return FAMILY_INET;
+        case AF_INET6:
+            return FAMILY_INET6;
+        case AF_UNIX:
+            return FAMILY_UNIX;
+        default:
+            return FAMILY_UNKNOWN;
     }
 #else
-    return "";
+    return EMPTY_STRING;
 #endif
 }
+
 std::string GetProtocolString(uint16_t protocol) {
     switch (protocol) {
         case 1:
-            return "ICMP";
+            return PROTOCOL_ICMP;
         case 2:
-            return "IGMP";
+            return PROTOCOL_IGMP;
         case 4:
-            return "IP";
+            return PROTOCOL_IP;
         case 6:
-            return "TCP";
+            return PROTOCOL_TCP;
         case 17:
-            return "UDP";
+            return PROTOCOL_UDP;
         case 41:
-            return "ENCAP";
+            return PROTOCOL_ENCAPSULATION;
         case 89:
-            return "OSPF";
+            return PROTOCOL_OSPF;
         default:
-            return "Unknown";
+            return PROTOCOL_UNKNOWN;
     }
 }
+
 } // namespace logtail

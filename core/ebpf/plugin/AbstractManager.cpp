@@ -22,6 +22,11 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string AbstractManager::sCallNameKey = "call_name";
+const std::string AbstractManager::sEventTypeKey = "event_type";
+const std::string AbstractManager::sKprobeValue = "kprobe";
+
+
 AbstractManager::AbstractManager(std::shared_ptr<BaseManager> bm,
                                  std::shared_ptr<SourceManager> sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,

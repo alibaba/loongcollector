@@ -28,6 +28,11 @@ namespace logtail {
 namespace ebpf {
 class FileSecurityManager : public AbstractManager {
 public:
+    static const std::string sPathKey;
+    static const std::string sMmapValue;
+    static const std::string sTruncateValue;
+    static const std::string sPermissionValue;
+
     FileSecurityManager() = delete;
     FileSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
                         std::shared_ptr<SourceManager> sourceManager,
@@ -67,7 +72,7 @@ public:
 
 private:
     ReadWriteLock mLock;
-    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> mAggregateTree;
+    SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
 } // namespace ebpf

@@ -29,7 +29,7 @@ public:
     uint64_t mKtime;
     std::string mPath;
     // attrs
-    std::vector<std::shared_ptr<FileEvent>> mInnerEvents;
+    std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
 
 } // namespace ebpf

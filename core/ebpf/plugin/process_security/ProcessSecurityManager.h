@@ -27,6 +27,12 @@ namespace logtail {
 namespace ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
+    static const std::string sExitTidKey;
+    static const std::string sExitCodeKey;
+    static const std::string sExecveValue;
+    static const std::string sCloneValue;
+    static const std::string sExitValue;
+
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
@@ -69,7 +75,7 @@ public:
 
 private:
     ReadWriteLock mLock;
-    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> mAggregateTree;
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
 } // namespace ebpf

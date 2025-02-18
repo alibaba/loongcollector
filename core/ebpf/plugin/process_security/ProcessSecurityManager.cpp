@@ -32,6 +32,12 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string ProcessSecurityManager::sExitTidKey = "exit_tid";
+const std::string ProcessSecurityManager::sExitCodeKey = "exit_code";
+const std::string ProcessSecurityManager::sExecveValue = "value";
+const std::string ProcessSecurityManager::sCloneValue = "clone";
+const std::string ProcessSecurityManager::sExitValue = "exit";
+
 ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -39,10 +45,10 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& bas
     : AbstractManager(baseMgr, sourceManager, queue, scheduler),
       mAggregateTree(
           4096,
-          [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<ProcessEvent>& other) {
+          [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<ProcessEvent>& in) {
+          [](const std::shared_ptr<CommonEvent>& in) {
               return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
           }) {
 }
@@ -53,7 +59,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(mLock);
-    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> aggTree = this->mAggregateTree.GetAndReset();
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
     lk.unlock();
 
     // read aggregator
@@ -92,25 +98,30 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 logEvent->SetTimestamp(seconds.count(), ts);
                 switch (innerEvent->mEventType) {
                     case KernelEventType::PROCESS_EXECVE_EVENT: {
-                        logEvent->SetContent("call_name", std::string("execve"));
-                        logEvent->SetContent("event_type", std::string("execve"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(ProcessSecurityManager::sExecveValue));
+                        // ? kprobe or execve
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(ProcessSecurityManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::PROCESS_EXIT_EVENT: {
-                        auto exitEvent = std::dynamic_pointer_cast<ProcessExitEvent>(innerEvent);
-                        if (exitEvent == nullptr) {
-                            LOG_ERROR(sLogger, ("cast to ProcessExitEvent faield", ""));
-                            continue;
-                        }
-                        logEvent->SetContent("call_name", std::string("exit"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
-                        logEvent->SetContent("exit_code", std::to_string(exitEvent->mExitCode));
-                        logEvent->SetContent("exit_tid", std::to_string(exitEvent->mExitTid));
+                        CommonEvent* ce = innerEvent.get();
+                        ProcessExitEvent* exitEvent = static_cast<ProcessExitEvent*>(ce);
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(ProcessSecurityManager::sExitValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContent(ProcessSecurityManager::sExitCodeKey,
+                                             std::to_string(exitEvent->mExitCode));
+                        logEvent->SetContent(ProcessSecurityManager::sExitTidKey, std::to_string(exitEvent->mExitTid));
                         break;
                     }
                     case KernelEventType::PROCESS_CLONE_EVENT: {
-                        logEvent->SetContent("call_name", std::string("clone"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(ProcessSecurityManager::sCloneValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(ProcessSecurityManager::sKprobeValue));
                         break;
                     }
                     default:
@@ -182,7 +193,7 @@ int ProcessSecurityManager::Destroy() {
     return 0;
 }
 
-std::array<size_t, 1> GenerateAggKey(const std::shared_ptr<ProcessEvent> event) {
+std::array<size_t, 1> GenerateAggKeyForProcessEvent(const std::shared_ptr<CommonEvent>& event) {
     // calculate agg key
     std::array<size_t, 1> hash_result;
     hash_result.fill(0UL);
@@ -199,7 +210,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     if (!event) {
         return 1;
     }
-    auto processEvent = std::dynamic_pointer_cast<ProcessEvent>(event);
+    ProcessEvent* processEvent = static_cast<ProcessEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
                                                                           magic_enum::enum_name(event->mEventType)));
@@ -212,10 +223,10 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     }
 
     // calculate agg key
-    std::array<size_t, 1> hash_result = GenerateAggKey(processEvent);
+    std::array<size_t, 1> hash_result = GenerateAggKeyForProcessEvent(event);
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(processEvent, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, hash_result);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
 

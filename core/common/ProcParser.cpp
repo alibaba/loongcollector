@@ -128,12 +128,14 @@ std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename, c
         return "";
     }
     std::string line;
+    size_t fileSize = ifs.tellg();
     std::string res;
+    res.reserve(fileSize << 1);
     while (std::getline(ifs, line)) {
         if (delimiter == "") {
-            res += std::move(line);
+            res += line;
         } else {
-            res += delimiter + std::move(line);
+            res += delimiter + line;
         }
     }
     // Strip out extra null character at the end of the string.

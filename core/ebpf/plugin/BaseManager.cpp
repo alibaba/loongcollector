@@ -40,6 +40,8 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string UNKOWN_STR = "unknown";
+
 /////////// ================= for perfbuffer handlers ================= ///////////
 void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
     BaseManager* bm = static_cast<BaseManager*>(ctx);
@@ -773,7 +775,7 @@ int BaseManager::PushExecveEvent(const std::shared_ptr<Procs> proc) {
     return 0;
 }
 
-std::string BaseManager::GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix> event) {
+std::string BaseManager::GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix>& event) {
     if (!event->msg) {
         return "";
     }
@@ -897,8 +899,7 @@ SizedMap BaseManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer> sb, uint
 
     // for parent
     if (!parentProc) {
-        auto unknownSb = sb->CopyString(std::string("unknown"));
-        res.Insert(kParentProcess.log_key(), StringView(unknownSb.data, unknownSb.size));
+        res.Insert(kParentProcess.log_key(), StringView(UNKOWN_STR));
         return res;
     } else {
         std::string permitted = GetCapabilities(parentProc->msg->creds.cap.permitted);

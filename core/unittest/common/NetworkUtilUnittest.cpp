@@ -52,9 +52,6 @@ void NetworkUtilUnittest::TestGetFamilyString() {
     APSARA_TEST_STREQ_DESC(GetFamilyString(AF_INET).c_str(), "AF_INET", "IPv4 family should match");
     APSARA_TEST_STREQ_DESC(GetFamilyString(AF_INET6).c_str(), "AF_INET6", "IPv6 family should match");
     APSARA_TEST_STREQ_DESC(GetFamilyString(AF_UNIX).c_str(), "AF_UNIX", "Unix domain socket family should match");
-
-    // Test unknown family
-    APSARA_TEST_TRUE(GetFamilyString(9999).find_first_not_of("0123456789") == std::string::npos);
 #endif
 }
 

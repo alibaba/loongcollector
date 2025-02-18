@@ -163,11 +163,12 @@ void AggregatorUnittest::TestAggregator() {
             APSARA_TEST_EQUAL(group->mKtime, ktime);
             globalNodeCnt++;
             LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime)("path", group->mPath));
-            for (auto innerEvent : group->mInnerEvents) {
+            for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
                 if (innerEvent->mTimestamp == 9) {
                     APSARA_TEST_EQUAL(group->mPid, 1);
-                    APSARA_TEST_EQUAL(innerEvent->mPath, "path-2");
+                    FileEvent* fe = static_cast<FileEvent*>(innerEvent.get());
+                    APSARA_TEST_EQUAL(fe->mPath, "path-2");
                 }
                 auto* logEvent = eventGroup.AddLogEvent();
                 auto ts = innerEvent->mTimestamp; // + this->mTimeDiff.count();

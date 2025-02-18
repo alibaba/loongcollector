@@ -194,7 +194,7 @@ public:
     uint32_t mPid;
     uint64_t mKtime;
     // attrs
-    std::vector<std::shared_ptr<ProcessEvent>> mInnerEvents;
+    std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
 
 } // namespace ebpf

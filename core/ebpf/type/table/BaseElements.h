@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "constants/TagConstants.h"
 #include "ebpf/type/table/DataTable.h"
 
 namespace logtail {

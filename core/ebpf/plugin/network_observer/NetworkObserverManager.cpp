@@ -230,7 +230,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 return;
             }
             std::array<StringView, kConnTrackerElementsTableSize> ctAttrVal;
-            for (auto record : group->mRecords) {
+            for (const auto& record : group->mRecords) {
                 if (!init) {
                     auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
                     auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
@@ -268,7 +268,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                     logEvent->SetContentNoCopy(kConnTrackerTable.ColLogKey(i), ctAttrVal[i]);
                 }
                 // set time stamp
-                std::shared_ptr<HttpRecord> httpRecord = std::dynamic_pointer_cast<HttpRecord>(record);
+                HttpRecord* httpRecord = static_cast<HttpRecord*>(record.get());
                 auto ts = httpRecord->GetStartTimeStamp();
                 logEvent->SetTimestamp(ts + mTimeDiff.count());
                 logEvent->SetContent("latency", std::to_string(httpRecord->GetLatencyMs()));
@@ -524,7 +524,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 LOG_DEBUG(sLogger, ("", "no records .."));
                 return;
             }
-            for (auto record : group->mRecords) {
+            for (const auto& record : group->mRecords) {
                 auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
                 auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
                 auto appname = ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())];

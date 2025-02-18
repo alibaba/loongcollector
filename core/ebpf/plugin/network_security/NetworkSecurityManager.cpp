@@ -28,6 +28,9 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string NetworkSecurityManager::sTcpSendMsgValue = "tcp_sendmsg";
+const std::string NetworkSecurityManager::sTcpCloseValue = "tcp_close";
+const std::string NetworkSecurityManager::sTcpConnectValue = "tcp_connect";
 
 void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
     if (!ctx) {
@@ -98,10 +101,11 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<BaseManager>& bas
     : AbstractManager(base, sourceManager, queue, scheduler),
       mAggregateTree(
           4096,
-          [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<NetworkEvent>& other) {
+          [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(std::move(other));
           },
-          [this](const std::shared_ptr<NetworkEvent>& in) {
+          [this](const std::shared_ptr<CommonEvent>& ce) {
+              NetworkEvent* in = static_cast<NetworkEvent*>(ce.get());
               return std::make_unique<NetworkEventGroup>(in->mPid,
                                                          in->mKtime,
                                                          in->mProtocol,
@@ -120,7 +124,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(this->mLock);
-    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> aggTree = this->mAggregateTree.GetAndReset();
+    SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -168,7 +172,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
             auto dportSb = sourceBuffer->CopyString(std::to_string(group->mDport));
             auto netnsSb = sourceBuffer->CopyString(std::to_string(group->mNetns));
 
-            for (auto innerEvent : group->mInnerEvents) {
+            for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
                 for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
                     logEvent->SetContentNoCopy(it->first, it->second);
@@ -189,18 +193,24 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::TCP_SENDMSG_EVENT: {
-                        logEvent->SetContent("call_name", std::string("tcp_sendmsg"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(NetworkSecurityManager::sTcpSendMsgValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CONNECT_EVENT: {
-                        logEvent->SetContent("call_name", std::string("tcp_connect"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(NetworkSecurityManager::sTcpConnectValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CLOSE_EVENT: {
-                        logEvent->SetContent("call_name", std::string("tcp_close"));
-                        logEvent->SetContent("event_type", std::string("kprobe"));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                                                   StringView(NetworkSecurityManager::sTcpCloseValue));
+                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                                                   StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     default:
@@ -273,7 +283,8 @@ int NetworkSecurityManager::Destroy() {
     return mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
 }
 
-std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) {
+std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<CommonEvent>& in) {
+    NetworkEvent* event = static_cast<NetworkEvent*>(in.get());
     // calculate agg key
     std::array<size_t, 2> hash_result;
     hash_result.fill(0UL);
@@ -296,7 +307,7 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<NetworkEvent> event) 
 }
 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
-    auto networkEvent = std::dynamic_pointer_cast<NetworkEvent>(event);
+    NetworkEvent* networkEvent = static_cast<NetworkEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("saddr", networkEvent->mSaddr)(
                   "daddr", networkEvent->mDaddr)("sport", networkEvent->mSport)("dport", networkEvent->mDport)(
@@ -310,11 +321,11 @@ int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event
     }
 
     // calculate agg key
-    std::array<size_t, 2> hash_result = GenerateAggKey(networkEvent);
+    std::array<size_t, 2> hash_result = GenerateAggKeyForNetworkEvent(event);
 
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(networkEvent, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, hash_result);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
     return 0;

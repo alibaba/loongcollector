@@ -72,7 +72,7 @@ public:
     uint32_t mDaddr; // Destination address
     uint32_t mNetns; // Network namespace
     // attrs
-    std::vector<std::shared_ptr<NetworkEvent>> mInnerEvents;
+    std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
 
 } // namespace ebpf
