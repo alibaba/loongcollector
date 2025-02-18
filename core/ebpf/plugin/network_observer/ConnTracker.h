@@ -203,7 +203,7 @@ private:
     int64_t last_update_timestamp;
     int64_t last_active_timestamp;
     ConnId conn_id_;
-    enum support_role_e role = IsClient;
+    enum support_role_e role = IsUnknown;
 
     std::chrono::time_point<std::chrono::steady_clock> mark_close_time_;
 

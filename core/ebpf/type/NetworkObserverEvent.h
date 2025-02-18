@@ -177,6 +177,8 @@ public:
     std::string req_msg;
     std::string resp_msg;
 
+    NetDataEvent(int32_t fd, uint32_t tgid, uint64_t start) : conn_id(fd, tgid, start) {}
+
     explicit NetDataEvent(struct conn_data_event_t* conn_data)
         : conn_id(conn_data->conn_id),
           start_ts(conn_data->start_ts),

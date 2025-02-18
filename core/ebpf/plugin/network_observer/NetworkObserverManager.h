@@ -172,6 +172,9 @@ private:
             onUpdate(oldValue, newValue);
         }
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class NetworkObserverManagerUnittest;
+#endif
 };
 
 } // namespace ebpf

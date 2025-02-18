@@ -866,7 +866,7 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(std::vector<std::shared_ptr<
 
         std::shared_ptr<ConnStatsRecord> netRecord = std::dynamic_pointer_cast<ConnStatsRecord>(record);
         if (netRecord != nullptr) {
-            auto conn_id = appRecord->GetConnId();
+            auto conn_id = netRecord->GetConnId();
             auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
             if (conn_tracker && !conn_tracker->MetaAttachReadyForNet()) {
                 // roll back
