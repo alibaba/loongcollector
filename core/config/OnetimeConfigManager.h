@@ -55,6 +55,10 @@ public:
     void DumpCheckpointFile() const;
     void ClearUnusedCheckpoints();
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    void Clear();
+#endif
+
 private:
     struct ConfigInfo {
         ConfigType mType;

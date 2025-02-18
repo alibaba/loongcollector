@@ -67,11 +67,12 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
     error_code ec;
     if (filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
         LOG_INFO(sLogger,
-                 ("delete obsolete checkpoint file succeeded", "config has changed")("config", configName)("input idx",
-                                                                                                           idx));
+                 ("config expire time checkpoint invalid, perhapes config has changed",
+                  "delete obsolete checkpoint file succeeded")("config", configName)("input idx", idx));
     } else if (ec) {
         LOG_WARNING(sLogger,
-                    ("failed to delete obsolete checkpoint file", "skip")("config", configName)("input idx", idx)(
+                    ("config expire time checkpoint invalid, perhapes config has changed",
+                     "failed to delete obsolete checkpoint file, ignore")("config", configName)("input idx", idx)(
                         "error code", ec.value())("error msg", ec.message()));
     }
 

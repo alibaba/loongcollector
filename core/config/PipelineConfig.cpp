@@ -59,27 +59,44 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }
 
-void PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
+bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
     uint32_t timeout = 0;
-    if (IsOneTime(mName, global, &timeout)) {
-        uint32_t expireTime = 0;
-        auto status = OnetimeConfigManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
-            mName, mConfigHash, &expireTime);
-        switch (status) {
-            case OnetimeConfigStatus::OLD:
-                mExpireTime = expireTime;
-                mIsFromCheckpoint = true;
-                LOG_INFO(sLogger,
-                         ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
-                break;
-            case OnetimeConfigStatus::OBSOLETE:
-            case OnetimeConfigStatus::NEW:
-                mExpireTime = time(nullptr) + timeout;
-                break;
-            default:
-                break;
-        }
+    if (!IsOneTime(mName, global, &timeout)) {
+        return true;
     }
+    uint32_t expireTime = 0;
+    auto status
+        = OnetimeConfigManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(mName, mConfigHash, &expireTime);
+    switch (status) {
+        case OnetimeConfigStatus::OLD:
+            mExpireTime = expireTime;
+            mIsFromCheckpoint = true;
+            LOG_INFO(sLogger, ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
+            return true;
+        case OnetimeConfigStatus::NEW:
+            mExpireTime = time(nullptr) + timeout;
+            return true;
+        case OnetimeConfigStatus::OBSOLETE: {
+            error_code ec;
+            if (filesystem::remove(mFilePath, ec)) {
+                LOG_INFO(sLogger,
+                         ("onetime config expired on init",
+                          "delete config file succeeded")("expire time", expireTime)("config", mName));
+            } else if (ec) {
+                LOG_WARNING(
+                    sLogger,
+                    ("onetime config expired on init", "failed to delete config file")("error code", ec.value())(
+                        "error msg", ec.message())("expire time", expireTime)("config", mName));
+            } else {
+                LOG_WARNING(sLogger,
+                            ("onetime config expired on init", "failed to delete config file")(
+                                "error msg", "config file not existed")("expire time", expireTime)("config", mName));
+            }
+        }
+        default:
+            break;
+    }
+    return false;
 }
 
 } // namespace logtail

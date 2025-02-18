@@ -33,15 +33,19 @@ OnetimeConfigStatus OnetimeConfigManager::GetOnetimeConfigStatusFromCheckpoint(c
                                                                                uint64_t hash,
                                                                                uint32_t* expireTime) {
     auto it = mConfigExpireTimeCheckpoint.find(configName);
-    if (it == mConfigExpireTimeCheckpoint.end() || it->second.first != hash) {
+    if (it == mConfigExpireTimeCheckpoint.end()) {
         return OnetimeConfigStatus::NEW;
     }
-    OnetimeConfigStatus status = OnetimeConfigStatus::OBSOLETE;
-    if (time(nullptr) < it->second.second) {
-        status = OnetimeConfigStatus::OLD;
-    }
-    if (expireTime) {
-        *expireTime = it->second.second;
+    OnetimeConfigStatus status = OnetimeConfigStatus::OLD;
+    if (it->second.first != hash) {
+        status = OnetimeConfigStatus::NEW;
+    } else {
+        if (time(nullptr) >= it->second.second) {
+            status = OnetimeConfigStatus::OBSOLETE;
+        }
+        if (expireTime) {
+            *expireTime = it->second.second;
+        }
     }
     mConfigExpireTimeCheckpoint.erase(it);
     return status;
@@ -102,12 +106,11 @@ bool OnetimeConfigManager::LoadCheckpointFile() {
     error_code ec;
     filesystem::file_status s = filesystem::status(mCheckpointFilePath, ec);
     if (ec) {
-        LOG_WARNING(sLogger,
-                    ("failed to get checkpoint file status", "skip")("filepath", mCheckpointFilePath.string()));
+        LOG_INFO(sLogger, ("failed to get checkpoint file status, filepath", mCheckpointFilePath.string()));
         return false;
     }
     if (!filesystem::exists(s)) {
-        LOG_WARNING(sLogger, ("checkpoint file not existed", "skip")("filepath", mCheckpointFilePath.string()));
+        LOG_INFO(sLogger, ("checkpoint file not existed, filepath", mCheckpointFilePath.string()));
         return false;
     }
     if (!filesystem::is_regular_file(s)) {
@@ -189,5 +192,12 @@ void OnetimeConfigManager::DumpCheckpointFile() const {
         LOG_WARNING(sLogger, ("failed to write checkpoint file", errMsg)("filepath", mCheckpointFilePath.string()));
     }
 }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+void OnetimeConfigManager::Clear() {
+    mConfigInfoMap.clear();
+    mConfigExpireTimeCheckpoint.clear();
+}
+#endif
 
 } // namespace logtail

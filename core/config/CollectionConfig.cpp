@@ -133,7 +133,9 @@ bool CollectionConfig::Parse() {
                 sLogger, alarm, "global module is not of type object", noModule, mName, mProject, mLogstore, mRegion);
         }
         mGlobal = itr;
-        GetExpireTimeIfOneTime(*mGlobal);
+        if (!GetExpireTimeIfOneTime(*mGlobal)) {
+            return false;
+        }
     }
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and

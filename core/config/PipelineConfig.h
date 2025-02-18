@@ -46,7 +46,7 @@ struct PipelineConfig {
     virtual bool Parse() = 0;
 
 protected:
-    void GetExpireTimeIfOneTime(const Json::Value& global);
+    bool GetExpireTimeIfOneTime(const Json::Value& global);
 };
 
 inline bool operator==(const PipelineConfig& lhs, const PipelineConfig& rhs) {
