@@ -213,11 +213,11 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 
             // update filter config
             std::vector<logtail::ebpf::AttachProgOps> attach_ops;
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     attach_ops.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
-                    int ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.filter_);
+                    int ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
@@ -261,11 +261,11 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 
             // update filter config
             std::vector<logtail::ebpf::AttachProgOps> attach_ops;
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     attach_ops.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
-                    int ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.filter_);
+                    int ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
@@ -386,8 +386,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
             int ret = 0;
             // update filter config
             std::vector<logtail::ebpf::AttachProgOps> attachOps;
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     attachOps.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
                 }
@@ -408,8 +408,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
             int ret = 0;
             // update filter config
             std::vector<logtail::ebpf::AttachProgOps> attachOps;
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     attachOps.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
                 }
@@ -445,8 +445,8 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
     switch (pluginType) {
         case logtail::ebpf::PluginType::NETWORK_SECURITY: {
             auto* config = std::get_if<logtail::ebpf::NetworkSecurityConfig>(&arg->mConfig);
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
                     int ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
                     if (ret) {
@@ -456,7 +456,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                         return 1;
                     }
 
-                    ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.filter_);
+                    ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security: create filter for callname %s falied.\n",
@@ -470,15 +470,15 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
         case logtail::ebpf::PluginType::FILE_SECURITY: {
             auto* config = std::get_if<logtail::ebpf::FileSecurityConfig>(&arg->mConfig);
             // 1. clean-up filter
-            for (const auto& opt : config->options_) {
-                for (const auto& cn : opt.call_names_) {
+            for (const auto& opt : config->mOptions) {
+                for (const auto& cn : opt.mCallNames) {
                     int ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: delete filter for callname %s falied.\n",
                                  cn.c_str());
                     }
-                    ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.filter_);
+                    ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: create filter for callname %s falied\n",

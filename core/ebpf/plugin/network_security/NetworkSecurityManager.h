@@ -61,7 +61,7 @@ public:
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        config.options_ = opts->mOptionList;
+        config.mOptions = opts->mOptionList;
         pc->mConfig = std::move(config);
         return pc;
     }

@@ -17,7 +17,7 @@ namespace ebpf {
 
 using PerfBufferSampleHandler = void (*)(void* ctx, int cpu, void* data, uint32_t size);
 using PerfBufferLostHandler = void (*)(void* ctx, int cpu, unsigned long long cnt);
-typedef int (*eBPFLogHandler)(int16_t level, const char* format, va_list args);
+using eBPFLogHandler = int (*)(int16_t level, const char* format, va_list args);
 
 struct ObserverNetworkOption {
     std::vector<std::string> mEnableProtocols;
@@ -82,10 +82,10 @@ struct SecurityNetworkFilter {
 };
 
 struct SecurityOption {
-    std::vector<std::string> call_names_;
-    std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> filter_;
+    std::vector<std::string> mCallNames;
+    std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> mFilter;
     bool operator==(const SecurityOption& other) const {
-        return call_names_ == other.call_names_ && filter_ == other.filter_;
+        return mCallNames == other.mCallNames && mFilter == other.mFilter;
     }
 };
 
@@ -114,21 +114,21 @@ struct NetworkObserveConfig {
 };
 
 struct ProcessConfig {
-    std::vector<SecurityOption> options_;
+    std::vector<SecurityOption> mOptions;
     std::vector<PerfBufferSpec> mPerfBufferSpec;
-    bool operator==(const ProcessConfig& other) const { return options_ == other.options_; }
+    bool operator==(const ProcessConfig& other) const { return mOptions == other.mOptions; }
 };
 
 struct NetworkSecurityConfig {
-    std::vector<SecurityOption> options_;
+    std::vector<SecurityOption> mOptions;
     std::vector<PerfBufferSpec> mPerfBufferSpec;
-    bool operator==(const NetworkSecurityConfig& other) const { return options_ == other.options_; }
+    bool operator==(const NetworkSecurityConfig& other) const { return mOptions == other.mOptions; }
 };
 
 struct FileSecurityConfig {
-    std::vector<SecurityOption> options_;
+    std::vector<SecurityOption> mOptions;
     std::vector<PerfBufferSpec> mPerfBufferSpec;
-    bool operator==(const FileSecurityConfig& other) const { return options_ == other.options_; }
+    bool operator==(const FileSecurityConfig& other) const { return mOptions == other.mOptions; }
 };
 
 enum class eBPFLogType {

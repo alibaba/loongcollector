@@ -100,7 +100,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     }
 
     WriteLock lk(this->mLock);
-    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
+    SIZETAggTree<FileEventGroup, std::shared_ptr<FileEvent>> aggTree = this->mAggregateTree.GetAndReset();
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -181,7 +181,6 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                             "[FileSecurityEvent] push queue failed!", ""));
         }
     }
-    aggTree.Clear();
     return true;
 }
 
@@ -210,7 +209,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     pc->mPluginType = PluginType::FILE_SECURITY;
     FileSecurityConfig config;
     SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    config.options_ = opts->mOptionList;
+    config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"file_secure_output",
             128,

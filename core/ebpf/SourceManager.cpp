@@ -118,10 +118,30 @@ void SourceManager::Init() {
         x = false;
     }
 
-    mLogPrinter = [](int16_t level, const char* format, va_list args) {
+    mLogPrinter = [](int16_t level, const char* format, va_list args) -> int {
         eBPFLogType printLevel = (eBPFLogType)level;
-        char buffer[1024] = {0};
-        vsnprintf(buffer, 1023, format, args);
+        switch (printLevel) {
+            case eBPFLogType::NAMI_LOG_TYPE_WARN:
+                if (!SHOULD_LOG_WARNING(sLogger)) {
+                    return 0;
+                }
+                break;
+            case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
+                if (!SHOULD_LOG_DEBUG(sLogger)) {
+                    return 0;
+                }
+                break;
+            case eBPFLogType::NAMI_LOG_TYPE_INFO:
+                [[fallthrough]];
+            default:
+                if (!SHOULD_LOG_INFO(sLogger)) {
+                    return 0;
+                }
+                break;
+        }
+        char buffer[4096] = {0};
+        vsnprintf(buffer, sizeof(buffer), format, args);
+        buffer[sizeof(buffer) - 1] = '\0';
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
                 LOG_WARNING(sLogger, ("module", "EbpfDriver")("msg", buffer));

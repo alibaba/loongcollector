@@ -18,6 +18,7 @@
 
 #include "json/json.h"
 
+#include "Logger.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
@@ -119,13 +120,17 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<MetricEvent>();
-                for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                    LOG_DEBUG(sLogger,
-                              ("event tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
-                }
-                for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
-                    LOG_DEBUG(sLogger,
-                              ("group tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
+                if (SHOULD_LOG_DEBUG(sLogger)) {
+                    for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
+                        LOG_DEBUG(
+                            sLogger,
+                            ("event tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
+                    }
+                    for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
+                        LOG_DEBUG(
+                            sLogger,
+                            ("group tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
+                    }
                 }
 
                 if (e.GetTimestamp() < 1e9) {
@@ -161,15 +166,17 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::SPAN:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<SpanEvent>();
-                for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                    LOG_DEBUG(sLogger,
-                              ("event tags for spanname", std::string(e.GetName()))(std::string(tag->first),
-                                                                                    std::string(tag->second)));
-                }
-                for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
-                    LOG_DEBUG(sLogger,
-                              ("group tags for spanname", std::string(e.GetName()))(std::string(tag->first),
-                                                                                    std::string(tag->second)));
+                if (SHOULD_LOG_DEBUG(sLogger)) {
+                    for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
+                        LOG_DEBUG(sLogger,
+                                  ("event tags for spanname", std::string(e.GetName()))(std::string(tag->first),
+                                                                                        std::string(tag->second)));
+                    }
+                    for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
+                        LOG_DEBUG(sLogger,
+                                  ("group tags for spanname", std::string(e.GetName()))(std::string(tag->first),
+                                                                                        std::string(tag->second)));
+                    }
                 }
                 size_t contentSZ = 0;
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_TRACE_ID.size(), e.GetTraceId().size());

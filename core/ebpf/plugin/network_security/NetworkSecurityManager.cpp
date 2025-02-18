@@ -120,7 +120,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(this->mLock);
-    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
+    SIZETAggTree<NetworkEventGroup, std::shared_ptr<NetworkEvent>> aggTree = this->mAggregateTree.GetAndReset();
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -223,7 +223,6 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                             "[NetworkSecurityEvent] push queue failed!", ""));
         }
     }
-    aggTree.Clear();
     return true;
 }
 
@@ -257,7 +256,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
     pc->mPluginType = PluginType::NETWORK_SECURITY;
     NetworkSecurityConfig config;
     SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    config.options_ = opts->mOptionList;
+    config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"sock_secure_output",
             128,

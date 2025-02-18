@@ -39,10 +39,10 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<BaseManager>& bas
     : AbstractManager(baseMgr, sourceManager, queue, scheduler),
       mAggregateTree(
           4096,
-          [this](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<ProcessEvent>& other) {
-              base->mInnerEvents.emplace_back(std::move(other));
+          [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<ProcessEvent>& other) {
+              base->mInnerEvents.emplace_back(other);
           },
-          [this](const std::shared_ptr<ProcessEvent>& in) {
+          [](const std::shared_ptr<ProcessEvent>& in) {
               return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
           }) {
 }
@@ -53,7 +53,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     }
 
     WriteLock lk(mLock);
-    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> aggTree(this->mAggregateTree.GetRootNodeAndClear());
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<ProcessEvent>> aggTree = this->mAggregateTree.GetAndReset();
     lk.unlock();
 
     // read aggregator
@@ -133,7 +133,6 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                             "[ProcessSecurityEvent] push queue failed!", ""));
         }
     }
-    aggTree.Clear();
 
     return true;
 }

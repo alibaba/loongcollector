@@ -207,7 +207,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
     }
 
     WriteLock lk(mLogAggLock);
-    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mLogAggregator.GetRootNodeAndClear());
+    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> aggTree = this->mLogAggregator.GetAndReset();
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -311,7 +311,6 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
             LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
         }
     }
-    aggTree.Clear();
 
     return true;
 }
@@ -323,7 +322,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
     }
 
     WriteLock lk(this->mAppAggLock);
-    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> aggTree(this->mAppAggregator.GetRootNodeAndClear());
+    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> aggTree = this->mAppAggregator.GetAndReset();
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -493,8 +492,6 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
         }
     }
 
-    aggTree.Clear();
-
     return true;
 }
 
@@ -505,7 +502,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
     }
 
     WriteLock lk(mSpanAggLock);
-    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> aggTree(this->mSpanAggregator.GetRootNodeAndClear());
+    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> aggTree = this->mSpanAggregator.GetAndReset();
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -612,7 +609,6 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
             LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
         }
     }
-    aggTree.Clear();
 
     return true;
 }

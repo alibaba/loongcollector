@@ -199,7 +199,7 @@ void AggregatorUnittest::TestAggregator() {
     }
     APSARA_TEST_EQUAL(globalEventCnt, 10);
     APSARA_TEST_EQUAL(globalNodeCnt, 5);
-    this->mAggregateTree->Clear();
+    this->mAggregateTree->Reset();
 }
 
 void AggregatorUnittest::TestAggManager() {
@@ -245,7 +245,7 @@ void AggregatorUnittest::TestBasicAgg() {
     APSARA_TEST_EQUAL(GetDataNodeCount(), 4);
     APSARA_TEST_EQUAL(agg->NodeCount(), 4);
     APSARA_TEST_EQUAL(GetSum(), 5);
-    agg->Clear();
+    agg->Reset();
     APSARA_TEST_EQUAL(GetDataNodeCount(), 0);
     APSARA_TEST_EQUAL(agg->NodeCount(), 0);
     APSARA_TEST_EQUAL(GetSum(), 0);

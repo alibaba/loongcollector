@@ -60,7 +60,7 @@ public:
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        config.options_ = opts->mOptionList;
+        config.mOptions = opts->mOptionList;
         pc->mConfig = std::move(config);
         return pc;
     }

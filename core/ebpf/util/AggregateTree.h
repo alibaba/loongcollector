@@ -37,52 +37,57 @@ public:
 template <class Data, class Value, class KeyType>
 class AggTree {
 private:
-    size_t max_nodes;
+    size_t mMaxNodes = 0UL;
 
-    size_t now_nodes = 0;
+    size_t mNodeCount = 0UL;
 
-    std::unique_ptr<AggNode<Data, KeyType>> root_node_;
+    std::unique_ptr<AggNode<Data, KeyType>> mRootNode;
 
-    std::function<void(std::unique_ptr<Data>& base, const Value& n)> aggregate_;
+    std::function<void(std::unique_ptr<Data>& base, const Value& n)> mAggregateFunc;
 
-    std::function<std::unique_ptr<Data>(const Value& n)> generate_;
+    std::function<std::unique_ptr<Data>(const Value& n)> mBuildFunc;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 public:
-    AggTree() {}
-    AggTree(std::unique_ptr<AggNode<Data, KeyType>>&& data) : root_node_(std::move(data)) {}
-    AggTree(size_t max_nodes,
-            const std::function<void(std::unique_ptr<Data>&, const Value&)>& aggregate,
-            const std::function<std::unique_ptr<Data>(const Value& n)>& generate)
-        : max_nodes(max_nodes),
-          root_node_(std::make_unique<AggNode<Data, KeyType>>()),
-          aggregate_(aggregate),
-          generate_(generate) {}
+    AggTree(size_t maxNodes,
+            const std::function<void(std::unique_ptr<Data>&, const Value&)>& aggregateFunc,
+            const std::function<std::unique_ptr<Data>(const Value& n)>& buildFunc)
+        : mMaxNodes(maxNodes),
+          mRootNode(std::make_unique<AggNode<Data, KeyType>>()),
+          mAggregateFunc(aggregateFunc),
+          mBuildFunc(buildFunc) {}
 
     AggTree(AggTree<Data, Value, KeyType>&& other) noexcept
-        : max_nodes(other.max_nodes),
-          now_nodes(other.now_nodes),
-          root_node_(std::move(other.root_node_)),
-          aggregate_(other.aggregate_),
-          generate_(other.generate_) {
-        other.Clear();
+        : mMaxNodes(other.mMaxNodes),
+          mNodeCount(other.mNodeCount),
+          mRootNode(std::move(other.mRootNode)),
+          mAggregateFunc(other.mAggregateFunc),
+          mBuildFunc(other.mBuildFunc) {}
+
+    AggTree& operator=(AggTree<Data, Value, KeyType>&& other) noexcept {
+        mMaxNodes = other.mMaxNodes;
+        mNodeCount = other.mNodeCount;
+        mRootNode = std::move(other.mRootNode);
+        mAggregateFunc = other.mAggregateFunc;
+        mBuildFunc = other.mBuildFunc;
+        return *this;
     }
 
-    std::unique_ptr<AggNode<Data, KeyType>> GetRootNodeAndClear() {
-        auto res = std::move(root_node_);
-        Clear();
+    AggTree<Data, Value, KeyType> GetAndReset() {
+        AggTree<Data, Value, KeyType> res = std::move(*this);
+        Reset();
         return res;
     }
 
     template <class ContainerType>
     bool Aggregate(const Value& d, const ContainerType& agg_keys) {
-        auto p = root_node_.get();
+        auto p = mRootNode.get();
         for (auto& val : agg_keys) {
             auto result = p->child.find(val);
-            if (result == p->child.end() && now_nodes >= max_nodes) {
+            if (result == p->child.end() && mNodeCount >= mMaxNodes) {
                 // when we exceed the maximum limit, we will drop new metrics
-                LOG_ERROR(sLogger, ("maximum limit exceeded", max_nodes));
+                LOG_ERROR(sLogger, ("maximum limit exceeded", mMaxNodes));
                 return false;
             }
             if (result == p->child.end()) {
@@ -90,30 +95,30 @@ public:
                 auto ptr = new_node.get();
                 p->child[val] = std::move(new_node);
                 p = ptr;
-                now_nodes++;
+                mNodeCount++;
             } else {
                 p = result->second.get();
             }
         }
         if (!p->data) {
             // generate new node ...
-            p->data = generate_(d);
+            p->data = mBuildFunc(d);
         }
-        aggregate_(p->data, d);
+        mAggregateFunc(p->data, d);
         return true;
     }
 
     std::vector<AggNode<Data, KeyType>*> GetNodesWithAggDepth(size_t i) {
         std::vector<AggNode<Data, KeyType>*> ans;
-        GetNodes(1, root_node_, i, ans);
+        GetNodes(1, mRootNode, i, ans);
         return ans;
     }
 
-    void ForEach(const std::function<void(const Data*)>& call) { ForEach(root_node_.get(), call); }
+    void ForEach(const std::function<void(const Data*)>& call) { ForEach(mRootNode.get(), call); }
 
-    void Clear() {
-        root_node_ = std::make_unique<AggNode<Data, KeyType>>();
-        now_nodes = 0;
+    void Reset() {
+        mRootNode = std::make_unique<AggNode<Data, KeyType>>();
+        mNodeCount = 0;
     }
 
     void ForEach(const AggNode<Data, KeyType>* root, const std::function<void(const Data*)>& call) {
@@ -128,7 +133,7 @@ public:
         }
     }
 
-    [[nodiscard]] size_t NodeCount() const { return now_nodes; }
+    [[nodiscard]] size_t NodeCount() const { return mNodeCount; }
 
 private:
     void GetNodes(size_t depth,

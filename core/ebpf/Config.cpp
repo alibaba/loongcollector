@@ -395,7 +395,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetRegion());
         }
         logtail::ebpf::SecurityOption thisSecurityOption;
-        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
         mOptionList.emplace_back(std::move(thisSecurityOption));
         return true;
     }
@@ -429,8 +429,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
     }
-    thisSecurityOption.filter_ = thisFilter;
-    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+    thisSecurityOption.mFilter = thisFilter;
+    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
     return true;
