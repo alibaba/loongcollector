@@ -145,7 +145,7 @@ func TestNoKeyErrorV2(t *testing.T) {
 		Events: []models.PipelineEvent{log},
 	}
 	// construct test context
-	context := helper.NewObservePipelineConext(10)
+	context := helper.NewObservePipelineContext(10)
 	// run test function
 	processor.Process(logs, context)
 	// collect test results

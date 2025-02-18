@@ -65,7 +65,7 @@ HOST_OS=`uname -s`
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 GEN_DOCKERFILE=$GENERATED_HOME/Dockerfile
 
-# automatically replace registery address to the fastest mirror
+# automatically replace registry address to the fastest mirror
 CN_REGION=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com
 US_REGION=sls-opensource-registry.us-east-1.cr.aliyuncs.com
 cn_time_connect=$(curl -o /dev/null -s -m 3 -w "%{time_total}" https://$CN_REGION) || cn_time_connect=9999

@@ -47,8 +47,8 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const C
 }
 
 vector<pair<size_t, PipelineEventGroup>> Router::Route(PipelineEventGroup& g) const {
-    mInEventsTotal->Add(g.GetEvents().size());
-    mInGroupDataSizeBytes->Add(g.DataSize());
+    ADD_COUNTER(mInEventsTotal, g.GetEvents().size());
+    ADD_COUNTER(mInGroupDataSizeBytes, g.DataSize());
 
     vector<size_t> dest;
     for (size_t i = 0; i < mConditions.size(); ++i) {

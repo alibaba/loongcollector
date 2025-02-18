@@ -116,7 +116,7 @@ public:
      *
      * @param path for whom event handler will be removed.
      */
-    void StopAllDir(const std::string& baseDir);
+    void StopAllDir(const std::string& baseDir, const std::string& containerID);
 
     EventHandler* GetHandler(const char* path) {
         MapType<std::string, int>::Type::iterator itr = mPathWdMap.find(path);
@@ -167,7 +167,7 @@ public:
     //  */
     // bool HandleReadException(int eventFd, int length, int hdrLength);
 
-    // /** Read Messsage on domain socket
+    // /** Read Message on domain socket
     //  *
     //  * @param eventFd
     //  *
@@ -179,7 +179,7 @@ public:
     // bool ReadDSPacketHdr(int eventFd);
     // bool ReadDSPacket(int eventFd);
 
-    // /** Enter the event loop, dispatch to the approiate handler when an event occurs.
+    // /** Enter the event loop, dispatch to the appropriate handler when an event occurs.
     //  * Propagate timeout.
     //  *
     //  * @return true on success; false on failure
@@ -287,6 +287,7 @@ protected:
     friend class FuseFileUnittest;
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
+    friend class ModifyHandlerUnittest;
 
     void CleanEnviroments();
     int32_t GetInotifyWatcherCount();

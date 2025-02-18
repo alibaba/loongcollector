@@ -320,7 +320,7 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
             string path = source;
             if (object.size() > 0)
                 path += PATH_SEPARATOR + object;
-            dispatcher->StopAllDir(path);
+            dispatcher->StopAllDir(path, ev->GetContainerID());
         } else {
             EventHandler* handler = dispatcher->GetHandler(source.c_str());
             if (handler) {
@@ -344,11 +344,11 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 }
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
-    mLastRunTime->Set(mLastReadEventTime.load());
+    SET_GAUGE(mLastRunTime, mLastReadEventTime.load());
     LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(
         GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
-    mRegisterdHandlersTotal->Set(EventDispatcher::GetInstance()->GetHandlerCount());
-    mActiveReadersTotal->Set(CheckPointManager::Instance()->GetReaderCount());
+    SET_GAUGE(mRegisterdHandlersTotal, EventDispatcher::GetInstance()->GetHandlerCount());
+    SET_GAUGE(mActiveReadersTotal, CheckPointManager::Instance()->GetReaderCount());
     mEventProcessCount = 0;
 }
 

@@ -99,7 +99,7 @@ func InvalidTestInputKafka(t *testing.T) {
 	_, input, err := newInput()
 	require.NoError(t, err)
 	collector := &mockCollector{}
-	pipelineCxt := helper.NewGroupedPipelineConext()
+	pipelineCxt := helper.NewGroupedPipelineContext()
 	err = input.StartService(pipelineCxt)
 	require.NoError(t, err)
 	time.Sleep(time.Second * 2)

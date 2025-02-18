@@ -51,11 +51,11 @@ void SelfMonitorMetricEventUnittest::TestCreateFromMetricEvent() {
                                                     std::make_shared<DynamicMetricLabels>());
 
     CounterPtr outSizeBytes = pluginMetric->CreateCounter("out_size_bytes");
-    outSizeBytes->Add(100);
+    ADD_COUNTER(outSizeBytes, 100);
     CounterPtr outEventTotal = pluginMetric->CreateCounter("out_event_total");
-    outEventTotal->Add(1024);
+    ADD_COUNTER(outEventTotal, 1024);
     IntGaugePtr monitorFileTotal = pluginMetric->CreateIntGauge("monitor_file_total");
-    monitorFileTotal->Set(10);
+    SET_GAUGE(monitorFileTotal, 10);
 
     SelfMonitorMetricEvent event(pluginMetric);
 
