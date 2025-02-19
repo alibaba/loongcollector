@@ -268,7 +268,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mCandidateHostsInfo->GetMode());
     SenderQueueManager::GetInstance()->Clear();
 
-    // Endpoint should be added to region remote endpoints if not existed
+    // region remote endpoints not existed
     configStr = R"(
         {
             "Type": "flusher_sls",
@@ -294,7 +294,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());
     SenderQueueManager::GetInstance()->Clear();
 
-    // Endpoint should be ignored when region remote endpoints existed
+    // region remote endpoints existed
     configStr = R"(
         {
             "Type": "flusher_sls",
@@ -312,8 +312,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
     endpoints = EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap["test_region"].mRemoteEndpoints;
-    APSARA_TEST_EQUAL(1U, endpoints.size());
+    APSARA_TEST_EQUAL(2U, endpoints.size());
     APSARA_TEST_EQUAL("test_region.log.aliyuncs.com", endpoints[0]);
+    APSARA_TEST_EQUAL("test_region-intranet.log.aliyuncs.com", endpoints[1]);
     APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
     APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
     APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());

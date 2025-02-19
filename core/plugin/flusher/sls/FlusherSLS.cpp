@@ -418,7 +418,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                                  mContext->GetRegion());
         }
         EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
-            mRegion, {mEndpoint}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::CREATE);
+            mRegion, {mEndpoint}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::APPEND);
     }
     mCandidateHostsInfo
         = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
