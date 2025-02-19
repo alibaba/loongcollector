@@ -42,3 +42,5 @@ add_unittest(worker_unittest WorkerUnittest.cpp)
 
 add_driver_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
 add_driver_unittest(ebpf_driver_unittest eBPFDriverUnittest.cpp)
+add_driver_unittest(ebpf_map_traits_unittest eBPFMapTraitsUnittest.cpp)
+add_driver_unittest(ebpf_wrapper_unittest eBPFWrapperUnittest.cpp)
