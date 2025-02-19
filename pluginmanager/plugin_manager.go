@@ -150,19 +150,19 @@ func StopAllPipelines(withInput bool) error {
 	LogtailConfigLock.Lock()
 	disabledConfigNames := make(map[string]struct{})
 	for configName, logstoreConfig := range LogtailConfig {
-		matchFlag := false
+		needStop := false
 		if withInput {
-			// if request is withinput=true, only process logstoreConfig.PluginRunner.IsWithInputPlugin=true
+			// if request is withinput=true, only stop logstoreConfig.PluginRunner.IsWithInputPlugin=true
 			if logstoreConfig.PluginRunner.IsWithInputPlugin() {
-				matchFlag = true
+				needStop = true
 			}
 		} else {
-			// if request is withinput=false, only process logstoreConfig.PluginRunner.IsWithInputPlugin=false
+			// if request is withinput=false, only stop logstoreConfig.PluginRunner.IsWithInputPlugin=false
 			if !logstoreConfig.PluginRunner.IsWithInputPlugin() {
-				matchFlag = true
+				needStop = true
 			}
 		}
-		if matchFlag {
+		if needStop {
 			logger.Info(logstoreConfig.Context.GetRuntimeContext(), "Stop config", configName)
 			if hasStopped := timeoutStop(logstoreConfig, true); !hasStopped {
 				disabledConfigNames[configName] = struct{}{}
