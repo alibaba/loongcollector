@@ -129,9 +129,10 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 			DisabledLogtailConfigLock.Unlock()
 			return
 		}
+		logger.Info(config.Context.GetRuntimeContext(), "Valid but slow stop config", config.ConfigName)
+		DeleteLogstoreConfig(DisabledLogtailConfig[config.ConfigNameWithSuffix])
 		delete(DisabledLogtailConfig, config.ConfigNameWithSuffix)
 		DisabledLogtailConfigLock.Unlock()
-		logger.Info(config.Context.GetRuntimeContext(), "Valid but slow stop config", config.ConfigName)
 	}()
 	select {
 	case <-done:
@@ -146,9 +147,7 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 // For user-defined config, timeoutStop is used to avoid hanging.
 func StopAllPipelines(withInput bool) error {
 	defer panicRecover("Run plugin")
-
 	LogtailConfigLock.Lock()
-	disabledConfigNames := make(map[string]struct{})
 	for configName, logstoreConfig := range LogtailConfig {
 		needStop := false
 		if withInput {
@@ -165,7 +164,6 @@ func StopAllPipelines(withInput bool) error {
 		if needStop {
 			logger.Info(logstoreConfig.Context.GetRuntimeContext(), "Stop config", configName)
 			if hasStopped := timeoutStop(logstoreConfig, true); !hasStopped {
-				disabledConfigNames[configName] = struct{}{}
 				// TODO: This alarm can not be sent to server in current alarm design.
 				logger.Error(logstoreConfig.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
 					"timeout when stop config, goroutine might leak")
