@@ -55,12 +55,7 @@ public:
                           StringView logKey,
                           StringView desc,
                           AggregationType aggType = AggregationType::NoAggregate)
-        : mName(name),
-          mEtricKey(metricKey),
-          mSpanKey(spanKey),
-          mLogKey(logKey),
-          mDesc(desc),
-          mAggType(aggType) {}
+        : mName(name), mEtricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc), mAggType(aggType) {}
 
     constexpr StringView Name() const { return mName; }
     constexpr StringView MetricKey() const { return mEtricKey; }
