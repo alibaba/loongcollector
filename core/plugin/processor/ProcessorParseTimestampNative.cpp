@@ -157,9 +157,10 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
             }
             AlarmManager::GetInstance()->SendAlarm(OUTDATED_LOG_ALARM,
                                                    std::string("logTime: ") + ToString(logTime.tv_sec),
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mHistoryFailureTotal, 1);
         ADD_COUNTER(mDiscardedEventsTotal, 1);
@@ -213,9 +214,10 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
             }
             AlarmManager::GetInstance()->SendAlarm(PARSE_TIME_FAIL_ALARM,
                                                    curTimeStr.to_string() + " " + mSourceFormat,
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
         return false;
     }

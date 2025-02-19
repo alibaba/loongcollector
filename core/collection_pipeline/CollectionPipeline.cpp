@@ -556,9 +556,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             return false;
         }
     }
@@ -575,9 +576,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             if (!mGoPipelineWithoutInput.isNull()) {
                 LogtailPlugin::GetInstance()->UnloadPipeline(GetConfigNameOfGoPipelineWithoutInput());
             }
@@ -607,9 +609,10 @@ void CollectionPipeline::WaitAllItemsInProcessFinished() {
             AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
                                                    string("pipeline stop too slow, config: ") + mName
                                                        + "; cost:" + std::to_string(duration),
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             alarmOnce = true;
         }
     }

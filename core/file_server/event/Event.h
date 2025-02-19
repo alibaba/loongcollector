@@ -47,6 +47,7 @@ private:
     uint64_t mInode;
     int64_t mHashKey;
     std::string mConfigName;
+    std::string mContainerID;
 
     // for read timeout
     int64_t mLastReadPos;
@@ -108,6 +109,8 @@ public:
 
     const std::string& GetConfigName() const { return mConfigName; }
 
+    const std::string& GetContainerID() const { return mContainerID; }
+
     int64_t GetLastReadPos() const { return mLastReadPos; }
 
     int64_t GetLastFilePos() const { return mLastFilePos; }
@@ -121,6 +124,8 @@ public:
     void SetHashKey(int64_t hashKey) { mHashKey = hashKey; }
 
     void SetConfigName(const std::string& configName) { mConfigName = configName; }
+
+    void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
 
     void SetLastReadPos(int64_t lastReadPos) { mLastReadPos = lastReadPos; }
 

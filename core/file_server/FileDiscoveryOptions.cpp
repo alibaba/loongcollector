@@ -648,7 +648,8 @@ ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& log
     if (!mContainerInfos) {
         return NULL;
     }
-    for (size_t i = 0; i < mContainerInfos->size(); ++i) {
+    // reverse order to find the latest container
+    for (int i = mContainerInfos->size() - 1; i >= 0; --i) {
         if (_IsSubPath((*mContainerInfos)[i].mRealBaseDir, logPath)) {
             return &(*mContainerInfos)[i];
         }

@@ -296,6 +296,12 @@ public:
 
     time_t GetContainerStoppedTime() const { return mContainerStoppedTime; }
 
+    std::string GetContainerID() const { return mContainerID; }
+
+    void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
+
+    bool UpdateContainerInfo();
+
     bool IsFileOpened() const { return mLogFileOp.IsOpen(); }
 
     bool ShouldForceReleaseDeletedFileFd();
@@ -370,24 +376,6 @@ public:
     //                       int32_t& lineFeed,
     //                       std::vector<StringView>& logIndex,
     //                       std::vector<StringView>& discardIndex);
-
-    // added by xianzhi(bowen.gbw@antfin.com)
-    static bool ParseLogTime(const char* buffer,
-                             const boost::regex* reg,
-                             LogtailTime& logTime,
-                             const std::string& timeFormat,
-                             const std::string& region = "",
-                             const std::string& project = "",
-                             const std::string& logStore = "",
-                             const std::string& logPath = "");
-    static bool GetLogTimeByOffset(const char* buffer,
-                                   int32_t pos,
-                                   LogtailTime& logTime,
-                                   const std::string& timeFormat,
-                                   const std::string& region = "",
-                                   const std::string& project = "",
-                                   const std::string& logStore = "",
-                                   const std::string& logPath = "");
 
     bool IsFromCheckPoint() { return mLastFileSignatureHash != 0 && mLastFileSignatureSize > (size_t)0; }
 
@@ -516,6 +504,7 @@ protected:
     bool mFileDeleted = false;
     time_t mDeletedTime = 0;
     bool mContainerStopped = false;
+    std::string mContainerID;
     time_t mContainerStoppedTime = 0;
     time_t mReadStoppedContainerAlarmTime = 0;
     int32_t mReadDelayTime = 0;

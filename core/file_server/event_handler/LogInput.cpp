@@ -284,9 +284,10 @@ bool LogInput::ReadLocalEvents() {
                                                string("process local event, dir:") + source + ", file name:" + object
                                                    + ", config:" + configName
                                                    + ", file count:" + ToString(objList.size()),
+                                               readerConfig.second->GetRegion(),
                                                readerConfig.second->GetProjectName(),
-                                               readerConfig.second->GetLogstoreName(),
-                                               readerConfig.second->GetRegion());
+                                               readerConfig.second->GetConfigName(),
+                                               readerConfig.second->GetLogstoreName());
 
         HistoryFileImporter* importer = HistoryFileImporter::GetInstance();
         importer->PushEvent(historyFileEvent);
@@ -320,7 +321,7 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
             string path = source;
             if (object.size() > 0)
                 path += PATH_SEPARATOR + object;
-            dispatcher->StopAllDir(path);
+            dispatcher->StopAllDir(path, ev->GetContainerID());
         } else {
             EventHandler* handler = dispatcher->GetHandler(source.c_str());
             if (handler) {
