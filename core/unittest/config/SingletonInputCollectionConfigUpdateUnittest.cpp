@@ -30,7 +30,7 @@ using namespace std;
 
 namespace logtail {
 
-class PipelineConfigWatcherUnittest : public testing::Test {
+class SingletonInputCollectionConfigUpdateUnittest : public testing::Test {
 public:
     void TestLoadAddedSingletonConfig();
     void TestLoadModifiedSingletonConfig();
@@ -176,7 +176,7 @@ private:
 // there are 4 kinds of priority relationship: first > second, first < second,
 // first > second -> first < second, first < second -> first > second
 // total case:  4 (first kind) * 4(second kind) * 4(priority) = 64
-void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
+void SingletonInputCollectionConfigUpdateUnittest::TestLoadAddedSingletonConfig() {
     { // case: added -> added, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
@@ -446,7 +446,7 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
     }
 }
 
-void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
+void SingletonInputCollectionConfigUpdateUnittest::TestLoadModifiedSingletonConfig() {
     { // case: modified -> added, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
@@ -886,7 +886,7 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
     }
 }
 
-void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
+void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfig() {
     { // case: removed -> added, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
@@ -1176,7 +1176,7 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
     }
 }
 
-void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
+void SingletonInputCollectionConfigUpdateUnittest::TestLoadUnchangedSingletonConfig() {
     { // case: unchanged -> added, first > second
         PrepareConfig();
         ofstream fout(configDir1 / "test1.json", ios::trunc);
@@ -1520,10 +1520,10 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     }
 }
 
-UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadAddedSingletonConfig)
-UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadModifiedSingletonConfig)
-UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadRemovedSingletonConfig)
-UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadUnchangedSingletonConfig)
+UNIT_TEST_CASE(SingletonInputCollectionConfigUpdateUnittest, TestLoadAddedSingletonConfig)
+UNIT_TEST_CASE(SingletonInputCollectionConfigUpdateUnittest, TestLoadModifiedSingletonConfig)
+UNIT_TEST_CASE(SingletonInputCollectionConfigUpdateUnittest, TestLoadRemovedSingletonConfig)
+UNIT_TEST_CASE(SingletonInputCollectionConfigUpdateUnittest, TestLoadUnchangedSingletonConfig)
 
 } // namespace logtail
 

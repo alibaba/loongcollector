@@ -92,7 +92,7 @@ private:
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class PipelineConfigWatcherUnittest;
+    friend class SingletonInputCollectionConfigUpdateUnittest;
 #endif
 };
 
