@@ -67,7 +67,7 @@ struct UntypedMultiDoubleValues {
 
     std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesBegin() const;
     std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesEnd() const;
-    size_t ValusSize() const;
+    size_t ValuesSize() const;
 
     size_t DataSize() const;
     void ResetPipelineEvent(PipelineEvent* ptr) { mMetricEventPtr = ptr; }

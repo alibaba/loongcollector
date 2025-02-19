@@ -200,7 +200,7 @@ extern const std::string METRIC_PLUGIN_PARSE_STDOUT_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL;
-extern const std::string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPIRED_ERROR_TOTAL;
 
 //////////////////////////////////////////////////////////////////////////
 // component
