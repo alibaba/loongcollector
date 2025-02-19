@@ -35,6 +35,7 @@ public:
     void TestProcess();
     void TestParseTargetGroups();
     void TestBuildScrapeSchedulerSet();
+    void TestTargetLabels();
 
 protected:
     void SetUp() override {
@@ -215,10 +216,262 @@ void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[2].second);
 }
 
+void TargetSubscriberSchedulerUnittest::TestTargetLabels() {
+    // prepare data
+    auto judgeFunc = [](const Json::Value& scrapeConfig,
+                        const string& targetResponse,
+                        const string& metricsPath,
+                        const string& scheme,
+                        int64_t scrapeIntervalSeconds,
+                        uint64_t scrapeTimeoutSeconds,
+                        const string& ip,
+                        int32_t port) {
+        std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+        APSARA_TEST_TRUE(targetSubscriber->Init(scrapeConfig));
+        std::vector<Labels> newScrapeSchedulerSet;
+        APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(targetResponse, newScrapeSchedulerSet));
+        APSARA_TEST_EQUAL(1UL, newScrapeSchedulerSet.size());
+
+        auto result = targetSubscriber->BuildScrapeSchedulerSet(newScrapeSchedulerSet);
+        APSARA_TEST_EQUAL(1UL, result.size());
+        APSARA_TEST_EQUAL(result.begin()->second->mMetricsPath, metricsPath);
+        APSARA_TEST_EQUAL(result.begin()->second->mInterval, scrapeIntervalSeconds);
+        APSARA_TEST_EQUAL(result.begin()->second->mScrapeTimeoutSeconds, scrapeTimeoutSeconds);
+        APSARA_TEST_EQUAL(result.begin()->second->mScheme, scheme);
+        APSARA_TEST_EQUAL(result.begin()->second->mHost, ip);
+        APSARA_TEST_EQUAL(result.begin()->second->mPort, port);
+    };
+
+    string case1 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.7:8080"
+            ],
+            "labels": {
+                "__address__": "192.168.22.7:8080",
+                "__scheme__": "https"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case1, "/metrics", "https", 30, 30, "192.168.22.7", 8080);
+    string case2 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.7:8080"
+            ],
+            "labels": {
+                "__address__": "192.168.22.7:8080",
+                "__scheme__": "http",
+                "__param_xx": "yy",
+                "__param_yy": "zz"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case2, "/metrics?xx=yy&yy=zz", "http", 30, 30, "192.168.22.7", 8080);
+    string case3 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scheme__": "http",
+                "__metrics_path__": "/metrics/ab/c?d=ef&aa=bb"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case3, "/metrics/ab/c?d=ef&aa=bb", "http", 30, 30, "192.168.22.31", 6443);
+    string case4 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.7:8080"
+            ],
+            "labels": {
+                "__address__": "192.168.22.7:8080",
+                "__scheme__": "https",
+                "__metrics_path__": "/custom/metrics",
+                "__param_xx": "yy",
+                "__param_yy": "zz"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case4, "/custom/metrics?xx=yy&yy=zz", "https", 30, 30, "192.168.22.7", 8080);
+    string case5 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scheme__": "http",
+                "__metrics_path__": "/metrics/ab/c?d=ef&aa=bb",
+                "__param_yy": "zz"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case5, "/metrics/ab/c?d=ef&aa=bb&yy=zz", "http", 30, 30, "192.168.22.31", 6443);
+    string case6 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scheme__": "http",
+                "__metrics_path__": "/metrics/ab/c?d=ef&aa=bb",
+                "__param_xx": "yy",
+                "__param_yy": "zz"
+            }
+        }
+    ])JSON";
+    judgeFunc(
+        mConfig["ScrapeConfig"], case6, "/metrics/ab/c?d=ef&aa=bb&xx=yy&yy=zz", "http", 30, 30, "192.168.22.31", 6443);
+    string case7 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scheme__": "http",
+                "__scrape_interval__": "5s",
+                "__scrape_timeout__": "5s"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"], case7, "/metrics", "http", 5, 5, "192.168.22.31", 6443);
+    string configStr8 = R"JSON(
+        {
+            "Type": "input_prometheus",
+            "ScrapeConfig": {
+                "enable_http2": true,
+                "follow_redirects": true,
+                "honor_timestamps": false,
+                "job_name": "_kube-state-metrics",
+                "kubernetes_sd_configs": [
+                    {
+                        "enable_http2": true,
+                        "follow_redirects": true,
+                        "kubeconfig_file": "",
+                        "namespaces": {
+                            "names": [
+                                "arms-prom"
+                            ],
+                            "own_namespace": false
+                        },
+                        "role": "pod"
+                    }
+                ],
+                "params" : {
+                    "__param_query": [
+                        "test_query"
+                    ],
+                    "__param_query_1": [
+                        "test_query_1"
+                    ]
+                },
+                "metrics_path": "/metrics",
+                "scheme": "https",
+                "scrape_interval": "30s",
+                "scrape_timeout": "30s"
+            }
+        }
+            )JSON";
+
+    std::string errMsg;
+    if (!ParseJsonTable(configStr8, mConfig, errMsg)) {
+        std::cerr << "JSON parsing failed." << std::endl;
+    }
+    string case8 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31:6443"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scrape_interval__": "5s",
+                "__scrape_timeout__": "5s"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"],
+              case8,
+              "/metrics?__param_query=test_query&__param_query_1=test_query_1",
+              "https",
+              5,
+              5,
+              "192.168.22.31",
+              6443);
+    string configStr9 = R"JSON(
+        {
+            "Type": "input_prometheus",
+            "ScrapeConfig": {
+                "enable_http2": true,
+                "follow_redirects": true,
+                "honor_timestamps": false,
+                "job_name": "_kube-state-metrics",
+                "kubernetes_sd_configs": [
+                    {
+                        "enable_http2": true,
+                        "follow_redirects": true,
+                        "kubeconfig_file": "",
+                        "namespaces": {
+                            "names": [
+                                "arms-prom"
+                            ],
+                            "own_namespace": false
+                        },
+                        "role": "pod"
+                    }
+                ],
+                "params" : {
+                    "__param_query": [
+                        "test_query"
+                    ],
+                    "__param_query_1": [
+                        "test_query_1"
+                    ]
+                },
+                "metrics_path": "/metrics",
+                "scheme": "https",
+                "scrape_interval": "30s",
+                "scrape_timeout": "30s"
+            }
+        }
+            )JSON";
+
+    if (!ParseJsonTable(configStr9, mConfig, errMsg)) {
+        std::cerr << "JSON parsing failed." << std::endl;
+    }
+    string case9 = R"JSON([
+        {
+            "targets": [
+                "192.168.22.31"
+            ],
+            "labels": {
+                "__address__": "192.168.22.31",
+                "__scheme__": "http",
+                "__param_xx": "yy",
+                "__scrape_interval__": "5s",
+                "__scrape_timeout__": "5s"
+            }
+        }
+    ])JSON";
+    judgeFunc(mConfig["ScrapeConfig"],
+              case9,
+              "/metrics?__param_query=test_query&__param_query_1=test_query_1&xx=yy",
+              "http",
+              5,
+              5,
+              "192.168.22.31",
+              80);
+}
+
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, OnInitScrapeJobEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestParseTargetGroups)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 
 } // namespace logtail
 
