@@ -27,12 +27,35 @@ constexpr DataElement kHost = {"host",
                                "",
                                AggregationType::Level0};
 
+constexpr DataElement kHostIp = {"host_ip",
+                                 "host_ip", // metric
+                                 "host.ip", // span
+                                 "host.ip", // log
+                                 "host ip",
+                                 AggregationType::Level0};
+
+constexpr DataElement kHostName = {"host_name",
+                                   "host_name", // metric
+                                   "host.name", // span
+                                   "host.name", // log
+                                   "host name",
+                                   AggregationType::Level0};
+
 constexpr DataElement kPodName = {
     "pod_name",
     "pod_name", // metric
     "k8s.pod.name", // span
     "k8s.pod.name", // log
     "",
+    AggregationType::Level1,
+};
+
+constexpr DataElement kPodUid = {
+    "pod_uid",
+    "pod_uid", // metric
+    "k8s.pod.uid", // span
+    "k8s.pod.uid", // log
+    "pod uid",
     AggregationType::Level1,
 };
 
@@ -68,6 +91,15 @@ constexpr DataElement kNamespace = {
     "namespace", // metric
     "k8s.namespace", // span
     "k8s.namespace", // log
+    "",
+    AggregationType::Level1,
+};
+
+constexpr DataElement kServiceName = {
+    "service_name",
+    "peerServiceName", // metric
+    "k8s.peer.service.name", // span
+    "k8s.peer.service.name", // log
     "",
     AggregationType::Level1,
 };
@@ -318,8 +350,36 @@ constexpr DataElement kContainerId = {
     AggregationType::Level1,
 };
 
+constexpr DataElement kContainerName = {
+    "container_name",
+    "container_name", // metric
+    "container.name", // span
+    "container.name", // log
+    "local container name",
+    AggregationType::Level1,
+};
+
+constexpr DataElement kContainerIp = {
+    "container_ip",
+    "container_ip", // metric
+    "container.ip", // span
+    "container.ip", // log
+    "container ip",
+    AggregationType::Level1,
+};
+
+constexpr DataElement kImageName = {
+    "image_name",
+    "conatainer_image_name", // metric
+    "conatainer.image.name", // span
+    "conatainer.image.name", // log
+    "container image name",
+    AggregationType::Level1,
+};
+
 // for processes
-constexpr DataElement kProcessId = {"process.id", "", "", "process.id", "", AggregationType::Level0};
+constexpr DataElement kProcessId
+    = {"process.pid", "process_pid", "process.pid", "process.pid", "process pid", AggregationType::Level0};
 
 constexpr DataElement kKtime = {"ktime", "", "", "ktime", "", AggregationType::Level0};
 

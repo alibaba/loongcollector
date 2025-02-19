@@ -41,6 +41,9 @@ namespace logtail {
 namespace ebpf {
 
 const std::string UNKOWN_STR = "unknown";
+const std::string PERMITTED_STR = "permitted";
+const std::string INHERITABLE_STR = "inheritable";
+const std::string EFFECTIVE_STR = "effective";
 
 /////////// ================= for perfbuffer handlers ================= ///////////
 void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
@@ -856,10 +859,8 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto pExecIdSb = sb->CopyString(proc->parent_exec_id);
     res.Insert(kParentExecId.log_key(), StringView(pExecIdSb.data, pExecIdSb.size));
 
-    // finalize parent tags
-
-    std::string args = proc->process.args; // TODO
-    std::string binary = proc->process.filename; // TODO
+    std::string args = proc->process.args;
+    std::string binary = proc->process.filename;
     std::string permitted = GetCapabilities(proc->msg->creds.caps.permitted);
     std::string effective = GetCapabilities(proc->msg->creds.caps.effective);
     std::string inheritable = GetCapabilities(proc->msg->creds.caps.inheritable);
@@ -867,9 +868,15 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     rapidjson::Document::AllocatorType allocator;
     rapidjson::Value cap(rapidjson::kObjectType);
 
-    cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
-    cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
-    cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
+    cap.AddMember(rapidjson::StringRef(PERMITTED_STR.data()),
+                  rapidjson::Value().SetString(permitted.c_str(), allocator),
+                  allocator);
+    cap.AddMember(rapidjson::StringRef(EFFECTIVE_STR.data()),
+                  rapidjson::Value().SetString(effective.c_str(), allocator),
+                  allocator);
+    cap.AddMember(rapidjson::StringRef(INHERITABLE_STR.data()),
+                  rapidjson::Value().SetString(inheritable.c_str(), allocator),
+                  allocator);
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -920,28 +927,47 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
         rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
 
-        d.AddMember("exec_id", rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator), allocator);
-        d.AddMember(
-            "parent_exec_id", rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator), allocator);
-        d.AddMember(
-            "pid", rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator), allocator);
-        d.AddMember(
-            "uid", rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator), allocator);
-        d.AddMember("user", rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator), allocator);
-        d.AddMember("binary", rapidjson::Value().SetString(binary.c_str(), allocator), allocator);
-        d.AddMember("arguments", rapidjson::Value().SetString(args.c_str(), allocator), allocator);
-        d.AddMember("cwd", rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator), allocator);
-        d.AddMember("ktime",
+        d.AddMember(rapidjson::StringRef(kExecId.log_key().data()),
+                    rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kParentExecId.log_key().data()),
+                    rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kPid.log_key().data()),
+                    rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kUid.log_key().data()),
+                    rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kUser.log_key().data()),
+                    rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kBinary.log_key().data()),
+                    rapidjson::Value().SetString(binary.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kArguments.log_key().data()),
+                    rapidjson::Value().SetString(args.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kCWD.log_key().data()),
+                    rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator),
+                    allocator);
+        d.AddMember(rapidjson::StringRef(kKtime.log_key().data()),
                     rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
                     allocator);
 
         rapidjson::Value cap(rapidjson::kObjectType);
 
-        cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
-        cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
-        cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
+        cap.AddMember(rapidjson::StringRef(PERMITTED_STR.data()),
+                      rapidjson::Value().SetString(permitted.c_str(), allocator),
+                      allocator);
+        cap.AddMember(rapidjson::StringRef(EFFECTIVE_STR.data()),
+                      rapidjson::Value().SetString(effective.c_str(), allocator),
+                      allocator);
+        cap.AddMember(rapidjson::StringRef(INHERITABLE_STR.data()),
+                      rapidjson::Value().SetString(inheritable.c_str(), allocator),
+                      allocator);
 
-        d.AddMember("cap", cap, allocator);
+        d.AddMember(rapidjson::StringRef(kCap.log_key().data()), cap, allocator);
 
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -953,100 +979,6 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
         res.Insert(kParentProcess.log_key(), StringView(parentSb.data, parentSb.size));
     }
     return res;
-}
-
-bool ProcessCacheManager::FinalizeProcessTags(PipelineEventGroup& eventGroup, uint32_t pid, uint64_t ktime) {
-    auto execId = GenerateExecId(pid, ktime);
-    auto proc = LookupCache(execId);
-    if (!proc) {
-        LOG_ERROR(sLogger, ("cannot find proc in cache, execId", execId)("pid", pid)("ktime", ktime));
-        return false;
-    }
-    // finalize proc tags
-
-    auto parentExecId = GenerateParentExecId(proc);
-    auto parentProc = LookupCache(execId);
-    // finalize proc tags
-    std::string args = proc->process.args; // TODO
-    std::string binary = proc->process.args; // TODO
-    std::string permitted = GetCapabilities(proc->msg->creds.caps.permitted);
-    std::string effective = GetCapabilities(proc->msg->creds.caps.effective);
-    std::string inheritable = GetCapabilities(proc->msg->creds.caps.inheritable);
-
-    rapidjson::Document::AllocatorType allocator;
-    rapidjson::Value cap(rapidjson::kObjectType);
-
-    cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
-    cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
-    cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-
-    cap.Accept(writer);
-
-    std::string capStr = buffer.GetString();
-
-    // event_type, added by xxx_security_manager
-    // call_name, added by xxx_security_manager
-    // event_time, added by xxx_security_manager
-    eventGroup.SetTag("exec_id", proc->exec_id);
-    eventGroup.SetTag("parent_exec_id", proc->parent_exec_id);
-    eventGroup.SetTag("pid", std::to_string(proc->process.pid));
-    eventGroup.SetTag("uid", std::to_string(proc->process.uid));
-    eventGroup.SetTag("user", proc->process.user.name);
-    eventGroup.SetTag("binary", binary);
-    eventGroup.SetTag("arguments", args);
-    eventGroup.SetTag("cwd", proc->process.cwd);
-    eventGroup.SetTag("ktime", std::to_string(proc->process.ktime));
-    eventGroup.SetTag("cap", capStr);
-
-    // for parent
-    if (!parentProc) {
-        eventGroup.SetTag("parent_process", UNKOWN_STR);
-        return true;
-    }
-    { // finalize parent tags
-        std::string permitted = GetCapabilities(parentProc->msg->creds.caps.permitted);
-        std::string effective = GetCapabilities(parentProc->msg->creds.caps.effective);
-        std::string inheritable = GetCapabilities(parentProc->msg->creds.caps.inheritable);
-
-        rapidjson::Document d;
-        d.SetObject();
-
-        rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
-
-        d.AddMember("exec_id", rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator), allocator);
-        d.AddMember(
-            "parent_exec_id", rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator), allocator);
-        d.AddMember(
-            "pid", rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator), allocator);
-        d.AddMember(
-            "uid", rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator), allocator);
-        d.AddMember("user", rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator), allocator);
-        d.AddMember("binary", rapidjson::Value().SetString(binary.c_str(), allocator), allocator);
-        d.AddMember("arguments", rapidjson::Value().SetString(args.c_str(), allocator), allocator);
-        d.AddMember("cwd", rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator), allocator);
-        d.AddMember("ktime",
-                    rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
-                    allocator);
-
-        rapidjson::Value cap(rapidjson::kObjectType);
-
-        cap.AddMember("permitted", rapidjson::Value().SetString(permitted.c_str(), allocator), allocator);
-        cap.AddMember("effective", rapidjson::Value().SetString(effective.c_str(), allocator), allocator);
-        cap.AddMember("inheritable", rapidjson::Value().SetString(inheritable.c_str(), allocator), allocator);
-
-        d.AddMember("cap", cap, allocator);
-
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        d.Accept(writer);
-
-        std::string result = buffer.GetString();
-        eventGroup.SetTag("parent_process", result);
-    }
-    return true;
 }
 
 } // namespace ebpf

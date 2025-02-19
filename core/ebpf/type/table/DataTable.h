@@ -81,7 +81,6 @@ protected:
 
 class DataTableSchema {
 public:
-    // TODO(oazizi): This constructor should only be called at compile-time. Need to enforce this.
     template <std::size_t N>
     constexpr DataTableSchema(StringView name, StringView desc, const DataElement (&elements)[N])
         : name_(name), desc_(desc), elements_(elements) {}
@@ -114,7 +113,6 @@ public:
     }
 
     constexpr StringView ColName(size_t i) const { return elements_[i].name(); }
-
     constexpr StringView ColMetricKey(size_t i) const { return elements_[i].metric_key(); }
     constexpr StringView ColSpanKey(size_t i) const { return elements_[i].span_key(); }
     constexpr StringView ColLogKey(size_t i) const { return elements_[i].log_key(); }

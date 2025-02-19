@@ -326,11 +326,6 @@ void ManagerUnittest::TestBaseManagerProcessTags() {
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     auto tags = mBaseManager->FinalizeProcessTags(sourceBuffer, execveEvent->process.pid, execveEvent->process.ktime);
     APSARA_TEST_FALSE(tags.mInner.empty());
-
-    // 测试事件组标签生成
-    PipelineEventGroup eventGroup(sourceBuffer);
-    bool result = mBaseManager->FinalizeProcessTags(eventGroup, execveEvent->process.pid, execveEvent->process.ktime);
-    APSARA_TEST_TRUE(result);
 }
 
 void ManagerUnittest::TestBaseManagerPerfBuffer() {
