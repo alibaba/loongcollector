@@ -160,6 +160,8 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 		defer k.wg.Done()
 		for {
 			if err := k.consumerGroupClient.Consume(cancelCtx, k.Topics, k); err != nil {
+				// Keep retrying Consume when error occurs.
+				// This loop will only exit when the context is canceled (i.e., when loongcollector process is stopping)
 				logger.Error(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Error from kafka consumer", err)
 			}
 			// check if context was canceled, signaling that the consumer should stop
