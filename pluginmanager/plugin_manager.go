@@ -130,7 +130,6 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 			return
 		}
 		logger.Info(context.Background(), "Valid but slow stop config", config.ConfigName)
-		DeleteLogstoreConfig(DisabledLogtailConfig[config.ConfigNameWithSuffix])
 		delete(DisabledLogtailConfig, config.ConfigNameWithSuffix)
 		DisabledLogtailConfigLock.Unlock()
 	}()
@@ -148,6 +147,7 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 func StopAllPipelines(withInput bool) error {
 	defer panicRecover("Run plugin")
 	LogtailConfigLock.Lock()
+	toDeleteConfigNames := make(map[string]struct{})
 	for configName, logstoreConfig := range LogtailConfig {
 		needStop := false
 		if withInput {
@@ -174,8 +174,11 @@ func StopAllPipelines(withInput bool) error {
 			} else {
 				DeleteLogstoreConfig(logstoreConfig)
 			}
-			delete(LogtailConfig, configName)
+			toDeleteConfigNames[configName] = struct{}{}
 		}
+	}
+	for key, _ := range toDeleteConfigNames {
+		delete(LogtailConfig, key)
 	}
 	LogtailConfigLock.Unlock()
 	return nil
