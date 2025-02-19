@@ -16,13 +16,6 @@ cmake_minimum_required(VERSION 3.22)
 project(driver)
 
 if (LINUX)
-    # include(ExternalProject)
-
-    # ExternalProject_Add(coolbpf_proj
-    #         PREFIX "${EXTERNAL_INSTALL_DIR}"
-    #         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/coolbpf"
-    #         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${DEFAULT_DEPS_ROOT} -DENABLE_PROFILE=OFF -DBUILD_TESTING=OFF
-    # )
     set(ENABLE_PROFILE OFF)
     set(BUILD_TESTING OFF)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
