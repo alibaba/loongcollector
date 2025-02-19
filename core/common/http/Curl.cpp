@@ -111,6 +111,7 @@ static size_t socket_write_callback(void* userdata, curl_socket_t fd, curlsockty
     // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
     int32_t tos = *static_cast<int32_t*>(userdata) << 2;
     setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+    return 0;
 }
 
 CURL* CreateCurlHandler(const string& method,
