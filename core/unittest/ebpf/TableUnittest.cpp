@@ -43,7 +43,7 @@ void TableUnittest::TestProcessTable() {
     // 测试 ProcessCommonTable
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("exec_id"));
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_exec_id"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("process.id"));
+    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("process_pid"));
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("uid"));
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("binary"));
 
@@ -66,7 +66,7 @@ void TableUnittest::TestProcessTable() {
 void TableUnittest::TestFileSecurityTable() {
     // 测试 FileSecurityTable 的列存在性
     APSARA_TEST_TRUE(kFileSecurityTable.HasCol("exec_id"));
-    APSARA_TEST_TRUE(kFileSecurityTable.HasCol("process.id"));
+    APSARA_TEST_TRUE(kFileSecurityTable.HasCol("process_pid"));
     APSARA_TEST_TRUE(kFileSecurityTable.HasCol("uid"));
     APSARA_TEST_TRUE(kFileSecurityTable.HasCol("binary"));
     APSARA_TEST_TRUE(kFileSecurityTable.HasCol("container_id"));
@@ -87,7 +87,7 @@ void TableUnittest::TestFileSecurityTable() {
 void TableUnittest::TestNetworkSecurityTable() {
     // 测试 NetworkSecurityTable 的列存在性
     APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("exec_id"));
-    APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("process.id"));
+    APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("process_pid"));
     APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("container_id"));
     APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("source.addr"));
     APSARA_TEST_TRUE(kNetworkSecurityTable.HasCol("dest.addr"));

@@ -379,7 +379,7 @@ constexpr DataElement kImageName = {
 
 // for processes
 constexpr DataElement kProcessId
-    = {"process.pid", "process_pid", "process.pid", "process.pid", "process pid", AggregationType::Level0};
+    = {"process_pid", "process_pid", "process.pid", "process.pid", "process pid", AggregationType::Level0};
 
 constexpr DataElement kKtime = {"ktime", "", "", "ktime", "", AggregationType::Level0};
 
