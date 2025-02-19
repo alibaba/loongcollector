@@ -38,7 +38,7 @@ public:
     ~AggregatorUnittest() { mTimer.Stop(); }
 
     void TestBasicAgg();
-    void TestMove();
+    void TestGetAndReset();
     void TestAggManager();
     void TestAggregator();
 
@@ -61,15 +61,15 @@ protected:
     }
     void TearDown() override {}
 
-    int GetSum() { return GetSum(agg); }
+    int GetSum() { return GetSum(*agg); }
 
-    static int GetSum(const std::unique_ptr<SIZETAggTree<HT, std::vector<std::string>>>& agg) {
+    static int GetSum(SIZETAggTree<HT, std::vector<std::string>>& agg) {
         int result = 0;
-        agg->ForEach([&result](const auto ht) { result += ht->val; });
+        agg.ForEach([&result](const auto ht) { result += ht->val; });
         return result;
     }
 
-    int GetDataNodeCount() { return GetDataNodeCount(agg); }
+    int GetDataNodeCount() { return GetDataNodeCount(*agg); }
 
     inline size_t GetHashByDepth(const std::vector<std::string>& data, int depth) {
         size_t seed = 0UL;
@@ -82,9 +82,9 @@ protected:
         return agg->Aggregate(data, std::array<size_t, 1>{GetHashByDepth(data, depth)});
     }
 
-    static int GetDataNodeCount(const std::unique_ptr<SIZETAggTree<HT, std::vector<std::string>>>& agg) {
+    static int GetDataNodeCount(SIZETAggTree<HT, std::vector<std::string>>& agg) {
         int node_count = 0;
-        agg->ForEach([&node_count](const auto ht) { node_count++; });
+        agg.ForEach([&node_count](const auto ht) { node_count++; });
         return node_count;
     }
 
@@ -252,7 +252,7 @@ void AggregatorUnittest::TestBasicAgg() {
     APSARA_TEST_EQUAL(GetSum(), 0);
 }
 
-void AggregatorUnittest::TestMove() {
+void AggregatorUnittest::TestGetAndReset() {
     Aggregate({"a", "b", "c", "d"}, 4);
     Aggregate({"a", "b", "c", "d", "e"}, 4);
     Aggregate({"a", "b", "d", "r"}, 4);
@@ -261,18 +261,18 @@ void AggregatorUnittest::TestMove() {
     APSARA_TEST_EQUAL(GetDataNodeCount(), 4);
     APSARA_TEST_EQUAL(agg->NodeCount(), 4);
     APSARA_TEST_EQUAL(GetSum(), 5);
-    auto moved_map = std::make_unique<SIZETAggTree<HT, std::vector<std::string>>>(std::move(*agg));
+    auto newTree(agg->GetAndReset());
     APSARA_TEST_EQUAL(GetDataNodeCount(), 0);
     APSARA_TEST_EQUAL(agg->NodeCount(), 0);
     APSARA_TEST_EQUAL(GetSum(), 0);
 
-    APSARA_TEST_EQUAL(GetDataNodeCount(moved_map), 4);
-    APSARA_TEST_EQUAL(moved_map->NodeCount(), 4);
-    APSARA_TEST_EQUAL(GetSum(moved_map), 5);
+    APSARA_TEST_EQUAL(GetDataNodeCount(newTree), 4);
+    APSARA_TEST_EQUAL(newTree.NodeCount(), 4);
+    APSARA_TEST_EQUAL(GetSum(newTree), 5);
 }
 
 UNIT_TEST_CASE(AggregatorUnittest, TestBasicAgg);
-UNIT_TEST_CASE(AggregatorUnittest, TestMove);
+UNIT_TEST_CASE(AggregatorUnittest, TestGetAndReset);
 // UNIT_TEST_CASE(AggregatorUnittest, TestAggManager);
 UNIT_TEST_CASE(AggregatorUnittest, TestAggregator);
 
