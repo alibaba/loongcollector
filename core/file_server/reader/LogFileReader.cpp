@@ -655,9 +655,10 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
             AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + "; errono:" + ErrnoToString(error),
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
             return false;
         }
     }
@@ -833,9 +834,10 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    string("extract topic by regex fail, exception:") + exception
                                                        + ", path:" + finalPath + ", regex:" + topicConfig,
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
         }
     } catch (...) {
         LOG_ERROR(sLogger,
@@ -844,9 +846,10 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
         AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                string("extract topic by regex fail, exception:") + exception
                                                    + ", path:" + finalPath + ", regex:" + topicConfig,
+                                               GetRegion(),
                                                GetProject(),
-                                               GetLogstore(),
-                                               GetRegion());
+                                               GetConfigName(),
+                                               GetLogstore());
     }
 
     return res;
@@ -997,9 +1000,10 @@ void LogFileReader::OnOpenFileError() {
             AlarmManager::GetInstance()->SendAlarm(LOGFILE_PERMINSSION_ALARM,
                                                    string("Failed to open log file because of permission: ")
                                                        + mHostLogPath,
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
             break;
         case EMFILE:
             LOG_ERROR(sLogger,
@@ -1011,9 +1015,10 @@ void LogFileReader::OnOpenFileError() {
             AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file because of : Too many open files")
                                                        + mHostLogPath,
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
             break;
         default:
             LOG_ERROR(sLogger,
@@ -1025,9 +1030,10 @@ void LogFileReader::OnOpenFileError() {
             AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + "; errono:" + ErrnoToString(GetErrno()),
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
     }
 }
 
@@ -1057,9 +1063,10 @@ bool LogFileReader::UpdateFilePtr() {
             AlarmManager::GetInstance()->SendAlarm(OPEN_FILE_LIMIT_ALARM,
                                                    string("Failed to open log file: ") + mHostLogPath
                                                        + " limit:" + ToString(INT32_FLAG(max_reader_open_files)),
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
             // set errno to "too many open file"
             errno = EMFILE;
             return false;
@@ -1202,9 +1209,10 @@ void LogFileReader::CloseFilePtr() {
                                                    string("close file error because of ") + strerror(errno)
                                                        + ", file path: " + mHostLogPath + ", inode: "
                                                        + ToString(mDevInode.inode) + ", inode: " + ToString(fd),
+                                                   GetRegion(),
                                                    GetProject(),
-                                                   GetLogstore(),
-                                                   GetRegion());
+                                                   GetConfigName(),
+                                                   GetLogstore());
         } else {
             LOG_INFO(
                 sLogger,
@@ -1262,9 +1270,10 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
         AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
                                                string("tell error because of ") + strerror(lastErrNo) + " file path: "
                                                    + mHostLogPath + ", inode : " + ToString(mDevInode.inode),
+                                               GetRegion(),
                                                GetProject(),
-                                               GetLogstore(),
-                                               GetRegion());
+                                               GetConfigName(),
+                                               GetLogstore());
         if (endSize < 0) {
             return false;
         }
@@ -1316,9 +1325,10 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
                                                mHostLogPath
                                                    + " signature is same but size decrease, read from now fileSize "
                                                    + ToString(endSize) + " last read pos " + ToString(mLastFilePos),
+                                               GetRegion(),
                                                GetProject(),
-                                               GetLogstore(),
-                                               GetRegion());
+                                               GetConfigName(),
+                                               GetLogstore());
 
         mLastFilePos = endSize;
         // when we use truncate_pos_skip_bytes, if truncate stop and log start to append, logtail will drop less data or
@@ -1358,76 +1368,6 @@ void LogFileReader::SetReadBufferSize(int32_t bufSize) {
     }
     LOG_INFO(sLogger, ("set max read buffer size", bufSize));
     BUFFER_SIZE = bufSize;
-}
-
-bool LogFileReader::ParseLogTime(const char* buffer,
-                                 const boost::regex* reg,
-                                 LogtailTime& logTime,
-                                 const std::string& timeFormat,
-                                 const std::string& region,
-                                 const std::string& project,
-                                 const std::string& logStore,
-                                 const std::string& logPath) {
-    std::string exception;
-    boost::match_results<const char*> what;
-    if (reg != NULL && BoostRegexSearch(buffer, *reg, exception, what, boost::match_default)) {
-        if (!what.empty()) {
-            std::string timeStr(what[0].str());
-            // convert log time
-            struct tm t;
-            memset(&t, 0, sizeof(t));
-            int nanosecondLength;
-            if (strptime_ns(timeStr.c_str(), timeFormat.c_str(), &t, &logTime.tv_nsec, &nanosecondLength) == NULL) {
-                LOG_ERROR(sLogger,
-                          ("convert time failed, time str", timeStr)("time format", timeFormat)("project", project)(
-                              "logstore", logStore)("file", logPath));
-                return false;
-            }
-
-            t.tm_isdst = -1;
-            logTime.tv_sec = mktime(&t);
-            return true;
-        }
-    }
-    if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
-            LOG_ERROR(sLogger,
-                      ("parse regex log fail, exception",
-                       exception)("buffer", buffer)("project", project)("logstore", logStore)("file", logPath));
-        }
-        AlarmManager::GetInstance()->SendAlarm(
-            REGEX_MATCH_ALARM, "parse regex log fail:" + exception, project, logStore, region);
-    }
-    return false;
-}
-
-bool LogFileReader::GetLogTimeByOffset(const char* buffer,
-                                       int32_t pos,
-                                       LogtailTime& logTime,
-                                       const std::string& timeFormat,
-                                       const std::string& region,
-                                       const std::string& project,
-                                       const std::string& logStore,
-                                       const std::string& logPath) {
-    struct tm t;
-    memset(&t, 0, sizeof(t));
-    long nanosecond = 0;
-    int nanosecondLength = 0;
-    if (strptime_ns(buffer + pos, timeFormat.c_str(), &t, &nanosecond, &nanosecondLength) == NULL) {
-        if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-            if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
-                LOG_WARNING(sLogger,
-                            ("get time by offset fail, region", region)("project", project)("logstore",
-                                                                                            logStore)("file", logPath));
-            }
-            AlarmManager::GetInstance()->SendAlarm(
-                PARSE_TIME_FAIL_ALARM, "errorlog:" + string(buffer), project, logStore, region);
-        }
-        return false;
-    }
-    t.tm_isdst = -1;
-    logTime.tv_sec = mktime(&t);
-    return true;
 }
 
 // Only get the currently written log file, it will choose the last modified file to read. There are several condition
@@ -1487,9 +1427,10 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
                 std::string("fall behind ") + ToString(delta) + " bytes, file size:" + ToString(fileSize)
                     + ", now position:" + ToString(mLastFilePos) + ", path:" + mHostLogPath
                     + ", now read log content:" + logBuffer.rawBuffer.substr(0, 256).to_string(),
+                GetRegion(),
                 GetProject(),
-                GetLogstore(),
-                GetRegion());
+                GetConfigName(),
+                GetLogstore());
         }
     } else
         mReadDelayTime = 0;
@@ -1506,9 +1447,10 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             string("force set file pos to file size, fall behind ") + ToString(delta)
                 + " bytes, file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos)
                 + ", path:" + mHostLogPath + ", now read log content:" + logBuffer.rawBuffer.substr(0, 256).to_string(),
+            GetRegion(),
             GetProject(),
-            GetLogstore(),
-            GetRegion());
+            GetConfigName(),
+            GetLogstore());
         mLastFilePos = fileSize;
         mCache.clear();
     }
@@ -1539,9 +1481,10 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
                 READ_STOPPED_CONTAINER_ALARM,
                 string("path: ") + mHostLogPath + ", stopped time:" + ToString(mContainerStoppedTime)
                     + ", file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos),
+                GetRegion(),
                 GetProject(),
-                GetLogstore(),
-                GetRegion());
+                GetConfigName(),
+                GetLogstore());
         }
     }
 
@@ -1672,7 +1615,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
                     << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
                     << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
                 AlarmManager::GetInstance()->SendAlarm(
-                    SPLIT_LOG_FAIL_ALARM, oss.str(), GetProject(), GetLogstore(), GetRegion());
+                    SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
             } else {
                 // line is not finished yet nor more data, put all data in cache
                 mCache.assign(stringBuffer, stringBufferLen);
@@ -1877,7 +1820,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
             << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
         AlarmManager::GetInstance()->SendAlarm(
-            SPLIT_LOG_FAIL_ALARM, oss.str(), GetProject(), GetLogstore(), GetRegion());
+            SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
     }
     LOG_DEBUG(sLogger,
               ("read gbk buffer, offset", mLastFilePos)("origin read", originReadCount)("at last read", readCharCount));
@@ -1909,9 +1852,10 @@ LogFileReader::ReadFile(LogFileOperator& op, void* buf, size_t size, int64_t& of
     //             FUSE_FILE_TRUNCATE_ALARM,
     //             string("read fuse file with a hole, size: ") + ToString(offset - oriOffset) + " filename: "
     //                 + mHostLogPath + " dev: " + ToString(mDevInode.dev) + " inode: " + ToString(mDevInode.inode),
+    //             GetRegion(),
     //             GetProject(),
-    //             GetLogstore(),
-    //             GetRegion());
+    //             GetConfigName(),
+    //             GetLogstore());
     //     }
     // } else {
     nbytes = op.Pread(buf, 1, size, offset);

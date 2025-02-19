@@ -298,9 +298,10 @@ bool ProcessorFilterNative::IsMatched(const LogEvent& contents, const LogFilterR
                 if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
                     GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                                       "regex_match in Filter fail:" + exception,
+                                                      GetContext().GetRegion(),
                                                       GetContext().GetProjectName(),
-                                                      GetContext().GetLogstoreName(),
-                                                      GetContext().GetRegion());
+                                                      GetContext().GetConfigName(),
+                                                      GetContext().GetLogstoreName());
                 }
             }
             return false;
@@ -496,9 +497,10 @@ bool RegexFilterValueNode::Match(const LogEvent& contents, const CollectionPipel
         if (mContext.GetAlarm().IsLowLevelAlarmValid()) {
             mContext.GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                           "regex_match in Filter fail:" + exception,
+                                          mContext.GetRegion(),
                                           mContext.GetProjectName(),
-                                          mContext.GetLogstoreName(),
-                                          mContext.GetRegion());
+                                          mContext.GetConfigName(),
+                                          mContext.GetLogstoreName());
         }
     }
     return result;
