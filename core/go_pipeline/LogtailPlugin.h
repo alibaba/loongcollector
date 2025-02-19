@@ -95,17 +95,17 @@ typedef struct {
 } InnerGoMetrics;
 
 typedef struct {
-	int alarmType;
+    int alarmType;
     char* project;
     char* logstore;
-	char* config;
-	char* message;
-	int count;
+    char* config;
+    char* message;
+    int count;
 } InnerGoAlarm;
 
 typedef struct {
-	InnerGoAlarm** alarms;
-	int count;
+    InnerGoAlarm** alarms;
+    int count;
 } InnerGoAlarms;
 
 struct K8sContainerMeta {
