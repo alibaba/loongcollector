@@ -348,7 +348,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
 
 string TargetSubscriberScheduler::TargetsInfoToString() const {
     Json::Value root;
-    PromAgentInfo agentInfo{0.0F, 0, 0.0F, 0.0F};
+    PromAgentInfo agentInfo{0.0F, 0, 0.0F, 0};
 
     PrometheusInputRunner::GetInstance()->GetAgentInfo(agentInfo);
     root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = agentInfo.mCpuUsage;
