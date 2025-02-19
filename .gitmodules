@@ -1,0 +1,3 @@
+[submodule "core/third_party/coolbpf"]
+	path = core/third_party/coolbpf
+	url = https://gitee.com/anolis/coolbpf.git

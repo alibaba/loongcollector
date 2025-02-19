@@ -35,7 +35,7 @@ public:
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return false; }
 
-    nami::ObserverNetworkOption mNetworkOption;
+    logtail::ebpf::ObserverNetworkOption mNetworkOption;
     PluginMetricManagerPtr mPluginMgr;
 };
 
