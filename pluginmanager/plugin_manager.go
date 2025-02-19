@@ -152,10 +152,12 @@ func StopAllPipelines(withInput bool) error {
 	for configName, logstoreConfig := range LogtailConfig {
 		matchFlag := false
 		if withInput {
+			// if request is withinput=true, only process logstoreConfig.PluginRunner.IsWithInputPlugin=true
 			if logstoreConfig.PluginRunner.IsWithInputPlugin() {
 				matchFlag = true
 			}
 		} else {
+			// if request is withinput=false, only process logstoreConfig.PluginRunner.IsWithInputPlugin=false
 			if !logstoreConfig.PluginRunner.IsWithInputPlugin() {
 				matchFlag = true
 			}
@@ -171,16 +173,12 @@ func StopAllPipelines(withInput bool) error {
 				DisabledLogtailConfigLock.Lock()
 				DisabledLogtailConfig[logstoreConfig.ConfigNameWithSuffix] = logstoreConfig
 				DisabledLogtailConfigLock.Unlock()
+			} else {
+				DeleteLogstoreConfig(logstoreConfig)
 			}
+			delete(LogtailConfig, configName)
 		}
 	}
-	for key, value := range LogtailConfig {
-		if _, ok := disabledConfigNames[key]; !ok {
-			DeleteLogstoreConfig(value)
-		}
-		delete(LogtailConfig, key)
-	}
-	LogtailConfig = make(map[string]*LogstoreConfig)
 	LogtailConfigLock.Unlock()
 	return nil
 }
@@ -274,14 +272,13 @@ func Stop(configName string, removedFlag bool) error {
 			DisabledLogtailConfigLock.Lock()
 			DisabledLogtailConfig[config.ConfigNameWithSuffix] = config
 			DisabledLogtailConfigLock.Unlock()
-
-			LogtailConfigLock.Lock()
-			delete(LogtailConfig, configName)
-			LogtailConfigLock.Unlock()
 		} else {
 			logger.Info(config.Context.GetRuntimeContext(), "Stop config now", configName)
-			DeleteLogstoreConfigFromLogtailConfig(configName)
+			DeleteLogstoreConfig(config)
 		}
+		LogtailConfigLock.Lock()
+		delete(LogtailConfig, configName)
+		LogtailConfigLock.Unlock()
 		return nil
 	}
 	LogtailConfigLock.RUnlock()
