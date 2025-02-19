@@ -42,60 +42,57 @@ enum class AggregationType {
     AggregationTypeBoundry, // notice: DO NOT use AggregationTypeBoundry when assigning AggregationType.
 };
 
-constexpr int MinAggregationLevel = static_cast<int>(AggregationType::NoAggregate) + 1;
-constexpr int MaxAggregationLevel = static_cast<int>(AggregationType::AggregationTypeBoundry) - 1;
+constexpr int kMinAggregationLevel = static_cast<int>(AggregationType::NoAggregate) + 1;
+constexpr int kMaxAggregationLevel = static_cast<int>(AggregationType::AggregationTypeBoundry) - 1;
 
 
 class DataElement {
 public:
     constexpr DataElement() = delete;
     constexpr DataElement(StringView name,
-                          StringView metric_key,
-                          StringView span_key,
-                          StringView log_key,
+                          StringView metricKey,
+                          StringView spanKey,
+                          StringView logKey,
                           StringView desc,
-                          AggregationType agg_type = AggregationType::NoAggregate)
-        : name_(name),
-          metric_key_(metric_key),
-          span_key_(span_key),
-          log_key_(log_key),
-          desc_(desc),
-          agg_type_(agg_type) {}
+                          AggregationType aggType = AggregationType::NoAggregate)
+        : mName(name),
+          mEtricKey(metricKey),
+          mSpanKey(spanKey),
+          mLogKey(logKey),
+          mDesc(desc),
+          mAggType(aggType) {}
 
-    constexpr StringView name() const { return name_; }
-    constexpr StringView metric_key() const { return metric_key_; }
-    constexpr StringView span_key() const { return span_key_; }
-    constexpr StringView log_key() const { return log_key_; }
-    constexpr StringView desc() const { return desc_; }
+    constexpr StringView Name() const { return mName; }
+    constexpr StringView MetricKey() const { return mEtricKey; }
+    constexpr StringView SpanKey() const { return mSpanKey; }
+    constexpr StringView LogKey() const { return mLogKey; }
+    constexpr StringView Desc() const { return mDesc; }
 
-    constexpr AggregationType agg_type() const { return agg_type_; }
+    constexpr AggregationType AggType() const { return mAggType; }
 
 protected:
-    const StringView name_;
-    const StringView metric_key_;
-    const StringView span_key_;
-    const StringView log_key_;
-    const StringView desc_;
-    const AggregationType agg_type_ = AggregationType::NoAggregate;
+    const StringView mName;
+    const StringView mEtricKey;
+    const StringView mSpanKey;
+    const StringView mLogKey;
+    const StringView mDesc;
+    const AggregationType mAggType = AggregationType::NoAggregate;
 };
 
 class DataTableSchema {
 public:
     template <std::size_t N>
     constexpr DataTableSchema(StringView name, StringView desc, const DataElement (&elements)[N])
-        : name_(name), desc_(desc), elements_(elements) {}
+        : mName(name), mDesc(desc), mElements(elements) {}
 
-    DataTableSchema(StringView name, StringView desc, const std::vector<DataElement>& elements)
-        : name_(name), desc_(desc), elements_(elements.data(), elements.size()) {}
-
-    constexpr StringView name() const { return name_; }
-    constexpr StringView desc() const { return desc_; }
-    constexpr ArrayView<DataElement> elements() const { return elements_; }
+    constexpr StringView Name() const { return mName; }
+    constexpr StringView Desc() const { return mDesc; }
+    constexpr ArrayView<DataElement> Elements() const { return mElements; }
 
     constexpr uint32_t ColIndex(StringView key) const {
         uint32_t i = 0;
-        for (i = 0; i < elements_.size(); i++) {
-            if (elements_[i].name() == key) {
+        for (i = 0; i < mElements.size(); i++) {
+            if (mElements[i].Name() == key) {
                 break;
             }
         }
@@ -104,23 +101,23 @@ public:
 
     constexpr bool HasCol(StringView key) const {
         uint32_t i = 0;
-        for (i = 0; i < elements_.size(); i++) {
-            if (elements_[i].name() == key) {
+        for (i = 0; i < mElements.size(); i++) {
+            if (mElements[i].Name() == key) {
                 return true;
             }
         }
         return false;
     }
 
-    constexpr StringView ColName(size_t i) const { return elements_[i].name(); }
-    constexpr StringView ColMetricKey(size_t i) const { return elements_[i].metric_key(); }
-    constexpr StringView ColSpanKey(size_t i) const { return elements_[i].span_key(); }
-    constexpr StringView ColLogKey(size_t i) const { return elements_[i].log_key(); }
+    constexpr StringView ColName(size_t i) const { return mElements[i].Name(); }
+    constexpr StringView ColMetricKey(size_t i) const { return mElements[i].MetricKey(); }
+    constexpr StringView ColSpanKey(size_t i) const { return mElements[i].SpanKey(); }
+    constexpr StringView ColLogKey(size_t i) const { return mElements[i].LogKey(); }
 
 private:
-    const StringView name_;
-    const StringView desc_;
-    const ArrayView<DataElement> elements_;
+    const StringView mName;
+    const StringView mDesc;
+    const ArrayView<DataElement> mElements;
 };
 
 } // namespace ebpf

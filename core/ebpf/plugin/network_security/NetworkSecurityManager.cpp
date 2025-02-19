@@ -177,13 +177,13 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
                     logEvent->SetContentNoCopy(it->first, it->second);
                 }
-                logEvent->SetContentNoCopy(kL4Protocol.log_key(), StringView(protocolSb.data, protocolSb.size));
-                logEvent->SetContentNoCopy(kFamily.log_key(), StringView(familySb.data, familySb.size));
-                logEvent->SetContentNoCopy(kSaddr.log_key(), StringView(saddrSb.data, saddrSb.size));
-                logEvent->SetContentNoCopy(kDaddr.log_key(), StringView(daddrSb.data, daddrSb.size));
-                logEvent->SetContentNoCopy(kSport.log_key(), StringView(sportSb.data, sportSb.size));
-                logEvent->SetContentNoCopy(kDport.log_key(), StringView(dportSb.data, dportSb.size));
-                logEvent->SetContentNoCopy(kNetNs.log_key(), StringView(netnsSb.data, netnsSb.size));
+                logEvent->SetContentNoCopy(kL4Protocol.LogKey(), StringView(protocolSb.data, protocolSb.size));
+                logEvent->SetContentNoCopy(kFamily.LogKey(), StringView(familySb.data, familySb.size));
+                logEvent->SetContentNoCopy(kSaddr.LogKey(), StringView(saddrSb.data, saddrSb.size));
+                logEvent->SetContentNoCopy(kDaddr.LogKey(), StringView(daddrSb.data, daddrSb.size));
+                logEvent->SetContentNoCopy(kSport.LogKey(), StringView(sportSb.data, sportSb.size));
+                logEvent->SetContentNoCopy(kDport.LogKey(), StringView(dportSb.data, dportSb.size));
+                logEvent->SetContentNoCopy(kNetNs.LogKey(), StringView(netnsSb.data, netnsSb.size));
 
                 auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));

@@ -256,7 +256,7 @@ func getGoModules(ctx *buildContext) error {
 	}
 
 	path := getAbsPath(ctx.ModFile, ctx.ProjectRoot)
-	mods, err := os.ReadFile(path)
+	mods, err := os.ReadFile(path) // nolint
 	if err != nil {
 		return fmt.Errorf("failed to read file content, err: %v", err)
 	}

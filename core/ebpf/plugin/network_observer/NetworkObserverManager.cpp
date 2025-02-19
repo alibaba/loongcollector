@@ -54,21 +54,21 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               auto data = std::make_unique<AppMetricData>(in->GetConnId(), in->GetSpanName());
               auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(in->GetConnId());
 
-              data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.name())];
-              data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())];
-              data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHost.name())];
-              data->mIp = ctAttrs[kConnTrackerTable.ColIndex(kIp.name())];
+              data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())];
+              data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())];
+              data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())];
+              data->mIp = ctAttrs[kConnTrackerTable.ColIndex(kIp.Name())];
 
-              data->mWorkloadKind = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.name())];
-              data->mWorkloadName = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.name())];
+              data->mWorkloadKind = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())];
+              data->mWorkloadName = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())];
 
-              data->mRpcType = ctAttrs[kConnTrackerTable.ColIndex(kRpcType.name())];
-              data->mCallType = ctAttrs[kConnTrackerTable.ColIndex(kCallType.name())];
-              data->mCallKind = ctAttrs[kConnTrackerTable.ColIndex(kCallKind.name())];
+              data->mRpcType = ctAttrs[kConnTrackerTable.ColIndex(kRpcType.Name())];
+              data->mCallType = ctAttrs[kConnTrackerTable.ColIndex(kCallType.Name())];
+              data->mCallKind = ctAttrs[kConnTrackerTable.ColIndex(kCallKind.Name())];
 
-              data->mDestId = ctAttrs[kConnTrackerTable.ColIndex(kDestId.name())];
-              data->mEndpoint = ctAttrs[kConnTrackerTable.ColIndex(kEndpoint.name())];
-              data->mNamespace = ctAttrs[kConnTrackerTable.ColIndex(kNamespace.name())];
+              data->mDestId = ctAttrs[kConnTrackerTable.ColIndex(kDestId.Name())];
+              data->mEndpoint = ctAttrs[kConnTrackerTable.ColIndex(kEndpoint.Name())];
+              data->mNamespace = ctAttrs[kConnTrackerTable.ColIndex(kNamespace.Name())];
 
               return data;
           }),
@@ -109,22 +109,22 @@ NetworkObserverManager::GenerateAggKeyForAppMetric(const std::shared_ptr<Abstrac
     std::hash<std::string> hasher;
     auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
 
-    for (size_t j = 0; j < kAppMetricsTable.elements().size(); j++) {
-        int agg_level = static_cast<int>(kAppMetricsTable.elements()[j].agg_type());
-        if (agg_level >= MinAggregationLevel && agg_level <= MaxAggregationLevel) {
-            bool ok = kConnTrackerTable.HasCol(kAppMetricsTable.elements()[j].name());
+    for (size_t j = 0; j < kAppMetricsTable.Elements().size(); j++) {
+        int agg_level = static_cast<int>(kAppMetricsTable.Elements()[j].AggType());
+        if (agg_level >= kMinAggregationLevel && agg_level <= kMaxAggregationLevel) {
+            bool ok = kConnTrackerTable.HasCol(kAppMetricsTable.Elements()[j].Name());
             std::string attr;
             if (ok) {
-                attr = connTrackerAttrs[kConnTrackerTable.ColIndex(kAppMetricsTable.elements()[j].name())];
-            } else if (kAppMetricsTable.elements()[j].name() == kRpc.name()) {
+                attr = connTrackerAttrs[kConnTrackerTable.ColIndex(kAppMetricsTable.Elements()[j].Name())];
+            } else if (kAppMetricsTable.Elements()[j].Name() == kRpc.Name()) {
                 // record dedicated ...
                 attr = record->GetSpanName();
             } else {
-                LOG_WARNING(sLogger, ("unknown elements", kAppMetricsTable.elements()[j].name()));
+                LOG_WARNING(sLogger, ("unknown elements", kAppMetricsTable.Elements()[j].Name()));
                 continue;
             }
 
-            int hash_result_index = agg_level - MinAggregationLevel;
+            int hash_result_index = agg_level - kMinAggregationLevel;
             hash_result[hash_result_index] ^= hasher(attr) + 0x9e3779b9 + (hash_result[hash_result_index] << 6)
                 + (hash_result[hash_result_index] >> 2);
         }
@@ -142,7 +142,7 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForSpan(const std::s
     auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
     auto elements = {kAppId, kIp, kHost};
     for (auto& x : elements) {
-        auto attr = connTrackerAttrs[kConnTrackerTable.ColIndex(x.name())];
+        auto attr = connTrackerAttrs[kConnTrackerTable.ColIndex(x.Name())];
         hash_result[0] ^= hasher(attr) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
     }
 
@@ -240,13 +240,13 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                     }
                     // set conn tracker attrs ...
                     eventGroup.SetTag(std::string("service.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())]); // app name
+                                      ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())]); // app name
                     eventGroup.SetTag(std::string("arms.appId"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppId.name())]); // app id
+                                      ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())]); // app id
                     eventGroup.SetTag(std::string("host.ip"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodIp.name())]); // pod ip
+                                      ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())]); // pod ip
                     eventGroup.SetTag(std::string("host.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodName.name())]); // pod name
+                                      ctAttrs[kConnTrackerTable.ColIndex(kPodName.Name())]); // pod name
                     eventGroup.SetTag(std::string("arms.app.type"), "ebpf"); //
                     eventGroup.SetTag(std::string("data_type"), "trace");
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
@@ -364,10 +364,10 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
 
             if (!init) {
                 // set app attrs ...
-                eventGroup.SetTag(std::string(kAppId.metric_key()), group->mAppId); // app id
-                eventGroup.SetTag(std::string(kIp.metric_key()), group->mIp); // pod ip
-                eventGroup.SetTag(std::string(kAppName.metric_key()), group->mAppName); // app name
-                eventGroup.SetTag(std::string(kHost.metric_key()), group->mHost); // pod name
+                eventGroup.SetTag(std::string(kAppId.MetricKey()), group->mAppId); // app id
+                eventGroup.SetTag(std::string(kIp.MetricKey()), group->mIp); // pod ip
+                eventGroup.SetTag(std::string(kAppName.MetricKey()), group->mAppName); // app name
+                eventGroup.SetTag(std::string(kHost.MetricKey()), group->mHost); // pod name
 
                 auto* tagMetric = eventGroup.AddMetricEvent();
                 tagMetric->SetName("arms_tag_entity");
@@ -458,16 +458,14 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             for (auto* metricsEvent : metrics) {
                 // set tags
                 metricsEvent->SetTimestamp(seconds, 0);
-                metricsEvent->SetTagNoCopy(kWorkloadName.metric_key(),
-                                           StringView(workloadName.data, workloadName.size));
-                metricsEvent->SetTagNoCopy(kWorkloadKind.metric_key(),
-                                           StringView(workloadKind.data, workloadKind.size));
-                metricsEvent->SetTagNoCopy(kRpc.metric_key(), StringView(rpc.data, rpc.size));
-                metricsEvent->SetTagNoCopy(kRpcType.metric_key(), StringView(rpcType.data, rpcType.size));
-                metricsEvent->SetTagNoCopy(kCallType.metric_key(), StringView(callType.data, callType.size));
-                metricsEvent->SetTagNoCopy(kCallKind.metric_key(), StringView(callKind.data, callKind.size));
-                metricsEvent->SetTagNoCopy(kEndpoint.metric_key(), StringView(endpoint.data, endpoint.size));
-                metricsEvent->SetTagNoCopy(kDestId.metric_key(), StringView(destId.data, destId.size));
+                metricsEvent->SetTagNoCopy(kWorkloadName.MetricKey(), StringView(workloadName.data, workloadName.size));
+                metricsEvent->SetTagNoCopy(kWorkloadKind.MetricKey(), StringView(workloadKind.data, workloadKind.size));
+                metricsEvent->SetTagNoCopy(kRpc.MetricKey(), StringView(rpc.data, rpc.size));
+                metricsEvent->SetTagNoCopy(kRpcType.MetricKey(), StringView(rpcType.data, rpcType.size));
+                metricsEvent->SetTagNoCopy(kCallType.MetricKey(), StringView(callType.data, callType.size));
+                metricsEvent->SetTagNoCopy(kCallKind.MetricKey(), StringView(callKind.data, callKind.size));
+                metricsEvent->SetTagNoCopy(kEndpoint.MetricKey(), StringView(endpoint.data, endpoint.size));
+                metricsEvent->SetTagNoCopy(kDestId.MetricKey(), StringView(destId.data, destId.size));
             }
         });
         if (needPush) {
@@ -527,7 +525,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
             for (const auto& record : group->mRecords) {
                 auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
                 auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
-                auto appname = ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())];
+                auto appname = ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())];
                 if (appname.empty() || ct == nullptr) {
                     LOG_DEBUG(sLogger,
                               ("no app name or ct null, skip, spanname ",
@@ -537,13 +535,13 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 if (!init) {
                     // set app attrs ...
                     eventGroup.SetTag(std::string("service.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppName.name())]); // app name
+                                      ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())]); // app name
                     eventGroup.SetTag(std::string("arms.appId"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppId.name())]); // app id
+                                      ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())]); // app id
                     eventGroup.SetTag(std::string("host.ip"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodIp.name())]); // pod ip
+                                      ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())]); // pod ip
                     eventGroup.SetTag(std::string("host.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodName.name())]); // pod name
+                                      ctAttrs[kConnTrackerTable.ColIndex(kPodName.Name())]); // pod name
                     eventGroup.SetTag(std::string("arms.app.type"), "ebpf"); //
                     eventGroup.SetTag(std::string("data_type"), "trace");
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
@@ -552,12 +550,12 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                     init = true;
                 }
                 auto* spanEvent = eventGroup.AddSpanEvent();
-                spanEvent->SetTag("app", ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.name())]);
-                spanEvent->SetTag("host", ctAttrs[kConnTrackerTable.ColIndex(kHost.name())]);
-                for (auto element : kAppTraceTable.elements()) {
-                    auto sb = sourceBuffer->CopyString(ctAttrs[kConnTrackerTable.ColIndex(element.name())]);
-                    spanEvent->SetTagNoCopy(element.span_key(), StringView(sb.data, sb.size));
-                    LOG_DEBUG(sLogger, ("record span tags", "")(std::string(element.span_key()), sb.data));
+                spanEvent->SetTag("app", ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())]);
+                spanEvent->SetTag("host", ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())]);
+                for (auto element : kAppTraceTable.Elements()) {
+                    auto sb = sourceBuffer->CopyString(ctAttrs[kConnTrackerTable.ColIndex(element.Name())]);
+                    spanEvent->SetTagNoCopy(element.SpanKey(), StringView(sb.data, sb.size));
+                    LOG_DEBUG(sLogger, ("record span tags", "")(std::string(element.SpanKey()), sb.data));
                 }
                 spanEvent->SetTraceId(record->mTraceId);
                 spanEvent->SetSpanId(record->mSpanId);

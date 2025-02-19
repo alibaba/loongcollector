@@ -26,39 +26,24 @@
 
 namespace logtail {
 
-static const std::array<std::string, 14> TCP_STATE_STRINGS = {{"UNKNOWN_STATE",
-                                                               "TCP_ESTABLISHED",
-                                                               "TCP_SYN_SENT",
-                                                               "TCP_SYN_RECV",
-                                                               "TCP_FIN_WAIT1",
-                                                               "TCP_FIN_WAIT2",
-                                                               "TCP_TIME_WAIT",
-                                                               "TCP_CLOSE",
-                                                               "TCP_CLOSE_WAIT",
-                                                               "TCP_LAST_ACK",
-                                                               "TCP_LISTEN",
-                                                               "TCP_CLOSING",
-                                                               "TCP_NEW_SYN_RECV",
-                                                               "TCP_MAX_STATES"}};
-
-static const std::string INVALID_STATE = "INVALID_STATE";
 static const std::string EMPTY_STRING = "";
 
-static const std::string PROTOCOL_ICMP = "ICMP";
-static const std::string PROTOCOL_IGMP = "IGMP";
-static const std::string PROTOCOL_IP = "IP";
-static const std::string PROTOCOL_TCP = "TCP";
-static const std::string PROTOCOL_UDP = "UDP";
-static const std::string PROTOCOL_ENCAPSULATION = "ENCAP";
-static const std::string PROTOCOL_OSPF = "OSPF";
-static const std::string PROTOCOL_UNKNOWN = "Unknown";
-
-static const std::string FAMILY_INET = "AF_INET";
-static const std::string FAMILY_INET6 = "AF_INET6";
-static const std::string FAMILY_UNIX = "AF_UNIX";
-static const std::string FAMILY_UNKNOWN = "UNKNOWN_FAMILY";
-
 const std::string& GetStateString(uint16_t state) {
+    static const std::array<std::string, 14> TCP_STATE_STRINGS = {{"UNKNOWN_STATE",
+                                                                   "TCP_ESTABLISHED",
+                                                                   "TCP_SYN_SENT",
+                                                                   "TCP_SYN_RECV",
+                                                                   "TCP_FIN_WAIT1",
+                                                                   "TCP_FIN_WAIT2",
+                                                                   "TCP_TIME_WAIT",
+                                                                   "TCP_CLOSE",
+                                                                   "TCP_CLOSE_WAIT",
+                                                                   "TCP_LAST_ACK",
+                                                                   "TCP_LISTEN",
+                                                                   "TCP_CLOSING",
+                                                                   "TCP_NEW_SYN_RECV",
+                                                                   "TCP_MAX_STATES"}};
+    static const std::string INVALID_STATE = "INVALID_STATE";
     if (state >= TCP_STATE_STRINGS.size()) {
         return INVALID_STATE;
     }
@@ -80,6 +65,10 @@ std::string GetAddrString(uint32_t ad) {
 
 const std::string& GetFamilyString(uint16_t family) {
 #if defined(__linux__)
+    static const std::string FAMILY_INET = "AF_INET";
+    static const std::string FAMILY_INET6 = "AF_INET6";
+    static const std::string FAMILY_UNIX = "AF_UNIX";
+    static const std::string FAMILY_UNKNOWN = "UNKNOWN_FAMILY";
     switch (family) {
         case AF_INET:
             return FAMILY_INET;
@@ -96,6 +85,14 @@ const std::string& GetFamilyString(uint16_t family) {
 }
 
 const std::string& GetProtocolString(uint16_t protocol) {
+    static const std::string PROTOCOL_ICMP = "ICMP";
+    static const std::string PROTOCOL_IGMP = "IGMP";
+    static const std::string PROTOCOL_IP = "IP";
+    static const std::string PROTOCOL_TCP = "TCP";
+    static const std::string PROTOCOL_UDP = "UDP";
+    static const std::string PROTOCOL_ENCAPSULATION = "ENCAP";
+    static const std::string PROTOCOL_OSPF = "OSPF";
+    static const std::string PROTOCOL_UNKNOWN = "Unknown";
     switch (protocol) {
         case 1:
             return PROTOCOL_ICMP;

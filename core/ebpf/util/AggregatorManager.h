@@ -71,7 +71,7 @@ public:
         }));
     }
 
-    void Aggregate(const std::array<size_t, MaxAggregationLevel>& key, const Value& value) {
+    void Aggregate(const std::array<size_t, kMaxAggregationLevel>& key, const Value& value) {
         mTree.Aggregate(key, value);
     }
 

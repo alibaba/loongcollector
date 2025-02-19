@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <coolbpf/security/type.h>
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>

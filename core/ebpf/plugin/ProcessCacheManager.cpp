@@ -854,10 +854,10 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
     // finalize proc tags
     auto execIdSb = sb->CopyString(proc->exec_id);
-    res.Insert(kExecId.log_key(), StringView(execIdSb.data, execIdSb.size));
+    res.Insert(kExecId.LogKey(), StringView(execIdSb.data, execIdSb.size));
 
     auto pExecIdSb = sb->CopyString(proc->parent_exec_id);
-    res.Insert(kParentExecId.log_key(), StringView(pExecIdSb.data, pExecIdSb.size));
+    res.Insert(kParentExecId.LogKey(), StringView(pExecIdSb.data, pExecIdSb.size));
 
     std::string args = proc->process.args;
     std::string binary = proc->process.filename;
@@ -889,32 +889,32 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     // call_name, added by xxx_security_manager
     // event_time, added by xxx_security_manager
     auto pidSb = sb->CopyString(std::to_string(proc->process.pid));
-    res.Insert(kPid.log_key(), StringView(pidSb.data, pidSb.size));
+    res.Insert(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
 
     auto uidSb = sb->CopyString(std::to_string(proc->process.uid));
-    res.Insert(kUid.log_key(), StringView(uidSb.data, uidSb.size));
+    res.Insert(kUid.LogKey(), StringView(uidSb.data, uidSb.size));
 
     auto userSb = sb->CopyString(proc->process.user.name);
-    res.Insert(kUser.log_key(), StringView(userSb.data, userSb.size));
+    res.Insert(kUser.LogKey(), StringView(userSb.data, userSb.size));
 
     auto binarySb = sb->CopyString(binary);
-    res.Insert(kBinary.log_key(), StringView(binarySb.data, binarySb.size));
+    res.Insert(kBinary.LogKey(), StringView(binarySb.data, binarySb.size));
 
     auto argsSb = sb->CopyString(args);
-    res.Insert(kArguments.log_key(), StringView(argsSb.data, argsSb.size));
+    res.Insert(kArguments.LogKey(), StringView(argsSb.data, argsSb.size));
 
     auto cwdSb = sb->CopyString(proc->process.cwd);
-    res.Insert(kCWD.log_key(), StringView(cwdSb.data, cwdSb.size));
+    res.Insert(kCWD.LogKey(), StringView(cwdSb.data, cwdSb.size));
 
     auto ktimeSb = sb->CopyString(std::to_string(proc->process.ktime));
-    res.Insert(kKtime.log_key(), StringView(ktimeSb.data, ktimeSb.size));
+    res.Insert(kKtime.LogKey(), StringView(ktimeSb.data, ktimeSb.size));
 
     auto capSb = sb->CopyString(capStr);
-    res.Insert(kCap.log_key(), StringView(capSb.data, capSb.size));
+    res.Insert(kCap.LogKey(), StringView(capSb.data, capSb.size));
 
     // for parent
     if (!parentProc) {
-        res.Insert(kParentProcess.log_key(), StringView(UNKOWN_STR));
+        res.Insert(kParentProcess.LogKey(), StringView(UNKOWN_STR));
         return res;
     }
     { // finalize parent tags
@@ -927,31 +927,31 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
         rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
 
-        d.AddMember(rapidjson::StringRef(kExecId.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kExecId.LogKey().data()),
                     rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kParentExecId.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kParentExecId.LogKey().data()),
                     rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kPid.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kPid.LogKey().data()),
                     rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kUid.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kUid.LogKey().data()),
                     rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kUser.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kUser.LogKey().data()),
                     rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kBinary.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kBinary.LogKey().data()),
                     rapidjson::Value().SetString(binary.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kArguments.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kArguments.LogKey().data()),
                     rapidjson::Value().SetString(args.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kCWD.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kCWD.LogKey().data()),
                     rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator),
                     allocator);
-        d.AddMember(rapidjson::StringRef(kKtime.log_key().data()),
+        d.AddMember(rapidjson::StringRef(kKtime.LogKey().data()),
                     rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
                     allocator);
 
@@ -967,7 +967,7 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
                       rapidjson::Value().SetString(inheritable.c_str(), allocator),
                       allocator);
 
-        d.AddMember(rapidjson::StringRef(kCap.log_key().data()), cap, allocator);
+        d.AddMember(rapidjson::StringRef(kCap.LogKey().data()), cap, allocator);
 
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -976,7 +976,7 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
         std::string result = buffer.GetString();
 
         auto parentSb = sb->CopyString(result);
-        res.Insert(kParentProcess.log_key(), StringView(parentSb.data, parentSb.size));
+        res.Insert(kParentProcess.LogKey(), StringView(parentSb.data, parentSb.size));
     }
     return res;
 }

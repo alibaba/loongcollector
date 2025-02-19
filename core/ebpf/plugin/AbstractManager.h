@@ -30,7 +30,6 @@
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/CommonDataEvent.h"
-#include "ebpf/type/SecurityEvent.h"
 #include "ebpf/util/AggregateTree.h"
 
 namespace logtail {

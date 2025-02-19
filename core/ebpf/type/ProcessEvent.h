@@ -59,7 +59,6 @@ public:
     std::string parent_exec_id;
     bool kernel_thread;
     std::string tags;
-    inline void print() const;
 };
 
 struct Procs {
