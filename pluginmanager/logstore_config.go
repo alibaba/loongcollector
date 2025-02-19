@@ -652,9 +652,7 @@ func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {
 func LoadLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) error {
 	if len(jsonStr) == 0 {
 		logger.Info(context.Background(), "delete config", configName, "logstore", logstore)
-		LogtailConfigLock.Lock()
-		delete(LogtailConfig, configName)
-		LogtailConfigLock.Unlock()
+		DeleteLogstoreConfigFromLogtailConfig(configName)
 		return nil
 	}
 	logger.Info(context.Background(), "load config", configName, "logstore", logstore)
