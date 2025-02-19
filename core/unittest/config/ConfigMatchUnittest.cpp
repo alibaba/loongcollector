@@ -89,10 +89,10 @@ public:
         sleep(1);
     }
     void CaseCleanUp() {
-        EventDispatcher::GetInstance()->CleanEnviroments();
+        EventDispatcher::GetInstance()->CleanEnvironments();
         gDispatchThreadId->join();
         gDispatchThreadId = nullptr;
-        ConfigManager::GetInstance()->CleanEnviroments();
+        ConfigManager::GetInstance()->CleanEnvironments();
         bfs::remove("user_log_config.json");
         bfs::remove("loongcollector_config.json");
         bfs::remove_all(gRootDir);

@@ -823,10 +823,10 @@ void ConfigUpdatorUnittest::CaseSetup(bool replaceConfigAllowed) {
 }
 
 void ConfigUpdatorUnittest::CaseCleanup() {
-    LogInput::GetInstance()->CleanEnviroments();
+    LogInput::GetInstance()->CleanEnvironments();
     ConfigManager::GetInstance()->mThreadIsRunning = false;
-    EventDispatcher::GetInstance()->CleanEnviroments();
-    ConfigManager::GetInstance()->CleanEnviroments();
+    EventDispatcher::GetInstance()->CleanEnvironments();
+    ConfigManager::GetInstance()->CleanEnvironments();
     Sender::Instance()->RemoveSender();
     bfs::remove_all(mRootDir);
     bfs::remove("loongcollector_config.json");
