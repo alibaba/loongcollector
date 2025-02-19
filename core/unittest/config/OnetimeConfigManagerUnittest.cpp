@@ -150,11 +150,11 @@ void OnetimeConfigManagerUnittest::TestUpdateConfig() const {
     { ofstream fout("test_config/test_config_2.json"); }
 
     // restart
-    APSARA_TEST_TRUE(sManager->AddConfig(
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
         "test_config_1", ConfigType::Collection, filesystem::path("test_config/test_config_1.json"), 1, 1000000000));
-    APSARA_TEST_TRUE(sManager->AddConfig(
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
         "test_config_2", ConfigType::Collection, filesystem::path("test_config/test_config_2.json"), 2, 1500000000));
-    APSARA_TEST_TRUE(sManager->AddConfig(
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
         "test_config_3", ConfigType::Collection, filesystem::path("test_config/test_config_3.json"), 3, 4000000000));
     APSARA_TEST_EQUAL(3U, sManager->mConfigInfoMap.size());
     {
@@ -180,8 +180,7 @@ void OnetimeConfigManagerUnittest::TestUpdateConfig() const {
     }
 
     // update
-    APSARA_TEST_TRUE(sManager->RemoveConfig("test_config_1"));
-    APSARA_TEST_TRUE(sManager->AddConfig(
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
         "test_config_1", ConfigType::Collection, filesystem::path("test_config/test_config_1.json"), 1, 1200000000));
     APSARA_TEST_FALSE(sManager->RemoveConfig("test_config_4"));
     APSARA_TEST_EQUAL(3U, sManager->mConfigInfoMap.size());
@@ -231,13 +230,13 @@ void OnetimeConfigManagerUnittest::TestDumpCheckpointFile() const {
     uint32_t expireTime = 0;
 
     sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1, &expireTime);
-    sManager->AddConfig(
+    sManager->UpdateConfig(
         "test_config_1", ConfigType::Collection, filesystem::path("test_config/test_config_1.json"), 1, 2000000000);
     sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2, &expireTime);
     sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4, &expireTime);
-    sManager->AddConfig(
+    sManager->UpdateConfig(
         "test_config_3", ConfigType::Collection, filesystem::path("test_config/test_config_3.json"), 4, 2200000000);
-    sManager->AddConfig(
+    sManager->UpdateConfig(
         "test_config_5", ConfigType::Collection, filesystem::path("test_config/test_config_5.json"), 5, 2100000000);
 
     sManager->DumpCheckpointFile();

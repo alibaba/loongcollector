@@ -44,11 +44,11 @@ public:
 
     OnetimeConfigStatus
     GetOnetimeConfigStatusFromCheckpoint(const std::string& configName, uint64_t hash, uint32_t* expireTime);
-    bool AddConfig(const std::string& configName,
-                   ConfigType type,
-                   const std::filesystem::path& filepath,
-                   uint64_t hash,
-                   uint32_t expireTime);
+    bool UpdateConfig(const std::string& configName,
+                      ConfigType type,
+                      const std::filesystem::path& filepath,
+                      uint64_t hash,
+                      uint32_t expireTime);
     bool RemoveConfig(const std::string& configName);
     void DeleteTimeoutConfigFiles();
     bool LoadCheckpointFile();

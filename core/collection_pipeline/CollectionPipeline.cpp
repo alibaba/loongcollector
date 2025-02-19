@@ -347,7 +347,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     }
 
     if (config.mExpireTime.has_value()) {
-        OnetimeConfigManager::GetInstance()->AddConfig(
+        OnetimeConfigManager::GetInstance()->UpdateConfig(
             mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
     }
 
@@ -481,7 +481,10 @@ void CollectionPipeline::Stop(bool isRemoving) {
     }
 
     // only valid for onetime config
-    OnetimeConfigManager::GetInstance()->RemoveConfig(mName);
+    // for update, the old expire has been replaced by the new one on init, should not remove here
+    if (isRemoving) {
+        OnetimeConfigManager::GetInstance()->RemoveConfig(mName);
+    }
 
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
 }

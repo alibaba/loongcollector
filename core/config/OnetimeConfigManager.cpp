@@ -51,13 +51,16 @@ OnetimeConfigStatus OnetimeConfigManager::GetOnetimeConfigStatusFromCheckpoint(c
     return status;
 }
 
-bool OnetimeConfigManager::AddConfig(
+bool OnetimeConfigManager::UpdateConfig(
     const string& configName, ConfigType type, const filesystem::path& filepath, uint64_t hash, uint32_t expireTime) {
-    if (mConfigInfoMap.find(configName) != mConfigInfoMap.end()) {
-        // should not happen
-        return false;
+    auto it = mConfigInfoMap.find(configName);
+    if (it != mConfigInfoMap.end()) {
+        // on update
+        it->second = ConfigInfo(type, filepath, hash, expireTime);
+    } else {
+        // on added
+        mConfigInfoMap.try_emplace(configName, type, filepath, hash, expireTime);
     }
-    mConfigInfoMap.try_emplace(configName, type, filepath, hash, expireTime);
     LOG_INFO(sLogger, ("onetime pipeline expire time", expireTime)("config", configName));
     return true;
 }

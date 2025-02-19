@@ -31,7 +31,7 @@ static bool IsOneTime(const string& configName, const Json::Value& global, uint3
     if (it == nullptr) {
         return false;
     }
-    if (!it->isUInt()) {
+    if (it->isUInt()) {
         *timeout = it->asUInt();
         if (*timeout > maxExpireTime) {
             *timeout = maxExpireTime;
@@ -92,8 +92,10 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
                             ("onetime config expired on init", "failed to delete config file")(
                                 "error msg", "config file not existed")("expire time", expireTime)("config", mName));
             }
+            return false;
         }
         default:
+            // should not happen
             break;
     }
     return false;
