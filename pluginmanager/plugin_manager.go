@@ -129,7 +129,7 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 			DisabledLogtailConfigLock.Unlock()
 			return
 		}
-		logger.Info(config.Context.GetRuntimeContext(), "Valid but slow stop config", config.ConfigName)
+		logger.Info(context.Background(), "Valid but slow stop config", config.ConfigName)
 		DeleteLogstoreConfig(DisabledLogtailConfig[config.ConfigNameWithSuffix])
 		delete(DisabledLogtailConfig, config.ConfigNameWithSuffix)
 		DisabledLogtailConfigLock.Unlock()
