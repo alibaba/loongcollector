@@ -48,6 +48,7 @@ struct ContainerInfo {
     std::vector<std::pair<std::string, std::string>> mTags; // ExternalEnvTag and ExternalK8sLabelTag.
     std::vector<std::pair<TagKey, std::string>> mMetadatas; //  ContainerNameTag
     Json::Value mJson; // this obj's json, for saving to local file
+    bool mStopped = false; // whether this container is stopped
 
     static bool ParseByJSONObj(const Json::Value&, ContainerInfo&, std::string&);
     static bool ParseAllByJSONObj(const Json::Value&, std::unordered_map<std::string, ContainerInfo>&, std::string&);

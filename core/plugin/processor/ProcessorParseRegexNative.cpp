@@ -128,12 +128,12 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
                                              PipelineEventPtr& e,
                                              const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
-        mOutKeyNotFoundEventsTotal->Add(1);
+        ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         return true;
     }
     auto rawContent = sourceEvent.GetContent(mSourceKey);
@@ -155,10 +155,10 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, rawContent, sourceEvent, false);
     }
     if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
-        mDiscardedEventsTotal->Add(1);
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
         return false;
     }
-    mOutSuccessfulEventsTotal->Add(1);
+    ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     return true;
 }
 
@@ -215,7 +215,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                                   GetContext().GetRegion());
             }
         }
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;
     } else if (what.size() <= keys.size()) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {

@@ -107,7 +107,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
             lastFlushBatchTime = curTime;
         }
 
-        sLastRunTime->Set(curTime);
+        SET_GAUGE(sLastRunTime, curTime);
         unique_ptr<ProcessQueueItem> item;
         string configName;
         if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {
@@ -118,9 +118,9 @@ void ProcessorRunner::Run(uint32_t threadNo) {
             continue;
         }
 
-        sInEventsCnt->Add(item->mEventGroup.GetEvents().size());
-        sInGroupsCnt->Add(1);
-        sInGroupDataSizeBytes->Add(item->mEventGroup.DataSize());
+        ADD_COUNTER(sInEventsCnt, item->mEventGroup.GetEvents().size());
+        ADD_COUNTER(sInGroupsCnt, 1);
+        ADD_COUNTER(sInGroupDataSizeBytes, item->mEventGroup.DataSize());
 
         shared_ptr<CollectionPipeline>& pipeline = item->mPipeline;
         bool hasOldPipeline = pipeline != nullptr;

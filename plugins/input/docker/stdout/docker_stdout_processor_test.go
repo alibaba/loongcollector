@@ -202,6 +202,158 @@ func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
 	}
 }
 
+func (s *inputProcessorTestSuite) TestStreamAllowed(c *check.C) {
+	stdoutAllowed := true
+	stderrAllowed := false
+	// docker
+	{
+		// stdout
+		{
+			// 合法的json
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine := `{"log":"123456","stream":"stdout", "time":"2018-05-16T06:28:41.2195434Z"}`
+			processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes := []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, "123456")
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "2018-05-16T06:28:41.2195434Z")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "stdout")
+
+			// 非法的json
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+			splitedlogNoNewLine = `{"log":"123456","stream":"stdout", "time":"2018-05-16`
+			processor = NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes = []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, `{"log":"123456","stream":"stdout", "time":"2018-05-16`)
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "")
+		}
+		// stderr
+		{
+			// 合法的json
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine := `{"log":"123456","stream":"stderr", "time":"2018-05-16T06:28:41.2195434Z"}`
+			processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes := []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+			c.Assert(len(s.collector.Logs), check.Equals, 0)
+
+			// 非法的json
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine = `{"log":"123456","stream":"stderr", "time":"2018-05-16T06:28`
+			processor = NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes = []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, `{"log":"123456","stream":"stderr", "time":"2018-05-16T06:28`)
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "")
+		}
+	}
+	// containerd
+	{
+		// stdout
+		{
+			// 合法的containerd日志
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine := `2018-05-16T06:28:41.2195434Z stdout F 123456`
+			processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes := []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, "123456")
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "2018-05-16T06:28:41.2195434Z")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "stdout")
+
+			// 非法的containerd日志
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine = `2018-05-16T06:28:41.2195434Z stdout`
+			processor = NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes = []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, `2018-05-16T06:28:41.2195434Z stdout`)
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "")
+		}
+		// stderr
+		{
+			// 合法的containerd日志
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine := `2018-05-16T06:28:41.2195434Z stderr F 123456`
+			processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes := []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+			c.Assert(len(s.collector.Logs), check.Equals, 0)
+
+			// 非法的containerd日志
+			s.collector.Logs = s.collector.Logs[:0]
+			s.context.InitContext("project", "logstore", "config")
+
+			splitedlogNoNewLine = `2018-05-16T06:28:41.2195434Z stderr`
+			processor = NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, stdoutAllowed, stderrAllowed, &s.context, &s.collector, s.tag, s.source)
+			splitedlogNoNewLineBytes = []byte(splitedlogNoNewLine)
+			processor.Process(splitedlogNoNewLineBytes, time.Duration(0))
+
+			c.Assert(len(s.collector.Logs), check.Equals, 1)
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetKey(), check.Equals, "content")
+			c.Assert(s.collector.Logs[0].Contents[1].GetKey(), check.Equals, "_time_")
+			c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
+
+			c.Assert(s.collector.Logs[0].Contents[0].GetValue(), check.Equals, `2018-05-16T06:28:41.2195434Z stderr`)
+			c.Assert(s.collector.Logs[0].Contents[1].GetValue(), check.Equals, "")
+			c.Assert(s.collector.Logs[0].Contents[2].GetValue(), check.Equals, "")
+		}
+	}
+}
+
 func (s *inputProcessorTestSuite) TestSplitedLine(c *check.C) {
 	processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	splitedlog1Bytes := []byte(splitedlog1)

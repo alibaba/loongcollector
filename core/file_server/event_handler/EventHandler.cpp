@@ -531,6 +531,9 @@ void ModifyHandler::Handle(const Event& event) {
         for (auto& pair : mNameReaderMap) {
             LogFileReaderPtrArray& readerArray = pair.second;
             for (auto& reader : readerArray) {
+                if (reader->GetContainerID() != event.GetContainerID()) {
+                    continue;
+                }
                 reader->SetContainerStopped();
                 if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
                     if (reader->IsFileOpened()) {
@@ -541,7 +544,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                                "file size", reader->GetFileSize()));
+                                "file size", reader->GetFileSize())("container id", event.GetContainerID()));
                         if (!readerArray[0]->ShouldForceReleaseDeletedFileFd() && reader->HasDataInCache()) {
                             ForceReadLogAndPush(readerArray[0]);
                         }
@@ -789,16 +792,26 @@ void ModifyHandler::Handle(const Event& event) {
                                  "file size", reader->GetFileSize()));
                     reader->CloseFilePtr();
                 } else if (reader->IsContainerStopped()) {
-                    // release fd as quick as possible
-                    LOG_INFO(
-                        sLogger,
-                        ("close the file", "current file has been read, and the relative container has been stopped")(
-                            "project", reader->GetProject())("logstore", reader->GetLogstore())("config", mConfigName)(
-                            "log reader queue name", reader->GetHostLogPath())("file device",
-                                                                               reader->GetDevInode().dev)(
-                            "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
-                    ForceReadLogAndPush(reader);
-                    reader->CloseFilePtr();
+                    // update container info one more time, ensure file is hold by same cotnainer
+                    if (reader->UpdateContainerInfo() && !reader->IsContainerStopped()) {
+                        LOG_INFO(sLogger,
+                                 ("file is reused by a new container", reader->GetContainerID())(
+                                     "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                     "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                     "file device", reader->GetDevInode().dev)(
+                                     "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
+                    } else {
+                        // release fd as quick as possible
+                        LOG_INFO(sLogger,
+                                 ("close the file",
+                                  "current file has been read, and the relative container has been stopped")(
+                                     "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                     "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                     "file device", reader->GetDevInode().dev)(
+                                     "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
+                        ForceReadLogAndPush(reader);
+                        reader->CloseFilePtr();
+                    }
                 }
                 break;
             }

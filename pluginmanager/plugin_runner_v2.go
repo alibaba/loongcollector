@@ -67,10 +67,10 @@ func (p *pluginv2Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.AggregatorPlugins = make([]*AggregatorWrapperV2, 0)
 	p.FlusherPlugins = make([]*FlusherWrapperV2, 0)
 	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
-	p.InputPipeContext = helper.NewObservePipelineConext(inputQueueSize)
-	p.ProcessPipeContext = helper.NewGroupedPipelineConext()
-	p.AggregatePipeContext = helper.NewObservePipelineConext(flushQueueSize)
-	p.FlushPipeContext = helper.NewNoopPipelineConext()
+	p.InputPipeContext = helper.NewObservePipelineContext(inputQueueSize)
+	p.ProcessPipeContext = helper.NewGroupedPipelineContext()
+	p.AggregatePipeContext = helper.NewObservePipelineContext(flushQueueSize)
+	p.FlushPipeContext = helper.NewNoopPipelineContext()
 	p.FlushOutStore.Write(p.AggregatePipeContext.Collector().Observe())
 	return nil
 }

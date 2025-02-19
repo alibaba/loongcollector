@@ -99,7 +99,7 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     mScrapeResponseSizeBytes = streamScraper->mRawSize;
     streamScraper->Reset();
 
-    mPluginTotalDelayMs->Add(scrapeDurationMilliSeconds);
+    ADD_COUNTER(mPluginTotalDelayMs, scrapeDurationMilliSeconds);
 }
 
 
@@ -127,7 +127,7 @@ void ScrapeScheduler::ScheduleNext() {
         }
         this->DelayExecTime(1);
         this->mExecDelayCount++;
-        this->mPromDelayTotal->Add(1);
+        ADD_COUNTER(this->mPromDelayTotal, 1);
         this->ScheduleNext();
         return false;
     });

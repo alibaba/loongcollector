@@ -61,8 +61,8 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
 
 
     CounterPtr fileCounter = fileMetric.CreateCounter("filed1");
-    fileCounter->Add(111UL);
-    fileCounter->Add(111UL);
+    ADD_COUNTER(fileCounter, 111UL);
+    ADD_COUNTER(fileCounter, 111UL);
     APSARA_TEST_EQUAL(fileCounter->GetValue(), 222);
 
     ReadMetrics::GetInstance()->UpdateMetrics();
@@ -97,7 +97,7 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter2 = fileMetric2.CreateCounter("filed2");
-        fileCounter2->Add(222UL);
+        ADD_COUNTER(fileCounter2, 222UL);
     }
 
     {
@@ -109,7 +109,7 @@ void MetricManagerUnittest::TestCreateMetricAutoDelete() {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter3 = fileMetric3.CreateCounter("filed3");
-        fileCounter3->Add(333UL);
+        ADD_COUNTER(fileCounter3, 333UL);
     }
 
     ReadMetrics::GetInstance()->UpdateMetrics();
@@ -144,7 +144,7 @@ void createMetrics(int count) {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             fileMetric, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric.CreateCounter("filed1");
-        fileCounter->Add(111UL);
+        ADD_COUNTER(fileCounter, 111UL);
     }
 }
 
@@ -213,7 +213,7 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         *fileMetric1, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
     CounterPtr fileCounter = fileMetric1->CreateCounter("filed1");
-    fileCounter->Add(111UL);
+    ADD_COUNTER(fileCounter, 111UL);
 
     {
         std::vector<std::pair<std::string, std::string>> labels;
@@ -223,7 +223,7 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             *fileMetric2, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric2->CreateCounter("filed1");
-        fileCounter->Add(111UL);
+        ADD_COUNTER(fileCounter, 111UL);
     }
 
     {
@@ -234,7 +234,7 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             *fileMetric3, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(labels));
         CounterPtr fileCounter = fileMetric3->CreateCounter("filed1");
-        fileCounter->Add(111UL);
+        ADD_COUNTER(fileCounter, 111UL);
     }
     std::thread t3(createMetrics, 3);
     std::thread t4(createMetrics, 4);
@@ -301,9 +301,9 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
     }
 
     // after dosnapshot, add value again
-    fileCounter->Add(111UL);
-    fileCounter->Add(111UL);
-    fileCounter->Add(111UL);
+    ADD_COUNTER(fileCounter, 111UL);
+    ADD_COUNTER(fileCounter, 111UL);
+    ADD_COUNTER(fileCounter, 111UL);
 
     APSARA_TEST_EQUAL(fileCounter->GetValue(), 333);
 

@@ -16,7 +16,7 @@
 
 #include "common/Flags.h"
 
-DEFINE_FLAG_INT32(max_file_not_exist_times, "treate as deleted when file stat failed XX times, default", 10);
+DEFINE_FLAG_INT32(max_file_not_exist_times, "treat as deleted when file stat failed XX times, default", 10);
 
 namespace logtail {
 

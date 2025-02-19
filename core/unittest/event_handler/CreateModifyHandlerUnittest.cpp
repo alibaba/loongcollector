@@ -19,11 +19,17 @@
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
+#include "common/JsonUtil.h"
+#include "config/CollectionConfig.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "unittest/Unittest.h"
+
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);
@@ -31,7 +37,8 @@ DECLARE_FLAG_STRING(ilogtail_config);
 namespace logtail {
 class MockModifyHandler : public ModifyHandler {
 public:
-    MockModifyHandler() : ModifyHandler("", nullptr) {}
+    MockModifyHandler(const std::string& configName, const FileDiscoveryConfig& pConfig)
+        : ModifyHandler(configName, pConfig) {}
     virtual void Handle(const Event& event) { ++handle_count; }
     virtual void HandleTimeOut() { ++handle_timeout_count; }
     virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) { return true; }
@@ -44,95 +51,154 @@ public:
 };
 
 class CreateModifyHandlerUnittest : public ::testing::Test {
+public:
+    void TestHandleContainerStoppedEvent();
+
 protected:
-    void SetUp() override {
-        // mock config, log_path is related to the unittest
-        std::string configStr = R"""({
-    "log_path" : "/root/log",
-    "file_pattern" : "test-0.log",
-    "advanced" :
-    {
-        "force_multiconfig" : false,
-        "k8s" : {},
-        "tail_size_kb" : 1024
-    },
-    "aliuid" : "123456789",
-    "category" : "logstore-0",
-    "create_time" : 1647230190,
-    "defaultEndpoint" : "cn-huhehaote-intranet.log.aliyuncs.com",
-    "delay_alarm_bytes" : 0,
-    "delay_skip_bytes" : 0,
-    "discard_none_utf8" : false,
-    "discard_unmatch" : false,
-    "docker_exclude_env" : {},
-    "docker_exclude_label" : {},
-    "docker_file" : true,
-    "docker_include_env" : {},
-    "docker_include_label" : {},
-    "enable" : true,
-    "enable_tag" : false,
-    "file_encoding" : "utf8",
-    "filter_keys" : [],
-    "filter_regs" : [],
-    "group_topic" : "",
-    "keys" :
-    [
-            "content"
-    ],
-    "local_storage" : true,
-    "log_begin_reg" : ".*",
-    "log_type" : "common_reg_log",
-    "log_tz" : "",
-    "max_depth" : 10,
-    "max_send_rate" : -1,
-    "merge_type" : "topic",
-    "preserve" : true,
-    "preserve_depth" : 1,
-    "priority" : 0,
-    "project_name" : "project-0",
-    "raw_log" : false,
-    "regex" :
-    [
-            "(.*)"
-    ],
-    "region" : "cn-huhehaote",
-    "send_rate_expire" : 0,
-    "sensitive_keys" : [],
-    "shard_hash_key" : [],
-    "tail_existed" : false,
-    "timeformat" : "",
-    "topic_format" : "none",
-    "tz_adjust" : false,
-    "version" : 1
-})""";
-        Json::Value userConfig;
-        Json::Reader reader;
-        APSARA_TEST_TRUE_FATAL(reader.parse(configStr, userConfig));
-        ConfigManager::GetInstance()->LoadSingleUserConfig(mConfigName, userConfig);
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
+            gRootDir.resize(gRootDir.size() - 1);
+        gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
+        bfs::remove_all(gRootDir);
     }
 
-    void TearDown() override {}
-    std::string mConfigName = "##1.0##project-0$config-0";
+    static void TearDownTestCase() {}
+
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        // create a file for reader
+        std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
+        writeLog(logPath, "a sample log\n");
+
+        // init pipeline and config
+        unique_ptr<Json::Value> configJson;
+        string configStr, errorMsg;
+        unique_ptr<CollectionConfig> config;
+        unique_ptr<CollectionPipeline> pipeline;
+
+        // new pipeline
+        configStr = R"(
+            {
+                "inputs": [
+                    {
+                        "Type": "input_file",
+                        "FilePaths": [
+                            ")"
+            + logPath + R"("
+                        ]
+                    }
+                ],
+                "flushers": [
+                    {
+                        "Type": "flusher_sls",
+                        "Project": "test_project",
+                        "Logstore": "test_logstore",
+                        "Region": "test_region",
+                        "Endpoint": "test_endpoint"
+                    }
+                ]
+            }
+        )";
+        configJson.reset(new Json::Value());
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+        Json::Value inputConfigJson = (*configJson)["inputs"][0];
+
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson)));
+        APSARA_TEST_TRUE(config->Parse());
+        pipeline.reset(new CollectionPipeline());
+        APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+        ctx.SetPipeline(*pipeline.get());
+        ctx.SetConfigName(mConfigName);
+        ctx.SetProcessQueueKey(0);
+        discoveryOpts = FileDiscoveryOptions();
+        discoveryOpts.Init(inputConfigJson, ctx, "test");
+        discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+            [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
+                containerInfo.mRealBaseDir = containerInfo.mUpperDir;
+                return true;
+            });
+        mConfig = std::make_pair(&discoveryOpts, &ctx);
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+
+        FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
+        FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
+        FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
+        FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
+
+        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
+
+        // build a reader
+        mReaderPtr = std::make_shared<LogFileReader>(gRootDir,
+                                                     gLogName,
+                                                     DevInode(),
+                                                     std::make_pair(&readerOpts, &ctx),
+                                                     std::make_pair(&multilineOpts, &ctx),
+                                                     std::make_pair(&tagOpts, &ctx));
+        mReaderPtr->UpdateReaderManual();
+        mReaderPtr->SetContainerID("1");
+        APSARA_TEST_TRUE_FATAL(mReaderPtr->CheckFileSignatureAndOffset(true));
+
+        // build a modify handler
+        LogFileReaderPtrArray readerPtrArray{mReaderPtr};
+        mHandlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
+        mHandlerPtr->mNameReaderMap[gLogName] = readerPtrArray;
+        mReaderPtr->SetReaderArray(&mHandlerPtr->mNameReaderMap[gLogName]);
+        mHandlerPtr->mDevInodeReaderMap[mReaderPtr->mDevInode] = mReaderPtr;
+
+        auto containerInfo = std::make_shared<std::vector<ContainerInfo>>();
+        discoveryOpts.SetContainerInfo(containerInfo);
+    }
+
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+
+private:
+    const std::string mConfigName = "##1.0##project-0$config-0";
+    FileDiscoveryOptions discoveryOpts;
+    FileReaderOptions readerOpts;
+    MultilineOptions multilineOpts;
+    FileTagOptions tagOpts;
+    CollectionPipelineContext ctx;
+    FileDiscoveryConfig mConfig;
+
+    std::shared_ptr<LogFileReader> mReaderPtr;
+    std::shared_ptr<ModifyHandler> mHandlerPtr;
     CreateHandler mCreateHandler;
 
-public:
-    void TestHandleContainerStoppedEvent() {
-        LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
-        CreateModifyHandler createModifyHandler(&mCreateHandler);
-        MockModifyHandler* pHanlder = new MockModifyHandler(); // released by ~CreateModifyHandler
-        createModifyHandler.mModifyHandlerPtrMap.insert(std::make_pair(mConfigName, pHanlder));
-
-        Event event1("/not_exist", "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
-        createModifyHandler.Handle(event1);
-        APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 0);
-
-        Event event2("/root/log", "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
-        createModifyHandler.Handle(event2);
-        APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 1);
+    void writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        writer << logContent;
+        writer.close();
     }
 };
 
-APSARA_UNIT_TEST_CASE(CreateModifyHandlerUnittest, TestHandleContainerStoppedEvent, 0);
+void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
+    LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
+    CreateModifyHandler createModifyHandler(&mCreateHandler);
+
+    MockModifyHandler* pHanlder = new MockModifyHandler(mConfigName, mConfig); // released by ~CreateModifyHandler
+    createModifyHandler.mModifyHandlerPtrMap.insert(std::make_pair(mConfigName, pHanlder));
+
+    Event event1("/not_exist", "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
+    event1.SetConfigName(mConfigName);
+    createModifyHandler.Handle(event1);
+    APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 1);
+
+    Event event2(gRootDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);
+    event2.SetConfigName(mConfigName);
+    createModifyHandler.Handle(event2);
+    APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 2);
+}
+
+std::string CreateModifyHandlerUnittest::gRootDir;
+std::string CreateModifyHandlerUnittest::gLogName;
+
+UNIT_TEST_CASE(CreateModifyHandlerUnittest, TestHandleContainerStoppedEvent);
 } // end of namespace logtail
 
 int main(int argc, char** argv) {

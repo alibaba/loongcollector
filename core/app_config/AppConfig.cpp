@@ -1508,39 +1508,9 @@ void AppConfig::ParseEnvToFlags() {
         }
     }
 #endif
-    std::unordered_set<std::string> sIgnoreFlagSet = {"buffer_file_path",
-                                                      "check_point_filename",
-                                                      "data_server_port",
-                                                      "host_path_blacklist",
-                                                      "process_thread_count",
-                                                      "send_request_concurrency",
-                                                      "check_point_dump_interval",
-                                                      "check_point_max_count",
-                                                      "enable_root_path_collection",
-                                                      "ilogtail_config",
-                                                      "ilogtail_discard_interval",
-                                                      "default_tail_limit_kb",
-                                                      "logreader_max_rotate_queue_size",
-                                                      "force_release_deleted_file_fd_timeout",
-                                                      "batch_send_interval",
-                                                      "ALIYUN_LOG_FILE_TAGS",
-                                                      "default_container_host_path",
-                                                      "default_max_inotify_watch_num",
-                                                      "enable_full_drain_mode",
-                                                      "ilogtail_discard_old_data",
-                                                      "timeout_interval",
-                                                      "enable_env_ref_in_config",
-                                                      "max_watch_dir_count",
-                                                      "polling_max_stat_count",
-                                                      "polling_max_stat_count_per_config",
-                                                      "polling_max_stat_count_per_dir"};
     for (const auto& iter : envMapping) {
         const std::string& value = iter.second;
         std::string key = iter.first;
-        // Skip if key is not in ignore set and doesn't start with prefix
-        if (sIgnoreFlagSet.find(key) == sIgnoreFlagSet.end() && !StartWith(key, LOONGCOLLECTOR_ENV_PREFIX)) {
-            continue;
-        }
         // Convert to lowercase if key has prefix
         if (StartWith(key, LOONGCOLLECTOR_ENV_PREFIX)) {
             key = ToLowerCaseString(key.substr(LOONGCOLLECTOR_ENV_PREFIX.size()));
