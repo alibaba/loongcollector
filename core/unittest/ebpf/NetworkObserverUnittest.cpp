@@ -49,7 +49,7 @@ protected:
         mTimer->Init();
         mSourceManager = std::make_shared<SourceManager>();
         mSourceManager->Init();
-        mBaseManager = std::make_shared<BaseManager>(mSourceManager, "test_host", "/", mEventQueue);
+        mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
         ProtocolParserManager::GetInstance().AddParser(ProtocolType::HTTP);
     }
 
@@ -74,7 +74,7 @@ private:
 
     std::shared_ptr<Timer> mTimer;
     std::shared_ptr<SourceManager> mSourceManager;
-    std::shared_ptr<BaseManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mBaseManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
 

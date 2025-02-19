@@ -23,7 +23,7 @@ class ManagerUnittest : public ::testing::Test {
 protected:
     void SetUp() override {
         mSourceManager = std::make_shared<SourceManager>();
-        mBaseManager = std::make_shared<BaseManager>(mSourceManager, "test_host", "/", mEventQueue);
+        mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
         mTimer = std::make_shared<Timer>();
     }
 
@@ -66,7 +66,7 @@ protected:
 
 protected:
     std::shared_ptr<SourceManager> mSourceManager;
-    std::shared_ptr<BaseManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mBaseManager;
     std::shared_ptr<Timer> mTimer;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
