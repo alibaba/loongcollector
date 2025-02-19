@@ -92,12 +92,19 @@ enum AlarmType {
     CHECKPOINT_V2_ALARM = 57,
     EXACTLY_ONCE_ALARM = 58,
     READ_STOPPED_CONTAINER_ALARM = 59,
-    INVALID_CONTAINER_PATH_ALARM = 64,
-    COMPRESS_FAIL_ALARM = 65,
-    SERIALIZE_FAIL_ALARM = 66,
-    RELABEL_METRIC_FAIL_ALARM = 67,
-    REGISTER_HANDLERS_TOO_SLOW_ALARM = 68,
-    ALL_LOGTAIL_ALARM_NUM = 69
+    INVALID_CONTAINER_PATH_ALARM = 60,
+    COMPRESS_FAIL_ALARM = 61,
+    SERIALIZE_FAIL_ALARM = 62,
+    RELABEL_METRIC_FAIL_ALARM = 63,
+    REGISTER_HANDLERS_TOO_SLOW_ALARM = 64,
+    PLUGIN_INIT_ALARM = 65,
+    PLUGIN_START_ALARM = 66,
+    PLUGIN_RUNTIME_ALARM = 67,
+    PLUGIN_STOP_ALARM = 68,
+    DOCKER_CENTER_ALARM = 69,
+    KUBERNETES_META_ALARM = 70,
+    INTERNAL_SERVICE_ERROR = 71,
+    ALL_LOGTAIL_ALARM_NUM = 72
 };
 
 struct AlarmMessage {
@@ -127,7 +134,8 @@ public:
                    const std::string& message,
                    const std::string& projectName = "",
                    const std::string& category = "",
-                   const std::string& region = "");
+                   const std::string& region = "",
+                   const int32_t count = 1);
     // only be called when prepare to exit
     void ForceToSend();
     bool IsLowLevelAlarmValid();
@@ -144,6 +152,26 @@ private:
     AlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
 
     std::vector<std::string> mMessageType;
+    // {
+    //   key: ${region},
+    //   value: [
+    //     [
+    //       index: ${alarmType}
+    //       value: {
+    //         key: ${project}_${logstore}_${config}
+    //         value: {
+    //           ${alarmType},
+    //           ${project},
+    //           ${logstore},
+    //           ${config},
+    //           ${message},
+    //           ${count},
+    //         }
+    //       }
+    //     ],
+    //     ${lastUpdateTime},
+    //    ]
+    //  }
     std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
     PTMutex mAlarmBufferMutex;
 

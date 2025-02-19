@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LogCollector struct {
@@ -31,7 +32,6 @@ type LogCollector struct {
 
 const (
 	startLogPath = "start.log"
-	JMXAlarmType = "JMXFETCH_ALARM"
 )
 
 // NewLogCollector create a log collector to read jmxfetch log.
@@ -53,7 +53,7 @@ func newJmxfetchLogReader(agentDirPath string, logPath string, drop bool) *helpe
 	if drop {
 		info, err := os.Stat(checkPoint.Path)
 		if err != nil {
-			logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "stat log file error, path", checkPoint.Path, "error", err.Error())
+			logger.Warning(manager.managerMeta.GetContext(), util.PLUGIN_RUNTIME_ALARM, "stat log file error, path", checkPoint.Path, "error", err.Error())
 		} else {
 			checkPoint.Offset = info.Size()
 			checkPoint.State = helper.GetOSState(info)
@@ -62,7 +62,7 @@ func newJmxfetchLogReader(agentDirPath string, logPath string, drop bool) *helpe
 
 	reader, err := helper.NewLogFileReader(manager.managerMeta.GetContext(), checkPoint, helper.DefaultLogFileReaderConfig, NewProcessor())
 	if err != nil {
-		logger.Error(manager.managerMeta.GetContext(), JMXAlarmType, "path", checkPoint.Path, "create jmxfetch log reader error", err)
+		logger.Error(manager.managerMeta.GetContext(), util.PLUGIN_RUNTIME_ALARM, "path", checkPoint.Path, "create jmxfetch log reader error", err)
 		return nil
 	}
 	return reader

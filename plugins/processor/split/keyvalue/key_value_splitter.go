@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type KeyValueSplitter struct {
@@ -91,7 +92,7 @@ func (s *KeyValueSplitter) processLog(log *protocol.Log) {
 		}
 	}
 	if !hasKey && s.ErrIfSourceKeyNotFound {
-		logger.Warningf(s.context.GetRuntimeContext(), "KV_SPLITTER_ALARM", "can not find key: %v", s.SourceKey)
+		logger.Warningf(s.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "can not find key: %v", s.SourceKey)
 	}
 }
 
@@ -111,7 +112,7 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 		pos := strings.Index(pair, s.Separator)
 		if pos == -1 {
 			if s.ErrIfSeparatorNotFound {
-				logger.Warningf(s.context.GetRuntimeContext(), "KV_SPLITTER_ALARM", "can not find separator in %v", pair)
+				logger.Warningf(s.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "can not find separator in %v", pair)
 			}
 			if !s.DiscardWhenSeparatorNotFound {
 				log.Contents = append(log.Contents, &protocol.Log_Content{
@@ -127,7 +128,7 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 				key = s.EmptyKeyPrefix + strconv.Itoa(emptyKeyIndex)
 				emptyKeyIndex++
 				if s.ErrIfKeyIsEmpty {
-					logger.Warningf(s.context.GetRuntimeContext(), "KV_SPLITTER_ALARM",
+					logger.Warningf(s.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM,
 						"the key of pair with value (%v) is empty", value)
 				}
 			}

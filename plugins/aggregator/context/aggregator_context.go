@@ -90,7 +90,7 @@ func addToQueueWithRetry(context context.Context, queue pipeline.LogGroupQueue, 
 		}
 		// wait until shutdown is active
 		if tryCount%100 == 0 {
-			logger.Warning(context, "AGGREGATOR_ADD_ALARM", "error", err)
+			logger.Warning(context, util.PLUGIN_RUNTIME_ALARM, "error", err)
 		}
 		time.Sleep(time.Millisecond * 10)
 	}

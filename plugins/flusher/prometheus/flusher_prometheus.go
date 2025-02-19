@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/flusher/http"
 )
 
@@ -50,13 +51,13 @@ func (p *FlusherPrometheus) Init(context pipeline.Context) error {
 	}
 
 	if err := p.prepareInit(); err != nil {
-		logger.Errorf(p.ctx.GetRuntimeContext(), "PROMETHEUS_FLUSHER_INIT_ALARM",
+		logger.Errorf(p.ctx.GetRuntimeContext(), util.PLUGIN_INIT_ALARM,
 			"prometheus flusher prepare init failed, error: %s", err.Error())
 		return err
 	}
 
 	if err := p.FlusherHTTP.Init(context); err != nil {
-		logger.Errorf(p.ctx.GetRuntimeContext(), "PROMETHEUS_FLUSHER_INIT_ALARM",
+		logger.Errorf(p.ctx.GetRuntimeContext(), util.PLUGIN_INIT_ALARM,
 			"prometheus flusher init http flusher failed, error: %s", err.Error())
 		return err
 	}

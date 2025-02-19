@@ -23,6 +23,7 @@
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "monitor/SelfMonitorServer.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
@@ -105,9 +106,20 @@ AlarmManager::AlarmManager() {
     mMessageType[SERIALIZE_FAIL_ALARM] = "SERIALIZE_FAIL_ALARM";
     mMessageType[RELABEL_METRIC_FAIL_ALARM] = "RELABEL_METRIC_FAIL_ALARM";
     mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
+    mMessageType[PLUGIN_INIT_ALARM] = "PLUGIN_INIT_ALARM";
+    mMessageType[PLUGIN_START_ALARM] = "PLUGIN_START_ALARM";
+    mMessageType[PLUGIN_RUNTIME_ALARM] = "PLUGIN_RUNTIME_ALARM";
+    mMessageType[PLUGIN_STOP_ALARM] = "PLUGIN_STOP_ALARM";
+    mMessageType[DOCKER_CENTER_ALARM] = "DOCKER_CENTER_ALARM";
+    mMessageType[KUBERNETES_META_ALARM] = "KUBERNETES_META_ALARM";
+    mMessageType[INTERNAL_SERVICE_ERROR] = "INTERNAL_SERVICE_ERROR";
 }
 
 void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEventGroupList) {
+    // 发送前同步一次go的alarm
+    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
+        LogtailPlugin::GetInstance()->GetGoAlarms();
+    }
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
@@ -216,7 +228,8 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
                              const std::string& message,
                              const std::string& projectName,
                              const std::string& category,
-                             const std::string& region) {
+                             const std::string& region,
+                             const int32_t count) {
     if (alarmType < 0 || alarmType >= ALL_LOGTAIL_ALARM_NUM) {
         return;
     }
@@ -231,10 +244,10 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     string key = projectName + "_" + category;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, count);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
-        alarmBufferVec[alarmType][key]->IncCount();
+        alarmBufferVec[alarmType][key]->IncCount(count);
 }
 
 void AlarmManager::ForceToSend() {

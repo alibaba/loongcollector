@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const labelName = "__labels__"
@@ -102,7 +103,7 @@ func (s *SharedUDPServer) dispatcher(logs []*protocol.Log) {
 
 func (s *SharedUDPServer) logErr(errStr string) {
 	if time.Since(s.lastLog).Seconds() > 10 {
-		logger.Error(s.udp.context.GetRuntimeContext(), "MULTI_HTTP_SERVER_ALARM", "not exist dispatch key", errStr)
+		logger.Error(s.udp.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "not exist dispatch key", errStr)
 		s.lastLog = time.Now()
 	}
 }
