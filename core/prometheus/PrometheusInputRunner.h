@@ -74,7 +74,6 @@ private:
     int32_t mServicePort;
     std::string mPodName;
 
-    std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;

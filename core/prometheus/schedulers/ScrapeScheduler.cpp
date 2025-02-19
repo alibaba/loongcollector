@@ -110,8 +110,7 @@ string ScrapeScheduler::GetId() const {
     return mHash;
 }
 
-void ScrapeScheduler::SetComponent(shared_ptr<Timer> timer, EventPool* eventPool) {
-    mTimer = std::move(timer);
+void ScrapeScheduler::SetComponent(EventPool* eventPool) {
     mEventPool = eventPool;
 }
 
@@ -147,7 +146,7 @@ void ScrapeScheduler::ScheduleNext() {
     }
 
     auto event = BuildScrapeTimerEvent(GetNextExecTime());
-    mTimer->PushEvent(std::move(event));
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime) {
@@ -158,9 +157,7 @@ void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime)
     });
     mFuture = future;
     auto event = BuildScrapeTimerEvent(execTime);
-    if (mTimer) {
-        mTimer->PushEvent(std::move(event));
-    }
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime) {
