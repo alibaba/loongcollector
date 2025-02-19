@@ -15,15 +15,23 @@
 #include "common/http/Curl.h"
 
 #include <cstdint>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
 
 #include <map>
 #include <string>
 
+#include "curl/curl.h"
+
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "common/DNSCache.h"
 #include "common/StringTools.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+
+DECLARE_FLAG_INT32(curl_ip_dscp);
 
 using namespace std;
 
@@ -97,6 +105,12 @@ static size_t header_write_callback(char* buffer,
             = string(buffer, colonIndex + 1 + rightSpaceNum, sizes - colonIndex - 1 - 2 - rightSpaceNum);
     }
     return sizes;
+}
+
+static size_t socket_write_callback(void* userdata, curl_socket_t fd, curlsocktype purpose) {
+    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
+    int32_t tos = *static_cast<int32_t*>(userdata) << 2;
+    setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
 }
 
 CURL* CreateCurlHandler(const string& method,
@@ -182,6 +196,11 @@ CURL* CreateCurlHandler(const string& method,
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
     curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
     curl_easy_setopt(curl, CURLOPT_NETRC, CURL_NETRC_IGNORED);
+    static int sDSCP = INT32_FLAG(curl_ip_dscp); // the lifestyle of sDSCP pointer should be longer than local variable
+    if (sDSCP >= 0 && sDSCP <= 63) {
+        curl_easy_setopt(curl, CURLOPT_SOCKOPTDATA, &sDSCP);
+        curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, socket_write_callback);
+    }
 
     return curl;
 }
