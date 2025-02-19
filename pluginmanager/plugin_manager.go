@@ -272,13 +272,16 @@ func Stop(configName string, removedFlag bool) error {
 			DisabledLogtailConfigLock.Lock()
 			DisabledLogtailConfig[config.ConfigNameWithSuffix] = config
 			DisabledLogtailConfigLock.Unlock()
+			LogtailConfigLock.Lock()
+			delete(LogtailConfig, configName)
+			LogtailConfigLock.Unlock()
 		} else {
 			logger.Info(config.Context.GetRuntimeContext(), "Stop config now", configName)
+			LogtailConfigLock.Lock()
 			DeleteLogstoreConfig(config)
+			delete(LogtailConfig, configName)
+			LogtailConfigLock.Unlock()
 		}
-		LogtailConfigLock.Lock()
-		delete(LogtailConfig, configName)
-		LogtailConfigLock.Unlock()
 		return nil
 	}
 	LogtailConfigLock.RUnlock()
