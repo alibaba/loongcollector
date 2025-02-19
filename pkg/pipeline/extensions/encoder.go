@@ -34,8 +34,8 @@ type Encoder interface {
 //
 // drivers: sls, influxdb, ...
 type EncoderV1 interface {
-	EncodeV1(*protocol.LogGroup) ([][]byte, error)
-	EncodeBatchV1([]*protocol.LogGroup) ([][]byte, error)
+	EncodeV1(*protocol.LogGroup, []string) ([][]byte, []map[string]string, error)
+	EncodeBatchV1([]*protocol.LogGroup, []string) ([][]byte, []map[string]string, error)
 }
 
 // EncoderV2 supports v2 pipeline plugin interface,
@@ -43,8 +43,13 @@ type EncoderV1 interface {
 //
 // drivers: raw, influxdb, prometheus, ...
 type EncoderV2 interface {
-	EncodeV2(*models.PipelineGroupEvents) ([][]byte, error)
-	EncodeBatchV2([]*models.PipelineGroupEvents) ([][]byte, error)
+	EncodeV2(*models.PipelineGroupEvents, []string) ([][]byte, []map[string]string, error)
+	EncodeBatchV2([]*models.PipelineGroupEvents, []string) ([][]byte, []map[string]string, error)
+}
+
+// Recycler recyles the buffer
+type BufferRecycler interface {
+	Recycle([]byte)
 }
 
 type EncoderExtension interface {
