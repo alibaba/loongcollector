@@ -239,7 +239,7 @@ void ConnTrackerManagerUnittest::TestProtocolDetection() {
 
     // 验证协议属性
     auto attrs = manager->GetConnTrackerAttrs(connId);
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kIp.name())], "127.0.0.1");
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kIp.Name())], "127.0.0.1");
 }
 
 void ConnTrackerManagerUnittest::TestResourceManagement() {

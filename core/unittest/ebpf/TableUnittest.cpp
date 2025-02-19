@@ -73,8 +73,8 @@ void TableUnittest::TestProcessTable() {
     APSARA_TEST_EQUAL(kProcessSecurityTableSize, std::size(kProcessSecurityElements));
 
     // 验证表名
-    APSARA_TEST_EQUAL(std::string(kProcessCommonTable.name()), "process_common_table");
-    APSARA_TEST_EQUAL(std::string(kProcessSecurityTable.name()), "process_security_table");
+    APSARA_TEST_EQUAL(std::string(kProcessCommonTable.Name()), "process_common_table");
+    APSARA_TEST_EQUAL(std::string(kProcessSecurityTable.Name()), "process_security_table");
 }
 
 void TableUnittest::TestFileSecurityTable() {
@@ -90,12 +90,12 @@ void TableUnittest::TestFileSecurityTable() {
     APSARA_TEST_EQUAL(kFileSecurityTableSize, std::size(kFileSecurityElements));
 
     // 验证表名
-    APSARA_TEST_EQUAL(std::string(kFileSecurityTable.name()), "file_security_table");
+    APSARA_TEST_EQUAL(std::string(kFileSecurityTable.Name()), "file_security_table");
 
     // 验证特定字段的属性
     auto pathIdx = kFileSecurityTable.ColIndex("path");
     APSARA_TEST_TRUE(pathIdx < kFileSecurityTableSize);
-    APSARA_TEST_EQUAL(std::string(kFileSecurityElements[pathIdx].desc()), "file path");
+    APSARA_TEST_EQUAL(std::string(kFileSecurityElements[pathIdx].Desc()), "file path");
 }
 
 void TableUnittest::TestNetworkSecurityTable() {
@@ -114,12 +114,12 @@ void TableUnittest::TestNetworkSecurityTable() {
     APSARA_TEST_EQUAL(kNetworkSecurityTableSize, std::size(kNetworkSecurityElements));
 
     // 验证表名
-    APSARA_TEST_EQUAL(std::string(kNetworkSecurityTable.name()), "network_security_table");
+    APSARA_TEST_EQUAL(std::string(kNetworkSecurityTable.Name()), "network_security_table");
 
     // 验证网络特定字段的属性
     auto saddrIdx = kNetworkSecurityTable.ColIndex("source.addr");
     APSARA_TEST_TRUE(saddrIdx < kNetworkSecurityTableSize);
-    APSARA_TEST_EQUAL(std::string(kNetworkSecurityElements[saddrIdx].desc()), "source address");
+    APSARA_TEST_EQUAL(std::string(kNetworkSecurityElements[saddrIdx].Desc()), "source address");
 }
 
 void TableUnittest::TestNetTable() {
@@ -135,8 +135,8 @@ void TableUnittest::TestNetTable() {
     APSARA_TEST_EQUAL(kNetMetricsNum, std::size(kNetMetricsElements));
 
     // 验证 NetMetricsTable 表名和描述
-    APSARA_TEST_EQUAL(std::string(kNetMetricsTable.name()), "net_metrics");
-    APSARA_TEST_EQUAL(std::string(kNetMetricsTable.desc()), "net metrics table");
+    APSARA_TEST_EQUAL(std::string(kNetMetricsTable.Name()), "net_metrics");
+    APSARA_TEST_EQUAL(std::string(kNetMetricsTable.Desc()), "net metrics table");
 
     // 测试 NetTable
     APSARA_TEST_TRUE(kNetTable.HasCol("ip"));
@@ -146,13 +146,13 @@ void TableUnittest::TestNetTable() {
     APSARA_TEST_TRUE(kNetTable.HasCol("remote_port"));
 
     // 验证 NetTable 表名和描述
-    APSARA_TEST_EQUAL(std::string(kNetTable.name()), "net_record");
-    APSARA_TEST_EQUAL(std::string(kNetTable.desc()), "net events");
+    APSARA_TEST_EQUAL(std::string(kNetTable.Name()), "net_record");
+    APSARA_TEST_EQUAL(std::string(kNetTable.Desc()), "net events");
 
     // 验证字段属性
     auto remoteAddrIdx = kNetTable.ColIndex("remote_addr");
     APSARA_TEST_TRUE(remoteAddrIdx < std::size(kNetElements));
-    APSARA_TEST_EQUAL(std::string(kNetElements[remoteAddrIdx].desc()), "IP address of the remote endpoint.");
+    APSARA_TEST_EQUAL(std::string(kNetElements[remoteAddrIdx].Desc()), "IP address of the remote endpoint.");
 }
 
 // 注册新增的测试用例

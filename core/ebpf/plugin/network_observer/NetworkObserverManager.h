@@ -84,14 +84,11 @@ public:
     }
 
     virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
-        // TODO
         LOG_WARNING(sLogger, ("TODO", "not support yet"));
         return 0;
     }
 
 private:
-    //   std::string Record2FileLog(const std::shared_ptr<HttpRecord> &);
-    //   void ConsumeRecordsAsFileLogs(const std::vector<std::shared_ptr<AbstractRecord>> &records, size_t count);
     void ConsumeRecordsAsEvent(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
     void ConsumeRecordsAsMetric(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
     void ConsumeRecordsAsTrace(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
@@ -132,7 +129,6 @@ private:
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRecordQueue;
 
     // WorkerPool: used to parse protocols from raw record
-    // NetDataHandler netDataHandler_;
     std::unique_ptr<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>> mWorkerPool;
 
     // coreThread used for polling kernel event...
