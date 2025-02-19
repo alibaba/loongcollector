@@ -24,7 +24,6 @@
 #include "common/http/HttpResponse.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "prometheus/PromSelfMonitor.h"
-#include "prometheus/component/StreamScraper.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -33,14 +32,23 @@
 
 namespace logtail {
 
+struct PromTargetInfo {
+    Labels mLabels;
+    std::string mInstance;
+    std::string mHash;
+    uint64_t mRebalanceMs = 0;
+};
+
 class ScrapeScheduler : public BaseScheduler {
+    friend class TargetSubscriberScheduler;
+
 public:
     ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
                     std::string host,
                     int32_t port,
-                    Labels labels,
                     QueueKey queueKey,
-                    size_t inputIndex);
+                    size_t inputIndex,
+                    const PromTargetInfo& targetInfo);
     ScrapeScheduler(const ScrapeScheduler&) = delete;
     ~ScrapeScheduler() override = default;
 
@@ -49,7 +57,9 @@ public:
     std::string GetId() const;
 
     void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
+    int64_t GetLastScrapeSize() const { return mScrapeResponseSizeBytes; }
 
+    uint64_t GetReBalanceMs() const { return mTargetInfo.mRebalanceMs; }
     void ScheduleNext() override;
     void ScrapeOnce(std::chrono::steady_clock::time_point execTime);
     void Cancel() override;
@@ -59,22 +69,17 @@ private:
     std::unique_ptr<TimerEvent> BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime);
 
     std::shared_ptr<ScrapeConfig> mScrapeConfigPtr;
-    std::string mHash;
+    std::atomic_int mExecDelayCount = 0;
     std::string mHost;
     int32_t mPort;
-    std::string mInstance;
+    PromTargetInfo mTargetInfo;
 
     // pipeline
     QueueKey mQueueKey;
     size_t mInputIndex;
 
-    Labels mTargetLabels;
-
     // auto metrics
-    uint64_t mScrapeTimestampMilliSec = 0;
-    double mScrapeDurationSeconds = 0;
-    uint64_t mScrapeResponseSizeBytes = 0;
-    bool mUpState = true;
+    std::atomic_int mScrapeResponseSizeBytes;
 
     // self monitor
     std::shared_ptr<PromSelfMonitorUnsafe> mSelfMonitor;

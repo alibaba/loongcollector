@@ -16,8 +16,7 @@
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 
 #include <cstddef>
-
-#include "json/json.h"
+#include <json/json.h>
 
 #include "common/Flags.h"
 #include "common/StringTools.h"
@@ -186,17 +185,25 @@ void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGrou
 
 void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup,
                                                       const prom::AutoMetric& autoMetric) const {
-    auto targetTags = eGroup.GetTags();
     if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC)) {
         LOG_ERROR(sLogger, ("scrape_timestamp_milliseconds is not set", ""));
         return;
     }
+    auto targetTags = eGroup.GetTags();
+    auto toDelete = GetToDeleteTargetLabels(targetTags);
+    for (const auto& item : toDelete) {
+        targetTags.erase(item);
+    }
+    if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID)) {
+        LOG_ERROR(sLogger, ("prometheus stream id", ""));
+        return;
+    }
+    targetTags[prometheus::LC_TARGET_HASH] = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID);
 
     StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
-
 
     AddMetric(
         eGroup, prometheus::SCRAPE_DURATION_SECONDS, autoMetric.mScrapeDurationSeconds, timestamp, nanoSec, targetTags);

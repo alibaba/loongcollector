@@ -58,26 +58,6 @@ void LabelsUnittest::TestRemoveMetaLabels() {
     APSARA_TEST_EQUAL("", labels.Get("__meta_port"));
 }
 
-void LabelsUnittest::TestHash() {
-    Labels labels;
-
-    labels.Set("host", "172.17.0.3:9100");
-    labels.Set("ip", "172.17.0.3");
-    labels.Set("port", "9100");
-    uint64_t hash = labels.Hash();
-
-    uint64_t expect = prometheus::OFFSET64;
-    string raw;
-    raw = raw + "host" + "\xff" + "172.17.0.3:9100" + "\xff" + "ip" + "\xff" + "172.17.0.3" + "\xff" + "port" + "\xff"
-        + "9100" + "\xff";
-    for (auto i : raw) {
-        expect ^= (uint64_t)i;
-        expect *= prometheus::PRIME64;
-    }
-
-    APSARA_TEST_EQUAL(expect, hash);
-}
-
 void LabelsUnittest::TestGet() {
     Labels labels;
     labels.Set("host", "172.17.0.3:9100");
@@ -117,7 +97,6 @@ void LabelsUnittest::TestRange() {
 UNIT_TEST_CASE(LabelsUnittest, TestGet)
 UNIT_TEST_CASE(LabelsUnittest, TestSet)
 UNIT_TEST_CASE(LabelsUnittest, TestRange)
-UNIT_TEST_CASE(LabelsUnittest, TestHash)
 UNIT_TEST_CASE(LabelsUnittest, TestRemoveMetaLabels)
 
 

@@ -215,6 +215,7 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(2325));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(true));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE, string("OK"));
+    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID, string("123"));
     eventGroup.SetTag(string("instance"), "localhost:8080");
     eventGroup.SetTag(string("job"), "test_job");
     processor.UpdateAutoMetrics(eventGroup, autoMetric);
@@ -235,6 +236,7 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     APSARA_TEST_EQUAL(1, eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL("localhost:8080", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("instance"));
     APSARA_TEST_EQUAL("test_job", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("job"));
+    APSARA_TEST_EQUAL("123", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("lc_target_hash"));
 }
 
 void ProcessorPromRelabelMetricNativeUnittest::TestHonorLabels() {
