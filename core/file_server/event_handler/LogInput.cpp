@@ -18,7 +18,6 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -28,6 +27,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"

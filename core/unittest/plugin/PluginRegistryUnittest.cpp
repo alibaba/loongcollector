@@ -32,7 +32,6 @@ public:
     void TestCreateProcessor() const;
     void TestCreateFlusher() const;
     void TestValidPlugin() const;
-    void TestRegisterFlusherSinkType() const;
 
 protected:
     void SetUp() override { LoadPluginMock(); }
@@ -40,7 +39,7 @@ protected:
 };
 
 void PluginRegistryUnittest::TestCreateInput() const {
-    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, {"0"});
+    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, false, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
     APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
 }
@@ -59,8 +58,8 @@ void PluginRegistryUnittest::TestCreateFlusher() const {
 }
 
 void PluginRegistryUnittest::TestValidPlugin() const {
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_mock"));
-    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_unknown"));
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_mock", false));
+    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_unknown", false));
     APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_mock"));
     APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_unknown"));
     APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_mock"));

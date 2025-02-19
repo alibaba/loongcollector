@@ -15,7 +15,6 @@
  */
 
 #pragma once
-#include <leveldb/db.h>
 
 #include <memory>
 #include <mutex>
@@ -23,6 +22,8 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
+#include "leveldb/db.h"
 
 #include "plugin/input/InputFile.h"
 #include "protobuf/sls/checkpoint.pb.h"
