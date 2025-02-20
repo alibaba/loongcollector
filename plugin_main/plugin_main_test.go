@@ -146,7 +146,6 @@ func TestHangConfigWhenStop(t *testing.T) {
 	time.Sleep(time.Second * 2)
 	_, exists = pluginmanager.DisabledLogtailConfig[config]
 	require.True(t, exists)
-	//require.Equal(t, configName, config.ConfigName)
 
 	// Change config detail, load a new pipeline.
 	validConfigStr := fmt.Sprintf(configTemplateJSONStr, 4)
