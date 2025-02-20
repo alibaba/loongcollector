@@ -83,7 +83,7 @@ func (p *ProcessorJSON) processLog(log *protocol.Log) {
 			}
 			err := jsonparser.ObjectEach([]byte(objectVal), param.ExpandJSONCallBack)
 			if err != nil {
-				logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
+				logger.Errorf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "parser json error %v", err)
 			}
 			if !p.shouldKeepSource(err) {
 				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
@@ -93,7 +93,7 @@ func (p *ProcessorJSON) processLog(log *protocol.Log) {
 		}
 	}
 	if !findKey && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_FIND_ALARM", "cannot find key %v", p.SourceKey)
+		logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key %v", p.SourceKey)
 	}
 }
 
@@ -248,7 +248,7 @@ func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
 	contents := event.(*models.Log).GetIndices()
 	if !contents.Contains(p.SourceKey) {
 		if p.NoKeyError {
-			logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_FIND_ALARM", "cannot find key %v", p.SourceKey)
+			logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key %v", p.SourceKey)
 		}
 		return
 	}
@@ -260,7 +260,7 @@ func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
 		bytesVal = util.ZeroCopyStringToBytes(stringVal)
 	}
 	if !ok {
-		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_FIND_ALARM", "key %v is not string", p.SourceKey)
+		logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "key %v is not string", p.SourceKey)
 		return
 	}
 	param := ExpandParam{
@@ -278,7 +278,7 @@ func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
 	}
 	err := jsonparser.ObjectEach(bytesVal, param.ExpandJSONCallBack)
 	if err != nil {
-		logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
+		logger.Errorf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "parser json error %v", err)
 	}
 	if !p.shouldKeepSource(err) && !param.isSourceKeyOverwritten {
 		contents.Delete(p.SourceKey)

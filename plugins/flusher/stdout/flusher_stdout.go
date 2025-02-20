@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/cihub/seelog"
 	jsoniter "github.com/json-iterator/go"
@@ -79,7 +80,7 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 		var err error
 		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern))
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init stdout flusher fail, error", err)
+			logger.Error(p.context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "init stdout flusher fail, error", err)
 			p.outLogger = seelog.Disabled
 		}
 	}
