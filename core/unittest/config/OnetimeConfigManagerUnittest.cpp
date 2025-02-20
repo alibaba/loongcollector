@@ -50,9 +50,9 @@ void OnetimeConfigManagerUnittest::TestLoadCheckpointFile() const {
     }
     {
         // invalid checkpoint file
-        filesystem::create_directories("onetime_config_info");
+        filesystem::create_directories("onetime_config_info.json");
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile());
-        filesystem::remove_all("onetime_config_info");
+        filesystem::remove_all("onetime_config_info.json");
     }
     {
         // empty content
@@ -61,14 +61,18 @@ void OnetimeConfigManagerUnittest::TestLoadCheckpointFile() const {
     }
     {
         // invalid checkpoint file format
-        ofstream fout(sManager->mCheckpointFilePath);
-        fout << "[}";
+        {
+            ofstream fout(sManager->mCheckpointFilePath);
+            fout << "[}";
+        }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile());
     }
     {
         // checkpoint file is not object
-        ofstream fout(sManager->mCheckpointFilePath);
-        fout << "[]";
+        {
+            ofstream fout(sManager->mCheckpointFilePath);
+            fout << "[]";
+        }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile());
     }
     {
@@ -140,7 +144,7 @@ void OnetimeConfigManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint() co
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 0;
     sManager->ClearUnusedCheckpoints();
     APSARA_TEST_TRUE(sManager->mConfigExpireTimeCheckpoint.empty());
-    sManager->mConfigExpireTimeCheckpoint.clear();
+    sManager->ClearUnusedCheckpoints();
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
 
