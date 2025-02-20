@@ -30,6 +30,7 @@ public:
 
 protected:
     static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
         // PipelineConfigWatcher::GetInstance()->SetPipelineManager(PipelineManagerMock::GetInstance());
     }
@@ -60,39 +61,38 @@ private:
 OnetimeConfigManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigManager::GetInstance();
 
 void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
-    // prepare checkpoint file
-    {
-        ofstream fout(sConfigManager->mCheckpointFilePath);
-        fout << R"({
-            "changed_config": {
-                "config_hash": 28279028812201817660,
-                "expire_time": 2000000000
-            },
-            "old_config": {
-                "config_hash": 10721333133363590973,
-                "expire_time": 2500000000
-            },
-            "obsolete_config": {
-                "config_hash": 4307355492778443398,
-                "expire_time": 1000000000
-            },
-            "unused_config": {
-                "config_hash": 10542524475940222222,
-                "expire_time": 1800000000
+    map<string, uint64_t> configHash;
+    string unusedConfigDetail = R"({
+        "global": {
+            "ExcutionTimeout": 1400
+        },
+        "inputs": [
+            {
+                "Type": "input_mock"
             }
-        })";
-    }
-    sConfigManager->LoadCheckpointFile();
+        ],
+        "flushers": [
+            {
+                "Type": "flusher_mock"
+            }
+        ]
+    })";
+    Json::Value root;
+    string errorMsg;
+    ParseJsonTable(unusedConfigDetail, root, errorMsg);
+    configHash["unused_config.json"] = Hash(root);
 
-    // prepare config files
-    vector<string> configDetails = {
-        R"({
+    // on restart
+    {
+        // prepare config files
+        vector<string> configDetails = {
+            R"({
             "global": {
                 "ExcutionTimeout": 3600
             },
             "inputs": [
                 {
-                    "Type": "input_mock_onetime"
+                    "Type": "input_mock"
                 }
             ],
             "flushers": [
@@ -101,13 +101,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
                 }
             ]
         })",
-        R"({
+            R"({
             "global": {
                 "ExcutionTimeout": 7200
             },
             "inputs": [
                 {
-                    "Type": "input_mock_onetime"
+                    "Type": "input_mock"
                 }
             ],
             "flushers": [
@@ -116,13 +116,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
                 }
             ]
         })",
-        R"({
+            R"({
             "global": {
                 "ExcutionTimeout": 1800
             },
             "inputs": [
                 {
-                    "Type": "input_mock_onetime"
+                    "Type": "input_mock"
                 }
             ],
             "flushers": [
@@ -131,13 +131,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
                 }
             ]
         })",
-        R"({
+            R"({
             "global": {
-                "ExcutionTimeout": 60
+                "ExcutionTimeout": 600
             },
             "inputs": [
                 {
-                    "Type": "input_mock_onetime"
+                    "Type": "input_mock"
                 }
             ],
             "flushers": [
@@ -146,52 +146,162 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
                 }
             ]
         })"};
-    vector<string> filenames = {"new_config.json", "changed_config.json", "old_config.json", "obsolete_config.json"};
-    for (size_t i = 0; i < configDetails.size(); ++i) {
-        ofstream fout(mConfigDir / filenames[i]);
-        fout << configDetails[i];
+        vector<string> filenames
+            = {"new_config.json", "changed_config.json", "old_config.json", "obsolete_config.json"};
+        for (size_t i = 0; i < configDetails.size(); ++i) {
+            ofstream fout(mConfigDir / filenames[i]);
+            fout << configDetails[i];
+        }
+
+        // compute config hash
+        for (size_t i = 0; i < configDetails.size(); ++i) {
+            Json::Value root;
+            string errorMsg;
+            ParseJsonTable(configDetails[i], root, errorMsg);
+            configHash[filenames[i]] = Hash(root);
+        }
+
+        // prepare checkpoint file
+        {
+            ofstream fout(sConfigManager->mCheckpointFilePath);
+            fout << R"({
+            "changed_config": {
+                "config_hash": 8279028812201817660,
+                "expire_time": 2000000000
+            },
+            "old_config": {
+                "config_hash": )"
+                    + ToString(configHash["old_config.json"]) + R"(,
+                "expire_time": 2500000000
+            },
+            "obsolete_config": {
+                "config_hash": )"
+                    + ToString(configHash["obsolete_config.json"]) + R"(,
+                "expire_time": 1000000000
+            },
+            "unused_config": {
+                "config_hash": )"
+                    + ToString(configHash["unused_config.json"]) + R"(,
+                "expire_time": 2200000000
+            }
+        })";
+        }
+        sConfigManager->LoadCheckpointFile();
+
+        auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        APSARA_TEST_FALSE(diff.first.IsEmpty());
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
+        sConfigManager->DumpCheckpointFile();
+
+        APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
+            APSARA_TEST_EQUAL(time(nullptr) + 3600U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
+        }
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
+            APSARA_TEST_EQUAL(time(nullptr) + 7200U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["changed_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
+        }
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
+            APSARA_TEST_EQUAL(2500000000U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / filenames[2], item.mFilepath);
+        }
+        APSARA_TEST_EQUAL(1U, sConfigManager->mConfigExpireTimeCheckpoint.size());
+        APSARA_TEST_NOT_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
+                              sConfigManager->mConfigExpireTimeCheckpoint.find("unused_config"));
     }
 
-    // compute config hash
-    vector<uint64_t> configHash;
-    for (const auto& config : configDetails) {
-        Json::Value root;
-        string errorMsg;
-        ParseJsonTable(config, root, errorMsg);
-        configHash.push_back(Hash(root));
-    }
+    // on update
+    {
+        // prepare config files
+        vector<string> configDetails = {
+            R"({
+            "global": {
+                "ExcutionTimeout": 1000
+            },
+            "inputs": [
+                {
+                    "Type": "input_mock"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_mock"
+                }
+            ]
+        })",
+            R"({
+            "global": {
+                "ExcutionTimeout": 1200
+            },
+            "inputs": [
+                {
+                    "Type": "input_mock"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_mock"
+                }
+            ]
+        })"};
+        vector<string> filenames = {"new_config.json", "old_config.json"};
+        for (size_t i = 0; i < configDetails.size(); ++i) {
+            ofstream fout(mConfigDir / filenames[i]);
+            fout << configDetails[i];
+        }
+        {
+            ofstream fout(mConfigDir / "unused_config.json");
+            fout << unusedConfigDetail;
+        }
+        filesystem::remove(mConfigDir / "changed_config.json");
 
-    // on restart
-    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
-    CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
-    sConfigManager->DumpCheckpointFile();
+        // compute config hash
+        for (size_t i = 0; i < configDetails.size(); ++i) {
+            Json::Value root;
+            string errorMsg;
+            ParseJsonTable(configDetails[i], root, errorMsg);
+            configHash[filenames[i]] = Hash(root);
+        }
 
-    APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
-    {
-        const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-        APSARA_TEST_EQUAL(time(nullptr) + 3600U, item.mExpireTime);
-        APSARA_TEST_EQUAL(configHash[0], item.mHash);
-        APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
-        APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
+        auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        APSARA_TEST_FALSE(diff.first.IsEmpty());
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
+        sConfigManager->DumpCheckpointFile();
+
+        APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
+            APSARA_TEST_EQUAL(time(nullptr) + 1000U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
+        }
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
+            APSARA_TEST_EQUAL(time(nullptr) + 1200U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
+        }
+        {
+            const auto& item = sConfigManager->mConfigInfoMap.at("unused_config");
+            APSARA_TEST_EQUAL(2200000000U, item.mExpireTime);
+            APSARA_TEST_EQUAL(configHash["unused_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
+            APSARA_TEST_EQUAL(mConfigDir / "unused_config.json", item.mFilepath);
+        }
+        APSARA_TEST_EQUAL(0U, sConfigManager->mConfigExpireTimeCheckpoint.size());
     }
-    {
-        const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
-        APSARA_TEST_EQUAL(time(nullptr) + 7200U, item.mExpireTime);
-        APSARA_TEST_EQUAL(configHash[1], item.mHash);
-        APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
-        APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
-    }
-    {
-        const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
-        APSARA_TEST_EQUAL(2500000000U, item.mExpireTime);
-        APSARA_TEST_EQUAL(configHash[2], item.mHash);
-        APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
-        APSARA_TEST_EQUAL(mConfigDir / filenames[2], item.mFilepath);
-    }
-    APSARA_TEST_EQUAL(1U, sConfigManager->mConfigExpireTimeCheckpoint.size());
-    APSARA_TEST_NOT_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
-                          sConfigManager->mConfigExpireTimeCheckpoint.find("unused_config"));
 }
 
 UNIT_TEST_CASE(OnetimeConfigUpdateUnittest, OnCollectionConfigUpdate)
