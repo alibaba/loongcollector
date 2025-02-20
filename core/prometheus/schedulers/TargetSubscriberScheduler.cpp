@@ -109,16 +109,14 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                 mScrapeSchedulerMap[k] = v;
                 if (mTimer) {
                     auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
-                    auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
-                        v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
+                    auto tmpRandSleepMilliSec
+                        = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
 
                     // zero-cost upgrade
                     if (mUnRegisterMs > 0
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
                             > mUnRegisterMs)
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
                             < mUnRegisterMs)) {
                         // scrape once just now
                         LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
@@ -165,14 +163,8 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         if (targets.empty()) {
             continue;
         }
-        // Parse labels
+        // Parse labels https://www.robustperception.io/life-of-a-label/
         Labels labels;
-        labels.Set(prometheus::JOB, mJobName);
-        labels.Set(prometheus::ADDRESS_LABEL_NAME, targets[0]);
-        labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
-        labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
-        labels.Set(prometheus::SCRAPE_INTERVAL_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeIntervalSeconds));
-        labels.Set(prometheus::SCRAPE_TIMEOUT_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeTimeoutSeconds));
         for (const auto& pair : mScrapeConfigPtr->mParams) {
             if (!pair.second.empty()) {
                 labels.Set(prometheus::PARAM_LABEL_NAME + pair.first, pair.second[0]);
@@ -183,6 +175,18 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
             for (const string& labelKey : element[prometheus::LABELS].getMemberNames()) {
                 labels.Set(labelKey, element[prometheus::LABELS][labelKey].asString());
             }
+        }
+        if (labels.Get(prometheus::JOB).empty()) {
+            labels.Set(prometheus::JOB, mJobName);
+        }
+        if (labels.Get(prometheus::SCHEME_LABEL_NAME).empty()) {
+            labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
+        }
+        if (labels.Get(prometheus::METRICS_PATH_LABEL_NAME).empty()) {
+            labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
+        }
+        if (labels.Get(prometheus::ADDRESS_LABEL_NAME).empty()) {
+            continue;
         }
         scrapeSchedulerGroup.push_back(labels);
     }
@@ -210,24 +214,94 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         }
 
         auto m = address.find(':');
-        if (m == string::npos) {
-            continue;
-        }
         int32_t port = 0;
-        try {
-            port = stoi(address.substr(m + 1));
-        } catch (...) {
-            continue;
+        if (m == string::npos) {
+            // if no port, use default port
+            if (resultLabel.Get(prometheus::SCHEME_LABEL_NAME) == prometheus::HTTP) {
+                port = 80;
+            } else if (resultLabel.Get(prometheus::SCHEME_LABEL_NAME) == prometheus::HTTPS) {
+                port = 443;
+            } else {
+                continue;
+            }
+        } else {
+            // parse port
+            try {
+                port = stoi(address.substr(m + 1));
+            } catch (...) {
+                continue;
+            }
         }
 
         string host = address.substr(0, m);
-        auto scrapeScheduler
-            = std::make_shared<ScrapeScheduler>(mScrapeConfigPtr, host, port, resultLabel, mQueueKey, mInputIndex);
+        string scheme = resultLabel.Get(prometheus::SCHEME_LABEL_NAME);
+        if (scheme.empty()) {
+            scheme = mScrapeConfigPtr->mScheme;
+        }
+
+
+        auto buildFullMetricsPath = [](Labels& labels, const string& rawMetricsPath) {
+            string metricsPath = labels.Get(prometheus::METRICS_PATH_LABEL_NAME);
+            if (metricsPath.empty()) {
+                metricsPath = rawMetricsPath;
+            }
+            if (metricsPath[0] != '/') {
+                metricsPath = "/" + metricsPath;
+            }
+            map<string, string> params;
+            labels.Range([&params](const string& key, const string& value) {
+                if (StartWith(key, prometheus::PARAM_LABEL_NAME)) {
+                    params[key.substr(strlen(prometheus::PARAM_LABEL_NAME))] = value;
+                }
+            });
+            string paramsStr;
+            for (const auto& pair : params) {
+                if (!paramsStr.empty()) {
+                    paramsStr += "&";
+                }
+                paramsStr += pair.first + "=" + pair.second;
+            }
+            string optionalQuestion;
+            if (!paramsStr.empty()) {
+                optionalQuestion = "?";
+                if (metricsPath.find('?') != string::npos) {
+                    optionalQuestion = "&";
+                }
+            }
+            return metricsPath + optionalQuestion + paramsStr;
+        };
+        auto metricsPath = buildFullMetricsPath(resultLabel, mScrapeConfigPtr->mMetricsPath);
+
+        auto scrapeIntervalSeconds = DurationToSecond(resultLabel.Get(prometheus::SCRAPE_INTERVAL_LABEL_NAME));
+        if (scrapeIntervalSeconds == 0) {
+            scrapeIntervalSeconds = mScrapeConfigPtr->mScrapeIntervalSeconds;
+        }
+        auto scrapeTimeoutSeconds = DurationToSecond(resultLabel.Get(prometheus::SCRAPE_TIMEOUT_LABEL_NAME));
+        if (scrapeTimeoutSeconds == 0) {
+            scrapeTimeoutSeconds = mScrapeConfigPtr->mScrapeTimeoutSeconds;
+        }
+        if (scrapeIntervalSeconds == 0 || scrapeTimeoutSeconds == 0) {
+            LOG_ERROR(sLogger,
+                      ("job", mJobName)("scrapeIntervalSeconds:", scrapeIntervalSeconds)("scrapeTimeoutSeconds:",
+                                                                                         scrapeTimeoutSeconds));
+            continue;
+        }
+
+        auto scrapeScheduler = std::make_shared<ScrapeScheduler>(mScrapeConfigPtr,
+                                                                 host,
+                                                                 port,
+                                                                 scheme,
+                                                                 metricsPath,
+                                                                 scrapeIntervalSeconds,
+                                                                 scrapeTimeoutSeconds,
+                                                                 resultLabel,
+                                                                 mQueueKey,
+                                                                 mInputIndex);
 
         scrapeScheduler->SetComponent(mTimer, mEventPool);
 
-        auto randSleepMilliSec = GetRandSleepMilliSec(
-            scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
+        auto randSleepMilliSec
+            = GetRandSleepMilliSec(scrapeScheduler->GetId(), scrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
         auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
         auto firstScrapeTIme = std::chrono::system_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
         scrapeScheduler->SetFirstExecTime(firstExecTime, firstScrapeTIme);
