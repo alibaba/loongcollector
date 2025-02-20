@@ -80,6 +80,7 @@ private:
     std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineConfigUnittest;
     friend class OnetimeConfigManagerUnittest;
     friend class OnetimeConfigUpdateUnittest;
 #endif

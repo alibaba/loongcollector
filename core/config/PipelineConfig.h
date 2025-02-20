@@ -47,6 +47,10 @@ struct PipelineConfig {
 
 protected:
     bool GetExpireTimeIfOneTime(const Json::Value& global);
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineConfigUnittest;
+#endif
 };
 
 inline bool operator==(const PipelineConfig& lhs, const PipelineConfig& rhs) {
