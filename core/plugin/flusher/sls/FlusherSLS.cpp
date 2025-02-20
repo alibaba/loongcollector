@@ -14,6 +14,7 @@
 
 #include "plugin/flusher/sls/FlusherSLS.h"
 
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
@@ -27,6 +28,7 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
+#include "common/http/HttpRequest.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -60,6 +62,7 @@ DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio, "", 1.2);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
+DECLARE_FLAG_INT32(curl_ip_dscp);
 
 namespace logtail {
 
@@ -1198,7 +1201,8 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                         item->mData,
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
-                                        1);
+                                        1,
+                                        BuildCurlSocket());
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
@@ -1230,7 +1234,8 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         item->mData,
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
-                                        1);
+                                        1,
+                                        BuildCurlSocket());
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
@@ -1255,6 +1260,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  query,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         item->mCurrentHost,
@@ -1265,7 +1271,15 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         item->mData,
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
-                                        1);
+                                        1,
+                                        BuildCurlSocket());
+}
+
+CurlSocket FlusherSLS::BuildCurlSocket() const {
+    CurlSocket socket = CurlSocket();
+    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
+    socket.mTOS = INT32_FLAG(curl_ip_dscp) << 2;
+    return socket;
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

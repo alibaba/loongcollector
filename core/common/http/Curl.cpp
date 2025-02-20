@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 
 #include <map>
+#include <optional>
 #include <string>
 
 #include "curl/curl.h"
@@ -29,6 +30,7 @@
 #include "common/DNSCache.h"
 #include "common/StringTools.h"
 #include "common/http/HttpResponse.h"
+#include "http/HttpRequest.h"
 #include "logger/Logger.h"
 
 DECLARE_FLAG_INT32(curl_ip_dscp);
@@ -107,10 +109,11 @@ static size_t header_write_callback(char* buffer,
     return sizes;
 }
 
-static size_t socket_write_callback(void* dscp, curl_socket_t fd, curlsocktype purpose) {
-    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
-    int32_t tos = *static_cast<int32_t*>(dscp) << 2;
-    setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
+    auto* socket = static_cast<CurlSocket*>(socketData);
+    if (socket->mTOS >= 0 && socket->mTOS <= 255) {
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &socket->mTOS, sizeof(socket->mTOS));
+    }
     return 0;
 }
 
@@ -128,7 +131,9 @@ CURL* CreateCurlHandler(const string& method,
                         bool replaceHostWithIp,
                         const string& intf,
                         bool followRedirects,
-                        optional<CurlTLS> tls) {
+                        optional<CurlTLS> tls,
+                        const optional<CurlSocket>& socket // socket is used async, the lifestyle must be longer
+) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 
     CURL* curl = curl_easy_init();
@@ -197,9 +202,8 @@ CURL* CreateCurlHandler(const string& method,
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
     curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
     curl_easy_setopt(curl, CURLOPT_NETRC, CURL_NETRC_IGNORED);
-    static int sDSCP = INT32_FLAG(curl_ip_dscp); // the lifestyle of sDSCP pointer should be longer than local variable
-    if (sDSCP >= 0 && sDSCP <= 63) {
-        curl_easy_setopt(curl, CURLOPT_SOCKOPTDATA, &sDSCP);
+    if (socket.has_value()) {
+        curl_easy_setopt(curl, CURLOPT_SOCKOPTDATA, &socket.value());
         curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, socket_write_callback);
     }
 
@@ -222,7 +226,8 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
-                                   request->mTls);
+                                   request->mTls,
+                                   request->mSocket);
     if (curl == NULL) {
         LOG_ERROR(sLogger,
                   ("failed to init curl handler", "failed to init curl client")("request address", request.get()));
@@ -282,7 +287,8 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
-                                   request->mTls);
+                                   request->mTls,
+                                   request->mSocket);
     if (curl == NULL) {
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
         LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
