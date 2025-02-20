@@ -26,16 +26,15 @@ inline constexpr char kContentLength[] = "Content-Length";
 inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
-std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::unique_ptr<NetDataEvent> data_event) {
+std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::unique_ptr<NetDataEvent> dataEvent) {
     // 处理 HTTP 协议数据
     std::vector<std::unique_ptr<AbstractRecord>> records;
-    ConnId conn_id = data_event->conn_id;
-    auto record = std::make_unique<HttpRecord>(std::move(conn_id));
-    record->SetEndTs(data_event->end_ts);
-    record->SetStartTs(data_event->start_ts);
-    if (data_event->req_msg.length() > 0) {
+    auto record = std::make_unique<HttpRecord>(dataEvent->mConnection);
+    record->SetEndTs(dataEvent->mEndTs);
+    record->SetStartTs(dataEvent->mStartTs);
+    if (dataEvent->mReqMsg.length() > 0) {
         Message result;
-        std::string_view buf = data_event->req_msg;
+        std::string_view buf = dataEvent->mReqMsg;
         ParseState state = http::ParseRequest(&buf, &result);
         if (state == ParseState::kSuccess) {
             std::size_t pos = result.req_path.find('?');
@@ -59,9 +58,9 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::uniq
         }
     }
 
-    if (data_event->resp_msg.length() > 0) {
+    if (dataEvent->mRespMsg.length() > 0) {
         Message result;
-        std::string_view buf = data_event->resp_msg;
+        std::string_view buf = dataEvent->mRespMsg;
         ParseState state = http::ParseResponse(&buf, &result, true);
         if (state == ParseState::kSuccess) {
             // record->SetPath(result.req_path);

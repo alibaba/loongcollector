@@ -51,6 +51,7 @@ static constexpr DataElement kConnTrackerElements[] = {
     kContainerId,
     kTraceRole,
     kIp,
+    kRemoteIp,
     kNetNs,
     kFamily,
     kStartTsNs,

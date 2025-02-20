@@ -33,7 +33,7 @@ void NetDataHandler::operator()(std::unique_ptr<NetDataEvent>& evt, ResultQueue&
     LOG_DEBUG(sLogger, ("[NetDataHandler] begin to handle data event ... total count", ++count_));
 
     // get protocol
-    ProtocolType protocol = static_cast<ProtocolType>(evt->protocol);
+    ProtocolType protocol = static_cast<ProtocolType>(evt->mProtocol);
     if (ProtocolType::UNKNOWN == protocol) {
         LOG_DEBUG(sLogger, ("[NetDataHandler] protocol is unknown, skip parse", ""));
         evt.reset();

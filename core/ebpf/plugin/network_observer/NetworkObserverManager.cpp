@@ -24,10 +24,11 @@
 #include "ebpf/type/PeriodicalEvent.h"
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
+#include "metadata/K8sMetadata.h"
 #include "models/StringView.h"
 
 extern "C" {
-#include <net.h>
+#include <coolbpf/net.h>
 }
 
 namespace logtail {
@@ -41,18 +42,26 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
       mAppAggregator(
           4096,
           [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractAppRecord>& other) {
-              base->m2xxCount += other->GetStatusCode() / 100 == 2;
-              base->m3xxCount += other->GetStatusCode() / 100 == 3;
-              base->m4xxCount += other->GetStatusCode() / 100 == 4;
-              base->m5xxCount += other->GetStatusCode() / 100 == 5;
+              int statusCode = other->GetStatusCode();
+              base->m2xxCount += statusCode / 100 == 2;
+              base->m3xxCount += statusCode / 100 == 3;
+              base->m4xxCount += statusCode / 100 == 4;
+              base->m5xxCount += statusCode / 100 == 5;
               base->mCount++;
               base->mErrCount += other->IsError();
               base->mSlowCount += other->IsSlow();
               base->mSum += double(other->GetLatencyMs() / 1000);
           },
-          [this](const std::shared_ptr<AbstractAppRecord>& in) {
-              auto data = std::make_unique<AppMetricData>(in->GetConnId(), in->GetSpanName());
-              auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(in->GetConnId());
+          [this](const std::shared_ptr<AbstractAppRecord>& in) -> std::unique_ptr<AppMetricData> {
+              auto data = std::make_unique<AppMetricData>(in->GetConnection(), in->GetSpanName());
+              auto connection = in->GetConnection();
+              if (!connection) {
+                  LOG_WARNING(sLogger, ("connection is null", ""));
+                  return nullptr;
+              }
+              auto ctAttrs = connection->GetConnTrackerAttrs();
+
+              //   auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(in->GetConnId());
 
               data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())];
               data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())];
@@ -75,16 +84,15 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
       mNetAggregator(
           4096,
           [this](std::unique_ptr<NetMetricData>& base, const std::shared_ptr<ConnStatsRecord>& other) {
-              // TODO aggregate
-              base->mDropCount += other->drop_count_;
-              base->mRetransCount += other->retrans_count_;
-              base->mRecvBytes += other->recv_bytes_;
-              base->mSendBytes += other->send_bytes_;
-              base->mRecvPkts += other->recv_packets_;
-              base->mSendPkts += other->send_packets_;
+              base->mDropCount += other->mDropCount;
+              base->mRetransCount += other->mRetransCount;
+              base->mRecvBytes += other->mRecvBytes;
+              base->mSendBytes += other->mSendBytes;
+              base->mRecvPkts += other->mRecvPackets;
+              base->mSendPkts += other->mSendPackets;
           },
           [this](const std::shared_ptr<ConnStatsRecord>& in) {
-              return std::make_unique<NetMetricData>(in->GetConnId());
+              return std::make_unique<NetMetricData>(in->GetConnection());
           }),
       mSpanAggregator(
           4096,
@@ -107,7 +115,12 @@ NetworkObserverManager::GenerateAggKeyForAppMetric(const std::shared_ptr<Abstrac
     std::array<size_t, 2> hash_result;
     hash_result.fill(0UL);
     std::hash<std::string> hasher;
-    auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
+    auto connection = record->GetConnection();
+    if (!connection) {
+        LOG_WARNING(sLogger, ("connection is null", ""));
+        return {};
+    }
+    auto connTrackerAttrs = connection->GetConnTrackerAttrs();
 
     for (size_t j = 0; j < kAppMetricsTable.Elements().size(); j++) {
         int agg_level = static_cast<int>(kAppMetricsTable.Elements()[j].AggType());
@@ -139,7 +152,13 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForSpan(const std::s
     std::array<size_t, 1> hash_result;
     hash_result.fill(0UL);
     std::hash<std::string> hasher;
-    auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
+    auto connection = record->GetConnection();
+    if (!connection) {
+        LOG_WARNING(sLogger, ("connection is null", ""));
+        return {};
+    }
+    auto connTrackerAttrs = connection->GetConnTrackerAttrs();
+    // auto connTrackerAttrs = mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
     auto elements = {kAppId, kIp, kHost};
     for (auto& x : elements) {
         auto attr = connTrackerAttrs[kConnTrackerTable.ColIndex(x.Name())];
@@ -154,7 +173,13 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForLog(const std::sh
     std::array<size_t, 1> hash_result;
     hash_result.fill(0UL);
     std::hash<uint64_t> hasher;
-    auto connId = record->GetConnId();
+    auto connection = record->GetConnection();
+    if (!connection) {
+        LOG_WARNING(sLogger, ("connection is null", ""));
+        return {};
+    }
+    auto connId = connection->GetConnId();
+    // auto connId = record->GetConnId();
 
     std::array<uint64_t, 3> elements = {uint64_t(connId.fd), uint64_t(connId.tgid), connId.start};
     for (auto& x : elements) {
@@ -164,19 +189,28 @@ std::array<size_t, 1> NetworkObserverManager::GenerateAggKeyForLog(const std::sh
     return hash_result;
 }
 
-void NetworkObserverManager::EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const {
-    mRecvHttpDataEventsTotal.fetch_add(1);
-    auto ct = mConnTrackerMgr->GetOrCreateConntracker(data_event->conn_id);
-    if (ct) {
-        ct->RecordActive();
-        ct->SafeUpdateRole(data_event->role);
-        ct->SafeUpdateProtocol(data_event->protocol);
-    } else {
-        mDataEventsDropTotal.fetch_add(1);
-        LOG_DEBUG(sLogger, ("cannot find or create conn_tracker, skip data event ... ", ""));
-    }
-    mRawEventQueue.enqueue(std::move(data_event));
-}
+// void NetworkObserverManager::EnqueueDataEvent(std::unique_ptr<NetDataEvent> dataEvent) const {
+//     // mRecvHttpDataEventsTotal.fetch_add(1);
+//     if (dataEvent->mConnection) {
+//         dataEvent->mConnection->RecordActive();
+//         dataEvent->mConnection->SafeUpdateRole(dataEvent->mRole);
+//         dataEvent->mConnection->SafeUpdateProtocol(dataEvent->mProtocol);
+//     } else {
+//         mDataEventsDropTotal.fetch_add(1);
+//         LOG_DEBUG(sLogger, ("cannot find or create conn_tracker, skip data event ... ", ""));
+//     }
+//     // auto ct = mConnTrackerMgr->GetOrCreateConntracker(data_event->conn_id);
+//     // if (ct) {
+//     //     ct->RecordActive();
+//     //     ct->SafeUpdateRole(data_event->role);
+//     //     ct->SafeUpdateProtocol(data_event->protocol);
+//     // } else {
+//     //     mDataEventsDropTotal.fetch_add(1);
+//     //     LOG_DEBUG(sLogger, ("cannot find or create conn_tracker, skip data event ... ", ""));
+//     // }
+//     //
+//     // mRawEventQueue.enqueue(std::move(data_event));
+// }
 
 bool NetworkObserverManager::UpdateParsers(const std::vector<std::string>& protocols) {
     std::set<std::string> enableProtocols;
@@ -232,8 +266,10 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
             std::array<StringView, kConnTrackerElementsTableSize> ctAttrVal;
             for (const auto& record : group->mRecords) {
                 if (!init) {
-                    auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
-                    auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
+                    const auto& ct = record->GetConnection();
+                    auto ctAttrs = ct->GetConnTrackerAttrs();
+                    // auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
+                    // auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
                     if (ct == nullptr) {
                         LOG_DEBUG(sLogger, ("ct is null, skip, spanname ", record->GetSpanName()));
                         continue;
@@ -523,8 +559,10 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 return;
             }
             for (const auto& record : group->mRecords) {
-                auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
-                auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
+                const auto& ct = record->GetConnection();
+                auto ctAttrs = ct->GetConnTrackerAttrs();
+                // auto ct = this->mConnTrackerMgr->GetConntracker(record->GetConnId());
+                // auto ctAttrs = this->mConnTrackerMgr->GetConnTrackerAttrs(record->GetConnId());
                 auto appname = ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())];
                 if (appname.empty() || ct == nullptr) {
                     LOG_DEBUG(sLogger,
@@ -611,6 +649,47 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
     return true;
 }
 
+std::string getLastPathSegment(const std::string& path) {
+    size_t pos = path.find_last_of('/');
+    if (pos == std::string::npos) {
+        return path; // No '/' found, return the entire string
+    } else {
+        return path.substr(pos + 1); // Return the substring after the last '/'
+    }
+}
+
+int GuessContainerIdOffset() {
+    const std::string cgroupFilePath = "/proc/self/cgroup";
+    std::ifstream cgroupFile(cgroupFilePath);
+    const std::regex regex("[a-f0-9]{64}");
+    std::smatch match;
+
+    std::string line;
+    std::string lastSegment;
+    while (std::getline(cgroupFile, line)) {
+        // cgroup file format：<hierarchy-id>:<subsystem>:/<cgroup-path>
+        LOG_DEBUG(sLogger, ("cgroup line", line));
+        size_t lastColonPosition = line.find_last_of(':');
+        if (lastColonPosition != std::string::npos) {
+            std::string cgroupPath = line.substr(lastColonPosition + 1);
+            lastSegment = getLastPathSegment(cgroupPath);
+            LOG_DEBUG(sLogger, ("The last segment in the cgroup path", lastSegment));
+            if (std::regex_search(lastSegment, match, regex)) {
+                auto cid = match.str(0);
+                LOG_DEBUG(sLogger, ("lastSegment", line)("pos", match.position())("cid", cid)("size", cid.size()));
+                cgroupFile.close();
+                return match.position();
+            } else {
+                LOG_DEBUG(sLogger, ("Find next line, Current line unexpected format in cgroup line", lastSegment));
+                continue;
+            }
+        }
+    }
+    cgroupFile.close();
+    LOG_ERROR(sLogger, ("No valid cgroup line to parse ... ", ""));
+    return -1;
+}
+
 int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
     auto opt = std::get<ObserverNetworkOption*>(options);
     if (!opt) {
@@ -626,13 +705,40 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mStartUid++;
 
     // start conntracker ...
-    mConnTrackerMgr = ConnTrackerManager::Create();
-    mConnTrackerMgr->Start();
+    // mConnTrackerMgr = ConnTrackerManager::Create();
+    // mConnTrackerMgr->Start();
+    mConnectionManager = ConnectionManager::Create();
 
     mPollKernelFreqMgr.SetPeriod(std::chrono::milliseconds(200));
     mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(200));
 
+    mCidOffset = GuessContainerIdOffset();
+    // if purage container mode
+
     // TODO @qianlu.kk init converger later ...
+
+    // register update host K8s metadata task ...
+    std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
+        5,
+        [this](const std::chrono::steady_clock::time_point& execTime) {
+            std::vector<std::string> podIpVec;
+            bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
+            if (res) {
+                this->HandleHostMetadataUpdate(podIpVec);
+            } else {
+                LOG_DEBUG(sLogger, ("failed to request host metada", ""));
+            }
+            return true;
+        },
+        [this](int currentUid) { // validator
+            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+            if (isStop) {
+                LOG_INFO(sLogger,
+                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+            }
+            return isStop;
+        },
+        mStartUid);
 
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
         1,
@@ -734,12 +840,15 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
             return;
         }
 
+        mgr->AcceptDataEvent(event);
+
         // will do deepcopy
-        auto data_event_ptr = std::make_unique<NetDataEvent>(event);
+        // auto data_event_ptr = std::make_unique<NetDataEvent>(event);
+
 
         // enqueue, waiting workers to process data event ...
         // @qianlu.kk Can we hold for a while and enqueue bulk ???
-        mgr->EnqueueDataEvent(std::move(data_event_ptr));
+        // mgr->EnqueueDataEvent(std::move(data_event_ptr));
     };
 
     config.mCtrlHandler = [](void* custom_data, struct conn_ctrl_event_t* event) {
@@ -769,16 +878,54 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     }
 
     // call ebpf start
-    mRawEventQueue = moodycamel::BlockingConcurrentQueue<std::unique_ptr<NetDataEvent>>(1024);
+    // mRawEventQueue = moodycamel::BlockingConcurrentQueue<std::unique_ptr<NetDataEvent>>(1024);
     mRecordQueue = moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>>(4096);
     // TODO @qianlu.kk
-    mWorkerPool = std::make_unique<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>>(
-        mRawEventQueue, mRecordQueue, NetDataHandler(), 1);
+    // mWorkerPool = std::make_unique<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>>(
+    //     mRawEventQueue, mRecordQueue, NetDataHandler(), 1);
 
     LOG_INFO(sLogger, ("begin to start ebpf ... ", ""));
     this->mFlag = true;
     this->RunInThread();
     return 0;
+}
+
+void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec) {
+    std::vector<std::string> newContainerIds;
+    std::vector<std::string> expiredContainerIds;
+    std::unordered_set<std::string> currentCids;
+
+
+    for (const auto& ip : podIpVec) {
+        auto podInfo = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
+        if (!podInfo || podInfo->appId == "") {
+            // filter appid ...
+            LOG_DEBUG(sLogger, (ip, "cannot fetch pod metadata or doesn't have arms label"));
+            continue;
+        }
+
+        std::string cids;
+        for (auto& cid : podInfo->containerIds) {
+            cids += cid + ",";
+            currentCids.insert(cid);
+            if (!mEnabledCids.count(cid)) {
+                // if cid doesn't exist in last cid set
+                newContainerIds.push_back(cid);
+            }
+        }
+        LOG_DEBUG(sLogger,
+                  ("appId", podInfo->appId)("appName", podInfo->appName)("podIp", podInfo->podIp)(
+                      "podName", podInfo->podName)("containerId", cids));
+    }
+
+    for (const auto& cid : mEnabledCids) {
+        if (!currentCids.count(cid)) {
+            expiredContainerIds.push_back(cid);
+        }
+    }
+
+    mEnabledCids = std::move(currentCids);
+    UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
 }
 
 void NetworkObserverManager::RunInThread() {
@@ -808,12 +955,13 @@ void NetworkObserverManager::ConsumeRecordsAsTrace(std::vector<std::shared_ptr<A
             LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId))("traceId", FromTraceId(traceId)));
             appRecord->SetTraceId(FromTraceId(traceId));
             appRecord->SetSpanId(FromSpanId(spanId));
-            auto conn_id = appRecord->GetConnId();
-            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
-            if (conn_tracker && !conn_tracker->MetaAttachReadyForApp()) {
+            const auto& connection = appRecord->GetConnection();
+            // auto conn_id = appRecord->GetConnId();
+            // auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            if (connection && !connection->MetaAttachReadyForApp()) {
                 LOG_WARNING(sLogger,
                             ("app meta not ready, rollback app record, times",
-                             record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
+                             record->Rollback())("connection", connection->DumpConnection()));
                 // TODO @qianlu.kk we need rollback logic ...
                 continue;
             }
@@ -836,20 +984,20 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(std::vector<std::shared_ptr<
         // handle app record ...
         std::shared_ptr<AbstractAppRecord> appRecord = std::dynamic_pointer_cast<AbstractAppRecord>(record);
         if (appRecord != nullptr) {
-            auto conn_id = appRecord->GetConnId();
-            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
-            if (conn_tracker && !conn_tracker->MetaAttachReadyForApp()) {
+            const auto& connection = appRecord->GetConnection();
+            // auto conn_id = appRecord->GetConnId();
+            // auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            if (connection && !connection->MetaAttachReadyForApp()) {
                 LOG_WARNING(sLogger,
                             ("app meta not ready, rollback app record, times",
-                             record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
+                             record->Rollback())("connection", connection->DumpConnection()));
                 // TODO @qianlu.kk we need rollback logic ...
                 // mRecordQueue.enqueue(std::move(record));
                 continue;
             }
 
             LOG_WARNING(sLogger,
-                        ("app meta ready, rollback:",
-                         record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
+                        ("app meta ready, rollback:", record->Rollback())("connection", connection->DumpConnection()));
             {
                 WriteLock lk(mAppAggLock);
                 auto res = mAppAggregator.Aggregate(appRecord, GenerateAggKeyForAppMetric(appRecord));
@@ -860,13 +1008,14 @@ void NetworkObserverManager::ConsumeRecordsAsMetric(std::vector<std::shared_ptr<
 
         std::shared_ptr<ConnStatsRecord> netRecord = std::dynamic_pointer_cast<ConnStatsRecord>(record);
         if (netRecord != nullptr) {
-            auto conn_id = netRecord->GetConnId();
-            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
-            if (conn_tracker && !conn_tracker->MetaAttachReadyForNet()) {
+            // auto conn_id = netRecord->GetConnId();
+            // auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            const auto& connection = netRecord->GetConnection();
+            if (connection && !connection->MetaAttachReadyForNet()) {
                 // roll back
                 LOG_WARNING(sLogger,
                             ("net meta not ready, rollback app record, times",
-                             record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
+                             record->Rollback())("connection", connection->DumpConnection()));
                 mRecordQueue.enqueue(std::move(record));
                 continue;
             }
@@ -885,12 +1034,13 @@ void NetworkObserverManager::ConsumeRecordsAsEvent(std::vector<std::shared_ptr<A
         // handle app record ...
         std::shared_ptr<AbstractAppRecord> appRecord = std::dynamic_pointer_cast<AbstractAppRecord>(record);
         if (appRecord != nullptr) {
-            auto conn_id = appRecord->GetConnId();
-            auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
-            if (conn_tracker && !conn_tracker->MetaAttachReadyForApp()) {
+            // auto conn_id = appRecord->GetConnId();
+            // auto conn_tracker = mConnTrackerMgr->GetConntracker(conn_id);
+            const auto& connection = appRecord->GetConnection();
+            if (connection && !connection->MetaAttachReadyForApp()) {
                 LOG_WARNING(sLogger,
                             ("app meta not ready, rollback app record, times",
-                             record->Rollback())("pid", conn_id.tgid)("fd", conn_id.fd)("start", conn_id.start));
+                             record->Rollback())("connection", connection->DumpConnection()));
                 continue;
             }
 
@@ -927,7 +1077,7 @@ void NetworkObserverManager::ConsumeRecords() {
             continue;
         }
 
-        // TODO ConvergeAbstractRecord(appRecord);
+        // TODO @qianlu.kk ConvergeAbstractRecord(appRecord);
         if (mEnableLog) {
             ConsumeRecordsAsEvent(items, count);
         }
@@ -947,6 +1097,7 @@ void NetworkObserverManager::ConsumeRecords() {
 
 
 void NetworkObserverManager::PollBufferWrapper() {
+    LOG_DEBUG(sLogger, ("enter poll perf buffer", ""));
     int32_t flag = 0;
     int cnt = 0;
     while (this->mFlag) {
@@ -966,7 +1117,9 @@ void NetworkObserverManager::PollBufferWrapper() {
             LOG_WARNING(sLogger, ("poll event err, ret", ret));
         }
 
-        mConnTrackerMgr->IterationsInternal(cnt++);
+        mConnectionManager->Iterations(cnt++);
+
+        // mConnTrackerMgr->IterationsInternal(cnt++);
 
         LOG_DEBUG(
             sLogger,
@@ -994,19 +1147,50 @@ void NetworkObserverManager::RecordEventLost(enum callback_type_e type, uint64_t
     }
 }
 
+void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
+    auto dataEvent = mConnectionManager->AcceptNetDataEvent(event);
+    mRecvHttpDataEventsTotal.fetch_add(1);
+
+    // maybe we can handle in the same thread ??
+    // EnqueueDataEvent(std::move(dataEvent));
+
+    LOG_DEBUG(sLogger, ("begin to handle data event", ""));
+
+    // get protocol
+    auto protocol = dataEvent->mProtocol;
+    if (ProtocolType::UNKNOWN == protocol) {
+        LOG_DEBUG(sLogger, ("protocol is unknown, skip parse", ""));
+        dataEvent.reset();
+        return;
+    }
+
+    LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(dataEvent->mProtocol))));
+
+
+    std::vector<std::unique_ptr<AbstractRecord>> records
+        = ProtocolParserManager::GetInstance().Parse(protocol, std::move(dataEvent));
+
+    // add records to span/event generate queue
+    for (auto& record : records) {
+        mRecordQueue.enqueue(std::move(record));
+    }
+}
+
 void NetworkObserverManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
     LOG_DEBUG(
         sLogger,
         ("[DUMP] stats event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)("start", event->conn_id.start)(
             "role", int(event->role))("state", int(event->conn_events))("eventTs", event->ts));
-    mConnTrackerMgr->AcceptNetStatsEvent(event);
+    // mConnTrackerMgr->AcceptNetStatsEvent(event);
+    mConnectionManager->AcceptNetStatsEvent(event);
 }
 
 void NetworkObserverManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
     LOG_DEBUG(sLogger,
               ("[DUMP] ctrl event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)(
                   "start", event->conn_id.start)("type", int(event->type))("eventTs", event->ts));
-    mConnTrackerMgr->AcceptNetCtrlEvent(event);
+    mConnectionManager->AcceptNetCtrlEvent(event);
+    // mConnTrackerMgr->AcceptNetCtrlEvent(event);
 }
 
 
@@ -1014,8 +1198,8 @@ void NetworkObserverManager::Stop() {
     LOG_INFO(sLogger, ("prepare to destroy", ""));
     mSourceManager->StopPlugin(PluginType::NETWORK_OBSERVE);
     LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
-    mConnTrackerMgr->Stop();
-    LOG_INFO(sLogger, ("destroy stage", "stop conn tracker"));
+    // mConnTrackerMgr->Stop();
+    // LOG_INFO(sLogger, ("destroy stage", "stop conn tracker"));
     this->mFlag = false;
 
     if (this->mCoreThread.joinable()) {
@@ -1029,7 +1213,7 @@ void NetworkObserverManager::Stop() {
     LOG_INFO(sLogger, ("destroy stage", "release consumer thread"));
 
     // destroy worker pool ...
-    mWorkerPool.reset();
+    // mWorkerPool.reset();
 }
 
 int NetworkObserverManager::Destroy() {
@@ -1040,12 +1224,13 @@ int NetworkObserverManager::Destroy() {
 void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableCids,
                                               std::vector<std::string>&& disableCids) {
     for (auto& cid : enableCids) {
-        LOG_INFO(sLogger, ("UpdateWhitelists cid", cid));
+        LOG_DEBUG(sLogger, ("UpdateWhitelists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, true);
     }
 
     for (auto& cid : disableCids) {
-        LOG_INFO(sLogger, ("UpdateBlacklists cid", cid));
+        // TODO?? black or delete ??
+        LOG_DEBUG(sLogger, ("UpdateBlacklists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, false);
     }
 }

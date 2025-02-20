@@ -71,23 +71,6 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
 #endif
 }
 
-void K8sMetadata::StopFetchHostMetadata() {
-    if (!mFlag)
-        return;
-    mFlag = false;
-    if (mPeriodicalRunner.joinable()) {
-        mPeriodicalRunner.join();
-    }
-}
-
-void K8sMetadata::StartFetchHostMetadata() {
-    if (mFlag) {
-        return;
-    }
-    mFlag = true;
-    mPeriodicalRunner = std::thread(&K8sMetadata::LocalHostMetaRefresher, this);
-}
-
 bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) {
     if (!json.isMember(imageKey) || !json.isMember(labelsKey) || !json.isMember(namespaceKey)
         || !json.isMember(workloadKindKey) || !json.isMember(workloadNameKey)) {
@@ -163,42 +146,6 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json,
         data->containers[key] = info;
     }
     return true;
-}
-
-// TODO @qianlu.kk how to remove callbacks...
-void K8sMetadata::ResiterHostMetadataCallback(uint32_t plugin_index, HostMetadataPostHandler&& handler) {
-    std::lock_guard lk(mMtx);
-    mHostMetaCallback[plugin_index] = std::move(handler);
-}
-
-void K8sMetadata::DeregisterHostMetadataCallback(uint32_t plugin_index) {
-    std::lock_guard lk(mMtx);
-    mHostMetaCallback.erase(plugin_index);
-}
-
-void K8sMetadata::LocalHostMetaRefresher() {
-    Json::Value jsonObj;
-    jsonObj["keys"].append(mHostIp);
-    Json::StreamWriterBuilder writer;
-    std::string output = Json::writeString(writer, jsonObj);
-    while (mFlag) {
-        std::vector<std::string> podIpVec;
-        bool res = SendRequestToOperator(mServiceHost, output, containerInfoType::HostInfo, podIpVec);
-        LOG_DEBUG(sLogger, ("begin to fetch localhost pod metadata, host", mHostIp)("status", res));
-
-        // do callbacks
-        if (res && podIpVec.size()) {
-            std::lock_guard lk(mMtx);
-            for (auto& it : mHostMetaCallback) {
-                bool res = it.second(it.first, podIpVec);
-                LOG_DEBUG(sLogger, ("host metadata callback status", res)("plugin index", it.first));
-            }
-        } else {
-            LOG_DEBUG(sLogger,
-                      ("no pod allocate in this machine", "skip calling callback")("operator call status", res));
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(mFetchIntervalSeconds));
-    }
 }
 
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
@@ -281,13 +228,17 @@ std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<st
     return res;
 }
 
-bool K8sMetadata::GetByLocalHostFromServer() {
+bool K8sMetadata::GetByLocalHostFromServer(std::vector<std::string>& podIpVec) {
     Json::Value jsonObj;
     jsonObj["keys"].append(mHostIp);
     Json::StreamWriterBuilder writer;
     std::string output = Json::writeString(writer, jsonObj);
-    std::vector<std::string> podIpVec;
     return SendRequestToOperator(mServiceHost, output, containerInfoType::HostInfo, podIpVec);
+}
+
+bool K8sMetadata::GetByLocalHostFromServer() {
+    std::vector<std::string> podIpVec;
+    return GetByLocalHostFromServer(podIpVec);
 }
 
 void K8sMetadata::SetContainerCache(const Json::Value& root) {
@@ -348,14 +299,22 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(con
     if (containerId.empty()) {
         return nullptr;
     }
-    return containerCache.get(containerId);
+    if (containerCache.contains(containerId)) {
+        return containerCache.get(containerId);
+    } else {
+        return nullptr;
+    }
 }
 
 std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::string& ip) {
     if (ip.empty()) {
         return nullptr;
     }
-    return ipCache.get(ip);
+    if (ipCache.contains(ip)) {
+        return ipCache.get(ip);
+    } else {
+        return nullptr;
+    }
 }
 
 
@@ -438,84 +397,18 @@ std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataBy
     return result;
 }
 
-std::future<std::vector<std::shared_ptr<k8sContainerInfo>>>
-K8sMetadata::AsyncGetPodMetadataByIps(std::vector<std::string>& ips) {
-    return std::async(std::launch::async, [this, ips] {
-        std::vector<std::shared_ptr<k8sContainerInfo>> result;
-        result.reserve(ips.size());
-        std::vector<std::string> missingIps;
-
-        for (const auto& ip : ips) {
-            auto info = GetInfoByIpFromCache(ip);
-            if (info) {
-                result.push_back(info);
-            } else {
-                result.push_back(nullptr);
-                missingIps.push_back(ip);
-            }
+void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& key) {
+    switch (type) {
+        case containerInfoType::ContainerIdInfo: {
+            break;
         }
-
-        if (!missingIps.empty()) {
-            bool serverStatus;
-            auto serverResults = GetByIpsFromServer(missingIps, serverStatus);
-
-            if (!serverStatus) {
-                LOG_ERROR(sLogger, ("Server did not respond", ""));
-                return result;
-            }
-
-            for (size_t i = 0, j = 0; i < result.size(); ++i) {
-                if (result[i] == nullptr) {
-                    if (j < serverResults.size()) {
-                        result[i] = std::make_shared<k8sContainerInfo>();
-                    }
-                    ++j;
-                }
-            }
+        case containerInfoType::IpInfo: {
+            break;
         }
-
-        return result;
-    });
+        default:
+            break;
+    }
 }
 
-std::future<std::vector<std::shared_ptr<k8sContainerInfo>>>
-K8sMetadata::AsyncGetPodMetadataByContainerIds(std::vector<std::string>& containerIds) {
-    return std::async(std::launch::async, [this, containerIds] {
-        std::vector<std::shared_ptr<k8sContainerInfo>> result;
-        result.reserve(containerIds.size());
-        std::vector<std::string> missingContainerIds;
-
-        for (const auto& containerId : containerIds) {
-            auto info = GetInfoByContainerIdFromCache(containerId);
-            if (info) {
-                result.push_back(info);
-            } else {
-                result.push_back(nullptr);
-                missingContainerIds.push_back(containerId);
-            }
-        }
-
-        if (!missingContainerIds.empty()) {
-            bool serverStatus;
-            auto serverResults = GetByContainerIdsFromServer(missingContainerIds, serverStatus);
-
-            if (!serverStatus) {
-                LOG_ERROR(sLogger, ("Server did not respond", ""));
-                return result;
-            }
-
-            for (size_t i = 0, j = 0; i < result.size(); ++i) {
-                if (result[i] == nullptr) {
-                    if (j < serverResults.size()) {
-                        result[i] = std::make_shared<k8sContainerInfo>();
-                    }
-                    ++j;
-                }
-            }
-        }
-
-        return result;
-    });
-}
 
 } // namespace logtail

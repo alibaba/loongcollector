@@ -60,47 +60,6 @@ uint32_t Status::ConvertToInt(const std::string& id) const {
     return UINT32_MAX;
 }
 
-std::string getLastPathSegment(const std::string& path) {
-    size_t pos = path.find_last_of('/');
-    if (pos == std::string::npos) {
-        return path; // No '/' found, return the entire string
-    } else {
-        return path.substr(pos + 1); // Return the substring after the last '/'
-    }
-}
-
-int GuessContainerIdOffset() {
-    const std::string cgroupFilePath = "/proc/self/cgroup";
-    std::ifstream cgroupFile(cgroupFilePath);
-    const std::regex regex("[a-f0-9]{64}");
-    std::smatch match;
-
-    std::string line;
-    std::string lastSegment;
-    while (std::getline(cgroupFile, line)) {
-        // cgroup file format：<hierarchy-id>:<subsystem>:/<cgroup-path>
-        LOG_DEBUG(sLogger, ("cgroup line", line));
-        size_t lastColonPosition = line.find_last_of(':');
-        if (lastColonPosition != std::string::npos) {
-            std::string cgroupPath = line.substr(lastColonPosition + 1);
-            lastSegment = getLastPathSegment(cgroupPath);
-            LOG_DEBUG(sLogger, ("The last segment in the cgroup path", lastSegment));
-            if (std::regex_search(lastSegment, match, regex)) {
-                auto cid = match.str(0);
-                LOG_DEBUG(sLogger, ("lastSegment", line)("pos", match.position())("cid", cid)("size", cid.size()));
-                cgroupFile.close();
-                return match.position();
-            } else {
-                LOG_DEBUG(sLogger, ("Find next line, Current line unexpected format in cgroup line", lastSegment));
-                continue;
-            }
-        }
-    }
-    cgroupFile.close();
-    LOG_ERROR(sLogger, ("No valid cgroup line to parse ... ", ""));
-    return -1;
-}
-
 std::filesystem::path ProcParser::ProcPidPath(uint32_t pid, const std::string& subpath) const {
     try {
         return std::filesystem::path(proc_path_) / std::to_string(pid) / subpath;

@@ -71,7 +71,6 @@ private:
     std::atomic_bool mFlag;
     int32_t mFetchIntervalSeconds;
     std::mutex mMtx;
-    std::map<uint32_t, HostMetadataPostHandler> mHostMetaCallback;
 
     K8sMetadata(size_t ipCacheSize = 1024,
                 size_t cidCacheSize = 1024,
@@ -96,16 +95,12 @@ public:
 
     bool Enable();
 
-    void StartFetchHostMetadata();
-    void StopFetchHostMetadata();
-
-    void ResiterHostMetadataCallback(uint32_t plugin_index, HostMetadataPostHandler&& callback);
-    void DeregisterHostMetadataCallback(uint32_t plugin_index);
     // 公共方法
     // if cache not have,get from server
     std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string>& containerIds, bool& status);
     // get pod metadatas for local host
     bool GetByLocalHostFromServer();
+    bool GetByLocalHostFromServer(std::vector<std::string>& podIpVec);
     //
     std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status);
     // get info by container id from cache
@@ -126,12 +121,14 @@ public:
     // if container info is not present in local cache, we will fetch it from remote server
     std::vector<std::shared_ptr<k8sContainerInfo>> SyncGetPodMetadataByIps(std::vector<std::string>&, bool& res);
 
-    std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> AsyncGetPodMetadataByIps(std::vector<std::string>& ips);
-    std::future<std::vector<std::shared_ptr<k8sContainerInfo>>>
-    AsyncGetPodMetadataByContainerIds(std::vector<std::string>& containerIds);
+    using HandleMetadataFunc = std::function<void(std::shared_ptr<k8sContainerInfo>)>;
+
+    void AsyncQueryMetadata(containerInfoType type, const std::string& key);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class k8sMetadataUnittest;
+    friend class ConnectionUnittest;
+    friend class ConnectionManagerUnittest;
 #endif
 };
 } // namespace logtail

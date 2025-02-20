@@ -17,7 +17,7 @@
 #include <atomic>
 #include <vector>
 
-#include "ConnTrackerManager.h"
+#include "ConnectionManager.h"
 #include "Worker.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
@@ -66,8 +66,9 @@ public:
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
+    void AcceptDataEvent(struct conn_data_event_t* event);
 
-    void EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const;
+    // void EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const;
 
     void PollBufferWrapper();
     void ConsumeRecords();
@@ -97,15 +98,17 @@ private:
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
+    void HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec);
+
     void RunInThread();
 
     bool UpdateParsers(const std::vector<std::string>& protocols);
 
-    std::shared_ptr<ConnTrackerManager> mConnTrackerMgr;
+    std::unique_ptr<ConnectionManager> mConnectionManager;
 
     // TODO @qianlu.kk modify T for abstract event
     // store raw events
-    mutable moodycamel::BlockingConcurrentQueue<std::unique_ptr<NetDataEvent>> mRawEventQueue;
+    // mutable moodycamel::BlockingConcurrentQueue<std::unique_ptr<NetDataEvent>> mRawEventQueue;
 
     mutable std::atomic_long mDataEventsDropTotal = 0;
 
@@ -134,7 +137,6 @@ private:
     // coreThread used for polling kernel event...
     std::thread mCoreThread;
 
-    // recordConsume used for polling kernel event...
     std::thread mRecordConsume;
 
     std::atomic_bool mEnableSpan;
@@ -145,6 +147,9 @@ private:
     FrequencyManager mConsumerFreqMgr;
 
     std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
+
+    int mCidOffset = -1;
+    std::unordered_set<std::string> mEnabledCids;
 
     ReadWriteLock mAppAggLock;
     SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> mAppAggregator;

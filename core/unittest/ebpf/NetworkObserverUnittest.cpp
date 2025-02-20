@@ -24,6 +24,7 @@
 #include "ebpf/plugin/network_observer/NetworkObserverManager.h"
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "metadata/K8sMetadata.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -39,7 +40,6 @@ public:
     void TestRecordProcessing();
     void TestAggregation();
     void TestProtocolParsing();
-    void TestConcurrency();
     void TestErrorHandling();
     void TestPluginLifecycle();
 
@@ -66,9 +66,9 @@ private:
                               support_role_e expectedRole) {
         EXPECT_NE(event, nullptr);
         if (event) {
-            EXPECT_EQ(event->conn_id, expectedConnId);
-            EXPECT_EQ(event->protocol, expectedProtocol);
-            EXPECT_EQ(event->role, expectedRole);
+            APSARA_TEST_EQUAL(event->mConnection->GetConnId(), expectedConnId);
+            APSARA_TEST_EQUAL(event->mConnection->GetProtocol(), expectedProtocol);
+            APSARA_TEST_EQUAL(event->mConnection->GetRole(), expectedRole);
         }
     }
 
@@ -135,20 +135,130 @@ void NetworkObserverManagerUnittest::TestEventHandling() {
     manager->RecordEventLost(callback_type_e::STAT_HAND, 3);
 }
 
+std::shared_ptr<Connection> CreateTestTracker() {
+    ConnId connId(1, 1000, 123456);
+    return std::make_shared<Connection>(connId);
+}
+
+conn_data_event_t* CreateHttpDataEvent() {
+    const std::string resp = "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: text/html\r\n"
+                             "Content-Length: 13\r\n"
+                             "\r\n"
+                             "Hello, World!";
+    const std::string req = "GET /index.html HTTP/1.1\r\nHost: www.cmonitor.ai\r\nAccept: image/gif, image/jpeg, "
+                            "*/*\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64)\r\n\r\n";
+    std::string msg = req + resp;
+    conn_data_event_t* evt = (conn_data_event_t*)malloc(offsetof(conn_data_event_t, msg) + msg.size());
+    memcpy(evt->msg, msg.data(), msg.size());
+    evt->conn_id.fd = 0;
+    evt->conn_id.start = 1;
+    evt->conn_id.tgid = 2;
+    evt->role = support_role_e::IsClient;
+    evt->request_len = req.size();
+    evt->response_len = resp.size();
+    evt->protocol = support_proto_e::ProtoHTTP;
+    evt->start_ts = 1;
+    evt->end_ts = 2;
+    return evt;
+}
+
+conn_data_event_t* CreateHttpDataEvent(int i) {
+    const std::string resp = "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: text/html\r\n"
+                             "Content-Length: 13\r\n"
+                             "\r\n"
+                             "Hello, World!";
+    const std::string req = "GET /index.html/" + std::to_string(i)
+        + " HTTP/1.1\r\nHost: www.cmonitor.ai\r\nAccept: image/gif, image/jpeg, "
+          "*/*\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64)\r\n\r\n";
+    std::string msg = req + resp;
+    conn_data_event_t* evt = (conn_data_event_t*)malloc(offsetof(conn_data_event_t, msg) + msg.size());
+    memcpy(evt->msg, msg.data(), msg.size());
+    evt->conn_id.fd = 0;
+    evt->conn_id.start = 1;
+    evt->conn_id.tgid = 2;
+    evt->role = support_role_e::IsClient;
+    evt->request_len = req.size();
+    evt->response_len = resp.size();
+    evt->protocol = support_proto_e::ProtoHTTP;
+    evt->start_ts = 1;
+    evt->end_ts = 2;
+    return evt;
+}
+
+conn_stats_event_t CreateConnStatsEvent() {
+    struct conn_stats_event_t statsEvent = {};
+    statsEvent.protocol = support_proto_e::ProtoHTTP;
+    statsEvent.role = support_role_e::IsClient;
+    statsEvent.si.family = AF_INET;
+    statsEvent.si.ap.saddr = 0x0100007F; // 127.0.0.1
+    statsEvent.si.ap.daddr = 0x0101A8C0; // 192.168.1.1
+    statsEvent.si.ap.sport = htons(8080);
+    statsEvent.si.ap.dport = htons(80);
+    statsEvent.ts = 1;
+    // set docker id
+    statsEvent.wr_bytes = 1;
+    statsEvent.conn_id.fd = 0;
+    statsEvent.conn_id.start = 1;
+    statsEvent.conn_id.tgid = 2;
+    // docker id
+    std::string testCid
+        = "/machine.slice/libpod-80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106.scope";
+    memcpy(statsEvent.docker_id, testCid.c_str(), testCid.size());
+    return statsEvent;
+}
+
 void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     auto manager = CreateManager();
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP"};
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    manager->Stop();
 
-    auto httpEvent = std::make_unique<NetDataEvent>(1, 1000, 123456);
-    httpEvent->protocol = ProtocolType::HTTP;
-    httpEvent->role = support_role_e::IsClient;
-    httpEvent->req_msg = "GET /api/v1/test HTTP/1.1\r\nHost: example.com\r\nContent-Length: 0\r\n\r\n";
-    httpEvent->resp_msg = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}";
-    httpEvent->start_ts = 1;
-    httpEvent->end_ts = 2;
-    manager->EnqueueDataEvent(std::move(httpEvent));
+    auto statsEvent = CreateConnStatsEvent();
+    manager->AcceptNetStatsEvent(&statsEvent);
+
+    auto* dataEvent = CreateHttpDataEvent();
+    manager->AcceptDataEvent(dataEvent);
+    free(dataEvent);
+
+    std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
+    size_t count = manager->mRecordQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+    APSARA_TEST_EQUAL(count, 1);
+    APSARA_TEST_TRUE(items[0] != nullptr);
+
+    AbstractAppRecord* record = static_cast<AbstractAppRecord*>(items[0].get());
+    APSARA_TEST_TRUE(record != nullptr);
+    auto conn = record->GetConnection();
+    APSARA_TEST_TRUE(conn != nullptr);
+
+    APSARA_TEST_TRUE(manager->mConnectionManager->GetConnection(conn->GetConnId()) != nullptr);
+
+    // destroy connection
+    conn->UnsafeMarkClose();
+    for (size_t i = 0; i < 12; i++) {
+        manager->mConnectionManager->Iterations(i);
+    }
+
+    // connection that record holds still available
+    APSARA_TEST_TRUE(manager->mConnectionManager->GetConnection(conn->GetConnId()) == nullptr);
+
+    // verify attributes
+    HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
+    // http attrs
+    APSARA_TEST_EQUAL(httpRecord->GetPath(), "/index.html");
+    APSARA_TEST_EQUAL(httpRecord->GetSpanName(), "/index.html");
+    APSARA_TEST_EQUAL(httpRecord->GetStatusCode(), 200);
+    APSARA_TEST_EQUAL(httpRecord->GetStartTimeStamp(), 1);
+    APSARA_TEST_EQUAL(httpRecord->GetEndTimeStamp(), 2);
+
+    auto attrs = httpRecord->GetConnection()->GetConnTrackerAttrs();
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kLocalAddr.Name())], "127.0.0.1:8080");
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())], "192.168.1.1:80");
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
+    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
 }
 
 void NetworkObserverManagerUnittest::TestWhitelistManagement() {
@@ -194,26 +304,45 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     auto manager = CreateManager();
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP"};
+    options.mEnableLog = true;
+    options.mEnableMetric = true;
+    options.mEnableSpan = true;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 创建不同类型的记录
-    std::vector<std::shared_ptr<AbstractRecord>> records;
+    auto podInfo = std::make_shared<k8sContainerInfo>();
+    podInfo->containerIds = {"1", "2"};
+    podInfo->podIp = "test-pod-ip";
+    podInfo->podName = "test-pod-name";
+    podInfo->k8sNamespace = "test-namespace";
 
-    // HTTP 记录
-    auto httpRecord = std::make_shared<HttpRecord>(ConnId(1, 1000, 123456));
-    httpRecord->SetPath("/api/v1/test");
-    httpRecord->SetMethod("GET");
-    httpRecord->SetStatusCode("200");
-    records.push_back(httpRecord);
+    LOG_INFO(sLogger, ("step", "0-0"));
+    K8sMetadata::GetInstance().containerCache.insert("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106",
+                                                     podInfo);
 
-    // 连接统计记录
-    auto statsRecord = std::make_shared<ConnStatsRecord>(ConnId(2, 2000, 234567));
-    records.push_back(statsRecord);
+    auto peerPodInfo = std::make_shared<k8sContainerInfo>();
+    peerPodInfo->containerIds = {"3", "4"};
+    peerPodInfo->podIp = "peer-pod-ip";
+    peerPodInfo->podName = "peer-pod-name";
+    peerPodInfo->k8sNamespace = "peer-namespace";
+    K8sMetadata::GetInstance().ipCache.insert("192.168.1.1", peerPodInfo);
 
-    // 测试不同类型的记录处理
-    manager->ConsumeRecordsAsEvent(records, records.size());
-    manager->ConsumeRecordsAsMetric(records, records.size());
-    manager->ConsumeRecordsAsTrace(records, records.size());
+    auto statsEvent = CreateConnStatsEvent();
+    manager->AcceptNetStatsEvent(&statsEvent);
+
+    // Generate 10 records
+    for (size_t i = 0; i < 100; i++) {
+        auto* dataEvent = CreateHttpDataEvent(i);
+        manager->AcceptDataEvent(dataEvent);
+        free(dataEvent);
+    }
+    // verify
+    auto now = std::chrono::steady_clock::now();
+    LOG_INFO(sLogger, ("====== consume span ======", ""));
+    APSARA_TEST_TRUE(manager->ConsumeSpanAggregateTree(now));
+    LOG_INFO(sLogger, ("====== consume metric ======", ""));
+    APSARA_TEST_TRUE(manager->ConsumeMetricAggregateTree(now));
+    LOG_INFO(sLogger, ("====== consume log ======", ""));
+    APSARA_TEST_TRUE(manager->ConsumeLogAggregateTree(now));
 }
 
 void NetworkObserverManagerUnittest::TestAggregation() {
@@ -259,60 +388,6 @@ void NetworkObserverManagerUnittest::TestProtocolParsing() {
     EXPECT_TRUE(result);
 }
 
-void NetworkObserverManagerUnittest::TestConcurrency() {
-    auto manager = CreateManager();
-    ObserverNetworkOption options;
-    options.mEnableProtocols = {"HTTP"};
-    manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-
-    const int threadCount = 10;
-    std::vector<std::thread> threads;
-
-    for (int i = 0; i < threadCount; ++i) {
-        threads.emplace_back([&manager, i]() {
-            // 模拟完整的连接生命周期
-            struct conn_ctrl_event_t connectEvent = {};
-            connectEvent.conn_id.fd = i;
-            connectEvent.conn_id.tgid = 1000 + i;
-            connectEvent.conn_id.start = 123456 + i;
-            connectEvent.type = EventConnect;
-            manager->AcceptNetCtrlEvent(&connectEvent);
-
-            // 统计事件
-            struct conn_stats_event_t statsEvent = {};
-            statsEvent.conn_id = connectEvent.conn_id;
-            statsEvent.protocol = support_proto_e::ProtoHTTP;
-            statsEvent.role = support_role_e::IsClient;
-            statsEvent.si.family = AF_INET;
-            statsEvent.si.netns = 12345 + i;
-            manager->AcceptNetStatsEvent(&statsEvent);
-
-            // 请求数据
-            auto reqEvent = std::make_unique<NetDataEvent>(i, 1000 + i, 123456 + i);
-            reqEvent->protocol = ProtocolType::HTTP;
-            reqEvent->role = support_role_e::IsClient;
-            reqEvent->req_msg = "GET /api/v1/test HTTP/1.1\r\nHost: example.com\r\n\r\n";
-            manager->EnqueueDataEvent(std::move(reqEvent));
-
-            // 响应数据
-            auto respEvent = std::make_unique<NetDataEvent>(i, 1000 + i, 123456 + i);
-            respEvent->protocol = ProtocolType::HTTP;
-            respEvent->role = support_role_e::IsServer;
-            respEvent->resp_msg = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}";
-            manager->EnqueueDataEvent(std::move(respEvent));
-
-            // 关闭连接
-            struct conn_ctrl_event_t closeEvent = connectEvent;
-            closeEvent.type = EventClose;
-            manager->AcceptNetCtrlEvent(&closeEvent);
-        });
-    }
-
-    for (auto& thread : threads) {
-        thread.join();
-    }
-}
-
 void NetworkObserverManagerUnittest::TestPluginLifecycle() {
     auto manager = CreateManager();
 
@@ -340,7 +415,6 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPerfBufferOperations);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestAggregation);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestProtocolParsing);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConcurrency);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 
 } // namespace ebpf

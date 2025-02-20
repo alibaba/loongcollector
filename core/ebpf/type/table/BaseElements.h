@@ -229,6 +229,13 @@ constexpr DataElement kIp = {"ip",
                              "local ip.",
                              AggregationType::Level0};
 
+constexpr DataElement kRemoteIp = {"remote_ip",
+                                   "", // metric
+                                   "remote.ip", // span
+                                   "remote.ip", // log
+                                   "remote ip.",
+                                   AggregationType::NoAggregate};
+
 constexpr DataElement kAppId = {"app_id",
                                 "pid", // metric
                                 "app.id", // span

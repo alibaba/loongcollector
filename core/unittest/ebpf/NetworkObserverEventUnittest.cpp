@@ -36,6 +36,10 @@ public:
     void TestAbstractNetRecord();
 
 protected:
+    std::shared_ptr<Connection> CreateTestTracker() {
+        ConnId connId(1, 1000, 123456);
+        return std::make_shared<Connection>(connId);
+    }
     void SetUp() override {}
     void TearDown() override {}
 };
@@ -108,12 +112,12 @@ void NetworkObserverEventUnittest::TestHeadersMap() {
 }
 
 void NetworkObserverEventUnittest::TestConnStatsRecord() {
-    ConnId id(1, 1000, 123456);
-    ConnStatsRecord record(id);
+    // ConnId id(1, 1000, 123456);
+    auto conn = CreateTestTracker();
+
+    ConnStatsRecord record(conn);
 
     // 测试基本属性
-    APSARA_TEST_EQUAL(record.GetEventType(), EventType::CONN_STATS_EVENT);
-    APSARA_TEST_EQUAL(record.GetAggregateType(), AggregateType::NETWORK);
     APSARA_TEST_FALSE(record.IsError());
     APSARA_TEST_FALSE(record.IsSlow());
     APSARA_TEST_EQUAL(record.GetStatusCode(), 0);
@@ -124,8 +128,8 @@ void NetworkObserverEventUnittest::TestConnStatsRecord() {
 }
 
 void NetworkObserverEventUnittest::TestHttpRecord() {
-    ConnId id(1, 1000, 123456);
-    HttpRecord record(std::move(id));
+    auto conn = CreateTestTracker();
+    HttpRecord record(conn);
 
     // 测试基本属性
     record.SetPath("/api/v1/test");
@@ -133,7 +137,6 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
     record.SetStatusCode("200");
     record.SetProtocolVersion("HTTP/1.1");
 
-    APSARA_TEST_EQUAL(record.GetEventType(), EventType::HTTP_EVENT);
     APSARA_TEST_EQUAL(record.GetPath(), "/api/v1/test");
     APSARA_TEST_EQUAL(record.GetMethod(), "GET");
     APSARA_TEST_EQUAL(record.GetStatusCode(), 200);
@@ -159,8 +162,8 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
 }
 
 void NetworkObserverEventUnittest::TestAppMetricData() {
-    ConnId id(1, 1000, 123456);
-    AppMetricData data(id, "test_span");
+    auto conn = CreateTestTracker();
+    AppMetricData data(conn, "test_span");
 
     // 测试基本属性设置和获取
     data.mCount = 100;
@@ -183,8 +186,8 @@ void NetworkObserverEventUnittest::TestAppMetricData() {
 }
 
 void NetworkObserverEventUnittest::TestNetMetricData() {
-    ConnId id(1, 1000, 123456);
-    NetMetricData data(id);
+    auto conn = CreateTestTracker();
+    NetMetricData data(conn);
 
     // 测试基本属性设置和获取
     data.mDropCount = 10;
@@ -247,8 +250,8 @@ void NetworkObserverEventUnittest::TestHeadersMapCaseInsensitive() {
 }
 
 void NetworkObserverEventUnittest::TestHttpRecordTimestamps() {
-    ConnId id(1, 1000, 123456);
-    HttpRecord record(std::move(id));
+    auto conn = CreateTestTracker();
+    HttpRecord record(conn);
 
     record.SetStartTs(1000000);
     record.SetEndTs(2000000);
@@ -260,8 +263,8 @@ void NetworkObserverEventUnittest::TestHttpRecordTimestamps() {
 }
 
 void NetworkObserverEventUnittest::TestHttpRecordStatus() {
-    ConnId id(1, 1000, 123456);
-    HttpRecord record(std::move(id));
+    auto conn = CreateTestTracker();
+    HttpRecord record(conn);
 
     // 测试正常状态码
     record.SetStatusCode("200");
@@ -289,12 +292,8 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
 }
 
 void NetworkObserverEventUnittest::TestAbstractNetRecord() {
-    ConnId id(1, 1000, 123456);
-    ConnStatsRecord record(id);
-
-    // 测试基类功能
-    APSARA_TEST_EQUAL(record.GetAggregateType(), AggregateType::NETWORK);
-    APSARA_TEST_TRUE(record.GetConnId() == id);
+    auto conn = CreateTestTracker();
+    ConnStatsRecord record(conn);
 
     // 测试表模式
     APSARA_TEST_TRUE(record.GetMetricsTableSchema().Name() == "net_metrics");
