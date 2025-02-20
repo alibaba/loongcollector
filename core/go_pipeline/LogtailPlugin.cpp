@@ -579,9 +579,10 @@ void LogtailPlugin::GetGoAlarms() {
                 if (alarm != nullptr) {
                     AlarmManager::GetInstance()->SendAlarm(AlarmType(alarm->alarmType),
                                                            alarm->message,
-                                                           alarm->project,
-                                                           alarm->logstore,
                                                            FlusherSLS::GetProjectRegion(alarm->project),
+                                                           alarm->project,
+                                                           alarm->config,
+                                                           alarm->logstore,
                                                            alarm->count);
                     free(alarm->project);
                     free(alarm->config);
