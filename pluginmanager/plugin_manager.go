@@ -177,7 +177,7 @@ func StopAllPipelines(withInput bool) error {
 			toDeleteConfigNames[configName] = struct{}{}
 		}
 	}
-	for key, _ := range toDeleteConfigNames {
+	for key := range toDeleteConfigNames {
 		delete(LogtailConfig, key)
 	}
 	LogtailConfigLock.Unlock()
