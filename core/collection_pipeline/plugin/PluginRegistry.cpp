@@ -145,18 +145,18 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 }
 
 void PluginRegistry::LoadStaticPlugins() {
-    RegisterInputCreator(new StaticInputCreator<InputFile>(), false);
-    RegisterInputCreator(new StaticInputCreator<InputStaticFile>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>(), false);
-    RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), false, true);
-    RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), false, true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputFile>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
-    RegisterInputCreator(new StaticInputCreator<InputContainerStdio>(), false);
-    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), false, true);
-    RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), false, true);
-    RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), false, true);
-    RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), false, true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
 #endif
+    RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
@@ -208,12 +208,12 @@ void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
     }
 }
 
-void PluginRegistry::RegisterInputCreator(PluginCreator* creator, bool isOnetime, bool isSingleton) {
-    if (isOnetime) {
-        RegisterCreator(ONETIME_INPUT_PLUGIN, creator, isSingleton);
-    } else {
-        RegisterCreator(CONTINUOUS_INPUT_PLUGIN, creator, isSingleton);
-    }
+void PluginRegistry::RegisterOnetimeInputCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(ONETIME_INPUT_PLUGIN, creator, isSingleton);
+}
+
+void PluginRegistry::RegisterContinuousInputCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(CONTINUOUS_INPUT_PLUGIN, creator, isSingleton);
 }
 
 void PluginRegistry::RegisterProcessorCreator(PluginCreator* creator) {

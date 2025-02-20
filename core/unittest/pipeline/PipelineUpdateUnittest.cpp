@@ -127,8 +127,8 @@ protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
-        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock>(), false);
-        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock2>(), false);
+        PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock>());
+        PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock2>());
         PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
         PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
         PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
