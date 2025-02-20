@@ -271,8 +271,8 @@ void Application::Start() { // GCOVR_EXCL_START
 
     OnetimeConfigManager::GetInstance()->LoadCheckpointFile();
 
-    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0,
-           lastCheckUnunsedCheckpointsTime = 0;
+    time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnunsedCheckpointsTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
@@ -281,6 +281,10 @@ void Application::Start() { // GCOVR_EXCL_START
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
             AppConfig::GetInstance()->UpdateFileTags();
             lastCheckTagsTime = curTime;
+        }
+        if (curTime - lastOnetimeConfigTimeoutCheckTime >= 10) {
+            OnetimeConfigManager::GetInstance()->DeleteTimeoutConfigFiles();
+            lastOnetimeConfigTimeoutCheckTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
