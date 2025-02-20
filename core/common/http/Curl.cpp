@@ -107,9 +107,9 @@ static size_t header_write_callback(char* buffer,
     return sizes;
 }
 
-static size_t socket_write_callback(void* userdata, curl_socket_t fd, curlsocktype purpose) {
+static size_t socket_write_callback(void* dscp, curl_socket_t fd, curlsocktype purpose) {
     // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
-    int32_t tos = *static_cast<int32_t*>(userdata) << 2;
+    int32_t tos = *static_cast<int32_t*>(dscp) << 2;
     setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
     return 0;
 }
