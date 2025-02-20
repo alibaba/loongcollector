@@ -41,7 +41,7 @@ var ContainerConfig *LogstoreConfig
 
 // Configs that were disabled because of slow or hang config.
 var DisabledLogtailConfigLock sync.RWMutex
-var DisabledLogtailConfig = make(map[string]*LogstoreConfig)
+var DisabledLogtailConfig = make(map[*LogstoreConfig]struct{})
 
 // Two built-in logtail configs to report statistics and alarm (from system and other logtail configs).
 var AlarmConfig *LogstoreConfig
@@ -119,18 +119,21 @@ func Init() (err error) {
 func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 	done := make(chan int)
 	go func() {
-		logger.Info(config.Context.GetRuntimeContext(), "Stop config in goroutine", "begin")
+		addressStr := fmt.Sprintf("%p", config)
+		logger.Info(config.Context.GetRuntimeContext(), "Stop config in goroutine", "begin", "LogstoreConfig", addressStr)
 		_ = config.Stop(removedFlag)
 		close(done)
-		logger.Info(config.Context.GetRuntimeContext(), "Stop config in goroutine", "end")
+		logger.Info(context.Background(), "Stop config in goroutine", "end", "LogstoreConfig", addressStr)
 		// The config is valid but stop slowly, allow it to load again.
 		DisabledLogtailConfigLock.Lock()
-		if _, exists := DisabledLogtailConfig[config.ConfigNameWithSuffix]; !exists {
+		if _, exists := DisabledLogtailConfig[config]; !exists {
 			DisabledLogtailConfigLock.Unlock()
 			return
 		}
-		logger.Info(context.Background(), "Valid but slow stop config", config.ConfigName)
-		delete(DisabledLogtailConfig, config.ConfigNameWithSuffix)
+		logger.Info(context.Background(), "Valid but slow stop config", config.ConfigName, "LogstoreConfig", addressStr)
+		DeleteLogstoreConfig(config)
+		delete(DisabledLogtailConfig, config)
+
 		DisabledLogtailConfigLock.Unlock()
 	}()
 	select {
@@ -169,7 +172,7 @@ func StopAllPipelines(withInput bool) error {
 					"timeout when stop config, goroutine might leak")
 				// TODO: The key should be versioned. Current implementation will overwrite the previous version when reload a block config multiple times.
 				DisabledLogtailConfigLock.Lock()
-				DisabledLogtailConfig[logstoreConfig.ConfigNameWithSuffix] = logstoreConfig
+				DisabledLogtailConfig[logstoreConfig] = struct{}{}
 				DisabledLogtailConfigLock.Unlock()
 			} else {
 				DeleteLogstoreConfig(logstoreConfig)
@@ -271,7 +274,7 @@ func Stop(configName string, removedFlag bool) error {
 			logger.Error(config.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
 				"timeout when stop config, goroutine might leak")
 			DisabledLogtailConfigLock.Lock()
-			DisabledLogtailConfig[config.ConfigNameWithSuffix] = config
+			DisabledLogtailConfig[config] = struct{}{}
 			DisabledLogtailConfigLock.Unlock()
 			LogtailConfigLock.Lock()
 			delete(LogtailConfig, configName)
