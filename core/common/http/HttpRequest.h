@@ -29,6 +29,7 @@
 
 DECLARE_FLAG_INT32(default_http_request_timeout_sec);
 DECLARE_FLAG_INT32(default_http_request_max_try_cnt);
+DECLARE_FLAG_INT32(curl_ip_dscp);
 
 namespace logtail {
 
@@ -40,7 +41,10 @@ struct CurlTLS {
 };
 
 struct CurlSocket {
+    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
     int32_t mTOS;
+
+    CurlSocket() : mTOS(INT32_FLAG(curl_ip_dscp) << 2) {}
 };
 
 struct HttpRequest {

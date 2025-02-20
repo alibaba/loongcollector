@@ -62,7 +62,6 @@ DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio, "", 1.2);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
-DECLARE_FLAG_INT32(curl_ip_dscp);
 
 namespace logtail {
 
@@ -1202,7 +1201,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        BuildCurlSocket());
+                                        CurlSocket());
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
@@ -1235,7 +1234,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        BuildCurlSocket());
+                                        CurlSocket());
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
@@ -1272,14 +1271,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        BuildCurlSocket());
-}
-
-CurlSocket FlusherSLS::BuildCurlSocket() const {
-    CurlSocket socket = CurlSocket();
-    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
-    socket.mTOS = INT32_FLAG(curl_ip_dscp) << 2;
-    return socket;
+                                        CurlSocket());
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

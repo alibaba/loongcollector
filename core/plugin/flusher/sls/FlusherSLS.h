@@ -124,7 +124,6 @@ private:
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
     std::string GetShardHashKey(const BatchedEvents& g) const;
     void AddPackId(BatchedEvents& g) const;
-    CurlSocket BuildCurlSocket() const;
 
     std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
                                                                    const std::string& accessKeySecret,
