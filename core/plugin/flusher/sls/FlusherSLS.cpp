@@ -14,7 +14,6 @@
 
 #include "plugin/flusher/sls/FlusherSLS.h"
 
-#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
@@ -1259,7 +1258,6 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  query,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         item->mCurrentHost,

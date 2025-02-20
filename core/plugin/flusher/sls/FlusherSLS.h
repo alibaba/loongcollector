@@ -32,7 +32,6 @@
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/compression/Compressor.h"
-#include "http/HttpRequest.h"
 #include "models/PipelineEventGroup.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"

@@ -20,17 +20,14 @@
 #include <sys/socket.h>
 
 #include <map>
-#include <optional>
 #include <string>
 
-#include "curl/curl.h"
-
-#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "common/DNSCache.h"
+#include "common/Flags.h"
 #include "common/StringTools.h"
+#include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
-#include "http/HttpRequest.h"
 #include "logger/Logger.h"
 
 DECLARE_FLAG_INT32(curl_ip_dscp);
