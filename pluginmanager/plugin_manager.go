@@ -43,6 +43,8 @@ var ContainerConfig *LogstoreConfig
 var DisabledLogtailConfigLock sync.RWMutex
 var DisabledLogtailConfig = make(map[*LogstoreConfig]struct{})
 
+var LastUnsendBuffer = make(map[string]PluginRunner)
+
 // Two built-in logtail configs to report statistics and alarm (from system and other logtail configs).
 var AlarmConfig *LogstoreConfig
 
@@ -131,7 +133,7 @@ func timeoutStop(config *LogstoreConfig, removedFlag bool) bool {
 			return
 		}
 		logger.Info(context.Background(), "Valid but slow stop config", config.ConfigName, "LogstoreConfig", addressStr)
-		DeleteLogstoreConfig(config)
+		DeleteLogstoreConfig(config, removedFlag)
 		delete(DisabledLogtailConfig, config)
 
 		DisabledLogtailConfigLock.Unlock()
@@ -175,7 +177,7 @@ func StopAllPipelines(withInput bool) error {
 				DisabledLogtailConfig[logstoreConfig] = struct{}{}
 				DisabledLogtailConfigLock.Unlock()
 			} else {
-				DeleteLogstoreConfig(logstoreConfig)
+				DeleteLogstoreConfig(logstoreConfig, true)
 			}
 			toDeleteConfigNames[configName] = struct{}{}
 		}
@@ -187,7 +189,7 @@ func StopAllPipelines(withInput bool) error {
 	return nil
 }
 
-func DeleteLogstoreConfig(config *LogstoreConfig) {
+func DeleteLogstoreConfig(config *LogstoreConfig, removedFlag bool) {
 	if actualObject, ok := config.Context.(*ContextImp); ok {
 		actualObject.logstoreC = nil
 	}
@@ -227,13 +229,16 @@ func DeleteLogstoreConfig(config *LogstoreConfig) {
 		}
 		runner.LogstoreConfig = nil
 	}
+	if !removedFlag {
+		LastUnsendBuffer[config.ConfigName] = config.PluginRunner
+	}
 	config.PluginRunner = nil
 }
 
-func DeleteLogstoreConfigFromLogtailConfig(configName string) {
+func DeleteLogstoreConfigFromLogtailConfig(configName string, removedFlag bool) {
 	LogtailConfigLock.Lock()
 	if config, ok := LogtailConfig[configName]; ok {
-		DeleteLogstoreConfig(config)
+		DeleteLogstoreConfig(config, removedFlag)
 		delete(LogtailConfig, configName)
 	}
 	LogtailConfigLock.Unlock()
@@ -282,7 +287,7 @@ func Stop(configName string, removedFlag bool) error {
 		} else {
 			logger.Info(config.Context.GetRuntimeContext(), "Stop config now", configName)
 			LogtailConfigLock.Lock()
-			DeleteLogstoreConfig(config)
+			DeleteLogstoreConfig(config, removedFlag)
 			delete(LogtailConfig, configName)
 			LogtailConfigLock.Unlock()
 		}
