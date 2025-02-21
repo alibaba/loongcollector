@@ -19,10 +19,10 @@ if (LINUX)
     set(ENABLE_PROFILE OFF)
     set(BUILD_TESTING OFF)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
-    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/coolbpf ${CMAKE_BINARY_DIR}/third_party/coolbpf)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf)
     add_custom_target(
         install_coolbpf ALL
-        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/third_party/coolbpf
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
         DEPENDS coolbpf coolbpf_static
     )
 
