@@ -29,6 +29,7 @@ class curl_slist;
 namespace logtail {
 
 struct CurlTLS;
+struct CurlSocket;
 
 enum NetworkCode {
     Ok = 0,
@@ -69,7 +70,8 @@ class HttpResponse {
                                    bool replaceHostWithIp,
                                    const std::string& intf,
                                    bool followRedirects,
-                                   std::optional<CurlTLS> tls);
+                                   const std::optional<CurlTLS>& tls,
+                                   const std::optional<CurlSocket>& socket);
 
 public:
     HttpResponse()

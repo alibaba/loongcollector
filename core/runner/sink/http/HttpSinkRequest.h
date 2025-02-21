@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/http/HttpRequest.h"
 
@@ -34,8 +36,22 @@ struct HttpSinkRequest : public AsynHttpRequest {
                     const std::string& body,
                     SenderQueueItem* item,
                     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
-                    uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)))
-        : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body, HttpResponse(), timeout, maxTryCnt),
+                    uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                    std::optional<CurlSocket> socket = std::nullopt)
+        : AsynHttpRequest(method,
+                          httpsFlag,
+                          host,
+                          port,
+                          url,
+                          query,
+                          header,
+                          body,
+                          HttpResponse(),
+                          timeout,
+                          maxTryCnt,
+                          false,
+                          std::nullopt,
+                          std::move(socket)),
           mItem(item) {}
 
     bool IsContextValid() const override { return true; }
