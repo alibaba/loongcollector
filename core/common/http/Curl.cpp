@@ -108,7 +108,7 @@ static size_t header_write_callback(char* buffer,
 
 static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
     auto* socket = static_cast<CurlSocket*>(socketData);
-    if (socket->mTOS >= 0 && socket->mTOS <= 255) {
+    if (socket->mTOS.has_value()) {
         setsockopt(fd, IPPROTO_IP, IP_TOS, &socket->mTOS, sizeof(socket->mTOS));
     }
     return 0;
@@ -128,8 +128,8 @@ CURL* CreateCurlHandler(const string& method,
                         bool replaceHostWithIp,
                         const string& intf,
                         bool followRedirects,
-                        optional<CurlTLS> tls,
-                        const optional<CurlSocket>& socket // socket is used async, the lifestyle must be longer
+                        const optional<CurlTLS>& tls,
+                        const optional<CurlSocket>& socket // socket is used async, the lifespan must be longer
 ) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 

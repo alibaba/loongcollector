@@ -21,6 +21,7 @@
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/EndpointUtil.h"
+#include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
@@ -59,6 +60,7 @@ DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this valu
 DEFINE_FLAG_BOOL(enable_metricstore_channel, "only works for metrics data for enhance metrics query performance", true);
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio, "", 1.2);
+DEFINE_FLAG_INT32(sls_request_dscp, "set dscp for sls request, from 0 to 63", -1);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
@@ -1200,7 +1202,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        CurlSocket());
+                                        CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
@@ -1233,7 +1235,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        CurlSocket());
+                                        CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
@@ -1269,7 +1271,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         item,
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
-                                        CurlSocket());
+                                        CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

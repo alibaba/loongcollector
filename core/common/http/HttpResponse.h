@@ -70,7 +70,7 @@ class HttpResponse {
                                    bool replaceHostWithIp,
                                    const std::string& intf,
                                    bool followRedirects,
-                                   std::optional<CurlTLS> tls,
+                                   const std::optional<CurlTLS>& tls,
                                    const std::optional<CurlSocket>& socket);
 
 public:

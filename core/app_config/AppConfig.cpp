@@ -111,7 +111,6 @@ DEFINE_FLAG_INT32(data_server_port, "", 80);
 // DEFINE_FLAG_STRING(alipay_app_zone, "", "ALIPAY_APP_ZONE");
 // DEFINE_FLAG_STRING(alipay_zone, "", "ALIPAY_ZONE");
 // DEFINE_FLAG_STRING(alipay_zone_env_name, "", "");
-DEFINE_FLAG_INT32(curl_ip_dscp, "curl ip dscp, differentiated services codepoint, from 0 to 63", -1);
 
 DECLARE_FLAG_INT32(polling_max_stat_count);
 DECLARE_FLAG_INT32(polling_max_stat_count_per_dir);
