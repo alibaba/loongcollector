@@ -18,16 +18,16 @@
 
 #include <atomic>
 #include <future>
-#include <regex>
 #include <unordered_map>
 
 #include "common/LRUCache.h"
 #include "common/ProcParser.h"
+#include "common/memory/SourceBuffer.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/ProcessEvent.h"
-#include "models/PipelineEventGroup.h"
+#include "models/SizedContainer.h"
 #include "util/FrequencyManager.h"
 
 namespace logtail {
@@ -49,16 +49,18 @@ public:
           mCommonEventQueue(queue) {}
     ~ProcessCacheManager() {}
 
-    bool ContainsKey(const std::string& key) const { return mCache.contains(key); }
+    bool ContainsKey(const data_event_id& key) const { return mCache.contains(key); }
 
     // thread-safe
-    std::shared_ptr<MsgExecveEventUnix> LookupCache(const std::string& key) { return mCache.get(key); }
+    std::shared_ptr<MsgExecveEventUnix> LookupCache(const data_event_id& key) { return mCache.get(key); }
 
     // thread-safe
-    void ReleaseCache(const std::string& key) { mCache.remove(key); }
+    void ReleaseCache(const data_event_id& key) { mCache.remove(key); }
 
     // thread-safe
-    void UpdateCache(const std::string& key, std::shared_ptr<MsgExecveEventUnix>& value) { mCache.insert(key, value); }
+    void UpdateCache(const data_event_id& key, std::shared_ptr<MsgExecveEventUnix>& value) {
+        mCache.insert(key, value);
+    }
 
     std::vector<std::shared_ptr<Procs>> ListRunningProcs();
     int WriteProcToBPFMap(const std::shared_ptr<Procs>& proc);
@@ -90,12 +92,11 @@ private:
     void HandleCacheUpdate();
 
     std::atomic_bool mInited = false;
-    std::atomic_bool mFlag = false;
+    std::atomic_bool mRunFlag = false;
     std::shared_ptr<SourceManager> mSourceManager = nullptr;
-    lru11::Cache<std::string, std::shared_ptr<MsgExecveEventUnix>, std::mutex> mCache;
 
     struct DataEventIdHash {
-        std::size_t operator()(const data_event_id& deid) const { return deid.pid ^ deid.time << 32; }
+        std::size_t operator()(const data_event_id& deid) const { return deid.pid ^ ((deid.time >> 12) << 16); }
     };
 
     struct DataEventIdEqual {
@@ -104,15 +105,21 @@ private:
         }
     };
 
-    std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual> mDataCache;
+    using ExecveEventMap = std::unordered_map<
+        data_event_id,
+        std::list<lru11::KeyValuePair<data_event_id, std::shared_ptr<MsgExecveEventUnix>>>::iterator,
+        DataEventIdHash,
+        DataEventIdEqual>;
+    lru11::Cache<data_event_id, std::shared_ptr<MsgExecveEventUnix>, std::mutex, ExecveEventMap> mCache;
+    using DataEventMap = std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual>;
+    DataEventMap mDataCache;
 
     // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>,
     // std::shared_ptr<std::string>>> mDataCache;
     ProcParser mProcParser;
     std::string mHostName;
-    std::string mHostPathPrefix;
+    std::filesystem::path mHostPathPrefix;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
-    std::regex mPidRegex = std::regex("\\d+");
 
     // record execve event, used to update process cache ...
     moodycamel::BlockingConcurrentQueue<std::unique_ptr<MsgExecveEventUnix>> mRecordQueue;

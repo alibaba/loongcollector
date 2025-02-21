@@ -14,6 +14,7 @@
 
 #include "ebpf/plugin/ProcessCacheManager.h"
 
+#include <charconv>
 #include <coolbpf/security/bpf_common.h>
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
@@ -21,7 +22,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <regex>
 #include <unordered_map>
 
 #include "rapidjson/document.h"
@@ -40,16 +40,11 @@
 namespace logtail {
 namespace ebpf {
 
-const std::string UNKOWN_STR = "unknown";
-const std::string PERMITTED_STR = "permitted";
-const std::string INHERITABLE_STR = "inheritable";
-const std::string EFFECTIVE_STR = "effective";
-
 /////////// ================= for perfbuffer handlers ================= ///////////
 void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
     auto* bm = static_cast<ProcessCacheManager*>(ctx);
     if (!bm) {
-        LOG_ERROR(sLogger, ("BaseManager is null!", ""));
+        LOG_ERROR(sLogger, ("ProcessCacheManager is null!", ""));
         return;
     }
     if (!data) {
@@ -105,14 +100,9 @@ bool ProcessCacheManager::Init() {
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
 
-    pconfig.mPerfBufferSpec
-        = {{"tcpmon_map",
-            128,
-            this,
-            [](void* ctx, int cpu, void* data, uint32_t size) { HandleKernelProcessEvent(ctx, cpu, data, size); },
-            [](void* ctx, int cpu, unsigned long long cnt) { HandleKernelProcessEventLost(ctx, cpu, cnt); }}};
+    pconfig.mPerfBufferSpec = {{"tcpmon_map", 128, this, HandleKernelProcessEvent, HandleKernelProcessEventLost}};
     ebpfConfig->mConfig = pconfig;
-    mFlag = true;
+    mRunFlag = true;
     mPoller = async(std::launch::async, &ProcessCacheManager::PollPerfBuffers, this);
     mCacheUpdater = async(std::launch::async, &ProcessCacheManager::HandleCacheUpdate, this);
     bool status = mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
@@ -130,7 +120,7 @@ bool ProcessCacheManager::Init() {
 void ProcessCacheManager::PollPerfBuffers() {
     int zero = 0;
     LOG_DEBUG(sLogger, ("enter poller thread", ""));
-    while (mFlag) {
+    while (mRunFlag) {
         auto now = std::chrono::steady_clock::now();
         auto nextWindow = mFrequencyMgr.Next();
         if (!mFrequencyMgr.Expired(now)) {
@@ -151,7 +141,7 @@ void ProcessCacheManager::Stop() {
     }
     auto res = mSourceManager->StopPlugin(PluginType::PROCESS_SECURITY);
     LOG_INFO(sLogger, ("stop process probes for base manager, status", res));
-    mFlag = false;
+    mRunFlag = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
     if (mPoller.valid()) {
         if (s1 == std::future_status::ready) {
@@ -292,10 +282,9 @@ std::tuple<std::string, std::string> ArgsDecoder(const std::string& args, uint32
 void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     // copy msg
     auto event = std::make_unique<MsgExecveEventUnix>();
-    event->msg = std::make_unique<MsgExecveEvent>();
     static_assert(offsetof(msg_execve_event, buffer) == sizeof(MsgExecveEvent),
                   "offsetof(msg_execve_event, buffer) must be equal to sizeof(MsgExecveEvent)");
-    std::memcpy(event->msg.get(), eventPtr, sizeof(MsgExecveEvent));
+    std::memcpy(&event->msg, eventPtr, sizeof(MsgExecveEvent));
 
     // parse exec
     event->process.size = eventPtr->process.size;
@@ -475,15 +464,18 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
 
 std::vector<std::shared_ptr<Procs>> ProcessCacheManager::ListRunningProcs() {
     std::vector<std::shared_ptr<Procs>> processes;
-    for (const auto& entry : std::filesystem::directory_iterator(mHostPathPrefix + "/proc")) {
+    for (const auto& entry : std::filesystem::directory_iterator(mHostPathPrefix / "proc")) {
         if (!entry.is_directory()) {
             continue;
         }
         auto dirName = entry.path().filename().string();
-        if (!std::regex_match(dirName, mPidRegex)) {
+        int32_t pid = 0;
+        const char* dirNameLast = dirName.data() + dirName.size();
+        auto convresult = std::from_chars(dirName.data(), dirNameLast, pid);
+        if (convresult.ec != std::errc() || convresult.ptr != dirNameLast) {
             continue;
         }
-        int32_t pid = std::stoi(dirName);
+
         auto cmdLine = mProcParser.GetPIDCmdline(pid);
         auto comm = mProcParser.GetPIDComm(pid);
         bool kernelThread = false;
@@ -492,115 +484,103 @@ std::vector<std::shared_ptr<Procs>> ProcessCacheManager::ListRunningProcs() {
             kernelThread = true;
         }
 
-        std::vector<std::string> stats;
-        try {
-            stats = mProcParser.GetProcStatStrings(pid);
-        } catch (std::runtime_error& e) {
-            LOG_WARNING(sLogger, ("GetProcStatStrings failed", e.what()));
+        ProcStat stats;
+        if (0 != mProcParser.GetProcStatStrings(pid, stats)) {
+            LOG_WARNING(sLogger, ("GetProcStatStrings", "failed"));
             continue;
         }
-
-        auto ppid = stats[3];
+        auto ppid = stats.stats[3];
 
         // get ppid
-        int32_t _ppid = std::stoi(ppid);
-        uint64_t ktime = mProcParser.GetStatsKtime(stats);
-
-        std::vector<uint32_t> uids
-            = {mProcParser.invalid_uid_, mProcParser.invalid_uid_, mProcParser.invalid_uid_, mProcParser.invalid_uid_};
-        std::vector<uint32_t> gids
-            = {mProcParser.invalid_uid_, mProcParser.invalid_uid_, mProcParser.invalid_uid_, mProcParser.invalid_uid_};
-        uint32_t auid = mProcParser.invalid_uid_;
-
-        try {
-            auto status = mProcParser.GetStatus(pid);
-            if (status) {
-                uids = status->GetUids();
-                gids = status->GetGids();
-                auid = status->GetLoginUid();
-            }
-        } catch (std::runtime_error& e) {
-            LOG_WARNING(sLogger, ("GetStatus failed", e.what()));
+        int32_t _ppid = 0;
+        const auto* ppidLast = ppid.data() + ppid.size();
+        auto [ptr, ec] = std::from_chars(ppid.data(), ppidLast, _ppid);
+        if (ec != std::errc() || ptr != ppidLast) {
+            LOG_WARNING(sLogger, ("Parse ppid", "failed"));
             continue;
         }
+        int64_t ktime = mProcParser.GetStatsKtime(stats);
+
+        Status status;
+        if (0 != mProcParser.GetStatus(pid, status)) {
+            LOG_WARNING(sLogger, ("GetStatus failed", "failed"));
+            continue;
+        }
+        auto uids = status.GetUids();
+        auto gids = status.GetGids();
+        auto auid = status.GetLoginUid();
+
 
         auto [nspid, permitted, effective, inheritable] = mProcParser.GetPIDCaps(pid);
-        auto uts_ns = mProcParser.GetPIDNsInode(pid, "uts");
-        auto ipc_ns = mProcParser.GetPIDNsInode(pid, "ipc");
-        auto mnt_ns = mProcParser.GetPIDNsInode(pid, "mnt");
-        auto pid_ns = mProcParser.GetPIDNsInode(pid, "pid");
-        auto pid_for_children_ns = mProcParser.GetPIDNsInode(pid, "pid_for_children");
-        auto net_ns = mProcParser.GetPIDNsInode(pid, "net");
-        auto cgroup_ns = mProcParser.GetPIDNsInode(pid, "cgroup");
-        auto user_ns = mProcParser.GetPIDNsInode(pid, "user");
-        uint32_t time_ns = 0;
-        uint32_t time_for_children_ns = 0;
-        try {
-            time_ns = mProcParser.GetPIDNsInode(pid, "time");
-            time_for_children_ns = mProcParser.GetPIDNsInode(pid, "time_for_children");
-        } catch (std::runtime_error& e) {
-            LOG_WARNING(sLogger, ("GetPIDNsInode failed", e.what()));
-            continue;
-        }
+        auto utsNs = mProcParser.GetPIDNsInode(pid, "uts");
+        auto ipcNs = mProcParser.GetPIDNsInode(pid, "ipc");
+        auto mntNs = mProcParser.GetPIDNsInode(pid, "mnt");
+        auto pidNs = mProcParser.GetPIDNsInode(pid, "pid");
+        auto pidForChildrenNs = mProcParser.GetPIDNsInode(pid, "pid_for_children");
+        auto netNs = mProcParser.GetPIDNsInode(pid, "net");
+        auto cgroupNs = mProcParser.GetPIDNsInode(pid, "cgroup");
+        auto userNs = mProcParser.GetPIDNsInode(pid, "user");
+        uint32_t timeNs = mProcParser.GetPIDNsInode(pid, "time");
+        uint32_t timeForChildrenNs = mProcParser.GetPIDNsInode(pid, "time_for_children");
 
         std::string docker_id = mProcParser.GetPIDDockerId(pid);
         if (docker_id == "") {
             nspid = 0;
         }
 
-        std::string parent_cmdline;
-        std::string parent_comm;
-        std::vector<std::string> parent_stats;
-        uint64_t parent_ktime = 0;
-        std::string parent_exe_path;
-        uint32_t parent_nspid = 0;
+        std::string parentCmdline;
+        std::string parentComm;
+        ProcStat parentStats;
+        int64_t parentKtime = 0;
+        std::string parentExePath;
+        uint32_t parentNspid = 0;
         if (_ppid) {
-            parent_cmdline = mProcParser.GetPIDCmdline(_ppid);
-            parent_comm = mProcParser.GetPIDComm(_ppid);
-            parent_stats = mProcParser.GetProcStatStrings(_ppid);
-            parent_ktime = mProcParser.GetStatsKtime(parent_stats);
-            parent_exe_path = mProcParser.GetPIDExePath(_ppid);
+            parentCmdline = mProcParser.GetPIDCmdline(_ppid);
+            parentComm = mProcParser.GetPIDComm(_ppid);
+            mProcParser.GetProcStatStrings(_ppid, parentStats);
+            parentKtime = mProcParser.GetStatsKtime(parentStats);
+            parentExePath = mProcParser.GetPIDExePath(_ppid);
             auto [pnspid, ppermitted, peffective, pinheritable] = mProcParser.GetPIDCaps(_ppid);
-            parent_nspid = pnspid;
+            parentNspid = pnspid;
         }
 
-        std::string exec_path = mProcParser.GetPIDExePath(pid);
+        std::string execPath = mProcParser.GetPIDExePath(pid);
 
-        std::shared_ptr<Procs> procs_ptr = std::make_shared<Procs>();
-        procs_ptr->ppid = static_cast<uint32_t>(_ppid);
-        procs_ptr->pnspid = parent_nspid;
-        procs_ptr->pexe = parent_exe_path;
-        procs_ptr->pcmdline = parent_cmdline;
-        procs_ptr->pflags
+        std::shared_ptr<Procs> procsPtr = std::make_shared<Procs>();
+        procsPtr->ppid = static_cast<uint32_t>(_ppid);
+        procsPtr->pnspid = parentNspid;
+        procsPtr->pexe = parentExePath;
+        procsPtr->pcmdline = parentCmdline;
+        procsPtr->pflags
             = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
-        procs_ptr->pktime = parent_ktime;
-        procs_ptr->uids = uids;
-        procs_ptr->gids = gids;
-        procs_ptr->auid = auid;
-        procs_ptr->pid = static_cast<uint32_t>(pid);
-        procs_ptr->tid = static_cast<uint32_t>(pid);
-        procs_ptr->nspid = nspid;
-        procs_ptr->exe = exec_path;
-        procs_ptr->cmdline = cmdLine;
-        procs_ptr->flags
+        procsPtr->pktime = parentKtime;
+        procsPtr->uids = uids;
+        procsPtr->gids = gids;
+        procsPtr->auid = auid;
+        procsPtr->pid = static_cast<uint32_t>(pid);
+        procsPtr->tid = static_cast<uint32_t>(pid);
+        procsPtr->nspid = nspid;
+        procsPtr->exe = execPath;
+        procsPtr->cmdline = cmdLine;
+        procsPtr->flags
             = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
-        procs_ptr->ktime = ktime;
-        procs_ptr->permitted = permitted;
-        procs_ptr->effective = effective;
-        procs_ptr->inheritable = inheritable;
-        procs_ptr->uts_ns = uts_ns;
-        procs_ptr->ipc_ns = ipc_ns;
-        procs_ptr->mnt_ns = mnt_ns;
-        procs_ptr->pid_ns = pid_ns;
-        procs_ptr->pid_for_children_ns = pid_for_children_ns;
-        procs_ptr->net_ns = net_ns;
-        procs_ptr->time_ns = time_ns;
-        procs_ptr->time_for_children_ns = time_for_children_ns;
-        procs_ptr->cgroup_ns = cgroup_ns;
-        procs_ptr->user_ns = user_ns;
-        procs_ptr->kernel_thread = kernelThread;
+        procsPtr->ktime = ktime;
+        procsPtr->permitted = permitted;
+        procsPtr->effective = effective;
+        procsPtr->inheritable = inheritable;
+        procsPtr->uts_ns = utsNs;
+        procsPtr->ipc_ns = ipcNs;
+        procsPtr->mnt_ns = mntNs;
+        procsPtr->pid_ns = pidNs;
+        procsPtr->pid_for_children_ns = pidForChildrenNs;
+        procsPtr->net_ns = netNs;
+        procsPtr->time_ns = timeNs;
+        procsPtr->time_for_children_ns = timeForChildrenNs;
+        procsPtr->cgroup_ns = cgroupNs;
+        procsPtr->user_ns = userNs;
+        procsPtr->kernel_thread = kernelThread;
 
-        processes.emplace_back(procs_ptr);
+        processes.emplace_back(procsPtr);
     }
     LOG_DEBUG(sLogger, ("Read ProcFS prefix", mHostPathPrefix)("append process cnt", processes.size()));
 
@@ -608,33 +588,29 @@ std::vector<std::shared_ptr<Procs>> ProcessCacheManager::ListRunningProcs() {
 }
 
 int ProcessCacheManager::WriteProcToBPFMap(const std::shared_ptr<Procs>& proc) {
-    msg_execve_key key;
-    key.pid = proc->pid;
-    key.ktime = 0;
-
-    execve_map_value value;
+    execve_map_value value{};
     value.pkey.pid = proc->ppid;
     value.pkey.ktime = proc->pktime;
     value.key.pid = proc->pid;
     value.key.ktime = proc->ktime;
     value.flags = 0;
     value.nspid = proc->nspid;
-    value.caps = {proc->permitted, proc->effective, proc->inheritable};
-    value.ns = {proc->uts_ns,
-                proc->ipc_ns,
-                proc->mnt_ns,
-                proc->pid,
-                proc->pid_for_children_ns,
-                proc->net_ns,
-                proc->time_ns,
-                proc->time_for_children_ns,
-                proc->cgroup_ns,
-                proc->user_ns};
+    value.caps = {{{proc->permitted, proc->effective, proc->inheritable}}};
+    value.ns = {{{proc->uts_ns,
+                  proc->ipc_ns,
+                  proc->mnt_ns,
+                  proc->pid,
+                  proc->pid_for_children_ns,
+                  proc->net_ns,
+                  proc->time_ns,
+                  proc->time_for_children_ns,
+                  proc->cgroup_ns,
+                  proc->user_ns}}};
     value.bin.path_length = proc->exe.size();
     ::memcpy(value.bin.path, proc->exe.data(), std::min(BINARY_PATH_MAX_LEN, static_cast<int>(proc->exe.size())));
 
     // update bpf map
-    int res = mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &key, &value, 0);
+    int res = mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &proc->pid, &value, 0);
     LOG_DEBUG(sLogger, ("update bpf map, pid", proc->pid)("res", res));
     return res;
 }
@@ -647,15 +623,15 @@ int ProcessCacheManager::SyncAllProc() {
         WriteProcToBPFMap(proc);
     }
     // add kernel thread (pid 0)
-    msg_execve_key key;
+    msg_execve_key key{};
     key.pid = 0;
     key.ktime = 0;
-    execve_map_value value;
+    execve_map_value value{};
     value.pkey.pid = 0;
     value.pkey.ktime = 1;
     value.key.pid = 0;
     value.key.ktime = 1;
-    mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &key, &value, 0);
+    mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &key.pid, &value, 0);
 
     // generage execve event ...
     for (const auto& proc : procs) {
@@ -701,15 +677,9 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
     }
 
     if (proc->kernel_thread) {
-        if (proc == nullptr) {
-            LOG_ERROR(sLogger, ("kernel thread, proc is null", ""));
-            return 1;
-        }
-
         event->kernel_thread = true;
-        event->msg = std::make_unique<MsgExecveEvent>();
-        event->msg->parent.pid = proc->ppid;
-        event->msg->parent.ktime = proc->ktime;
+        event->msg.parent.pid = proc->ppid;
+        event->msg.parent.ktime = proc->ktime;
 
         event->process.size = proc->size;
         event->process.pid = proc->pid;
@@ -726,13 +696,12 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
     } else {
         //    std::unique_ptr<MsgExecveEventUnix> event = std::make_unique<MsgExecveEventUnix>();
         event->kernel_thread = false;
-        event->msg = std::make_unique<MsgExecveEvent>();
-        event->msg->common.op = MSG_OP_EXECVE;
+        event->msg.common.op = MSG_OP_EXECVE;
         if (proc == nullptr) {
             LOG_ERROR(sLogger, ("user thread, proc is null", ""));
             return 1;
         }
-        event->msg->common.size = MSG_UNIX_SIZE + proc->psize + proc->size;
+        event->msg.common.size = MSG_UNIX_SIZE + proc->psize + proc->size;
 
         if (proc->pid) {
             std::string dockerId = mProcParser.GetPIDDockerId(proc->pid);
@@ -740,38 +709,38 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
                 event->kube.docker = dockerId;
             }
         }
-        event->msg->parent.pid = proc->ppid;
-        event->msg->parent.ktime = proc->pktime;
-        event->msg->ns.uts_inum = proc->uts_ns;
-        event->msg->ns.ipc_inum = proc->ipc_ns;
-        event->msg->ns.mnt_inum = proc->mnt_ns;
-        event->msg->ns.pid_inum = proc->pid_ns;
-        event->msg->ns.pid_for_children_inum = proc->pid_for_children_ns;
-        event->msg->ns.net_inum = proc->net_ns;
-        event->msg->ns.time_inum = proc->time_ns;
-        event->msg->ns.time_for_children_inum = proc->time_for_children_ns;
-        event->msg->ns.cgroup_inum = proc->cgroup_ns;
-        event->msg->ns.user_inum = proc->user_ns;
+        event->msg.parent.pid = proc->ppid;
+        event->msg.parent.ktime = proc->pktime;
+        event->msg.ns.uts_inum = proc->uts_ns;
+        event->msg.ns.ipc_inum = proc->ipc_ns;
+        event->msg.ns.mnt_inum = proc->mnt_ns;
+        event->msg.ns.pid_inum = proc->pid_ns;
+        event->msg.ns.pid_for_children_inum = proc->pid_for_children_ns;
+        event->msg.ns.net_inum = proc->net_ns;
+        event->msg.ns.time_inum = proc->time_ns;
+        event->msg.ns.time_for_children_inum = proc->time_for_children_ns;
+        event->msg.ns.cgroup_inum = proc->cgroup_ns;
+        event->msg.ns.user_inum = proc->user_ns;
         event->process.size = proc->size;
         event->process.pid = proc->pid;
         event->process.tid = proc->tid;
         event->process.nspid = proc->nspid;
         event->process.uid = proc->uids[1];
         event->process.auid = proc->auid;
-        event->msg->creds.uid = proc->uids[0];
-        event->msg->creds.gid = proc->uids[1];
-        event->msg->creds.suid = proc->uids[2];
-        event->msg->creds.sgid = proc->uids[3];
-        event->msg->creds.euid = proc->gids[0];
-        event->msg->creds.egid = proc->gids[1];
-        event->msg->creds.fsuid = proc->gids[2];
-        event->msg->creds.fsgid = proc->gids[3];
-        event->msg->creds.caps.permitted = proc->permitted;
-        event->msg->creds.caps.effective = proc->effective;
-        event->msg->creds.caps.inheritable = proc->inheritable;
+        event->msg.creds.uid = proc->uids[0];
+        event->msg.creds.gid = proc->uids[1];
+        event->msg.creds.suid = proc->uids[2];
+        event->msg.creds.sgid = proc->uids[3];
+        event->msg.creds.euid = proc->gids[0];
+        event->msg.creds.egid = proc->gids[1];
+        event->msg.creds.fsuid = proc->gids[2];
+        event->msg.creds.fsgid = proc->gids[3];
+        event->msg.creds.caps.permitted = proc->permitted;
+        event->msg.creds.caps.effective = proc->effective;
+        event->msg.creds.caps.inheritable = proc->inheritable;
         event->process.flags = proc->flags | flags;
         event->process.ktime = proc->ktime;
-        event->msg->common.ktime = proc->ktime;
+        event->msg.common.ktime = proc->ktime;
         event->process.filename = proc->exe;
         //    event->process.args = raw_args;
         event->process.args = args;
@@ -784,13 +753,10 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
 }
 
 std::string ProcessCacheManager::GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix>& event) {
-    if (!event->msg) {
-        return "";
+    if (event->msg.cleanup_key.ktime == 0 || event->process.flags & EVENT_CLONE) {
+        return GenerateExecId(event->msg.parent.pid, event->msg.parent.ktime);
     }
-    if (event->msg->cleanup_key.ktime == 0 || event->process.flags & EVENT_CLONE) {
-        return GenerateExecId(event->msg->parent.pid, event->msg->parent.ktime);
-    }
-    return GenerateExecId(event->msg->cleanup_key.pid, event->msg->cleanup_key.ktime);
+    return GenerateExecId(event->msg.cleanup_key.pid, event->msg.cleanup_key.ktime);
 }
 
 std::string ProcessCacheManager::GenerateExecId(uint32_t pid, uint64_t ktime) {
@@ -806,7 +772,7 @@ std::string ProcessCacheManager::GenerateExecId(uint32_t pid, uint64_t ktime) {
 void ProcessCacheManager::HandleCacheUpdate() {
     std::vector<std::unique_ptr<MsgExecveEventUnix>> items(mMaxBatchConsumeSize);
 
-    while (mFlag) {
+    while (mRunFlag) {
         size_t count = mRecordQueue.wait_dequeue_bulk_timed(
             items.data(), mMaxBatchConsumeSize, std::chrono::milliseconds(mMaxWaitTimeMS));
 
@@ -830,7 +796,7 @@ void ProcessCacheManager::HandleCacheUpdate() {
                     "execId", execKey)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
                     "filename", mProcParser.GetPIDExePath(event->process.pid))("args", event->process.args));
 
-            UpdateCache(execKey, event);
+            UpdateCache({event->process.pid, event->process.ktime}, event);
         }
 
         items.clear();
@@ -839,18 +805,20 @@ void ProcessCacheManager::HandleCacheUpdate() {
 }
 
 SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>& sb, uint32_t pid, uint64_t ktime) {
+    static const std::string kUnkownStr = "unknown";
+    static const std::string kPermittedStr = "permitted";
+    static const std::string kInheritableStr = "inheritable";
+    static const std::string kEffectiveStr = "effective";
+
     SizedMap res;
-    auto execId = GenerateExecId(pid, ktime);
-    auto proc = LookupCache(execId);
+    auto proc = LookupCache({pid, ktime});
     if (!proc) {
         LOG_WARNING(sLogger,
-                    ("cannot find proc in cache, execId",
-                     execId)("pid", pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));
+                    ("cannot find proc in cache, pid", pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));
         return res;
     }
 
-    auto parentExecId = GenerateParentExecId(proc);
-    auto parentProc = LookupCache(parentExecId);
+    auto parentProc = LookupCache({pid, ktime});
 
     // finalize proc tags
     auto execIdSb = sb->CopyString(proc->exec_id);
@@ -861,20 +829,20 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
     std::string args = proc->process.args;
     std::string binary = proc->process.filename;
-    std::string permitted = GetCapabilities(proc->msg->creds.caps.permitted);
-    std::string effective = GetCapabilities(proc->msg->creds.caps.effective);
-    std::string inheritable = GetCapabilities(proc->msg->creds.caps.inheritable);
+    std::string permitted = GetCapabilities(proc->msg.creds.caps.permitted);
+    std::string effective = GetCapabilities(proc->msg.creds.caps.effective);
+    std::string inheritable = GetCapabilities(proc->msg.creds.caps.inheritable);
 
     rapidjson::Document::AllocatorType allocator;
     rapidjson::Value cap(rapidjson::kObjectType);
 
-    cap.AddMember(rapidjson::StringRef(PERMITTED_STR.data()),
+    cap.AddMember(rapidjson::StringRef(kPermittedStr.data()),
                   rapidjson::Value().SetString(permitted.c_str(), allocator),
                   allocator);
-    cap.AddMember(rapidjson::StringRef(EFFECTIVE_STR.data()),
+    cap.AddMember(rapidjson::StringRef(kEffectiveStr.data()),
                   rapidjson::Value().SetString(effective.c_str(), allocator),
                   allocator);
-    cap.AddMember(rapidjson::StringRef(INHERITABLE_STR.data()),
+    cap.AddMember(rapidjson::StringRef(kInheritableStr.data()),
                   rapidjson::Value().SetString(inheritable.c_str(), allocator),
                   allocator);
 
@@ -914,13 +882,13 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
     // for parent
     if (!parentProc) {
-        res.Insert(kParentProcess.LogKey(), StringView(UNKOWN_STR));
+        res.Insert(kParentProcess.LogKey(), StringView(kUnkownStr));
         return res;
     }
     { // finalize parent tags
-        std::string permitted = GetCapabilities(parentProc->msg->creds.caps.permitted);
-        std::string effective = GetCapabilities(parentProc->msg->creds.caps.effective);
-        std::string inheritable = GetCapabilities(parentProc->msg->creds.caps.inheritable);
+        std::string permitted = GetCapabilities(parentProc->msg.creds.caps.permitted);
+        std::string effective = GetCapabilities(parentProc->msg.creds.caps.effective);
+        std::string inheritable = GetCapabilities(parentProc->msg.creds.caps.inheritable);
 
         rapidjson::Document d;
         d.SetObject();
@@ -957,13 +925,13 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
 
         rapidjson::Value cap(rapidjson::kObjectType);
 
-        cap.AddMember(rapidjson::StringRef(PERMITTED_STR.data()),
+        cap.AddMember(rapidjson::StringRef(kPermittedStr.data()),
                       rapidjson::Value().SetString(permitted.c_str(), allocator),
                       allocator);
-        cap.AddMember(rapidjson::StringRef(EFFECTIVE_STR.data()),
+        cap.AddMember(rapidjson::StringRef(kEffectiveStr.data()),
                       rapidjson::Value().SetString(effective.c_str(), allocator),
                       allocator);
-        cap.AddMember(rapidjson::StringRef(INHERITABLE_STR.data()),
+        cap.AddMember(rapidjson::StringRef(kInheritableStr.data()),
                       rapidjson::Value().SetString(inheritable.c_str(), allocator),
                       allocator);
 

@@ -26,17 +26,17 @@ struct MsgUserRecord {
 };
 
 struct MsgProcess {
-    uint32_t size;
-    uint32_t pid;
-    uint32_t tid;
-    uint32_t nspid;
-    uint32_t secure_exec;
-    uint32_t uid;
-    uint32_t auid;
-    uint32_t flags;
-    uint32_t nlink;
-    uint64_t ino;
-    uint64_t ktime;
+    uint32_t size = 0U;
+    uint32_t pid = 0U;
+    uint32_t tid = 0U;
+    uint32_t nspid = 0U;
+    uint32_t secure_exec = 0U;
+    uint32_t uid = 0U;
+    uint32_t auid = 0U;
+    uint32_t flags = 0U;
+    uint32_t nlink = 0U;
+    uint64_t ino = 0UL;
+    uint64_t ktime = 0UL;
     std::string filename;
     std::string args;
     std::string cmdline;
@@ -51,13 +51,12 @@ struct MsgProcess {
 
 class MsgExecveEventUnix {
 public:
-    MsgExecveEventUnix() : msg(nullptr) {}
-    std::unique_ptr<MsgExecveEvent> msg;
+    MsgExecveEvent msg;
     MsgK8sUnix kube;
     MsgProcess process;
+    bool kernel_thread = false;
     std::string exec_id;
     std::string parent_exec_id;
-    bool kernel_thread;
     std::string tags;
 };
 

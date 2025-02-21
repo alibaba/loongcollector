@@ -23,7 +23,7 @@ public:
                  uint32_t daddr,
                  uint16_t sport,
                  uint16_t dport,
-                 uint32_t net_ns)
+                 uint32_t netNs)
         : CommonEvent(pid, ktime, type, timestamp),
           mProtocol(protocol),
           mFamily(family),
@@ -31,7 +31,7 @@ public:
           mDport(dport),
           mSaddr(saddr),
           mDaddr(daddr),
-          mNetns(net_ns) {}
+          mNetns(netNs) {}
     virtual PluginType GetPluginType() const { return PluginType::NETWORK_SECURITY; };
     uint16_t mProtocol;
     uint16_t mFamily;
@@ -52,7 +52,7 @@ public:
                       uint32_t daddr,
                       uint16_t sport,
                       uint16_t dport,
-                      uint32_t net_ns)
+                      uint32_t netNs)
         : mPid(pid),
           mKtime(ktime),
           mProtocol(protocol),
@@ -61,7 +61,7 @@ public:
           mDport(dport),
           mSaddr(saddr),
           mDaddr(daddr),
-          mNetns(net_ns) {}
+          mNetns(netNs) {}
     uint32_t mPid;
     uint64_t mKtime;
     uint16_t mProtocol;

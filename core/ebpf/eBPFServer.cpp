@@ -199,8 +199,9 @@ void eBPFServer::Init() {
 }
 
 void eBPFServer::Stop() {
-    if (!mInited)
+    if (!mInited) {
         return;
+    }
     mInited = false;
 
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));

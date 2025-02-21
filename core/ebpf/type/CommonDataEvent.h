@@ -36,11 +36,12 @@ enum class KernelEventType {
 
 class CommonEvent {
 public:
-    ~CommonEvent() {}
     explicit CommonEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
         : mPid(pid), mKtime(ktime), mEventType(type), mTimestamp(timestamp) {}
+    virtual ~CommonEvent() {}
+
     virtual PluginType GetPluginType() const = 0;
-    virtual KernelEventType GetKernelEventType() const { return mEventType; };
+    virtual KernelEventType GetKernelEventType() const { return mEventType; }
     uint32_t mPid;
     uint64_t mKtime;
     KernelEventType mEventType;

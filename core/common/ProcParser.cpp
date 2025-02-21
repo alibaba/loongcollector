@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <charconv>
 #include <cstring>
 #include <limits.h>
 
@@ -23,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #if defined(__linux__)
 #include <pwd.h>
@@ -61,27 +63,22 @@ uint32_t Status::ConvertToInt(const std::string& id) const {
 }
 
 std::filesystem::path ProcParser::ProcPidPath(uint32_t pid, const std::string& subpath) const {
-    try {
-        return std::filesystem::path(proc_path_) / std::to_string(pid) / subpath;
-    } catch (std::exception& exception) {
-        return std::filesystem::path();
-    }
+    return mProcPath / std::to_string(pid) / subpath;
 }
 
 std::string ProcParser::ReadPIDLink(uint32_t pid, const std::string& filename) const {
     const auto fpath = ProcPidPath(pid, filename);
-    try {
-        return std::filesystem::read_symlink(fpath).string();
-    } catch (std::filesystem::filesystem_error& e) {
-        LOG_DEBUG(sLogger, ("[ReadPIDLink] failed pid", pid)("filename", filename)("e", e.what()));
+    std::error_code ec;
+    std::string netStr = std::filesystem::read_symlink(fpath, ec).string();
+    if (ec) {
+        LOG_DEBUG(sLogger, ("[ReadPIDLink] failed pid", pid)("filename", filename)("e", ec.message()));
         return "";
     }
+    return netStr;
 }
 
 std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename, const std::string& delimiter) const {
-    //  const auto fpath = ProcPidPath(pid, filename);
-    std::filesystem::path procRoot = proc_path_;
-    std::filesystem::path fpath = procRoot / std::to_string(pid) / filename;
+    std::filesystem::path fpath = mProcPath / std::to_string(pid) / filename;
     std::ifstream ifs(fpath);
     if (!ifs) {
         return "";
@@ -148,8 +145,8 @@ ProcParser::LookupContainerId(const std::string& cgroup, bool bpfSource, bool wa
 
     auto [container, i] = ProcsContainerIdOffset(subdir);
 
-    if (container.size() >= ContainerIdLength || (idTruncated && container.size() >= BpfContainerIdLength)) {
-        return {container.substr(0, BpfContainerIdLength), i};
+    if (container.size() >= kContainerIdLength || (idTruncated && container.size() >= kBpfContainerIdLength)) {
+        return {container.substr(0, kBpfContainerIdLength), i};
     }
 
     if (cgroup.find("libpod") != std::string::npos && container == "container") {
@@ -162,9 +159,9 @@ ProcParser::LookupContainerId(const std::string& cgroup, bool bpfSource, bool wa
 
     for (int j = subDirs.size() - 2; j > 1; --j) {
         auto [container, i] = ProcsContainerIdOffset(subDirs[j]);
-        if (container.size() == ContainerIdLength
-            || (container.size() > ContainerIdLength && container.find("scope") != std::string::npos)) {
-            return {container.substr(0, BpfContainerIdLength), i};
+        if (container.size() == kContainerIdLength
+            || (container.size() > kContainerIdLength && container.find("scope") != std::string::npos)) {
+            return {container.substr(0, kBpfContainerIdLength), i};
         }
     }
     return {"", 0};
@@ -215,18 +212,35 @@ std::pair<std::string, uint32_t> ProcParser::GetPIDCWD(uint32_t pid) const {
 }
 
 std::string ProcParser::GetUserNameByUid(uid_t uid) {
+    static std::string sEmpty;
 #if defined(__linux__)
-    passwd* pw = getpwuid(uid);
-    if (pw)
-        return std::string(pw->pw_name);
-    else
-        return "";
+    thread_local static std::unordered_map<uid_t, std::string> sUserNameCache;
+
+    auto it = sUserNameCache.find(uid);
+    if (it != sUserNameCache.end()) {
+        return it->second;
+    }
+    struct passwd pwd {};
+    struct passwd* result = nullptr;
+    char buf[8192]; // This buffer size is quite large. If it's still not enough, it's unusual and we return an empty
+                    // result.
+
+    int ret = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
+    if (ret == 0 && result) {
+        if (sUserNameCache.size() > 100000) { // If we have too many entries, reset the cache.
+            sUserNameCache.clear();
+        }
+        sUserNameCache[uid] = pwd.pw_name;
+        return sUserNameCache[uid];
+    }
+    return sEmpty;
 #elif defined(_MSC_VER)
-    return "";
+    return sEmpty;
 #endif
 }
 
-std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32_t origin_pid) const {
+// TODO: 实现与其他读status的合并一下
+std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32_t originPid) const {
     uint32_t pid = 0;
     uint64_t permitted = 0;
     uint64_t effective = 0;
@@ -235,15 +249,15 @@ std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32
     auto getValue64Hex = [](const std::string& line) -> std::tuple<uint64_t, std::string> {
         std::istringstream stream(line);
         std::string field;
-        uint64_t value;
+        uint64_t value = 0;
 
-        while (stream >> field)
-            ;
-        try {
-            value = std::stoull(field, nullptr, 16);
-        } catch (const std::invalid_argument&) {
+        while (stream >> field) {
+        }
+        auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), value, 16);
+        if (ec == std::errc::invalid_argument) {
             return {0, "Invalid argument in line: " + line};
-        } catch (const std::out_of_range&) {
+        }
+        if (ec == std::errc::result_out_of_range) {
             return {0, "Out of range in line: " + line};
         }
         return {value, ""};
@@ -252,21 +266,21 @@ std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32
     auto getValue32Int = [](const std::string& line) -> std::tuple<uint32_t, std::string> {
         std::istringstream stream(line);
         std::string field;
-        uint32_t value;
+        uint32_t value = 0;
 
-        while (stream >> field)
-            ;
-        try {
-            value = std::stoul(field);
-        } catch (const std::invalid_argument&) {
+        while (stream >> field) {
+        }
+        auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), value, 16);
+        if (ec == std::errc::invalid_argument) {
             return {0, "Invalid argument in line: " + line};
-        } catch (const std::out_of_range&) {
+        }
+        if (ec == std::errc::result_out_of_range) {
             return {0, "Out of range in line: " + line};
         }
         return {value, ""};
     };
 
-    std::string filename = proc_path_ + "/" + std::to_string(origin_pid) + "/status";
+    std::string filename = mProcPath / std::to_string(originPid) / "status";
     std::ifstream file(filename);
     if (!file.is_open()) {
         LOG_WARNING(sLogger, ("ReadFile failed", filename));
@@ -293,26 +307,24 @@ std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32
     return {pid, permitted, effective, inheritable};
 }
 
-uint64_t ProcParser::GetStatsKtime(std::vector<std::string>& proc_stat) const {
-    if (proc_stat.size() <= 21) {
-        throw std::out_of_range("Index 21 is out of range for the input vector");
+int64_t ProcParser::GetStatsKtime(ProcStat& procStat) const {
+    if (procStat.stats.size() <= 21) {
+        return -1;
     }
 
-    try {
-        uint64_t ktime = std::stoull(proc_stat[21]);
-        return ktime * (nanoPerSeconds / clktck);
-    } catch (const std::invalid_argument& e) {
-        LOG_WARNING(sLogger, ("Invalid argument, e", e.what()));
-        return 0;
-    } catch (const std::out_of_range& e) {
-        LOG_WARNING(sLogger, ("Out of range, proc stat size", proc_stat.size()));
-        return 0;
+    int64_t ktime = 0L;
+    const auto* kTimeLast = procStat.stats[21].data() + procStat.stats[21].size();
+    auto [ptr, ec] = std::from_chars(procStat.stats[21].data(), kTimeLast, ktime);
+    if (ec != std::errc() || ptr != kTimeLast) {
+        LOG_WARNING(sLogger, ("Parse ktime", "failed"));
+        return -1;
     }
+    return ktime * (kNanoPerSeconds / kClktck);
 }
 
-uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& ns_str) const {
+uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& nsStr) const {
     std::string pidStr = std::to_string(pid);
-    std::filesystem::path netns = std::filesystem::path(proc_path_) / pidStr / "ns" / ns_str;
+    std::filesystem::path netns = std::filesystem::path(mProcPath) / pidStr / "ns" / nsStr;
 
     std::error_code ec;
     std::string netStr = std::filesystem::read_symlink(netns, ec).string();
@@ -326,29 +338,31 @@ uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& ns_str) cons
         LOG_WARNING(sLogger, ("parsing namespace fields less than 2, net str ", netStr)("netns", netns));
         return 0;
     }
-
-    std::string inode = fields[1];
-    inode = inode.substr(1, inode.size() - 2); // Remove [ and ]
-    uint64_t inodeEntry;
-    try {
-        inodeEntry = std::stoull(inode);
-    } catch (const std::invalid_argument& e) {
-        LOG_WARNING(sLogger, ("Invalid argument, e", e.what()));
-        return 0;
-    } catch (const std::out_of_range& e) {
-        LOG_WARNING(sLogger, ("Out of range:, e", e.what()));
+    auto openPos = netStr.find('[');
+    auto closePos = netStr.find_last_of(']');
+    if (openPos == std::string::npos || closePos == std::string::npos || openPos >= closePos) {
+        LOG_WARNING(sLogger, ("Invalid argument in line: ", netStr));
         return 0;
     }
-
-    return static_cast<uint32_t>(inodeEntry);
+    uint32_t inodeEntry = 0;
+    auto [ptr, errc] = std::from_chars(netStr.data() + openPos, netStr.data() + closePos, inodeEntry, 16);
+    if (errc == std::errc::invalid_argument) {
+        LOG_WARNING(sLogger, ("Invalid argument in line: ", netStr));
+        return 0;
+    }
+    if (errc == std::errc::result_out_of_range) {
+        LOG_WARNING(sLogger, ("Out of range in line: ", netStr));
+        return 0;
+    }
+    return inodeEntry;
 }
 
-int ProcParser::FillStatus(uint32_t pid, std::shared_ptr<Status> status) const {
+int ProcParser::FillStatus(uint32_t pid, Status& status) const {
     const auto path = ProcPidPath(pid, "status");
 
     std::ifstream f(path);
 
-    if (!f.is_open()) {
+    if (!f) {
         LOG_WARNING(sLogger, ("open failed, path", path));
         return -1;
     }
@@ -357,37 +371,39 @@ int ProcParser::FillStatus(uint32_t pid, std::shared_ptr<Status> status) const {
     while (std::getline(f, line)) {
         std::istringstream iss(line);
         std::vector<std::string> fields;
+        fields.reserve(256);
         std::string field;
         while (iss >> field) {
             fields.push_back(field);
         }
-        if (fields.size() < 2)
+        if (fields.size() < 2) {
             continue;
+        }
         if (fields[0] == "Uid:") {
             if (fields.size() != 5) {
                 LOG_WARNING(sLogger, ("Reading Uid failed: malformed input, path", path));
                 return -1;
             }
-            status->uids = {fields[1], fields[2], fields[3], fields[4]};
+            status.uids = {fields[1], fields[2], fields[3], fields[4]};
         }
         if (fields[0] == "Gid:") {
             if (fields.size() != 5) {
                 LOG_WARNING(sLogger, ("Reading Gid failed: malformed input, path", path));
                 return -1;
             }
-            status->gids = {fields[1], fields[2], fields[3], fields[4]};
+            status.gids = {fields[1], fields[2], fields[3], fields[4]};
         }
-        if (!status->uids.empty() && !status->gids.empty()) {
+        if (!status.uids.empty() && !status.gids.empty()) {
             break;
         }
     }
     return 0;
 }
 
-int ProcParser::FillLoginUid(uint32_t pid, std::shared_ptr<Status> status) const {
+int ProcParser::FillLoginUid(uint32_t pid, Status& status) const {
     try {
-        std::string login_uid = ReadPIDFile(pid, "loginuid", "");
-        status->login_uid = login_uid;
+        std::string loginUid = ReadPIDFile(pid, "loginuid", "");
+        status.loginUid = loginUid;
     } catch (std::runtime_error& error) {
         return -1;
     }
@@ -395,17 +411,15 @@ int ProcParser::FillLoginUid(uint32_t pid, std::shared_ptr<Status> status) const
 }
 
 // TODO @qianlu.kk
-std::shared_ptr<Status> ProcParser::GetStatus(uint32_t pid) const {
-    auto status = std::make_shared<Status>();
-
+int ProcParser::GetStatus(uint32_t pid, Status& status) const {
     if (FillStatus(pid, status) != 0 || FillLoginUid(pid, status) != 0) {
-        return nullptr;
+        return -1;
     }
-    return status;
+    return 0;
 }
 
 std::tuple<std::string, std::string> ProcParser::ProcsFilename(const std::string& args) {
-    std::string filename = args;
+    std::string filename;
     std::string cmds;
     size_t idx = args.find('\0');
 
@@ -419,24 +433,26 @@ std::tuple<std::string, std::string> ProcParser::ProcsFilename(const std::string
     return std::make_tuple(cmds, filename);
 }
 
-std::vector<std::string> ProcParser::GetProcStatStrings(uint32_t pid) const {
-    std::string path = proc_path_ + "/" + std::to_string(pid) + "/stat";
+int ProcParser::GetProcStatStrings(uint32_t pid, ProcStat& stat) const {
+    std::string path = mProcPath / std::to_string(pid) / "stat";
     std::ifstream file(path);
-    if (!file.is_open()) {
-        throw std::runtime_error("ReadFile: " + path + "/stat error");
+    if (!file) {
+        return -1;
     }
+    try {
+        stat.buffer.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    } catch (const std::ios_base::failure& e) {
+        return -1;
+    }
+    auto& statline = stat.buffer;
+    auto& output = stat.stats;
 
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string statline = buffer.str();
-
-    std::vector<std::string> output;
     size_t oldIndex = statline.length();
     size_t index = statline.find_last_of(' ');
 
     // Build list of strings in reverse order
     while (index != std::string::npos) {
-        output.push_back(statline.substr(index + 1, oldIndex - index - 1));
+        output.emplace_back(statline.data() + index + 1, oldIndex - index - 1);
         if (statline[index - 1] == ')') {
             break;
         }
@@ -445,17 +461,16 @@ std::vector<std::string> ProcParser::GetProcStatStrings(uint32_t pid) const {
     }
 
     if (index == std::string::npos) {
-        output.push_back(statline.substr(0, oldIndex));
+        output.emplace_back(statline.data(), oldIndex);
     } else {
         size_t commIndex = statline.find_first_of(' ');
-        output.push_back(statline.substr(commIndex + 1, index - commIndex - 1));
-        output.push_back(statline.substr(0, commIndex));
+        output.emplace_back(statline.data() + commIndex + 1, index - commIndex - 1);
+        output.emplace_back(statline.data(), commIndex);
     }
 
     // Reverse the array
     std::reverse(output.begin(), output.end());
-
-    return output;
+    return 0;
 }
 } // namespace logtail
 

@@ -125,7 +125,7 @@ private:
 
     std::string mHostIp;
     std::string mHostName;
-    std::string mHostPathPrefix;
+    std::filesystem::path mHostPathPrefix;
 
     EnvManager mEnvMgr;
     MetricsRecordRef mRef;

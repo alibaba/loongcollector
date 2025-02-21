@@ -68,19 +68,16 @@ inline bool operator&(ApiEventFlag lhs, ApiEventFlag rhs) {
     return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
 }
 
-
-int GuessContainerIdOffset();
-
 struct Status {
 public:
     std::vector<std::string> uids;
     std::vector<std::string> gids;
-    std::string login_uid;
+    std::string loginUid;
     std::vector<uint32_t> GetUids() const { return ConvertToInt(uids); }
 
     std::vector<uint32_t> GetGids() const { return ConvertToInt(gids); }
 
-    uint32_t GetLoginUid() const { return ConvertToInt(login_uid); }
+    uint32_t GetLoginUid() const { return ConvertToInt(loginUid); }
 
 private:
     std::vector<uint32_t> ConvertToInt(const std::vector<std::string>& ids) const;
@@ -88,21 +85,31 @@ private:
     uint32_t ConvertToInt(const std::string& id) const;
 };
 
+class ProcStat {
+public:
+    ProcStat() {
+        buffer.reserve(512);
+        stats.reserve(52); // 52 is the number of fields in proc/stat
+    }
+    std::string buffer;
+    std::vector<std::string_view> stats;
+};
+
 class ProcParser {
 public:
-    ProcParser(const std::string& prefix) : host_path_(prefix), proc_path_(prefix + "/proc") {}
+    ProcParser(const std::string& prefix) : mProcPath(prefix + "/proc") {}
 
     std::string GetPIDCmdline(uint32_t pid) const;
     std::string GetPIDComm(uint32_t pid) const;
     std::string GetPIDEnviron(uint32_t pid) const;
     std::pair<std::string, uint32_t> GetPIDCWD(uint32_t) const;
-    std::vector<std::string> GetProcStatStrings(uint32_t pid) const;
-    uint64_t GetStatsKtime(std::vector<std::string>& proc_stat) const;
-    std::shared_ptr<Status> GetStatus(uint32_t pid) const;
+    int GetProcStatStrings(uint32_t pid, ProcStat& stat) const;
+    int64_t GetStatsKtime(ProcStat& procStat) const;
+    int GetStatus(uint32_t pid, Status& status) const;
 
     std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> GetPIDCaps(uint32_t pid) const;
     std::string GetPIDDockerId(uint32_t) const;
-    uint32_t GetPIDNsInode(uint32_t pid, const std::string& ns_str) const;
+    uint32_t GetPIDNsInode(uint32_t pid, const std::string& nsStr) const;
     std::string GetPIDExePath(uint32_t pid) const;
     std::tuple<std::string, int> LookupContainerId(const std::string& cgroup, bool bpfSource, bool walkParent) const;
     uint32_t invalid_uid_ = UINT32_MAX;
@@ -111,24 +118,22 @@ public:
     std::string GetUserNameByUid(uid_t uid);
 
 private:
-    std::string GetProcPath() const { return proc_path_; }
     std::filesystem::path ProcPidPath(uint32_t pid, const std::string& subpath) const;
-    int FillStatus(uint32_t pid, std::shared_ptr<Status> status) const;
-    int FillLoginUid(uint32_t pid, std::shared_ptr<Status> status) const;
+    int FillStatus(uint32_t pid, Status& status) const;
+    int FillLoginUid(uint32_t pid, Status& status) const;
     std::string ReadPIDFile(uint32_t pid, const std::string& filename, const std::string& delimiter) const;
     std::string ReadPIDLink(uint32_t pid, const std::string& filename) const;
     std::tuple<std::string, int> ProcsFindDockerId(const std::string& cgroups) const;
     std::vector<std::string> split(const std::string& str, char delimiter) const;
     std::tuple<std::string, int> ProcsContainerIdOffset(const std::string& subdir) const;
 
-    std::string host_path_;
-    std::string proc_path_;
+    std::filesystem::path mProcPath;
 
-    const size_t ContainerIdLength = 64;
-    const size_t BpfContainerIdLength = 64;
+    static constexpr size_t kContainerIdLength = 64;
+    static constexpr size_t kBpfContainerIdLength = 64;
     //  const int DOCKER_ID_LENGTH = 128;
-    const size_t CGROUP_NAME_LENGTH = 128;
-    const uint64_t nanoPerSeconds = 1000000000;
-    const uint64_t clktck = 100;
+    static constexpr size_t kCgroupNameLength = 128;
+    static constexpr int64_t kNanoPerSeconds = 1000000000;
+    static constexpr int64_t kClktck = 100;
 };
 } // namespace logtail
