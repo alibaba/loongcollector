@@ -42,11 +42,16 @@ public:
     SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
 
     void SetInterval(size_t interval);
-    void Merge(SelfMonitorMetricEvent& event);
+    void Merge(const SelfMonitorMetricEvent& event);
+    void Copy(const SelfMonitorMetricEvent& event);
 
     bool ShouldSend();
     bool ShouldDelete();
     void ReadAsMetricEvent(MetricEvent* metricEventPtr);
+
+    std::unordered_map<std::string, std::string>& GetLabels() { return mLabels; }
+    std::unordered_map<std::string, uint64_t>& GetCounters() { return mCounters; }
+    std::unordered_map<std::string, double>& GetGauges() { return mGauges; }
 
     SelfMonitorMetricEventKey mKey; // labels + category
     std::string mCategory; // category

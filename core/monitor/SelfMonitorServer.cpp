@@ -16,6 +16,8 @@
 
 #include "monitor/SelfMonitorServer.h"
 
+#include "MetricConstants.h"
+#include "Monitor.h"
 #include "common/LogtailCommonFlags.h"
 #include "runner/ProcessorRunner.h"
 
@@ -139,8 +141,11 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
     for (auto event : events) {
         bool shouldSkip = false;
         if (event.mCategory == MetricCategory::METRIC_CATEGORY_AGENT) {
+            LoongCollectorMonitor::GetInstance()->SetAgentMetricData(event);
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mAgentMetricsRule);
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_RUNNER) {
+            LoongCollectorMonitor::GetInstance()->SetRunnerMetricData(event.GetLabels()[METRIC_LABEL_KEY_RUNNER_NAME],
+                                                                      event);
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mRunnerMetricsRule);
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_COMPONENT) {
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mComponentMetricsRule);
