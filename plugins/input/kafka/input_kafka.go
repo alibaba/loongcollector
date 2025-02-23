@@ -165,7 +165,7 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 				// This loop will only exit when the context is canceled (i.e., when loongcollector process is stopping)
 				logger.Error(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Error from kafka consumer", err)
 
-				// Add a retry delay to avoid busy loop
+				// Add a retry delay to avoid busy loop.
 				select {
 				case <-time.After(time.Second * 5):
 				case <-cancelCtx.Done():
