@@ -32,9 +32,9 @@ namespace ebpf {
 
 class NetworkSecurityManager : public AbstractManager {
 public:
-    static const std::string sTcpSendMsgValue;
-    static const std::string sTcpCloseValue;
-    static const std::string sTcpConnectValue;
+    static const std::string kTcpSendMsgValue;
+    static const std::string kTcpCloseValue;
+    static const std::string kTcpConnectValue;
 
     NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
                            std::shared_ptr<SourceManager> sourceManager,
@@ -50,7 +50,7 @@ public:
         return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, scheduler);
     }
 
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) override;
+    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     void RecordNetworkEvent(tcp_data_t* event);
@@ -59,10 +59,10 @@ public:
 
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
+    int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;

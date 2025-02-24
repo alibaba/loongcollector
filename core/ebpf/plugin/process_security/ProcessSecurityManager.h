@@ -27,11 +27,11 @@ namespace logtail {
 namespace ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
-    static const std::string sExitTidKey;
-    static const std::string sExitCodeKey;
-    static const std::string sExecveValue;
-    static const std::string sCloneValue;
-    static const std::string sExitValue;
+    static const std::string kExitTidKey;
+    static const std::string kExitCodeKey;
+    static const std::string kExecveValue;
+    static const std::string kCloneValue;
+    static const std::string kExitValue;
 
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -48,26 +48,28 @@ public:
     }
 
     ~ProcessSecurityManager() {}
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
+    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
-    virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
+    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
+    int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
     bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
     // process perfbuffer was polled by baseManager ...
-    virtual int PollPerfBuffer() override { return 0; }
+    int PollPerfBuffer() override { return 0; }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
+        override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
         return ebpfConfig;
     }
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
+    int Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
+        override {
         // do nothing ...
         LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0;

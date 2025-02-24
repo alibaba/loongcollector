@@ -48,19 +48,19 @@ public:
     }
 
     ~FileSecurityManager() {}
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
+    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     void RecordFileEvent(file_data_t* event);
 
     bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override;
+    int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    virtual PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
+    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;

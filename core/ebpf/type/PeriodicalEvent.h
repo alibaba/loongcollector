@@ -27,7 +27,10 @@ public:
                    std::function<bool(const std::chrono::steady_clock::time_point&)> handler,
                    std::function<bool(int)> stopChecker,
                    int uid = 0)
-        : PeriodicalTimerEvent(interval), mUid(uid), mHandler(std::move(handler)), mStopChecker(std::move(stopChecker)) {}
+        : PeriodicalTimerEvent(interval),
+          mUid(uid),
+          mHandler(std::move(handler)),
+          mStopChecker(std::move(stopChecker)) {}
 
     bool IsValid() const override { return true; }
 

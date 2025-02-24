@@ -20,6 +20,7 @@
 #include <queue>
 #include <set>
 #include <unordered_map>
+#include <utility>
 
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
@@ -48,11 +49,11 @@ public:
                              std::shared_ptr<Timer> scheduler);
     virtual ~AbstractManager() {}
 
-    virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
+    virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) = 0;
 
     virtual int Destroy() = 0;
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) = 0;
+    virtual int HandleEvent(const std::shared_ptr<CommonEvent>& event) = 0;
 
     virtual int PollPerfBuffer() {
         int zero = 0;
@@ -64,7 +65,7 @@ public:
 
     bool IsRunning() { return mFlag && !mSuspendFlag; }
 
-    int GetCallNameIdx(const std::string& call_name);
+    int GetCallNameIdx(const std::string& callName);
 
     virtual logtail::ebpf::PluginType GetPluginType() = 0;
 
@@ -79,7 +80,7 @@ public:
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;
@@ -92,10 +93,12 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) = 0;
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
+        = 0;
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    virtual int
+    Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
         bool ret = mSourceManager->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
@@ -113,7 +116,7 @@ public:
 
     void UpdateBaseManager(std::shared_ptr<ProcessCacheManager> other) {
         WriteLock lk(mBaseMgrLock);
-        mBaseManager = other;
+        mBaseManager = std::move(other);
     }
 
     std::shared_ptr<ProcessCacheManager> GetBaseManager() const {
@@ -121,11 +124,11 @@ public:
         return mBaseManager;
     }
 
-    mutable ReadWriteLock mMtx;
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
 
 private:
+    mutable ReadWriteLock mMtx;
     mutable ReadWriteLock mBaseMgrLock;
     std::shared_ptr<ProcessCacheManager> mBaseManager;
 

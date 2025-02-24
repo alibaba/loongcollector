@@ -194,7 +194,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     return true;
 }
 
-int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
+int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // set init flag ...
     mFlag = true;
     mStartUid++;
@@ -246,8 +246,8 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
     return hash_result;
 }
 
-int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
-    FileEvent* fileEvent = static_cast<FileEvent*>(event.get());
+int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
+    auto* fileEvent = static_cast<FileEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(
                   "eventType", magic_enum::enum_name(event->mEventType)));
@@ -260,10 +260,10 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
     }
 
     // calculate agg key
-    std::array<size_t, 2> hash_result = GenerateAggKeyForFileEvent(event);
+    std::array<size_t, 2> hashResult = GenerateAggKeyForFileEvent(event);
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, hashResult);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
     return 0;

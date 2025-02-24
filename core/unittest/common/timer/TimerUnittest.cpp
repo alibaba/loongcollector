@@ -58,7 +58,6 @@ void TimerUnittest::TestPushEvent() {
 }
 
 void TimerUnittest::TestPeriodicEvent() {
-    auto now = chrono::steady_clock::now();
     Timer timer;
     timer.Init();
     std::unique_ptr<ebpf::AggregateEvent> event = std::make_unique<ebpf::AggregateEvent>(

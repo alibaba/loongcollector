@@ -234,7 +234,7 @@ void ManagerUnittest::TestManagerErrorHandling() {
 
 void ManagerUnittest::TestBaseManagerCache() {
     // 测试缓存操作
-    std::string key = "test_key";
+    data_event_id key{12345, 1234567890};
     auto execveEvent = std::make_shared<MsgExecveEventUnix>();
     execveEvent->process.pid = 1234;
     execveEvent->process.ktime = 5678;
@@ -297,12 +297,11 @@ void ManagerUnittest::TestBaseManagerDataEvents() {
     mBaseManager->RecordDataEvent(&dataEvent);
 
     // 测试数据事件ID生成和查找
-    data_event_desc desc;
+    data_event_desc desc{};
     desc.id.pid = 1234;
     desc.id.time = 5678;
     desc.size = testArg.size();
     desc.leftover = 0;
-    data_event_id id = {desc.id.pid, desc.id.time};
 
     // mBaseManager->DataAdd(&dataEvent);
     std::string retrievedData = mBaseManager->DataGet(&desc);
@@ -316,11 +315,9 @@ void ManagerUnittest::TestBaseManagerProcessTags() {
     execveEvent->process.ktime = 5678;
     execveEvent->process.uid = 1000;
     execveEvent->process.binary = "test_binary";
-    auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_key.ktime = 0;
-    msg->parent.pid = 2345;
-    msg->parent.ktime = 6789;
-    execveEvent->msg = std::move(msg);
+    execveEvent->msg.cleanup_key.ktime = 0;
+    execveEvent->msg.parent.pid = 2345;
+    execveEvent->msg.parent.ktime = 6789;
 
     // parent
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
@@ -328,12 +325,11 @@ void ManagerUnittest::TestBaseManagerProcessTags() {
     pExecveEvent->process.ktime = 6789;
     pExecveEvent->process.uid = 1000;
     pExecveEvent->process.binary = "test_binary_parent";
-    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
 
     // 更新缓存
-    std::string key = mBaseManager->GenerateExecId(execveEvent->process.pid, execveEvent->process.ktime);
+    data_event_id key{execveEvent->process.pid, execveEvent->process.ktime};
     mBaseManager->UpdateCache(key, execveEvent);
-    key = mBaseManager->GenerateExecId(pExecveEvent->process.pid, pExecveEvent->process.ktime);
+    key = {pExecveEvent->process.pid, pExecveEvent->process.ktime};
     mBaseManager->UpdateCache(key, pExecveEvent);
 
     // 测试进程标签生成
@@ -463,7 +459,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
 
     // add cache
     auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    data_event_id key{1234, 5678};
     execveEvent->process.pid = 1234;
     execveEvent->process.ktime = 5678;
     execveEvent->process.uid = 1000;
@@ -472,17 +468,15 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     execveEvent->process.filename = "test_filename";
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
-    auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_key.ktime = 0;
-    msg->parent.pid = 2345;
-    msg->parent.ktime = 6789;
-    execveEvent->msg = std::move(msg);
+    execveEvent->msg.cleanup_key.ktime = 0;
+    execveEvent->msg.parent.pid = 2345;
+    execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
     mBaseManager->UpdateCache(key, execveEvent);
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    data_event_id pkey{2345, 6789};
     pExecveEvent->process.pid = 2345;
     pExecveEvent->process.ktime = 6789;
     pExecveEvent->process.uid = 1000;
@@ -491,7 +485,6 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     pExecveEvent->process.filename = "test_filename";
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
-    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
 
     mBaseManager->UpdateCache(pkey, pExecveEvent);
 
@@ -527,7 +520,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
 
     // add cache
     auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    data_event_id key{1234, 5678};
     execveEvent->process.pid = 1234;
     execveEvent->process.ktime = 5678;
     execveEvent->process.uid = 1000;
@@ -536,17 +529,15 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     execveEvent->process.filename = "test_filename";
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
-    auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_key.ktime = 0;
-    msg->parent.pid = 2345;
-    msg->parent.ktime = 6789;
-    execveEvent->msg = std::move(msg);
+    execveEvent->msg.cleanup_key.ktime = 0;
+    execveEvent->msg.parent.pid = 2345;
+    execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
     mBaseManager->UpdateCache(key, execveEvent);
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    data_event_id pkey{2345, 6789};
     pExecveEvent->process.pid = 2345;
     pExecveEvent->process.ktime = 6789;
     pExecveEvent->process.uid = 1000;
@@ -555,7 +546,6 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     pExecveEvent->process.filename = "test_filename";
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
-    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
 
     mBaseManager->UpdateCache(pkey, pExecveEvent);
 
@@ -592,7 +582,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
 
     // add cache
     auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string key = mBaseManager->GenerateExecId(1234, 5678);
+    data_event_id key{1234, 5678};
     execveEvent->process.pid = 1234;
     execveEvent->process.ktime = 5678;
     execveEvent->process.uid = 1000;
@@ -601,17 +591,15 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     execveEvent->process.filename = "test_filename";
     execveEvent->process.args = "test_arg";
     execveEvent->process.cmdline = "test_cmdline";
-    auto msg = std::make_unique<MsgExecveEvent>();
-    msg->cleanup_key.ktime = 0;
-    msg->parent.pid = 2345;
-    msg->parent.ktime = 6789;
-    execveEvent->msg = std::move(msg);
+    execveEvent->msg.cleanup_key.ktime = 0;
+    execveEvent->msg.parent.pid = 2345;
+    execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
     mBaseManager->UpdateCache(key, execveEvent);
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
-    std::string pkey = mBaseManager->GenerateExecId(2345, 6789);
+    data_event_id pkey{2345, 6789};
     pExecveEvent->process.pid = 2345;
     pExecveEvent->process.ktime = 6789;
     pExecveEvent->process.uid = 1000;
@@ -620,7 +608,6 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     pExecveEvent->process.filename = "test_filename";
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
-    pExecveEvent->msg = std::make_unique<MsgExecveEvent>();
 
     mBaseManager->UpdateCache(pkey, pExecveEvent);
 

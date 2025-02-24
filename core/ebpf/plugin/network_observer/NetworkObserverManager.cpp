@@ -690,8 +690,8 @@ int GuessContainerIdOffset() {
     return -1;
 }
 
-int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
-    auto opt = std::get<ObserverNetworkOption*>(options);
+int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    auto* opt = std::get<ObserverNetworkOption*>(options);
     if (!opt) {
         LOG_ERROR(sLogger, ("invalid options", ""));
         return -1;

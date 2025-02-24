@@ -134,7 +134,7 @@ void ProcParserUnittest::TestGetPIDCWD() {
 
     auto [cwd, flags] = mParser->GetPIDCWD(testPid);
     APSARA_TEST_TRUE(cwd.find("/home/user") != std::string::npos);
-    APSARA_TEST_EQUAL(flags & static_cast<uint32_t>(ApiEventFlag::RootCWD), 0);
+    APSARA_TEST_EQUAL(flags & static_cast<uint32_t>(ApiEventFlag::RootCWD), 0U);
 }
 
 void ProcParserUnittest::TestGetPIDDockerId() {
@@ -158,22 +158,23 @@ void ProcParserUnittest::TestGetStatus() {
     const int testPid = 12345;
     CreateProcTestFiles(testPid);
 
-    auto status = mParser->GetStatus(testPid);
-    APSARA_TEST_TRUE(status != nullptr);
+    Status status;
+    mParser->GetStatus(testPid, status);
+    APSARA_TEST_EQUAL_FATAL(0, mParser->GetStatus(testPid, status));
 
-    auto uids = status->GetUids();
-    APSARA_TEST_EQUAL(uids.size(), 4);
+    auto uids = status.GetUids();
+    APSARA_TEST_EQUAL(uids.size(), 4UL);
     for (const auto& uid : uids) {
-        APSARA_TEST_EQUAL(uid, 1000);
+        APSARA_TEST_EQUAL(uid, 1000U);
     }
 
-    auto gids = status->GetGids();
-    APSARA_TEST_EQUAL(gids.size(), 4);
+    auto gids = status.GetGids();
+    APSARA_TEST_EQUAL(gids.size(), 4UL);
     for (const auto& gid : gids) {
-        APSARA_TEST_EQUAL(gid, 1000);
+        APSARA_TEST_EQUAL(gid, 1000U);
     }
 
-    APSARA_TEST_EQUAL(status->GetLoginUid(), 1000);
+    APSARA_TEST_EQUAL(status.GetLoginUid(), 1000U);
 }
 
 void ProcParserUnittest::TestGetPIDNsInode() {
@@ -181,7 +182,7 @@ void ProcParserUnittest::TestGetPIDNsInode() {
     CreateProcTestFiles(testPid);
 
     uint32_t nsInode = mParser->GetPIDNsInode(testPid, "net");
-    APSARA_TEST_EQUAL(nsInode, 4026531992);
+    APSARA_TEST_EQUAL(nsInode, 4026531992U);
 }
 
 void ProcParserUnittest::TestProcsFilename() {

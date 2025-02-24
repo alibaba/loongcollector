@@ -814,7 +814,8 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto proc = LookupCache({pid, ktime});
     if (!proc) {
         LOG_WARNING(sLogger,
-                    ("cannot find proc in cache, pid", pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));
+                    ("cannot find proc in cache, pid",
+                     pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));
         return res;
     }
 

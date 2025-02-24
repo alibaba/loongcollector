@@ -28,9 +28,9 @@
 namespace logtail {
 namespace ebpf {
 
-const std::string NetworkSecurityManager::sTcpSendMsgValue = "tcp_sendmsg";
-const std::string NetworkSecurityManager::sTcpCloseValue = "tcp_close";
-const std::string NetworkSecurityManager::sTcpConnectValue = "tcp_connect";
+const std::string NetworkSecurityManager::kTcpSendMsgValue = "tcp_sendmsg";
+const std::string NetworkSecurityManager::kTcpCloseValue = "tcp_close";
+const std::string NetworkSecurityManager::kTcpConnectValue = "tcp_connect";
 
 void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
     if (!ctx) {
@@ -194,21 +194,21 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 switch (innerEvent->mEventType) {
                     case KernelEventType::TCP_SENDMSG_EVENT: {
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(NetworkSecurityManager::sTcpSendMsgValue));
+                                                   StringView(NetworkSecurityManager::kTcpSendMsgValue));
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
                                                    StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CONNECT_EVENT: {
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(NetworkSecurityManager::sTcpConnectValue));
+                                                   StringView(NetworkSecurityManager::kTcpConnectValue));
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
                                                    StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CLOSE_EVENT: {
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(NetworkSecurityManager::sTcpCloseValue));
+                                                   StringView(NetworkSecurityManager::kTcpCloseValue));
                         logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
                                                    StringView(AbstractManager::sKprobeValue));
                         break;
@@ -236,7 +236,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     return true;
 }
 
-int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*> options) {
+int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     auto securityOpts = std::get_if<SecurityOptions*>(&options);
     if (!securityOpts) {
         LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
@@ -306,7 +306,7 @@ std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<Common
     return hash_result;
 }
 
-int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent> event) {
+int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     NetworkEvent* networkEvent = static_cast<NetworkEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("saddr", networkEvent->mSaddr)(

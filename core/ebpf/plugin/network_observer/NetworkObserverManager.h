@@ -46,19 +46,19 @@ public:
 
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() { Destroy(); }
-    virtual PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
+    PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            std::shared_ptr<Timer> scheduler);
 
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override;
+    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
     int Destroy() override;
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
-    virtual int HandleEvent(const std::shared_ptr<CommonEvent> event) override { return 0; }
+    int HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& event) override { return 0; }
 
-    virtual int PollPerfBuffer() override { return 0; }
+    int PollPerfBuffer() override { return 0; }
 
     void Stop();
 
@@ -77,14 +77,16 @@ public:
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
     std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
+        override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::NETWORK_OBSERVE;
         return ebpfConfig;
     }
 
-    virtual int Update(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options) override {
+    int Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
+        override {
         LOG_WARNING(sLogger, ("TODO", "not support yet"));
         return 0;
     }
