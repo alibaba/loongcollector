@@ -239,3 +239,38 @@ func (s *configUpdateTestSuite) TestStopAllExitTimeout() {
 	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(0, checkFlusher.GetLogCount())
 }
+
+func (s *configUpdateTestSuite) TestUnreadyFlusher() {
+	// block config
+	LogtailConfigLock.RLock()
+	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
+	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
+	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
+	s.True(ok)
+	mockInput, ok := GetConfigInputs(config.PluginRunner)[0].(*mockd.ServiceMock)
+	s.True(ok)
+	s.Equal(0, checkFlusher.GetLogCount(), "the block flusher checker doesn't have any logs")
+
+	// make flusher unready
+	checkFlusher.Ready = false
+	// unblock input
+	mockInput.Block = false
+	time.Sleep(time.Second * time.Duration(3))
+
+	// update config
+	s.NoError(Stop(updateConfigName, false))
+	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
+	_ = LoadAndStartMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName))
+	LogtailConfigLock.RLock()
+	config = LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
+	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
+	checkFlusher, ok = GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
+	s.True(ok)
+	mockInput, ok = GetConfigInputs(config.PluginRunner)[0].(*mockd.ServiceMock)
+	s.True(ok)
+	mockInput.Block = false
+	time.Sleep(time.Second * time.Duration(3))
+	s.Equal(20000+10000, checkFlusher.GetLogCount(), "the new flusher checker should merge the old logs")
+}

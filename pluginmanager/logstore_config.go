@@ -351,6 +351,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if logstoreC.PluginRunner, err = initPluginRunner(logstoreC); err != nil {
 		return nil, err
 	}
+	if lastConfigRunner, hasLastConfig := LastUnsendBuffer[configName]; hasLastConfig {
+		// Move unsent LogGroups from last config to new config.
+		logstoreC.PluginRunner.Merge(lastConfigRunner)
+	}
 
 	logstoreC.ContainerLabelSet = make(map[string]struct{})
 	logstoreC.EnvSet = make(map[string]struct{})
@@ -652,7 +656,7 @@ func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {
 func LoadLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) error {
 	if len(jsonStr) == 0 {
 		logger.Info(context.Background(), "delete config", configName, "logstore", logstore)
-		DeleteLogstoreConfigFromLogtailConfig(configName)
+		DeleteLogstoreConfigFromLogtailConfig(configName, true)
 		return nil
 	}
 	logger.Info(context.Background(), "load config", configName, "logstore", logstore)
