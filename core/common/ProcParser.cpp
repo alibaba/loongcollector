@@ -270,7 +270,7 @@ std::tuple<uint32_t, uint64_t, uint64_t, uint64_t> ProcParser::GetPIDCaps(uint32
 
         while (stream >> field) {
         }
-        auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), value, 16);
+        auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), value);
         if (ec == std::errc::invalid_argument) {
             return {0, "Invalid argument in line: " + line};
         }
@@ -340,12 +340,12 @@ uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& nsStr) const
     }
     auto openPos = netStr.find('[');
     auto closePos = netStr.find_last_of(']');
-    if (openPos == std::string::npos || closePos == std::string::npos || openPos >= closePos) {
+    if (openPos == std::string::npos || closePos == std::string::npos || openPos + 1 >= closePos) {
         LOG_WARNING(sLogger, ("Invalid argument in line: ", netStr));
         return 0;
     }
     uint32_t inodeEntry = 0;
-    auto [ptr, errc] = std::from_chars(netStr.data() + openPos, netStr.data() + closePos, inodeEntry, 16);
+    auto [ptr, errc] = std::from_chars(netStr.data() + openPos + 1, netStr.data() + closePos, inodeEntry);
     if (errc == std::errc::invalid_argument) {
         LOG_WARNING(sLogger, ("Invalid argument in line: ", netStr));
         return 0;
