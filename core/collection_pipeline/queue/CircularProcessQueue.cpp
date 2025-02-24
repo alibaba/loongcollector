@@ -39,9 +39,9 @@ bool CircularProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
         auto size = mQueue.front()->mEventGroup.DataSize();
         mEventCnt -= cnt;
         mQueue.pop_front();
-        mQueueSizeTotal->Set(Size());
-        mQueueDataSizeByte->Sub(size);
-        mDiscardedEventsTotal->Add(cnt);
+        SET_GAUGE(mQueueSizeTotal, Size());
+        SUB_GAUGE(mQueueDataSizeByte, size);
+        ADD_COUNTER(mDiscardedEventsTotal, cnt);
     }
     if (mEventCnt + newCnt > mCapacity) {
         return false;
@@ -51,19 +51,19 @@ bool CircularProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     mQueue.push_back(std::move(item));
     mEventCnt += newCnt;
 
-    mInItemsTotal->Add(1);
-    mInItemDataSizeBytes->Add(size);
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Add(size);
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemDataSizeBytes, size);
+    SET_GAUGE(mQueueSizeTotal, Size());
+    ADD_GAUGE(mQueueDataSizeByte, size);
     return true;
 }
 
 bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
-    mFetchTimesCnt->Add(1);
+    ADD_COUNTER(mFetchTimesCnt, 1);
     if (Empty()) {
         return false;
     }
-    mValidFetchTimesCnt->Add(1);
+    ADD_COUNTER(mValidFetchTimesCnt, 1);
     if (!IsValidToPop()) {
         return false;
     }
@@ -72,10 +72,10 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     mQueue.pop_front();
     mEventCnt -= item->mEventGroup.GetEvents().size();
 
-    mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(std::chrono::system_clock::now() - item->mEnqueTime);
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
+    ADD_COUNTER(mOutItemsTotal, 1);
+    ADD_COUNTER(mTotalDelayMs, std::chrono::system_clock::now() - item->mEnqueTime);
+    SET_GAUGE(mQueueSizeTotal, Size());
+    SUB_GAUGE(mQueueDataSizeByte, item->mEventGroup.DataSize());
     return true;
 }
 

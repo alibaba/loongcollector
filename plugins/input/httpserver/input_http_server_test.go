@@ -359,7 +359,7 @@ func TestInputWithRequestParams(t *testing.T) {
 	input.QueryParamPrefix = "_query_prefix_"
 	input.QueryParams = []string{"db"}
 
-	inputCtx := helper.NewObservePipelineConext(10)
+	inputCtx := helper.NewObservePipelineContext(10)
 	err = input.StartService(inputCtx)
 	require.NoError(t, err)
 
@@ -391,7 +391,7 @@ func TestInputWithRequestParamsWithoutPrefix(t *testing.T) {
 	input.HeaderParams = []string{"Test-A", "Test-B"}
 	input.QueryParams = []string{"db"}
 
-	inputCtx := helper.NewObservePipelineConext(10)
+	inputCtx := helper.NewObservePipelineContext(10)
 	err = input.StartService(inputCtx)
 	require.NoError(t, err)
 

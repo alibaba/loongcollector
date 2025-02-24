@@ -83,9 +83,10 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
+                config.mRegion,
                 config.mProject,
-                config.mLogstore,
-                config.mRegion);
+                config.mName,
+                config.mLogstore);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;
@@ -111,9 +112,10 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
+                config.mRegion,
                 config.mProject,
-                config.mLogstore,
-                config.mRegion);
+                config.mName,
+                config.mLogstore);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;

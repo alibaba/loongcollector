@@ -617,9 +617,9 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
     auto& mgr = ebpf::eBPFServer::GetInstance()->mMonitorMgr->mSelfMonitors[int(nami::PluginType::NETWORK_OBSERVE)];
     auto mgrPtr = mgr.get();
     NetworkObserverSelfMonitor* monitor = dynamic_cast<NetworkObserverSelfMonitor*>(mgrPtr);
-    monitor->mLossKernelEventsTotal->Add(1);
+    ADD_COUNTER(monitor->mLossKernelEventsTotal, 1);
     EXPECT_EQ(monitor->mProcessCacheEntitiesNum != nullptr, true);
-    monitor->mProcessCacheEntitiesNum->Set(10);
+    SET_GAUGE(monitor->mProcessCacheEntitiesNum, 10);
     EXPECT_EQ(monitor->mLossKernelEventsTotal != nullptr, true);
     EXPECT_EQ(monitor->mRecvCtrlEventsTotal != nullptr, true);
 

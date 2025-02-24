@@ -162,9 +162,10 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
             AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                    "call stat() on path fail" + string(path)
                                                        + ", errno: " + ToString(errno) + ", will not be monitored",
+                                                   config.second->GetRegion(),
                                                    config.second->GetProjectName(),
-                                                   config.second->GetLogstoreName(),
-                                                   config.second->GetRegion());
+                                                   config.second->GetConfigName(),
+                                                   config.second->GetLogstoreName());
         }
         LOG_DEBUG(sLogger, ("call stat() on path fail", path)("errno", errno));
         return false;
@@ -217,19 +218,24 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
                                                string("dir: ") + path
                                                    + " will not monitored, dir count should less than "
                                                    + ToString(INT32_FLAG(max_watch_dir_count)),
+                                               config.second->GetRegion(),
                                                config.second->GetProjectName(),
-                                               config.second->GetLogstoreName(),
-                                               config.second->GetRegion());
+                                               config.second->GetConfigName(),
+                                               config.second->GetLogstoreName());
         return false;
     }
 
     wd = -1;
     if (mInotifyWatchNum >= INT32_FLAG(default_max_inotify_watch_num)) {
         LOG_INFO(sLogger,
-                 ("failed to add inotify watcher for dir", path)("max allowd inotify watchers",
+                 ("failed to add inotify watcher for dir", path)("max allowed inotify watchers",
                                                                  INT32_FLAG(default_max_inotify_watch_num)));
         AlarmManager::GetInstance()->SendAlarm(INOTIFY_DIR_NUM_LIMIT_ALARM,
-                                               string("failed to register inotify watcher for dir") + path);
+                                               string("failed to register inotify watcher for dir") + path,
+                                               config.second->GetRegion(),
+                                               config.second->GetProjectName(),
+                                               config.second->GetConfigName(),
+                                               config.second->GetLogstoreName());
     } else {
         // need check mEventListener valid
         if (mEventListener->IsInit() && !AppConfig::GetInstance()->IsInInotifyBlackList(path)) {
@@ -245,7 +251,11 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
                                                                                              "wait 10 seconds."));
                     AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
                                                            string("Failed to register dir:  ") + path + ", errno: "
-                                                               + ToString(errno) + ", error: " + str + ", force exit");
+                                                               + ToString(errno) + ", error: " + str + ", force exit",
+                                                           config.second->GetRegion(),
+                                                           config.second->GetProjectName(),
+                                                           config.second->GetConfigName(),
+                                                           config.second->GetLogstoreName());
                     AlarmManager::GetInstance()->ForceToSend();
                     sleep(10);
                     _exit(1);
@@ -255,11 +265,19 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
                     AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                            string("Failed to register dir: ") + path + ", reason: "
                                                                + str + ", project: " + config.second->GetProjectName()
-                                                               + ", logstore: " + config.second->GetLogstoreName());
+                                                               + ", logstore: " + config.second->GetLogstoreName(),
+                                                           config.second->GetRegion(),
+                                                           config.second->GetProjectName(),
+                                                           config.second->GetConfigName(),
+                                                           config.second->GetLogstoreName());
                 else
                     AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                            string("Failed to register dir: ") + path
-                                                               + ", reason: " + str + ", no timeout");
+                                                               + ", reason: " + str + ", no timeout",
+                                                           config.second->GetRegion(),
+                                                           config.second->GetProjectName(),
+                                                           config.second->GetConfigName(),
+                                                           config.second->GetLogstoreName());
             } else {
                 // recheck inode, wd is relevance to inode
                 if (mWdDirInfoMap.find(wd) != mWdDirInfoMap.end()) {
@@ -465,7 +483,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             return ValidateCheckpointResult::kSigChanged;
         }
         if (checkpoint->mDevInode.dev != devInode.dev) {
-            // all other checks passed. dev may be a statefulset pv remounted on another node
+            // all other checks passed. dev may be a stateful set pv remounted on another node
             checkpoint->mDevInode.dev = devInode.dev;
         }
 
@@ -546,7 +564,11 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
         AlarmManager::GetInstance()->SendAlarm(
             CHECKPOINT_ALARM,
             string("cannot find the file because of full find cache, delete the checkpoint, log reader queue name: ")
-                + filePath + ", real file path: " + realFilePath);
+                + filePath + ", real file path: " + realFilePath,
+            config->GetContext().GetRegion(),
+            config->GetContext().GetProjectName(),
+            config->GetContext().GetConfigName(),
+            config->GetContext().GetLogstoreName());
         return ValidateCheckpointResult::kCacheFull;
     }
     uint16_t searchDepth = 0;
@@ -635,6 +657,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
                                                  cpt.real_path(),
                                                  1,
                                                  0,
+                                                 "",
                                                  0);
             const auto result = validateCheckpoint(v1Cpt, cachePathDevInodeMap, eventVec);
             switch (result) {
@@ -835,11 +858,12 @@ void EventDispatcher::UnregisterEventHandler(const string& path) {
     LOG_INFO(sLogger, ("remove the watcher for dir", path)("wd", wd));
 }
 
-void EventDispatcher::StopAllDir(const string& baseDir) {
+void EventDispatcher::StopAllDir(const string& baseDir, const string& containerID) {
     LOG_DEBUG(sLogger, ("Stop all sub dir", baseDir));
     auto subDirAndHandlers = FindAllSubDirAndHandler(baseDir);
     for (auto& subDirAndHandler : subDirAndHandlers) {
         Event e(subDirAndHandler.first, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
+        e.SetContainerID(containerID);
         subDirAndHandler.second->Handle(e);
     }
 }

@@ -63,7 +63,7 @@ private:
 void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
 }
 
@@ -73,7 +73,7 @@ void ScrapeSchedulerUnittest::TestProcess() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
     HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
@@ -132,7 +132,7 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
     HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -192,7 +192,8 @@ void ScrapeSchedulerUnittest::TestReceiveMessage() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    auto event = make_shared<ScrapeScheduler>(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto event
+        = make_shared<ScrapeScheduler>(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
 
 
     // before
@@ -206,7 +207,8 @@ void ScrapeSchedulerUnittest::TestReceiveMessage() {
 void ScrapeSchedulerUnittest::TestScheduler() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
+    auto timer = make_shared<Timer>();
     EventPool eventPool{true};
     event.SetComponent(&eventPool);
     event.ScheduleNext();
@@ -222,7 +224,7 @@ void ScrapeSchedulerUnittest::TestScheduler() {
 void ScrapeSchedulerUnittest::TestQueueIsFull() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     EventPool eventPool{true};
@@ -247,7 +249,7 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
 void ScrapeSchedulerUnittest::TestExactlyScrape() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 10, 10, labels, 0, 0);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     EventPool eventPool{true};

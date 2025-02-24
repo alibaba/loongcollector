@@ -154,7 +154,7 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
         shouldKeepEvent = ParseDockerJsonLogLine(sourceEvent, errorMsg);
     }
     if (!errorMsg.empty()) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
     }
 
     if (!mIgnoreParseWarning && !errorMsg.empty() && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
@@ -165,9 +165,10 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
             + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName();
         AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                errorMsg,
+                                               GetContext().GetRegion(),
                                                GetContext().GetProjectName(),
-                                               GetContext().GetLogstoreName(),
-                                               GetContext().GetRegion());
+                                               GetContext().GetConfigName(),
+                                               GetContext().GetLogstoreName());
     }
     return shouldKeepEvent;
 }
@@ -211,12 +212,12 @@ bool ProcessorParseContainerLogNative::ParseContainerdTextLogLine(LogEvent& sour
     }
 
     if (sourceValue == "stdout") {
-        mParseStdoutTotal->Add(1);
+        ADD_COUNTER(mParseStdoutTotal, 1);
         if (mIgnoringStdout) {
             return false;
         }
     } else {
-        mParseStderrTotal->Add(1);
+        ADD_COUNTER(mParseStderrTotal, 1);
         if (mIgnoringStderr) {
             return false;
         }
@@ -484,12 +485,12 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
     }
 
     if (sourceValue == "stdout") {
-        mParseStdoutTotal->Add(1);
+        ADD_COUNTER(mParseStdoutTotal, 1);
         if (mIgnoringStdout) {
             return false;
         }
     } else {
-        mParseStderrTotal->Add(1);
+        ADD_COUNTER(mParseStderrTotal, 1);
         if (mIgnoringStderr) {
             return false;
         }

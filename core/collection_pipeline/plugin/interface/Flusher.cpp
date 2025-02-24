@@ -65,7 +65,11 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
             AlarmManager::GetInstance()->SendAlarm(
                 DISCARD_DATA_ALARM,
-                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
+                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str,
+                item->mPipeline->GetContext().GetRegion(),
+                item->mPipeline->GetContext().GetProjectName(),
+                item->mPipeline->GetContext().GetConfigName(),
+                item->mPipeline->GetContext().GetLogstoreName());
             return false;
         }
         if (i % 100 == 0) {
@@ -80,7 +84,11 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
     AlarmManager::GetInstance()->SendAlarm(
         DISCARD_DATA_ALARM,
-        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
+        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str,
+        item->mPipeline->GetContext().GetRegion(),
+        item->mPipeline->GetContext().GetProjectName(),
+        item->mPipeline->GetContext().GetConfigName(),
+        item->mPipeline->GetContext().GetLogstoreName());
     return false;
 }
 

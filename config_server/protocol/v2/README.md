@@ -214,7 +214,7 @@ Server是否保存Client信息取决于Server实现，如果服务端找不到�
 
 Server根据agent\_type + attributes 查询进程配置，根据ip和tags查询机器组和关联采集配置。
 
-![image](https://github.com/alibaba/ilogtail/assets/1827594/05799ac2-9249-49ed-8088-3b927821ac73)
+![image](https://github.com/alibaba/loongcollector/assets/1827594/05799ac2-9249-49ed-8088-3b927821ac73)
 
 ### 心跳（心跳压缩）
 
@@ -224,11 +224,11 @@ Server：同注册
 
 允许心跳压缩
 
-![image](https://github.com/alibaba/ilogtail/assets/1827594/ad22bcfa-b14a-41b5-b4b8-4956bb065bf7)
+![image](https://github.com/alibaba/loongcollector/assets/1827594/ad22bcfa-b14a-41b5-b4b8-4956bb065bf7)
 
 不允许心跳压缩
 
-![image](https://github.com/alibaba/ilogtail/assets/1827594/35a823fd-6b8e-499f-951e-2231f3319420)
+![image](https://github.com/alibaba/loongcollector/assets/1827594/35a823fd-6b8e-499f-951e-2231f3319420)
 
 ### 进程配置
 
@@ -264,11 +264,11 @@ Client获取到多个进程配置时，自动合并，若产生冲突默认行�
 
 实现1：直接将Detail返回在心跳响应中（FetchContinuousPipelineConfigDetail flag is unset）
 
-![image](https://github.com/alibaba/ilogtail/assets/1827594/be645615-dd99-42dd-9deb-681e9a4069bb)
+![image](https://github.com/alibaba/loongcollector/assets/1827594/be645615-dd99-42dd-9deb-681e9a4069bb)
 
 实现2：仅返回配置名和版本，Detail使用单独请求获取（FetchContinuousPipelineConfigDetail flag is set）
 
-![image](https://github.com/alibaba/ilogtail/assets/1827594/c409c35c-2a81-4927-bfd2-7fb321ef1ca8)
+![image](https://github.com/alibaba/loongcollector/assets/1827594/c409c35c-2a81-4927-bfd2-7fb321ef1ca8)
 
 ### 配置状态上报
 
