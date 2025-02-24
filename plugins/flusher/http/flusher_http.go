@@ -90,6 +90,7 @@ type FlusherHTTP struct {
 	QueueCapacity          int                          // capacity of channel
 	DropEventWhenQueueFull bool                         // If true, pipeline events will be dropped when the queue is full
 	Compression            string                       // Compression type, support gzip and snappy at this moment.
+	IgnoreRespBody         bool                         // If true, senders directly close the resp without reading the body.
 
 	varKeys []string
 
@@ -386,14 +387,17 @@ func (f *FlusherHTTP) runFlushTask() {
 
 func (f *FlusherHTTP) encodeAndFlush(event any) error {
 	defer f.countDownTask()
+	if event == nil {
+		return nil
+	}
 
 	var data [][]byte
+	var varValues []map[string]string
 	var err error
 
 	switch v := event.(type) {
 	case *models.PipelineGroupEvents:
-		data, err = f.encoder.EncodeV2(v)
-
+		data, varValues, err = f.encoder.EncodeV2(v, f.varKeys)
 	default:
 		return errors.New("unsupported event type")
 	}
@@ -402,8 +406,12 @@ func (f *FlusherHTTP) encodeAndFlush(event any) error {
 		return fmt.Errorf("http flusher encode event data fail, error: %w", err)
 	}
 
-	for _, shard := range data {
-		if err = f.flushWithRetry(shard, nil); err != nil {
+	for i, shard := range data {
+		var values map[string]string
+		if i < len(varValues) {
+			values = varValues[i]
+		}
+		if err = f.flushWithRetry(shard, values); err != nil {
 			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
 				"http flusher failed flush data after retry, data dropped, error", err,
 				"remote url", f.RemoteURL)
@@ -471,6 +479,14 @@ func (f *FlusherHTTP) flushWithRetry(data []byte, varValues map[string]string) e
 		err = e
 		<-time.After(f.getNextRetryDelay(i))
 	}
+
+	if f.encoder != nil {
+		if recycler, ok := f.encoder.(extensions.BufferRecycler); ok {
+			recycler.Recycle(data)
+			return err
+		}
+	}
+
 	converter.PutPooledByteBuf(&data)
 	return err
 }
@@ -572,7 +588,15 @@ func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retry
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALRAM", "http flusher send request fail, error", err)
 		return false, retry, err
 	}
-	body, err := io.ReadAll(response.Body)
+	var body []byte
+	if !f.IgnoreRespBody {
+		body, err = io.ReadAll(response.Body)
+		if err != nil {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALRAM", "http flusher read response fail, error", err)
+			return false, false, err
+		}
+	}
+
 	if err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALRAM", "http flusher read response fail, error", err)
 		return false, false, err
