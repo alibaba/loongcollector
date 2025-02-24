@@ -135,7 +135,7 @@ void SelfMonitorMetricEvent::SetInterval(size_t interval) {
     mSendInterval = interval;
 }
 
-void SelfMonitorMetricEvent::Merge(SelfMonitorMetricEvent& event) {
+void SelfMonitorMetricEvent::Merge(const SelfMonitorMetricEvent& event) {
     if (mSendInterval != event.mSendInterval) {
         mSendInterval = event.mSendInterval;
         mLastSendInterval = 0;
@@ -150,6 +150,23 @@ void SelfMonitorMetricEvent::Merge(SelfMonitorMetricEvent& event) {
         mGauges[gauge->first] = gauge->second;
     }
     mUpdatedFlag = true;
+}
+
+void SelfMonitorMetricEvent::Copy(const SelfMonitorMetricEvent& event) {
+    mSendInterval = event.mSendInterval;
+    mLastSendInterval = event.mLastSendInterval;
+    mCategory = event.mCategory;
+    mKey = event.mKey;
+    for (auto label = event.mLabels.begin(); label != event.mLabels.end(); label++) {
+        mLabels[label->first] = label->second;
+    }
+    for (auto counter = event.mCounters.begin(); counter != event.mCounters.end(); counter++) {
+        mCounters[counter->first] = counter->second;
+    }
+    for (auto gauge = event.mGauges.begin(); gauge != event.mGauges.end(); gauge++) {
+        mGauges[gauge->first] = gauge->second;
+    }
+    mUpdatedFlag = event.mUpdatedFlag;
 }
 
 bool SelfMonitorMetricEvent::ShouldSend() {

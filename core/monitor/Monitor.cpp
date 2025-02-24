@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "Monitor.h"
+
+#include "MetricRecord.h"
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
@@ -633,6 +635,36 @@ void LoongCollectorMonitor::Init() {
 void LoongCollectorMonitor::Stop() {
     SelfMonitorServer::GetInstance()->Stop();
     LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
+}
+
+bool LoongCollectorMonitor::GetAgentMetricData(SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].find("")
+        != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].end()) {
+        event.Copy(mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][""]);
+        return true;
+    }
+    return false;
+}
+
+void LoongCollectorMonitor::SetAgentMetricData(const SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][""].Copy(event);
+}
+
+bool LoongCollectorMonitor::GetRunnerMetricData(const std::string& runnerName, SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].find(runnerName)
+        != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].end()) {
+        event.Copy(mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName]);
+        return true;
+    }
+    return false;
+}
+
+void LoongCollectorMonitor::SetRunnerMetricData(const std::string& runnerName, const SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName].Copy(event);
 }
 
 } // namespace logtail
