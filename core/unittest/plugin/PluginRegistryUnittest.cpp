@@ -32,47 +32,65 @@ public:
     void TestCreateProcessor() const;
     void TestCreateFlusher() const;
     void TestValidPlugin() const;
-    void TestRegisterFlusherSinkType() const;
+    void TestSingletonInput() const;
 
 protected:
     void SetUp() override { LoadPluginMock(); }
-    void TearDown() override { PluginRegistry::GetInstance()->UnloadPlugins(); }
+    void TearDown() override { sRegistry->UnloadPlugins(); }
+
+private:
+    static PluginRegistry* sRegistry;
 };
 
+PluginRegistry* PluginRegistryUnittest::sRegistry = PluginRegistry::GetInstance();
+
 void PluginRegistryUnittest::TestCreateInput() const {
-    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, {"0"});
-    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
-    APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
+    {
+        auto input = sRegistry->CreateInput(InputMock::sName, false, {"0"});
+        APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
+        APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
+    }
+    {
+        auto input = sRegistry->CreateInput(InputMock::sName, true, {"0"});
+        APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
+        APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
+    }
 }
 
 void PluginRegistryUnittest::TestCreateProcessor() const {
-    unique_ptr<ProcessorInstance> processor
-        = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, {"0"});
+    auto processor = sRegistry->CreateProcessor(ProcessorMock::sName, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processor);
     APSARA_TEST_EQUAL_FATAL("0", processor->PluginID());
 }
 
 void PluginRegistryUnittest::TestCreateFlusher() const {
-    unique_ptr<FlusherInstance> flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, {"0"});
+    auto flusher = sRegistry->CreateFlusher(FlusherMock::sName, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, flusher);
     APSARA_TEST_EQUAL_FATAL("0", flusher->PluginID());
 }
 
 void PluginRegistryUnittest::TestValidPlugin() const {
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_mock"));
-    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_unknown"));
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_mock"));
-    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_unknown"));
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_mock"));
-    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_unknown"));
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_mock"));
-    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_unknown"));
+    APSARA_TEST_TRUE(sRegistry->IsValidNativeInputPlugin("input_mock", false));
+    APSARA_TEST_TRUE(sRegistry->IsValidNativeInputPlugin("input_mock", true));
+    APSARA_TEST_FALSE(sRegistry->IsValidNativeInputPlugin("input_unknown", false));
+    APSARA_TEST_TRUE(sRegistry->IsValidNativeProcessorPlugin("processor_mock"));
+    APSARA_TEST_FALSE(sRegistry->IsValidNativeProcessorPlugin("processor_unknown"));
+    APSARA_TEST_TRUE(sRegistry->IsValidNativeFlusherPlugin("flusher_mock"));
+    APSARA_TEST_FALSE(sRegistry->IsValidNativeFlusherPlugin("flusher_unknown"));
+    APSARA_TEST_TRUE(sRegistry->IsValidGoPlugin("service_mock"));
+    APSARA_TEST_TRUE(sRegistry->IsValidGoPlugin("service_unknown"));
+}
+
+void PluginRegistryUnittest::TestSingletonInput() const {
+    APSARA_TEST_FALSE(sRegistry->IsGlobalSingletonInputPlugin("input_mock", false));
+    APSARA_TEST_FALSE(sRegistry->IsGlobalSingletonInputPlugin("input_mock", true));
 }
 
 UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateInput)
 UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateProcessor)
 UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateFlusher)
 UNIT_TEST_CASE(PluginRegistryUnittest, TestValidPlugin)
+UNIT_TEST_CASE(PluginRegistryUnittest, TestSingletonInput)
 
 } // namespace logtail
 

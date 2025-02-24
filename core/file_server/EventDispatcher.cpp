@@ -31,8 +31,6 @@
 #include <vector>
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
-#include "checkpoint/CheckpointManagerV2.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
@@ -41,6 +39,8 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
+#include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/LogInput.h"

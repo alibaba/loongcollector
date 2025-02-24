@@ -27,6 +27,9 @@ DEFINE_FLAG_DOUBLE(pub_cpu_usage_up_limit, "cpu usage upper limit, cores", 0.4);
 DEFINE_FLAG_INT64(memory_usage_up_limit, "memory usage upper limit, MB", 2 * 1024);
 DEFINE_FLAG_INT64(pub_memory_usage_up_limit, "memory usage upper limit, MB", 200);
 
+// checkpoint
+DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
+
 // epoll
 DEFINE_FLAG_INT32(ilogtail_epoll_time_out, "default time out is 1s", 1);
 DEFINE_FLAG_INT32(ilogtail_epoll_wait_events, "epoll_wait event number", 100);

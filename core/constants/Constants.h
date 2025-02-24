@@ -15,6 +15,7 @@
  */
 
 #pragma once
+
 #include <string>
 
 namespace logtail {
@@ -22,37 +23,14 @@ namespace logtail {
 // OS name, Linux, Windows.
 extern const std::string OS_NAME;
 
-extern const char* SLS_EMPTY_STR_FOR_INDEX;
+extern const std::string DEFAULT_CONTENT_KEY;
 
 // profile project
 extern const std::string PROFILE_PROJECT;
 extern const std::string PROFILE_PROJECT_REGION;
 extern const std::string PROFILE_LOGSTORE;
 
-// global config
-extern const std::string GLOBAL_CONFIG_NODE;
-extern const std::string GLOBAL_CONFIG_VERSION;
-
-// user config
 extern const std::string USER_CONFIG_NODE;
-extern const std::string USER_CONFIG_VERSION;
-extern const std::string USER_CONFIG_GROUPTOPIC;
-extern const std::string USER_CONFIG_TOPICFORMAT;
-
-// metric config
-extern const std::string ROW_MAPPING;
-extern const std::string COLUMN_MAPPING;
-extern const std::string GROUP_RULE;
-
-extern const std::string TABLE_PREFIX;
-extern const std::string TABLE_NAME;
-extern const std::string DATE_TYPE;
-extern const std::string DATE_SUFFIX;
-extern const std::string INTERVAL;
-extern const std::string EXPIRE_DAY;
-
-extern const std::string DEFAULT_CONTENT_KEY; //"content"
-extern const std::string DEFAULT_REG; //"(.*)"
 
 extern const std::string AGENT_NAME;
 extern const std::string LOONGCOLLECTOR_CONFIG;

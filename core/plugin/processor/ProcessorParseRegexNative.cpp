@@ -18,6 +18,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
+#include "constants/Constants.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {

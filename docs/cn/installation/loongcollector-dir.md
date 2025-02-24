@@ -183,8 +183,6 @@ LoongCollector 提供以下参数用于自定义各类目录位置：
 
 - check_point_filename
 
-- adhoc_check_point_file_dir
-
 - app_info_file
 
 - ilogtail_config

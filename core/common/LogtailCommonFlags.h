@@ -28,6 +28,9 @@ DECLARE_FLAG_DOUBLE(pub_cpu_usage_up_limit);
 DECLARE_FLAG_INT64(memory_usage_up_limit);
 DECLARE_FLAG_INT64(pub_memory_usage_up_limit);
 
+// checkpoint
+DECLARE_FLAG_INT32(unused_checkpoints_clear_interval_sec);
+
 // epoll
 DECLARE_FLAG_INT32(ilogtail_epoll_time_out);
 DECLARE_FLAG_INT32(ilogtail_epoll_wait_events);
