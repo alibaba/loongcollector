@@ -707,6 +707,7 @@ private:
     friend class LastMatchedContainerdTextWithDockerJsonUnittest;
     friend class ForceReadUnittest;
     friend class FileTagUnittest;
+    friend class CreateModifyHandlerUnittest;
 
 protected:
     void UpdateReaderManual();
