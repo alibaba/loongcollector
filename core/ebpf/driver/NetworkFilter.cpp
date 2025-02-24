@@ -33,6 +33,23 @@ extern "C" {
 namespace logtail {
 namespace ebpf {
 
+#ifdef APSARA_UNIT_TEST_MAIN
+std::vector<TestPortFilterItem> gPortFilters;
+std::vector<TestAddr4FilterItem> gAddr4Filters;
+std::vector<TestAddr6FilterItem> gAddr6Filters;
+
+std::vector<TestPortFilterItem> GetPortFilters() {
+    return gPortFilters;
+}
+std::vector<TestAddr4FilterItem> GetAddr4Filters() {
+    return gAddr4Filters;
+}
+std::vector<TestAddr6FilterItem> GetAddr6Filters() {
+    return gAddr6Filters;
+}
+
+#endif
+
 std::pair<std::string, int> ParseIpString(const std::string& addr) {
     // split
     auto del = addr.find('/');
@@ -82,41 +99,61 @@ bool ConvertIPv6StrToBytes(const std::string& ipv6Str, uint8_t* ipv6Bytes) {
     ((addr)[0] >> 16) & 0xFFFF, (addr)[0] & 0xFFFF, ((addr)[1] >> 16) & 0xFFFF, (addr)[1] & 0xFFFF, \
         ((addr)[2] >> 16) & 0xFFFF, (addr)[2] & 0xFFFF, ((addr)[3] >> 16) & 0xFFFF, (addr)[3] & 0xFFFF
 
-int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
-                   int /*callNameIdx*/,
-                   selector_filters& filters,
-                   const SecurityNetworkFilter* config) {
+bool TryConvertIpToV4Trie(const std::string& addr, addr4_lpm_trie& arg4) {
+    ::memset(&arg4, 0, sizeof(arg4));
+    auto result = ParseIpString(addr);
+    std::string ip = result.first;
+    int mask = result.second;
+    bool ok = ConvertIPv4StrToBytes(ip, arg4.addr);
+    if (ok) {
+        if (mask == 0) {
+            arg4.prefix = 32;
+        } else {
+            arg4.prefix = mask;
+        }
+    }
+    return ok;
+}
+
+bool TryConvertIpToV6Trie(const std::string& addr, addr6_lpm_trie& arg6) {
+    ::memset(&arg6, 0, sizeof(arg6));
+    auto result = ParseIpString(addr);
+    std::string ip = result.first;
+    int mask = result.second;
+    bool ok = ConvertIPv6StrToBytes(ip, (uint8_t*)&arg6.addr);
+    if (ok) {
+        if (mask == 0) {
+            arg6.prefix = 128;
+        } else {
+            arg6.prefix = mask;
+        }
+    }
+    return ok;
+}
+
+int SetCommonAddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
+                        selector_filters& filters,
+                        const std::vector<std::string>& addrList,
+                        filter_type filterType,
+                        op_type opType,
+                        uint8_t val) {
     int ret = 0;
-    if (config->mSourceAddrList.size()) {
+    if (!addrList.empty()) {
         selector_filter kFilter{};
-        kFilter.filter_type = FILTER_TYPE_SADDR;
-        kFilter.op_type = OP_TYPE_IN;
+        kFilter.filter_type = filterType;
+        kFilter.op_type = opType;
         std::vector<addr4_lpm_trie> addr4Tries;
         std::vector<addr6_lpm_trie> addr6Tries;
-        for (const auto& addr : config->mSourceAddrList) {
-            auto result = ParseIpString(addr);
-            std::string ip = result.first;
-            int mask = result.second;
+
+        // Compute tries
+        for (const auto& addr : addrList) {
             addr4_lpm_trie arg4{};
             addr6_lpm_trie arg6{};
-
-            bool yes = ConvertIPv4StrToBytes(ip, arg4.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 32;
-                } else {
-                    arg4.prefix = mask;
-                }
+            ::memset(&arg4, 0, sizeof(arg4));
+            ::memset(&arg6, 0, sizeof(arg6));
+            if (TryConvertIpToV4Trie(addr, arg4)) {
                 addr4Tries.push_back(arg4);
-                continue;
-            }
-            yes = ConvertIPv6StrToBytes(ip, (uint8_t*)&arg6.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 128;
-                } else {
-                    arg4.prefix = mask;
-                }
+            } else if (TryConvertIpToV6Trie(addr, arg6)) {
                 addr6Tries.push_back(arg6);
             }
         }
@@ -130,13 +167,22 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                          "[before update] ipv4 prefix trie addr: " IPV4_FMT " mask: %u\n",
                          IPV4_ARGS(arg4.addr),
                          arg4.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4Idx, &arg4, &val, 0);
+#ifdef APSARA_UNIT_TEST_MAIN
+                ret = 0;
+                gAddr4Filters.push_back({ipv4Idx, arg4, opType, val});
+                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
+                         "[update success] ipv4 prefix trie data success! addr: " IPV4_FMT " mask: %u, size: %d\n",
+                         IPV4_ARGS(arg4.addr),
+                         arg4.prefix,
+                         gAddr4Filters.size());
+#else
+                ret = wrapper->UpdateInnerMapElem<Addr4Map>("addr4lpm_maps", &ipv4Idx, &arg4, &val, 0);
+#endif
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[update failed] ipv4 prefix trie data failed! addr: " IPV4_FMT " mask: %u\n",
                              IPV4_ARGS(arg4.addr),
                              arg4.prefix);
-                    continue;
                 }
             }
         } else {
@@ -152,7 +198,12 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                          "[before update] ipv6 prefix trie addr: " IPV6_FMT "mask: %u\n",
                          IPV6_ARGS(arg6.addr),
                          arg6.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6Idx, &arg6, &val, 0);
+#ifdef APSARA_UNIT_TEST_MAIN
+                ret = 0;
+                gAddr6Filters.push_back({ipv6Idx, arg6, opType, val});
+#else
+                ret = wrapper->UpdateInnerMapElem<Addr6Map>("addr6lpm_maps", &ipv6Idx, &arg6, &val, 0);
+#endif
                 if (ret) {
                     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[update failed] ipv6 prefix trie data failed! addr: " IPV6_FMT " mask: %u\n",
@@ -164,406 +215,117 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         } else {
             kFilter.map_idx[1] = -1;
         }
+
         filters.filters[filters.filter_count++] = kFilter;
     }
-
     return ret;
+}
+
+int SetCommonPortFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
+                        selector_filters& filters,
+                        const std::vector<uint32_t>& portList,
+                        filter_type filterType,
+                        op_type opType,
+                        uint8_t val) {
+    if (portList.empty())
+        return 0;
+
+    int idx = IdAllocator::GetInstance()->GetNextId<PortMap>();
+    selector_filter kFilter{};
+    kFilter.filter_type = filterType;
+    kFilter.op_type = opType;
+    kFilter.map_idx[0] = idx;
+
+    if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
+        return 1;
+    }
+    filters.filters[filters.filter_count++] = kFilter;
+    for (uint32_t port : portList) {
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
+                 "[before update] begin to update map in map for filter detail, idx: %d, port: %u, val: %d, op: %d\n",
+                 idx,
+                 port,
+                 val,
+                 opType);
+#ifdef APSARA_UNIT_TEST_MAIN
+        int ret = 0;
+        gPortFilters.push_back({idx, port, opType, val});
+        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
+                 "begin to update map in map for filter detail, idx: %d, port: %u, val: %d, op: %d\n",
+                 idx,
+                 port,
+                 val,
+                 opType);
+#else
+        int ret = wrapper->UpdateInnerMapElem<PortMap>("port_maps", &idx, &port, &val, 0);
+#endif
+        if (ret) {
+            ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[update failed] port map update failed! port: %u, val: %d, op: %d\n",
+                     port,
+                     val,
+                     opType);
+            continue;
+        }
+    }
+    return 0;
+}
+
+int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
+                   int /*callNameIdx*/,
+                   selector_filters& filters,
+                   const SecurityNetworkFilter* config) {
+    return SetCommonAddrFilter(wrapper, filters, config->mSourceAddrList, FILTER_TYPE_SADDR, OP_TYPE_IN, 1);
 }
 
 int SetSaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                         int /*callNameIdx*/,
                         selector_filters& filters,
                         const SecurityNetworkFilter* config) {
-    int ret = 0;
-    if (config->mSourceAddrBlackList.size()) {
-        selector_filter kFilter{};
-        kFilter.filter_type = FILTER_TYPE_SADDR;
-        kFilter.op_type = OP_TYPE_NOT_IN;
-        std::vector<addr4_lpm_trie> addr4Tries;
-        std::vector<addr6_lpm_trie> addr6Tries;
-        for (const auto& addr : config->mSourceAddrBlackList) {
-            auto result = ParseIpString(addr);
-            std::string ip = result.first;
-            int mask = result.second;
-            addr4_lpm_trie arg4{};
-            addr6_lpm_trie arg6{};
-
-            bool yes = ConvertIPv4StrToBytes(ip, arg4.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 32;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr4Tries.push_back(arg4);
-                continue;
-            }
-            yes = ConvertIPv6StrToBytes(ip, (uint8_t*)&arg6.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 128;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr6Tries.push_back(arg6);
-            }
-        }
-
-        if (addr4Tries.size()) {
-            int ipv4Idx = IdAllocator::GetInstance()->GetNextId<Addr4Map>();
-            kFilter.map_idx[0] = ipv4Idx;
-            for (auto arg4 : addr4Tries) {
-                uint8_t val = 0;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: " IPV4_FMT " mask: %u\n",
-                         IPV4_ARGS(arg4.addr),
-                         arg4.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4Idx, &arg4, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: " IPV4_FMT " mask: %u\n",
-                             IPV4_ARGS(arg4.addr),
-                             arg4.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[0] = -1;
-        }
-
-        if (addr6Tries.size()) {
-            int ipv6Idx = IdAllocator::GetInstance()->GetNextId<Addr6Map>();
-            kFilter.map_idx[1] = ipv6Idx;
-            for (auto arg6 : addr6Tries) {
-                uint8_t val = 0;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: " IPV6_FMT " mask: %u\n",
-                         IPV6_ARGS(arg6.addr),
-                         arg6.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6Idx, &arg6, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: " IPV6_FMT " mask: %u\n",
-                             IPV6_ARGS(arg6.addr),
-                             arg6.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[1] = -1;
-        }
-        filters.filters[filters.filter_count++] = kFilter;
-    }
-
-    return ret;
+    return SetCommonAddrFilter(wrapper, filters, config->mSourceAddrBlackList, FILTER_TYPE_SADDR, OP_TYPE_NOT_IN, 0);
 }
 
 int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                    int /*callNameIdx*/,
                    selector_filters& filters,
                    const SecurityNetworkFilter* config) {
-    int ret = 0;
-    if (config->mDestAddrList.size()) {
-        selector_filter kFilter{};
-        kFilter.filter_type = FILTER_TYPE_DADDR;
-        kFilter.op_type = OP_TYPE_IN;
-        std::vector<addr4_lpm_trie> addr4Tries;
-        std::vector<addr6_lpm_trie> addr6Tries;
-        for (const auto& addr : config->mDestAddrList) {
-            auto result = ParseIpString(addr);
-            std::string ip = result.first;
-            int mask = result.second;
-            addr4_lpm_trie arg4{};
-            addr6_lpm_trie arg6{};
-            ::memset(&arg4, 0, sizeof(arg4));
-            ::memset(&arg6, 0, sizeof(arg6));
-            bool yes = ConvertIPv4StrToBytes(ip, arg4.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 32;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr4Tries.push_back(arg4);
-                continue;
-            }
-            yes = ConvertIPv6StrToBytes(ip, (uint8_t*)&arg6.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 128;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr6Tries.push_back(arg6);
-            }
-        }
-
-        if (addr4Tries.size()) {
-            int ipv4Idx = IdAllocator::GetInstance()->GetNextId<Addr4Map>();
-            kFilter.map_idx[0] = ipv4Idx;
-            for (auto arg4 : addr4Tries) {
-                uint8_t val = 1;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: " IPV4_FMT " mask: %u inner map idx: %d\n",
-                         IPV4_ARGS(arg4.addr),
-                         arg4.prefix,
-                         ipv4Idx);
-                ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4Idx, &arg4, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: " IPV4_FMT " mask: %u\n",
-                             IPV4_ARGS(arg4.addr),
-                             arg4.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[0] = -1;
-        }
-
-        if (addr6Tries.size()) {
-            int ipv6Idx = IdAllocator::GetInstance()->GetNextId<Addr6Map>();
-            kFilter.map_idx[1] = ipv6Idx;
-            for (auto arg6 : addr6Tries) {
-                uint8_t val = 1;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: " IPV6_FMT " mask: %u\n",
-                         IPV6_ARGS(arg6.addr),
-                         arg6.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6Idx, &arg6, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: " IPV6_FMT " mask: %u\n",
-                             IPV6_ARGS(arg6.addr),
-                             arg6.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[1] = -1;
-        }
-        filters.filters[filters.filter_count++] = kFilter;
-    }
-
-    return ret;
+    return SetCommonAddrFilter(wrapper, filters, config->mDestAddrList, FILTER_TYPE_DADDR, OP_TYPE_IN, 1);
 }
 
 int SetDaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                         int /*callNameIdx*/,
                         selector_filters& filters,
                         const SecurityNetworkFilter* config) {
-    int ret = 0;
-    if (config->mDestAddrBlackList.size()) {
-        selector_filter kFilter{};
-        kFilter.filter_type = FILTER_TYPE_DADDR;
-        kFilter.op_type = OP_TYPE_NOT_IN;
-        std::vector<addr4_lpm_trie> addr4Tries;
-        std::vector<addr6_lpm_trie> addr6Tries;
-        for (const auto& addr : config->mDestAddrBlackList) {
-            auto result = ParseIpString(addr);
-            std::string ip = result.first;
-            int mask = result.second;
-            addr4_lpm_trie arg4{};
-            addr6_lpm_trie arg6{};
-            bool yes = ConvertIPv4StrToBytes(ip, arg4.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 32;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr4Tries.push_back(arg4);
-                continue;
-            }
-            yes = ConvertIPv6StrToBytes(ip, (uint8_t*)&arg6.addr);
-            if (yes) {
-                if (mask == 0) {
-                    arg4.prefix = 128;
-                } else {
-                    arg4.prefix = mask;
-                }
-                addr6Tries.push_back(arg6);
-            }
-        }
-
-        if (addr4Tries.size()) {
-            int ipv4Idx = IdAllocator::GetInstance()->GetNextId<Addr4Map>();
-            kFilter.map_idx[0] = ipv4Idx;
-            for (auto arg4 : addr4Tries) {
-                uint8_t val = 1;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv4 prefix trie addr: " IPV4_FMT " mask: %u inner map idx: %d\n",
-                         IPV4_ARGS(arg4.addr),
-                         arg4.prefix,
-                         ipv4Idx);
-                ret = wrapper->UpdateInnerMapElem<Addr4Map>(std::string("addr4lpm_maps"), &ipv4Idx, &arg4, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv4 prefix trie data failed! addr: " IPV4_FMT " mask: %u\n",
-                             IPV4_ARGS(arg4.addr),
-                             arg4.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[0] = -1;
-        }
-
-        if (addr6Tries.size()) {
-            int ipv6Idx = IdAllocator::GetInstance()->GetNextId<Addr6Map>();
-            kFilter.map_idx[1] = ipv6Idx;
-            for (auto arg6 : addr6Tries) {
-                uint8_t val = 1;
-                ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
-                         "[before update] ipv6 prefix trie addr: " IPV6_FMT " mask: %u\n",
-                         IPV6_ARGS(arg6.addr),
-                         arg6.prefix);
-                ret = wrapper->UpdateInnerMapElem<Addr6Map>(std::string("addr6lpm_maps"), &ipv6Idx, &arg6, &val, 0);
-                if (ret) {
-                    ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "[update failed] ipv6 prefix trie data failed! addr: " IPV6_FMT " mask: %u\n",
-                             IPV6_ARGS(arg6.addr),
-                             arg6.prefix);
-                    continue;
-                }
-            }
-        } else {
-            kFilter.map_idx[1] = -1;
-        }
-        filters.filters[filters.filter_count++] = kFilter;
-    }
-
-    return ret;
+    return SetCommonAddrFilter(wrapper, filters, config->mDestAddrBlackList, FILTER_TYPE_DADDR, OP_TYPE_NOT_IN, 0);
 }
 
 int SetSportFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                    int /*callNameIdx*/,
                    selector_filters& filters,
                    const SecurityNetworkFilter* config) {
-    int idx = IdAllocator::GetInstance()->GetNextId<PortMap>();
-    selector_filter kFilter{};
-    kFilter.filter_type = FILTER_TYPE_SPORT;
-    kFilter.op_type = OP_TYPE_IN;
-    kFilter.map_idx[0] = idx;
-    if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
-        return 1;
-    }
-    filters.filters[filters.filter_count++] = kFilter;
-
-    if (config->mSourcePortList.empty()) {
-        return 0;
-    }
-    for (uint32_t port : config->mSourcePortList) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
-        uint8_t val = 1;
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][white] source port: %u\n", port);
-        int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
-        if (ret) {
-            ebpf_log(
-                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][white] port map update failed! sport: %u\n", port);
-            continue;
-        }
-    }
-    return 0;
+    return SetCommonPortFilter(wrapper, filters, config->mSourcePortList, FILTER_TYPE_SPORT, OP_TYPE_IN, 1);
 }
 
 int SetSportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                         int /*callNameIdx*/,
                         selector_filters& filters,
                         const SecurityNetworkFilter* config) {
-    int idx = IdAllocator::GetInstance()->GetNextId<PortMap>();
-    selector_filter kFilter{};
-    kFilter.filter_type = FILTER_TYPE_SPORT;
-    kFilter.op_type = OP_TYPE_NOT_IN;
-    kFilter.map_idx[0] = idx;
-    if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
-        return 1;
-    }
-    filters.filters[filters.filter_count++] = kFilter;
-
-    if (config->mSourcePortBlackList.empty()) {
-        return 0;
-    }
-    for (uint32_t port : config->mSourcePortBlackList) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
-        uint8_t val = 0;
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][black] source port: %u\n", port);
-        int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
-        if (ret) {
-            ebpf_log(
-                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][black] port map update failed! sport: %u\n", port);
-            continue;
-        }
-    }
-    return 0;
+    return SetCommonPortFilter(wrapper, filters, config->mSourcePortBlackList, FILTER_TYPE_SPORT, OP_TYPE_NOT_IN, 0);
 }
 
 int SetDportFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                    int /*callNameIdx*/,
                    selector_filters& filters,
                    const SecurityNetworkFilter* config) {
-    int idx = IdAllocator::GetInstance()->GetNextId<PortMap>();
-    selector_filter kFilter{};
-    kFilter.filter_type = FILTER_TYPE_DPORT;
-    kFilter.op_type = OP_TYPE_IN;
-    kFilter.map_idx[0] = idx;
-    if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
-        return 1;
-    }
-    filters.filters[filters.filter_count++] = kFilter;
-
-    if (config->mDestPortList.empty()) {
-        return 0;
-    }
-    for (uint32_t port : config->mDestPortList) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
-        uint8_t val = 1;
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][white] dest port: %u\n", port);
-        int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
-        if (ret) {
-            ebpf_log(
-                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][white] port map update failed! dport: %u\n", port);
-            continue;
-        }
-    }
-
-    return 0;
+    return SetCommonPortFilter(wrapper, filters, config->mDestPortList, FILTER_TYPE_DPORT, OP_TYPE_IN, 1);
 }
 
 int SetDportBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                         int /*callNameIdx*/,
                         selector_filters& filters,
                         const SecurityNetworkFilter* config) {
-    int idx = IdAllocator::GetInstance()->GetNextId<PortMap>();
-    selector_filter kFilter{};
-    kFilter.filter_type = FILTER_TYPE_DPORT;
-    kFilter.op_type = OP_TYPE_NOT_IN;
-    kFilter.map_idx[0] = idx;
-    if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
-        return 1;
-    }
-    filters.filters[filters.filter_count++] = kFilter;
-
-    if (config->mDestPortBlackList.empty()) {
-        return 0;
-    }
-    for (uint32_t port : config->mDestPortBlackList) {
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "begin to update map in map for filter detail, idx: %d\n", idx);
-        uint8_t val = 0;
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "[before update][black] dest port: %u\n", port);
-        int ret = wrapper->UpdateInnerMapElem<PortMap>(std::string("port_maps"), &idx, &port, &val, 0);
-        if (ret) {
-            ebpf_log(
-                eBPFLogType::NAMI_LOG_TYPE_WARN, "[update failed][black] port map update failed! dport: %u\n", port);
-            continue;
-        }
-    }
-
-    return 0;
+    return SetCommonPortFilter(wrapper, filters, config->mDestPortBlackList, FILTER_TYPE_DPORT, OP_TYPE_NOT_IN, 0);
 }
 
 int CreateNetworkFilterForCallname(

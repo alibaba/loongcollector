@@ -20,6 +20,7 @@
 
 #include "AbstractParser.h"
 #include "ParserRegistry.h"
+#include "common/Lock.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "http/HttpParser.h"
 
@@ -43,14 +44,21 @@ public:
         return instance;
     }
 
+    bool AddParser(const std::string& protocol);
+    bool RemoveParser(const std::string& protocol);
     bool AddParser(ProtocolType type);
     bool RemoveParser(ProtocolType type);
+    std::set<ProtocolType> AvaliableProtocolTypes() const;
 
     std::vector<std::unique_ptr<AbstractRecord>> Parse(ProtocolType type, std::unique_ptr<NetDataEvent> data);
 
 private:
     ProtocolParserManager() {}
-    std::unordered_map<ProtocolType, std::shared_ptr<AbstractProtocolParser>> parsers_;
+    ReadWriteLock mLock;
+    std::unordered_map<ProtocolType, std::shared_ptr<AbstractProtocolParser>> mParsers;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class NetworkObserverManagerUnittest;
+#endif
 };
 
 } // namespace ebpf

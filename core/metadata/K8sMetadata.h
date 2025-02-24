@@ -24,6 +24,8 @@
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/LRUCache.h"
+#include "common/Lock.h"
+#include "common/http/HttpRequest.h"
 
 DECLARE_FLAG_STRING(singleton_service);
 DECLARE_FLAG_INT32(singleton_port);
@@ -59,43 +61,49 @@ using HostMetadataPostHandler = std::function<bool(uint32_t pluginIndex, std::ve
 
 class K8sMetadata {
 private:
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> ipCache;
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> containerCache;
-    lru11::Cache<std::string, uint8_t, std::mutex> externalIpCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mIpCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mContainerCache;
+    lru11::Cache<std::string, uint8_t, std::mutex> mExternalIpCache;
+
     std::string mServiceHost;
     int32_t mServicePort;
     std::string mHostIp;
 
-    // mPeriodicalRunner will periodically fetch local host metadata.
-    std::thread mPeriodicalRunner;
-    std::atomic_bool mFlag;
-    int32_t mFetchIntervalSeconds;
-    std::mutex mMtx;
+    void ProcessBatch();
 
-    K8sMetadata(size_t ipCacheSize = 1024,
-                size_t cidCacheSize = 1024,
-                size_t externalIpCacheSize = 1024,
-                int32_t fetchIntervalSec = 5);
+    mutable std::mutex mStateMux;
+    std::unordered_set<std::string> mPendingKeys;
+
+    mutable std::condition_variable mCv;
+    std::vector<std::string> mBatchKeys;
+    bool mFlag;
+    std::thread mQueryThread;
+
+    K8sMetadata(size_t ipCacheSize = 1024, size_t cidCacheSize = 1024, size_t externalIpCacheSize = 1024);
     K8sMetadata(const K8sMetadata&) = delete;
     K8sMetadata& operator=(const K8sMetadata&) = delete;
 
-    void SetIpCache(const Json::Value& root);
-    void SetContainerCache(const Json::Value& root);
+    std::unique_ptr<HttpRequest>
+    BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
+    void SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
+    void SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
     void SetExternalIpCache(const std::string&);
+    void UpdateExternalIpCache(const std::vector<std::string>& queryIps, const std::vector<std::string>& retIps);
     bool FromInfoJson(const Json::Value& json, k8sContainerInfo& info);
     bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, containerInfoType infoType);
-    void LocalHostMetaRefresher();
+    void HandleMetadataResponse(containerInfoType infoType,
+                                const std::shared_ptr<ContainerData>& data,
+                                std::vector<std::string>& resKey);
 
 public:
     static K8sMetadata& GetInstance() {
-        static K8sMetadata instance(1024, 1024, 1024, 5);
+        static K8sMetadata instance(1024, 1024, 1024);
         return instance;
     }
     ~K8sMetadata() {}
 
     bool Enable();
 
-    // 公共方法
     // if cache not have,get from server
     std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string>& containerIds, bool& status);
     // get pod metadatas for local host
@@ -113,19 +121,10 @@ public:
                                containerInfoType infoType,
                                std::vector<std::string>& resKey);
 
-    // SyncGetPodMetadataByContainerIds
-    // if container info is not present in local cache, we will fetch it from remote server
-    std::vector<std::shared_ptr<k8sContainerInfo>> SyncGetPodMetadataByContainerIds(std::vector<std::string>&,
-                                                                                    bool& res);
-    // SyncGetPodMetadataByIps
-    // if container info is not present in local cache, we will fetch it from remote server
-    std::vector<std::shared_ptr<k8sContainerInfo>> SyncGetPodMetadataByIps(std::vector<std::string>&, bool& res);
-
-    using HandleMetadataFunc = std::function<void(std::shared_ptr<k8sContainerInfo>)>;
-
     void AsyncQueryMetadata(containerInfoType type, const std::string& key);
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    HttpRequest* mRequest;
     friend class k8sMetadataUnittest;
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;

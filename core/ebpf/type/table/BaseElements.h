@@ -301,7 +301,8 @@ constexpr DataElement kEndpoint = {"endpoint",
                                    "endpoint", // metric
                                    "endpoint", // span
                                    "endpoint", // log
-                                   "reqeust path"};
+                                   "reqeust path",
+                                   AggregationType::Level1};
 
 constexpr DataElement kProtocol = {
     "protocol",

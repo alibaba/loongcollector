@@ -51,11 +51,16 @@ public:
     }
 };
 
+enum class RecordType {
+    APP_RECORD,
+    CONN_STATS_RECORD,
+};
+
 /// record ///
 class AbstractRecord {
 public:
     virtual ~AbstractRecord() {}
-
+    virtual RecordType GetRecordType() = 0;
     virtual std::string GetSpanName() = 0;
 
     uint64_t GetStartTimeStamp() { return mStartTs; }
@@ -86,6 +91,7 @@ class AbstractNetRecord : public AbstractRecord {
 public:
     ~AbstractNetRecord() override {}
     std::string GetSpanName() override { return ""; }
+    RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
     std::shared_ptr<Connection> GetConnection() const { return mConnection; }
     explicit AbstractNetRecord(std::shared_ptr<Connection> connection) : mConnection(connection) {}
 
@@ -97,17 +103,14 @@ class ConnStatsRecord : public AbstractNetRecord {
 public:
     ~ConnStatsRecord() override {}
     ConnStatsRecord(std::shared_ptr<Connection> connection) : AbstractNetRecord(connection) {}
-
+    RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
     bool IsError() const override { return false; }
     bool IsSlow() const override { return false; }
     int GetStatusCode() const override { return 0; }
 
     std::string GetSpanName() override { return "CONN_STATS"; }
-
     DataTableSchema GetMetricsTableSchema() const override { return kNetMetricsTable; }
-
     DataTableSchema GetTableSchema() const override { return kNetTable; }
-
     uint64_t mDropCount;
     uint64_t mConnSum;
     uint64_t mRttVar;
@@ -127,6 +130,8 @@ public:
 
     void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
     void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
+
+    RecordType GetRecordType() override { return RecordType::APP_RECORD; }
 
     virtual std::string GetReqBody() = 0;
     virtual std::string GetRespBody() = 0;
@@ -260,7 +265,7 @@ public:
     AppSpanGroup() {}
     ~AppSpanGroup() {}
 
-    std::vector<std::shared_ptr<AbstractAppRecord>> mRecords;
+    std::vector<std::shared_ptr<AbstractRecord>> mRecords;
 };
 
 class AppLogGroup {
@@ -268,7 +273,7 @@ public:
     AppLogGroup() {}
     ~AppLogGroup() {}
 
-    std::vector<std::shared_ptr<AbstractAppRecord>> mRecords;
+    std::vector<std::shared_ptr<AbstractRecord>> mRecords;
 };
 
 

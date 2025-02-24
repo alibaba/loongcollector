@@ -29,6 +29,9 @@ if (LINUX)
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
     file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+    if (BUILD_LOGTAIL_UT)
+        add_definitions(-DAPSARA_UNIT_TEST_MAIN)
+    endif ()
 
     add_library(${EBPF_DIRVER_TARGET} SHARED ${LIB_SOURCE_FILES})
     target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf)

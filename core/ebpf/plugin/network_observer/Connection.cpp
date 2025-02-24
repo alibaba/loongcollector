@@ -183,13 +183,6 @@ void Connection::SafeUpdateNetMetaAttr(struct conn_stats_event_t* event) {
     auto sip = GetAddrString(si.ap.saddr);
     auto dip = GetAddrString(si.ap.daddr);
 
-    if (IsLocalhost()) {
-        LOG_DEBUG(sLogger, ("remote ip is localhost", "attach localhost for peer pod meta"));
-        UpdatePeerPodMetaForLocalhost();
-    } else {
-        TryAttachPeerMeta();
-    }
-
     auto sport = ntohs(si.ap.sport);
     auto dport = ntohs(si.ap.dport);
     auto saddr = sip + ":" + std::to_string(sport);
@@ -212,6 +205,22 @@ void Connection::SafeUpdateNetMetaAttr(struct conn_stats_event_t* event) {
         mAttrs[kConnTrackerTable.ColIndex(kTraceRole.Name())] = std::string(magic_enum::enum_name(mRole));
         mAttrs[kConnTrackerTable.ColIndex(kIp.Name())] = sip;
         mAttrs[kConnTrackerTable.ColIndex(kRemoteIp.Name())] = dip;
+    }
+
+    if (IsLocalhost()) {
+        LOG_DEBUG(sLogger, ("remote ip is localhost", "attach localhost for peer pod meta"));
+        UpdatePeerPodMetaForLocalhost();
+    } else {
+        LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
+        TryAttachPeerMeta();
+    }
+
+    if (cidTrim.empty()) {
+        LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));
+        UpdateSelfPodMetaForUnknown();
+    } else {
+        LOG_DEBUG(sLogger, ("try attach self meta", GetContainerId()));
+        TryAttachSelfMeta();
     }
 
     mNetMetaAttached = true;
@@ -344,6 +353,7 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
         } else if (pod->serviceName.size()) {
             mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = pod->serviceName;
         } else {
+            // TODO set to rpc value...
             mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = UNKNOWN_STR;
         }
         mAttrs[kConnTrackerTable.ColIndex(kEndpoint.Name())] = mAttrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())];

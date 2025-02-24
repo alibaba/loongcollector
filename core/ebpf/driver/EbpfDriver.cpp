@@ -602,8 +602,6 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
 int suspend_plugin(logtail::ebpf::PluginType pluginType) {
     gPluginStatus[int(pluginType)] = false;
     switch (pluginType) {
-        case logtail::ebpf::PluginType::NETWORK_OBSERVE:
-            return ebpf_stop();
         case logtail::ebpf::PluginType::NETWORK_SECURITY: {
             auto callNames = gPluginCallNames[int(pluginType)];
             gPluginCallNames[int(pluginType)] = {};

@@ -66,15 +66,13 @@ static constexpr DataElement kAppMetricsElements[] = {
     kAppId, // pid
     kIp, // server ip
     kAppName, // service
+
     kWorkloadKind,
     kWorkloadName,
 
     kProtocol,
     kRpc,
     kDestId,
-    // kContainerId,
-    /* non-aggregate keys */
-
     kRpcType,
     kCallType,
     kCallKind,

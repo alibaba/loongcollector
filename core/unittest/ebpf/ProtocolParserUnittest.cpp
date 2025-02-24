@@ -37,13 +37,19 @@ public:
     void TestProtocolParserManager();
     void TestHttpParserEdgeCases();
 
+    void RequestBenchmark();
+    void RequestWithoutBodyBenchmark();
+    void ResponseBenchmark();
+    void ResponseWithoutBodyBenchmark();
+    void ChunkedResponseBenchmark();
+
 protected:
     void SetUp() override {}
     void TearDown() override {}
 
 private:
     bool IsValidHttpHeader(const std::string& name, const std::string& value) {
-        return !name.empty() && name.find_first_of("()<>@,;:\\\"/[]?={} \t") == std::string::npos;
+        return !name.empty() && name.find_first_of("()<>@,;:\\\"/[]?={}t") == std::string::npos;
     }
 };
 
@@ -188,7 +194,6 @@ void ProtocolParserUnittest::TestParsePartialRequests() {
     state = http::ParseRequest(&buf2, &result);
     EXPECT_EQ(state, ParseState::kNeedsMoreData);
 
-    // 测试不完整的消息体
     const std::string partialBody = "POST /test HTTP/1.1\r\n"
                                     "Content-Length: 10\r\n"
                                     "\r\n"
@@ -201,16 +206,12 @@ void ProtocolParserUnittest::TestParsePartialRequests() {
 void ProtocolParserUnittest::TestProtocolParserManager() {
     auto& manager = ProtocolParserManager::GetInstance();
 
-    // 测试添加解析器
     EXPECT_TRUE(manager.AddParser(ProtocolType::HTTP));
 
-    // 测试重复添加解析器
     EXPECT_TRUE(manager.AddParser(ProtocolType::HTTP));
 
-    // 测试移除解析器
     EXPECT_TRUE(manager.RemoveParser(ProtocolType::HTTP));
 
-    // 测试移除不存在的解析器
     EXPECT_TRUE(manager.RemoveParser(ProtocolType::HTTP));
 }
 
@@ -222,23 +223,118 @@ void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     ParseState state = http::ParseRequest(&buf1, &result);
     EXPECT_EQ(state, ParseState::kNeedsMoreData);
 
-    // 测试超长URL
     std::string longUrl = "GET /";
-    longUrl.append(2048, 'a'); // 创建一个超长URL
+    longUrl.append(2048, 'a');
     longUrl += " HTTP/1.1\r\n\r\n";
     std::string_view buf2(longUrl);
     state = http::ParseRequest(&buf2, &result);
-    // EXPECT_EQ(state, ParseState::kError);
+    EXPECT_EQ(state, ParseState::kSuccess);
 
-    // 测试超多请求头
     std::string manyHeaders = "GET /test HTTP/1.1\r\n";
-    for (int i = 0; i < 200; i++) { // 添加大量头部
+    for (int i = 0; i < 200; i++) {
         manyHeaders += "X-Custom-Header-" + std::to_string(i) + ": value\r\n";
     }
     manyHeaders += "\r\n";
     std::string_view buf3(manyHeaders);
     state = http::ParseRequest(&buf3, &result);
-    // EXPECT_EQ(state, ParseState::kError);
+    EXPECT_EQ(state, ParseState::kInvalid);
+}
+
+const std::string REQ
+    = "GET /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg HTTP/1.1\r\n"
+      "Host: www.kittyhell.com\r\n"
+      "User-Agent: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; ja-JP-mac; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 "
+      "Pathtraq/0.9\r\n"
+      "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+      "Accept-Language: ja,en-us;q=0.7,en;q=0.3\r\n"
+      "Accept-Encoding: gzip,deflate\r\n"
+      "Accept-Charset: Shift_JIS,utf-8;q=0.7,*;q=0.7\r\n"
+      "Keep-Alive: 115\r\n"
+      "Connection: keep-alive\r\n"
+      "Cookie: wp_ozh_wsa_visits=2; wp_ozh_wsa_visit_lasttime=xxxxxxxxxx; "
+      "__utma=xxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.x; "
+      "__utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral\r\n"
+      "\r\n";
+
+const std::string CHUNKED_RESP_MSG = "HTTP/1.1 200 OK\r\n"
+                                     "Transfer-Encoding: chunked\r\n"
+                                     "\r\n"
+                                     "9\r\n"
+                                     "pixielabs\r\n"
+                                     "C\r\n"
+                                     " is awesome!\r\n"
+                                     "100\r\n"
+                                     "0000000000000000000000000000000000000000000000000000000000000000"
+                                     "1111111111111111111111111111111111111111111111111111111111111111"
+                                     "2222222222222222222222222222222222222222222222222222222222222222"
+                                     "3333333333333333333333333333333333333333333333333333333333333333"
+                                     "\r\n"
+                                     "0\r\n"
+                                     "\r\n";
+
+const std::string RESP_MSG = "HTTP/1.1 200 OK\r\n"
+                             "Content-Length: 320\r\n"
+                             "\r\n"
+                             "0000000000000000000000000000000000000000000000000000000000000000"
+                             "1111111111111111111111111111111111111111111111111111111111111111"
+                             "2222222222222222222222222222222222222222222222222222222222222222"
+                             "3333333333333333333333333333333333333333333333333333333333333333"
+                             "4444444444444444444444444444444444444444444444444444444444444444\r\n\r\n";
+
+void ProtocolParserUnittest::RequestBenchmark() {
+    std::string_view reqBuf(REQ);
+    Message result;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < 1000000; i++) {
+        std::string_view reqBuf(REQ);
+        http::ParseRequest(&reqBuf, &result);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[request] elapsed: " << elapsed.count() << " seconds" << std::endl;
+}
+
+void ProtocolParserUnittest::RequestWithoutBodyBenchmark() {
+    std::string_view reqBuf(REQ);
+    HTTPRequest result;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < 10000000; i++) {
+        std::string_view reqBuf(REQ);
+        auto res = http::ParseHttpRequest(reqBuf, &result);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[request] elapsed: " << elapsed.count() << " seconds" << std::endl;
+}
+
+void ProtocolParserUnittest::ResponseBenchmark() {
+    Message result;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000; i++) {
+        std::string_view respBuf(RESP_MSG);
+        http::ParseResponse(&respBuf, &result, false);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[response] elapsed: " << elapsed.count() << " seconds" << std::endl;
+}
+
+void ProtocolParserUnittest::ChunkedResponseBenchmark() {
+    Message result;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000; i++) {
+        std::string_view respBuf(CHUNKED_RESP_MSG);
+        http::ParseResponse(&respBuf, &result, false);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[response][chunked] elapsed: " << elapsed.count() << " seconds" << std::endl;
 }
 
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttp);
@@ -249,6 +345,10 @@ UNIT_TEST_CASE(ProtocolParserUnittest, TestParseInvalidRequests);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParsePartialRequests);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestProtocolParserManager);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestHttpParserEdgeCases);
+UNIT_TEST_CASE(ProtocolParserUnittest, RequestBenchmark);
+UNIT_TEST_CASE(ProtocolParserUnittest, RequestWithoutBodyBenchmark);
+UNIT_TEST_CASE(ProtocolParserUnittest, ResponseBenchmark);
+UNIT_TEST_CASE(ProtocolParserUnittest, ChunkedResponseBenchmark);
 
 } // namespace ebpf
 } // namespace logtail

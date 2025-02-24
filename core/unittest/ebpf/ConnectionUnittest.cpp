@@ -195,7 +195,7 @@ void ConnectionUnittest::TestMetadataManagement() {
     podInfo->k8sNamespace = "test-namespace";
 
     LOG_INFO(sLogger, ("step", "0-0"));
-    K8sMetadata::GetInstance().containerCache.insert(tracker->GetContainerId(), podInfo);
+    K8sMetadata::GetInstance().mContainerCache.insert(tracker->GetContainerId(), podInfo);
     LOG_INFO(sLogger, ("step", "0-1"));
 
     tracker->TryAttachSelfMeta();
@@ -215,13 +215,13 @@ void ConnectionUnittest::TestMetadataManagement() {
     peerPodInfo->podIp = "peer-pod-ip";
     peerPodInfo->podName = "peer-pod-name";
     peerPodInfo->k8sNamespace = "peer-namespace";
-    K8sMetadata::GetInstance().ipCache.insert(tracker->GetRemoteIp(), peerPodInfo);
+    K8sMetadata::GetInstance().mIpCache.insert(tracker->GetRemoteIp(), peerPodInfo);
     LOG_INFO(sLogger, ("step", "2"));
 
     tracker->TryAttachSelfMeta();
     tracker->TryAttachPeerMeta();
-    K8sMetadata::GetInstance().ipCache.remove(tracker->GetRemoteIp());
-    K8sMetadata::GetInstance().containerCache.remove(tracker->GetContainerId());
+    K8sMetadata::GetInstance().mIpCache.remove(tracker->GetRemoteIp());
+    K8sMetadata::GetInstance().mContainerCache.remove(tracker->GetContainerId());
     APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
     APSARA_TEST_TRUE(tracker->mK8sPeerMetaAttached);
     APSARA_TEST_TRUE(tracker->mNetMetaAttached);

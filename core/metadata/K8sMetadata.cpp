@@ -31,6 +31,10 @@ using namespace std;
 
 namespace logtail {
 
+const std::string CONTAINER_ID_METADATA_PATH = "/metadata/containerid";
+const std::string HOST_METADATAPATH = "/metadata/host";
+const std::string IP_METADATA_PATH = "/metadata/ipport";
+
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
@@ -40,18 +44,11 @@ bool K8sMetadata::Enable() {
 #ifdef APSARA_UNIT_TEST_MAIN
     return false;
 #endif
-    if (!AppConfig::GetInstance()->IsPurageContainerMode()) {
-        return false;
-    }
-    // Is this enough?
-    return true;
+    return AppConfig::GetInstance()->IsPurageContainerMode();
 }
 
-K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externalIpCacheSize, int32_t fetchIntervalSec)
-    : ipCache(ipCacheSize, 20),
-      containerCache(cidCacheSize, 20),
-      externalIpCache(externalIpCacheSize, 20),
-      mFetchIntervalSeconds(fetchIntervalSec) {
+K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externalIpCacheSize)
+    : mIpCache(ipCacheSize, 20), mContainerCache(cidCacheSize, 20), mExternalIpCache(externalIpCacheSize, 20) {
     mServiceHost = STRING_FLAG(singleton_service);
     mServicePort = INT32_FLAG(singleton_port);
     // TODO @qianlu.kk
@@ -62,7 +59,6 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
         mHostIp = GetHostIp();
     }
 #ifndef APSARA_UNIT_TEST_MAIN
-    // mHostIp = GetHostIp();
     LOG_INFO(sLogger, ("[metadata] host ip", mHostIp));
 #else
     mServiceHost = "47.95.70.43";
@@ -148,30 +144,39 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json,
     return true;
 }
 
+std::unique_ptr<HttpRequest>
+K8sMetadata::BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout, uint32_t maxTryCnt) {
+    return std::make_unique<HttpRequest>("GET",
+                                         false,
+                                         mServiceHost,
+                                         mServicePort,
+                                         path,
+                                         "",
+                                         map<std::string, std::string>({{"Content-Type", "application/json"}}),
+                                         reqBody,
+                                         timeout,
+                                         maxTryCnt);
+}
+
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                                         const std::string& query,
                                         containerInfoType infoType,
                                         std::vector<std::string>& resKey) {
-    std::unique_ptr<HttpRequest> request;
     HttpResponse res;
-    std::string path = "/metadata/containerid";
+    std::string path = CONTAINER_ID_METADATA_PATH;
     if (infoType == containerInfoType::IpInfo) {
-        path = "/metadata/ipport";
+        path = IP_METADATA_PATH;
     } else if (infoType == containerInfoType::HostInfo) {
-        path = "/metadata/host";
+        path = HOST_METADATAPATH;
     }
-    request = std::make_unique<HttpRequest>("GET",
-                                            false,
-                                            mServiceHost,
-                                            mServicePort,
-                                            path,
-                                            "",
-                                            map<std::string, std::string>({{"Content-Type", "application/json"}}),
-                                            query,
-                                            1,
-                                            3);
+    auto request = BuildRequest(path, query);
     LOG_DEBUG(sLogger, ("host", mServiceHost)("port", mServicePort)("path", path)("query", query));
+#ifdef APSARA_UNIT_TEST_MAIN
+    mRequest = request.get();
+    bool success = false;
+#else
     bool success = SendHttpRequest(std::move(request), res);
+#endif
     LOG_DEBUG(sLogger, ("res body", *res.GetBody<std::string>()));
     if (success) {
         if (res.GetStatusCode() != 200) {
@@ -192,16 +197,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
             if (!FromContainerJson(root, data, infoType)) {
                 LOG_WARNING(sLogger, ("from container json error:", "SetIpCache"));
             } else {
-                for (const auto& pair : data->containers) {
-                    // record result
-                    resKey.push_back(pair.first);
-                    // update cache
-                    if (infoType == containerInfoType::ContainerIdInfo) {
-                        containerCache.insert(pair.first, std::make_shared<k8sContainerInfo>(pair.second));
-                    } else {
-                        ipCache.insert(pair.first, std::make_shared<k8sContainerInfo>(pair.second));
-                    }
-                }
+                HandleMetadataResponse(infoType, data, resKey);
             }
         } else {
             LOG_WARNING(sLogger, ("JSON parse error:", errors));
@@ -215,6 +211,22 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
 }
 
+void K8sMetadata::HandleMetadataResponse(containerInfoType infoType,
+                                         const std::shared_ptr<ContainerData>& data,
+                                         std::vector<std::string>& resKey) {
+    for (const auto& pair : data->containers) {
+        // record result
+        resKey.push_back(pair.first);
+        // update cache
+        auto info = std::make_shared<k8sContainerInfo>(pair.second);
+        if (infoType == containerInfoType::ContainerIdInfo) {
+            SetContainerCache(pair.first, info);
+        } else {
+            SetIpCache(pair.first, info);
+        }
+    }
+}
+
 std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string>& containerIds,
                                                                   bool& status) {
     Json::Value jsonObj;
@@ -223,8 +235,8 @@ std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<st
     }
     std::vector<std::string> res;
     Json::StreamWriterBuilder writer;
-    std::string output = Json::writeString(writer, jsonObj);
-    status = SendRequestToOperator(mServiceHost, output, containerInfoType::ContainerIdInfo, res);
+    std::string reqBody = Json::writeString(writer, jsonObj);
+    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::ContainerIdInfo, res);
     return res;
 }
 
@@ -232,8 +244,8 @@ bool K8sMetadata::GetByLocalHostFromServer(std::vector<std::string>& podIpVec) {
     Json::Value jsonObj;
     jsonObj["keys"].append(mHostIp);
     Json::StreamWriterBuilder writer;
-    std::string output = Json::writeString(writer, jsonObj);
-    return SendRequestToOperator(mServiceHost, output, containerInfoType::HostInfo, podIpVec);
+    std::string reqBody = Json::writeString(writer, jsonObj);
+    return SendRequestToOperator(mServiceHost, reqBody, containerInfoType::HostInfo, podIpVec);
 }
 
 bool K8sMetadata::GetByLocalHostFromServer() {
@@ -241,37 +253,30 @@ bool K8sMetadata::GetByLocalHostFromServer() {
     return GetByLocalHostFromServer(podIpVec);
 }
 
-void K8sMetadata::SetContainerCache(const Json::Value& root) {
-    std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-    if (data == nullptr) {
-        return;
-    }
-    if (!FromContainerJson(root, data, containerInfoType::IpInfo)) {
-        LOG_DEBUG(sLogger, ("from container json error:", "SetContainerCache"));
-    } else {
-        for (const auto& pair : data->containers) {
-            containerCache.insert(pair.first, std::make_shared<k8sContainerInfo>(pair.second));
-        }
-    }
+void K8sMetadata::SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info) {
+    mContainerCache.insert(key, info);
 }
 
-void K8sMetadata::SetIpCache(const Json::Value& root) {
-    std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-    if (data == nullptr) {
-        return;
-    }
-    if (!FromContainerJson(root, data, containerInfoType::IpInfo)) {
-        LOG_DEBUG(sLogger, ("from container json error:", "SetIpCache"));
-    } else {
-        for (const auto& pair : data->containers) {
-            ipCache.insert(pair.first, std::make_shared<k8sContainerInfo>(pair.second));
-        }
-    }
+void K8sMetadata::SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info) {
+    mIpCache.insert(key, info);
 }
 
 void K8sMetadata::SetExternalIpCache(const std::string& ip) {
     LOG_DEBUG(sLogger, (ip, "is external, inset into cache ..."));
-    externalIpCache.insert(ip, uint8_t(0));
+    mExternalIpCache.insert(ip, uint8_t(0));
+}
+
+void K8sMetadata::UpdateExternalIpCache(const std::vector<std::string>& queryIps,
+                                        const std::vector<std::string>& retIps) {
+    std::set<std::string> hash;
+    for (auto& ip : retIps) {
+        hash.insert(ip);
+    }
+    for (auto& x : queryIps) {
+        if (!hash.count(x)) {
+            SetExternalIpCache(x);
+        }
+    }
 }
 
 std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string>& ips, bool& status) {
@@ -281,17 +286,18 @@ std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string
     }
     std::vector<std::string> res;
     Json::StreamWriterBuilder writer;
-    std::string output = Json::writeString(writer, jsonObj);
-    status = SendRequestToOperator(mServiceHost, output, containerInfoType::IpInfo, res);
-    std::set<std::string> hash;
-    for (auto& ip : res) {
-        hash.insert(ip);
-    }
-    for (auto& x : ips) {
-        if (!hash.count(x)) {
-            SetExternalIpCache(x);
-        }
-    }
+    std::string reqBody = Json::writeString(writer, jsonObj);
+    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::IpInfo, res);
+    UpdateExternalIpCache(ips, res);
+    // std::set<std::string> hash;
+    // for (auto& ip : res) {
+    //     hash.insert(ip);
+    // }
+    // for (auto& x : ips) {
+    //     if (!hash.count(x)) {
+    //         SetExternalIpCache(x);
+    //     }
+    // }
     return res;
 }
 
@@ -299,8 +305,8 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(con
     if (containerId.empty()) {
         return nullptr;
     }
-    if (containerCache.contains(containerId)) {
-        return containerCache.get(containerId);
+    if (mContainerCache.contains(containerId)) {
+        return mContainerCache.get(containerId);
     } else {
         return nullptr;
     }
@@ -310,105 +316,58 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::s
     if (ip.empty()) {
         return nullptr;
     }
-    if (ipCache.contains(ip)) {
-        return ipCache.get(ip);
+    if (mIpCache.contains(ip)) {
+        return mIpCache.get(ip);
     } else {
         return nullptr;
     }
 }
 
-
 bool K8sMetadata::IsExternalIp(const std::string& ip) const {
-    return externalIpCache.contains(ip);
-}
-
-std::vector<std::shared_ptr<k8sContainerInfo>>
-K8sMetadata::SyncGetPodMetadataByContainerIds(std::vector<std::string>& cids, bool& res) {
-    std::vector<std::shared_ptr<k8sContainerInfo>> result(cids.size(), nullptr);
-    std::vector<std::string> missingCids;
-
-    for (size_t i = 0; i < cids.size(); i++) {
-        auto info = GetInfoByContainerIdFromCache(cids[i]);
-        if (info) {
-            result[i] = info;
-        } else {
-            missingCids.push_back(cids[i]);
-        }
-    }
-
-    if (!missingCids.empty()) {
-        bool serverStatus;
-        GetByContainerIdsFromServer(missingCids, serverStatus);
-
-        if (!serverStatus) {
-            res = false;
-            return result;
-        }
-
-        for (size_t i = 0; i < result.size(); ++i) {
-            if (result[i] == nullptr) {
-                auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cids[i]);
-                result[i] = podMeta;
-            }
-        }
-    }
-
-    res = true;
-    return result;
-}
-
-std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataByIps(std::vector<std::string>& ips,
-                                                                                    bool& res) {
-    std::vector<std::shared_ptr<k8sContainerInfo>> result(ips.size(), nullptr);
-    std::vector<std::string> missingIps;
-
-    for (size_t i = 0; i < ips.size(); i++) {
-        if (IsExternalIp(ips[i])) {
-            result[i] = nullptr;
-            LOG_DEBUG(sLogger, (ips[i], "external, set nullptr to metadata"));
-            continue;
-        }
-        auto info = GetInfoByIpFromCache(ips[i]);
-        if (info) {
-            result[i] = info;
-        } else {
-            missingIps.push_back(ips[i]);
-        }
-    }
-
-    if (!missingIps.empty()) {
-        bool serverStatus;
-        GetByIpsFromServer(missingIps, serverStatus);
-
-        if (!serverStatus) {
-            res = false;
-            return result;
-        }
-
-        for (size_t i = 0; i < result.size(); ++i) {
-            if (result[i] == nullptr) {
-                auto podMeta = K8sMetadata::GetInstance().GetInfoByIpFromCache(ips[i]);
-                result[i] = podMeta;
-            }
-        }
-    }
-
-    res = true;
-    return result;
+    return mExternalIpCache.contains(ip);
 }
 
 void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& key) {
-    switch (type) {
-        case containerInfoType::ContainerIdInfo: {
-            break;
-        }
-        case containerInfoType::IpInfo: {
-            break;
-        }
-        default:
-            break;
+    std::unique_lock<std::mutex> lock(mStateMux);
+    if (mPendingKeys.find(key) != mPendingKeys.end()) {
+        // already in query queue ...
+        return;
     }
+    mPendingKeys.insert(key);
+    mBatchKeys.push_back(key);
+    mCv.notify_one();
 }
 
+void K8sMetadata::ProcessBatch() {
+    while (true) {
+        std::vector<std::string> keysToProcess;
+        {
+            std::unique_lock<std::mutex> lock(mStateMux);
+            mCv.wait_for(lock, std::chrono::milliseconds(10), [this] { return !mBatchKeys.empty() || !mFlag; });
+            if (!mFlag && mBatchKeys.empty()) {
+                break;
+            }
+            keysToProcess.swap(mBatchKeys);
+        }
+
+        if (!keysToProcess.empty()) {
+            bool status = false;
+            std::vector<std::string> results = GetByIpsFromServer(keysToProcess, status);
+            if (!status) {
+                std::unique_lock<std::mutex> lock(mStateMux);
+                for (const auto& ip : keysToProcess) {
+                    mBatchKeys.push_back(ip);
+                }
+                mCv.notify_one();
+            } else {
+                // request success
+                std::unique_lock<std::mutex> lock(mStateMux);
+                for (const auto& ip : keysToProcess) {
+                    mPendingKeys.erase(ip);
+                }
+            }
+        }
+    }
+}
 
 } // namespace logtail

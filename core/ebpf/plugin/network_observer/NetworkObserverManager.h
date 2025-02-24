@@ -73,9 +73,9 @@ public:
     void PollBufferWrapper();
     void ConsumeRecords();
 
-    std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractAppRecord> event);
-    std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractAppRecord> event);
-    std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractAppRecord> event);
+    std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
+    std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
+    std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&);
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
@@ -85,16 +85,24 @@ public:
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
-        override {
-        LOG_WARNING(sLogger, ("TODO", "not support yet"));
+    virtual int Update(
+        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+
+    virtual int Suspend() override {
+        mSuspendFlag = true;
+        return 0;
+    }
+
+    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
+        mSuspendFlag = false;
         return 0;
     }
 
 private:
-    void ConsumeRecordsAsEvent(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
-    void ConsumeRecordsAsMetric(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
-    void ConsumeRecordsAsTrace(std::vector<std::shared_ptr<AbstractRecord>>& records, size_t count);
+    void ProcessRecord(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
 
     bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
@@ -104,7 +112,7 @@ private:
 
     void RunInThread();
 
-    bool UpdateParsers(const std::vector<std::string>& protocols);
+    bool UpdateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
 
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
@@ -154,18 +162,18 @@ private:
     std::unordered_set<std::string> mEnabledCids;
 
     ReadWriteLock mAppAggLock;
-    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractAppRecord>> mAppAggregator;
+    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
 
 
     ReadWriteLock mNetAggLock;
-    SIZETAggTree<NetMetricData, std::shared_ptr<ConnStatsRecord>> mNetAggregator;
+    SIZETAggTree<NetMetricData, std::shared_ptr<AbstractRecord>> mNetAggregator;
 
 
     ReadWriteLock mSpanAggLock;
-    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractAppRecord>> mSpanAggregator;
+    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractRecord>> mSpanAggregator;
 
     ReadWriteLock mLogAggLock;
-    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractAppRecord>> mLogAggregator;
+    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
 
     template <typename T, typename Func>
@@ -177,6 +185,12 @@ private:
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;
+    std::vector<PipelineEventGroup> mMetricEventGroups;
+    std::vector<PipelineEventGroup> mLogEventGroups;
+    std::vector<PipelineEventGroup> mSpanEventGroups;
+
+    int mRollbackRecordTotal = 0;
+    int mDropRecordTotal = 0;
 #endif
 };
 
