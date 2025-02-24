@@ -23,6 +23,13 @@ namespace logtail {
 class SystemInformationToolsUnittest : public testing::Test {
 public:
     void TestGetSystemBootSeconds() const;
+
+protected:
+    void SetUp() override {
+        bfs::create_directories("./1");
+        ofstream ofs("./stat", std::ios::trunc);
+        ofs << "btime 1731142542";
+    }
 };
 
 void SystemInformationToolsUnittest::TestGetSystemBootSeconds() const {

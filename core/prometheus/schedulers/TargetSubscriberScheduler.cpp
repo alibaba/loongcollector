@@ -107,23 +107,21 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
         for (const auto& [k, v] : newScrapeSchedulerMap) {
             if (mScrapeSchedulerMap.find(k) == mScrapeSchedulerMap.end()) {
                 mScrapeSchedulerMap[k] = v;
-                if (mTimer) {
-                    auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
-                    auto tmpRandSleepMilliSec
-                        = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
+                auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
+                auto tmpRandSleepMilliSec
+                    = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
 
-                    // zero-cost upgrade
-                    if (mUnRegisterMs > 0
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
-                            > mUnRegisterMs)
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
-                            < mUnRegisterMs)) {
-                        // scrape once just now
-                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
-                    }
-                    v->ScheduleNext();
+                // zero-cost upgrade
+                if (mUnRegisterMs > 0
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
+                        > mUnRegisterMs)
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
+                        < mUnRegisterMs)) {
+                    // scrape once just now
+                    LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
+                    v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
                 }
+                v->ScheduleNext();
             }
         }
     }

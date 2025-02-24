@@ -51,7 +51,7 @@ private:
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->UpdateCollector({MockCollector::sName}, QueueKey{}, 0, 60);
+    runner->UpdateCollector({MockCollector::sName}, {60}, QueueKey{}, 0);
     APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid(std::chrono::steady_clock::now(), MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(
         runner->IsCollectTaskValid(std::chrono::steady_clock::now() - std::chrono::seconds(60), MockCollector::sName));
@@ -66,7 +66,7 @@ void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
 void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->mThreadPool.Start();
+    runner->mThreadPool->Start();
     runner->mRegisteredCollectorMap.find(MockCollector::sName)->second.Enable();
     std::string configName = "test";
     auto queueKey = QueueKeyManager::GetInstance()->GetKey(configName);
@@ -86,7 +86,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
     APSARA_TEST_EQUAL_FATAL("test", configName);
 
-    runner->mThreadPool.Stop();
+    runner->mThreadPool->Stop();
     runner->Stop();
 }
 
