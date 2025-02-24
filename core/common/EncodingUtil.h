@@ -20,6 +20,6 @@
 
 namespace logtail {
 
-std::string Base64Enconde(const std::string& message);
+std::string Base64Encode(const std::string& message);
 
 } // namespace logtail

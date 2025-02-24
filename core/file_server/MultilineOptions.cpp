@@ -229,8 +229,8 @@ const string& UnmatchedContentTreatmentToString(MultilineOptions::UnmatchedConte
             static string singleLine = "single line";
             return singleLine;
         default:
-            static string unkonwn = "";
-            return unkonwn;
+            static string unknown = "";
+            return unknown;
     }
 }
 
