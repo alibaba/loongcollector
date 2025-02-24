@@ -17,6 +17,7 @@
 #include "HostMonitorInputRunner.h"
 
 #include <chrono>
+#include <cstdint>
 
 #include <memory>
 #include <mutex>
@@ -25,10 +26,10 @@
 #include <utility>
 #include <vector>
 
-#include "HostMonitorTimerEvent.h"
-#include "ProcessEntityCollector.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/timer/Timer.h"
+#include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
@@ -37,30 +38,38 @@ DEFINE_FLAG_INT32(host_monitor_thread_pool_size, "host monitor thread pool size"
 
 namespace logtail {
 
-HostMonitorInputRunner::HostMonitorInputRunner() : mThreadPool(ThreadPool(INT32_FLAG(host_monitor_thread_pool_size))) {
+HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<ProcessEntityCollector>();
+    size_t threadPoolSize = 1;
+    // threadPoolSize should be greater than 0
+    if (INT32_FLAG(host_monitor_thread_pool_size) > 0) {
+        threadPoolSize = INT32_FLAG(host_monitor_thread_pool_size);
+    }
+    // threadPoolSize should be less than or equal to the number of registered collectors
+    mThreadPool = std::make_unique<ThreadPool>(std::min(threadPoolSize, mRegisteredCollectorMap.size()));
 }
 
 void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& newCollectorNames,
+                                             const std::vector<uint32_t>& newCollectorIntervals,
                                              QueueKey processQueueKey,
-                                             int inputIndex,
-                                             int interval) {
+                                             int inputIndex) {
     std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
-    for (auto& collector : newCollectorNames) {
-        auto iter = mRegisteredCollectorMap.find(collector);
+    for (size_t i = 0; i < newCollectorNames.size(); ++i) {
+        const auto& collectorName = newCollectorNames[i];
+        auto iter = mRegisteredCollectorMap.find(collectorName);
         if (iter == mRegisteredCollectorMap.end()) {
-            LOG_ERROR(sLogger, ("host monitor", "collector not support")("collector", collector));
+            LOG_ERROR(sLogger, ("host monitor", "collector not support")("collector", collectorName));
             continue;
         }
         // register new collector
         iter->second.Enable();
         // add timer event
         HostMonitorTimerEvent::CollectConfig collectConfig(
-            collector, processQueueKey, inputIndex, std::chrono::seconds(interval));
+            collectorName, processQueueKey, inputIndex, std::chrono::seconds(newCollectorIntervals[i]));
         auto now = std::chrono::steady_clock::now();
         auto event = std::make_unique<HostMonitorTimerEvent>(now, collectConfig);
         Timer::GetInstance()->PushEvent(std::move(event));
-        LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collector));
+        LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collectorName));
     }
 }
 
@@ -77,7 +86,8 @@ void HostMonitorInputRunner::Init() {
     }
     LOG_INFO(sLogger, ("HostMonitorInputRunner", "Start"));
 #ifndef APSARA_UNIT_TEST_MAIN
-    mThreadPool.Start();
+    mThreadPool->Start();
+    Timer::GetInstance()->Init();
 #endif
 }
 
@@ -87,12 +97,12 @@ void HostMonitorInputRunner::Stop() {
     }
     RemoveCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool.Stop(); });
+    std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
     if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {
-        LOG_ERROR(sLogger, ("HostMonitorInputRunner stop timeout 3 seconds", "may cause thread leak"));
+        LOG_ERROR(sLogger, ("host monitor runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
     }
 #endif
-    LOG_INFO(sLogger, ("HostMonitorInputRunner", "Stop"));
+    LOG_INFO(sLogger, ("host monitor runner", "stop successfully"));
 }
 
 bool HostMonitorInputRunner::HasRegisteredPlugins() const {
@@ -105,18 +115,25 @@ bool HostMonitorInputRunner::HasRegisteredPlugins() const {
     return false;
 }
 
-bool HostMonitorInputRunner::IsCollectTaskValid(std::chrono::steady_clock::time_point execTime,
+bool HostMonitorInputRunner::IsCollectTaskValid(const std::chrono::steady_clock::time_point& execTime,
                                                 const std::string& collectorName) {
     std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     auto it = mRegisteredCollectorMap.find(collectorName);
     if (it == mRegisteredCollectorMap.end()) {
         return false;
     }
-    return it->second.IsEnabled() && (it->second.mLastEnableTime <= execTime);
+    return it->second.IsValidEvent(execTime);
 }
 
 void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point execTime,
                                           HostMonitorTimerEvent::CollectConfig& config) {
+    if (!ProcessQueueManager::GetInstance()->IsValidToPush(config.mProcessQueueKey)) {
+        LOG_WARNING(sLogger,
+                    ("host monitor push process queue failed", "discard data")("collector", config.mCollectorName));
+        PushNextTimerEvent(execTime, config);
+        return;
+    }
+
     auto collectFn = [this, config, execTime]() mutable {
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
         std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
@@ -133,37 +150,32 @@ void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point 
                                                                                                 config.mCollectorName));
             return;
         }
-        collector->second.GetCollector()->Collect(group, config);
+        collector->second.GetCollector()->Collect(config, &group);
         LOG_DEBUG(
             sLogger,
             ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));
         if (group.GetEvents().size() > 0) {
-            LOG_DEBUG(sLogger, ("host monitor", "push process queue")("collector", config.mProcessQueueKey));
             bool result = ProcessorRunner::GetInstance()->PushQueue(
                 config.mProcessQueueKey, config.mInputIndex, std::move(group));
             if (!result) {
-                // there is no process for host monitor, so should not block in process queue
                 LOG_ERROR(
                     sLogger,
                     ("host monitor push process queue failed", "discard data")("collector", config.mCollectorName));
             }
         }
-
-        // add next collect event
-        std::chrono::steady_clock::time_point nextExecTime = execTime + config.mInterval;
-        while (nextExecTime < std::chrono::steady_clock::now()) {
-            nextExecTime += config.mInterval;
-        }
-        auto event = std::make_unique<HostMonitorTimerEvent>(nextExecTime, config);
-        Timer::GetInstance()->PushEvent(std::move(event));
+        PushNextTimerEvent(execTime, config);
     };
-    mThreadPool.Add(collectFn);
+    mThreadPool->Add(collectFn);
 }
 
-template <typename T>
-void HostMonitorInputRunner::RegisterCollector() {
-    auto collector = std::make_unique<T>();
-    mRegisteredCollectorMap.emplace(T::sName, CollectorInstance(std::move(collector)));
+void HostMonitorInputRunner::PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
+                                                const HostMonitorTimerEvent::CollectConfig& config) {
+    std::chrono::steady_clock::time_point nextExecTime = execTime + config.mInterval;
+    while (nextExecTime < std::chrono::steady_clock::now()) {
+        nextExecTime += config.mInterval;
+    }
+    auto event = std::make_unique<HostMonitorTimerEvent>(nextExecTime, config);
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 } // namespace logtail

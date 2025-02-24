@@ -20,12 +20,7 @@
 
 namespace logtail {
 
-#ifndef APSARA_UNIT_TEST_MAIN
-extern const std::filesystem::path PROCESS_DIR;
-#else
 extern std::filesystem::path PROCESS_DIR;
-#endif
-
 const extern std::filesystem::path PROCESS_STAT;
 
 } // namespace logtail

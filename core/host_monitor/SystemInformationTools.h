@@ -18,17 +18,8 @@
 
 #include <cstdint>
 
-#include <string>
-#include <vector>
-
-#include "FileSystemUtil.h"
-#include "StringTools.h"
-#include "constants/EntityConstants.h"
-
-using namespace std::chrono;
-
 namespace logtail {
 
-int64_t GetSystemBootSeconds();
+int64_t GetHostSystemBootTime();
 
 } // namespace logtail

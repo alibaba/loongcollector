@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include "Flags.h"
+#include <cstdint>
+
 #include "collection_pipeline/plugin/interface/Input.h"
 
 namespace logtail {
@@ -32,7 +33,7 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
-    int mInterval = 60;
+    uint32_t mInterval = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputHostMetaUnittest;

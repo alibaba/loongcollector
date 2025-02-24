@@ -38,7 +38,6 @@ public:
     Timer(Timer&&) = delete;
     Timer& operator=(const Timer&) = delete;
     Timer& operator=(Timer&&) = delete;
-    ~Timer() = default;
     static Timer* GetInstance() {
         static Timer sInstance;
         return &sInstance;
@@ -52,6 +51,7 @@ public:
 
 private:
     Timer() = default;
+    ~Timer() = default;
     void Run();
 
     mutable std::mutex mQueueMux;

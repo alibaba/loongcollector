@@ -23,7 +23,6 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -35,12 +34,9 @@
 
 namespace logtail {
 
-struct CollectorInstance {
+class CollectorInstance {
+public:
     CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
-
-    std::unique_ptr<BaseCollector> mCollector;
-    bool mIsEnabled = false;
-    std::chrono::steady_clock::time_point mLastEnableTime;
 
     BaseCollector* GetCollector() const { return mCollector.get(); }
     bool IsEnabled() const { return mIsEnabled; }
@@ -49,6 +45,14 @@ struct CollectorInstance {
         mLastEnableTime = std::chrono::steady_clock::now();
     }
     void Disable() { mIsEnabled = false; }
+    bool IsValidEvent(const std::chrono::steady_clock::time_point& execTime) const {
+        return mIsEnabled && execTime >= mLastEnableTime;
+    }
+
+private:
+    std::unique_ptr<BaseCollector> mCollector;
+    bool mIsEnabled = false;
+    std::chrono::steady_clock::time_point mLastEnableTime;
 };
 
 class HostMonitorInputRunner : public InputRunner {
@@ -57,7 +61,6 @@ public:
     HostMonitorInputRunner(HostMonitorInputRunner&&) = delete;
     HostMonitorInputRunner& operator=(const HostMonitorInputRunner&) = delete;
     HostMonitorInputRunner& operator=(HostMonitorInputRunner&&) = delete;
-    ~HostMonitorInputRunner() override = default;
     static HostMonitorInputRunner* GetInstance() {
         static HostMonitorInputRunner sInstance;
         return &sInstance;
@@ -65,27 +68,33 @@ public:
 
     // Only support singleton mode
     void UpdateCollector(const std::vector<std::string>& newCollectorNames,
+                         const std::vector<uint32_t>& newCollectorIntervals,
                          QueueKey processQueueKey,
-                         int inputIndex,
-                         int interval);
+                         int inputIndex);
     void RemoveCollector();
 
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
 
-    bool IsCollectTaskValid(std::chrono::steady_clock::time_point execTime, const std::string& collectorName);
+    bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& execTime, const std::string& collectorName);
     void ScheduleOnce(std::chrono::steady_clock::time_point execTime,
                       HostMonitorTimerEvent::CollectConfig& collectConfig);
 
 private:
     HostMonitorInputRunner();
+    ~HostMonitorInputRunner() override = default;
 
     template <typename T>
-    void RegisterCollector();
+    void RegisterCollector() {
+        auto collector = std::make_unique<T>();
+        mRegisteredCollectorMap.emplace(T::sName, CollectorInstance(std::move(collector)));
+    }
+    void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
+                            const HostMonitorTimerEvent::CollectConfig& config);
 
     std::atomic_bool mIsStarted = false;
-    ThreadPool mThreadPool;
+    std::unique_ptr<ThreadPool> mThreadPool;
 
     mutable std::shared_mutex mRegisteredCollectorMapMutex;
     std::unordered_map<std::string, CollectorInstance> mRegisteredCollectorMap;

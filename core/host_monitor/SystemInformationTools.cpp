@@ -14,21 +14,30 @@
  * limitations under the License.
  */
 
-#include "SystemInformationTools.h"
+#include "host_monitor/SystemInformationTools.h"
 
-#include "Logger.h"
+#include <string>
+#include <vector>
+
+#include "FileSystemUtil.h"
+#include "StringTools.h"
+#include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
+#include "logger/Logger.h"
+
+using namespace std;
+using namespace std::chrono;
 
 namespace logtail {
 
-int64_t GetSystemBootSeconds() {
-    static int64_t systemBootSeconds;
+int64_t GetHostSystemBootTime() {
+    static int64_t systemBootSeconds = 0;
     if (systemBootSeconds != 0) {
         return systemBootSeconds;
     }
 
-    std::vector<std::string> cpuLines = {};
-    std::string errorMessage;
+    vector<string> cpuLines = {};
+    string errorMessage;
     int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, cpuLines, true, &errorMessage);
     if (ret != 0 || cpuLines.empty()) {
         LOG_WARNING(sLogger, ("failed to get cpu lines", errorMessage)("ret", ret)("cpuLines", cpuLines.size()));
@@ -37,14 +46,14 @@ int64_t GetSystemBootSeconds() {
 
     for (auto const& cpuLine : cpuLines) {
         auto cpuMetric = SplitString(cpuLine);
+        // example: btime 1719922762
         if (cpuMetric.size() >= 2 && cpuMetric[0] == "btime") {
-            constexpr size_t bootTimeIndex = 1;
-            return bootTimeIndex < cpuMetric.size() ? StringTo<int64_t>(cpuMetric[bootTimeIndex]) : 0;
+            systemBootSeconds = StringTo<int64_t>(cpuMetric[1]);
+            return systemBootSeconds;
         }
     }
 
-    systemBootSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-    return systemBootSeconds;
+    return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 }
 
 } // namespace logtail

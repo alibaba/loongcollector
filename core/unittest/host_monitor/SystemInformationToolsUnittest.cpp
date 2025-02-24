@@ -27,7 +27,7 @@ public:
 
 void SystemInformationToolsUnittest::TestGetSystemBootSeconds() const {
     PROCESS_DIR = ".";
-    APSARA_TEST_EQUAL(1731142542, GetSystemBootSeconds());
+    APSARA_TEST_EQUAL(1731142542, GetHostSystemBootTime());
 }
 
 

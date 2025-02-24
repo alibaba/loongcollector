@@ -18,35 +18,32 @@
 
 #include <chrono>
 
-#include <memory>
 #include <string>
-#include <utility>
 
-#include "QueueKey.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "timer/TimerEvent.h"
 
 namespace logtail {
 
-
 class HostMonitorTimerEvent : public TimerEvent {
 public:
     struct CollectConfig {
-        CollectConfig(std::string collectorName,
-                      QueueKey processQueueKey,
-                      int inputIndex,
-                      std::chrono::seconds interval)
-            : mCollectorName(collectorName),
-              mProcessQueueKey(processQueueKey),
-              mInputIndex(inputIndex),
-              mInterval(interval) {}
-
         std::string mCollectorName;
         QueueKey mProcessQueueKey;
         size_t mInputIndex;
         std::chrono::seconds mInterval;
+
+        CollectConfig(const std::string& collectorName,
+                      QueueKey processQueueKey,
+                      size_t inputIndex,
+                      const std::chrono::seconds& interval)
+            : mCollectorName(collectorName),
+              mProcessQueueKey(processQueueKey),
+              mInputIndex(inputIndex),
+              mInterval(interval) {}
     };
 
-    HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, CollectConfig collectConfig)
+    HostMonitorTimerEvent(const std::chrono::steady_clock::time_point& execTime, const CollectConfig& collectConfig)
         : TimerEvent(execTime), mCollectConfig(collectConfig) {}
 
     bool IsValid() const override;

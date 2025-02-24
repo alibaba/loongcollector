@@ -140,7 +140,7 @@ public:
     ProcessEntityCollector();
     ~ProcessEntityCollector() override = default;
 
-    void Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) override;
+    void Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }

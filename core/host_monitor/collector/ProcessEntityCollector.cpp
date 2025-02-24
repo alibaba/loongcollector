@@ -43,7 +43,6 @@
 #include "models/StringView.h"
 
 DEFINE_FLAG_INT32(process_collect_silent_count, "number of process scanned between a sleep", 1000);
-DECLARE_FLAG_INT32(host_monitor_collect_min_interval);
 
 namespace logtail {
 
@@ -62,14 +61,15 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
     }
 };
 
-void ProcessEntityCollector::Collect(PipelineEventGroup& group, HostMonitorTimerEvent::CollectConfig& collectConfig) {
-    if (!mValidState) {
+void ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
+                                     PipelineEventGroup* group) {
+    if (!mValidState || group == nullptr) {
         return;
     }
     std::vector<ProcessStatPtr> processes;
     GetSortedProcess(processes, ProcessTopN);
     for (auto process : processes) {
-        auto event = group.AddLogEvent();
+        auto event = group->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
 
@@ -103,7 +103,7 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group, HostMonitorTimer
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID, ""); TODO: get container id
 
         // process -> host link
-        auto linkEvent = group.AddLogEvent();
+        auto linkEvent = group->AddLogEvent();
         linkEvent->SetTimestamp(logtime);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_DOMAIN, domain);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_ENTITY_TYPE, entityType);
@@ -262,7 +262,7 @@ ProcessStatPtr ProcessEntityCollector::ParseProcessStat(pid_t pid, std::string& 
 
     ptr->startTime = system_clock::time_point{
         static_cast<milliseconds>(StringTo<uint32_t>(words[EnumProcessStat::starttime - offset]))
-        + milliseconds{GetSystemBootSeconds() * 1000}};
+        + milliseconds{GetHostSystemBootTime() * 1000}};
     ptr->vSize = StringTo<uint64_t>(words[EnumProcessStat::vsize - offset]);
     ptr->rss = StringTo<uint64_t>(words[EnumProcessStat::rss - offset]) << (getpagesize());
     ptr->processor = StringTo<int>(words[EnumProcessStat::processor - offset]);

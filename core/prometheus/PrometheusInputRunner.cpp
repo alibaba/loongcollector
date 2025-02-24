@@ -136,6 +136,7 @@ void PrometheusInputRunner::Init() {
     mIsStarted = true;
 
 #ifndef APSARA_UNIT_TEST_MAIN
+    Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
 

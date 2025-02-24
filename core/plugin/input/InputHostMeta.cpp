@@ -18,45 +18,42 @@
 
 #include "json/value.h"
 
-#include "Flags.h"
+#include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/HostMonitorInputRunner.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
-
-DEFINE_FLAG_INT32(host_monitor_collect_min_interval, "host monitor collect min interval", 15);
 
 namespace logtail {
 
 const std::string InputHostMeta::sName = "input_host_meta";
+const uint32_t kMinInterval = 5; // seconds
 
 bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
-    if (!GetOptionalIntParam(config, "Interval", mInterval, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              false,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
+    if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
     }
-    mInterval = std::max(mInterval, INT32_FLAG(host_monitor_collect_min_interval));
+    mInterval = std::max(mInterval, kMinInterval);
     return true;
 }
 
 bool InputHostMeta::Start() {
-    LOG_INFO(sLogger, ("input host meta start", mContext->GetConfigName()));
     HostMonitorInputRunner::GetInstance()->Init();
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        {"process_entity"}, mContext->GetProcessQueueKey(), mIndex, mInterval);
+        {ProcessEntityCollector::sName}, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    LOG_INFO(sLogger, ("input host meta stop", mContext->GetConfigName()));
     HostMonitorInputRunner::GetInstance()->RemoveCollector();
     return true;
 }
