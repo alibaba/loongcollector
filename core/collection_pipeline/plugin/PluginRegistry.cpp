@@ -17,9 +17,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if !defined(_MSC_VER)
 #include <dirent.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#endif
 
 #include <string>
 
@@ -30,11 +32,11 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputInternalAlarms.h"
+#include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
-#include "plugin/input/InputInternalAlarms.h"
-#include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"

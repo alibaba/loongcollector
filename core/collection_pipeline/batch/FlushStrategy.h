@@ -85,7 +85,10 @@ private:
 };
 
 template <>
-bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
-                                                              const PipelineEventPtr& e);
+inline bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
+                                                                     const PipelineEventPtr& e) {
+    return time(nullptr) - status.GetCreateTime() > mTimeoutSecs
+        || status.GetCreateTimeMinute() != e->GetTimestamp() / 60;
+}
 
 } // namespace logtail

@@ -27,21 +27,26 @@ StringView gEmptyStringView;
 
 const string& PipelineEventTypeToString(PipelineEvent::Type t) {
     switch (t) {
-        case PipelineEvent::Type::LOG:
+        case PipelineEvent::Type::LOG: {
             static string logName = "Log";
             return logName;
-        case PipelineEvent::Type::METRIC:
+        }
+        case PipelineEvent::Type::METRIC: {
             static string metricName = "Metric";
             return metricName;
-        case PipelineEvent::Type::SPAN:
+        }
+        case PipelineEvent::Type::SPAN: {
             static string spanName = "Span";
             return spanName;
-        case PipelineEvent::Type::RAW:
+        }
+        case PipelineEvent::Type::RAW: {
             static string rawName = "Raw";
             return rawName;
-        default:
+        }
+        default: {
             static string voidName = "";
             return voidName;
+        }
     }
 }
 

@@ -35,7 +35,19 @@ struct BatchedEvents {
 
     BatchedEvents() = default;
     ~BatchedEvents();
-    BatchedEvents(BatchedEvents&&) noexcept = default;
+#if defined(_MSC_VER)
+    // default noexcept constructor need all member noexcept,
+    // in vs2017, std::map is not noexcept.
+    BatchedEvents(BatchedEvents&& other) noexcept
+        : mEvents(std::move(other.mEvents)),
+          mTags(std::move(other.mTags)),
+          mSourceBuffers(std::move(other.mSourceBuffers)),
+          mSizeBytes(other.mSizeBytes),
+          mExactlyOnceCheckpoint(std::move(other.mExactlyOnceCheckpoint)),
+          mPackIdPrefix(other.mPackIdPrefix) {}
+#else
+    BatchedEvents(BatchedEvents&&) = default;
+#endif
     BatchedEvents& operator=(BatchedEvents&&) noexcept = default;
 
     // for flusher_sls only
