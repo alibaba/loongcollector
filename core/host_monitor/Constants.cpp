@@ -14,25 +14,12 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "Constants.h"
 
-#include <chrono>
 
 namespace logtail {
 
-class TimerEvent {
-public:
-    TimerEvent(std::chrono::steady_clock::time_point execTime) : mExecTime(execTime) {}
-    virtual ~TimerEvent() = default;
-
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
-
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
-    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
-
-private:
-    std::chrono::steady_clock::time_point mExecTime;
-};
+std::filesystem::path PROCESS_DIR = "/proc";
+const std::filesystem::path PROCESS_STAT = "stat";
 
 } // namespace logtail

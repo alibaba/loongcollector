@@ -16,23 +16,27 @@
 
 #pragma once
 
-#include <chrono>
+#include "host_monitor/collector/BaseCollector.h"
 
 namespace logtail {
 
-class TimerEvent {
+class MockCollector : public BaseCollector {
 public:
-    TimerEvent(std::chrono::steady_clock::time_point execTime) : mExecTime(execTime) {}
-    virtual ~TimerEvent() = default;
+    MockCollector() = default;
+    ~MockCollector() = default;
 
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
-
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
-    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
-
-private:
-    std::chrono::steady_clock::time_point mExecTime;
+    void Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override {
+        auto event = group->AddLogEvent();
+        time_t logtime = time(nullptr);
+        event->SetTimestamp(logtime);
+        std::string key = "mock_key";
+        std::string value = "mock_value";
+        event->SetContent(key, value);
+    }
+    static const std::string sName;
+    const std::string& Name() const { return sName; }
 };
+
+const std::string MockCollector::sName = "mock";
 
 } // namespace logtail

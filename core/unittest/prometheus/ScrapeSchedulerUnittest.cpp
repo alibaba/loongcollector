@@ -54,6 +54,8 @@ protected:
         mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
     }
 
+    void TearDown() override { Timer::GetInstance()->Clear(); }
+
 private:
     std::shared_ptr<ScrapeConfig> mScrapeConfig;
 };
@@ -208,10 +210,10 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     auto timer = make_shared<Timer>();
     EventPool eventPool{true};
-    event.SetComponent(timer, &eventPool);
+    event.SetComponent(&eventPool);
     event.ScheduleNext();
 
-    APSARA_TEST_TRUE(timer->mQueue.size() == 1);
+    APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.size() == 1);
 
     event.Cancel();
 
@@ -225,23 +227,22 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, labels, 0, 0);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
-    auto timer = make_shared<Timer>();
     EventPool eventPool{true};
-    event.SetComponent(timer, &eventPool);
+    event.SetComponent(&eventPool);
     auto now = std::chrono::steady_clock::now();
     auto nowScrape = std::chrono::system_clock::now();
     event.SetFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
-    APSARA_TEST_TRUE(timer->mQueue.size() == 1);
+    APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.size() == 1);
 
-    const auto& e = timer->mQueue.top();
+    const auto& e = Timer::GetInstance()->mQueue.top();
     APSARA_TEST_EQUAL(now, e->GetExecTime());
     APSARA_TEST_FALSE(e->IsValid());
-    timer->mQueue.pop();
+    Timer::GetInstance()->mQueue.pop();
     // queue is full, so it should schedule next after 1 second
-    APSARA_TEST_EQUAL(1UL, timer->mQueue.size());
-    const auto& next = timer->mQueue.top();
+    APSARA_TEST_EQUAL(1UL, Timer::GetInstance()->mQueue.size());
+    const auto& next = Timer::GetInstance()->mQueue.top();
     APSARA_TEST_EQUAL(now + std::chrono::seconds(1), next->GetExecTime());
 }
 
@@ -251,9 +252,8 @@ void ScrapeSchedulerUnittest::TestExactlyScrape() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 10, 10, labels, 0, 0);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
-    auto timer = make_shared<Timer>();
     EventPool eventPool{true};
-    event.SetComponent(timer, &eventPool);
+    event.SetComponent(&eventPool);
     auto execTime = std::chrono::steady_clock::now();
     auto scrapeTime = std::chrono::system_clock::now();
     event.SetFirstExecTime(execTime, scrapeTime);

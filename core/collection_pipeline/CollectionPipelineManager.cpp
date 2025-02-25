@@ -16,6 +16,7 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 
+#include "HostMonitorInputRunner.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
@@ -41,6 +42,7 @@ CollectionPipelineManager::CollectionPipelineManager()
           PrometheusInputRunner::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
           ebpf::eBPFServer::GetInstance(),
+          HostMonitorInputRunner::GetInstance(),
 #endif
       }) {
 }
@@ -190,6 +192,7 @@ void CollectionPipelineManager::StopAllPipelines() {
 
     LogtailPlugin::GetInstance()->StopAllPipelines(true);
 
+    Timer::GetInstance()->Stop();
     ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();
