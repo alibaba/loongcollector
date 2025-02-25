@@ -47,7 +47,7 @@ static const std::unordered_map<SecurityProbeType, std::unordered_set<std::strin
        {SecurityProbeType::NETWORK, {"tcp_connect", "tcp_close", "tcp_sendmsg"}}};
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
-                                    nami::ObserverNetworkOption& thisObserverNetworkOption,
+                                    logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
                                     const CollectionPipelineContext* mContext,
                                     const std::string& sName) {
     std::string errorMsg;
@@ -75,6 +75,29 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
     }
     // EnableMetric (Optional)
     if (!GetOptionalBoolParam(probeConfig, "EnableMetric", thisObserverNetworkOption.mEnableMetric, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+    // EnableMetric (Optional)
+    if (!GetOptionalBoolParam(probeConfig, "EnableCidFilter", thisObserverNetworkOption.mEnableCidFilter, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+    // EnableMetric (Optional)
+    if (!GetOptionalListParam<std::string>(
+            probeConfig, "EnableCids", thisObserverNetworkOption.mEnableCids, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -180,7 +203,7 @@ bool ExtractProbeConfig(const Json::Value& config,
 }
 
 bool InitObserverNetworkOption(const Json::Value& config,
-                               nami::ObserverNetworkOption& thisObserverNetworkOption,
+                               logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     Json::Value probeConfig;
@@ -192,7 +215,7 @@ bool InitObserverNetworkOption(const Json::Value& config,
 }
 
 void InitSecurityFileFilter(const Json::Value& config,
-                            nami::SecurityFileFilter& thisFileFilter,
+                            SecurityFileFilter& thisFileFilter,
                             const CollectionPipelineContext* mContext,
                             const std::string& sName) {
     std::string errorMsg;
@@ -219,7 +242,7 @@ void InitSecurityFileFilter(const Json::Value& config,
 }
 
 void InitSecurityNetworkFilter(const Json::Value& config,
-                               nami::SecurityNetworkFilter& thisNetworkFilter,
+                               SecurityNetworkFilter& thisNetworkFilter,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     std::string errorMsg;
@@ -371,26 +394,26 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
         }
-        nami::SecurityOption thisSecurityOption;
-        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+        logtail::ebpf::SecurityOption thisSecurityOption;
+        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
         mOptionList.emplace_back(std::move(thisSecurityOption));
         return true;
     }
     const auto& innerConfig = config["ProbeConfig"];
-    nami::SecurityOption thisSecurityOption;
+    logtail::ebpf::SecurityOption thisSecurityOption;
     // Genral Filter (Optional)
-    std::variant<std::monostate, nami::SecurityFileFilter, nami::SecurityNetworkFilter> thisFilter;
+    std::variant<std::monostate, logtail::ebpf::SecurityFileFilter, logtail::ebpf::SecurityNetworkFilter> thisFilter;
     switch (probeType) {
         case SecurityProbeType::FILE: {
-            nami::SecurityFileFilter thisFileFilter;
+            logtail::ebpf::SecurityFileFilter thisFileFilter;
             InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
-            thisFilter.emplace<nami::SecurityFileFilter>(std::move(thisFileFilter));
+            thisFilter.emplace<logtail::ebpf::SecurityFileFilter>(std::move(thisFileFilter));
             break;
         }
         case SecurityProbeType::NETWORK: {
-            nami::SecurityNetworkFilter thisNetworkFilter;
+            logtail::ebpf::SecurityNetworkFilter thisNetworkFilter;
             InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
-            thisFilter.emplace<nami::SecurityNetworkFilter>(std::move(thisNetworkFilter));
+            thisFilter.emplace<logtail::ebpf::SecurityNetworkFilter>(std::move(thisNetworkFilter));
             break;
         }
         case SecurityProbeType::PROCESS: {
@@ -406,8 +429,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
     }
-    thisSecurityOption.filter_ = thisFilter;
-    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+    thisSecurityOption.mFilter = thisFilter;
+    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
     return true;
