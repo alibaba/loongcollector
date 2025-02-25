@@ -31,9 +31,12 @@
 
 namespace logtail {
 
+class ProcessorPromRelabelMetricNative;
+
 class MetricEvent : public PipelineEvent {
     friend class PipelineEventGroup;
     friend class EventPool;
+    friend class ProcessorPromRelabelMetricNative;
 
 public:
     std::unique_ptr<PipelineEvent> Copy() const override;
@@ -76,13 +79,12 @@ public:
         mValue = UntypedMultiDoubleValues{multiDoubleValues.mValues, this};
     }
 
-    [[nodiscard]] StringView GetTag(StringView key) const;
-    [[nodiscard]] bool HasTag(StringView key) const;
+    StringView GetTag(StringView key) const;
+    bool HasTag(StringView key) const;
     void SetTag(StringView key, StringView val);
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
-    SizedVectorTags& GetTags() { return mTags; }
 
     void DelTag(StringView key);
     void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };

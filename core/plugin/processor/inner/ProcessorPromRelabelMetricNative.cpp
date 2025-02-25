@@ -87,7 +87,7 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
     }
     auto& sourceEvent = e.Cast<MetricEvent>();
 
-    auto& eventTags = sourceEvent.GetTags();
+    auto& eventTags = sourceEvent.mTags;
 
     for (const auto& [k, v] : targetTags) {
         auto it = std::find_if(
