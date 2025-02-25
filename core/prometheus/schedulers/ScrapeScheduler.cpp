@@ -42,6 +42,10 @@ namespace logtail {
 ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
                                  string host,
                                  int32_t port,
+                                 std::string scheme,
+                                 std::string metricsPath,
+                                 uint64_t scrapeIntervalSeconds,
+                                 uint64_t scrapeTimeoutSeconds,
                                  QueueKey queueKey,
                                  size_t inputIndex,
                                  const PromTargetInfo& targetInfo)
@@ -49,10 +53,13 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
       mHost(std::move(host)),
       mPort(port),
       mTargetInfo(targetInfo),
+      mMetricsPath(std::move(metricsPath)),
+      mScheme(std::move(scheme)),
+      mScrapeTimeoutSeconds(scrapeTimeoutSeconds),
       mQueueKey(queueKey),
       mInputIndex(inputIndex),
       mScrapeResponseSizeBytes(-1) {
-    mInterval = mScrapeConfigPtr->mScrapeIntervalSeconds;
+    mInterval = scrapeIntervalSeconds;
 }
 
 void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
@@ -105,6 +112,10 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
 
 string ScrapeScheduler::GetId() const {
     return mTargetInfo.mHash;
+}
+
+uint64_t ScrapeScheduler::GetScrapeIntervalSeconds() const {
+    return mInterval;
 }
 
 void ScrapeScheduler::SetComponent(shared_ptr<Timer> timer, EventPool* eventPool) {
@@ -162,18 +173,18 @@ void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime)
 }
 
 std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime) {
-    auto retry = mScrapeConfigPtr->mScrapeIntervalSeconds / mScrapeConfigPtr->mScrapeTimeoutSeconds;
+    auto retry = mInterval / mScrapeTimeoutSeconds;
     if (retry > 0) {
         retry -= 1;
     }
 
     auto request = std::make_unique<PromHttpRequest>(
         HTTP_GET,
-        mScrapeConfigPtr->mScheme == prometheus::HTTPS,
+        mScheme == prometheus::HTTPS,
         mHost,
         mPort,
-        mScrapeConfigPtr->mMetricsPath,
-        mScrapeConfigPtr->mQueryString,
+        mMetricsPath,
+        "",
         mScrapeConfigPtr->mRequestHeaders,
         "",
         HttpResponse(
@@ -181,7 +192,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
                 mTargetInfo.mLabels, mQueueKey, mInputIndex, mTargetInfo.mHash, mEventPool, mLatestScrapeTime),
             [](void* p) { delete static_cast<prom::StreamScraper*>(p); },
             prom::StreamScraper::MetricWriteCallback),
-        mScrapeConfigPtr->mScrapeTimeoutSeconds,
+        mScrapeTimeoutSeconds,
         retry,
         this->mFuture,
         this->mIsContextValidFuture,

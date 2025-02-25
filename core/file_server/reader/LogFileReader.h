@@ -377,24 +377,6 @@ public:
     //                       std::vector<StringView>& logIndex,
     //                       std::vector<StringView>& discardIndex);
 
-    // added by xianzhi(bowen.gbw@antfin.com)
-    static bool ParseLogTime(const char* buffer,
-                             const boost::regex* reg,
-                             LogtailTime& logTime,
-                             const std::string& timeFormat,
-                             const std::string& region = "",
-                             const std::string& project = "",
-                             const std::string& logStore = "",
-                             const std::string& logPath = "");
-    static bool GetLogTimeByOffset(const char* buffer,
-                                   int32_t pos,
-                                   LogtailTime& logTime,
-                                   const std::string& timeFormat,
-                                   const std::string& region = "",
-                                   const std::string& project = "",
-                                   const std::string& logStore = "",
-                                   const std::string& logPath = "");
-
     bool IsFromCheckPoint() { return mLastFileSignatureHash != 0 && mLastFileSignatureSize > (size_t)0; }
 
     // void SetDelayAlarmBytes(int64_t value) { mReadDelayAlarmBytes = value; }

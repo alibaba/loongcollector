@@ -132,9 +132,10 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
                                      "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is "
                                      "not: ignore multiline config, module: "
                                          + pluginType + ", config: " + ctx.GetConfigName(),
+                                     ctx.GetRegion(),
                                      ctx.GetProjectName(),
-                                     ctx.GetLogstoreName(),
-                                     ctx.GetRegion());
+                                     ctx.GetConfigName(),
+                                     ctx.GetLogstoreName());
         } else if (mStartPatternRegPtr && mContinuePatternRegPtr && mEndPatternRegPtr) {
             mContinuePatternRegPtr.reset();
             LOG_WARNING(
@@ -148,9 +149,10 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
                 "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty: "
                 "ignore param Multiline.ContinuePattern, module: "
                     + pluginType + ", config: " + ctx.GetConfigName(),
+                ctx.GetRegion(),
                 ctx.GetProjectName(),
-                ctx.GetLogstoreName(),
-                ctx.GetRegion());
+                ctx.GetConfigName(),
+                ctx.GetLogstoreName());
         }
         if (mStartPatternRegPtr || mEndPatternRegPtr) {
             mIsMultiline = true;

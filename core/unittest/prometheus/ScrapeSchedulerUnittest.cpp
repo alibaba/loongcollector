@@ -67,7 +67,7 @@ void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_joblocalhost:8080887d0db7cce49fc7";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
 
     APSARA_TEST_EQUAL(event.GetId(), "test_joblocalhost:8080887d0db7cce49fc7");
 }
@@ -81,7 +81,7 @@ void ScrapeSchedulerUnittest::TestProcess() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
     HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
@@ -143,7 +143,7 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
     HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     // APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -206,7 +206,8 @@ void ScrapeSchedulerUnittest::TestReceiveMessage() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    auto event = make_shared<ScrapeScheduler>(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    auto event
+        = make_shared<ScrapeScheduler>(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
 
 
     // before
@@ -223,7 +224,7 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto timer = make_shared<Timer>();
     EventPool eventPool{true};
     event.SetComponent(timer, &eventPool);
@@ -243,7 +244,7 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     auto timer = make_shared<Timer>();
@@ -272,7 +273,7 @@ void ScrapeSchedulerUnittest::TestExactlyScrape() {
     PromTargetInfo targetInfo;
     targetInfo.mLabels = labels;
     targetInfo.mHash = "test_hash";
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, 0, 0, targetInfo);
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 10, 10, 0, 0, targetInfo);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     auto timer = make_shared<Timer>();

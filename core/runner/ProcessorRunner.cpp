@@ -169,9 +169,10 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                                                                     "failed to serialize event group: " + errorMsg
                                                                         + "\taction: discard data\tconfig: "
                                                                         + configName,
+                                                                    pipeline->GetContext().GetRegion(),
                                                                     pipeline->GetContext().GetProjectName(),
-                                                                    pipeline->GetContext().GetLogstoreName(),
-                                                                    pipeline->GetContext().GetRegion());
+                                                                    configName,
+                                                                    pipeline->GetContext().GetLogstoreName());
                         continue;
                     }
                     LogtailPlugin::GetInstance()->ProcessLogGroup(

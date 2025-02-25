@@ -103,9 +103,10 @@ bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& 
     mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                    "unexpected error: some events are not supported.\tprocessor: " + sName
                                        + "\tconfig: " + mContext->GetConfigName(),
+                                   mContext->GetRegion(),
                                    mContext->GetProjectName(),
-                                   mContext->GetLogstoreName(),
-                                   mContext->GetRegion());
+                                   mContext->GetConfigName(),
+                                   mContext->GetLogstoreName());
     return false;
 }
 
@@ -207,9 +208,10 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                                            "unexpected error: some events do not have the sourceKey.\tSourceKey: "
                                                + mSourceKey + "\tprocessor: " + sName
                                                + "\tconfig: " + mContext->GetConfigName(),
+                                           mContext->GetRegion(),
                                            mContext->GetProjectName(),
-                                           mContext->GetLogstoreName(),
-                                           mContext->GetRegion());
+                                           mContext->GetConfigName(),
+                                           mContext->GetLogstoreName());
             return;
         }
         StringView sourceVal = sourceEvent->GetContent(mSourceKey);
@@ -369,9 +371,10 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
                 "unmatched log line, first 1KB:" + sourceVal.substr(0, 1024).to_string() + "\taction: "
                     + UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment) + "\tfilepath: "
                     + logPath.to_string() + "\tprocessor: " + sName + "\tconfig: " + GetContext().GetConfigName(),
+                GetContext().GetRegion(),
                 GetContext().GetProjectName(),
-                GetContext().GetLogstoreName(),
-                GetContext().GetRegion());
+                GetContext().GetConfigName(),
+                GetContext().GetLogstoreName());
         }
         if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
             logEvents[newSize++] = std::move(logEvents[i]);
