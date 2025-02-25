@@ -116,6 +116,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
+                reader->SetContainerID(containerPath->mID);
                 reader->AddExtraTags(containerPath->mMetadatas);
                 reader->AddExtraTags(containerPath->mTags);
             }
@@ -257,6 +258,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
                                                mRealLogPath,
                                                mLogFileOp.IsOpen(),
                                                mContainerStopped,
+                                               mContainerID,
                                                mLastForceRead);
     // use last event time as checkpoint's last update time
     checkPointPtr->mLastUpdateTime = mLastEventTime;
@@ -310,16 +312,23 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mLastFileSignatureSize = checkPointPtr->mSignatureSize;
             mRealLogPath = checkPointPtr->mRealFileName;
             mLastEventTime = checkPointPtr->mLastUpdateTime;
-            mContainerStopped = checkPointPtr->mContainerStopped;
+            if (checkPointPtr->mContainerID == mContainerID) {
+                mContainerStopped = checkPointPtr->mContainerStopped;
+            } else {
+                LOG_INFO(
+                    sLogger,
+                    ("container id is different between container discovery and checkpoint",
+                     checkPointPtr->mRealFileName)("checkpoint", checkPointPtr->mContainerID)("current", mContainerID));
+            }
             // new property to recover reader exactly from checkpoint
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
             LOG_INFO(sLogger,
                      ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
-                         "config", GetConfigName())("log reader queue name", mHostLogPath)("file device",
-                                                                                           ToString(mDevInode.dev))(
-                         "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
-                         "file signature size", mLastFileSignatureSize)("real file path", mRealLogPath)(
-                         "last file position", mLastFilePos)("index in reader array", mIdxInReaderArrayFromLastCpt));
+                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
+                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
+                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID));
             // if file is open or
             // last update time is new and the file's container is not stopped we
             // we should use first modify
@@ -2591,6 +2600,42 @@ void ContainerdTextParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
         paseLine.data = StringView(pch3 + 1, lineEnd - pch3 - 1);
         return;
     }
+}
+
+bool LogFileReader::UpdateContainerInfo() {
+    FileDiscoveryConfig discoveryConfig = FileServer::GetInstance()->GetFileDiscoveryConfig(mConfigName);
+    if (discoveryConfig.first == nullptr) {
+        return false;
+    }
+    ContainerInfo* containerInfo = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
+    if (containerInfo && containerInfo->mID != mContainerID) {
+        LOG_INFO(sLogger,
+                 ("container info of file reader changed", "may be because container restart")(
+                     "old container id", mContainerID)("new container id", containerInfo->mID)(
+                     "container status", containerInfo->mStopped ? "stopped" : "running"));
+        // if config have wildcard path, use mWildcardPaths[0] as base path
+        SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
+                                                                         : discoveryConfig.first->GetBasePath(),
+                      containerInfo->mRealBaseDir.size());
+        SetContainerID(containerInfo->mID);
+        mContainerStopped = containerInfo->mStopped;
+        for (size_t i = 0; i < mExtraTags.size(); ++i) {
+            for (size_t j = 0; j < containerInfo->mMetadatas.size(); ++j) {
+                if (mExtraTags[i].key() == containerInfo->mMetadatas[j].key()) {
+                    mExtraTags[i] = containerInfo->mMetadatas[j];
+                    break;
+                }
+            }
+            for (size_t j = 0; j < containerInfo->mTags.size(); ++j) {
+                if (mExtraTags[i].key() == containerInfo->mTags[j].key()) {
+                    mExtraTags[i] = containerInfo->mTags[j];
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+    return false;
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
