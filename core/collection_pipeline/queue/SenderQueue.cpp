@@ -34,14 +34,14 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     item->mFirstEnqueTime = chrono::system_clock::now();
     auto size = item->mData.size();
 
-    mInItemsTotal->Add(1);
-    mInItemDataSizeBytes->Add(size);
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemDataSizeBytes, size);
 
     if (Full()) {
         mExtraBuffer.push_back(std::move(item));
 
-        mExtraBufferSize->Set(mExtraBuffer.size());
-        mExtraBufferDataSizeBytes->Add(size);
+        SET_GAUGE(mExtraBufferSize, mExtraBuffer.size());
+        ADD_GAUGE(mExtraBufferDataSizeBytes, size);
         return true;
     }
 
@@ -58,9 +58,9 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     ++mSize;
     ChangeStateIfNeededAfterPush();
 
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Add(size);
-    mValidToPushFlag->Set(IsValidToPush());
+    SET_GAUGE(mQueueSizeTotal, Size());
+    ADD_GAUGE(mQueueDataSizeByte, size);
+    SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
@@ -88,30 +88,30 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
     }
     --mSize;
 
-    mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(chrono::system_clock::now() - enQueuTime);
-    mQueueDataSizeByte->Sub(size);
+    ADD_COUNTER(mOutItemsTotal, 1);
+    ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - enQueuTime);
+    SUB_GAUGE(mQueueDataSizeByte, size);
 
     if (!mExtraBuffer.empty()) {
         auto newSize = mExtraBuffer.front()->mData.size();
         PushFromExtraBuffer(std::move(mExtraBuffer.front()));
         mExtraBuffer.pop_front();
 
-        mExtraBufferSize->Set(mExtraBuffer.size());
-        mExtraBufferDataSizeBytes->Sub(newSize);
+        SET_GAUGE(mExtraBufferSize, mExtraBuffer.size());
+        SUB_GAUGE(mExtraBufferDataSizeBytes, newSize);
         return true;
     }
     if (ChangeStateIfNeededAfterPop()) {
         GiveFeedback();
     }
 
-    mQueueSizeTotal->Set(Size());
-    mValidToPushFlag->Set(IsValidToPush());
+    SET_GAUGE(mQueueSizeTotal, Size());
+    SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
 void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t limit) {
-    mFetchTimesCnt->Add(1);
+    ADD_COUNTER(mFetchTimesCnt, 1);
     if (Empty()) {
         return;
     }
@@ -122,7 +122,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
             if (item == nullptr) {
                 continue;
             }
-            mFetchedItemsCnt->Add(1);
+            ADD_COUNTER(mFetchedItemsCnt, 1);
             if (item->mStatus.load() == SendingStatus::IDLE) {
                 item->mStatus = SendingStatus::SENDING;
                 items.emplace_back(item);
@@ -143,13 +143,13 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
                 break;
             }
             if (mRateLimiter && !mRateLimiter->IsValidToPop()) {
-                mFetchRejectedByRateLimiterTimesCnt->Add(1);
+                ADD_COUNTER(mFetchRejectedByRateLimiterTimesCnt, 1);
                 break;
             }
             bool rejectedByConcurrencyLimiter = false;
             for (auto& limiter : mConcurrencyLimiters) {
                 if (!limiter.first->IsValidToPop()) {
-                    limiter.second->Add(1);
+                    ADD_COUNTER(limiter.second, 1);
                     rejectedByConcurrencyLimiter = true;
                     break;
                 }
@@ -158,7 +158,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
                 break;
             }
 
-            mFetchedItemsCnt->Add(1);
+            ADD_COUNTER(mFetchedItemsCnt, 1);
             item->mStatus = SendingStatus::SENDING;
             items.emplace_back(item);
             for (auto& limiter : mConcurrencyLimiters) {
@@ -173,7 +173,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
         }
     }
     if (hasAvailableItem) {
-        mValidFetchTimesCnt->Add(1);
+        ADD_COUNTER(mValidFetchTimesCnt, 1);
     }
 }
 
@@ -212,8 +212,8 @@ void SenderQueue::PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) {
     }
     ++mSize;
 
-    mQueueSizeTotal->Set(Size());
-    mQueueDataSizeByte->Add(size);
+    SET_GAUGE(mQueueSizeTotal, Size());
+    ADD_GAUGE(mQueueDataSizeByte, size);
 }
 
 } // namespace logtail

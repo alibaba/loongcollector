@@ -191,7 +191,7 @@ bool IsAccessibleDirectory(const std::string& dirPath) {
 bool GetAllFiles(const std::string& dirPath, const std::string& filePattern, std::vector<std::string>& allFiles) {
     allFiles.clear();
     {
-        // If no wildcard charaters in filePattern, only one file.
+        // If no wildcard characters in filePattern, only one file.
         size_t i = 0;
         for (; i < filePattern.size(); ++i) {
             if (filePattern[i] == '?' || filePattern[i] == '*') {
@@ -291,10 +291,10 @@ FILE* FileAppendOpen(const char* filePath, const char* mode) {
     if (NULL == f)
         return NULL;
     // We have to call fseek manually, because _fdopen will not synchronize offset
-    // from HANDLE during openning.
+    // from HANDLE during opening.
     if (0 == FSeek(f, 0, SEEK_END))
         return f;
-    LOG_WARNING(sLogger, ("Call fseek faild", errno)("FilePath", filePath));
+    LOG_WARNING(sLogger, ("Call fseek failed", errno)("FilePath", filePath));
     fclose(f);
     return NULL;
 #endif
@@ -466,7 +466,7 @@ Entry Dir::ReadNext(bool resolveWithStat) {
                     break;
                 }
 
-                // Try to get target type by stat, if failed, return UNKNONW to remind
+                // Try to get target type by stat, if failed, return UNKNOWN to remind
                 // caller that maybe the symbolic is invalid.
                 auto fullPath = PathJoin(mDirPath, fileName);
                 struct stat fileStat;

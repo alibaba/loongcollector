@@ -159,9 +159,10 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
         warningMsg = "warning msg: " + warningMsg + "\tconfig: " + mContext->GetConfigName();
         mContext->GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
                                        warningMsg,
+                                       GetContext().GetRegion(),
                                        GetContext().GetProjectName(),
-                                       GetContext().GetLogstoreName(),
-                                       GetContext().GetRegion());
+                                       GetContext().GetConfigName(),
+                                       GetContext().GetLogstoreName());
     }
 
     // init PluginMetricManager
@@ -252,9 +253,10 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
                                   "failed to set container base dir: container log path not existed\tcontainer id: "
                                       + ToString(containerInfo.mID) + "\tcontainer log path: " + containerInfo.mLogPath
                                       + "\tconfig: " + ctx->GetPipeline().Name(),
+                                  ctx->GetRegion(),
                                   ctx->GetProjectName(),
-                                  ctx->GetLogstoreName(),
-                                  ctx->GetRegion());
+                                  ctx->GetPipeline().Name(),
+                                  ctx->GetLogstoreName());
         return false;
     }
     size_t pos = realPath.find_last_of('/');

@@ -108,6 +108,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
                                 eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_SOURCE));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_MACHINE_UUID));
     }
     { // native branch default
         Json::Value config;
@@ -161,6 +163,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr,
                                 eventGroup.GetTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_SOURCE));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_MACHINE_UUID));
     }
     { // native branch rename
         Json::Value config;
@@ -217,6 +221,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(eventGroup.HasTag("test_host_ip"));
         APSARA_TEST_EQUAL_FATAL(LoongCollectorMonitor::GetInstance()->mIpAddr, eventGroup.GetTag("test_host_ip"));
 #endif
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_SOURCE));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_MACHINE_UUID));
     }
     { // native branch delete
         Json::Value config;
@@ -266,6 +272,8 @@ void ProcessorTagNativeUnittest::TestProcess() {
 #else
         APSARA_TEST_FALSE_FATAL(eventGroup.HasTag(GetDefaultTagKeyString(TagKey::HOST_IP_TAG_KEY)));
 #endif
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_SOURCE));
+        APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_MACHINE_UUID));
     }
 }
 

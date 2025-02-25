@@ -118,12 +118,12 @@ func benchmarkLogSource(b *testing.B, num int) {
 }
 
 // 1 log per second per file
-func BenchmarkLogProducinfPace1(b *testing.B) {
+func BenchmarkLogProducingPace1(b *testing.B) {
 	benchmarkLogProducingPace(b, 1)
 }
 
 // 1000 logs per second per file
-func BenchmarkLogProducinfPace1000(b *testing.B) {
+func BenchmarkLogProducingPace1000(b *testing.B) {
 	benchmarkLogProducingPace(b, 1000)
 }
 

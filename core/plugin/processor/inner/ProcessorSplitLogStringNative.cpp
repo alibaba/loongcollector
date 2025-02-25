@@ -91,9 +91,10 @@ bool ProcessorSplitLogStringNative::IsSupportedEvent(const PipelineEventPtr& e) 
     mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                    "unexpected error: unsupported log event.\tprocessor: " + sName
                                        + "\tconfig: " + mContext->GetConfigName(),
+                                   mContext->GetRegion(),
                                    mContext->GetProjectName(),
-                                   mContext->GetLogstoreName(),
-                                   mContext->GetRegion());
+                                   mContext->GetConfigName(),
+                                   mContext->GetLogstoreName());
     return false;
 }
 
@@ -119,9 +120,10 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
         mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                        "unexpected error: " + errorMsg + ".\tprocessor: " + sName
                                            + "\tconfig: " + mContext->GetConfigName(),
+                                       mContext->GetRegion(),
                                        mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
+                                       mContext->GetConfigName(),
+                                       mContext->GetLogstoreName());
         return;
     }
 

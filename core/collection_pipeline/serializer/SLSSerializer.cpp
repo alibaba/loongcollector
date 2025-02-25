@@ -18,11 +18,14 @@
 
 #include "json/json.h"
 
+#include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
 #include "constants/SpanConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"
+
+DEFINE_FLAG_BOOL(debug_sls_serializer, "", false);
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -61,19 +64,19 @@ bool Serializer<vector<CompressedLogGroup>>::DoSerialize(vector<CompressedLogGro
     for (auto& item : p) {
         inputSize += item.mData.size();
     }
-    mInItemsTotal->Add(1);
-    mInItemSizeBytes->Add(inputSize);
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemSizeBytes, inputSize);
 
     auto before = std::chrono::system_clock::now();
     auto res = Serialize(std::move(p), output, errorMsg);
-    mTotalProcessMs->Add(std::chrono::system_clock::now() - before);
+    ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
 
     if (res) {
-        mOutItemsTotal->Add(1);
-        mOutItemSizeBytes->Add(output.size());
+        ADD_COUNTER(mOutItemsTotal, 1);
+        ADD_COUNTER(mOutItemSizeBytes, output.size());
     } else {
-        mDiscardedItemsTotal->Add(1);
-        mDiscardedItemSizeBytes->Add(inputSize);
+        ADD_COUNTER(mDiscardedItemsTotal, 1);
+        ADD_COUNTER(mDiscardedItemSizeBytes, inputSize);
     }
     return res;
 }
@@ -116,13 +119,19 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<MetricEvent>();
+                if (e.GetTimestamp() < 1e9) {
+                    LOG_WARNING(sLogger,
+                                ("metric event timestamp is less than 1e9", "discard event")(
+                                    "timestamp", e.GetTimestamp())("config", mFlusher->GetContext().GetConfigName()));
+                    continue;
+                }
                 if (e.Is<UntypedSingleValue>()) {
                     metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
                 } else {
-                    // should not happen
-                    LOG_ERROR(sLogger,
-                              ("unexpected error",
-                               "invalid metric event type")("config", mFlusher->GetContext().GetConfigName()));
+                    // untyped multi value is not supported
+                    LOG_WARNING(sLogger,
+                                ("invalid metric event type", "discard event")("config",
+                                                                               mFlusher->GetContext().GetConfigName()));
                     continue;
                 }
                 metricEventContentCache[i].second = GetMetricLabelSize(e);
@@ -186,9 +195,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::RAW:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<RawEvent>();
-                if (e.GetContent().empty()) {
-                    continue;
-                }
                 size_t contentSZ = GetLogContentSize(DEFAULT_CONTENT_KEY.size(), e.GetContent().size());
                 logGroupSZ += GetLogSize(contentSZ, enableNs && e.GetTimestampNanosecond(), logSZ[i]);
             }
@@ -223,6 +229,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::LOG:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<LogEvent>();
+                if (e.Empty()) {
+                    continue;
+                }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
                 for (const auto& kv : e) {
@@ -236,7 +245,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 auto& e = group.mEvents[i].Cast<MetricEvent>();
-                if (e.Is<std::monostate>()) {
+                if (!e.Is<UntypedSingleValue>() || e.GetTimestamp() < 1e9) {
                     continue;
                 }
                 serializer.StartToAddLog(logSZ[i]);
@@ -306,6 +315,19 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         }
     }
     res = std::move(serializer.GetResult());
+
+    // when function stablize, remove the following logic
+    if (BOOL_FLAG(debug_sls_serializer)) {
+        sls_logs::LogGroup logGroup;
+        if (!logGroup.ParseFromString(res)) {
+            JsonEventGroupSerializer ser(const_cast<Flusher*>(mFlusher));
+            string jsonStr;
+            ser.DoSerialize(std::move(group), jsonStr, errorMsg);
+            LOG_ERROR(sLogger,
+                      ("failed to parse log group", jsonStr)("config", mFlusher->GetContext().GetConfigName()));
+            return false;
+        }
+    }
     return true;
 }
 

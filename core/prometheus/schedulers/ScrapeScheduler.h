@@ -38,6 +38,10 @@ public:
     ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
                     std::string host,
                     int32_t port,
+                    std::string scheme,
+                    std::string metricsPath,
+                    uint64_t scrapeIntervalSeconds,
+                    uint64_t scrapeTimeoutSeconds,
                     Labels labels,
                     QueueKey queueKey,
                     size_t inputIndex);
@@ -47,6 +51,7 @@ public:
     void OnMetricResult(HttpResponse&, uint64_t timestampMilliSec);
 
     std::string GetId() const;
+    uint64_t GetScrapeIntervalSeconds() const;
 
     void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
 
@@ -63,6 +68,9 @@ private:
     std::string mHost;
     int32_t mPort;
     std::string mInstance;
+    std::string mMetricsPath;
+    std::string mScheme;
+    uint64_t mScrapeTimeoutSeconds;
 
     // pipeline
     QueueKey mQueueKey;
@@ -83,6 +91,7 @@ private:
     CounterPtr mPluginTotalDelayMs;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParsePrometheusMetricUnittest;
+    friend class TargetSubscriberSchedulerUnittest;
     friend class ScrapeSchedulerUnittest;
 #endif
 };

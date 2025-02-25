@@ -102,9 +102,7 @@ ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecord
     ptr->Init(mDefaultCategory, newLabels, dynamicLabels, mMetricKeys);
 
     mReentrantMetricsRecordRefsMap.emplace(key, ptr);
-    if (mSizeGauge != nullptr) {
-        mSizeGauge->Set(mReentrantMetricsRecordRefsMap.size());
-    }
+    SET_GAUGE(mSizeGauge, mReentrantMetricsRecordRefsMap.size());
     return ptr;
 }
 
@@ -123,9 +121,7 @@ void PluginMetricManager::ReleaseReentrantMetricsRecordRef(MetricLabels labels) 
     }
     // delete
     mReentrantMetricsRecordRefsMap.erase(key);
-    if (mSizeGauge != nullptr) {
-        mSizeGauge->Set(mReentrantMetricsRecordRefsMap.size());
-    }
+    SET_GAUGE(mSizeGauge, mReentrantMetricsRecordRefsMap.size());
 }
 
 std::string PluginMetricManager::GenerateKey(MetricLabels& labels) {

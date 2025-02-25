@@ -40,7 +40,7 @@ public:
     ~LogFileOperator() { Close(); }
 
     // @return file descriptor when fuseMode is enabled or on Linux.
-    //   An positve identifier is returned on Windows.
+    //   An positive identifier is returned on Windows.
     int Open(const char* path);
 
     int64_t Seek(int64_t offset, int whence);

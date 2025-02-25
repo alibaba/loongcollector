@@ -27,7 +27,7 @@
 namespace logtail {
 class EventPool;
 
-// referrences
+// references
 // https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs.md

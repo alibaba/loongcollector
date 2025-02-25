@@ -298,9 +298,10 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
                 AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                        "new config found but invalid: skip current object, config: "
                                                            + configName,
+                                                       config.mRegion,
                                                        config.mProject,
-                                                       config.mLogstore,
-                                                       config.mRegion);
+                                                       configName,
+                                                       config.mLogstore);
                 return false;
             }
             PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
@@ -343,9 +344,10 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                         CATEGORY_CONFIG_ALARM,
                         "existing invalid config modified and remains invalid: skip current object, config: "
                             + configName,
+                        config.mRegion,
                         config.mProject,
-                        config.mLogstore,
-                        config.mRegion);
+                        configName,
+                        config.mLogstore);
                     return false;
                 }
                 LOG_INFO(sLogger,
@@ -362,9 +364,10 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                         CATEGORY_CONFIG_ALARM,
                         "existing valid config modified and becomes invalid: skip current object, config: "
                             + configName,
+                        config.mRegion,
                         config.mProject,
-                        config.mLogstore,
-                        config.mRegion);
+                        configName,
+                        config.mLogstore);
                     return false;
                 }
                 LOG_INFO(sLogger,

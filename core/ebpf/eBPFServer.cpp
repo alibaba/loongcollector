@@ -313,7 +313,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     }
 
     if (ret) {
-        mStartPluginTotal->Add(1);
+        ADD_COUNTER(mStartPluginTotal, 1);
     }
 
     return ret;
@@ -355,7 +355,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginTyp
     // UpdateContext must after than StopPlugin
     if (ret) {
         UpdateCBContext(type, nullptr, -1, -1);
-        mStopPluginTotal->Add(1);
+        ADD_COUNTER(mStopPluginTotal, 1);
     }
     return ret;
 }
@@ -392,7 +392,7 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, nami::PluginTyp
     bool ret = mSourceManager->SuspendPlugin(type);
     if (ret) {
         UpdateCBContext(type, nullptr, -1, -1);
-        mSuspendPluginTotal->Add(1);
+        ADD_COUNTER(mSuspendPluginTotal, 1);
     }
     return ret;
 }

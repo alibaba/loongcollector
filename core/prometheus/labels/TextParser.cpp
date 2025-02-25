@@ -177,7 +177,7 @@ void TextParser::HandleLabelValue(MetricEvent& metricEvent) {
             }
             if (mPos + 1 < mLine.size()) {
                 // check next char, if it is valid escape char, we can consume two chars and push one escaped char
-                // if not, we neet to push the two chars
+                // if not, we need to push the two chars
                 // valid escape char: \", \\, \n
                 switch (mLine[lPos + 1]) {
                     case '\\':

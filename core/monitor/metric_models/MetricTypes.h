@@ -25,8 +25,6 @@
 #include <string>
 #include <vector>
 
-#include "protobuf/sls/sls_logs.pb.h"
-
 namespace logtail {
 
 enum class MetricType {
@@ -93,5 +91,22 @@ using MetricLabels = std::vector<std::pair<std::string, std::string>>;
 using MetricLabelsPtr = std::shared_ptr<MetricLabels>;
 using DynamicMetricLabels = std::vector<std::pair<std::string, std::function<std::string()>>>;
 using DynamicMetricLabelsPtr = std::shared_ptr<DynamicMetricLabels>;
+
+#define ADD_COUNTER(counterPtr, value) \
+    if (counterPtr) { \
+        (counterPtr)->Add(value); \
+    }
+#define SET_GAUGE(gaugePtr, value) \
+    if (gaugePtr) { \
+        (gaugePtr)->Set(value); \
+    }
+#define ADD_GAUGE(gaugePtr, value) \
+    if (gaugePtr) { \
+        (gaugePtr)->Add(value); \
+    }
+#define SUB_GAUGE(gaugePtr, value) \
+    if (gaugePtr) { \
+        (gaugePtr)->Sub(value); \
+    }
 
 } // namespace logtail

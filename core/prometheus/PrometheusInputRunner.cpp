@@ -102,7 +102,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->ScheduleNext();
     {
         ReadLock lock(mSubscriberMapRWLock);
-        mPromJobNum->Set(mTargetSubscriberSchedulerMap.size());
+        SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
     }
     // 3. add project name to mJobNameToProjectNameMap for self monitor
     {
@@ -117,7 +117,7 @@ void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
         if (mTargetSubscriberSchedulerMap.count(jobName)) {
             mTargetSubscriberSchedulerMap[jobName]->Cancel();
             mTargetSubscriberSchedulerMap.erase(jobName);
-            mPromJobNum->Set(mTargetSubscriberSchedulerMap.size());
+            SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
         }
     }
     {
@@ -153,7 +153,7 @@ void PrometheusInputRunner::Init() {
                 ++retry;
                 auto httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
                 if (httpResponse.GetStatusCode() != 200) {
-                    mPromRegisterRetryTotal->Add(1);
+                    ADD_COUNTER(mPromRegisterRetryTotal, 1);
                     if (retry % 10 == 0) {
                         LOG_INFO(sLogger,
                                  ("register failed, retried", retry)("statusCode", httpResponse.GetStatusCode()));
@@ -179,7 +179,7 @@ void PrometheusInputRunner::Init() {
                             }
                         }
                     }
-                    mPromRegisterState->Set(1);
+                    SET_GAUGE(mPromRegisterState, 1);
                     LOG_INFO(sLogger, ("Register Success", mPodName));
                     // subscribe immediately
                     SubscribeOnce();
@@ -228,7 +228,7 @@ void PrometheusInputRunner::Stop() {
                     LOG_ERROR(sLogger, ("unregister failed, statusCode", httpResponse.GetStatusCode()));
                 } else {
                     LOG_INFO(sLogger, ("Unregister Success", mPodName));
-                    mPromRegisterState->Set(0);
+                    SET_GAUGE(mPromRegisterState, 0);
                     break;
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));

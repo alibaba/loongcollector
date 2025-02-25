@@ -54,7 +54,7 @@ using ScopedSpinLock = std::lock_guard<SpinLock>;
 
 // TODO(baoze.yyh): there is a potential problem, on Windows, because the slim reader/writer
 // lock doesn't supply any methods to set r/w preferences, it may take some (unknown) time
-// for writer to accquire lock from readers(s). So, the HoldOn/Resume with ReadWriteLock
+// for writer to acquire lock from readers(s). So, the HoldOn/Resume with ReadWriteLock
 // can not stop/resume immediately, which might cause some problems related to timeout.
 class ReadWriteLock {
 #ifdef _MSC_VER
