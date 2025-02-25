@@ -178,6 +178,8 @@ void LogtailMonitor::Monitor() {
 
                 GetMemStat();
                 CalCpuStat(curCpuStat, mCpuStat);
+                mCpuUsage.store(mCpuStat.mCpuUsage);
+                mMemoryUsage.store(mMemStat.mRss);
                 if (CheckHardMemLimit()) {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",

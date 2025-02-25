@@ -13,6 +13,7 @@ const uint64_t RefeshIntervalSeconds = 5;
 const char* const META = "__meta_";
 const char* const UNDEFINED = "undefined";
 const std::string PROMETHEUS = "prometheus";
+const char* const LC_TARGET_HASH = "lc_target_hash";
 
 // relabel config
 const char* const SOURCE_LABELS = "source_labels";
@@ -100,6 +101,8 @@ const char* const SCHEME_LABEL_NAME = "__scheme__";
 const char* const METRICS_PATH_LABEL_NAME = "__metrics_path__";
 const char* const PARAM_LABEL_NAME = "__param_";
 const char* const LABELS = "labels";
+const char* const TARGET_HASH = "hash";
+const char* const REBALANCE_MS = "rebalance_ms";
 
 // auto metrics
 const char* const SCRAPE_STATE = "scrape_state";
@@ -118,5 +121,15 @@ const char* const ENABLE_COMPRESSION = "enable_compression";
 const char* const ACCEPT_ENCODING = "Accept-Encoding";
 const char* const GZIP = "gzip";
 const char* const IDENTITY = "identity";
+
+const char* const AGENT_INFO = "AgentInfo";
+const char* const TARGETS_INFO = "TargetsInfo";
+const char* const CPU_LIMIT = "CpuLimit";
+const char* const CPU_USAGE = "CpuUsage";
+const char* const MEM_LIMIT = "MemLimit";
+const char* const MEM_USAGE = "MemUsage";
+const char* const HASH = "Hash";
+const char* const SIZE = "Size";
+const char* const SCRAPE_DELAY_SECONDS = "ScrapeDelaySeconds";
 
 } // namespace logtail::prometheus

@@ -22,6 +22,7 @@
 #include <string>
 
 #include "application/Application.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
@@ -31,6 +32,7 @@
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
@@ -51,6 +53,7 @@ PrometheusInputRunner::PrometheusInputRunner()
       mEventPool(true),
       mUnRegisterMs(0) {
     mTimer = std::make_shared<Timer>();
+    mLastUpdateTime = std::chrono::steady_clock::now();
 
     // self monitor
     MetricLabels labels;
@@ -175,6 +178,8 @@ void PrometheusInputRunner::Init() {
                                 mUnRegisterMs = 0;
                             } else {
                                 mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                // adjust unRegisterMs to scrape targets for zero-cost
+                                mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
                             }
                         }
@@ -292,5 +297,12 @@ string PrometheusInputRunner::GetAllProjects() {
 
 void PrometheusInputRunner::CheckGC() {
     mEventPool.CheckGC();
+}
+
+void PrometheusInputRunner::GetAgentInfo(PromAgentInfo& agentInfo) {
+    agentInfo.mCpuUsage = LogtailMonitor::GetInstance()->GetCpuUsage();
+    agentInfo.mMemUsage = LogtailMonitor::GetInstance()->GetMemoryUsage();
+    agentInfo.mCpuLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
+    agentInfo.mMemLimit = AppConfig::GetInstance()->GetMemUsageUpLimit();
 }
 }; // namespace logtail
