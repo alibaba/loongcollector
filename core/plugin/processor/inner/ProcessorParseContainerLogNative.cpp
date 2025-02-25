@@ -291,8 +291,7 @@ static int32_t parseLogType(char* buffer, int32_t idx, int32_t size, DockerLogTy
     return idx;
 }
 
-// TODO: windows
-// windows can't instantiation with char32_t, unsigend maybe not ok.
+// windows can't instantiation with char32_t.
 #if defined(_MSC_VER)
 std::wstring_convert<std::codecvt_utf8<unsigned long>, unsigned long> convert;
 #else

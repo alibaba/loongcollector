@@ -150,7 +150,6 @@ void MetricEventUnittest::TestTag() {
 }
 
 void MetricEventUnittest::TestUntypedSingleValueSize() {
-    // TODO: windows
     size_t basicSize
         = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
     mMetricEvent->SetName("test");
@@ -174,7 +173,6 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
-    // TODO: windows
     size_t basicSize
         = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
     basicSize += 4;
@@ -245,7 +243,6 @@ void MetricEventUnittest::TestUntypedSingleValueToJson() {
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
 
-    // TODO: windows
     APSARA_TEST_TRUE(eventJson.toStyledString() == res.toStyledString());
 }
 
@@ -284,7 +281,6 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesToJson() {
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
 
-    // TODO: windows
     APSARA_TEST_TRUE(eventJson.toStyledString() == res.toStyledString());
 }
 

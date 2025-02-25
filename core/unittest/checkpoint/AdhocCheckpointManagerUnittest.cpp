@@ -242,8 +242,6 @@ AdhocFileKey* AdhocCheckpointManagerUnittest::GetAdhocFileKey(const std::string&
 long AdhocCheckpointManagerUnittest::GetFileUpdateTime(const std::string& filePath) {
     struct stat statbuf;
     stat(filePath.c_str(), &statbuf);
-    // TODO: windows
-    // it's ok?
 #if defined(__linux__)
     return statbuf.st_mtim.tv_nsec;
 #else

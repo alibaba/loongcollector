@@ -255,6 +255,8 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_FALSE_FATAL(moreData);
         expectedPart = expectedContent.get();
         expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
+        LOG_ERROR(sLogger, ("xxxxxxxxxxx", expectedPart.size()));
+        LOG_ERROR(sLogger, ("xxxxxxxxxxx", logBuffer.rawBuffer.size()));
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
         APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
