@@ -18,6 +18,9 @@
 #include <cstddef>
 #include <json/json.h>
 
+#include <numeric>
+
+#include "StringView.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "models/MetricEvent.h"
@@ -88,12 +91,11 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
     auto& sourceEvent = e.Cast<MetricEvent>();
 
     auto& eventTags = sourceEvent.mTags;
-
-    for (const auto& [k, v] : targetTags) {
+    auto appendLabels = [&eventTags, &sourceEvent](StringView k, StringView v, bool honorLabels) {
         auto it = std::find_if(
             eventTags.mInner.begin(), eventTags.mInner.end(), [k](const auto& item) { return item.first == k; });
         if (it != eventTags.mInner.end()) {
-            if (!mScrapeConfigPtr->mHonorLabels) {
+            if (!honorLabels) {
                 // metric event labels is secondary
                 // if confiliction, then rename it exported_<label_name>
                 auto key = prometheus::EXPORTED_PREFIX + k.to_string();
@@ -106,6 +108,10 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
             eventTags.mInner.emplace_back(k, v);
             eventTags.mAllocatedSize += k.size() + v.size();
         }
+    };
+
+    for (const auto& [k, v] : targetTags) {
+        appendLabels(k, v, mScrapeConfigPtr->mHonorLabels);
     }
 
     if (!mScrapeConfigPtr->mMetricRelabelConfigs.Empty()
@@ -114,31 +120,20 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
     }
 
     {
-        size_t index = 0;
-        eventTags.mAllocatedSize = 0;
-        for (const auto& item : eventTags.mInner) {
-            if (item.first.starts_with("__")) {
-                continue;
-            }
-            eventTags.mInner[index++] = item;
-            eventTags.mAllocatedSize += item.first.size() + item.second.size();
-        }
-        eventTags.mInner.resize(index);
+        auto& inner = eventTags.mInner;
+
+        inner.erase(
+            std::remove_if(inner.begin(), inner.end(), [](const auto& item) { return item.first.starts_with("__"); }),
+            inner.end());
+
+        eventTags.mAllocatedSize
+            = std::transform_reduce(inner.begin(), inner.end(), size_t{0}, std::plus<>(), [](const auto& item) {
+                  return item.first.size() + item.second.size();
+              });
     }
 
     for (const auto& [k, v] : mScrapeConfigPtr->mExternalLabels) {
-        if (sourceEvent.HasTag(k)) {
-            if (!mScrapeConfigPtr->mHonorLabels) {
-                // metric event labels is secondary
-                // if confiliction, then rename it exported_<label_name>
-                auto key = prometheus::EXPORTED_PREFIX + k;
-                auto b = sourceEvent.GetSourceBuffer()->CopyString(key);
-                sourceEvent.SetTagNoCopy(StringView(b.data, b.size), sourceEvent.GetTag(k));
-                sourceEvent.SetTagNoCopy(k, v);
-            }
-        } else {
-            sourceEvent.SetTagNoCopy(k, v);
-        }
+        appendLabels(k, v, mScrapeConfigPtr->mHonorLabels);
     }
 
     return true;
