@@ -100,8 +100,9 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
                 // if confiliction, then rename it exported_<label_name>
                 auto key = prometheus::EXPORTED_PREFIX + k.to_string();
                 auto b = sourceEvent.GetSourceBuffer()->CopyString(key);
-                eventTags.mInner.emplace_back(StringView(b.data, b.size), it->second);
+                auto tmp = it->second;
                 it->second = v;
+                eventTags.mInner.emplace_back(StringView(b.data, b.size), tmp);
                 eventTags.mAllocatedSize += b.size + v.size();
             }
         } else {
