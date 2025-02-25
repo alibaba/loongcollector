@@ -35,13 +35,18 @@ int64_t GetHostSystemBootTime() {
     if (systemBootSeconds != 0) {
         return systemBootSeconds;
     }
+    int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
+        LOG_WARNING(sLogger, ("get system boot time failed", "file not exists"));
+        return currentSeconds;
+    }
 
     vector<string> cpuLines = {};
     string errorMessage;
     int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, cpuLines, true, &errorMessage);
     if (ret != 0 || cpuLines.empty()) {
         LOG_WARNING(sLogger, ("failed to get cpu lines", errorMessage)("ret", ret)("cpuLines", cpuLines.size()));
-        return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        return currentSeconds;
     }
 
     for (auto const& cpuLine : cpuLines) {
@@ -53,7 +58,7 @@ int64_t GetHostSystemBootTime() {
         }
     }
 
-    return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    return currentSeconds;
 }
 
 } // namespace logtail

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "boost/filesystem/operations.hpp"
+
 #include "SystemInformationTools.h"
 #include "host_monitor/Constants.h"
 #include "unittest/Unittest.h"
@@ -36,7 +38,6 @@ void SystemInformationToolsUnittest::TestGetSystemBootSeconds() const {
     PROCESS_DIR = ".";
     APSARA_TEST_EQUAL(1731142542, GetHostSystemBootTime());
 }
-
 
 UNIT_TEST_CASE(SystemInformationToolsUnittest, TestGetSystemBootSeconds);
 
