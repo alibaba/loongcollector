@@ -99,10 +99,6 @@ protected:
     mutable std::condition_variable mStopCV;
     bool mConfigServerAvailable = false;
 
-    mutable std::mutex mInstanceInfoMapMux;
-    mutable std::mutex mContinuousPipelineInfoMapMux;
-    mutable std::mutex mOnetimePipelineInfoMapMux;
-
     std::unordered_map<std::string, ConfigInfo> mContinuousPipelineConfigInfoMap;
     std::unordered_map<std::string, ConfigInfo> mInstanceConfigInfoMap;
     std::unordered_map<std::string, ConfigInfo> mOnetimePipelineConfigInfoMap;

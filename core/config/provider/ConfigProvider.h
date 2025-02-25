@@ -38,6 +38,7 @@ protected:
     std::filesystem::path mInstanceSourceDir;
     mutable std::mutex mContinuousPipelineMux;
     mutable std::mutex mInstanceMux;
+    mutable std::mutex mOnetimePipelineMux;
 };
 
 } // namespace logtail
