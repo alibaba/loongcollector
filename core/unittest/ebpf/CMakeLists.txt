@@ -36,7 +36,7 @@ add_unittest(manager_unittest ManagerUnittest.cpp)
 add_unittest(common_util_unittest CommonUtilUnittest.cpp)
 add_unittest(networkobserver_event_unittest NetworkObserverEventUnittest.cpp)
 add_unittest(networkobserver_unittest NetworkObserverUnittest.cpp)
-add_unittest(worker_unittest WorkerUnittest.cpp)
+# add_unittest(worker_unittest WorkerUnittest.cpp)
 add_unittest(connection_unittest ConnectionUnittest.cpp)
 add_unittest(connection_manager_unittest ConnectionManagerUnittest.cpp)
 

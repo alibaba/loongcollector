@@ -78,10 +78,10 @@ void Connection::SafeUpdateRole(enum support_role_e role) {
     }
 }
 
-void Connection::SafeUpdateProtocol(ProtocolType protocol) {
+void Connection::SafeUpdateProtocol(support_proto_e protocol) {
     if (!mProtocolAttached) {
         WriteLock lock(mProtocolAndRoleLock);
-        if (mProtocol != ProtocolType::UNKNOWN && mProtocol != protocol) {
+        if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
             LOG_WARNING(sLogger,
                         ("protocol change!! last protocol",
                          magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
@@ -109,7 +109,7 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
 
     SafeUpdateRole(event->role);
 
-    SafeUpdateProtocol(ProtocolType(event->protocol));
+    SafeUpdateProtocol(event->protocol);
 
     SafeUpdateNetMetaAttr(event);
 
@@ -127,7 +127,7 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
 }
 
 void Connection::TrySafeUpdateProtocolAttr() {
-    if (mProtocol == ProtocolType::UNKNOWN || mProtocolAttached) {
+    if (mProtocol == support_proto_e::ProtoUnknown || mProtocolAttached) {
         return;
     }
 

@@ -12,6 +12,7 @@
 #include "ebpf/protocol/AbstractParser.h"
 #include "ebpf/protocol/ParserRegistry.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/sampler/Sampler.h"
 #include "picohttpparser.h"
 
 namespace logtail {
@@ -90,9 +91,9 @@ enum class ParseState {
 
 namespace http {
 
-ParseState ParseRequest(std::string_view* buf, Message* result);
+ParseState ParseRequest(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool sample);
 
-ParseState ParseRequestBody(std::string_view* buf, Message* result);
+ParseState ParseRequestBody(std::string_view* buf, std::unique_ptr<HttpRecord>& result);
 
 HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t num_headers);
 
@@ -102,7 +103,7 @@ ParseState ParseContent(std::string_view content_len_str,
                         std::string* result,
                         size_t* body_size);
 
-ParseState ParseResponse(std::string_view* buf, Message* result, bool closed);
+ParseState ParseResponse(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool closed, bool sample);
 
 int ParseHttpRequest(std::string_view buf, HTTPRequest* result);
 } // namespace http
@@ -112,10 +113,12 @@ class HTTPProtocolParser : public AbstractProtocolParser {
 public:
     std::shared_ptr<AbstractProtocolParser> Create() override { return std::make_shared<HTTPProtocolParser>(); }
 
-    std::vector<std::unique_ptr<AbstractRecord>> Parse(std::unique_ptr<NetDataEvent> data_event) override;
+    std::vector<std::unique_ptr<AbstractRecord>> Parse(struct conn_data_event_t* data_event,
+                                                       const std::shared_ptr<Connection>& conn,
+                                                       const std::shared_ptr<Sampler>& sampler = nullptr) override;
 };
 
-REGISTER_PROTOCOL_PARSER(ProtocolType::HTTP, HTTPProtocolParser)
+REGISTER_PROTOCOL_PARSER(support_proto_e::ProtoHTTP, HTTPProtocolParser)
 
 } // namespace ebpf
 } // namespace logtail

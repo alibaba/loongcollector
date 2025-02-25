@@ -151,13 +151,13 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
     // 测试请求头
     HeadersMap reqHeaders;
     reqHeaders.insert({"Content-Type", "application/json"});
-    record.SetReqHeaderMap(reqHeaders);
+    record.SetReqHeaderMap(std::move(reqHeaders));
     APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1);
 
     // 测试响应头
     HeadersMap respHeaders;
     respHeaders.insert({"Content-Length", "100"});
-    record.SetRespHeaderMap(respHeaders);
+    record.SetRespHeaderMap(std::move(respHeaders));
     APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1);
 }
 
@@ -281,11 +281,11 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
 
     HeadersMap reqHeaders;
     reqHeaders.insert({"Content-Type", "application/json"});
-    record.SetReqHeaderMap(reqHeaders);
+    record.SetReqHeaderMap(std::move(reqHeaders));
 
     HeadersMap respHeaders;
     respHeaders.insert({"Content-Length", "100"});
-    record.SetRespHeaderMap(respHeaders);
+    record.SetRespHeaderMap(std::move(respHeaders));
 
     APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1);
     APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1);

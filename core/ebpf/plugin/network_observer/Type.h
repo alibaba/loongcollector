@@ -14,7 +14,9 @@
 
 #pragma once
 
+extern "C" {
 #include <coolbpf/net.h>
+}
 #include <cstddef>
 
 #include <map>
@@ -39,32 +41,16 @@ struct CaseInsensitiveLess {
 
 using HeadersMap = std::multimap<std::string, std::string, CaseInsensitiveLess>;
 
-
-enum class ProtocolType {
-    UNKNOWN,
-    HTTP,
-    MYSQL,
-    DNS,
-    REDIS,
-    KAFKA,
-    PGSQL,
-    MONGO,
-    DUBBO,
-    HSF,
-    MAX,
-};
-
-inline ProtocolType& operator++(ProtocolType& pt) {
-    pt = static_cast<ProtocolType>(static_cast<int>(pt) + 1);
+inline enum support_proto_e& operator++(enum support_proto_e& pt) {
+    pt = static_cast<enum support_proto_e>(static_cast<int>(pt) + 1);
     return pt;
 }
 
-inline ProtocolType operator++(ProtocolType& pt, int) {
-    ProtocolType old = pt;
-    pt = static_cast<ProtocolType>(static_cast<int>(pt) + 1);
+inline enum support_proto_e operator++(enum support_proto_e& pt, int) {
+    enum support_proto_e old = pt;
+    pt = static_cast<enum support_proto_e>(static_cast<int>(pt) + 1);
     return old;
 }
-
 
 class ConnId {
 public:
@@ -118,10 +104,8 @@ struct ConnIdHash {
 
 namespace std {
 template <>
-struct hash<logtail::ebpf::ProtocolType> {
-    std::size_t operator()(const logtail::ebpf::ProtocolType& proto) const noexcept {
-        return static_cast<std::size_t>(proto);
-    }
+struct hash<support_proto_e> {
+    std::size_t operator()(const support_proto_e& proto) const noexcept { return static_cast<std::size_t>(proto); }
 };
 } // namespace std
 

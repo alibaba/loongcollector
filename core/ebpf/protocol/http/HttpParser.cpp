@@ -17,6 +17,7 @@
 #include <map>
 
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -26,48 +27,46 @@ inline constexpr char kContentLength[] = "Content-Length";
 inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
-std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(std::unique_ptr<NetDataEvent> dataEvent) {
+std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
+                                                                       const std::shared_ptr<Connection>& conn,
+                                                                       const std::shared_ptr<Sampler>& sampler) {
     // 处理 HTTP 协议数据
     std::vector<std::unique_ptr<AbstractRecord>> records;
-    auto record = std::make_unique<HttpRecord>(dataEvent->mConnection);
-    record->SetEndTs(dataEvent->mEndTs);
-    record->SetStartTs(dataEvent->mStartTs);
-    if (dataEvent->mReqMsg.length() > 0) {
-        Message result;
-        std::string_view buf = dataEvent->mReqMsg;
-        ParseState state = http::ParseRequest(&buf, &result);
-        if (state == ParseState::kSuccess) {
-            std::size_t pos = result.req_path.find('?');
-            record->SetRealPath(result.req_path);
-            if (pos != std::string::npos) {
-                result.req_path = result.req_path.substr(0, pos);
-            }
-            if (result.req_path.empty()) {
-                result.req_path = "/";
-            }
-            record->SetPath(result.req_path);
+    auto record = std::make_unique<HttpRecord>(conn);
+    // record->SetEndTs(dataEvent->mEndTs);
+    // record->SetStartTs(dataEvent->mStartTs);
+    record->SetEndTs(dataEvent->end_ts);
+    record->SetStartTs(dataEvent->start_ts);
+    auto spanId = GenerateSpanID();
+    bool isSample = sampler->ShouldSample(spanId);
+    if (isSample) {
+        // LOG
+        auto traceId = GenerateTraceID();
+        LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId))("traceId", FromTraceId(traceId)));
+        record->SetSpanId(FromSpanId(spanId));
+        record->SetTraceId(FromTraceId(traceId));
+    } else {
+        LOG_DEBUG(sLogger, ("sampler", "reject"));
+    }
 
-            record->SetReqBody(result.body);
-            record->SetMethod(result.req_method);
-            record->SetProtocolVersion("http1." + std::to_string(result.minor_version));
-            record->SetReqHeaderMap(result.headers);
-        }
-
+    if (dataEvent->request_len) {
+        // Message result;
+        std::string_view buf(dataEvent->msg, dataEvent->request_len);
+        ParseState state = http::ParseRequest(&buf, record, isSample);
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
         }
     }
 
-    if (dataEvent->mRespMsg.length() > 0) {
-        Message result;
-        std::string_view buf = dataEvent->mRespMsg;
-        ParseState state = http::ParseResponse(&buf, &result, true);
-        if (state == ParseState::kSuccess) {
-            // record->SetPath(result.req_path);
-            record->SetRespBody(result.body);
-            record->SetStatusCode(std::to_string(result.resp_status));
-            record->SetRespHeaderMap(result.headers);
-        }
+    if (dataEvent->response_len > 0) {
+        // Message result;
+        std::string_view buf(dataEvent->msg + dataEvent->request_len, dataEvent->response_len);
+        ParseState state = http::ParseResponse(&buf, record, true, isSample);
+        // if (state == ParseState::kSuccess) {
+        //     record->SetRespBody(result.body);
+        //     record->SetStatusCode(std::to_string(result.resp_status));
+        //     record->SetRespHeaderMap(result.headers);
+        // }
 
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
@@ -103,23 +102,43 @@ int ParseHttpRequest(std::string_view buf, HTTPRequest* result) {
                              /*last_len*/ 0);
 }
 
-ParseState ParseRequest(std::string_view* buf, Message* result) {
+const std::string ROOT_PATH = "/";
+const char QUESTION_MARK = '?';
+const std::string HTTP1_PREFIX = "http1.";
+
+ParseState ParseRequest(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool sample) {
     HTTPRequest req;
     int retval = http::ParseHttpRequest(*buf, &req);
     if (retval >= 0) {
         buf->remove_prefix(retval);
-        result->minor_version = req.minor_version;
-        result->headers = http::GetHTTPHeadersMap(req.headers, req.num_headers);
-        result->req_method = std::string(req.method, req.method_len);
-        result->req_path = std::string(req.path, req.path_len);
-        result->headers_byte_size = retval;
 
-        return ParseRequestBody(buf, result);
-    }
-    if (retval == -2) {
+        if (req.path_len == 0) {
+            result->SetPath(ROOT_PATH);
+            result->SetRealPath(ROOT_PATH);
+        } else {
+            auto path = std::string(req.path, req.path_len);
+            result->SetRealPath(path);
+            std::size_t pos = result->GetRealPath().find(QUESTION_MARK);
+            if (pos != std::string::npos) {
+                result->SetPath(path.substr(0, pos));
+            } else {
+                result->SetPath(path);
+            }
+        }
+
+        if (sample) {
+            result->SetProtocolVersion(HTTP1_PREFIX + std::to_string(req.minor_version));
+            result->SetMethod(std::string(req.method, req.method_len));
+            result->SetReqHeaderMap(http::GetHTTPHeadersMap(req.headers, req.num_headers));
+            return ParseRequestBody(buf, result);
+        } else {
+            return ParseState::kSuccess;
+        }
+    } else if (retval == -2) {
         return ParseState::kNeedsMoreData;
+    } else {
+        return ParseState::kInvalid;
     }
-    return ParseState::kInvalid;
 }
 
 ParseState
@@ -165,19 +184,19 @@ ParseState ParseChunked(std::string_view* data, size_t body_size_limit_bytes, st
     return PicoParseChunked(data, body_size_limit_bytes, result, body_size);
 }
 
-ParseState ParseRequestBody(std::string_view* buf, Message* result) {
+ParseState ParseRequestBody(std::string_view* buf, std::unique_ptr<HttpRecord>& result) {
     // Case 1: Content-Length
-    const auto content_length_iter = result->headers.find(kContentLength);
-    if (content_length_iter != result->headers.end()) {
+    const auto content_length_iter = result->GetReqHeaderMap().find(kContentLength);
+    if (content_length_iter != result->GetReqHeaderMap().end()) {
         std::string_view content_len_str = content_length_iter->second;
-        auto r = ParseContent(content_len_str, buf, 256, &result->body, &result->body_size);
+        auto r = ParseContent(content_len_str, buf, 256, &result->mReqBody, &result->mReqBodySize);
         return r;
     }
 
     // Case 2: Chunked transfer.
-    const auto transfer_encoding_iter = result->headers.find(kTransferEncoding);
-    if (transfer_encoding_iter != result->headers.end() && transfer_encoding_iter->second == "chunked") {
-        auto s = ParseChunked(buf, 256, &result->body, &result->body_size);
+    const auto transfer_encoding_iter = result->GetReqHeaderMap().find(kTransferEncoding);
+    if (transfer_encoding_iter != result->GetReqHeaderMap().end() && transfer_encoding_iter->second == "chunked") {
+        auto s = ParseChunked(buf, 256, &result->mReqBody, &result->mReqBodySize);
 
         return s;
     }
@@ -189,7 +208,7 @@ ParseState ParseRequestBody(std::string_view* buf, Message* result) {
     // not contain a payload body and the method semantics do not anticipate such a body."
     //
     // We apply this to all methods, since we have no better strategy in other cases.
-    result->body = "";
+    result->mReqBody = "";
     return ParseState::kSuccess;
 }
 
@@ -206,13 +225,14 @@ int ParseHttpResponse(std::string_view buf, HTTPResponse* result) {
                               /*last_len*/ 0);
 }
 
-bool parse_content_length(const std::string_view& content_len_str, size_t* len) {
+bool ParseContentLength(const std::string_view& content_len_str, size_t* len) {
     if (len == nullptr) {
         return false;
     }
 
     try {
         size_t pos;
+        std::stoull(content_len_str.data());
         *len = std::stoull(std::string(content_len_str), &pos);
         if (pos != content_len_str.size()) {
             return false;
@@ -230,7 +250,7 @@ ParseState ParseContent(std::string_view content_len_str,
                         std::string* result,
                         size_t* body_size) {
     size_t len;
-    if (!parse_content_length(content_len_str, &len)) {
+    if (!ParseContentLength(content_len_str, &len)) {
         return ParseState::kInvalid;
     }
     if (data->size() < len) {
@@ -253,28 +273,28 @@ bool starts_with_http(const std::string_view* buf) {
     return buf->size() >= prefix.size() && buf->substr(0, prefix.size()) == prefix;
 }
 
-ParseState ParseResponseBody(std::string_view* buf, Message* result, bool closed) {
+ParseState ParseResponseBody(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool closed) {
     HTTPResponse r;
     bool adjacent_resp = starts_with_http(buf) && (ParseHttpResponse(*buf, &r) > 0);
 
     if (adjacent_resp || (buf->empty() && closed)) {
-        result->body = "";
+        // result->mRespBody = "";
         return ParseState::kSuccess;
     }
 
     // Case 1: Content-Length
-    const auto content_length_iter = result->headers.find(kContentLength);
-    if (content_length_iter != result->headers.end()) {
+    const auto content_length_iter = result->GetRespHeaderMap().find(kContentLength);
+    if (content_length_iter != result->GetRespHeaderMap().end()) {
         std::string_view content_len_str = content_length_iter->second;
-        auto s = ParseContent(content_len_str, buf, 256, &result->body, &result->body_size);
+        auto s = ParseContent(content_len_str, buf, 256, &result->mRespBody, &result->mRespBodySize);
         // CTX_DCHECK_LE(result->body.size(), FLAGS_http_body_limit_bytes);
         return s;
     }
 
     // Case 2: Chunked transfer.
-    const auto transfer_encoding_iter = result->headers.find(kTransferEncoding);
-    if (transfer_encoding_iter != result->headers.end() && transfer_encoding_iter->second == "chunked") {
-        auto s = ParseChunked(buf, 256, &result->body, &result->body_size);
+    const auto transfer_encoding_iter = result->GetRespHeaderMap().find(kTransferEncoding);
+    if (transfer_encoding_iter != result->GetRespHeaderMap().end() && transfer_encoding_iter->second == "chunked") {
+        auto s = ParseChunked(buf, 256, &result->mRespBody, &result->mRespBodySize);
         // CTX_DCHECK_LE(result->body.size(), FLAGS_http_body_limit_bytes);
         return s;
     }
@@ -282,14 +302,13 @@ ParseState ParseResponseBody(std::string_view* buf, Message* result, bool closed
     // Case 3: Responses where we can assume no body.
     // The status codes below MUST not have a body, according to the spec.
     // See: https://tools.ietf.org/html/rfc2616#section-4.4
-    if ((result->resp_status >= 100 && result->resp_status < 200) || result->resp_status == 204
-        || result->resp_status == 304) {
-        result->body = "";
+    if ((result->mCode >= 100 && result->mCode < 200) || result->mCode == 204 || result->mCode == 304) {
+        result->mRespBody = "";
 
         // Status 101 is an even more special case.
-        if (result->resp_status == 101) {
-            const auto upgrade_iter = result->headers.find(kUpgrade);
-            if (upgrade_iter == result->headers.end()) {
+        if (result->mCode == 101) {
+            const auto upgrade_iter = result->GetRespHeaderMap().find(kUpgrade);
+            if (upgrade_iter == result->GetRespHeaderMap().end()) {
                 //    LOG(WARNING) << "Expected an Upgrade header with HTTP status 101";
             }
 
@@ -307,27 +326,34 @@ ParseState ParseResponseBody(std::string_view* buf, Message* result, bool closed
     // such messages are terminated by the close of the connection.
     // TODO(yzhao): For now we just accumulate messages, let probe_close() submit a message to
     // perf buffer, so that we can terminate such messages.
-    result->body = *buf;
+    result->mRespBody = *buf;
     buf->remove_prefix(buf->size());
 
     return ParseState::kSuccess;
-
-    return ParseState::kNeedsMoreData;
 }
 
-ParseState ParseResponse(std::string_view* buf, Message* result, bool closed) {
+ParseState ParseResponse(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool closed, bool sample) {
     HTTPResponse resp;
     int retval = ParseHttpResponse(*buf, &resp);
 
     if (retval >= 0) {
         buf->remove_prefix(retval);
-        result->minor_version = resp.minor_version;
-        result->headers = http::GetHTTPHeadersMap(resp.headers, resp.num_headers);
-        result->resp_status = resp.status;
-        result->resp_message = std::string(resp.msg, resp.msg_len);
-        result->headers_byte_size = retval;
+        result->SetStatusCode(resp.status);
 
-        return ParseResponseBody(buf, result, closed);
+        if (!sample) {
+            return ParseState::kSuccess;
+        } else {
+            result->SetRespHeaderMap(http::GetHTTPHeadersMap(resp.headers, resp.num_headers));
+            result->SetRespMsg(std::string(resp.msg, resp.msg_len));
+            return ParseResponseBody(buf, result, closed);
+        }
+        // result->minor_version = resp.minor_version;
+        // result->headers = http::GetHTTPHeadersMap(resp.headers, resp.num_headers);
+        // result->resp_status = resp.status;
+        // result->resp_message = std::string(resp.msg, resp.msg_len);
+        // result->headers_byte_size = retval;
+
+        // return ParseResponseBody(buf, result, closed);
     }
     if (retval == -2) {
         return ParseState::kNeedsMoreData;

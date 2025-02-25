@@ -22,9 +22,12 @@
 #include "ParserRegistry.h"
 #include "common/Lock.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/sampler/Sampler.h"
 #include "http/HttpParser.h"
 
-
+extern "C" {
+#include <coolbpf/net.h>
+}
 namespace logtail {
 namespace ebpf {
 
@@ -46,16 +49,19 @@ public:
 
     bool AddParser(const std::string& protocol);
     bool RemoveParser(const std::string& protocol);
-    bool AddParser(ProtocolType type);
-    bool RemoveParser(ProtocolType type);
-    std::set<ProtocolType> AvaliableProtocolTypes() const;
+    bool AddParser(support_proto_e type);
+    bool RemoveParser(support_proto_e type);
+    std::set<support_proto_e> AvaliableProtocolTypes() const;
 
-    std::vector<std::unique_ptr<AbstractRecord>> Parse(ProtocolType type, std::unique_ptr<NetDataEvent> data);
+    std::vector<std::unique_ptr<AbstractRecord>> Parse(support_proto_e type,
+                                                       const std::shared_ptr<Connection>& conn,
+                                                       struct conn_data_event_t* data,
+                                                       const std::shared_ptr<Sampler>& sampler = nullptr);
 
 private:
     ProtocolParserManager() {}
     ReadWriteLock mLock;
-    std::unordered_map<ProtocolType, std::shared_ptr<AbstractProtocolParser>> mParsers;
+    std::unordered_map<support_proto_e, std::shared_ptr<AbstractProtocolParser>> mParsers;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;
 #endif

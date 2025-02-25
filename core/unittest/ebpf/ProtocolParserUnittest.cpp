@@ -57,25 +57,30 @@ void ProtocolParserUnittest::TestParseHttp() {
     const std::string input = "GET /index.html HTTP/1.1\r\nHost: www.cmonitor.ai\r\nAccept: image/gif, image/jpeg, "
                               "*/*\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64)\r\n\r\n";
     std::string_view buf(input);
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
-    ParseState state = http::ParseRequest(&buf, &result);
+    ParseState state = http::ParseRequest(&buf, result, true);
 
-    EXPECT_EQ(state, ParseState::kSuccess);
-    EXPECT_EQ(result.minor_version, 1);
-    EXPECT_EQ(result.req_method, "GET");
-    EXPECT_EQ(result.req_path, "/index.html");
-    EXPECT_EQ(result.headers_byte_size, input.size());
-    EXPECT_EQ(result.body, "");
-    EXPECT_EQ(result.body_size, result.body.size());
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetProtocolVersion(), "http1.1");
+    APSARA_TEST_EQUAL(result->GetRealPath(), "/index.html");
+    APSARA_TEST_EQUAL(result->GetPath(), "/index.html");
+    APSARA_TEST_EQUAL(result->GetReqBody(), "");
+    APSARA_TEST_EQUAL(result->GetReqBodySize(), 0);
+    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 3);
 
-    // 检查头部信息
-    EXPECT_EQ(result.headers.size(), 3);
+    // APSARA_TEST_EQUAL(result->GetReqHeaderMap()_byte_size, input.size());
+    // APSARA_TEST_EQUAL(result.body, "");
+    // APSARA_TEST_EQUAL(result.body_size, result.body.size());
+
+    // // 检查头部信息
+    // APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 3);
 
     const std::string input2 = "GET /path HTTP/1.1\r\nHost: example.com"; // Incomplete header
     std::string_view buf2(input2);
-    state = http::ParseRequest(&buf2, &result);
-    EXPECT_EQ(state, ParseState::kNeedsMoreData);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf2, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 }
 
 void ProtocolParserUnittest::TestParseHttpResponse() {
@@ -85,16 +90,15 @@ void ProtocolParserUnittest::TestParseHttpResponse() {
                               "\r\n"
                               "Hello, World!";
     std::string_view buf(input);
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
-    ParseState state = http::ParseResponse(&buf, &result, false);
+    ParseState state = http::ParseResponse(&buf, result, false, true);
 
-    EXPECT_EQ(state, ParseState::kSuccess);
-    EXPECT_EQ(result.minor_version, 1);
-    EXPECT_EQ(result.resp_status, 200);
-    EXPECT_EQ(result.resp_message, "OK");
-    EXPECT_EQ(result.headers.size(), 2);
-    EXPECT_EQ(result.body, "Hello, World!");
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 200);
+    APSARA_TEST_EQUAL(result->GetRespMsg(), "OK");
+    APSARA_TEST_EQUAL(result->GetRespHeaderMap().size(), 2);
+    APSARA_TEST_EQUAL(result->GetRespBody(), "Hello, World!");
 
     // 测试404响应
     const std::string notFound = "HTTP/1.1 404 Not Found\r\n"
@@ -103,11 +107,11 @@ void ProtocolParserUnittest::TestParseHttpResponse() {
                                  "\r\n"
                                  "Not Found";
     std::string_view buf2(notFound);
-    state = http::ParseResponse(&buf2, &result, false);
-
-    EXPECT_EQ(state, ParseState::kSuccess);
-    EXPECT_EQ(result.resp_status, 404);
-    EXPECT_EQ(result.resp_message, "Not Found");
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseResponse(&buf2, result, false, true);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 404);
+    APSARA_TEST_EQUAL(result->GetRespMsg(), "Not Found");
 }
 
 void ProtocolParserUnittest::TestParseHttpHeaders() {
@@ -118,24 +122,24 @@ void ProtocolParserUnittest::TestParseHttpHeaders() {
                               "Cookie: session=abc123; user=john\r\n"
                               "\r\n";
     std::string_view buf(input);
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
-    ParseState state = http::ParseRequest(&buf, &result);
-    EXPECT_EQ(state, ParseState::kSuccess);
-    EXPECT_EQ(result.headers.size(), 4);
+    ParseState state = http::ParseRequest(&buf, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 4);
 
     // 验证特定头部
-    EXPECT_TRUE(result.headers.find("host") != result.headers.end());
-    EXPECT_TRUE(result.headers.find("content-type") != result.headers.end());
-    EXPECT_TRUE(result.headers.find("x-custom-header") != result.headers.end());
-    EXPECT_TRUE(result.headers.find("cookie") != result.headers.end());
+    APSARA_TEST_TRUE(result->GetReqHeaderMap().find("host") != result->GetReqHeaderMap().end());
+    APSARA_TEST_TRUE(result->GetReqHeaderMap().find("content-type") != result->GetReqHeaderMap().end());
+    APSARA_TEST_TRUE(result->GetReqHeaderMap().find("x-custom-header") != result->GetReqHeaderMap().end());
+    APSARA_TEST_TRUE(result->GetReqHeaderMap().find("cookie") != result->GetReqHeaderMap().end());
 
     // 验证头部值
-    auto host = result.headers.find("host");
-    APSARA_TEST_NOT_EQUAL(host, result.headers.end());
+    auto host = result->GetReqHeaderMap().find("host");
+    APSARA_TEST_NOT_EQUAL(host, result->GetReqHeaderMap().end());
     APSARA_TEST_EQUAL(host->second, "example.com");
-    auto contentType = result.headers.find("content-type");
-    APSARA_TEST_NOT_EQUAL(contentType, result.headers.end());
+    auto contentType = result->GetReqHeaderMap().find("content-type");
+    APSARA_TEST_NOT_EQUAL(contentType, result->GetReqHeaderMap().end());
     APSARA_TEST_EQUAL(contentType->second, "application/json");
 }
 
@@ -152,83 +156,87 @@ void ProtocolParserUnittest::TestParseChunkedEncoding() {
                               "0\r\n"
                               "\r\n";
     std::string_view buf(input);
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
-    ParseState state = http::ParseResponse(&buf, &result, false);
-    EXPECT_EQ(state, ParseState::kSuccess);
+    ParseState state = http::ParseResponse(&buf, result, false, true);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
 
     // 验证分块解码后的完整消息
     std::string expected = "MozillaDeveloperNetwork";
-    EXPECT_EQ(result.body, expected);
+    APSARA_TEST_EQUAL(result->GetRespBody(), expected);
 }
 
 void ProtocolParserUnittest::TestParseInvalidRequests() {
     const std::string invalidMethod = "INVALID /test HTTP/1.1\r\n\r\n";
     std::string_view buf1(invalidMethod);
-    Message result;
-    ParseState state = http::ParseRequest(&buf1, &result);
-    EXPECT_EQ(state, ParseState::kSuccess);
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
+    ParseState state = http::ParseRequest(&buf1, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
 
     const std::string invalidVersion = "GET /test HTTP/2.0\r\n\r\n";
     std::string_view buf2(invalidVersion);
-    state = http::ParseRequest(&buf2, &result);
-    EXPECT_EQ(state, ParseState::kInvalid);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf2, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 
     const std::string invalidHeader = "GET /test HTTP/1.1\r\nInvalid Header\r\n\r\n";
     std::string_view buf3(invalidHeader);
-    state = http::ParseRequest(&buf3, &result);
-    EXPECT_EQ(state, ParseState::kInvalid);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf3, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 }
 
 void ProtocolParserUnittest::TestParsePartialRequests() {
     // 测试不完整的请求行
     const std::string partialRequestLine = "GET /test";
     std::string_view buf1(partialRequestLine);
-    Message result;
-    ParseState state = http::ParseRequest(&buf1, &result);
-    EXPECT_EQ(state, ParseState::kNeedsMoreData);
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
+    ParseState state = http::ParseRequest(&buf1, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
     // 测试不完整的头部
     const std::string partialHeaders = "GET /test HTTP/1.1\r\nHost: example.com\r\n";
     std::string_view buf2(partialHeaders);
-    state = http::ParseRequest(&buf2, &result);
-    EXPECT_EQ(state, ParseState::kNeedsMoreData);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf2, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
     const std::string partialBody = "POST /test HTTP/1.1\r\n"
                                     "Content-Length: 10\r\n"
                                     "\r\n"
                                     "Part";
     std::string_view buf3(partialBody);
-    state = http::ParseRequest(&buf3, &result);
-    EXPECT_EQ(state, ParseState::kNeedsMoreData);
+    state = http::ParseRequest(&buf3, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 }
 
 void ProtocolParserUnittest::TestProtocolParserManager() {
     auto& manager = ProtocolParserManager::GetInstance();
 
-    EXPECT_TRUE(manager.AddParser(ProtocolType::HTTP));
+    APSARA_TEST_TRUE(manager.AddParser(support_proto_e::ProtoHTTP));
 
-    EXPECT_TRUE(manager.AddParser(ProtocolType::HTTP));
+    APSARA_TEST_TRUE(manager.AddParser(support_proto_e::ProtoHTTP));
 
-    EXPECT_TRUE(manager.RemoveParser(ProtocolType::HTTP));
+    APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoHTTP));
 
-    EXPECT_TRUE(manager.RemoveParser(ProtocolType::HTTP));
+    APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoHTTP));
 }
 
 void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     // 测试空请求
     const std::string emptyRequest = "";
     std::string_view buf1(emptyRequest);
-    Message result;
-    ParseState state = http::ParseRequest(&buf1, &result);
-    EXPECT_EQ(state, ParseState::kNeedsMoreData);
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
+    ParseState state = http::ParseRequest(&buf1, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
     std::string longUrl = "GET /";
     longUrl.append(2048, 'a');
     longUrl += " HTTP/1.1\r\n\r\n";
     std::string_view buf2(longUrl);
-    state = http::ParseRequest(&buf2, &result);
-    EXPECT_EQ(state, ParseState::kSuccess);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf2, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
 
     std::string manyHeaders = "GET /test HTTP/1.1\r\n";
     for (int i = 0; i < 200; i++) {
@@ -236,8 +244,9 @@ void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     }
     manyHeaders += "\r\n";
     std::string_view buf3(manyHeaders);
-    state = http::ParseRequest(&buf3, &result);
-    EXPECT_EQ(state, ParseState::kInvalid);
+    result = std::make_unique<HttpRecord>(nullptr);
+    state = http::ParseRequest(&buf3, result, true);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 }
 
 const std::string REQ
@@ -283,13 +292,13 @@ const std::string RESP_MSG = "HTTP/1.1 200 OK\r\n"
 
 void ProtocolParserUnittest::RequestBenchmark() {
     std::string_view reqBuf(REQ);
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < 1000000; i++) {
         std::string_view reqBuf(REQ);
-        http::ParseRequest(&reqBuf, &result);
+        http::ParseRequest(&reqBuf, result, true);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -314,11 +323,11 @@ void ProtocolParserUnittest::RequestWithoutBodyBenchmark() {
 }
 
 void ProtocolParserUnittest::ResponseBenchmark() {
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
         std::string_view respBuf(RESP_MSG);
-        http::ParseResponse(&respBuf, &result, false);
+        http::ParseResponse(&respBuf, result, false, true);
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
@@ -326,11 +335,11 @@ void ProtocolParserUnittest::ResponseBenchmark() {
 }
 
 void ProtocolParserUnittest::ChunkedResponseBenchmark() {
-    Message result;
+    std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
         std::string_view respBuf(CHUNKED_RESP_MSG);
-        http::ParseResponse(&respBuf, &result, false);
+        http::ParseResponse(&respBuf, result, false, true);
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

@@ -59,7 +59,7 @@ void ConnectionManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
     conn->RecordActive();
 }
 
-std::unique_ptr<NetDataEvent> ConnectionManager::AcceptNetDataEvent(struct conn_data_event_t* event) {
+const std::shared_ptr<Connection> ConnectionManager::AcceptNetDataEvent(struct conn_data_event_t* event) {
     ConnId connId = ConnId(event->conn_id.fd, event->conn_id.tgid, event->conn_id.start);
     auto conn = GetOrCreateConnection(connId);
 
@@ -68,13 +68,9 @@ std::unique_ptr<NetDataEvent> ConnectionManager::AcceptNetDataEvent(struct conn_
     }
 
     conn->SafeUpdateRole(event->role);
-    conn->SafeUpdateProtocol(ProtocolType(event->protocol));
+    conn->SafeUpdateProtocol(event->protocol);
     conn->RecordActive();
-
-    // will do deepcopy
-    auto res = std::make_unique<NetDataEvent>(event);
-    res->mConnection = conn;
-    return res;
+    return conn;
 }
 
 void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {

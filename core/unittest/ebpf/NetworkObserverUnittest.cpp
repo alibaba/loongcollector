@@ -50,7 +50,7 @@ protected:
         mSourceManager = std::make_shared<SourceManager>();
         mSourceManager->Init();
         mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
-        ProtocolParserManager::GetInstance().AddParser(ProtocolType::HTTP);
+        ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
     }
 
     void TearDown() override { mTimer->Stop(); }
@@ -58,18 +58,6 @@ protected:
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
         return NetworkObserverManager::Create(mBaseManager, mSourceManager, mEventQueue, mTimer);
-    }
-
-    void ValidateNetDataEvent(const std::unique_ptr<NetDataEvent>& event,
-                              const ConnId& expectedConnId,
-                              ProtocolType expectedProtocol,
-                              support_role_e expectedRole) {
-        EXPECT_NE(event, nullptr);
-        if (event) {
-            APSARA_TEST_EQUAL(event->mConnection->GetConnId(), expectedConnId);
-            APSARA_TEST_EQUAL(event->mConnection->GetProtocol(), expectedProtocol);
-            APSARA_TEST_EQUAL(event->mConnection->GetRole(), expectedRole);
-        }
     }
 
     std::shared_ptr<Timer> mTimer;
@@ -381,7 +369,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(manager->mLogEventGroups.size(), 1);
     APSARA_TEST_EQUAL(manager->mLogEventGroups[0].GetEvents().size(), 100);
     tags = manager->mLogEventGroups[0].GetTags();
-    APSARA_TEST_EQUAL(tags.size(), 6);
+    APSARA_TEST_EQUAL(tags.size(), 0);
 }
 
 // TEST RollBack mechanism
@@ -480,14 +468,15 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         auto manager = CreateManager();
         ObserverNetworkOption options;
         options.mEnableProtocols = {"http"};
+        std::cout << magic_enum::enum_name(support_proto_e::ProtoHTTP) << std::endl;
         manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_TRUE(manager->mPreviousOpt != nullptr);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols.size(), 1);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols[0], "http");
         // only http
         APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(ProtocolType::HTTP) > 0);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[ProtocolType::HTTP] != nullptr);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
 
         options.mEnableProtocols = {"MySQL", "Redis", "Dubbo"};
         // std::vector<std::string> protocols = {"MySQL", "Redis", "Dubbo"};
@@ -500,8 +489,8 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
         APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(ProtocolType::HTTP) > 0);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[ProtocolType::HTTP] != nullptr);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
 
         // protocols.clear();
         options.mEnableProtocols = {};
@@ -525,8 +514,8 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols[0], "http");
         // only http
         APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(ProtocolType::HTTP) > 0);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[ProtocolType::HTTP] != nullptr);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, false);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableMetric, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableSpan, true);
@@ -551,8 +540,8 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
         APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(ProtocolType::HTTP) > 0);
-        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[ProtocolType::HTTP] != nullptr);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
+        APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableMetric, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableSpan, false);

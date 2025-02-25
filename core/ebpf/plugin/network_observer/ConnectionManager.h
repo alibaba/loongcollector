@@ -26,7 +26,6 @@
 #include <unordered_map>
 
 #include "Connection.h"
-#include "Worker.h"
 #include "common/Lock.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 extern "C" {
@@ -46,7 +45,7 @@ public:
     ~ConnectionManager() {}
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
-    std::unique_ptr<NetDataEvent> AcceptNetDataEvent(struct conn_data_event_t* event);
+    const std::shared_ptr<Connection> AcceptNetDataEvent(struct conn_data_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
     void Iterations(int count);

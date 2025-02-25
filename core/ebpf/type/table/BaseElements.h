@@ -22,7 +22,7 @@ namespace ebpf {
 
 constexpr DataElement kHost = {"host",
                                "host", // metric
-                               "host", // span
+                               "host.name", // span
                                "host", // log
                                "",
                                AggregationType::Level0};
@@ -39,6 +39,20 @@ constexpr DataElement kHostName = {"host_name",
                                    "host.name", // span
                                    "host.name", // log
                                    "host name",
+                                   AggregationType::Level0};
+
+constexpr DataElement kAppType = {"app_type",
+                                  "source", // metric
+                                  "arms.app.type", // span
+                                  "app.type", // log
+                                  "host name",
+                                  AggregationType::Level0};
+
+constexpr DataElement kDataType = {"data_type",
+                                   "data_type", // metric
+                                   "data_type", // span
+                                   "data_type", // log
+                                   "data_type",
                                    AggregationType::Level0};
 
 constexpr DataElement kPodName = {
@@ -238,7 +252,7 @@ constexpr DataElement kRemoteIp = {"remote_ip",
 
 constexpr DataElement kAppId = {"app_id",
                                 "pid", // metric
-                                "app.id", // span
+                                "arms.appId", // span
                                 "arms.app.id", // log
                                 "arms app id",
                                 AggregationType::Level0};
@@ -258,14 +272,14 @@ constexpr DataElement kFamily = {
     "",
 };
 
-constexpr DataElement kAppName = {"app_name",
+constexpr DataElement kAppName = {"app",
                                   "service", // metric
-                                  "arms.app.name", // span
+                                  "service.name", // span
                                   "arms.app.name", // log
                                   "arms app name",
                                   AggregationType::Level0};
 
-constexpr DataElement kPeerAppName = {"peer_app_name",
+constexpr DataElement kPeerAppName = {"peer_app",
                                       "arms_peer_app_name", // metric
                                       "arms.peer.app.name", // span
                                       "arms.app.name", // log

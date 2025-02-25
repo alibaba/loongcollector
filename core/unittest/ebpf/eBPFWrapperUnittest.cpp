@@ -1,4 +1,6 @@
+extern "C" {
 #include <coolbpf/net.h>
+}
 #include <coolbpf/security.skel.h>
 #include <sys/resource.h>
 

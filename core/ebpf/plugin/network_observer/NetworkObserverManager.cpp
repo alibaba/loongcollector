@@ -18,9 +18,11 @@
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/StringTools.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
+#include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/PeriodicalEvent.h"
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
@@ -254,17 +256,6 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                         LOG_DEBUG(sLogger, ("ct is null, skip, spanname ", record->GetSpanName()));
                         continue;
                     }
-                    // set conn tracker attrs ...
-                    eventGroup.SetTag(std::string("service.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())]); // app name
-                    eventGroup.SetTag(std::string("arms.appId"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())]); // app id
-                    eventGroup.SetTag(std::string("host.ip"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())]); // pod ip
-                    eventGroup.SetTag(std::string("host.name"),
-                                      ctAttrs[kConnTrackerTable.ColIndex(kPodName.Name())]); // pod name
-                    eventGroup.SetTag(std::string("arms.app.type"), "ebpf"); //
-                    eventGroup.SetTag(std::string("data_type"), "trace");
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
                         LOG_DEBUG(sLogger, ("record span tags", "")(std::string(tag->first), std::string(tag->second)));
                     }
@@ -287,21 +278,13 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
                 auto ts = httpRecord->GetStartTimeStamp();
                 logEvent->SetTimestamp(ts + mTimeDiff.count());
-                logEvent->SetContent("latency", std::to_string(httpRecord->GetLatencyMs()));
-                logEvent->SetContent("http.method", httpRecord->GetMethod());
-                logEvent->SetContent("http.path", httpRecord->GetPath());
-                logEvent->SetContent("http.protocol", httpRecord->GetProtocolVersion());
-                logEvent->SetContent("http.latency", std::to_string(httpRecord->GetLatencyMs()));
-                logEvent->SetContent("http.status_code", std::to_string(httpRecord->GetStatusCode()));
-                logEvent->SetContent("http.request.body", httpRecord->GetReqBody());
-                logEvent->SetContent("http.response.body", httpRecord->GetRespBody());
-
-                for (auto& h : httpRecord->GetReqHeaderMap()) {
-                    logEvent->SetContent("http.request.header." + h.first, h.second);
-                }
-                for (auto& h : httpRecord->GetRespHeaderMap()) {
-                    logEvent->SetContent("http.response.header." + h.first, h.second);
-                }
+                logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
+                logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
+                logEvent->SetContent(kHTTPPath.LogKey(), httpRecord->GetPath());
+                logEvent->SetContent(kHTTPVersion.LogKey(), httpRecord->GetProtocolVersion());
+                logEvent->SetContent(kStatusCode.LogKey(), std::to_string(httpRecord->GetStatusCode()));
+                logEvent->SetContent(kHTTPReqBody.LogKey(), httpRecord->GetReqBody());
+                logEvent->SetContent(kHTTPRespBody.LogKey(), httpRecord->GetRespBody());
 
                 LOG_DEBUG(sLogger, ("add one log, log timestamp", ts));
                 needPush = true;
@@ -335,6 +318,48 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
     return true;
 }
 
+// apm
+const static std::string METRIC_NAME_TAG = "arms_tag_entity";
+const static std::string METRIC_NAME_REQ_TOTAL = "arms_rpc_requests_count";
+const static std::string METRIC_NAME_REQ_DURATION_SUM = "arms_rpc_requests_seconds";
+const static std::string METRIC_NAME_REQ_ERR_TOTAL = "arms_rpc_requests_error_count";
+const static std::string METRIC_NAME_REQ_SLOW_TOTAL = "arms_rpc_requests_slow_count";
+const static std::string METRIC_NAME_REQ_BY_STATUS_TOTAL = "arms_rpc_requests_by_status_count";
+
+static const std::string status_2xx_key = "2xx";
+static const std::string status_3xx_key = "3xx";
+static const std::string status_4xx_key = "4xx";
+static const std::string status_5xx_key = "5xx";
+
+// npm
+const static std::string METRIC_NAME_TCP_DROP_TOTAL = "arms_npm_tcp_drop_count";
+const static std::string METRIC_NAME_TCP_RETRANS_TOTAL = "arms_npm_tcp_retrans_total";
+const static std::string METRIC_NAME_TCP_CONN_TOTAL = "arms_npm_tcp_count_by_state";
+const static std::string METRIC_NAME_TCP_RECV_PKTS_TOTAL = "arms_npm_recv_packets_total";
+const static std::string METRIC_NAME_TCP_RECV_BYTES_TOTAL = "arms_npm_recv_bytes_total";
+const static std::string METRIC_NAME_TCP_SENT_PKTS_TOTAL = "arms_npm_sent_packets_total";
+const static std::string METRIC_NAME_TCP_SENT_BTES_TOTAL = "arms_npm_sent_bytes_total";
+
+const static std::string EBPF_VALUE = "ebpf";
+const static std::string METRIC_VALUE = "metric";
+const static std::string TRACE_VALUE = "trace";
+const static std::string LOG_VALUE = "log";
+
+const static std::string TAG_AGENT_VERSION_KEY = "agentVersion";
+const static std::string TAG_APP_KEY = "app";
+const static std::string TAG_V1_VALUE = "v1";
+const static std::string TAG_RESOURCE_ID_KEY = "resourceid";
+const static std::string TAG_VERSION_KEY = "version";
+const static std::string TAG_CLUSTER_ID_KEY = "clusterId";
+const static std::string TAG_WORKLOAD_NAME_KEY = "workloadName";
+const static std::string TAG_WORKLOAD_KIND_KEY = "workloadKind";
+const static std::string TAG_NAMESPACE_KEY = "namespace";
+const static std::string TAG_HOST_KEY = "host";
+const static std::string TAG_HOSTNAME_KEY = "hostname";
+const static std::string TAG_APPLICATION_VALUE = "APPLICATION";
+const static std::string TAG_RESOURCE_TYPE_KEY = "resourcetype";
+
+
 bool NetworkObserverManager::ConsumeMetricAggregateTree(
     const std::chrono::steady_clock::time_point& execTime) { // handler
     if (!this->mFlag || this->mSuspendFlag) {
@@ -364,8 +389,8 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
         // every node represent an instance of an arms app ...
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTag(std::string("source"), "ebpf");
-        eventGroup.SetTag(std::string("data_type"), "metric");
+        eventGroup.SetTag(kAppType.MetricKey(), EBPF_VALUE);
+        eventGroup.SetTag(kDataType.MetricKey(), METRIC_VALUE);
 
         bool needPush = false;
 
@@ -390,22 +415,20 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
                 eventGroup.SetTag(std::string(kHost.MetricKey()), group->mHost); // pod name
 
                 auto* tagMetric = eventGroup.AddMetricEvent();
-                tagMetric->SetName("arms_tag_entity");
+                tagMetric->SetName(METRIC_NAME_TAG);
                 tagMetric->SetValue(UntypedSingleValue{1.0});
                 tagMetric->SetTimestamp(seconds, 0);
-                tagMetric->SetTag("agentVersion", std::string("v1"));
-                tagMetric->SetTag("app", group->mAppName); // app ===> appname
-                tagMetric->SetTag("resourceid", group->mAppId); // resourceid -==> pid
-                tagMetric->SetTag("resourcetype", std::string("APPLICATION")); // resourcetype ===> APPLICATION
-                tagMetric->SetTag("version", std::string("v1")); // version ===> v1
-                tagMetric->SetTag(
-                    "clusterId",
-                    std::string("c0748d004a7ce431d8da62ed8f6134879")); // clusterId ===> TODO read from env _cluster_id_
-                tagMetric->SetTag("host", group->mIp); // host ===>
-                tagMetric->SetTag("hostname", group->mHost); // hostName ===>
-                tagMetric->SetTag("namespace", group->mNamespace); // namespace ===>
-                tagMetric->SetTag("workloadKind", group->mWorkloadKind); // workloadKind ===>
-                tagMetric->SetTag("workloadName", group->mWorkloadName); // workloadName ===>
+                tagMetric->SetTag(TAG_AGENT_VERSION_KEY, TAG_V1_VALUE);
+                tagMetric->SetTag(TAG_APP_KEY, group->mAppName); // app ===> appname
+                tagMetric->SetTag(TAG_RESOURCE_ID_KEY, group->mAppId); // resourceid -==> pid
+                tagMetric->SetTag(TAG_RESOURCE_TYPE_KEY, TAG_APPLICATION_VALUE); // resourcetype ===> APPLICATION
+                tagMetric->SetTag(TAG_VERSION_KEY, std::string("v1")); // version ===> v1
+                tagMetric->SetTag(TAG_CLUSTER_ID_KEY, mClusterId); // clusterId ===> TODO read from env _cluster_id_
+                tagMetric->SetTag(TAG_HOST_KEY, group->mIp); // host ===>
+                tagMetric->SetTag(TAG_HOSTNAME_KEY, group->mHost); // hostName ===>
+                tagMetric->SetTag(TAG_NAMESPACE_KEY, group->mNamespace); // namespace ===>
+                tagMetric->SetTag(TAG_WORKLOAD_KIND_KEY, group->mWorkloadKind); // workloadKind ===>
+                tagMetric->SetTag(TAG_WORKLOAD_NAME_KEY, group->mWorkloadName); // workloadName ===>
                 init = true;
             }
 
@@ -420,24 +443,24 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             std::vector<MetricEvent*> metrics;
             if (group->mCount) {
                 auto* requestsMetric = eventGroup.AddMetricEvent();
-                requestsMetric->SetName("arms_rpc_requests_count");
+                requestsMetric->SetName(METRIC_NAME_REQ_TOTAL);
                 requestsMetric->SetValue(UntypedSingleValue{double(group->mCount)});
                 metrics.push_back(requestsMetric);
 
                 auto* latencyMetric = eventGroup.AddMetricEvent();
-                latencyMetric->SetName("arms_rpc_requests_seconds");
+                latencyMetric->SetName(METRIC_NAME_REQ_DURATION_SUM);
                 latencyMetric->SetValue(UntypedSingleValue{double(group->mSum)});
                 metrics.push_back(latencyMetric);
             }
             if (group->mErrCount) {
                 auto* errorMetric = eventGroup.AddMetricEvent();
-                errorMetric->SetName("arms_rpc_requests_error_count");
+                errorMetric->SetName(METRIC_NAME_REQ_ERR_TOTAL);
                 errorMetric->SetValue(UntypedSingleValue{double(group->mErrCount)});
                 metrics.push_back(errorMetric);
             }
             if (group->mSlowCount) {
                 auto* slowMetric = eventGroup.AddMetricEvent();
-                slowMetric->SetName("arms_rpc_requests_slow_count");
+                slowMetric->SetName(METRIC_NAME_REQ_SLOW_TOTAL);
                 slowMetric->SetValue(UntypedSingleValue{double(group->mSlowCount)});
                 metrics.push_back(slowMetric);
             }
@@ -445,29 +468,29 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             if (group->m2xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m2xxCount)});
-                statusMetric->SetName("arms_rpc_requests_by_status_count");
-                statusMetric->SetTag("status", std::string("2xx"));
+                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
+                statusMetric->SetTag(kStatusCode.MetricKey(), status_2xx_key);
                 metrics.push_back(statusMetric);
             }
             if (group->m3xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m3xxCount)});
-                statusMetric->SetName("arms_rpc_requests_by_status_count");
-                statusMetric->SetTag("status", std::string("3xx"));
+                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
+                statusMetric->SetTag(kStatusCode.MetricKey(), status_3xx_key);
                 metrics.push_back(statusMetric);
             }
             if (group->m4xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m4xxCount)});
-                statusMetric->SetName("arms_rpc_requests_by_status_count");
-                statusMetric->SetTag("status", std::string("4xx"));
+                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
+                statusMetric->SetTag(kStatusCode.MetricKey(), status_4xx_key);
                 metrics.push_back(statusMetric);
             }
             if (group->m5xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m5xxCount)});
-                statusMetric->SetName("arms_rpc_requests_by_status_count");
-                statusMetric->SetTag("status", std::string("5xx"));
+                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
+                statusMetric->SetTag(kStatusCode.MetricKey(), status_5xx_key);
                 metrics.push_back(statusMetric);
             }
 
@@ -558,16 +581,16 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 }
                 if (!init) {
                     // set app attrs ...
-                    eventGroup.SetTag(std::string("service.name"),
+                    eventGroup.SetTag(kAppName.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())]); // app name
-                    eventGroup.SetTag(std::string("arms.appId"),
+                    eventGroup.SetTag(kAppId.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())]); // app id
-                    eventGroup.SetTag(std::string("host.ip"),
+                    eventGroup.SetTag(kHostIp.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())]); // pod ip
-                    eventGroup.SetTag(std::string("host.name"),
+                    eventGroup.SetTag(kHost.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kPodName.Name())]); // pod name
-                    eventGroup.SetTag(std::string("arms.app.type"), "ebpf"); //
-                    eventGroup.SetTag(std::string("data_type"), "trace");
+                    eventGroup.SetTag(kAppType.SpanKey(), EBPF_VALUE); //
+                    eventGroup.SetTag(kDataType.SpanKey(), TRACE_VALUE);
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
                         LOG_DEBUG(sLogger, ("record span tags", "")(std::string(tag->first), std::string(tag->second)));
                     }
@@ -575,7 +598,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 }
                 auto* spanEvent = eventGroup.AddSpanEvent();
                 spanEvent->SetTag("app", ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())]);
-                spanEvent->SetTag("host", ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())]);
+                spanEvent->SetTag(kHost.Name(), ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())]);
                 for (auto element : kAppTraceTable.Elements()) {
                     auto sb = sourceBuffer->CopyString(ctAttrs[kConnTrackerTable.ColIndex(element.Name())]);
                     spanEvent->SetTagNoCopy(element.SpanKey(), StringView(sb.data, sb.size));
@@ -598,9 +621,9 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
 
                 spanEvent->SetName(record->GetSpanName());
-                spanEvent->SetTag(std::string("req.body"), record->GetReqBody());
-                spanEvent->SetTag(std::string("resp.body"), record->GetRespBody());
-                spanEvent->SetTag(std::string("protocol.version"), record->GetProtocolVersion());
+                spanEvent->SetTag(kHTTPReqBody.SpanKey(), record->GetReqBody());
+                spanEvent->SetTag(kHTTPRespBody.SpanKey(), record->GetRespBody());
+                spanEvent->SetTag(kHTTPVersion.SpanKey(), record->GetProtocolVersion());
 
                 auto startTime = record->GetStartTimeStamp() + this->mTimeDiff.count();
                 spanEvent->SetStartTimeNs(startTime);
@@ -730,6 +753,11 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(200));
 
     mCidOffset = GuessContainerIdOffset();
+
+    const char* value = getenv("_cluster_id_");
+    if (value != NULL) {
+        mClusterId = StringTo<std::string>(value);
+    }
     // if purage container mode
 
     // TODO @qianlu.kk init converger later ...
@@ -805,8 +833,9 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mScheduler->PushEvent(std::move(appMetricEvent));
     mScheduler->PushEvent(std::move(appTraceEvent));
     mScheduler->PushEvent(std::move(appLogEvent));
+    mScheduler->PushEvent(std::move(hostMetaUpdateTask));
     // init sampler
-    mSampler = std::make_unique<HashRatioSampler>(1);
+    mSampler = std::make_shared<HashRatioSampler>(1);
 
     mEnableLog = opt->mEnableLog;
     mEnableSpan = opt->mEnableSpan;
@@ -1019,7 +1048,6 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
     }
 }
 
-// TODO @qianlu.kk
 void NetworkObserverManager::ConsumeRecords() {
     std::vector<std::shared_ptr<AbstractRecord>> items(1024);
     while (mFlag) {
@@ -1099,24 +1127,22 @@ void NetworkObserverManager::RecordEventLost(enum callback_type_e type, uint64_t
 }
 
 void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
-    auto dataEvent = mConnectionManager->AcceptNetDataEvent(event);
+    const auto conn = mConnectionManager->AcceptNetDataEvent(event);
     mRecvHttpDataEventsTotal.fetch_add(1);
 
     LOG_DEBUG(sLogger, ("begin to handle data event", ""));
 
     // get protocol
-    auto protocol = dataEvent->mProtocol;
-    if (ProtocolType::UNKNOWN == protocol) {
+    auto protocol = event->protocol;
+    if (support_proto_e::ProtoUnknown == protocol) {
         LOG_DEBUG(sLogger, ("protocol is unknown, skip parse", ""));
-        dataEvent.reset();
         return;
     }
 
-    LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(dataEvent->mProtocol))));
+    LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
 
-    // judge if we need parse body ...
     std::vector<std::unique_ptr<AbstractRecord>> records
-        = ProtocolParserManager::GetInstance().Parse(protocol, std::move(dataEvent));
+        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, mSampler);
 
     // add records to span/event generate queue
     for (auto& record : records) {
@@ -1155,9 +1181,6 @@ void NetworkObserverManager::Stop() {
         this->mRecordConsume.join();
     }
     LOG_INFO(sLogger, ("destroy stage", "release consumer thread"));
-
-    // destroy worker pool ...
-    // mWorkerPool.reset();
 }
 
 int NetworkObserverManager::Destroy() {

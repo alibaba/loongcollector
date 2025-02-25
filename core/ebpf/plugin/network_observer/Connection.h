@@ -134,7 +134,7 @@ public:
 
     void SafeUpdateRole(enum support_role_e role);
 
-    void SafeUpdateProtocol(ProtocolType protocol);
+    void SafeUpdateProtocol(support_proto_e protocol);
 
     support_role_e GetRole() const {
         ReadLock lock(mProtocolAndRoleLock);
@@ -157,7 +157,7 @@ private:
     void MarkPodMetaAttached() { mK8sMetaAttached = true; }
     void MarkPeerPodMetaAttached() { mK8sPeerMetaAttached = true; }
 
-    ProtocolType GetProtocol() const {
+    support_proto_e GetProtocol() const {
         ReadLock lock(mProtocolAndRoleLock);
         return mProtocol;
     }
@@ -171,7 +171,7 @@ private:
 
     ConnId mConnId;
     mutable ReadWriteLock mProtocolAndRoleLock;
-    ProtocolType mProtocol = ProtocolType::UNKNOWN;
+    support_proto_e mProtocol = support_proto_e::ProtoUnknown;
     // accessed by at least 2 threads ...
     support_role_e mRole = support_role_e::IsUnknown;
 

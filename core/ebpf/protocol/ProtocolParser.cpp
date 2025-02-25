@@ -1,3 +1,17 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "ProtocolParser.h"
 
 #include <memory>
@@ -6,24 +20,31 @@
 #include <vector>
 
 #include "common/magic_enum.hpp"
+#include "ebpf/plugin/network_observer/Connection.h"
 #include "logger/Logger.h"
 
+extern "C" {
+#include <coolbpf/net.h>
+}
 namespace logtail {
 namespace ebpf {
 
-std::set<ProtocolType> ProtocolParserManager::AvaliableProtocolTypes() const {
-    return {ProtocolType::HTTP};
+std::set<support_proto_e> ProtocolParserManager::AvaliableProtocolTypes() const {
+    return {support_proto_e::ProtoHTTP};
 }
 
-ProtocolType ProtocolStringToEnum(std::string protocol) {
+support_proto_e ProtocolStringToEnum(std::string protocol) {
     std::transform(protocol.begin(), protocol.end(), protocol.begin(), [](unsigned char c) { return std::toupper(c); });
-    auto pro = magic_enum::enum_cast<ProtocolType>(protocol).value_or(ProtocolType::UNKNOWN);
-    return pro;
+    if (protocol == "HTTP") {
+        return support_proto_e::ProtoHTTP;
+    } else {
+        return support_proto_e::ProtoUnknown;
+    }
 }
 
 bool ProtocolParserManager::AddParser(const std::string& protocol) {
     auto pro = ProtocolStringToEnum(protocol);
-    if (pro == ProtocolType::UNKNOWN) {
+    if (pro == support_proto_e::ProtoUnknown) {
         return false;
     }
     return AddParser(pro);
@@ -31,13 +52,13 @@ bool ProtocolParserManager::AddParser(const std::string& protocol) {
 
 bool ProtocolParserManager::RemoveParser(const std::string& protocol) {
     auto pro = ProtocolStringToEnum(protocol);
-    if (pro == ProtocolType::UNKNOWN) {
+    if (pro == support_proto_e::ProtoUnknown) {
         return false;
     }
     return RemoveParser(pro);
 }
 
-bool ProtocolParserManager::AddParser(ProtocolType type) {
+bool ProtocolParserManager::AddParser(support_proto_e type) {
     if (!AvaliableProtocolTypes().count(type)) {
         LOG_WARNING(sLogger, ("protocol not supported", magic_enum::enum_name(type)));
         return false;
@@ -54,7 +75,7 @@ bool ProtocolParserManager::AddParser(ProtocolType type) {
     return false;
 }
 
-bool ProtocolParserManager::RemoveParser(ProtocolType type) {
+bool ProtocolParserManager::RemoveParser(support_proto_e type) {
     WriteLock lock(mLock);
     if (mParsers.count(type)) {
         LOG_DEBUG(sLogger, ("remove protocol parser", std::string(magic_enum::enum_name(type))));
@@ -67,11 +88,13 @@ bool ProtocolParserManager::RemoveParser(ProtocolType type) {
 }
 
 
-std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(ProtocolType type,
-                                                                          std::unique_ptr<NetDataEvent> data) {
+std::vector<std::unique_ptr<AbstractRecord>> ProtocolParserManager::Parse(support_proto_e type,
+                                                                          const std::shared_ptr<Connection>& conn,
+                                                                          struct conn_data_event_t* data,
+                                                                          const std::shared_ptr<Sampler>& sampler) {
     ReadLock lock(mLock);
     if (mParsers.find(type) != mParsers.end()) {
-        return mParsers[type]->Parse(std::move(data));
+        return mParsers[type]->Parse(data, conn, sampler);
     } else {
         LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
         return std::vector<std::unique_ptr<AbstractRecord>>();

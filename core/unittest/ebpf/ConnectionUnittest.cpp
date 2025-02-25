@@ -120,9 +120,9 @@ void ConnectionUnittest::TestProtocolHandling() {
     // will update protocol but will not update role
     tracker->UpdateConnStats(&statsEvent);
     APSARA_TEST_FALSE(tracker->mProtocolAttached);
-    ProtocolType pt = tracker->GetProtocol();
+    support_proto_e pt = tracker->GetProtocol();
     auto& attrs = tracker->GetConnTrackerAttrs();
-    APSARA_TEST_EQUAL(pt, ProtocolType::HTTP);
+    APSARA_TEST_EQUAL(pt, support_proto_e::ProtoHTTP);
     APSARA_TEST_EQUAL(tracker->GetSourceIp(), "127.0.0.1");
     APSARA_TEST_EQUAL(tracker->GetRemoteIp(), "192.168.1.1");
     // role not set, so we cannot fill rpc attr
@@ -132,7 +132,7 @@ void ConnectionUnittest::TestProtocolHandling() {
 
     // mock receive a data event
     tracker->SafeUpdateRole(support_role_e::IsClient);
-    tracker->SafeUpdateProtocol(ProtocolType::HTTP);
+    tracker->SafeUpdateProtocol(support_proto_e::ProtoHTTP);
     APSARA_TEST_TRUE(tracker->mProtocolAttached);
     // now rpc attributes all set
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
@@ -146,11 +146,11 @@ void ConnectionUnittest::TestProtocolHandling() {
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
 
     // protocol change ...
-    tracker->SafeUpdateProtocol(ProtocolType::MYSQL);
+    tracker->SafeUpdateProtocol(support_proto_e::ProtoMySQL);
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
-    APSARA_TEST_EQUAL(tracker->GetProtocol(), ProtocolType::HTTP);
+    APSARA_TEST_EQUAL(tracker->GetProtocol(), support_proto_e::ProtoHTTP);
 }
 
 void ConnectionUnittest::TestMetadataManagement() {
@@ -230,7 +230,7 @@ void ConnectionUnittest::TestMetadataManagement() {
 
     // mock receive data event ...
     tracker->SafeUpdateRole(support_role_e::IsClient);
-    tracker->SafeUpdateProtocol(ProtocolType::HTTP);
+    tracker->SafeUpdateProtocol(support_proto_e::ProtoHTTP);
     tracker->RecordActive();
     APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
     APSARA_TEST_TRUE(tracker->mK8sPeerMetaAttached);

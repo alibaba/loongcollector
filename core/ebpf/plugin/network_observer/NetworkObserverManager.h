@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "ConnectionManager.h"
-#include "Worker.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
@@ -30,9 +29,6 @@
 
 namespace logtail {
 namespace ebpf {
-
-
-template class WorkerFunc<std::unique_ptr<NetDataEvent>, std::unique_ptr<AbstractRecord>>;
 
 class NetworkObserverManager : public AbstractManager {
 public:
@@ -67,8 +63,6 @@ public:
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
     void AcceptDataEvent(struct conn_data_event_t* event);
-
-    // void EnqueueDataEvent(std::unique_ptr<NetDataEvent> data_event) const;
 
     void PollBufferWrapper();
     void ConsumeRecords();
@@ -116,10 +110,6 @@ private:
 
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
-    // TODO @qianlu.kk modify T for abstract event
-    // store raw events
-    // mutable moodycamel::BlockingConcurrentQueue<std::unique_ptr<NetDataEvent>> mRawEventQueue;
-
     mutable std::atomic_long mDataEventsDropTotal = 0;
 
     mutable std::atomic_int64_t mConntrackerNum = 0;
@@ -136,13 +126,10 @@ private:
 
     double mSampleRate = 1.0;
 
-    std::unique_ptr<Sampler> mSampler;
+    std::shared_ptr<Sampler> mSampler;
 
     // store parsed records
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRecordQueue;
-
-    // WorkerPool: used to parse protocols from raw record
-    std::unique_ptr<WorkerPool<std::unique_ptr<NetDataEvent>, std::shared_ptr<AbstractRecord>>> mWorkerPool;
 
     // coreThread used for polling kernel event...
     std::thread mCoreThread;
@@ -174,6 +161,8 @@ private:
 
     ReadWriteLock mLogAggLock;
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
+
+    std::string mClusterId;
 
 
     template <typename T, typename Func>

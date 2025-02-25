@@ -23,33 +23,34 @@
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/HttpTable.h"
 #include "ebpf/type/table/NetTable.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {
 
 class Connection;
 
-class NetDataEvent {
-public:
-    std::shared_ptr<Connection> mConnection;
-    uint64_t mStartTs;
-    uint64_t mEndTs;
-    ProtocolType mProtocol;
-    enum support_role_e mRole;
-    std::string mReqMsg;
-    std::string mRespMsg;
+// class NetDataEvent {
+// public:
+//     std::shared_ptr<Connection> mConnection;
+//     uint64_t mStartTs;
+//     uint64_t mEndTs;
+//     support_proto_e mProtocol;
+//     enum support_role_e mRole;
+//     std::string mReqMsg;
+//     std::string mRespMsg;
 
-    NetDataEvent(std::shared_ptr<Connection> connection) : mConnection(connection) {}
+//     NetDataEvent(std::shared_ptr<Connection> connection) : mConnection(connection) {}
 
-    explicit NetDataEvent(struct conn_data_event_t* data)
-        : mStartTs(data->start_ts),
-          mEndTs(data->end_ts),
-          mProtocol(static_cast<ProtocolType>(data->protocol)),
-          mRole(data->role) {
-        mReqMsg = std::string(data->msg, data->request_len);
-        mRespMsg = std::string(data->msg + data->request_len, data->response_len);
-    }
-};
+//     explicit NetDataEvent(struct conn_data_event_t* data)
+//         : mStartTs(data->start_ts),
+//           mEndTs(data->end_ts),
+//           mProtocol(data->protocol),
+//           mRole(data->role) {
+//         mReqMsg = std::string(data->msg, data->request_len);
+//         mRespMsg = std::string(data->msg + data->request_len, data->response_len);
+//     }
+// };
 
 enum class RecordType {
     APP_RECORD,
@@ -71,6 +72,8 @@ public:
     void SetEndTs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
     int RollbackCount() const { return mRollbackCount; }
     int Rollback() { return mRollbackCount++; }
+    bool ShouldSample() const { return mIsSample; }
+    void MarkSample() { mIsSample = true; }
 
     virtual bool IsError() const = 0;
     virtual bool IsSlow() const = 0;
@@ -83,6 +86,7 @@ public:
 protected:
     uint64_t mStartTs;
     uint64_t mEndTs;
+    bool mIsSample;
     int mRollbackCount = 0;
 };
 
@@ -133,19 +137,25 @@ public:
 
     RecordType GetRecordType() override { return RecordType::APP_RECORD; }
 
-    virtual std::string GetReqBody() = 0;
-    virtual std::string GetRespBody() = 0;
-    virtual std::string GetMethod() = 0;
-    virtual HeadersMap GetReqHeaderMap() = 0;
-    virtual HeadersMap GetRespHeaderMap() = 0;
-    virtual std::string GetProtocolVersion() = 0;
-    virtual std::string GetPath() = 0;
+    virtual std::string GetReqBody() const = 0;
+    virtual std::string GetRespBody() const = 0;
+    virtual std::string GetMethod() const = 0;
+    virtual const HeadersMap& GetReqHeaderMap() const = 0;
+    virtual const HeadersMap& GetRespHeaderMap() const = 0;
+    virtual std::string GetProtocolVersion() const = 0;
+    virtual std::string GetPath() const = 0;
 
     DataTableSchema GetMetricsTableSchema() const override { return kAppMetricsTable; }
 
     mutable std::string mTraceId;
     mutable std::string mSpanId;
 };
+
+const static std::string STATUS_CODE_1XX = "1xx";
+const static std::string STATUS_CODE_2XX = "2xx";
+const static std::string STATUS_CODE_3XX = "3xx";
+const static std::string STATUS_CODE_4XX = "4xx";
+const static std::string STATUS_CODE_5XX = "5xx";
 
 
 class HttpRecord : public AbstractAppRecord {
@@ -172,35 +182,57 @@ public:
         mStatusCode = code;
     }
 
-    void SetReqHeaderMap(HeadersMap& headerMap) { mReqHeaderMap = headerMap; }
+    void SetStatusCode(int code) {
+        mCode = code;
+        if (code < 200) {
+            mStatusCode = STATUS_CODE_1XX;
+        } else if (code < 300) {
+            mStatusCode = STATUS_CODE_2XX;
+        } else if (code < 400) {
+            mStatusCode = STATUS_CODE_3XX;
+        } else if (code < 500) {
+            mStatusCode = STATUS_CODE_4XX;
+        } else {
+            mStatusCode = STATUS_CODE_5XX;
+        }
+    }
 
-    void SetRespHeaderMap(HeadersMap& headerMap) { mRespHeaderMap = headerMap; }
+    void SetReqHeaderMap(HeadersMap&& headerMap) { mReqHeaderMap = std::move(headerMap); }
+
+    void SetRespHeaderMap(HeadersMap&& headerMap) { mRespHeaderMap = std::move(headerMap); }
+
+    void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
 
     bool IsError() const override { return mCode >= 400; }
 
     // TODO @qianlu.kk
     bool IsSlow() const override { return GetLatencyMs() > 500; }
     int GetStatusCode() const override { return mCode; }
-    std::string GetReqBody() { return mReqBody; }
-    std::string GetRespBody() { return mRespBody; }
-    std::string GetMethod() { return mHttpMethod; }
-    HeadersMap GetReqHeaderMap() { return mReqHeaderMap; }
-    HeadersMap GetRespHeaderMap() { return mRespHeaderMap; }
-    std::string GetProtocolVersion() { return mProtocolVersion; }
-    std::string GetPath() { return mPath; }
-    std::string GetRealPaht() { return mRealPath; }
+    std::string GetReqBody() const { return mReqBody; }
+    std::string GetRespBody() const { return mRespBody; }
+    std::string GetRespMsg() const { return mRespMsg; }
+    size_t GetReqBodySize() const { return mReqBodySize; }
+    size_t GetRespBodySize() const { return mRespBodySize; }
+    std::string GetMethod() const { return mHttpMethod; }
+    const HeadersMap& GetReqHeaderMap() const { return mReqHeaderMap; }
+    const HeadersMap& GetRespHeaderMap() const { return mRespHeaderMap; }
+    std::string GetProtocolVersion() const { return mProtocolVersion; }
+    std::string GetPath() const { return mPath; }
+    std::string GetRealPath() const { return mRealPath; }
     std::string GetSpanName() override { return mPath; }
 
-private:
     std::string mStatusCode;
-    int mCode;
+    int mCode = 0;
     std::string mPath;
     std::string mRealPath;
     std::string mConvPath;
     std::string mReqBody;
+    size_t mReqBodySize = 0;
     std::string mRespBody;
+    size_t mRespBodySize = 0;
     std::string mHttpMethod;
     std::string mProtocolVersion;
+    std::string mRespMsg;
     HeadersMap mReqHeaderMap;
     HeadersMap mRespHeaderMap;
 };

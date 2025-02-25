@@ -66,7 +66,7 @@ void CleanPluginPbs(logtail::ebpf::PluginType type) {
     gPluginPbs[int(type)] = {};
 }
 
-std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> wrapper = logtail::ebpf::BPFWrapper<security_bpf>::Create();
+std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> gWrapper = logtail::ebpf::BPFWrapper<security_bpf>::Create();
 void SetCoolBpfConfig(int32_t opt, int32_t value) {
     int32_t* params[] = {&value};
     int32_t paramsLen[] = {4};
@@ -115,11 +115,11 @@ int SetupPerfbuffers(logtail::ebpf::PluginConfig* arg) {
         std::vector<logtail::ebpf::PerfBufferOps> perfBuffers;
         std::vector<void*> pbs;
         for (auto& spec : specs) {
-            void* pb = wrapper->CreatePerfBuffer(spec.mName,
-                                                 spec.mSize,
-                                                 spec.mCtx,
-                                                 static_cast<perf_buffer_sample_fn>(spec.mSampleHandler),
-                                                 static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
+            void* pb = gWrapper->CreatePerfBuffer(spec.mName,
+                                                  spec.mSize,
+                                                  spec.mCtx,
+                                                  static_cast<perf_buffer_sample_fn>(spec.mSampleHandler),
+                                                  static_cast<perf_buffer_lost_fn>(spec.mLostHandler));
             if (!pb) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "plugin type:%s: create perfbuffer fail, name:%s, size:%ld\n",
@@ -195,7 +195,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             int ret = 0;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "begin to set tail call\n");
             // setup tail call
-            ret = wrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
+            ret = gWrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
             if (ret) {
                 ebpf_log(
                     logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "file security: SetTailCall fail ret:%d\n", ret);
@@ -217,7 +217,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 for (const auto& cn : opt.mCallNames) {
                     attach_ops.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
-                    int ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.mFilter);
+                    int ret = logtail::ebpf::CreateFileFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
@@ -227,7 +227,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = wrapper->DynamicAttachBPFObject(attach_ops);
+            ret = gWrapper->DynamicAttachBPFObject(attach_ops);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
@@ -243,7 +243,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             int ret = 0;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "begin to set tail call\n");
             // set tail call
-            ret = wrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
+            ret = gWrapper->SetTailCall("secure_tailcall_map", {"filter_prog", "secure_data_send"});
             if (ret != 0) {
                 ebpf_log(
                     logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "network security: SetTailCall fail ret:%d\n", ret);
@@ -265,7 +265,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 for (const auto& cn : opt.mCallNames) {
                     attach_ops.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
-                    int ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.mFilter);
+                    int ret = logtail::ebpf::CreateNetworkFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
@@ -275,7 +275,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = wrapper->DynamicAttachBPFObject(attach_ops);
+            ret = gWrapper->DynamicAttachBPFObject(attach_ops);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
@@ -286,7 +286,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
-            int err = wrapper->Init();
+            int err = gWrapper->Init();
             if (err) {
                 ebpf_log(
                     logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "process security: ebpf_init fail ret:%d\n", err);
@@ -309,7 +309,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 
             // set tail call
             for (auto& tailCall : tailCalls) {
-                auto ret = wrapper->SetTailCall(tailCall.first, tailCall.second);
+                auto ret = gWrapper->SetTailCall(tailCall.first, tailCall.second);
                 if (ret != 0) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "process security: SetTailCall fail ret:%d\n",
@@ -328,7 +328,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // attach bpf object
-            ret = wrapper->DynamicAttachBPFObject(attachOps);
+            ret = gWrapper->DynamicAttachBPFObject(attachOps);
             if (ret != 0) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "process security: DynamicAttachBPFObject fail ret:%d\n",
@@ -357,6 +357,7 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
     }
 
+    std::lock_guard lk(gPbMtx);
     // find pbs
     auto& pbs = gPluginPbs[int(type)];
     if (pbs.empty()) {
@@ -368,7 +369,7 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
         if (!x) {
             continue;
         }
-        int ret = wrapper->PollPerfBuffer(x, max_events, timeout_ms);
+        int ret = gWrapper->PollPerfBuffer(x, max_events, timeout_ms);
         if (ret < 0 && errno != EINTR) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "poll perf buffer failed ...\n");
         } else {
@@ -393,7 +394,7 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = wrapper->DynamicAttachBPFObject(attachOps);
+            ret = gWrapper->DynamicAttachBPFObject(attachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
@@ -415,7 +416,7 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = wrapper->DynamicAttachBPFObject(attachOps);
+            ret = gWrapper->DynamicAttachBPFObject(attachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
@@ -448,7 +449,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
             for (const auto& opt : config->mOptions) {
                 for (const auto& cn : opt.mCallNames) {
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
-                    int ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
+                    int ret = logtail::ebpf::DeleteNetworkFilterForCallname(gWrapper, cn);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security delete filter for callname %s failed.\n",
@@ -456,7 +457,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                         return 1;
                     }
 
-                    ret = logtail::ebpf::CreateNetworkFilterForCallname(wrapper, cn, opt.mFilter);
+                    ret = logtail::ebpf::CreateNetworkFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security: create filter for callname %s falied.\n",
@@ -472,13 +473,13 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
             // 1. clean-up filter
             for (const auto& opt : config->mOptions) {
                 for (const auto& cn : opt.mCallNames) {
-                    int ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
+                    int ret = logtail::ebpf::DeleteFileFilterForCallname(gWrapper, cn);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: delete filter for callname %s falied.\n",
                                  cn.c_str());
                     }
-                    ret = logtail::ebpf::CreateFileFilterForCallname(wrapper, cn, opt.mFilter);
+                    ret = logtail::ebpf::CreateFileFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] file security: create filter for callname %s falied\n",
@@ -499,7 +500,8 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
 }
 
 void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
-    return;
+    std::lock_guard lk(gPbMtx);
+    // return;
     auto pbs = gPluginPbs[static_cast<int>(pluginType)];
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
              "[BPFWrapper][stop_plugin] begin clean perfbuffer for pluginType: %d  \n",
@@ -527,7 +529,7 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
                 logtail::ebpf::AttachProgOps("event_exit_disassociate_ctty", true),
                 logtail::ebpf::AttachProgOps("event_execve", true),
             };
-            int ret = wrapper->DynamicDetachBPFObject(attachOps);
+            int ret = gWrapper->DynamicDetachBPFObject(attachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[stop plugin] process security: detach progs failed\n");
@@ -545,14 +547,14 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
                 detachOps.emplace_back("kprobe_" + cn, true);
             }
             int ret = 0;
-            ret = wrapper->DynamicDetachBPFObject(detachOps);
+            ret = gWrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[stop plugin] network security: detach progs failed\n");
             }
             // 2. clean-up filter
             for (const auto& cn : callNames) {
-                ret = logtail::ebpf::DeleteNetworkFilterForCallname(wrapper, cn);
+                ret = logtail::ebpf::DeleteNetworkFilterForCallname(gWrapper, cn);
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[stop plugin] network security: delete filter for callname %s falied\n",
@@ -571,14 +573,14 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             for (const auto& cn : callNames) {
                 detachOps.emplace_back("kprobe_" + cn, true);
             }
-            int ret = wrapper->DynamicDetachBPFObject(detachOps);
+            int ret = gWrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[stop plugin] network security: detach progs failed\n");
             }
             // 2. clean-up filter
             for (const auto& cn : callNames) {
-                ret = logtail::ebpf::DeleteFileFilterForCallname(wrapper, cn);
+                ret = logtail::ebpf::DeleteFileFilterForCallname(gWrapper, cn);
                 if (ret) {
                     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                              "[stop plugin] file security: delete filter for callname %s falied\n",
@@ -610,7 +612,7 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
                 detachOps.emplace_back("kprobe_" + cn, true);
             }
             int ret = 0;
-            ret = wrapper->DynamicDetachBPFObject(detachOps);
+            ret = gWrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[suspend plugin] network security: detach progs failed\n");
@@ -624,7 +626,7 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
             for (const auto& cn : callNames) {
                 detachOps.emplace_back("kprobe_" + cn, true);
             }
-            int ret = wrapper->DynamicDetachBPFObject(detachOps);
+            int ret = gWrapper->DynamicDetachBPFObject(detachOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[suspend plugin] file security: detach progs failed\n");
@@ -641,5 +643,5 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
 }
 
 int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* key, void* value, uint64_t flag) {
-    return wrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
+    return gWrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
 }

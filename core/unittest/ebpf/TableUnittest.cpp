@@ -127,7 +127,7 @@ void TableUnittest::TestNetTable() {
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("host"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("app_id"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("ip"));
-    APSARA_TEST_TRUE(kNetMetricsTable.HasCol("app_name"));
+    APSARA_TEST_TRUE(kNetMetricsTable.HasCol("app"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("workload_kind"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("workload_name"));
 

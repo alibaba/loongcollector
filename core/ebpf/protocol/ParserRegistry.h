@@ -19,7 +19,9 @@
 #include <unordered_map>
 
 #include "AbstractParser.h"
-
+extern "C" {
+#include <coolbpf/net.h>
+}
 namespace logtail {
 namespace ebpf {
 
@@ -32,9 +34,9 @@ public:
         return registry;
     }
 
-    void registerParser(ProtocolType type, CreatorFunc creator) { registry_[type] = std::move(creator); }
+    void registerParser(support_proto_e type, CreatorFunc creator) { registry_[type] = std::move(creator); }
 
-    std::shared_ptr<AbstractProtocolParser> createParser(ProtocolType type) {
+    std::shared_ptr<AbstractProtocolParser> createParser(support_proto_e type) {
         if (registry_.find(type) != registry_.end()) {
             return registry_[type]();
         }
@@ -43,7 +45,7 @@ public:
 
 private:
     ProtocolParserRegistry() = default;
-    std::unordered_map<ProtocolType, CreatorFunc> registry_;
+    std::unordered_map<support_proto_e, CreatorFunc> registry_;
 };
 
 #define REGISTER_PROTOCOL_PARSER(type, className) \
