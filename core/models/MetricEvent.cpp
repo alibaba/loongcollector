@@ -16,6 +16,8 @@
 
 #include "models/MetricEvent.h"
 
+#include <algorithm>
+
 using namespace std;
 
 namespace logtail {
@@ -48,7 +50,7 @@ void MetricEvent::SetNameNoCopy(StringView name) {
 }
 
 StringView MetricEvent::GetTag(StringView key) const {
-    auto it = mTags.mInner.find(key);
+    auto it = std::find_if(mTags.mInner.begin(), mTags.mInner.end(), [&key](const auto& p) { return p.first == key; });
     if (it != mTags.mInner.end()) {
         return it->second;
     }
@@ -56,7 +58,8 @@ StringView MetricEvent::GetTag(StringView key) const {
 }
 
 bool MetricEvent::HasTag(StringView key) const {
-    return mTags.mInner.find(key) != mTags.mInner.end();
+    auto it = std::find_if(mTags.mInner.begin(), mTags.mInner.end(), [&key](const auto& p) { return p.first == key; });
+    return it != mTags.mInner.end();
 }
 
 void MetricEvent::SetTag(StringView key, StringView val) {

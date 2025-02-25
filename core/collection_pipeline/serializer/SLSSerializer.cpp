@@ -244,12 +244,13 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
         case PipelineEvent::Type::METRIC:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& e = group.mEvents[i].Cast<MetricEvent>();
+                auto& e = group.mEvents[i].Cast<MetricEvent>();
                 if (!e.Is<UntypedSingleValue>() || e.GetTimestamp() < 1e9) {
                     continue;
                 }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
+                e.SortTags();
                 serializer.AddLogContentMetricLabel(e, metricEventContentCache[i].second);
                 serializer.AddLogContentMetricTimeNano(e);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);

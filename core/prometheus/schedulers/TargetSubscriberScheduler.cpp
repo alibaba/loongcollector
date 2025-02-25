@@ -199,8 +199,7 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
     for (const auto& labels : targetGroups) {
         // Relabel Config
         Labels resultLabel = labels;
-        vector<string> toDelete;
-        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel, toDelete)) {
+        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel)) {
             continue;
         }
         resultLabel.RemoveMetaLabels();
