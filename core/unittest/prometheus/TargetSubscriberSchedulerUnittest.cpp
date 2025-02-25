@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 
+#include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
 #include "prometheus/Constants.h"
 #include "prometheus/labels/Labels.h"
@@ -339,7 +340,7 @@ void TargetSubscriberSchedulerUnittest::TestTargetLabels() {
                         int32_t port) {
         std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
         APSARA_TEST_TRUE(targetSubscriber->Init(scrapeConfig));
-        std::vector<Labels> newScrapeSchedulerSet;
+        std::vector<PromTargetInfo> newScrapeSchedulerSet;
         APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(targetResponse, newScrapeSchedulerSet));
         APSARA_TEST_EQUAL(1UL, newScrapeSchedulerSet.size());
 
