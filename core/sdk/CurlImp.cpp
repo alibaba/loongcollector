@@ -13,11 +13,19 @@
 // limitations under the License.
 
 #include "CurlImp.h"
+
+#include <curl/curl.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
+
 #include "Exception.h"
 #include "CurlAsynInstance.h"
 #include "DNSCache.h"
 #include "app_config/AppConfig.h"
-#include <curl/curl.h>
+#include "common/Flags.h"
+
+DEFINE_FLAG_INT32(sls_request_dscp, "set dscp for sls request, from 0 to 63", -1);
 
 using namespace std;
 
@@ -71,6 +79,13 @@ namespace sdk {
                 = string(buffer, colonIndex + 1 + rightSpaceNum, sizes - colonIndex - 1 - 2 - rightSpaceNum);
         }
         return sizes;
+    }
+
+    static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
+        // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
+        int32_t tos = *static_cast<int32_t*>(socketData) << 2;
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+        return 0;
     }
 
     CURL* PackCurlRequest(const std::string& httpMethod,
@@ -134,6 +149,13 @@ namespace sdk {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, data_write_callback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, &(httpMessage.header));
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_write_callback);
+
+        static int sDSCP
+            = INT32_FLAG(sls_request_dscp); // the lifestyle of sDSCP pointer should be longer than local variable
+        if (sDSCP >= 0 && sDSCP <= 63) {
+            curl_easy_setopt(curl, CURLOPT_SOCKOPTDATA, &sDSCP);
+            curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, socket_write_callback);
+        }
         return curl;
     }
 
