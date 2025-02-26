@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "HostMonitorInputRunner.h"
+#include "host_monitor/HostMonitorInputRunner.h"
 
 #include <chrono>
 #include <cstdint>
@@ -52,7 +52,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
 void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& newCollectorNames,
                                              const std::vector<uint32_t>& newCollectorIntervals,
                                              QueueKey processQueueKey,
-                                             int inputIndex) {
+                                             size_t inputIndex) {
     std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     for (size_t i = 0; i < newCollectorNames.size(); ++i) {
         const auto& collectorName = newCollectorNames[i];
@@ -125,7 +125,7 @@ bool HostMonitorInputRunner::IsCollectTaskValid(const std::chrono::steady_clock:
     return it->second.IsValidEvent(execTime);
 }
 
-void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point execTime,
+void HostMonitorInputRunner::ScheduleOnce(const std::chrono::steady_clock::time_point& execTime,
                                           HostMonitorTimerEvent::CollectConfig& config) {
     if (!ProcessQueueManager::GetInstance()->IsValidToPush(config.mProcessQueueKey)) {
         LOG_WARNING(sLogger,
@@ -150,18 +150,22 @@ void HostMonitorInputRunner::ScheduleOnce(std::chrono::steady_clock::time_point 
                                                                                                 config.mCollectorName));
             return;
         }
-        collector->second.GetCollector()->Collect(config, &group);
-        LOG_DEBUG(
-            sLogger,
-            ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));
-        if (group.GetEvents().size() > 0) {
-            bool result = ProcessorRunner::GetInstance()->PushQueue(
-                config.mProcessQueueKey, config.mInputIndex, std::move(group));
-            if (!result) {
-                LOG_ERROR(
-                    sLogger,
-                    ("host monitor push process queue failed", "discard data")("collector", config.mCollectorName));
+        if (collector->second.mCollector->Collect(config, &group)) {
+            LOG_DEBUG(
+                sLogger,
+                ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));
+            if (group.GetEvents().size() > 0) {
+                bool result = ProcessorRunner::GetInstance()->PushQueue(
+                    config.mProcessQueueKey, config.mInputIndex, std::move(group));
+                if (!result) {
+                    LOG_ERROR(
+                        sLogger,
+                        ("host monitor push process queue failed", "discard data")("collector", config.mCollectorName));
+                }
             }
+        } else {
+            LOG_ERROR(sLogger,
+                      ("host monitor collect data failed", "collect error")("collector", config.mCollectorName));
         }
         PushNextTimerEvent(execTime, config);
     };

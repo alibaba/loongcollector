@@ -25,13 +25,14 @@ public:
     MockCollector() = default;
     ~MockCollector() = default;
 
-    void Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override {
+    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override {
         auto event = group->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
         std::string key = "mock_key";
         std::string value = "mock_value";
         event->SetContent(key, value);
+        return true;
     }
     static const std::string sName;
     const std::string& Name() const { return sName; }

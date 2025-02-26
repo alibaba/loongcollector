@@ -38,7 +38,6 @@ class CollectorInstance {
 public:
     CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
 
-    BaseCollector* GetCollector() const { return mCollector.get(); }
     bool IsEnabled() const { return mIsEnabled; }
     void Enable() {
         mIsEnabled = true;
@@ -49,8 +48,9 @@ public:
         return mIsEnabled && execTime >= mLastEnableTime;
     }
 
-private:
     std::unique_ptr<BaseCollector> mCollector;
+
+private:
     bool mIsEnabled = false;
     std::chrono::steady_clock::time_point mLastEnableTime;
 };
@@ -70,7 +70,7 @@ public:
     void UpdateCollector(const std::vector<std::string>& newCollectorNames,
                          const std::vector<uint32_t>& newCollectorIntervals,
                          QueueKey processQueueKey,
-                         int inputIndex);
+                         size_t inputIndex);
     void RemoveCollector();
 
     void Init() override;
@@ -78,7 +78,7 @@ public:
     bool HasRegisteredPlugins() const override;
 
     bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& execTime, const std::string& collectorName);
-    void ScheduleOnce(std::chrono::steady_clock::time_point execTime,
+    void ScheduleOnce(const std::chrono::steady_clock::time_point& execTime,
                       HostMonitorTimerEvent::CollectConfig& collectConfig);
 
 private:
@@ -90,6 +90,7 @@ private:
         auto collector = std::make_unique<T>();
         mRegisteredCollectorMap.emplace(T::sName, CollectorInstance(std::move(collector)));
     }
+
     void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
                             const HostMonitorTimerEvent::CollectConfig& config);
 

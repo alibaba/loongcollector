@@ -50,6 +50,8 @@ const size_t ProcessTopN = 20;
 
 const std::string ProcessEntityCollector::sName = "process_entity";
 
+const int64_t kSystemHertz = sysconf(_SC_CLK_TCK);
+
 ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {
     // try to read process dir
     if (access(PROCESS_DIR.c_str(), R_OK) != 0) {
@@ -61,10 +63,10 @@ ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLA
     }
 };
 
-void ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
+bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
                                      PipelineEventGroup* group) {
     if (!mValidState || group == nullptr) {
-        return;
+        return false;
     }
     std::vector<ProcessStatPtr> processes;
     GetSortedProcess(processes, ProcessTopN);
@@ -117,15 +119,16 @@ void ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
     }
+    return true;
 }
 
 void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& processStats, size_t topN) {
     steady_clock::time_point now = steady_clock::now();
-    auto compare = [](const std::pair<ProcessStatPtr, uint64_t>& a, const std::pair<ProcessStatPtr, uint64_t>& b) {
-        return a.second < b.second;
+    auto compare = [](const std::pair<ProcessStatPtr, double>& a, const std::pair<ProcessStatPtr, double>& b) {
+        return a.second > b.second;
     };
-    std::priority_queue<std::pair<ProcessStatPtr, uint64_t>,
-                        std::vector<std::pair<ProcessStatPtr, uint64_t>>,
+    std::priority_queue<std::pair<ProcessStatPtr, double>,
+                        std::vector<std::pair<ProcessStatPtr, double>>,
                         decltype(compare)>
         queue(compare);
 
@@ -140,7 +143,7 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& proce
             bool isFirstCollect = false;
             auto ptr = GetProcessStat(pid, isFirstCollect);
             if (ptr && !isFirstCollect) {
-                queue.push(std::make_pair(ptr, ptr->cpuInfo.total));
+                queue.emplace(ptr, ptr->cpuInfo.percent);
             }
             if (queue.size() > topN) {
                 queue.pop();
@@ -188,17 +191,20 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
     // calculate CPU related fields
     {
         ptr->lastTime = now;
-        ptr->cpuInfo.user = ptr->utime.count();
-        ptr->cpuInfo.sys = ptr->stime.count();
+        constexpr const uint64_t MILLISECOND = 1000;
+        ptr->cpuInfo.user = (ptr->utime.count() + ptr->cutime.count()) * MILLISECOND / kSystemHertz;
+        ptr->cpuInfo.sys = (ptr->stime.count() + ptr->cstime.count()) * MILLISECOND / kSystemHertz;
         ptr->cpuInfo.total = ptr->cpuInfo.user + ptr->cpuInfo.sys;
         if (isFirstCollect || ptr->cpuInfo.total <= prev->second->cpuInfo.total) {
             // first time called
             ptr->cpuInfo.percent = 0.0;
         } else {
             auto totalDiff = static_cast<double>(ptr->cpuInfo.total - prev->second->cpuInfo.total);
-            auto timeDiff = static_cast<double>(ptr->lastTime.time_since_epoch().count()
-                                                - prev->second->lastTime.time_since_epoch().count());
-            ptr->cpuInfo.percent = totalDiff / timeDiff * 100;
+            auto timeDiff
+                = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          ptr->lastTime.time_since_epoch() - prev->second->lastTime.time_since_epoch())
+                                          .count());
+            ptr->cpuInfo.percent = totalDiff / timeDiff;
         }
     }
 

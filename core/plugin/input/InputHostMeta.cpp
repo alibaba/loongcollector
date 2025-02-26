@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "InputHostMeta.h"
-
-#include <algorithm>
+#include "plugin/input/InputHostMeta.h"
 
 #include "json/value.h"
 
-#include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/HostMonitorInputRunner.h"
@@ -42,7 +39,12 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    mInterval = std::max(mInterval, kMinInterval);
+    if (mInterval < kMinInterval) {
+        LOG_WARNING(sLogger,
+                    ("input host meta", "interval is too small, set to min interval")("original interval", mInterval)(
+                        "new interval", kMinInterval));
+        mInterval = kMinInterval;
+    }
     return true;
 }
 

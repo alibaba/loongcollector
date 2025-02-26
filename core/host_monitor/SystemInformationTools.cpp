@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-#include "FileSystemUtil.h"
-#include "StringTools.h"
+#include "common/FileSystemUtil.h"
+#include "common/StringTools.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
@@ -37,7 +37,9 @@ int64_t GetHostSystemBootTime() {
     }
     int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
-        LOG_WARNING(sLogger, ("get system boot time failed", "file not exists"));
+        LOG_WARNING(sLogger,
+                    ("failed to get system boot time", "use process start time instead")(
+                        "error msg", "file not exists")("process start time", currentSeconds));
         return currentSeconds;
     }
 
@@ -45,7 +47,9 @@ int64_t GetHostSystemBootTime() {
     string errorMessage;
     int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, cpuLines, true, &errorMessage);
     if (ret != 0 || cpuLines.empty()) {
-        LOG_WARNING(sLogger, ("failed to get cpu lines", errorMessage)("ret", ret)("cpuLines", cpuLines.size()));
+        LOG_WARNING(sLogger,
+                    ("failed to get system boot time", "use process start time instead")("error msg", errorMessage)(
+                        "process start time", currentSeconds));
         return currentSeconds;
     }
 
@@ -58,6 +62,9 @@ int64_t GetHostSystemBootTime() {
         }
     }
 
+    LOG_WARNING(sLogger,
+                ("failed to get system boot time", "use process start time instead")(
+                    "error msg", "btime not found in stat")("process start time", currentSeconds));
     return currentSeconds;
 }
 

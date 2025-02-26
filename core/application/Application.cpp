@@ -14,8 +14,6 @@
 
 #include "application/Application.h"
 
-#include "timer/Timer.h"
-
 #ifndef LOGTAIL_NO_TC_MALLOC
 #include "gperftools/malloc_extension.h"
 #endif
