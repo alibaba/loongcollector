@@ -85,7 +85,6 @@ public:
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
-
     void DelTag(StringView key);
     void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };
 
