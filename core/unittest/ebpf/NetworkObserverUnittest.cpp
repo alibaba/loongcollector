@@ -49,7 +49,7 @@ protected:
         mTimer->Init();
         mSourceManager = std::make_shared<SourceManager>();
         mSourceManager->Init();
-        mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
     }
 
@@ -57,12 +57,12 @@ protected:
 
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(mBaseManager, mSourceManager, mEventQueue, mTimer);
+        return NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
     }
 
     std::shared_ptr<Timer> mTimer;
     std::shared_ptr<SourceManager> mSourceManager;
-    std::shared_ptr<ProcessCacheManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
 
@@ -213,7 +213,7 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
 
     std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
     size_t count = manager->mRecordQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
-    APSARA_TEST_EQUAL(count, 1);
+    APSARA_TEST_EQUAL(count, 1UL);
     APSARA_TEST_TRUE(items[0] != nullptr);
 
     AbstractAppRecord* record = static_cast<AbstractAppRecord*>(items[0].get());

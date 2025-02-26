@@ -43,7 +43,7 @@ void IdAllocatorUnittest::TestMaxId() {
     // add until max
     int maxId = IdAllocator::GetInstance()->GetMaxId<StringPrefixMap>();
     APSARA_TEST_EQUAL(maxId, BPFMapTraits<StringPrefixMap>::outter_max_entries);
-    for (size_t i = 0; i < maxId + 20; i++) {
+    for (int i = 0; i < maxId + 20; i++) {
         int nextIdx = IdAllocator::GetInstance()->GetNextId<StringPrefixMap>();
         if (i >= maxId) {
             APSARA_TEST_EQUAL(nextIdx, -1);

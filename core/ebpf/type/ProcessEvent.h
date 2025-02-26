@@ -78,7 +78,7 @@ public:
     uint32_t auid;
     uint32_t flags;
     uint64_t ktime;
-    std::string cmdline;
+    std::string cmdline; // \0 separated binary and args
     std::string exe;
     uint64_t effective;
     uint64_t inheritable;

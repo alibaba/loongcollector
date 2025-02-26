@@ -124,12 +124,12 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
             if (!init) {
-                auto bm = GetBaseManager();
-                if (bm == nullptr) {
-                    LOG_WARNING(sLogger, ("basemanager is null", ""));
+                auto processCacheMgr = GetProcessCacheManager();
+                if (processCacheMgr == nullptr) {
+                    LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                     return;
                 }
-                processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
                 init = true;
             }
             if (processTags.mInner.empty()) {

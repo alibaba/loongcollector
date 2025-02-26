@@ -91,7 +91,7 @@ public:
 
     std::string GetAllProjects();
 
-    bool CheckIfNeedStopBaseManager() const;
+    bool CheckIfNeedStopProcessCacheManager() const;
 
     void PollPerfBuffers();
     void HandlerEvents();
@@ -135,7 +135,7 @@ private:
     CounterPtr mSuspendPluginTotal;
 
     // hold some managers ...
-    std::shared_ptr<ProcessCacheManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
     std::shared_ptr<Timer> mScheduler;
 

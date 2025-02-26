@@ -15,7 +15,6 @@
 #pragma once
 
 extern "C" {
-
 #include <bpf/libbpf.h>
 #include <coolbpf/coolbpf.h>
 };

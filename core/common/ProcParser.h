@@ -24,7 +24,7 @@
 
 namespace logtail {
 
-// TODO use bpf...
+// TODO use definations in bpf_process_event_type.h
 #define DOCKER_ID_LENGTH 128
 
 enum class ApiEventFlag : uint32_t {
@@ -121,7 +121,7 @@ private:
     std::filesystem::path ProcPidPath(uint32_t pid, const std::string& subpath) const;
     int FillStatus(uint32_t pid, Status& status) const;
     int FillLoginUid(uint32_t pid, Status& status) const;
-    std::string ReadPIDFile(uint32_t pid, const std::string& filename, const std::string& delimiter) const;
+    std::string ReadPIDFile(uint32_t pid, const std::string& filename) const;
     std::string ReadPIDLink(uint32_t pid, const std::string& filename) const;
     std::tuple<std::string, int> ProcsFindDockerId(const std::string& cgroups) const;
     std::vector<std::string> split(const std::string& str, char delimiter) const;

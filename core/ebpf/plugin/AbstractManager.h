@@ -114,25 +114,24 @@ public:
         mPluginIndex = index;
     }
 
-    void UpdateBaseManager(std::shared_ptr<ProcessCacheManager> other) {
+    void UpdateProcessCacheManager(std::shared_ptr<ProcessCacheManager> other) {
         WriteLock lk(mBaseMgrLock);
-        mBaseManager = std::move(other);
+        mProcessCacheManager = std::move(other);
     }
 
-    std::shared_ptr<ProcessCacheManager> GetBaseManager() const {
+    std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const {
         ReadLock lk(mBaseMgrLock);
-        return mBaseManager;
+        return mProcessCacheManager;
     }
-
-    std::atomic<bool> mFlag = false;
-    std::atomic<bool> mSuspendFlag = false;
 
 private:
     mutable ReadWriteLock mMtx;
     mutable ReadWriteLock mBaseMgrLock;
-    std::shared_ptr<ProcessCacheManager> mBaseManager;
+    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:
+    std::atomic<bool> mFlag = false;
+    std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<Timer> mScheduler;

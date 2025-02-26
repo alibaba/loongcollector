@@ -77,44 +77,33 @@ std::string ProcParser::ReadPIDLink(uint32_t pid, const std::string& filename) c
     return netStr;
 }
 
-std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename, const std::string& delimiter) const {
+std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename) const {
     std::filesystem::path fpath = mProcPath / std::to_string(pid) / filename;
     std::ifstream ifs(fpath);
     if (!ifs) {
         return "";
     }
-    std::string line;
-    size_t fileSize = ifs.tellg();
-    std::string res;
-    res.reserve(fileSize << 1);
-    while (std::getline(ifs, line)) {
-        if (delimiter == "") {
-            res += line;
-        } else {
-            res += delimiter + line;
+    try {
+        std::string res((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        if (!res.empty() && res[res.size() - 1] == 0) {
+            res.pop_back();
         }
+        return res;
+    } catch (const std::ios_base::failure& e) {
     }
-    // Strip out extra null character at the end of the string.
-    if (!res.empty() && res[res.size() - 1] == 0) {
-        res.pop_back();
-    }
-    // Replace all nulls with spaces. Sometimes the command line has
-    // null to separate arguments and others it has spaces. We just make them all spaces
-    // and leave it to upstream code to tokenize properly.
-    std::replace(res.begin(), res.end(), static_cast<char>(0), ' ');
-    return res;
+    return "";
 }
 
 std::string ProcParser::GetPIDCmdline(uint32_t pid) const {
-    return ReadPIDFile(pid, "cmdline", "");
+    return ReadPIDFile(pid, "cmdline");
 }
 
 std::string ProcParser::GetPIDComm(uint32_t pid) const {
-    return ReadPIDFile(pid, "comm", "");
+    return ReadPIDFile(pid, "comm");
 }
 
 std::string ProcParser::GetPIDEnviron(uint32_t pid) const {
-    return ReadPIDFile(pid, "environ", "");
+    return ReadPIDFile(pid, "environ");
 }
 
 std::tuple<std::string, int> ProcParser::ProcsContainerIdOffset(const std::string& subdir) const {
@@ -183,7 +172,7 @@ std::tuple<std::string, int> ProcParser::ProcsFindDockerId(const std::string& cg
 }
 
 std::string ProcParser::GetPIDDockerId(uint32_t pid) const {
-    std::string cgroups = ReadPIDFile(pid, "cgroup", "\n");
+    std::string cgroups = ReadPIDFile(pid, "cgroup");
     auto [dockerId, offset] = ProcsFindDockerId(cgroups);
     LOG_DEBUG(sLogger, ("[GetPIDDockerId] failed, pid:", pid)("containerid", dockerId));
     return dockerId;
@@ -402,7 +391,7 @@ int ProcParser::FillStatus(uint32_t pid, Status& status) const {
 
 int ProcParser::FillLoginUid(uint32_t pid, Status& status) const {
     try {
-        std::string loginUid = ReadPIDFile(pid, "loginuid", "");
+        std::string loginUid = ReadPIDFile(pid, "loginuid");
         status.loginUid = loginUid;
     } catch (std::runtime_error& error) {
         return -1;

@@ -80,7 +80,7 @@ void InputProcessSecurityUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_process_security");
-    APSARA_TEST_EQUAL(input->mSecurityOptions.mOptionList[0].mCallNames.size(), 5);
+    APSARA_TEST_EQUAL(input->mSecurityOptions.mOptionList[0].mCallNames.size(), 5UL);
     // no general filter, default is monostate
     APSARA_TEST_EQUAL(std::holds_alternative<std::monostate>(input->mSecurityOptions.mOptionList[0].mFilter), true);
 }

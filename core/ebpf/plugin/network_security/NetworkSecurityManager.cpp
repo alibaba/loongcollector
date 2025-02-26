@@ -146,14 +146,14 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
             LOG_DEBUG(sLogger, ("step", "enter for each"));
             // set process tag
             if (!init) {
-                auto bm = GetBaseManager();
-                if (bm == nullptr) {
-                    LOG_WARNING(sLogger, ("basemanager is null", ""));
+                auto processCacheMgr = GetProcessCacheManager();
+                if (processCacheMgr == nullptr) {
+                    LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                     return;
                 }
                 LOG_DEBUG(sLogger,
                           ("step", "before finalize process tags")("pid", group->mPid)("ktime", group->mKtime));
-                processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+                processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
                 init = true;
             }
             LOG_DEBUG(sLogger, ("step", "after finalize process tags"));

@@ -83,7 +83,7 @@ public:
     void PollPerfBuffers();
 
     void DataAdd(msg_data* data);
-    std::string DataGet(data_event_desc*);
+    std::string DataGetAndRemove(data_event_desc*);
 
     bool Init();
     void Stop();
@@ -112,7 +112,9 @@ private:
         DataEventIdEqual>;
     lru11::Cache<data_event_id, std::shared_ptr<MsgExecveEventUnix>, std::mutex, ExecveEventMap> mCache;
     using DataEventMap = std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual>;
-    DataEventMap mDataCache;
+
+    std::mutex mDataCacheMutex;
+    DataEventMap mDataCache; // TODO：ebpf中也没区分filename和args，如果两者都超长会导致filename被覆盖为args
 
     // lru11::Cache<std::vector<uint64_t>, std::shared_ptr<std::string>, std::mutex, std::map<std::vector<uint64_t>,
     // std::shared_ptr<std::string>>> mDataCache;

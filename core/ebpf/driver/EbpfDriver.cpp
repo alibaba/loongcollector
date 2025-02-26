@@ -13,7 +13,10 @@
 // limitations under the License.
 
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>
+#pragma GCC diagnostic pop
 
 #include "ebpf/include/export.h"
 

@@ -192,7 +192,8 @@ void eBPFServer::Init() {
     mSourceManager = std::make_shared<SourceManager>();
     mSourceManager->Init();
 
-    mBaseManager = std::make_shared<ProcessCacheManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
+    mProcessCacheManager
+        = std::make_shared<ProcessCacheManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -279,8 +280,8 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
     if (type != PluginType::NETWORK_OBSERVE) {
         LOG_INFO(sLogger, ("hostname", mHostName)("mHostPathPrefix", mHostPathPrefix));
-        auto res = mBaseManager->Init();
-        LOG_INFO(sLogger, ("basemanager init ", res));
+        auto res = mProcessCacheManager->Init();
+        LOG_INFO(sLogger, ("ProcessCacheManager init ", res));
     }
 
     // init self monitor
@@ -296,10 +297,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = ProcessSecurityManager::Create(mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr
+                    = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
-                pluginMgr->UpdateBaseManager(mBaseManager);
+                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             ret = (pluginMgr->Init(options) == 0);
@@ -308,10 +310,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
-                pluginMgr = NetworkObserverManager::Create(mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr
+                    = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
-                pluginMgr->UpdateBaseManager(mBaseManager);
+                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
             NetworkObserveConfig nconfig;
             // TODO @qianlu.kk register k8s metadata callback for metric ??
@@ -324,10 +327,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = NetworkSecurityManager::Create(mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr
+                    = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
-                pluginMgr->UpdateBaseManager(mBaseManager);
+                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
 
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
@@ -337,10 +341,11 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = FileSecurityManager::Create(mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr
+                    = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
-                pluginMgr->UpdateBaseManager(mBaseManager);
+                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             ret = (pluginMgr->Init(options) == 0);
@@ -379,7 +384,7 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options, mgr);
 }
 
-bool eBPFServer::CheckIfNeedStopBaseManager() const {
+bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
     std::lock_guard<std::mutex> lk(mMtx);
     auto nsMgr = mPlugins[static_cast<int>(PluginType::NETWORK_SECURITY)];
     auto psMgr = mPlugins[static_cast<int>(PluginType::PROCESS_SECURITY)];
@@ -412,13 +417,13 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
         pluginManager->UpdateContext(nullptr, -1, -1);
         int ret = pluginManager->Destroy();
         if (ret == 0) {
-            pluginManager->UpdateBaseManager(nullptr);
+            pluginManager->UpdateProcessCacheManager(nullptr);
             LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
                 || type == PluginType::FILE_SECURITY) {
-                // check if we need stop basemanager
-                if (CheckIfNeedStopBaseManager()) {
-                    mBaseManager->Stop();
+                // check if we need stop ProcessCacheManager
+                if (CheckIfNeedStopProcessCacheManager()) {
+                    mProcessCacheManager->Stop();
                 }
             }
         } else {

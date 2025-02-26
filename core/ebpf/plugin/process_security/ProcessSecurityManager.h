@@ -57,7 +57,7 @@ public:
 
     bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
-    // process perfbuffer was polled by baseManager ...
+    // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(

@@ -117,7 +117,6 @@ std::array<size_t, 2> GenerateAggKey(const std::shared_ptr<FileEvent> event) {
     std::array<size_t, 2> hash_result;
     hash_result.fill(0UL);
     std::hash<std::string> hasher;
-    std::hash<uint64_t> hasher0;
 
     hash_result[0] = uint64_t(event->mPid) ^ (event->mKtime >> 32) ^ (event->mKtime << 32);
     // LOG_INFO(sLogger, ("ktime", event->mKtime) ("hash result", hash_result[0]));
@@ -160,7 +159,7 @@ void AggregatorUnittest::TestAggregator() {
     }
 
     auto nodes = mAggregateTree->GetNodesWithAggDepth(1);
-    APSARA_TEST_EQUAL(2, nodes.size());
+    APSARA_TEST_EQUAL(2UL, nodes.size());
 
     int globalNodeCnt = 0;
     int globalEventCnt = 0;
@@ -180,7 +179,7 @@ void AggregatorUnittest::TestAggregator() {
             for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
                 if (innerEvent->mTimestamp == 9) {
-                    APSARA_TEST_EQUAL(group->mPid, 1);
+                    APSARA_TEST_EQUAL(group->mPid, 1U);
                     FileEvent* fe = static_cast<FileEvent*>(innerEvent.get());
                     APSARA_TEST_EQUAL(fe->mPath, "path-2");
                 }
@@ -219,7 +218,6 @@ void AggregatorUnittest::TestAggregator() {
 
 void AggregatorUnittest::TestAggManager() {
     auto now = std::chrono::steady_clock::now();
-    auto nextTime = now + std::chrono::seconds(1);
 
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         1,
@@ -245,10 +243,10 @@ void AggregatorUnittest::TestAggManager() {
     std::this_thread::sleep_for(std::chrono::seconds(4));
     mFlag = false;
     std::this_thread::sleep_for(std::chrono::seconds(3));
-    APSARA_TEST_EQUAL(mVec.size(), 3);
+    APSARA_TEST_EQUAL(mVec.size(), 3UL);
     mFlag = true;
     std::this_thread::sleep_for(std::chrono::seconds(3));
-    APSARA_TEST_EQUAL(mVec.size(), 3);
+    APSARA_TEST_EQUAL(mVec.size(), 3UL);
 }
 
 void AggregatorUnittest::TestBasicAgg() {
@@ -258,11 +256,11 @@ void AggregatorUnittest::TestBasicAgg() {
     Aggregate({"a", "b", "c", "e"}, 4);
     Aggregate({"a", "b", "c"}, 3);
     APSARA_TEST_EQUAL(GetDataNodeCount(), 4);
-    APSARA_TEST_EQUAL(agg->NodeCount(), 4);
+    APSARA_TEST_EQUAL(agg->NodeCount(), 4UL);
     APSARA_TEST_EQUAL(GetSum(), 5);
     agg->Reset();
     APSARA_TEST_EQUAL(GetDataNodeCount(), 0);
-    APSARA_TEST_EQUAL(agg->NodeCount(), 0);
+    APSARA_TEST_EQUAL(agg->NodeCount(), 0UL);
     APSARA_TEST_EQUAL(GetSum(), 0);
 }
 
@@ -273,15 +271,15 @@ void AggregatorUnittest::TestGetAndReset() {
     Aggregate({"a", "b", "c", "e"}, 4);
     Aggregate({"a", "b", "c"}, 3);
     APSARA_TEST_EQUAL(GetDataNodeCount(), 4);
-    APSARA_TEST_EQUAL(agg->NodeCount(), 4);
+    APSARA_TEST_EQUAL(agg->NodeCount(), 4UL);
     APSARA_TEST_EQUAL(GetSum(), 5);
     auto newTree(agg->GetAndReset());
     APSARA_TEST_EQUAL(GetDataNodeCount(), 0);
-    APSARA_TEST_EQUAL(agg->NodeCount(), 0);
+    APSARA_TEST_EQUAL(agg->NodeCount(), 0UL);
     APSARA_TEST_EQUAL(GetSum(), 0);
 
     APSARA_TEST_EQUAL(GetDataNodeCount(newTree), 4);
-    APSARA_TEST_EQUAL(newTree.NodeCount(), 4);
+    APSARA_TEST_EQUAL(newTree.NodeCount(), 4UL);
     APSARA_TEST_EQUAL(GetSum(newTree), 5);
 }
 

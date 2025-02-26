@@ -27,11 +27,14 @@ const std::string AbstractManager::sEventTypeKey = "event_type";
 const std::string AbstractManager::sKprobeValue = "kprobe";
 
 
-AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> bm,
+AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCacheMgr,
                                  std::shared_ptr<SourceManager> sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                  std::shared_ptr<Timer> scheduler)
-    : mBaseManager(bm), mSourceManager(sourceManager), mCommonEventQueue(queue), mScheduler(scheduler) {
+    : mProcessCacheManager(processCacheMgr),
+      mSourceManager(sourceManager),
+      mCommonEventQueue(queue),
+      mScheduler(scheduler) {
     mTimeDiff = GetTimeDiffFromMonotonic();
 }
 

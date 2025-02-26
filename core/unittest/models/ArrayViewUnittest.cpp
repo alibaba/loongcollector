@@ -40,7 +40,7 @@ protected:
 void ArrayViewUnittest::TestDefaultConstructor() {
     // 测试默认构造函数
     ArrayView<int> view;
-    APSARA_TEST_EQUAL(view.size(), 0);
+    APSARA_TEST_EQUAL(view.size(), 0UL);
 }
 
 void ArrayViewUnittest::TestArrayConstructor() {
@@ -48,7 +48,7 @@ void ArrayViewUnittest::TestArrayConstructor() {
     const int arr[] = {1, 2, 3, 4, 5};
     ArrayView<int> view(arr);
 
-    APSARA_TEST_EQUAL(view.size(), 5);
+    APSARA_TEST_EQUAL(view.size(), 5UL);
     for (size_t i = 0; i < 5; ++i) {
         APSARA_TEST_EQUAL(view[i], arr[i]);
     }
@@ -59,7 +59,7 @@ void ArrayViewUnittest::TestPointerConstructor() {
     const int arr[] = {1, 2, 3, 4, 5};
     ArrayView<int> view(arr, 3); // 只使用前3个元素
 
-    APSARA_TEST_EQUAL(view.size(), 3);
+    APSARA_TEST_EQUAL(view.size(), 3UL);
     for (size_t i = 0; i < 3; ++i) {
         APSARA_TEST_EQUAL(view[i], arr[i]);
     }
@@ -70,7 +70,7 @@ void ArrayViewUnittest::TestStdArrayConstructor() {
     std::array<int, 4> arr = {1, 2, 3, 4};
     ArrayView<int> view(arr);
 
-    APSARA_TEST_EQUAL(view.size(), 4);
+    APSARA_TEST_EQUAL(view.size(), 4UL);
     for (size_t i = 0; i < 4; ++i) {
         APSARA_TEST_EQUAL(view[i], arr[i]);
     }
@@ -86,9 +86,9 @@ void ArrayViewUnittest::TestSize() {
     auto view1Size = view1.size();
     auto view2Size = view2.size();
     auto view3Size = view3.size();
-    APSARA_TEST_EQUAL(view1Size, 0);
-    APSARA_TEST_EQUAL(view2Size, 5);
-    APSARA_TEST_EQUAL(view3Size, 3);
+    APSARA_TEST_EQUAL(view1Size, 0UL);
+    APSARA_TEST_EQUAL(view2Size, 5UL);
+    APSARA_TEST_EQUAL(view3Size, 3UL);
 }
 
 void ArrayViewUnittest::TestSubscriptOperator() {

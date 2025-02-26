@@ -22,16 +22,19 @@
 
 #include <algorithm>
 #include <atomic>
+#include <string_view>
 #include <unordered_map>
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "_thirdparty/coolbpf/src/security/bpf_process_event_type.h"
 #include "common/CapabilityUtil.h"
 #include "common/EncodingUtil.h"
 #include "common/LRUCache.h"
 #include "common/ProcParser.h"
+#include "common/StringTools.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "logger/Logger.h"
@@ -42,8 +45,8 @@ namespace ebpf {
 
 /////////// ================= for perfbuffer handlers ================= ///////////
 void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
-    auto* bm = static_cast<ProcessCacheManager*>(ctx);
-    if (!bm) {
+    auto* processCacheMgr = static_cast<ProcessCacheManager*>(ctx);
+    if (!processCacheMgr) {
         LOG_ERROR(sLogger, ("ProcessCacheManager is null!", ""));
         return;
     }
@@ -57,24 +60,23 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
         case MSG_OP_CLONE: {
             auto* event = static_cast<struct msg_clone_event*>(data);
             // TODO enqueue
-            bm->RecordCloneEvent(event);
+            processCacheMgr->RecordCloneEvent(event);
             break;
         }
         case MSG_OP_EXIT: {
             auto* event = static_cast<struct msg_exit*>(data);
             // TODO set into delete queue ...
-            bm->RecordExitEvent(event);
+            processCacheMgr->RecordExitEvent(event);
             break;
         }
         case MSG_OP_EXECVE: {
-            auto* event_ptr = static_cast<struct msg_execve_event*>(data);
-            bm->RecordExecveEvent(event_ptr);
+            auto* eventPtr = static_cast<struct msg_execve_event*>(data);
+            processCacheMgr->RecordExecveEvent(eventPtr);
             break;
         }
         case MSG_OP_DATA: {
             auto* eventPtr = static_cast<msg_data*>(data);
-            bm->RecordDataEvent(eventPtr);
-            // TODO
+            processCacheMgr->RecordDataEvent(eventPtr);
             break;
         }
         default: {
@@ -166,6 +168,7 @@ void ProcessCacheManager::DataAdd(msg_data* dataPtr) {
     auto size = dataPtr->common.size - offsetof(msg_data, arg);
     if (size <= MSG_DATA_ARG_LEN) {
         // std::vector<uint64_t> key = {dataPtr->id.pid, dataPtr->id.time};
+        std::lock_guard<std::mutex> lk(mDataCacheMutex);
         auto res = mDataCache.find(dataPtr->id);
         if (res != mDataCache.end()) {
             std::string prevData = mDataCache[dataPtr->id];
@@ -183,20 +186,20 @@ void ProcessCacheManager::DataAdd(msg_data* dataPtr) {
         LOG_ERROR(sLogger, ("pid", dataPtr->id.pid)("ktime", dataPtr->id.time)("size limit exceeded", size));
     }
 }
-std::string ProcessCacheManager::DataGet(data_event_desc* desc) {
-    std::vector<uint64_t> key = {desc->id.pid, desc->id.time};
-    auto res = mDataCache.find(desc->id);
-    static std::string sEmpty;
-    if (res == mDataCache.end()) {
-        return sEmpty;
-    }
+std::string ProcessCacheManager::DataGetAndRemove(data_event_desc* desc) {
     std::string data;
-    data.swap(res->second);
-    mDataCache.erase(res);
-
+    {
+        std::lock_guard<std::mutex> lk(mDataCacheMutex);
+        auto res = mDataCache.find(desc->id);
+        if (res == mDataCache.end()) {
+            return data;
+        }
+        data.swap(res->second);
+        mDataCache.erase(res);
+    }
     if (data.size() != desc->size - desc->leftover) {
         LOG_WARNING(sLogger, ("size bad! data size", data.size())("expect", desc->size - desc->leftover));
-        return sEmpty;
+        return data;
     }
 
     return data;
@@ -209,74 +212,41 @@ void ProcessCacheManager::RecordDataEvent(msg_data* eventPtr) {
     DataAdd(eventPtr);
 }
 
-std::tuple<std::string, std::string> ArgsDecoder(const std::string& args, uint32_t flags) {
-    LOG_DEBUG(sLogger, ("args", args)("flags", flags));
-    int hasCWD = 0;
-    std::string cwd;
-    if (((flags & EVENT_NO_CWD_SUPPORT) | (flags & EVENT_ERROR_CWD) | (flags & EVENT_ROOT_CWD)) == 0) {
-        hasCWD = 1;
+std::string DecodeArgs(std::string_view& rawArgs) {
+    std::string args;
+    if (rawArgs.empty()) {
+        return args;
     }
-
-    std::vector<std::string> argTokens;
-    std::string item;
-
-    // split with \0
-    for (auto x : args) {
-        if (x == '\0') {
-            if (item.size()) {
-                argTokens.push_back(item);
-                item.clear();
-            }
+    args.reserve(rawArgs.size() * 2);
+    StringViewSplitter splitter(args, "\0");
+    bool first = true;
+    for (auto field : splitter) {
+        if (first) {
+            first = false;
         } else {
-            item += x;
+            args += " ";
         }
-    }
-    if (item.size()) {
-        argTokens.push_back(item);
-    }
-
-    LOG_DEBUG(sLogger, ("args", args)("flags", flags)("length", argTokens.size())("hasCWD", hasCWD));
-
-    if (flags & EVENT_NO_CWD_SUPPORT) {
-        LOG_DEBUG(sLogger, ("args", args)("flags", flags)("length", argTokens.size())("hasCWD", hasCWD));
-        hasCWD = 1;
-    } else if (flags & EVENT_ERROR_CWD) {
-        LOG_DEBUG(sLogger, ("args", args)("flags", flags)("length", argTokens.size())("hasCWD", hasCWD));
-        cwd = "ERROR";
-        hasCWD = 1;
-    } else if (flags & EVENT_ROOT_CWD) {
-        LOG_DEBUG(sLogger, ("args", args)("flags", flags)("length", argTokens.size())("hasCWD", hasCWD));
-        cwd = "/";
-        hasCWD = 1;
-    } else {
-        LOG_DEBUG(sLogger, ("args", args)("flags", flags)("length", argTokens.size())("hasCWD", hasCWD));
-        if (argTokens.size()) {
-            cwd = argTokens[argTokens.size() - 1];
-        }
-    }
-
-    std::string arguments;
-
-    if (argTokens.empty()) {
-        LOG_DEBUG(sLogger, ("arg", args)("cwd", cwd)("arguments", arguments)("flag", flags));
-        return std::make_tuple(std::move(arguments), std::move(cwd));
-    }
-
-    for (size_t i = 0; i < argTokens.size() - hasCWD; i++) {
-        if (argTokens[i].find(' ') != std::string::npos) {
-            arguments += ("\"" + argTokens[i] + "\"");
-        } else {
-            if (arguments.empty()) {
-                arguments = argTokens[i];
-            } else {
-                arguments = arguments + " " + argTokens[i];
+        if (field.find(' ') != std::string::npos || field.find('\t') != std::string::npos
+            || field.find('\n') != std::string::npos) {
+            args += "\"";
+            for (char c : field) {
+                if (c == '"' || c == '\\') {
+                    args += '\\'; // Escape the character
+                }
+                if (c == '\n') {
+                    args += "\\n";
+                } else if (c == '\t') {
+                    args += "\\t";
+                } else {
+                    args += c;
+                }
             }
+            args += "\"";
+        } else {
+            args += field;
         }
     }
-
-    LOG_DEBUG(sLogger, ("arg", args)("cwd", cwd)("arguments", arguments)("flag", flags));
-
-    return std::make_tuple(std::move(arguments), std::move(cwd));
+    return args;
 }
 
 void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
@@ -307,13 +277,14 @@ void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     event->process.testCmdline = mProcParser.GetPIDCmdline(event->process.pid);
 #endif
 
-
     // args && filename
-
     // verifier size
-    // constexpr auto argOffset = offsetof(msg_process, args); // 56
+    // SIZEOF_EVENT is the total size of all fixed fields, = offsetof(msg_process, args) = 56
     auto size = eventPtr->process.size - SIZEOF_EVENT; // remain size
-    if (size > PADDED_BUFFER - SIZEOF_EVENT) {
+    if (size > PADDED_BUFFER - SIZEOF_EVENT) { // size exceed args buffer size
+        LOG_ERROR(sLogger,
+                  ("error", "msg exec size larger than argsbuffer")("pid", event->process.pid)("ktime",
+                                                                                               event->process.ktime));
         event->process.args = "enomem enomem";
         event->process.filename = "enomem";
         eventPtr->process.size = SIZEOF_EVENT;
@@ -321,81 +292,135 @@ void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
         return;
     }
 
-    char* argStart = eventPtr->buffer + SIZEOF_EVENT;
-    // auto args = std::string(eventPtr->buffer + SIZEOF_EVENT, size);
-    if (eventPtr->process.flags & EVENT_DATA_FILENAME) {
+    // executable filename
+    char* buffer = eventPtr->buffer + SIZEOF_EVENT; // equivalent to eventPtr->process.args;
+    if (eventPtr->process.flags & EVENT_DATA_FILENAME) { // filename should be in data cache
         if (size < sizeof(data_event_desc)) {
+            LOG_ERROR(sLogger,
+                      ("EVENT_DATA_FILENAME", "msg exec size less than sizeof(data_event_desc)")(
+                          "pid", event->process.pid)("ktime", event->process.ktime));
             event->process.args = "enomem enomem";
             event->process.filename = "enomem";
             eventPtr->process.size = SIZEOF_EVENT;
             PostHandlerExecveEvent(eventPtr, std::move(event));
             return;
         }
-        auto* desc = reinterpret_cast<data_event_desc*>(argStart);
+        auto* desc = reinterpret_cast<data_event_desc*>(buffer);
         LOG_DEBUG(sLogger,
                   ("EVENT_DATA_FILENAME, size",
                    desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
-        auto data = DataGet(desc);
+        auto data = DataGetAndRemove(desc);
         if (data.empty()) {
+            LOG_WARNING(
+                sLogger,
+                ("EVENT_DATA_FILENAME", "not found in data cache")("pid", desc->id.pid)("ktime", desc->id.time));
+        }
+        event->process.filename = data;
+        buffer += sizeof(data_event_desc);
+        size -= sizeof(data_event_desc);
+    } else if ((eventPtr->process.flags & EVENT_ERROR_FILENAME) == 0) { // filename should be in process.args
+        char* nullPos = std::find(buffer, buffer + size, '\0');
+        event->process.filename = std::string(buffer, nullPos - buffer);
+        size -= nullPos - buffer;
+        if (size == 0) { // no tailing \0 found
+            buffer = nullPos;
+        } else {
+            buffer = nullPos + 1; // skip \0
+            --size;
+        }
+    } else {
+        LOG_WARNING(
+            sLogger,
+            ("EVENT_DATA_FILENAME", "ebpf get data error")("pid", event->process.pid)("ktime", event->process.ktime));
+    }
+
+    // args & cmd
+    std::string data;
+    std::string_view args;
+    std::string_view cwd;
+    if (eventPtr->process.flags & EVENT_DATA_ARGS) { // arguments should be in data cache
+        if (size < sizeof(data_event_desc)) {
+            LOG_ERROR(sLogger,
+                      ("EVENT_DATA_ARGS", "msg exec size less than sizeof(data_event_desc)")("pid", event->process.pid)(
+                          "ktime", event->process.ktime));
+            event->process.args = "enomem enomem";
+            eventPtr->process.size = SIZEOF_EVENT;
             PostHandlerExecveEvent(eventPtr, std::move(event));
             return;
         }
-        event->process.filename = data;
-        argStart += sizeof(data_event_desc);
-        size -= sizeof(data_event_desc);
-    } else if ((eventPtr->process.flags & EVENT_ERROR_FILENAME) == 0) {
-        // args 中找第一个 \0 的索引 idx
-        for (uint32_t i = 0; i < size; i++) {
-            if (argStart[i] == '\0') {
-                event->process.filename = std::string(argStart, i);
-                argStart += (i + 1);
-                size -= i;
-                break;
+        auto* desc = reinterpret_cast<data_event_desc*>(buffer);
+        LOG_DEBUG(sLogger,
+                  ("EVENT_DATA_ARGS, size", desc->size)("leftover",
+                                                        desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
+        data = DataGetAndRemove(desc);
+        if (data.empty()) {
+            LOG_WARNING(sLogger,
+                        ("EVENT_DATA_ARGS", "not found in data cache")("pid", desc->id.pid)("ktime", desc->id.time));
+        }
+        args = data;
+        // the remaining data is cwd
+        cwd = std::string_view(buffer + sizeof(data_event_desc), size - sizeof(data_event_desc));
+    } else {
+        bool hasCwd = false;
+        if (((eventPtr->process.flags & EVENT_NO_CWD_SUPPORT) | (eventPtr->process.flags & EVENT_ERROR_CWD)
+             | (eventPtr->process.flags & EVENT_ROOT_CWD))
+            == 0) {
+            hasCwd = true;
+        }
+        char* nullPos = nullptr;
+        args = std::string_view(buffer, size - 1); // excluding tailing zero
+        if (hasCwd) {
+            // find the last \0 to serapate args and cwd
+            for (int i = size - 1; i >= 0; i--) {
+                if (buffer[i] == '\0') {
+                    nullPos = buffer + i;
+                    break;
+                }
+            }
+            if (nullPos == nullptr) {
+                cwd = std::string_view(buffer, size);
+                args = std::string_view(buffer, 0);
+            } else {
+                cwd = std::string_view(nullPos + 1, size - (nullPos - buffer + 1));
+                args = std::string_view(buffer, nullPos - buffer);
             }
         }
     }
-
-    // cmd args
-    if (eventPtr->process.flags & EVENT_DATA_ARGS) {
-        auto* desc = reinterpret_cast<data_event_desc*>(argStart);
-        LOG_DEBUG(sLogger,
-                  ("EVENT_DATA_FILENAME, size",
-                   desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
-        auto data = DataGet(desc);
-        if (data.empty()) {
-            PostHandlerExecveEvent(eventPtr, std::move(event));
-            return;
-        }
-        // cwd
-        event->process.cwd = std::string(argStart + sizeof(data_event_desc), size - sizeof(data_event_desc));
-        event->process.args.reserve(data.size() + 1 + event->process.cwd.size());
-        event->process.args.assign(data).append("\0").append(event->process.cwd);
+    // Post handle cwd
+    if (eventPtr->process.flags & EVENT_ROOT_CWD) {
+        event->process.cwd = "/";
+    } else if (eventPtr->process.flags & EVENT_PROCFS) {
+        event->process.cwd = Trim(cwd);
     } else {
-        event->process.args = std::string(argStart, size);
+        event->process.cwd = cwd;
     }
-
+    // Post handle args
+    event->process.args = DecodeArgs(args);
+    if (eventPtr->process.flags & EVENT_ERROR_ARGS) {
+        LOG_WARNING(
+            sLogger,
+            ("EVENT_DATA_ARGS", "ebpf get data error")("pid", event->process.pid)("ktime", event->process.ktime));
+    }
+    if (eventPtr->process.flags & EVENT_ERROR_CWD) {
+        LOG_WARNING(
+            sLogger,
+            ("EVENT_DATA_CWD", "ebpf get data error")("pid", event->process.pid)("ktime", event->process.ktime));
+    }
+    if (eventPtr->process.flags & EVENT_ERROR_PATH_COMPONENTS) {
+        LOG_WARNING(sLogger,
+                    ("EVENT_DATA_CWD",
+                     "cwd too long, maybe truncated")("pid", event->process.pid)("ktime", event->process.ktime));
+    }
     PostHandlerExecveEvent(eventPtr, std::move(event));
 }
 
 void ProcessCacheManager::PostHandlerExecveEvent(msg_execve_event* eventPtr,
                                                  std::unique_ptr<MsgExecveEventUnix>&& event) {
-#ifdef APSARA_UNIT_TEST_MAIN
-    LOG_DEBUG(
-        sLogger,
-        ("before ArgsDecoder", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
-            "filename", event->process.filename)("dockerid", event->kube.docker)("raw_args", event->process.args)(
-            "cwd", event->process.cwd)("flag", eventPtr->process.flags)(
-            "procParser.exePath", event->process.testFileName)("procParser.cmdLine", event->process.testCmdline));
-#endif
-
-    auto [args, cwd] = ArgsDecoder(event->process.args, event->process.flags);
-    event->process.args = args;
-    event->process.cwd = cwd;
     // set binary
     if (event->process.filename.size()) {
         if (event->process.filename[0] == '/') {
             event->process.binary = event->process.filename;
-        } else {
+        } else if (!event->process.cwd.empty()) {
             event->process.binary.reserve(event->process.cwd.size() + 1 + event->process.filename.size());
             event->process.binary.assign(event->process.cwd).append("/").append(event->process.filename);
         }
@@ -408,7 +433,11 @@ void ProcessCacheManager::PostHandlerExecveEvent(msg_execve_event* eventPtr,
         sLogger,
         ("begin enqueue pid", event->process.pid)("ktime", event->process.ktime)("cmdline", event->process.cmdline)(
             "filename", event->process.filename)("dockerid", event->kube.docker)("args", event->process.args)(
-            "cwd", event->process.cwd)("flag", eventPtr->process.flags));
+            "cwd", event->process.cwd)("flag", eventPtr->process.flags)
+#ifdef APSARA_UNIT_TEST_MAIN
+            ("procParser.exePath", event->process.testFileName)("procParser.cmdLine", event->process.testCmdline)
+#endif
+    );
 
     mRecordQueue.enqueue(std::move(event));
 
@@ -652,19 +681,21 @@ std::string PrependPath(const std::string& exe, const std::string& cmdline) {
     return res;
 }
 
-
-const uint32_t MSG_UNIX_SIZE = 640;
 int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
     if (proc == nullptr) {
         return 1;
     }
-    std::string rawArgs = PrependPath(proc->exe, proc->cmdline);
-    std::string rawPargs = PrependPath(proc->pexe, proc->pcmdline);
+    std::string_view rawArgs = proc->cmdline;
+    auto nullPos = rawArgs.find('\0');
+    if (nullPos != std::string::npos) {
+        rawArgs = rawArgs.substr(nullPos + 1);
+    }
+    // std::string rawPargs = PrependPath(proc->pexe, proc->pcmdline);
 
-    auto [args, filename] = mProcParser.ProcsFilename(rawArgs);
-    LOG_DEBUG(sLogger, ("raw_args", rawArgs)("args", args)("filename", filename));
+    auto args = DecodeArgs(rawArgs);
+    LOG_DEBUG(sLogger, ("raw_args", rawArgs)("args", args));
     std::string cwd;
-    uint32_t flags = static_cast<uint32_t>(ApiEventFlag::RootCWD);
+    uint32_t flags = 0U;
 
     std::pair<std::string, uint32_t> cwdRes = mProcParser.GetPIDCWD(proc->pid);
     cwd = cwdRes.first;
@@ -701,7 +732,7 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
             LOG_ERROR(sLogger, ("user thread, proc is null", ""));
             return 1;
         }
-        event->msg.common.size = MSG_UNIX_SIZE + proc->psize + proc->size;
+        event->msg.common.size = SIZEOF_EVENT;
 
         if (proc->pid) {
             std::string dockerId = mProcParser.GetPIDDockerId(proc->pid);

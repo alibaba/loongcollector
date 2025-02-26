@@ -59,7 +59,7 @@ void ConsumerUnittest::BasicFunctionality() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     // consumer_.suspend();
-    APSARA_TEST_EQUAL(processed_items_.size(), 3);
+    APSARA_TEST_EQUAL(processed_items_.size(), 3UL);
     APSARA_TEST_EQUAL(processed_items_[0], 1);
     APSARA_TEST_EQUAL(processed_items_[1], 2);
     APSARA_TEST_EQUAL(processed_items_[2], 3);
@@ -68,7 +68,7 @@ void ConsumerUnittest::BasicFunctionality() {
 void ConsumerUnittest::SuspendAndResume() {
     processed_items_.clear();
     // consumer_.resume();
-    APSARA_TEST_EQUAL(processed_items_.size(), 0);
+    APSARA_TEST_EQUAL(processed_items_.size(), 0UL);
     queue_.enqueue(4);
     queue_.enqueue(5);
 
@@ -76,17 +76,17 @@ void ConsumerUnittest::SuspendAndResume() {
     LOG_INFO(sLogger, ("begin to suspend", ""));
     consumer_.suspend();
     LOG_INFO(sLogger, ("after suspend", ""));
-    APSARA_TEST_EQUAL(processed_items_.size(), 2);
+    APSARA_TEST_EQUAL(processed_items_.size(), 2UL);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     queue_.enqueue(6);
-    APSARA_TEST_EQUAL(processed_items_.size(), 2);
+    APSARA_TEST_EQUAL(processed_items_.size(), 2UL);
 
     LOG_INFO(sLogger, ("begin to resume", ""));
     consumer_.resume();
     LOG_INFO(sLogger, ("after resume", ""));
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    APSARA_TEST_EQUAL(processed_items_.size(), 3);
+    APSARA_TEST_EQUAL(processed_items_.size(), 3UL);
     APSARA_TEST_EQUAL(processed_items_[0], 4);
     APSARA_TEST_EQUAL(processed_items_[1], 5);
     APSARA_TEST_EQUAL(processed_items_[2], 6);

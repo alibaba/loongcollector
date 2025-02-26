@@ -94,9 +94,9 @@ void InputNetworkSecurityUnittest::OnSuccessfulInit() {
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
-    APSARA_TEST_EQUAL(1, thisFilter1.mDestPortList.size());
+    APSARA_TEST_EQUAL(1UL, thisFilter1.mDestPortList.size());
     APSARA_TEST_EQUAL("127.0.0.1/8", thisFilter1.mSourceAddrBlackList[0]);
-    APSARA_TEST_EQUAL(9300, thisFilter1.mSourcePortBlackList[0]);
+    APSARA_TEST_EQUAL(9300U, thisFilter1.mSourcePortBlackList[0]);
 }
 
 void InputNetworkSecurityUnittest::OnFailedInit() {
@@ -153,10 +153,10 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter5
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(thisFilter5.mDestAddrList.size(), 0);
-    APSARA_TEST_EQUAL(thisFilter5.mDestPortList.size(), 0);
-    APSARA_TEST_EQUAL(thisFilter5.mSourceAddrBlackList.size(), 0);
-    APSARA_TEST_EQUAL(thisFilter5.mSourcePortBlackList.size(), 0);
+    APSARA_TEST_EQUAL(thisFilter5.mDestAddrList.size(), 0UL);
+    APSARA_TEST_EQUAL(thisFilter5.mDestPortList.size(), 0UL);
+    APSARA_TEST_EQUAL(thisFilter5.mSourceAddrBlackList.size(), 0UL);
+    APSARA_TEST_EQUAL(thisFilter5.mSourcePortBlackList.size(), 0UL);
 
     // valid and invalid optional param
     // if the optional param in a list is invalid, the valid param after it will be read
@@ -181,7 +181,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter6
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(2, thisFilter6.mDestAddrList.size());
+    APSARA_TEST_EQUAL(2UL, thisFilter6.mDestAddrList.size());
 }
 
 void InputNetworkSecurityUnittest::OnSuccessfulStart() {

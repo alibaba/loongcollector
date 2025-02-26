@@ -78,12 +78,12 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
             SizedMap processTags;
             // represent a process ...
-            auto bm = GetBaseManager();
-            if (bm == nullptr) {
-                LOG_WARNING(sLogger, ("basemanager is null", ""));
+            auto processCacheMgr = GetProcessCacheManager();
+            if (processCacheMgr == nullptr) {
+                LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            processTags = bm->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
+            processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
             if (processTags.mInner.empty()) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
@@ -156,13 +156,13 @@ int ProcessSecurityManager::Init(
     mSuspendFlag = false;
 
     mStartUid++;
-    auto bm = GetBaseManager();
-    if (bm == nullptr) {
-        LOG_WARNING(sLogger, ("basemanager is null", ""));
+    auto processCacheMgr = GetProcessCacheManager();
+    if (processCacheMgr == nullptr) {
+        LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
         return 1;
     }
 
-    bm->MarkProcessEventFlushStatus(true);
+    processCacheMgr->MarkProcessEventFlushStatus(true);
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
@@ -185,12 +185,12 @@ int ProcessSecurityManager::Init(
 
 int ProcessSecurityManager::Destroy() {
     mFlag = false;
-    auto bm = GetBaseManager();
-    if (bm == nullptr) {
-        LOG_WARNING(sLogger, ("basemanager is null", ""));
+    auto processCacheMgr = GetProcessCacheManager();
+    if (processCacheMgr == nullptr) {
+        LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
         return 1;
     }
-    bm->MarkProcessEventFlushStatus(false);
+    processCacheMgr->MarkProcessEventFlushStatus(false);
     return 0;
 }
 

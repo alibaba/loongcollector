@@ -145,7 +145,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter
         = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(0, thisFilter.mFilePathList.size());
+    APSARA_TEST_EQUAL(0UL, thisFilter.mFilePathList.size());
 
     // invalid optional param
     configStr = R"(
@@ -168,7 +168,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter1
         = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(0, thisFilter1.mFilePathList.size());
+    APSARA_TEST_EQUAL(0UL, thisFilter1.mFilePathList.size());
 
     // lose mandatory param
     configStr = R"(
@@ -185,8 +185,8 @@ void InputFileSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
-    APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
+    APSARA_TEST_EQUAL(1UL, input->mSecurityOptions.mOptionList.size()); // default callname
+    APSARA_TEST_EQUAL(3UL, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStart() {
