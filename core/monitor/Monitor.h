@@ -221,12 +221,15 @@ private:
     LoongCollectorMonitor();
     ~LoongCollectorMonitor();
 
-    std::mutex mGlobalMetricsMux;
     // 一个全局级别指标的副本，由 SelfMonitorServer::PushSelfMonitorMetricEvents 更新，格式为：
     // {MetricCategory: {key:MetricValue}}
     // 现支持 Agent 和 Runner 指标的保存、获取
-    std::map<std::string, std::unordered_map<std::string, SelfMonitorMetricEvent> > mGlobalMetrics;
-    const std::string mAgentMetricKey = "agent";
+    struct GlobalMetrics {
+        SelfMonitorMetricEvent mAgentMetric;
+        std::unordered_map<std::string, SelfMonitorMetricEvent> mRunnerMetrics;
+    };
+    std::mutex mGlobalMetricsMux;
+    GlobalMetrics mGlobalMetrics;
 
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;

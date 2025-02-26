@@ -179,7 +179,9 @@ void LogtailMonitor::Monitor() {
                 lastCheckHardLimitTime = monitorTime;
 
                 GetMemStat();
+                LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
                 CalCpuStat(curCpuStat, mCpuStat);
+                LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
                 if (CheckHardMemLimit()) {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",
@@ -249,10 +251,6 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
         sleep(10);
         _exit(1);
     }
-    // CPU usage of Logtail process.
-    LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
-    // Memory usage of Logtail process.
-    LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
 
     return mIsThreadRunning;
 }
@@ -639,32 +637,33 @@ void LoongCollectorMonitor::Stop() {
 
 bool LoongCollectorMonitor::GetAgentMetric(SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].find(mAgentMetricKey)
-        != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].end()) {
-        event = mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][mAgentMetricKey];
-        return true;
-    }
-    return false;
+    event = mGlobalMetrics.mAgentMetric;
+    return true;
 }
 
 void LoongCollectorMonitor::SetAgentMetric(const SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][mAgentMetricKey] = event;
+    mGlobalMetrics.mAgentMetric = event;
 }
 
 bool LoongCollectorMonitor::GetRunnerMetric(const std::string& runnerName, SelfMonitorMetricEvent& event) {
+    if (runnerName.empty()) {
+        return false;
+    }
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].find(runnerName)
-        != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].end()) {
-        event = mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName];
+    if (mGlobalMetrics.mRunnerMetrics.find(runnerName) != mGlobalMetrics.mRunnerMetrics.end()) {
+        event = mGlobalMetrics.mRunnerMetrics[runnerName];
         return true;
     }
     return false;
 }
 
 void LoongCollectorMonitor::SetRunnerMetric(const std::string& runnerName, const SelfMonitorMetricEvent& event) {
+    if (runnerName.empty()) {
+        return;
+    }
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName] = event;
+    mGlobalMetrics.mRunnerMetrics[runnerName] = event;
 }
 
 } // namespace logtail

@@ -207,7 +207,6 @@ void SelfMonitorMetricEventUnittest::TestGlobalMetrics() {
     { // test set/get agent metric
         SelfMonitorMetricEvent originAgentEvent;
         SelfMonitorMetricEvent wantAgentEvent;
-        APSARA_TEST_FALSE(LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent));
 
         // set
         originAgentEvent.mCategory = MetricCategory::METRIC_CATEGORY_AGENT;
