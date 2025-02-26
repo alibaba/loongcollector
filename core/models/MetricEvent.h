@@ -16,22 +16,16 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include <map>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include "StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEvent.h"
 #include "models/SizedContainer.h"
 
 namespace logtail {
-
-class ProcessorPromRelabelMetricNative;
 
 class MetricEvent : public PipelineEvent {
     friend class PipelineEventGroup;
