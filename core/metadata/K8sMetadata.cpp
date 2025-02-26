@@ -44,13 +44,8 @@ bool K8sMetadata::Enable() {
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #endif
-
-    if (!AppConfig::GetInstance()->IsPurageContainerMode()) {
-        return false;
-    }
-
-    // ping
-    return mEnable;
+    // TODO check network
+    return AppConfig::GetInstance()->IsPurageContainerMode();
 }
 
 K8sMetadata::~K8sMetadata() {
