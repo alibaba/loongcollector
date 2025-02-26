@@ -81,11 +81,10 @@ void Timer::Run() {
                     } else {
                         e->Execute();
                         if (e->IsPeriodicalEvent()) {
-                            LOG_INFO(sLogger, ("IsPeriodicalEvent", ""));
                             auto pe = static_cast<PeriodicalTimerEvent*>(e.get());
                             pe->ScheduleNext();
                             if (!pe->IsStop()) {
-                                LOG_INFO(sLogger, ("IsPeriodicalEvent", ""));
+                                LOG_DEBUG(sLogger, ("periodical event done", ""));
                                 PushEvent(std::move(e));
                             }
                         }

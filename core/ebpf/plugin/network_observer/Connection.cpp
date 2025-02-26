@@ -366,6 +366,10 @@ void Connection::TryAttachSelfMeta() {
     if (mK8sMetaAttached) {
         return;
     }
+    if (!K8sMetadata::GetInstance().Enable()) {
+        MarkPeerPodMetaAttached();
+        return;
+    }
 
     switch (mSelfMetadataAttachStatus) {
         case MetadataAttachStatus::KERNEL_EVENT_RECEIVED: {
@@ -401,10 +405,19 @@ void Connection::TryAttachPeerMeta() {
         return;
     }
 
+    if (!K8sMetadata::GetInstance().Enable()) {
+        MarkPeerPodMetaAttached();
+        return;
+    }
+
     switch (mPeerMetadataAttachStatus) {
         case MetadataAttachStatus::KERNEL_EVENT_RECEIVED: {
             // query cache ...
             auto& dip = GetRemoteIp();
+            if (dip.empty()) {
+                LOG_DEBUG(sLogger, ("dip is empty, conn", DumpConnection()));
+                break;
+            }
             auto info = K8sMetadata::GetInstance().GetInfoByIpFromCache(dip);
             if (info) {
                 UpdatePeerPodMeta(info);

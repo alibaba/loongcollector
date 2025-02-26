@@ -39,8 +39,8 @@ public:
     [[nodiscard]] bool ShouldSample(const std::array<uint8_t, 16>& traceID) const override;
 
 private:
-    double fraction_;
-    uint64_t thresHold_;
+    double mFraction;
+    uint64_t mThresHold;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SamplerUnittest;
 #endif

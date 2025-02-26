@@ -170,9 +170,12 @@ void eBPFServer::Init() {
     }
 #endif
 
+    LOG_INFO(sLogger, ("begin to start timer", ""));
     mScheduler = std::make_unique<Timer>();
     mScheduler->Init();
+    LOG_INFO(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
+    LOG_INFO(sLogger, ("begin to start handler", ""));
     mHandler = async(std::launch::async, &eBPFServer::HandlerEvents, this);
     // check env
 

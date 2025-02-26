@@ -46,7 +46,6 @@ const static std::string envKey = "envs";
 const static std::string containerIdKey = "containerIDs";
 const static std::string startTimeKey = "startTime";
 
-// 定义顶层的结构体
 struct ContainerData {
     std::unordered_map<std::string, k8sContainerInfo> containers;
 };
@@ -76,6 +75,7 @@ private:
 
     mutable std::condition_variable mCv;
     std::vector<std::string> mBatchKeys;
+    std::atomic_bool mEnable = false;
     bool mFlag;
     std::thread mQueryThread;
 
@@ -100,7 +100,7 @@ public:
         static K8sMetadata instance(1024, 1024, 1024);
         return instance;
     }
-    ~K8sMetadata() {}
+    ~K8sMetadata();
 
     bool Enable();
 

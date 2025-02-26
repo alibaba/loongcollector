@@ -53,12 +53,12 @@ double ThresholdToProbability(uint64_t threshold) {
 }
 
 RatioSampler::RatioSampler(const double fraction, const uint64_t thresHold)
-    : fraction_(fraction), thresHold_(thresHold) {
+    : mFraction(fraction), mThresHold(thresHold) {
 }
 
 bool RatioSampler::ShouldSample(const std::array<uint8_t, 16>& traceID) const {
     auto rand = TraceIDToRandomness(traceID);
-    return rand >= thresHold_;
+    return rand >= mThresHold;
 }
 
 HashRatioSampler::HashRatioSampler(const double fraction) : RatioSampler(fraction, ProbabilityToThreshold(fraction)) {

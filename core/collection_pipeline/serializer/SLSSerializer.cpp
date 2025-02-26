@@ -142,7 +142,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 if (e.Is<UntypedSingleValue>()) {
                     metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
                     // should not happen
-                    LOG_ERROR(sLogger, ("config", mFlusher->GetContext().GetConfigName())("metricname", e.GetName()));
+                    LOG_DEBUG(sLogger, ("config", mFlusher->GetContext().GetConfigName())("metricname", e.GetName()));
                 } else {
                     // untyped multi value is not supported
                     LOG_WARNING(sLogger,

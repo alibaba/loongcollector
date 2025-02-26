@@ -126,6 +126,7 @@ private:
 
     double mSampleRate = 1.0;
 
+    mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;
 
     // store parsed records

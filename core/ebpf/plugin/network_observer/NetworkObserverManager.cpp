@@ -709,18 +709,27 @@ int NetworkObserverManager::Update(
 
     // diff opt
     if (mPreviousOpt) {
-        CompareAndUpdate("EnableLog",
-                         mPreviousOpt->mEnableLog,
-                         opt->mDisableConnStats,
-                         [this](bool oldValue, bool newValue) { this->mEnableLog = newValue; });
+        CompareAndUpdate("EnableLog", mPreviousOpt->mEnableLog, opt->mEnableLog, [this](bool oldValue, bool newValue) {
+            this->mEnableLog = newValue;
+        });
         CompareAndUpdate("EnableMetric",
                          mPreviousOpt->mEnableMetric,
-                         opt->mDisableConnStats,
+                         opt->mEnableMetric,
                          [this](bool oldValue, bool newValue) { this->mEnableMetric = newValue; });
         CompareAndUpdate("EnableSpan",
                          mPreviousOpt->mEnableSpan,
-                         opt->mDisableConnStats,
+                         opt->mEnableSpan,
                          [this](bool oldValue, bool newValue) { this->mEnableSpan = newValue; });
+        CompareAndUpdate(
+            "SampleRate", mPreviousOpt->mSampleRate, opt->mSampleRate, [this](double oldValue, double newValue) {
+                if (newValue < 0 || newValue > 1) {
+                    LOG_WARNING(sLogger,
+                                ("invalid sample rate, must between [0, 1], use default 0.01, givin", newValue));
+                    newValue = 0.01;
+                }
+                WriteLock lk(mSamplerLock);
+                mSampler = std::make_shared<HashRatioSampler>(newValue);
+            });
         CompareAndUpdate("EnableProtocols",
                          mPreviousOpt->mEnableProtocols,
                          opt->mEnableProtocols,
@@ -750,7 +759,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mConnectionManager = ConnectionManager::Create();
 
     mPollKernelFreqMgr.SetPeriod(std::chrono::milliseconds(200));
-    mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(200));
+    mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(500));
 
     mCidOffset = GuessContainerIdOffset();
 
@@ -761,29 +770,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     // if purage container mode
 
     // TODO @qianlu.kk init converger later ...
-
-    // register update host K8s metadata task ...
-    std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
-        5,
-        [this](const std::chrono::steady_clock::time_point& execTime) {
-            std::vector<std::string> podIpVec;
-            bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
-            if (res) {
-                this->HandleHostMetadataUpdate(podIpVec);
-            } else {
-                LOG_DEBUG(sLogger, ("failed to request host metada", ""));
-            }
-            return true;
-        },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
-            }
-            return isStop;
-        },
-        mStartUid);
 
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
         5,
@@ -833,9 +819,17 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mScheduler->PushEvent(std::move(appMetricEvent));
     mScheduler->PushEvent(std::move(appTraceEvent));
     mScheduler->PushEvent(std::move(appLogEvent));
-    mScheduler->PushEvent(std::move(hostMetaUpdateTask));
     // init sampler
-    mSampler = std::make_shared<HashRatioSampler>(1);
+    {
+        if (opt->mSampleRate < 0 || opt->mSampleRate > 1) {
+            LOG_WARNING(sLogger,
+                        ("invalid sample rate, must between [0, 1], use default 0.01, givin", opt->mSampleRate));
+            opt->mSampleRate = 0.01;
+        }
+        WriteLock lk(mSamplerLock);
+        LOG_DEBUG(sLogger, ("sample rate", opt->mSampleRate));
+        mSampler = std::make_shared<HashRatioSampler>(opt->mSampleRate);
+    }
 
     mEnableLog = opt->mEnableLog;
     mEnableSpan = opt->mEnableSpan;
@@ -855,12 +849,41 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         }
     };
 
+    // register update host K8s metadata task ...
+    if (K8sMetadata::GetInstance().Enable()) {
+        config.mCidOffset = mCidOffset;
+        config.mEnableCidFilter = true;
+        std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
+            5,
+            [this](const std::chrono::steady_clock::time_point& execTime) {
+                std::vector<std::string> podIpVec;
+                bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
+                if (res) {
+                    this->HandleHostMetadataUpdate(podIpVec);
+                } else {
+                    LOG_DEBUG(sLogger, ("failed to request host metada", ""));
+                }
+                return true;
+            },
+            [this](int currentUid) { // validator
+                auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+                if (isStop) {
+                    LOG_INFO(
+                        sLogger,
+                        ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+                }
+                return isStop;
+            },
+            mStartUid);
+        mScheduler->PushEvent(std::move(hostMetaUpdateTask));
+    }
+
     config.mDataHandler = [](void* custom_data, struct conn_data_event_t* event) {
-        LOG_DEBUG(sLogger,
-                  ("[DUMP] stats event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)(
-                      "start", event->conn_id.start)("role", int(event->role))("startTs", event->start_ts)(
-                      "endTs", event->end_ts)("protocol", int(event->protocol))("req_len", event->request_len)(
-                      "resp_len", event->response_len)("data", event->msg));
+        // LOG_DEBUG(sLogger,
+        //           ("[DUMP] stats event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)(
+        //               "start", event->conn_id.start)("role", int(event->role))("startTs", event->start_ts)(
+        //               "endTs", event->end_ts)("protocol", int(event->protocol))("req_len", event->request_len)(
+        //               "resp_len", event->response_len)("data", event->msg));
         auto mgr = static_cast<NetworkObserverManager*>(custom_data);
         if (mgr == nullptr) {
             LOG_ERROR(sLogger, ("assert network observer handler failed", ""));
@@ -912,7 +935,6 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
     std::vector<std::string> newContainerIds;
     std::vector<std::string> expiredContainerIds;
     std::unordered_set<std::string> currentCids;
-
 
     for (const auto& ip : podIpVec) {
         auto podInfo = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
@@ -1004,6 +1026,10 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                     mRecordQueue.enqueue(std::move(record));
                 }
                 return;
+            } else {
+                LOG_DEBUG(sLogger,
+                          ("app meta ready, times",
+                           record->RollbackCount())("connection", appRecord->GetConnection()->DumpConnection()));
             }
 
             if (mEnableLog) {
@@ -1141,8 +1167,10 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
 
     LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
 
+    ReadLock lk(mSamplerLock);
     std::vector<std::unique_ptr<AbstractRecord>> records
         = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, mSampler);
+    lk.unlock();
 
     // add records to span/event generate queue
     for (auto& record : records) {
@@ -1191,13 +1219,13 @@ int NetworkObserverManager::Destroy() {
 void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableCids,
                                               std::vector<std::string>&& disableCids) {
     for (auto& cid : enableCids) {
-        LOG_DEBUG(sLogger, ("UpdateWhitelists cid", cid));
+        LOG_INFO(sLogger, ("UpdateWhitelists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, true);
     }
 
     for (auto& cid : disableCids) {
         // TODO?? black or delete ??
-        LOG_DEBUG(sLogger, ("UpdateBlacklists cid", cid));
+        LOG_INFO(sLogger, ("UpdateBlacklists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, false);
     }
 }
