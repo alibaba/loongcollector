@@ -47,12 +47,14 @@ public:
     bool IsValidEvent(const std::chrono::steady_clock::time_point& execTime) const {
         return mIsEnabled && execTime >= mLastEnableTime;
     }
-
-    std::unique_ptr<BaseCollector> mCollector;
+    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+        return mCollector->Collect(collectConfig, group);
+    }
 
 private:
     bool mIsEnabled = false;
     std::chrono::steady_clock::time_point mLastEnableTime;
+    std::unique_ptr<BaseCollector> mCollector;
 };
 
 class HostMonitorInputRunner : public InputRunner {

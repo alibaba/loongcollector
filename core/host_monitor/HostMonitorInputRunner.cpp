@@ -151,7 +151,7 @@ void HostMonitorInputRunner::ScheduleOnce(const std::chrono::steady_clock::time_
                                                                                                 config.mCollectorName));
             return;
         }
-        if (collector->second.mCollector->Collect(config, &group)) {
+        if (collector->second.Collect(config, &group)) {
             LOG_DEBUG(
                 sLogger,
                 ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));
