@@ -100,9 +100,10 @@ void HostMonitorInputRunner::Stop() {
     std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
     if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {
         LOG_ERROR(sLogger, ("host monitor runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
+    } else {
+        LOG_INFO(sLogger, ("host monitor runner", "stop successfully"));
     }
 #endif
-    LOG_INFO(sLogger, ("host monitor runner", "stop successfully"));
 }
 
 bool HostMonitorInputRunner::HasRegisteredPlugins() const {
