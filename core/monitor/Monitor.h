@@ -190,10 +190,10 @@ public:
     void Init();
     void Stop();
 
-    bool GetAgentMetricData(SelfMonitorMetricEvent& event);
-    void SetAgentMetricData(const SelfMonitorMetricEvent& event);
-    bool GetRunnerMetricData(const std::string& runnerName, SelfMonitorMetricEvent& event);
-    void SetRunnerMetricData(const std::string& runnerName, const SelfMonitorMetricEvent& event);
+    bool GetAgentMetric(SelfMonitorMetricEvent& event);
+    void SetAgentMetric(const SelfMonitorMetricEvent& event);
+    bool GetRunnerMetric(const std::string& runnerName, SelfMonitorMetricEvent& event);
+    void SetRunnerMetric(const std::string& runnerName, const SelfMonitorMetricEvent& event);
 
     void SetAgentCpu(double cpu) { SET_GAUGE(mAgentCpu, cpu); }
     void SetAgentMemory(uint64_t mem) { SET_GAUGE(mAgentMemory, mem); }
@@ -226,6 +226,7 @@ private:
     // {MetricCategory: {key:MetricValue}}
     // 现支持 Agent 和 Runner 指标的保存、获取
     std::map<std::string, std::unordered_map<std::string, SelfMonitorMetricEvent> > mGlobalMetrics;
+    const std::string mAgentMetricKey = "agent";
 
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;

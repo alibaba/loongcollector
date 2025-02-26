@@ -637,34 +637,34 @@ void LoongCollectorMonitor::Stop() {
     LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
 }
 
-bool LoongCollectorMonitor::GetAgentMetricData(SelfMonitorMetricEvent& event) {
+bool LoongCollectorMonitor::GetAgentMetric(SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].find("")
+    if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].find(mAgentMetricKey)
         != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT].end()) {
-        event.Copy(mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][""]);
+        event = mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][mAgentMetricKey];
         return true;
     }
     return false;
 }
 
-void LoongCollectorMonitor::SetAgentMetricData(const SelfMonitorMetricEvent& event) {
+void LoongCollectorMonitor::SetAgentMetric(const SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][""].Copy(event);
+    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_AGENT][mAgentMetricKey] = event;
 }
 
-bool LoongCollectorMonitor::GetRunnerMetricData(const std::string& runnerName, SelfMonitorMetricEvent& event) {
+bool LoongCollectorMonitor::GetRunnerMetric(const std::string& runnerName, SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
     if (mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].find(runnerName)
         != mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER].end()) {
-        event.Copy(mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName]);
+        event = mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName];
         return true;
     }
     return false;
 }
 
-void LoongCollectorMonitor::SetRunnerMetricData(const std::string& runnerName, const SelfMonitorMetricEvent& event) {
+void LoongCollectorMonitor::SetRunnerMetric(const std::string& runnerName, const SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
-    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName].Copy(event);
+    mGlobalMetrics[MetricCategory::METRIC_CATEGORY_RUNNER][runnerName] = event;
 }
 
 } // namespace logtail

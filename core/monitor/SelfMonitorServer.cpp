@@ -18,7 +18,6 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
-#include "common/LogtailCommonFlags.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -141,11 +140,10 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
     for (auto event : events) {
         bool shouldSkip = false;
         if (event.mCategory == MetricCategory::METRIC_CATEGORY_AGENT) {
-            LoongCollectorMonitor::GetInstance()->SetAgentMetricData(event);
+            LoongCollectorMonitor::GetInstance()->SetAgentMetric(event);
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mAgentMetricsRule);
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_RUNNER) {
-            LoongCollectorMonitor::GetInstance()->SetRunnerMetricData(event.GetLabels()[METRIC_LABEL_KEY_RUNNER_NAME],
-                                                                      event);
+            LoongCollectorMonitor::GetInstance()->SetRunnerMetric(event.GetLabel(METRIC_LABEL_KEY_RUNNER_NAME), event);
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mRunnerMetricsRule);
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_COMPONENT) {
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mComponentMetricsRule);
@@ -162,7 +160,7 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
         if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
             mSelfMonitorMetricEventMap[event.mKey].Merge(event);
         } else {
-            mSelfMonitorMetricEventMap[event.mKey] = std::move(event);
+            mSelfMonitorMetricEventMap[event.mKey] = event;
         }
     }
 }
