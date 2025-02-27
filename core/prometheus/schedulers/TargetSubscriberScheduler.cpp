@@ -420,14 +420,14 @@ string TargetSubscriberScheduler::TargetsInfoToString() const {
     SelfMonitorMetricEvent wantRunnerEvent;
     LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
 
-    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU);
-    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit();
-    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY);
-    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit();
+    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU); // double
+    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit(); // float
+    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY); // double
+    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit(); // int64_t
     root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_IN_ITEMS_TOTAL]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL); // uint64_t
     root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL); // uint64_t
     {
         ReadLock lock(mRWLock);
         for (const auto& [k, v] : mScrapeSchedulerMap) {

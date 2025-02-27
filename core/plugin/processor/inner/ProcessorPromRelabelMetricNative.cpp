@@ -188,7 +188,7 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup
         eGroup, prometheus::SCRAPE_DURATION_SECONDS, autoMetric.mScrapeDurationSeconds, timestamp, nanoSec, targetTags);
 
     AddMetric(eGroup,
-              prometheus::SCRAPE_RESPONSE_SIZE_BYTES,
+              prometheus::SCRAPE_BODY_SIZE_BYTES,
               autoMetric.mScrapeResponseSizeBytes,
               timestamp,
               nanoSec,

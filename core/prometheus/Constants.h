@@ -107,7 +107,7 @@ const char* const REBALANCE_MS = "rebalance_ms";
 // auto metrics
 const char* const SCRAPE_STATE = "scrape_state";
 const char* const SCRAPE_DURATION_SECONDS = "scrape_duration_seconds";
-const char* const SCRAPE_RESPONSE_SIZE_BYTES = "scrape_response_size_bytes";
+const char* const SCRAPE_BODY_SIZE_BYTES = "scrape_body_size_bytes";
 const char* const SCRAPE_SAMPLES_LIMIT = "scrape_samples_limit";
 const char* const SCRAPE_SAMPLES_POST_METRIC_RELABELING = "scrape_samples_post_metric_relabeling";
 const char* const SCRAPE_SAMPLES_SCRAPED = "scrape_samples_scraped";
