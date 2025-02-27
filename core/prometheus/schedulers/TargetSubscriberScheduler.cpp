@@ -424,8 +424,8 @@ string TargetSubscriberScheduler::TargetsInfoToString() const {
     root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit();
     root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY);
     root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit();
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_SUCCESS]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
+    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_IN_ITEMS_TOTAL]
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
     root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
         = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
     {
