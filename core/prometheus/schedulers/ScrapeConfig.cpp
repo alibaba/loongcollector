@@ -412,7 +412,7 @@ bool ScrapeConfig::InitExternalLabels(const Json::Value& externalLabels) {
     set<string> dups;
     for (auto& key : externalLabels.getMemberNames()) {
         if (externalLabels[key].isString()) {
-            if (dups.count(key)) {
+            if (dups.find(key) != dups.end()) {
                 LOG_ERROR(sLogger, ("duplicated key in external_labels", key));
                 return false;
             }
