@@ -22,15 +22,17 @@
 #include <memory>
 #include <string>
 
+#include "AppConfig.h"
+#include "SelfMonitorMetricEvent.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
-#include "prometheus/PrometheusInputRunner.h"
 #include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
@@ -416,15 +418,20 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
 
 string TargetSubscriberScheduler::TargetsInfoToString() const {
     Json::Value root;
-    PromAgentInfo agentInfo{0.0F, 0, 0.0F, 0};
 
-    PrometheusInputRunner::GetInstance()->GetAgentInfo(agentInfo);
-    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = agentInfo.mCpuUsage;
-    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = agentInfo.mCpuLimit;
-    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = agentInfo.mMemUsage;
-    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = agentInfo.mMemLimit;
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_SUCCESS] = agentInfo.mHttpSinkOutSuccess;
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED] = agentInfo.mHttpSinkOutFailed;
+    SelfMonitorMetricEvent wantAgentEvent;
+    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
+    SelfMonitorMetricEvent wantRunnerEvent;
+    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
+
+    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU);
+    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit();
+    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY);
+    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit();
+    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_SUCCESS]
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
+    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
     {
         ReadLock lock(mRWLock);
         for (const auto& [k, v] : mScrapeSchedulerMap) {

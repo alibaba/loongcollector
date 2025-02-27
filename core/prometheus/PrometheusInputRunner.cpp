@@ -21,8 +21,6 @@
 #include <memory>
 #include <string>
 
-#include "AppConfig.h"
-#include "SelfMonitorMetricEvent.h"
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -32,7 +30,6 @@
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
-#include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
@@ -296,18 +293,5 @@ string PrometheusInputRunner::GetAllProjects() {
 
 void PrometheusInputRunner::CheckGC() {
     mEventPool.CheckGC();
-}
-
-void PrometheusInputRunner::GetAgentInfo(PromAgentInfo& agentInfo) {
-    SelfMonitorMetricEvent wantAgentEvent;
-    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
-    SelfMonitorMetricEvent wantRunnerEvent;
-    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
-    agentInfo.mCpuUsage = wantAgentEvent.GetGauge(METRIC_AGENT_CPU);
-    agentInfo.mMemUsage = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY);
-    agentInfo.mCpuLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
-    agentInfo.mMemLimit = AppConfig::GetInstance()->GetMemUsageUpLimit();
-    agentInfo.mHttpSinkOutSuccess = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
-    agentInfo.mHttpSinkOutFailed = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
 }
 }; // namespace logtail
