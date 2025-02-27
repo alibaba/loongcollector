@@ -95,8 +95,8 @@ void ScrapeConfigUnittest::TestInit() {
                 }
             ],
             "external_labels": {
-                "test_key1": "test_value1",
-                "test_key2": "test_value2"
+                "test_key2": "test_value2",
+                "test_key1": "test_value1"
             },
             "params" : {
                 "__param_query": [

@@ -137,14 +137,13 @@ bool RelabelConfig::Init(const Json::Value& config) {
     return true;
 }
 
-bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
+bool RelabelConfig::Process(Labels& l) const {
     vector<string> values;
     values.reserve(mSourceLabels.size());
     for (const auto& item : mSourceLabels) {
         values.push_back(l.Get(item));
     }
     string val = boost::algorithm::join(values, mSeparator);
-    CollectLabelsToDelete(mTargetLabel, toDelete);
     switch (mAction) {
         case Action::DROP: {
             if (boost::regex_match(val, mRegex)) {
@@ -183,7 +182,6 @@ bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
                 break;
             }
             l.Set(target, string(res));
-            CollectLabelsToDelete(target, toDelete);
             break;
         }
         case Action::LOWERCASE: {
@@ -212,7 +210,6 @@ bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
                     string res
                         = boost::regex_replace(key, mRegex, mReplacement, boost::match_default | boost::format_all);
                     l.Set(res, value);
-                    CollectLabelsToDelete(res, toDelete);
                 }
             });
             break;
@@ -255,12 +252,6 @@ bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
     return true;
 }
 
-void RelabelConfig::CollectLabelsToDelete(const string& labelName, vector<string>& toDelete) const {
-    if (StartWith(labelName, "__")) {
-        toDelete.push_back(labelName);
-    }
-}
-
 bool RelabelConfigList::Init(const Json::Value& relabelConfigs) {
     if (!relabelConfigs.isArray()) {
         return false;
@@ -276,19 +267,19 @@ bool RelabelConfigList::Init(const Json::Value& relabelConfigs) {
     return true;
 }
 
-bool RelabelConfigList::Process(Labels& l, vector<string>& toDelete) const {
+bool RelabelConfigList::Process(Labels& l) const {
     for (const auto& cfg : mRelabelConfigs) {
-        if (!cfg.Process(l, toDelete)) {
+        if (!cfg.Process(l)) {
             return false;
         }
     }
     return true;
 }
 
-bool RelabelConfigList::Process(MetricEvent& event, vector<string>& toDelete) const {
+bool RelabelConfigList::Process(MetricEvent& event) const {
     Labels labels;
     labels.Reset(&event);
-    return Process(labels, toDelete);
+    return Process(labels);
 }
 
 bool RelabelConfigList::Empty() const {

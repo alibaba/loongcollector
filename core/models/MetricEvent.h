@@ -18,6 +18,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "common/memory/SourceBuffer.h"
 #include "models/MetricValue.h"
@@ -29,6 +30,7 @@ namespace logtail {
 class MetricEvent : public PipelineEvent {
     friend class PipelineEventGroup;
     friend class EventPool;
+    friend class ProcessorPromRelabelMetricNative;
 
 public:
     std::unique_ptr<PipelineEvent> Copy() const override;
@@ -78,9 +80,11 @@ public:
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
+    void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };
 
-    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+
     size_t TagsSize() const { return mTags.mInner.size(); }
 
     size_t DataSize() const override;
@@ -95,7 +99,7 @@ private:
 
     StringView mName;
     MetricValue mValue;
-    SizedMap mTags;
+    SizedVectorTags mTags;
 };
 
 } // namespace logtail
