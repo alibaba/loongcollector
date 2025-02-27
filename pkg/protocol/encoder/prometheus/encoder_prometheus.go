@@ -17,6 +17,7 @@ package prometheus
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -50,22 +51,23 @@ func newPromEncoder(seriesLimit int) *Encoder {
 	}
 }
 
-func (p *Encoder) EncodeV1(logGroups *protocol.LogGroup) ([][]byte, error) {
+func (p *Encoder) EncodeV1(logGroups *protocol.LogGroup, targetFields []string) ([][]byte, []map[string]string, error) {
 	// TODO implement me
-	return nil, nil
+	return nil, nil, fmt.Errorf("not implemented")
 }
 
-func (p *Encoder) EncodeBatchV1(logGroups []*protocol.LogGroup) ([][]byte, error) {
+func (p *Encoder) EncodeBatchV1(logGroups []*protocol.LogGroup, targetFields []string) ([][]byte, []map[string]string, error) {
 	// TODO implement me
-	return nil, nil
+	return nil, nil, fmt.Errorf("not implemented")
 }
 
-func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents) ([][]byte, error) {
+func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents, targetFields []string) ([][]byte, []map[string]string, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
-		return nil, errNilOrZeroGroupEvents
+		return nil, nil, errNilOrZeroGroupEvents
 	}
 
 	var res [][]byte
+	var varValues []map[string]string
 
 	wr := getWriteRequest(p.SeriesLimit)
 	defer putWriteRequest(wr)
@@ -99,28 +101,34 @@ func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents) ([][]byte, e
 		wr.Timeseries = wr.Timeseries[:0]
 	}
 
-	return res, nil
+	return res, varValues, nil
 }
 
-func (p *Encoder) EncodeBatchV2(groupEventsSlice []*models.PipelineGroupEvents) ([][]byte, error) {
+func (p *Encoder) EncodeBatchV2(groupEventsSlice []*models.PipelineGroupEvents, targetFields []string) ([][]byte, []map[string]string, error) {
 	if len(groupEventsSlice) == 0 {
-		return nil, errNilOrZeroGroupEvents
+		return nil, nil, errNilOrZeroGroupEvents
 	}
 
 	var res [][]byte
+	var varValues []map[string]string
 
 	for _, groupEvents := range groupEventsSlice {
-		bytes, err := p.EncodeV2(groupEvents)
+		bytes, values, err := p.EncodeV2(groupEvents, targetFields)
 		if err != nil {
 			continue
 		}
 
 		res = append(res, bytes...)
+		varValues = append(varValues, values...)
 	}
 
-	if res == nil {
-		return nil, errNilOrZeroGroupEvents
+	if len(res) == 0 {
+		return nil, nil, errNilOrZeroGroupEvents
 	}
 
-	return res, nil
+	return res, varValues, nil
 }
+
+// Recycle implements Extension.BufferRecycler
+// But Prometheus Encoder doesn't actually recycle the buffer since its Encode implementation cannot reuse the buffer now.
+func (p *Encoder) Recycle(buf []byte) {}
