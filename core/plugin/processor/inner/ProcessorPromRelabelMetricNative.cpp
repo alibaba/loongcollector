@@ -168,11 +168,11 @@ void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGrou
 
 void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup,
                                                       const prom::AutoMetric& autoMetric) const {
+    auto targetTags = eGroup.GetTags();
     if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC)) {
         LOG_ERROR(sLogger, ("scrape_timestamp_milliseconds is not set", ""));
         return;
     }
-    auto targetTags = eGroup.GetTags();
     if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID)) {
         LOG_ERROR(sLogger, ("prometheus stream id", ""));
         return;

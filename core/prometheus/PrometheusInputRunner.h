@@ -35,6 +35,8 @@ struct PromAgentInfo {
     int64_t mMemUsage;
     float mCpuLimit;
     int64_t mMemLimit;
+    int64_t mHttpSinkOutSuccess;
+    int64_t mHttpSinkOutFailed;
 };
 
 class PrometheusInputRunner : public InputRunner {

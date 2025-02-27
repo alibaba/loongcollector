@@ -21,12 +21,12 @@
 #include <memory>
 #include <string>
 
+#include "AppConfig.h"
+#include "SelfMonitorMetricEvent.h"
 #include "application/Application.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
-#include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
@@ -34,7 +34,6 @@
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
@@ -300,9 +299,15 @@ void PrometheusInputRunner::CheckGC() {
 }
 
 void PrometheusInputRunner::GetAgentInfo(PromAgentInfo& agentInfo) {
-    agentInfo.mCpuUsage = LogtailMonitor::GetInstance()->GetCpuUsage();
-    agentInfo.mMemUsage = LogtailMonitor::GetInstance()->GetMemoryUsage();
+    SelfMonitorMetricEvent wantAgentEvent;
+    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
+    SelfMonitorMetricEvent wantRunnerEvent;
+    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
+    agentInfo.mCpuUsage = wantAgentEvent.GetGauge(METRIC_AGENT_CPU);
+    agentInfo.mMemUsage = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY);
     agentInfo.mCpuLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
     agentInfo.mMemLimit = AppConfig::GetInstance()->GetMemUsageUpLimit();
+    agentInfo.mHttpSinkOutSuccess = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
+    agentInfo.mHttpSinkOutFailed = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
 }
 }; // namespace logtail
