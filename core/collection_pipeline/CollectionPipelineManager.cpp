@@ -16,16 +16,18 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 
-#include "HostMonitorInputRunner.h"
-#include "file_server/ConfigManager.h"
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
+
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "host_monitor/HostMonitorInputRunner.h"
 #include "prometheus/PrometheusInputRunner.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "ebpf/eBPFServer.h"
 #endif
-#include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -64,16 +66,24 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
     if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-
+    vector<string> toRemovePipelineNames(diff.mRemoved.size());
+    // other threads only read mPipelineNameEntityMap, so we don't need to lock it here
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
-        mPipelineNameEntityMap.erase(iter);
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
-                                                                                     ConfigFeedbackStatus::DELETED);
+        toRemovePipelineNames.push_back(name);
     }
+    {
+        unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+        for (const auto& name : toRemovePipelineNames) {
+            mPipelineNameEntityMap.erase(name);
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                         ConfigFeedbackStatus::DELETED);
+        }
+    }
+    vector<pair<string, shared_ptr<CollectionPipeline>>> toStartPipelines;
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
@@ -92,17 +102,11 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             continue;
         }
         LOG_INFO(sLogger,
-                 ("pipeline building for existing config succeeded",
-                  "stop the old pipeline and start the new one")("config", config.mName));
+                 ("pipeline building for existing config succeeded", "stop the old pipeline")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
         iter->second->Stop(false);
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
-
-        mPipelineNameEntityMap[config.mName] = p;
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
-        p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                     ConfigFeedbackStatus::APPLIED);
+        toStartPipelines.emplace_back(config.mName, p);
     }
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
@@ -120,12 +124,19 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;
         }
-        LOG_INFO(sLogger,
-                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
-        mPipelineNameEntityMap[config.mName] = p;
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
-        p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+        toStartPipelines.emplace_back(config.mName, p);
+    }
+    {
+        unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+        for (auto& item : toStartPipelines) {
+            mPipelineNameEntityMap[item.first] = item.second;
+        }
+    }
+    for (auto& item : toStartPipelines) {
+        LOG_INFO(sLogger, ("pipeline building for config succeeded", "begin to start pipeline")("config", item.first));
+        IncreasePluginUsageCnt(item.second->GetPluginStatistics());
+        item.second->Start();
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(item.first,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 
@@ -157,6 +168,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 }
 
 const shared_ptr<CollectionPipeline>& CollectionPipelineManager::FindConfigByName(const string& configName) const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
@@ -165,6 +177,7 @@ const shared_ptr<CollectionPipeline>& CollectionPipelineManager::FindConfigByNam
 }
 
 vector<string> CollectionPipelineManager::GetAllConfigNames() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     vector<string> res;
     for (const auto& item : mPipelineNameEntityMap) {
         res.push_back(item.first);
@@ -203,6 +216,11 @@ void CollectionPipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "succeeded"));
 }
 
+void CollectionPipelineManager::ClearAllPipelines() {
+    unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    mPipelineNameEntityMap.clear();
+}
+
 shared_ptr<CollectionPipeline> CollectionPipelineManager::BuildPipeline(CollectionConfig&& config) {
     shared_ptr<CollectionPipeline> p = make_shared<CollectionPipeline>();
     // only config.mDetail is removed, other members can be safely used later
@@ -213,6 +231,7 @@ shared_ptr<CollectionPipeline> CollectionPipelineManager::BuildPipeline(Collecti
 }
 
 void CollectionPipelineManager::FlushAllBatch() {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     for (const auto& item : mPipelineNameEntityMap) {
         item.second->FlushBatch();
     }
@@ -237,6 +256,7 @@ void CollectionPipelineManager::DecreasePluginUsageCnt(
 }
 
 bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& diff) {
+    // private method, no need to lock mPipelineNameEntityMapMutex
     for (const auto& name : diff.mRemoved) {
         string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
         if (inputType == "input_file" || inputType == "input_container_stdio") {
