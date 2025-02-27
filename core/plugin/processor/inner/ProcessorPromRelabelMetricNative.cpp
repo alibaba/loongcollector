@@ -173,10 +173,6 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup
         return;
     }
     auto targetTags = eGroup.GetTags();
-    auto toDelete = GetToDeleteTargetLabels(targetTags);
-    for (const auto& item : toDelete) {
-        targetTags.erase(item);
-    }
     if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID)) {
         LOG_ERROR(sLogger, ("prometheus stream id", ""));
         return;
