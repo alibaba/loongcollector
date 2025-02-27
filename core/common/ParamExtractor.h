@@ -145,6 +145,8 @@ bool GetOptionalBoolParam(const Json::Value& config, const std::string& key, boo
 
 bool GetOptionalIntParam(const Json::Value& config, const std::string& key, int32_t& param, std::string& errorMsg);
 
+bool GetOptionalUInt64Param(const Json::Value& config, const std::string& key, uint64_t& param, std::string& errorMsg);
+
 bool GetOptionalUIntParam(const Json::Value& config, const std::string& key, uint32_t& param, std::string& errorMsg);
 
 bool GetOptionalStringParam(const Json::Value& config,
@@ -303,6 +305,8 @@ bool GetOptionalMapParam(const Json::Value& config,
 bool GetMandatoryBoolParam(const Json::Value& config, const std::string& key, bool& param, std::string& errorMsg);
 
 bool GetMandatoryIntParam(const Json::Value& config, const std::string& key, int32_t& param, std::string& errorMsg);
+
+bool GetMandatoryUInt64Param(const Json::Value& config, const std::string& key, uint64_t& param, std::string& errorMsg);
 
 bool GetMandatoryUIntParam(const Json::Value& config, const std::string& key, uint32_t& param, std::string& errorMsg);
 

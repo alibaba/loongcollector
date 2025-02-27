@@ -119,13 +119,14 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 
 # Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
-        application app_config checkpoint container_manager metadata logger go_pipeline monitor monitor/metric_constants monitor/metric_models monitor/profile_sender models
-        config config/watcher constants
+        application app_config constants container_manager metadata logger go_pipeline models
+        config config/watcher
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
-        task_pipeline
         runner runner/sink/http
+        task_pipeline
+        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
         protobuf/sls protobuf/models
-        file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
+        file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         ebpf ebpf/observer ebpf/security ebpf/handler
         parser
