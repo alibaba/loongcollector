@@ -74,8 +74,6 @@ private:
     int32_t mServicePort;
     std::string mPodName;
 
-    std::chrono::steady_clock::time_point mLastUpdateTime;
-
     EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;

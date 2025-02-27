@@ -48,8 +48,6 @@ PrometheusInputRunner::PrometheusInputRunner()
       mPodName(STRING_FLAG(_pod_name_)),
       mEventPool(true),
       mUnRegisterMs(0) {
-    mLastUpdateTime = std::chrono::steady_clock::now();
-
     // self monitor
     MetricLabels labels;
     labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS);
