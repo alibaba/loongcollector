@@ -399,8 +399,19 @@ public:
 
     const std::vector<sls_logs::LogTag>& GetExtraTags() { return mExtraTags; }
 
-    void AddExtraTags(const std::vector<sls_logs::LogTag>& tags) {
-        mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
+    void AddExtraOtherTags(const std::vector<sls_logs::LogTag>& tags) {
+        mExtraOtherTags.insert(mExtraOtherTags.end(), tags.begin(), tags.end());
+    }
+
+    void AddExtraContainerTags(const std::vector<sls_logs::LogTag>& tags) {
+        mExtraContainerTags.insert(mExtraContainerTags.end(), tags.begin(), tags.end());
+    }
+
+    void MergeExtraTags() {
+        mExtraTags.clear();
+        mExtraTags.reserve(mExtraContainerTags.size() + mExtraOtherTags.size());
+        mExtraTags.insert(mExtraTags.end(), mExtraContainerTags.begin(), mExtraContainerTags.end());
+        mExtraTags.insert(mExtraTags.end(), mExtraOtherTags.begin(), mExtraOtherTags.end());
     }
 
     // void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
@@ -530,6 +541,8 @@ protected:
     // we should use mDockerPath to extract topic and set it to __tag__:__path__
     std::string mDockerPath;
     std::vector<sls_logs::LogTag> mExtraTags;
+    std::vector<sls_logs::LogTag> mExtraContainerTags;
+    std::vector<sls_logs::LogTag> mExtraOtherTags;
     // int32_t mCloseUnusedInterval;
 
     // PreciseTimestampConfig mPreciseTimestampConfig;

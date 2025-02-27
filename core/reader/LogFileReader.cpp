@@ -117,15 +117,15 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
                 reader->SetContainerID(containerPath->mID);
-                reader->AddExtraTags(containerPath->mMetadatas);
-                reader->AddExtraTags(containerPath->mTags);
+                reader->AddExtraContainerTags(containerPath->mMetadatas);
+                reader->AddExtraContainerTags(containerPath->mTags);
             }
         }
         if (readerConfig.first->mAppendingLogPositionMeta) {
             sls_logs::LogTag inodeTag;
             inodeTag.set_key(LOG_RESERVED_KEY_INODE);
             inodeTag.set_value(std::to_string(devInode.inode));
-            reader->AddExtraTags(std::vector<sls_logs::LogTag>{inodeTag});
+            reader->AddExtraOtherTags(std::vector<sls_logs::LogTag>{inodeTag});
         }
 
         GlobalConfig::TopicType topicType = readerConfig.second->GetGlobalConfig().mTopicType;
@@ -157,6 +157,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
             }
         }
         reader->SetTopicName(topicName);
+        reader->MergeExtraTags();
 
 #ifndef _MSC_VER // Unnecessary on platforms without symbolic.
         fsutil::PathStat buf;
@@ -815,7 +816,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     sls_logs::LogTag tag;
                     tag.set_key(keys[0]);
                     tag.set_value(values[0]);
-                    mExtraTags.push_back(tag);
+                    mExtraOtherTags.push_back(tag);
                 }
                 return values[0];
             } else {
@@ -828,7 +829,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     sls_logs::LogTag tag;
                     tag.set_key(keys[i]);
                     tag.set_value(values[i]);
-                    mExtraTags.push_back(tag);
+                    mExtraOtherTags.push_back(tag);
                 }
             }
             return res;
@@ -853,7 +854,7 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     sls_logs::LogTag tag;
                     tag.set_key(string("__topic_") + ToString(i) + "__");
                     tag.set_value(what[i]);
-                    mExtraTags.push_back(tag);
+                    mExtraOtherTags.push_back(tag);
                 }
             }
         } else {
@@ -2619,20 +2620,10 @@ bool LogFileReader::UpdateContainerInfo() {
                       containerInfo->mRealBaseDir.size());
         SetContainerID(containerInfo->mID);
         mContainerStopped = containerInfo->mStopped;
-        for (size_t i = 0; i < mExtraTags.size(); ++i) {
-            for (size_t j = 0; j < containerInfo->mMetadatas.size(); ++j) {
-                if (mExtraTags[i].key() == containerInfo->mMetadatas[j].key()) {
-                    mExtraTags[i] = containerInfo->mMetadatas[j];
-                    break;
-                }
-            }
-            for (size_t j = 0; j < containerInfo->mTags.size(); ++j) {
-                if (mExtraTags[i].key() == containerInfo->mTags[j].key()) {
-                    mExtraTags[i] = containerInfo->mTags[j];
-                    break;
-                }
-            }
-        }
+        mExtraContainerTags.clear();
+        AddExtraContainerTags(containerInfo->mMetadatas);
+        AddExtraContainerTags(containerInfo->mTags);
+        MergeExtraTags();
         return true;
     }
     return false;
