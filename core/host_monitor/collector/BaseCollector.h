@@ -16,23 +16,22 @@
 
 #pragma once
 
-#include <chrono>
+#include <string>
+
+#include "host_monitor/HostMonitorTimerEvent.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
-class TimerEvent {
+class BaseCollector {
 public:
-    TimerEvent(std::chrono::steady_clock::time_point execTime) : mExecTime(execTime) {}
-    virtual ~TimerEvent() = default;
+    virtual ~BaseCollector() = default;
 
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
+    virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
+    virtual const std::string& Name() const = 0;
 
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
-    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
-
-private:
-    std::chrono::steady_clock::time_point mExecTime;
+protected:
+    bool mValidState = false;
 };
 
 } // namespace logtail

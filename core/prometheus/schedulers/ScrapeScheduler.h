@@ -61,7 +61,7 @@ public:
     std::string GetId() const;
     uint64_t GetScrapeIntervalSeconds() const;
 
-    void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
+    void SetComponent(EventPool* eventPool);
     int64_t GetLastScrapeSize() const { return mScrapeResponseSizeBytes; }
 
     uint64_t GetReBalanceMs() const { return mTargetInfo.mRebalanceMs; }

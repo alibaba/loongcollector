@@ -133,6 +133,7 @@ private:
     friend class InputNetworkSecurityUnittest;
     friend class InputNetworkObserverUnittest;
     friend class PipelineUpdateUnittest;
+    friend class InputHostMetaUnittest;
 #endif
 };
 

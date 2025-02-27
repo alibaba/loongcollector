@@ -76,7 +76,6 @@ private:
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
 
-    std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;

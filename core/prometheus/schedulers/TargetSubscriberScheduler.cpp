@@ -115,28 +115,26 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
             if (mScrapeSchedulerMap.find(k) == mScrapeSchedulerMap.end()) {
                 added++;
                 mScrapeSchedulerMap[k] = v;
-                if (mTimer) {
-                    auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
-                    auto tmpRandSleepMilliSec
-                        = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
+                auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
+                auto tmpRandSleepMilliSec
+                    = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
 
-                    // zero-cost upgrade
-                    if ((mUnRegisterMs > 0
-                         && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
-                             > mUnRegisterMs)
-                         && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
-                             < mUnRegisterMs))
-                        || (v->GetReBalanceMs() > 0
-                            && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
-                                > v->GetReBalanceMs())
-                            && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
-                                < v->GetReBalanceMs()))) {
-                        // scrape once just now
-                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
-                    }
-                    v->ScheduleNext();
+                // zero-cost upgrade
+                if ((mUnRegisterMs > 0
+                     && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
+                         > mUnRegisterMs)
+                     && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
+                         < mUnRegisterMs))
+                    || (v->GetReBalanceMs() > 0
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
+                            > v->GetReBalanceMs())
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
+                            < v->GetReBalanceMs()))) {
+                    // scrape once just now
+                    LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
+                    v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
                 }
+                v->ScheduleNext();
             }
         }
         total = mScrapeSchedulerMap.size();
@@ -326,7 +324,7 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<PromTargetInfo>& 
                                                                  mInputIndex,
                                                                  targetInfo);
 
-        scrapeScheduler->SetComponent(mTimer, mEventPool);
+        scrapeScheduler->SetComponent(mEventPool);
 
         auto randSleepMilliSec
             = GetRandSleepMilliSec(scrapeScheduler->GetId(), scrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
@@ -364,7 +362,7 @@ void TargetSubscriberScheduler::ScheduleNext() {
     }
 
     auto event = BuildSubscriberTimerEvent(GetNextExecTime());
-    mTimer->PushEvent(std::move(event));
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 void TargetSubscriberScheduler::Cancel() {
@@ -384,9 +382,7 @@ void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_po
     });
     mFuture = future;
     auto event = BuildSubscriberTimerEvent(execTime);
-    if (mTimer) {
-        mTimer->PushEvent(std::move(event));
-    }
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 std::unique_ptr<TimerEvent>

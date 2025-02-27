@@ -30,8 +30,6 @@
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 
-DECLARE_FLAG_INT32(curl_ip_dscp);
-
 using namespace std;
 
 namespace logtail {

@@ -1,6 +1,7 @@
 package kubernetesmetav2
 
 const (
+	// should keep same with EntityConstants.cpp
 	entityDomainFieldName       = "__domain__"
 	entityTypeFieldName         = "__entity_type__"
 	entityIDFieldName           = "__entity_id__"
