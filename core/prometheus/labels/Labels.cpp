@@ -111,10 +111,26 @@ void Labels::Range(const std::function<void(const string& k, const string& v)>& 
 uint64_t Labels::Hash() {
     string hash;
     uint64_t sum = prometheus::OFFSET64;
-    Range([&hash](const string& k, const string& v) { hash += k + "\xff" + v + "\xff"; });
-    for (auto i : hash) {
-        sum ^= (uint64_t)i;
-        sum *= prometheus::PRIME64;
+    vector<string> names;
+    Range([&names](const string& k, const string&) { names.push_back(k); });
+    sort(names.begin(), names.end());
+    auto calc = [](uint64_t h, uint64_t c) {
+        h ^= (uint64_t)c;
+        h *= prometheus::PRIME64;
+        return h;
+    };
+    auto calcString = [](uint64_t h, const string& s) {
+        for (auto c : s) {
+            h ^= (uint64_t)c;
+            h *= prometheus::PRIME64;
+        }
+        return h;
+    };
+    for (const auto& name : names) {
+        sum = calcString(sum, name);
+        sum = calc(sum, 255);
+        sum = calcString(sum, Get(name));
+        sum = calc(sum, 255);
     }
     return sum;
 }

@@ -16,18 +16,21 @@
 
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 
+#include <chrono>
 #include <cstdlib>
 
 #include <memory>
 #include <string>
 
+#include "AppConfig.h"
+#include "SelfMonitorMetricEvent.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
-#include "common/timer/Timer.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
@@ -39,6 +42,8 @@ using namespace std;
 
 namespace logtail {
 
+std::chrono::steady_clock::time_point TargetSubscriberScheduler::mLastUpdateTime = std::chrono::steady_clock::now();
+uint64_t TargetSubscriberScheduler::sDelaySeconds = 0;
 TargetSubscriberScheduler::TargetSubscriberScheduler()
     : mQueueKey(0), mInputIndex(0), mServicePort(0), mUnRegisterMs(0) {
 }
@@ -74,7 +79,7 @@ void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t 
         mETag = response.GetHeader().at(prometheus::ETAG);
     }
     const string& content = *response.GetBody<string>();
-    vector<Labels> targetGroup;
+    vector<PromTargetInfo> targetGroup;
     if (!ParseScrapeSchedulerGroup(content, targetGroup)) {
         return;
     }
@@ -104,19 +109,27 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
         }
 
         // save new scrape work
+        auto added = 0;
+        auto total = 0;
         for (const auto& [k, v] : newScrapeSchedulerMap) {
             if (mScrapeSchedulerMap.find(k) == mScrapeSchedulerMap.end()) {
+                added++;
                 mScrapeSchedulerMap[k] = v;
                 auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
                 auto tmpRandSleepMilliSec
                     = GetRandSleepMilliSec(v->GetId(), v->GetScrapeIntervalSeconds(), tmpCurrentMilliSeconds);
 
                 // zero-cost upgrade
-                if (mUnRegisterMs > 0
-                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
-                        > mUnRegisterMs)
-                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
-                        < mUnRegisterMs)) {
+                if ((mUnRegisterMs > 0
+                     && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
+                         > mUnRegisterMs)
+                     && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
+                         < mUnRegisterMs))
+                    || (v->GetReBalanceMs() > 0
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000
+                            > v->GetReBalanceMs())
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec - v->GetScrapeIntervalSeconds() * 1000 * 2
+                            < v->GetReBalanceMs()))) {
                     // scrape once just now
                     LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
                     v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
@@ -124,11 +137,13 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                 v->ScheduleNext();
             }
         }
+        total = mScrapeSchedulerMap.size();
+        LOG_INFO(sLogger, ("prom job", mJobName)("targets removed", toRemove.size())("added", added)("total", total));
     }
 }
 
 bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& content,
-                                                          std::vector<Labels>& scrapeSchedulerGroup) {
+                                                          std::vector<PromTargetInfo>& scrapeSchedulerGroup) {
     string errs;
     Json::Value root;
     if (!ParseJsonTable(content, root, errs) || !root.isArray()) {
@@ -161,8 +176,20 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         if (targets.empty()) {
             continue;
         }
+        PromTargetInfo targetInfo;
         // Parse labels https://www.robustperception.io/life-of-a-label/
         Labels labels;
+        if (element.isMember(prometheus::LABELS) && element[prometheus::LABELS].isObject()) {
+            for (const string& labelKey : element[prometheus::LABELS].getMemberNames()) {
+                labels.Set(labelKey, element[prometheus::LABELS][labelKey].asString());
+            }
+        }
+        std::ostringstream rawHashStream;
+        rawHashStream << std::setw(16) << std::setfill('0') << std::hex << labels.Hash();
+        string rawAddress = labels.Get(prometheus::ADDRESS_LABEL_NAME);
+        targetInfo.mHash = mScrapeConfigPtr->mJobName + rawAddress + rawHashStream.str();
+        targetInfo.mInstance = targets[0];
+
         for (const auto& pair : mScrapeConfigPtr->mParams) {
             if (!pair.second.empty()) {
                 labels.Set(prometheus::PARAM_LABEL_NAME + pair.first, pair.second[0]);
@@ -186,17 +213,19 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         if (labels.Get(prometheus::ADDRESS_LABEL_NAME).empty()) {
             continue;
         }
-        scrapeSchedulerGroup.push_back(labels);
+
+        targetInfo.mLabels = labels;
+        scrapeSchedulerGroup.push_back(targetInfo);
     }
     return true;
 }
 
 std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>
-TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGroups) {
+TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<PromTargetInfo>& targetGroups) {
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> scrapeSchedulerMap;
-    for (const auto& labels : targetGroups) {
+    for (auto& targetInfo : targetGroups) {
         // Relabel Config
-        Labels resultLabel = labels;
+        auto& resultLabel = targetInfo.mLabels;
         if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel)) {
             continue;
         }
@@ -291,9 +320,9 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
                                                                  metricsPath,
                                                                  scrapeIntervalSeconds,
                                                                  scrapeTimeoutSeconds,
-                                                                 resultLabel,
                                                                  mQueueKey,
-                                                                 mInputIndex);
+                                                                 mInputIndex,
+                                                                 targetInfo);
 
         scrapeScheduler->SetComponent(mEventPool);
 
@@ -365,6 +394,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
+    auto body = TargetsInfoToString();
     auto request = std::make_unique<PromHttpRequest>(HTTP_GET,
                                                      false,
                                                      mServiceHost,
@@ -372,7 +402,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
                                                      "/jobs/" + URLEncode(GetId()) + "/targets",
                                                      "collector_id=" + mPodName,
                                                      httpHeader,
-                                                     "",
+                                                     body,
                                                      HttpResponse(),
                                                      prometheus::RefeshIntervalSeconds,
                                                      1,
@@ -380,6 +410,43 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     auto timerEvent = std::make_unique<HttpRequestTimerEvent>(execTime, std::move(request));
 
     return timerEvent;
+}
+
+string TargetSubscriberScheduler::TargetsInfoToString() const {
+    Json::Value root;
+
+    SelfMonitorMetricEvent wantAgentEvent;
+    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
+    SelfMonitorMetricEvent wantRunnerEvent;
+    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
+
+    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU); // double
+    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit(); // float
+    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY); // double
+    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit(); // int64_t
+    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_IN_ITEMS_TOTAL]
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL); // uint64_t
+    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
+        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL); // uint64_t
+    {
+        ReadLock lock(mRWLock);
+        for (const auto& [k, v] : mScrapeSchedulerMap) {
+            Json::Value targetInfo;
+            targetInfo[prometheus::HASH] = v->GetId();
+            targetInfo[prometheus::SIZE] = v->GetLastScrapeSize();
+            sDelaySeconds += v->mExecDelayCount;
+            v->mExecDelayCount = 0;
+            root[prometheus::TARGETS_INFO].append(targetInfo);
+        }
+    }
+    auto curTime = std::chrono::steady_clock::now();
+    auto needToClear = curTime - mLastUpdateTime >= std::chrono::seconds(prometheus::RefeshIntervalSeconds);
+    root[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS] = sDelaySeconds;
+    if (needToClear) {
+        sDelaySeconds = 0;
+        mLastUpdateTime = curTime;
+    }
+    return root.toStyledString();
 }
 
 void TargetSubscriberScheduler::CancelAllScrapeScheduler() {

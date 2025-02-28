@@ -25,14 +25,12 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
-#include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
@@ -173,6 +171,8 @@ void PrometheusInputRunner::Init() {
                                 mUnRegisterMs = 0;
                             } else {
                                 mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                // adjust unRegisterMs to scrape targets for zero-cost
+                                mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
                             }
                         }
