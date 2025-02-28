@@ -126,6 +126,14 @@ void ScrapeScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     auto isContextValidFuture = std::make_shared<PromFuture<>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
+        if (response.GetStatusCode() == 401
+            && ((mScrapeConfigPtr->mLastUpdateTime + mInterval * 1000
+                 >= chrono::duration_cast<chrono::milliseconds>(mLatestScrapeTime.time_since_epoch()).count())
+                || mScrapeConfigPtr->UpdateAuthorization())) {
+            LOG_WARNING(sLogger, ("retry", GetId()));
+            this->ScheduleNext();
+            return true;
+        }
         this->OnMetricResult(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
