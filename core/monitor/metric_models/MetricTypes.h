@@ -47,7 +47,7 @@ public:
     Counter* Collect() { return new Counter(mName, mVal.exchange(0)); }
 };
 
-// input: nanosecond, output: milisecond
+// input: nanosecond, output: millisecond
 class TimeCounter : public Counter {
 public:
     TimeCounter(const std::string& name, uint64_t val = 0) : Counter(name, val) {}
