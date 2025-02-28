@@ -43,11 +43,10 @@ public:
     std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
 
-#ifdef APSARA_UNIT_TEST_MAIN
+    // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;
     }
-#endif
     // 过渡使用
     void StopAllPipelines();
     void ClearAllPipelines(); // only used when exiting

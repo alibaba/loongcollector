@@ -66,24 +66,19 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
     if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-    vector<string> toRemovePipelineNames(diff.mRemoved.size());
-    // other threads only read mPipelineNameEntityMap, so we don't need to lock it here
+    // other threads only read mPipelineNameEntityMap, so we don't need to lock read here
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
-        toRemovePipelineNames.push_back(name);
-    }
-    {
-        unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-        for (const auto& name : toRemovePipelineNames) {
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap.erase(name);
-            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
-                                                                                         ConfigFeedbackStatus::DELETED);
         }
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                     ConfigFeedbackStatus::DELETED);
     }
-    vector<pair<string, shared_ptr<CollectionPipeline>>> toStartPipelines;
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
@@ -102,11 +97,19 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             continue;
         }
         LOG_INFO(sLogger,
-                 ("pipeline building for existing config succeeded", "stop the old pipeline")("config", config.mName));
+                 ("pipeline building for existing config succeeded",
+                  "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
         iter->second->Stop(false);
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
-        toStartPipelines.emplace_back(config.mName, p);
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap[config.mName] = p;
+        }
+        IncreasePluginUsageCnt(p->GetPluginStatistics());
+        p->Start();
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                     ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
@@ -124,19 +127,15 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;
         }
-        toStartPipelines.emplace_back(config.mName, p);
-    }
-    {
-        unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-        for (auto& item : toStartPipelines) {
-            mPipelineNameEntityMap[item.first] = item.second;
+        LOG_INFO(sLogger,
+                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap[config.mName] = p;
         }
-    }
-    for (auto& item : toStartPipelines) {
-        LOG_INFO(sLogger, ("pipeline building for config succeeded", "begin to start pipeline")("config", item.first));
-        IncreasePluginUsageCnt(item.second->GetPluginStatistics());
-        item.second->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(item.first,
+        IncreasePluginUsageCnt(p->GetPluginStatistics());
+        p->Start();
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 
