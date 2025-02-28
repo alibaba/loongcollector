@@ -64,7 +64,7 @@ func (m *metaCollector) processJobCronJobLink(data *k8smeta.ObjectWrapper, metho
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, obj.CronJob.Kind, obj.CronJob.Namespace, obj.CronJob.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.CronJob2Job)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -76,7 +76,7 @@ func (m *metaCollector) processPodJobLink(data *k8smeta.ObjectWrapper, method st
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Job2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}

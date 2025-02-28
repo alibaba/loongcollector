@@ -289,7 +289,7 @@ func (m *metadataHandler) handlePodMetaByHostIP(w http.ResponseWriter, r *http.R
 			if !ok {
 				continue
 			}
-			metadata[pod.Status.PodIP] = meta
+			metadata[string(pod.UID)] = meta
 		}
 	}
 	wrapperResponse(w, metadata)
@@ -308,6 +308,7 @@ func (m *metadataHandler) convertObjs2HostResponse(objs []*ObjectWrapper) []*Pod
 			containerIDs = append(containerIDs, truncateContainerID(container.ContainerID))
 		}
 		podMetadata.ContainerIDs = containerIDs
+		podMetadata.PodIP = pod.Status.PodIP
 		metadatas = append(metadatas, podMetadata)
 	}
 	return metadatas
