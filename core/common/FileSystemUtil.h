@@ -42,7 +42,7 @@ inline std::string PathJoin(const std::string& base, const std::string& sub) {
 #if defined(__linux__)
     if (!base.empty() && base.back() == PATH_SEPARATOR[0]) {
         return base + sub;
-    } 
+    }
     return base + PATH_SEPARATOR + sub;
 #elif defined(_MSC_VER)
     if (!BOOL_FLAG(enable_root_path_collection) || base.back() != PATH_SEPARATOR[0]) {
