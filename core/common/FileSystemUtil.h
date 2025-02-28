@@ -40,6 +40,9 @@ extern const std::string PATH_SEPARATOR;
 inline std::string PathJoin(const std::string& base, const std::string& sub) {
     // Only Windows can collect root path, so linux do as old way.
 #if defined(__linux__)
+    if (!base.empty() && base.back() == PATH_SEPARATOR[0]) {
+        return base + sub;
+    } 
     return base + PATH_SEPARATOR + sub;
 #elif defined(_MSC_VER)
     if (!BOOL_FLAG(enable_root_path_collection) || base.back() != PATH_SEPARATOR[0]) {
