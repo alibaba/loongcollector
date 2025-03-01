@@ -17,6 +17,7 @@
 #pragma once
 
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 
@@ -41,12 +42,14 @@ public:
     const std::shared_ptr<CollectionPipeline>& FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
+
     // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;
     }
     // 过渡使用
     void StopAllPipelines();
+    void ClearAllPipelines(); // only used when exiting
 
 private:
     CollectionPipelineManager();
@@ -61,6 +64,7 @@ private:
     // TODO: 长期过渡使用
     bool CheckIfFileServerUpdated(CollectionConfigDiff& diff);
 
+    mutable std::shared_mutex mPipelineNameEntityMapMutex;
     std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>> mPipelineNameEntityMap;
     mutable SpinLock mPluginCntMapLock;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;

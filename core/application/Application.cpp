@@ -379,6 +379,8 @@ void Application::Exit() {
     // TODO: make it common
     FlusherSLS::RecycleResourceIfNotUsed();
 
+    CollectionPipelineManager::GetInstance()->ClearAllPipelines();
+
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif
