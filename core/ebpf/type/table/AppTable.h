@@ -21,7 +21,7 @@ namespace logtail {
 namespace ebpf {
 
 static constexpr DataElement kConnTrackerElements[] = {
-    kHost,
+    kHostName,
     kAppName,
     kAppId,
     kPodName,
@@ -47,7 +47,7 @@ static constexpr DataElement kConnTrackerElements[] = {
     kDestId,
     kEndpoint,
     kFd,
-    kPid,
+    kProcessId,
     kContainerId,
     kTraceRole,
     kIp,
@@ -62,7 +62,7 @@ static constexpr size_t kConnTrackerElementsTableSize = std::size(kConnTrackerEl
 static constexpr auto kConnTrackerTable = DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
 
 static constexpr DataElement kAppMetricsElements[] = {
-    kHost, // host
+    kHostName, // host
     kAppId, // pid
     kIp, // server ip
     kAppName, // service
@@ -105,7 +105,7 @@ static constexpr DataElement kAppTraceElements[] = {
     kDestId,
     kEndpoint,
     kFd,
-    kPid,
+    kProcessId,
     kContainerId,
     kTraceRole,
     kIp,
@@ -119,7 +119,7 @@ static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 static constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
 static constexpr DataElement kAppLogElements[] = {
-    kHost, // host
+    kHostName, // host
     kAppId, // pid
     kIp, // server ip
     kAppName, // service

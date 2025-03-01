@@ -55,8 +55,8 @@ protected:
         std::filesystem::create_directories(pidDir);
 
         // Create cmdline file with null separators
-        const char cmdline[] = {'t', 'e',  's', 't', '\0', 'p', 'r',  'o', 'g', 'r', 'a',
-                                'm', '\0', 'a', 'r', 'g',  '1', '\0', 'a', 'r', 'g', '2'};
+        const char cmdline[] = {'t', 'e',  's', 't', ' ', 'p', 'r',  'o', 'g', 'r', 'a',
+                                'm', '\0', 'a', 'r', 'g', '1', '\0', 'a', 'r', 'g', '2'};
         WriteStringWithNulls(pidDir / "cmdline", cmdline, sizeof(cmdline));
 
         // Create comm file
@@ -107,7 +107,8 @@ void ProcParserUnittest::TestGetPIDCmdline() {
     CreateProcTestFiles(testPid);
 
     std::string cmdline = mParser->GetPIDCmdline(testPid);
-    APSARA_TEST_STREQ_DESC(cmdline.c_str(), "test program arg1 arg2", "Cmdline should match");
+    const char expected[] = "test program\0arg1\0arg2";
+    APSARA_TEST_TRUE_DESC(cmdline == std::string(expected, sizeof(expected) - 1), "Cmdline should match");
 }
 
 void ProcParserUnittest::TestGetPIDComm() {

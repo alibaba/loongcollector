@@ -48,8 +48,8 @@ void NetworkObserverEventUnittest::TestConnId() {
     // 测试构造函数
     ConnId id1(1, 1000, 123456);
     APSARA_TEST_EQUAL(id1.fd, 1);
-    APSARA_TEST_EQUAL(id1.tgid, 1000);
-    APSARA_TEST_EQUAL(id1.start, 123456);
+    APSARA_TEST_EQUAL(id1.tgid, 1000U);
+    APSARA_TEST_EQUAL(id1.start, 123456UL);
 
     // 测试拷贝构造
     ConnId id2(id1);
@@ -58,10 +58,10 @@ void NetworkObserverEventUnittest::TestConnId() {
     APSARA_TEST_EQUAL(id2.start, id1.start);
 
     // 测试移动构造
-    ConnId id3(std::move(ConnId(2, 2000, 234567)));
+    ConnId id3(ConnId(2, 2000, 234567));
     APSARA_TEST_EQUAL(id3.fd, 2);
-    APSARA_TEST_EQUAL(id3.tgid, 2000);
-    APSARA_TEST_EQUAL(id3.start, 234567);
+    APSARA_TEST_EQUAL(id3.tgid, 2000U);
+    APSARA_TEST_EQUAL(id3.start, 234567UL);
 
     // 测试相等运算符
     APSARA_TEST_TRUE(id1 == id2);

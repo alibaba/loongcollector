@@ -66,8 +66,8 @@ void ProtocolParserUnittest::TestParseHttp() {
     APSARA_TEST_EQUAL(result->GetRealPath(), "/index.html");
     APSARA_TEST_EQUAL(result->GetPath(), "/index.html");
     APSARA_TEST_EQUAL(result->GetReqBody(), "");
-    APSARA_TEST_EQUAL(result->GetReqBodySize(), 0);
-    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 3);
+    APSARA_TEST_EQUAL(result->GetReqBodySize(), 0UL);
+    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 3UL);
 
     // APSARA_TEST_EQUAL(result->GetReqHeaderMap()_byte_size, input.size());
     // APSARA_TEST_EQUAL(result.body, "");
@@ -97,7 +97,7 @@ void ProtocolParserUnittest::TestParseHttpResponse() {
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetStatusCode(), 200);
     APSARA_TEST_EQUAL(result->GetRespMsg(), "OK");
-    APSARA_TEST_EQUAL(result->GetRespHeaderMap().size(), 2);
+    APSARA_TEST_EQUAL(result->GetRespHeaderMap().size(), 2UL);
     APSARA_TEST_EQUAL(result->GetRespBody(), "Hello, World!");
 
     // 测试404响应
@@ -126,7 +126,7 @@ void ProtocolParserUnittest::TestParseHttpHeaders() {
 
     ParseState state = http::ParseRequest(&buf, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 4);
+    APSARA_TEST_EQUAL(result->GetReqHeaderMap().size(), 4UL);
 
     // 验证特定头部
     APSARA_TEST_TRUE(result->GetReqHeaderMap().find("host") != result->GetReqHeaderMap().end());
@@ -224,7 +224,7 @@ void ProtocolParserUnittest::TestProtocolParserManager() {
 
 void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     // 测试空请求
-    const std::string emptyRequest = "";
+    const std::string emptyRequest;
     std::string_view buf1(emptyRequest);
     std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
     ParseState state = http::ParseRequest(&buf1, result, true);
@@ -291,7 +291,6 @@ const std::string RESP_MSG = "HTTP/1.1 200 OK\r\n"
                              "4444444444444444444444444444444444444444444444444444444444444444\r\n\r\n";
 
 void ProtocolParserUnittest::RequestBenchmark() {
-    std::string_view reqBuf(REQ);
     std::unique_ptr<HttpRecord> result = std::make_unique<HttpRecord>(nullptr);
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -307,14 +306,13 @@ void ProtocolParserUnittest::RequestBenchmark() {
 }
 
 void ProtocolParserUnittest::RequestWithoutBodyBenchmark() {
-    std::string_view reqBuf(REQ);
     HTTPRequest result;
 
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < 10000000; i++) {
         std::string_view reqBuf(REQ);
-        auto res = http::ParseHttpRequest(reqBuf, &result);
+        http::ParseHttpRequest(reqBuf, &result);
     }
 
     auto end = std::chrono::high_resolution_clock::now();

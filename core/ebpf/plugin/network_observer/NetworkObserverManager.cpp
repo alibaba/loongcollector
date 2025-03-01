@@ -66,7 +66,7 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               auto ctAttrs = connection->GetConnTrackerAttrs();
               data->mAppId = ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())];
               data->mAppName = ctAttrs[kConnTrackerTable.ColIndex(kAppName.Name())];
-              data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())];
+              data->mHost = ctAttrs[kConnTrackerTable.ColIndex(kHostName.Name())];
               data->mIp = ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())];
 
               data->mWorkloadKind = ctAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())];
@@ -165,7 +165,7 @@ NetworkObserverManager::GenerateAggKeyForSpan(const std::shared_ptr<AbstractReco
         return {};
     }
     auto connTrackerAttrs = connection->GetConnTrackerAttrs();
-    auto elements = {kAppId, kIp, kHost};
+    auto elements = {kAppId, kIp, kHostName};
     for (auto& x : elements) {
         auto attr = connTrackerAttrs[kConnTrackerTable.ColIndex(x.Name())];
         hash_result[0] ^= hasher(attr) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
@@ -412,7 +412,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
                 eventGroup.SetTag(std::string(kAppId.MetricKey()), group->mAppId); // app id
                 eventGroup.SetTag(std::string(kIp.MetricKey()), group->mIp); // pod ip
                 eventGroup.SetTag(std::string(kAppName.MetricKey()), group->mAppName); // app name
-                eventGroup.SetTag(std::string(kHost.MetricKey()), group->mHost); // pod name
+                eventGroup.SetTag(std::string(kHostName.MetricKey()), group->mHost); // pod name
 
                 auto* tagMetric = eventGroup.AddMetricEvent();
                 tagMetric->SetName(METRIC_NAME_TAG);
@@ -587,7 +587,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                                       ctAttrs[kConnTrackerTable.ColIndex(kAppId.Name())]); // app id
                     eventGroup.SetTag(kHostIp.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())]); // pod ip
-                    eventGroup.SetTag(kHost.SpanKey(),
+                    eventGroup.SetTag(kHostName.SpanKey(),
                                       ctAttrs[kConnTrackerTable.ColIndex(kPodName.Name())]); // pod name
                     eventGroup.SetTag(kAppType.SpanKey(), EBPF_VALUE); //
                     eventGroup.SetTag(kDataType.SpanKey(), TRACE_VALUE);
@@ -598,7 +598,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 }
                 auto* spanEvent = eventGroup.AddSpanEvent();
                 spanEvent->SetTag("app", ctAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())]);
-                spanEvent->SetTag(kHost.Name(), ctAttrs[kConnTrackerTable.ColIndex(kHost.Name())]);
+                spanEvent->SetTag(kHostName.Name(), ctAttrs[kConnTrackerTable.ColIndex(kHostName.Name())]);
                 for (auto element : kAppTraceTable.Elements()) {
                     auto sb = sourceBuffer->CopyString(ctAttrs[kConnTrackerTable.ColIndex(element.Name())]);
                     spanEvent->SetTagNoCopy(element.SpanKey(), StringView(sb.data, sb.size));

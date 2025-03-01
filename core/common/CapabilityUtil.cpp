@@ -17,78 +17,82 @@
 #include <array>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+
+#include "common/memory/SourceBuffer.h"
 
 namespace logtail {
 
-static const std::array<std::string, 41> CAPABILITY_STRINGS = {{"CAP_CHOWN",
-                                                                "DAC_OVERRIDE",
-                                                                "CAP_DAC_READ_SEARCH",
-                                                                "CAP_FOWNER",
-                                                                "CAP_FSETID",
-                                                                "CAP_KILL",
-                                                                "CAP_SETGID",
-                                                                "CAP_SETUID",
-                                                                "CAP_SETPCAP",
-                                                                "CAP_LINUX_IMMUTABLE",
-                                                                "CAP_NET_BIND_SERVICE",
-                                                                "CAP_NET_BROADCAST",
-                                                                "CAP_NET_ADMIN",
-                                                                "CAP_NET_RAW",
-                                                                "CAP_IPC_LOCK",
-                                                                "CAP_IPC_OWNER",
-                                                                "CAP_SYS_MODULE",
-                                                                "CAP_SYS_RAWIO",
-                                                                "CAP_SYS_CHROOT",
-                                                                "CAP_SYS_PTRACE",
-                                                                "CAP_SYS_PACCT",
-                                                                "CAP_SYS_ADMIN",
-                                                                "CAP_SYS_BOOT",
-                                                                "CAP_SYS_NICE",
-                                                                "CAP_SYS_RESOURCE",
-                                                                "CAP_SYS_TIME",
-                                                                "CAP_SYS_TTY_CONFIG",
-                                                                "CAP_MKNOD",
-                                                                "CAP_LEASE",
-                                                                "CAP_AUDIT_WRITE",
-                                                                "CAP_AUDIT_CONTROL",
-                                                                "CAP_SETFCAP",
-                                                                "CAP_MAC_OVERRIDE",
-                                                                "CAP_MAC_ADMIN",
-                                                                "CAP_SYSLOG",
-                                                                "CAP_WAKE_ALARM",
-                                                                "CAP_BLOCK_SUSPEND",
-                                                                "CAP_AUDIT_READ",
-                                                                "CAP_PERFMON",
-                                                                "CAP_BPF",
-                                                                "CAP_CHECKPOINT_RESTORE"}};
+static constexpr std::array kCapabilityStrings = {std::string_view("CAP_CHOWN"),
+                                                  std::string_view("DAC_OVERRIDE"),
+                                                  std::string_view("CAP_DAC_READ_SEARCH"),
+                                                  std::string_view("CAP_FOWNER"),
+                                                  std::string_view("CAP_FSETID"),
+                                                  std::string_view("CAP_KILL"),
+                                                  std::string_view("CAP_SETGID"),
+                                                  std::string_view("CAP_SETUID"),
+                                                  std::string_view("CAP_SETPCAP"),
+                                                  std::string_view("CAP_LINUX_IMMUTABLE"),
+                                                  std::string_view("CAP_NET_BIND_SERVICE"),
+                                                  std::string_view("CAP_NET_BROADCAST"),
+                                                  std::string_view("CAP_NET_ADMIN"),
+                                                  std::string_view("CAP_NET_RAW"),
+                                                  std::string_view("CAP_IPC_LOCK"),
+                                                  std::string_view("CAP_IPC_OWNER"),
+                                                  std::string_view("CAP_SYS_MODULE"),
+                                                  std::string_view("CAP_SYS_RAWIO"),
+                                                  std::string_view("CAP_SYS_CHROOT"),
+                                                  std::string_view("CAP_SYS_PTRACE"),
+                                                  std::string_view("CAP_SYS_PACCT"),
+                                                  std::string_view("CAP_SYS_ADMIN"),
+                                                  std::string_view("CAP_SYS_BOOT"),
+                                                  std::string_view("CAP_SYS_NICE"),
+                                                  std::string_view("CAP_SYS_RESOURCE"),
+                                                  std::string_view("CAP_SYS_TIME"),
+                                                  std::string_view("CAP_SYS_TTY_CONFIG"),
+                                                  std::string_view("CAP_MKNOD"),
+                                                  std::string_view("CAP_LEASE"),
+                                                  std::string_view("CAP_AUDIT_WRITE"),
+                                                  std::string_view("CAP_AUDIT_CONTROL"),
+                                                  std::string_view("CAP_SETFCAP"),
+                                                  std::string_view("CAP_MAC_OVERRIDE"),
+                                                  std::string_view("CAP_MAC_ADMIN"),
+                                                  std::string_view("CAP_SYSLOG"),
+                                                  std::string_view("CAP_WAKE_ALARM"),
+                                                  std::string_view("CAP_BLOCK_SUSPEND"),
+                                                  std::string_view("CAP_AUDIT_READ"),
+                                                  std::string_view("CAP_PERFMON"),
+                                                  std::string_view("CAP_BPF"),
+                                                  std::string_view("CAP_CHECKPOINT_RESTORE")};
 
-static constexpr int32_t CAP_LAST_CAP = 40;
-
-const std::string& GetCapability(int32_t capInt) {
-    if (capInt < 0 || capInt > CAP_LAST_CAP) {
-        throw std::invalid_argument("invalid capability value " + std::to_string(capInt));
-    }
-    return CAPABILITY_STRINGS[capInt];
-}
-
-std::string GetCapabilities(uint64_t capInt) {
+StringView GetCapabilities(uint64_t capInt, std::shared_ptr<SourceBuffer>& sb) {
     if (capInt == 0) {
-        return "";
+        return StringView("");
     }
 
-    std::string result;
-    result.reserve(CAP_LAST_CAP * 16);
-
-    for (uint64_t i = 0; i <= CAP_LAST_CAP; ++i) {
+    size_t capLen = 0;
+    for (uint64_t i = 0; i <= kCapabilityStrings.size(); ++i) {
         if ((1ULL << i) & capInt) {
-            if (!result.empty()) {
-                result.append(1, ' ');
+            if (capLen == 0) {
+                ++capLen;
             }
-            result.append(CAPABILITY_STRINGS[i]);
+            capLen += kCapabilityStrings[i].size();
         }
     }
 
-    return result;
+    auto result = sb->AllocateStringBuffer(capLen);
+    for (uint64_t i = 0; i <= kCapabilityStrings.size(); ++i) {
+        if ((1ULL << i) & capInt) {
+            if (result.size == 0) {
+                memcpy(result.data, " ", 1);
+                ++result.size;
+            }
+            memcpy(result.data, kCapabilityStrings[i].data(), kCapabilityStrings[i].size());
+            result.size += kCapabilityStrings[i].size();
+        }
+    }
+
+    return {result.data, result.size};
 }
 
 } // namespace logtail

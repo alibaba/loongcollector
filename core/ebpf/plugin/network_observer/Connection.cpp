@@ -19,6 +19,7 @@
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
 #include "logger/Logger.h"
+#include "type/table/BaseElements.h"
 extern "C" {
 #include <coolbpf/net.h>
 }
@@ -194,7 +195,7 @@ void Connection::SafeUpdateNetMetaAttr(struct conn_stats_event_t* event) {
     {
         WriteLock lock(mAttrLock);
         mAttrs[kConnTrackerTable.ColIndex(kFd.Name())] = std::to_string(mConnId.fd);
-        mAttrs[kConnTrackerTable.ColIndex(kPid.Name())] = std::to_string(mConnId.tgid);
+        mAttrs[kConnTrackerTable.ColIndex(kProcessId.Name())] = std::to_string(mConnId.tgid);
         mAttrs[kConnTrackerTable.ColIndex(kStartTsNs.Name())] = std::to_string(mConnId.start);
         mAttrs[kConnTrackerTable.ColIndex(kContainerId.Name())] = cidTrim;
         mAttrs[kConnTrackerTable.ColIndex(kLocalAddr.Name())] = saddr;
@@ -252,7 +253,7 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
         mAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())] = pod->workloadName;
         mAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())] = workloadKind;
         mAttrs[kConnTrackerTable.ColIndex(kNamespace.Name())] = pod->k8sNamespace;
-        mAttrs[kConnTrackerTable.ColIndex(kHost.Name())] = pod->podName;
+        mAttrs[kConnTrackerTable.ColIndex(kHostName.Name())] = pod->podName;
         MarkPodMetaAttached();
     }
 }
@@ -312,7 +313,7 @@ void Connection::UpdateSelfPodMetaForUnknown() {
     mAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())] = UNKNOWN_STR;
     mAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())] = UNKNOWN_STR;
     mAttrs[kConnTrackerTable.ColIndex(kNamespace.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kHost.Name())] = UNKNOWN_STR;
+    mAttrs[kConnTrackerTable.ColIndex(kHostName.Name())] = UNKNOWN_STR;
     MarkPodMetaAttached();
 }
 

@@ -38,8 +38,6 @@ namespace ebpf {
 
 class AbstractManager {
 public:
-    static const std::string sCallNameKey;
-    static const std::string sEventTypeKey;
     static const std::string sKprobeValue;
 
     AbstractManager() = delete;

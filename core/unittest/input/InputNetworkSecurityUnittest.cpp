@@ -129,9 +129,9 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("10.0.0.0/8", thisFilter1.mDestAddrList[0]);
     APSARA_TEST_EQUAL("92.168.0.0/16", thisFilter1.mDestAddrList[1]);
-    APSARA_TEST_EQUAL(0, thisFilter1.mDestPortList.size());
+    APSARA_TEST_EQUAL(0UL, thisFilter1.mDestPortList.size());
     APSARA_TEST_EQUAL("127.0.0.1/8", thisFilter1.mSourceAddrBlackList[0]);
-    APSARA_TEST_EQUAL(9300, thisFilter1.mSourcePortBlackList[0]);
+    APSARA_TEST_EQUAL(9300U, thisFilter1.mSourcePortBlackList[0]);
 
     // error param level
     configStr = R"(

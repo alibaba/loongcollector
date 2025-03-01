@@ -21,7 +21,6 @@ namespace logtail {
 namespace ebpf {
 
 static constexpr DataElement kProcessCommonElements[] = {kExecId,
-                                                         kParentExecId,
                                                          kProcessId,
                                                          kUid,
                                                          kUser,

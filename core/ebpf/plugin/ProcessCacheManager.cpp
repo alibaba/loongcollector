@@ -38,6 +38,7 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "logger/Logger.h"
+#include "type/table/BaseElements.h"
 #include "util/FrequencyManager.h"
 
 namespace logtail {
@@ -794,8 +795,8 @@ std::string ProcessCacheManager::GenerateExecId(uint32_t pid, uint64_t ktime) {
     // /proc/sys/kernel/pid_max is usually 7 digits 4194304
     // nano timestamp is usually 19 digits
     std::string execid;
-    execid.reserve(mHostName.size() + 1 + 7 + 1 + 19);
-    execid.assign(mHostName).append(":").append(std::to_string(pid)).append(":").append(std::to_string(ktime));
+    execid.reserve(mHostName.size() + 1 + 19 + 1 + 7);
+    execid.assign(mHostName).append(":").append(std::to_string(ktime)).append(":").append(std::to_string(pid));
     return Base64Enconde(execid);
 }
 
@@ -837,9 +838,6 @@ void ProcessCacheManager::HandleCacheUpdate() {
 
 SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>& sb, uint32_t pid, uint64_t ktime) {
     static const std::string kUnkownStr = "unknown";
-    static const std::string kPermittedStr = "permitted";
-    static const std::string kInheritableStr = "inheritable";
-    static const std::string kEffectiveStr = "effective";
 
     SizedMap res;
     auto proc = LookupCache({pid, ktime});
@@ -850,46 +848,16 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
         return res;
     }
 
-    auto parentProc = LookupCache({pid, ktime});
+    // event_type, added by xxx_security_manager
+    // call_name, added by xxx_security_manager
+    // event_time, added by xxx_security_manager
 
     // finalize proc tags
     auto execIdSb = sb->CopyString(proc->exec_id);
     res.Insert(kExecId.LogKey(), StringView(execIdSb.data, execIdSb.size));
 
-    auto pExecIdSb = sb->CopyString(proc->parent_exec_id);
-    res.Insert(kParentExecId.LogKey(), StringView(pExecIdSb.data, pExecIdSb.size));
-
-    std::string args = proc->process.args;
-    std::string binary = proc->process.filename;
-    std::string permitted = GetCapabilities(proc->msg.creds.caps.permitted);
-    std::string effective = GetCapabilities(proc->msg.creds.caps.effective);
-    std::string inheritable = GetCapabilities(proc->msg.creds.caps.inheritable);
-
-    rapidjson::Document::AllocatorType allocator;
-    rapidjson::Value cap(rapidjson::kObjectType);
-
-    cap.AddMember(rapidjson::StringRef(kPermittedStr.data()),
-                  rapidjson::Value().SetString(permitted.c_str(), allocator),
-                  allocator);
-    cap.AddMember(rapidjson::StringRef(kEffectiveStr.data()),
-                  rapidjson::Value().SetString(effective.c_str(), allocator),
-                  allocator);
-    cap.AddMember(rapidjson::StringRef(kInheritableStr.data()),
-                  rapidjson::Value().SetString(inheritable.c_str(), allocator),
-                  allocator);
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-
-    cap.Accept(writer);
-
-    std::string capStr = buffer.GetString();
-
-    // event_type, added by xxx_security_manager
-    // call_name, added by xxx_security_manager
-    // event_time, added by xxx_security_manager
     auto pidSb = sb->CopyString(std::to_string(proc->process.pid));
-    res.Insert(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
+    res.Insert(kProcessId.LogKey(), StringView(pidSb.data, pidSb.size));
 
     auto uidSb = sb->CopyString(std::to_string(proc->process.uid));
     res.Insert(kUid.LogKey(), StringView(uidSb.data, uidSb.size));
@@ -897,10 +865,10 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto userSb = sb->CopyString(proc->process.user.name);
     res.Insert(kUser.LogKey(), StringView(userSb.data, userSb.size));
 
-    auto binarySb = sb->CopyString(binary);
+    auto binarySb = sb->CopyString(proc->process.filename);
     res.Insert(kBinary.LogKey(), StringView(binarySb.data, binarySb.size));
 
-    auto argsSb = sb->CopyString(args);
+    auto argsSb = sb->CopyString(proc->process.args);
     res.Insert(kArguments.LogKey(), StringView(argsSb.data, argsSb.size));
 
     auto cwdSb = sb->CopyString(proc->process.cwd);
@@ -909,75 +877,54 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto ktimeSb = sb->CopyString(std::to_string(proc->process.ktime));
     res.Insert(kKtime.LogKey(), StringView(ktimeSb.data, ktimeSb.size));
 
-    auto capSb = sb->CopyString(capStr);
-    res.Insert(kCap.LogKey(), StringView(capSb.data, capSb.size));
+    auto permitted = GetCapabilities(proc->msg.creds.caps.permitted, sb);
+    res.Insert(kCapPermitted.LogKey(), permitted);
 
+    auto effective = GetCapabilities(proc->msg.creds.caps.effective, sb);
+    res.Insert(kCapEffective.LogKey(), effective);
+
+    auto inheritable = GetCapabilities(proc->msg.creds.caps.inheritable, sb);
+    res.Insert(kCapInheritable.LogKey(), inheritable);
+
+    auto parentProc = LookupCache({pid, ktime});
     // for parent
     if (!parentProc) {
-        res.Insert(kParentProcess.LogKey(), StringView(kUnkownStr));
         return res;
     }
-    { // finalize parent tags
-        std::string permitted = GetCapabilities(parentProc->msg.creds.caps.permitted);
-        std::string effective = GetCapabilities(parentProc->msg.creds.caps.effective);
-        std::string inheritable = GetCapabilities(parentProc->msg.creds.caps.inheritable);
+    // finalize parent tags
+    auto parentExecIdSb = sb->CopyString(parentProc->exec_id);
+    res.Insert(kParentExecId.LogKey(), StringView(parentExecIdSb.data, parentExecIdSb.size));
 
-        rapidjson::Document d;
-        d.SetObject();
+    auto parentPidSb = sb->CopyString(std::to_string(parentProc->process.pid));
+    res.Insert(kParentProcessId.LogKey(), StringView(parentPidSb.data, parentPidSb.size));
 
-        rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
+    auto parentUidSb = sb->CopyString(std::to_string(parentProc->process.uid));
+    res.Insert(kParentUid.LogKey(), StringView(parentUidSb.data, parentUidSb.size));
 
-        d.AddMember(rapidjson::StringRef(kExecId.LogKey().data()),
-                    rapidjson::Value().SetString(parentProc->exec_id.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kParentExecId.LogKey().data()),
-                    rapidjson::Value().SetString(parentProc->parent_exec_id.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kPid.LogKey().data()),
-                    rapidjson::Value().SetString(std::to_string(parentProc->process.pid).c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kUid.LogKey().data()),
-                    rapidjson::Value().SetString(std::to_string(parentProc->process.uid).c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kUser.LogKey().data()),
-                    rapidjson::Value().SetString(parentProc->process.user.name.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kBinary.LogKey().data()),
-                    rapidjson::Value().SetString(binary.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kArguments.LogKey().data()),
-                    rapidjson::Value().SetString(args.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kCWD.LogKey().data()),
-                    rapidjson::Value().SetString(parentProc->process.cwd.c_str(), allocator),
-                    allocator);
-        d.AddMember(rapidjson::StringRef(kKtime.LogKey().data()),
-                    rapidjson::Value().SetString(std::to_string(parentProc->process.ktime).c_str(), allocator),
-                    allocator);
+    auto parentUserSb = sb->CopyString(parentProc->process.user.name);
+    res.Insert(kParentUser.LogKey(), StringView(parentUserSb.data, parentUserSb.size));
 
-        rapidjson::Value cap(rapidjson::kObjectType);
+    auto parentBinarySb = sb->CopyString(parentProc->process.filename);
+    res.Insert(kParentBinary.LogKey(), StringView(parentBinarySb.data, parentBinarySb.size));
 
-        cap.AddMember(rapidjson::StringRef(kPermittedStr.data()),
-                      rapidjson::Value().SetString(permitted.c_str(), allocator),
-                      allocator);
-        cap.AddMember(rapidjson::StringRef(kEffectiveStr.data()),
-                      rapidjson::Value().SetString(effective.c_str(), allocator),
-                      allocator);
-        cap.AddMember(rapidjson::StringRef(kInheritableStr.data()),
-                      rapidjson::Value().SetString(inheritable.c_str(), allocator),
-                      allocator);
+    auto parentArgsSb = sb->CopyString(parentProc->process.args);
+    res.Insert(kParentArguments.LogKey(), StringView(parentArgsSb.data, parentArgsSb.size));
 
-        d.AddMember(rapidjson::StringRef(kCap.LogKey().data()), cap, allocator);
+    auto parentCwdSb = sb->CopyString(parentProc->process.cwd);
+    res.Insert(kParentCWD.LogKey(), StringView(parentCwdSb.data, parentCwdSb.size));
 
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        d.Accept(writer);
+    auto parentKtimeSb = sb->CopyString(std::to_string(parentProc->process.ktime));
+    res.Insert(kParentKtime.LogKey(), StringView(parentKtimeSb.data, parentKtimeSb.size));
 
-        std::string result = buffer.GetString();
+    auto parentPermitted = GetCapabilities(parentProc->msg.creds.caps.permitted, sb);
+    res.Insert(kParentCapPermitted.LogKey(), parentPermitted);
 
-        auto parentSb = sb->CopyString(result);
-        res.Insert(kParentProcess.LogKey(), StringView(parentSb.data, parentSb.size));
-    }
+    auto parentEffective = GetCapabilities(parentProc->msg.creds.caps.effective, sb);
+    res.Insert(kParentCapEffective.LogKey(), parentEffective);
+
+    auto parentInheritable = GetCapabilities(parentProc->msg.creds.caps.inheritable, sb);
+    res.Insert(kParentCapInheritable.LogKey(), parentInheritable);
+
     return res;
 }
 

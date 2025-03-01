@@ -193,24 +193,21 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::TCP_SENDMSG_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpSendMsgValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CONNECT_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpConnectValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CLOSE_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpCloseValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     default:

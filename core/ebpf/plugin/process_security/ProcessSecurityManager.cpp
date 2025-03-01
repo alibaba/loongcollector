@@ -28,6 +28,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {
 namespace ebpf {
@@ -98,29 +99,26 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 logEvent->SetTimestamp(seconds.count(), ts);
                 switch (innerEvent->mEventType) {
                     case KernelEventType::PROCESS_EXECVE_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(ProcessSecurityManager::kExecveValue));
                         // ? kprobe or execve
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                        logEvent->SetContentNoCopy(kEventType.LogKey(),
                                                    StringView(ProcessSecurityManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::PROCESS_EXIT_EVENT: {
                         CommonEvent* ce = innerEvent.get();
                         ProcessExitEvent* exitEvent = static_cast<ProcessExitEvent*>(ce);
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(ProcessSecurityManager::kExitValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kExitValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         logEvent->SetContent(ProcessSecurityManager::kExitCodeKey,
                                              std::to_string(exitEvent->mExitCode));
                         logEvent->SetContent(ProcessSecurityManager::kExitTidKey, std::to_string(exitEvent->mExitTid));
                         break;
                     }
                     case KernelEventType::PROCESS_CLONE_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(ProcessSecurityManager::kCloneValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kCloneValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(),
                                                    StringView(ProcessSecurityManager::sKprobeValue));
                         break;
                     }

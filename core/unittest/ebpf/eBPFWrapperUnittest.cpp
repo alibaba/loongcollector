@@ -13,7 +13,7 @@
 // limitations under the License.
 
 extern "C" {
-#include <coolbpf/net.h>
+// #include <coolbpf/net.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>

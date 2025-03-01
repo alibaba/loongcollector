@@ -20,6 +20,7 @@
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -151,24 +152,18 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(FileSecurityManager::sTruncateValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_MMAP: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(FileSecurityManager::sMmapValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sMmapValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sCallNameKey),
-                                                   StringView(FileSecurityManager::sTruncateValue));
-                        logEvent->SetContentNoCopy(StringView(AbstractManager::sEventTypeKey),
-                                                   StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         break;
                     }
                     default:

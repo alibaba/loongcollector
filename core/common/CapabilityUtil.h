@@ -16,10 +16,9 @@
 
 #include <string>
 
+#include "common/memory/SourceBuffer.h"
+
 namespace logtail {
 
-std::string GetCapabilities(uint64_t capInt);
-
-const std::string& GetCapability(int32_t capInt);
-
+StringView GetCapabilities(uint64_t capInt, std::shared_ptr<SourceBuffer>& sb);
 } // namespace logtail

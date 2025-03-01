@@ -22,7 +22,6 @@ namespace ebpf {
 
 static constexpr DataElement kFileSecurityElements[] = {
     kExecId,
-    kParentExecId,
     kProcessId,
     kUid,
     kUser,

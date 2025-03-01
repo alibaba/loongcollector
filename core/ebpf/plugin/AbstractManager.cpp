@@ -22,8 +22,6 @@
 namespace logtail {
 namespace ebpf {
 
-const std::string AbstractManager::sCallNameKey = "call_name";
-const std::string AbstractManager::sEventTypeKey = "event_type";
 const std::string AbstractManager::sKprobeValue = "kprobe";
 
 

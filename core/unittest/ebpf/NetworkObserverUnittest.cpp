@@ -238,8 +238,8 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     APSARA_TEST_EQUAL(httpRecord->GetPath(), "/index.html");
     APSARA_TEST_EQUAL(httpRecord->GetSpanName(), "/index.html");
     APSARA_TEST_EQUAL(httpRecord->GetStatusCode(), 200);
-    APSARA_TEST_EQUAL(httpRecord->GetStartTimeStamp(), 1);
-    APSARA_TEST_EQUAL(httpRecord->GetEndTimeStamp(), 2);
+    APSARA_TEST_EQUAL(httpRecord->GetStartTimeStamp(), 1UL);
+    APSARA_TEST_EQUAL(httpRecord->GetEndTimeStamp(), 2UL);
 
     auto attrs = httpRecord->GetConnection()->GetConnTrackerAttrs();
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kLocalAddr.Name())], "127.0.0.1:8080");
@@ -341,8 +341,8 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     auto now = std::chrono::steady_clock::now();
     LOG_INFO(sLogger, ("====== consume span ======", ""));
     APSARA_TEST_TRUE(manager->ConsumeSpanAggregateTree(now));
-    APSARA_TEST_EQUAL(manager->mSpanEventGroups.size(), 1);
-    APSARA_TEST_EQUAL(manager->mSpanEventGroups[0].GetEvents().size(), 100);
+    APSARA_TEST_EQUAL(manager->mSpanEventGroups.size(), 1UL);
+    APSARA_TEST_EQUAL(manager->mSpanEventGroups[0].GetEvents().size(), 100UL);
     auto tags = manager->mSpanEventGroups[0].GetTags();
     APSARA_TEST_EQUAL(tags.size(), 6);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
@@ -355,9 +355,9 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     LOG_INFO(sLogger, ("====== consume metric ======", ""));
     APSARA_TEST_TRUE(manager->ConsumeMetricAggregateTree(now));
     APSARA_TEST_EQUAL(manager->mMetricEventGroups.size(), 1);
-    APSARA_TEST_EQUAL(manager->mMetricEventGroups[0].GetEvents().size(), 301);
+    APSARA_TEST_EQUAL(manager->mMetricEventGroups[0].GetEvents().size(), 301UL);
     tags = manager->mMetricEventGroups[0].GetTags();
-    APSARA_TEST_EQUAL(tags.size(), 6);
+    APSARA_TEST_EQUAL(tags.size(), 6UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "test-pod-ip");
@@ -366,10 +366,10 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
     LOG_INFO(sLogger, ("====== consume log ======", ""));
     APSARA_TEST_TRUE(manager->ConsumeLogAggregateTree(now));
-    APSARA_TEST_EQUAL(manager->mLogEventGroups.size(), 1);
-    APSARA_TEST_EQUAL(manager->mLogEventGroups[0].GetEvents().size(), 100);
+    APSARA_TEST_EQUAL(manager->mLogEventGroups.size(), 1UL);
+    APSARA_TEST_EQUAL(manager->mLogEventGroups[0].GetEvents().size(), 100UL);
     tags = manager->mLogEventGroups[0].GetTags();
-    APSARA_TEST_EQUAL(tags.size(), 0);
+    APSARA_TEST_EQUAL(tags.size(), 0UL);
 }
 
 // TEST RollBack mechanism
@@ -471,10 +471,10 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         std::cout << magic_enum::enum_name(support_proto_e::ProtoHTTP) << std::endl;
         manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_TRUE(manager->mPreviousOpt != nullptr);
-        APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols.size(), 1);
+        APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols.size(), 1UL);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols[0], "http");
         // only http
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
 
@@ -482,13 +482,13 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         // std::vector<std::string> protocols = {"MySQL", "Redis", "Dubbo"};
         int result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
 
         // protocols = {"HTTP", "MySQL"};
         options.mEnableProtocols = {"HTTP", "MySQL"};
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
 
@@ -496,7 +496,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         options.mEnableProtocols = {};
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
     }
 
     // for enable log
@@ -510,10 +510,10 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         options.mEnableSpan = true;
         manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_TRUE(manager->mPreviousOpt != nullptr);
-        APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols.size(), 1);
+        APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols.size(), 1UL);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableProtocols[0], "http");
         // only http
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, false);
@@ -527,7 +527,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         // std::vector<std::string> protocols = {"MySQL", "Redis", "Dubbo"};
         int result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableMetric, false);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableSpan, false);
@@ -539,7 +539,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         options.mEnableSpan = false;
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
         APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, true);
@@ -550,7 +550,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         options.mEnableProtocols = {};
         result = manager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
         APSARA_TEST_EQUAL(result, 0);
-        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0);
+        APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableLog, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableMetric, true);
         APSARA_TEST_EQUAL(manager->mPreviousOpt->mEnableSpan, false);

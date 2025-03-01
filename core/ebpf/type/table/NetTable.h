@@ -22,7 +22,7 @@ namespace ebpf {
 
 static constexpr DataElement kNetMetricsElements[] = {
 
-    kHost, // host
+    kHostName, // host
     kAppId, // pid
     kIp, // server ip
     kAppName, // service
