@@ -80,6 +80,14 @@ void Timer::Run() {
                         LOG_INFO(sLogger, ("invalid timer event", "task is cancelled"));
                     } else {
                         e->Execute();
+                        if (e->IsPeriodicalEvent()) {
+                            auto pe = static_cast<PeriodicalTimerEvent*>(e.get());
+                            pe->ScheduleNext();
+                            if (!pe->IsStop()) {
+                                LOG_DEBUG(sLogger, ("periodical event done", ""));
+                                PushEvent(std::move(e));
+                            }
+                        }
                     }
                     queueLock.lock();
                 }
