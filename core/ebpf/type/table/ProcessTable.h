@@ -28,9 +28,21 @@ static constexpr DataElement kProcessCommonElements[] = {kExecId,
                                                          kArguments,
                                                          kCWD,
                                                          kKtime,
-                                                         kCap,
-                                                         kParentProcess,
+                                                         kCapInheritable,
+                                                         kCapPermitted,
+                                                         kCapEffective,
+                                                         kParentProcessId,
+                                                         kParentUid,
+                                                         kParentUser,
+                                                         kParentBinary,
+                                                         kParentArguments,
+                                                         kParentCWD,
+                                                         kParentKtime,
+                                                         kParentCapInheritable,
+                                                         kParentCapPermitted,
+                                                         kParentCapEffective,
                                                          kContainerId};
+
 static constexpr size_t kProcessCommonTableSize = std::size(kProcessCommonElements);
 
 static constexpr auto kProcessCommonTable = DataTableSchema("process_common_table", "", kProcessCommonElements);

@@ -13,69 +13,39 @@
 // limitations under the License.
 
 #include "common/CapabilityUtil.h"
+#include "memory/SourceBuffer.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
 
 class CapabilityUtilUnittest : public ::testing::Test {
 public:
-    void TestGetCapability();
     void TestGetCapabilities();
-    void TestInvalidCapability();
 };
-
-void CapabilityUtilUnittest::TestGetCapability() {
-    // Test some common capabilities
-    APSARA_TEST_STREQ_DESC(GetCapability(0).c_str(), "CAP_CHOWN", "CAP_CHOWN should match");
-    APSARA_TEST_STREQ_DESC(GetCapability(1).c_str(), "DAC_OVERRIDE", "DAC_OVERRIDE should match");
-    APSARA_TEST_STREQ_DESC(GetCapability(2).c_str(), "CAP_DAC_READ_SEARCH", "CAP_DAC_READ_SEARCH should match");
-    APSARA_TEST_STREQ_DESC(GetCapability(7).c_str(), "CAP_SETUID", "CAP_SETUID should match");
-    APSARA_TEST_STREQ_DESC(GetCapability(21).c_str(), "CAP_SYS_ADMIN", "CAP_SYS_ADMIN should match");
-}
 
 void CapabilityUtilUnittest::TestGetCapabilities() {
     // Test single capability
     uint64_t singleCap = 1ULL << 0; // CAP_CHOWN
-    APSARA_TEST_STREQ_DESC(GetCapabilities(singleCap).c_str(), "CAP_CHOWN", "Single capability should match");
+    SourceBuffer sb;
+    APSARA_TEST_STREQ_FATAL(GetCapabilities(singleCap, sb).data(), "CAP_CHOWN");
 
     // Test multiple capabilities
     uint64_t multipleCaps = (1ULL << 0) | (1ULL << 1) | (1ULL << 7); // CAP_CHOWN, DAC_OVERRIDE, CAP_SETUID
-    std::string result = GetCapabilities(multipleCaps);
-    APSARA_TEST_TRUE(result.find("CAP_CHOWN") != std::string::npos);
-    APSARA_TEST_TRUE(result.find("DAC_OVERRIDE") != std::string::npos);
-    APSARA_TEST_TRUE(result.find("CAP_SETUID") != std::string::npos);
+    auto result = GetCapabilities(multipleCaps, sb);
+    APSARA_TEST_STREQ_FATAL(result.data(), "CAP_CHOWN DAC_OVERRIDE CAP_SETUID");
 
     // Test no capabilities
-    APSARA_TEST_STREQ_DESC(GetCapabilities(0).c_str(), "", "No capabilities should return empty string");
+    APSARA_TEST_STREQ_DESC(GetCapabilities(0, sb).data(), "", "No capabilities should return empty string");
 
     // Test all capabilities
     uint64_t allCaps = ~0ULL;
-    result = GetCapabilities(allCaps);
+    result = GetCapabilities(allCaps, sb);
     APSARA_TEST_TRUE(result.find("CAP_CHOWN") != std::string::npos);
     APSARA_TEST_TRUE(result.find("CAP_SYS_ADMIN") != std::string::npos);
-    APSARA_TEST_TRUE(result.find("CAP_CHECKPOINT_RESTORE") != std::string::npos);
+    APSARA_TEST_TRUE(result.find("CAP_CHECKPOINT_RESTORE") != std::string::npos); // the last capability
 }
 
-void CapabilityUtilUnittest::TestInvalidCapability() {
-    // Test invalid capability value
-    try {
-        GetCapability(-1);
-        APSARA_TEST_TRUE(false); // Should not reach here
-    } catch (const std::invalid_argument& e) {
-        APSARA_TEST_TRUE(true);
-    }
-
-    try {
-        GetCapability(100);
-        APSARA_TEST_TRUE(false); // Should not reach here
-    } catch (const std::invalid_argument& e) {
-        APSARA_TEST_TRUE(true);
-    }
-}
-
-UNIT_TEST_CASE(CapabilityUtilUnittest, TestGetCapability);
 UNIT_TEST_CASE(CapabilityUtilUnittest, TestGetCapabilities);
-UNIT_TEST_CASE(CapabilityUtilUnittest, TestInvalidCapability);
 
 } // namespace logtail
 

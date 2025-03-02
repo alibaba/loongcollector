@@ -65,29 +65,29 @@ static constexpr std::array kCapabilityStrings = {std::string_view("CAP_CHOWN"),
                                                   std::string_view("CAP_BPF"),
                                                   std::string_view("CAP_CHECKPOINT_RESTORE")};
 
-StringView GetCapabilities(uint64_t capInt, std::shared_ptr<SourceBuffer>& sb) {
+StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb) {
     if (capInt == 0) {
         return StringView("");
     }
 
     size_t capLen = 0;
-    for (uint64_t i = 0; i <= kCapabilityStrings.size(); ++i) {
+    for (uint64_t i = 0; i < kCapabilityStrings.size(); ++i) {
         if ((1ULL << i) & capInt) {
-            if (capLen == 0) {
+            if (capLen != 0) {
                 ++capLen;
             }
             capLen += kCapabilityStrings[i].size();
         }
     }
 
-    auto result = sb->AllocateStringBuffer(capLen);
-    for (uint64_t i = 0; i <= kCapabilityStrings.size(); ++i) {
+    auto result = sb.AllocateStringBuffer(capLen);
+    for (uint64_t i = 0; i < kCapabilityStrings.size(); ++i) {
         if ((1ULL << i) & capInt) {
-            if (result.size == 0) {
-                memcpy(result.data, " ", 1);
+            if (result.size != 0) {
+                memcpy(result.data + result.size, " ", 1);
                 ++result.size;
             }
-            memcpy(result.data, kCapabilityStrings[i].data(), kCapabilityStrings[i].size());
+            memcpy(result.data + result.size, kCapabilityStrings[i].data(), kCapabilityStrings[i].size());
             result.size += kCapabilityStrings[i].size();
         }
     }

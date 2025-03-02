@@ -877,13 +877,13 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto ktimeSb = sb->CopyString(std::to_string(proc->process.ktime));
     res.Insert(kKtime.LogKey(), StringView(ktimeSb.data, ktimeSb.size));
 
-    auto permitted = GetCapabilities(proc->msg.creds.caps.permitted, sb);
+    auto permitted = GetCapabilities(proc->msg.creds.caps.permitted, *sb);
     res.Insert(kCapPermitted.LogKey(), permitted);
 
-    auto effective = GetCapabilities(proc->msg.creds.caps.effective, sb);
+    auto effective = GetCapabilities(proc->msg.creds.caps.effective, *sb);
     res.Insert(kCapEffective.LogKey(), effective);
 
-    auto inheritable = GetCapabilities(proc->msg.creds.caps.inheritable, sb);
+    auto inheritable = GetCapabilities(proc->msg.creds.caps.inheritable, *sb);
     res.Insert(kCapInheritable.LogKey(), inheritable);
 
     auto parentProc = LookupCache({pid, ktime});
@@ -916,13 +916,13 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto parentKtimeSb = sb->CopyString(std::to_string(parentProc->process.ktime));
     res.Insert(kParentKtime.LogKey(), StringView(parentKtimeSb.data, parentKtimeSb.size));
 
-    auto parentPermitted = GetCapabilities(parentProc->msg.creds.caps.permitted, sb);
+    auto parentPermitted = GetCapabilities(parentProc->msg.creds.caps.permitted, *sb);
     res.Insert(kParentCapPermitted.LogKey(), parentPermitted);
 
-    auto parentEffective = GetCapabilities(parentProc->msg.creds.caps.effective, sb);
+    auto parentEffective = GetCapabilities(parentProc->msg.creds.caps.effective, *sb);
     res.Insert(kParentCapEffective.LogKey(), parentEffective);
 
-    auto parentInheritable = GetCapabilities(parentProc->msg.creds.caps.inheritable, sb);
+    auto parentInheritable = GetCapabilities(parentProc->msg.creds.caps.inheritable, *sb);
     res.Insert(kParentCapInheritable.LogKey(), parentInheritable);
 
     return res;

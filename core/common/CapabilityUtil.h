@@ -20,5 +20,5 @@
 
 namespace logtail {
 
-StringView GetCapabilities(uint64_t capInt, std::shared_ptr<SourceBuffer>& sb);
+StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb);
 } // namespace logtail
