@@ -243,7 +243,8 @@ void ManagerUnittest::TestProcessCacheManagerCache() {
     execveEvent->process.binary = "test_binary";
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, execveEvent);
+
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
     APSARA_TEST_TRUE(mProcessCacheManager->ContainsKey(key));
 
     // 测试缓存查找
@@ -329,9 +330,9 @@ void ManagerUnittest::TestProcessCacheManagerProcessTags() {
 
     // 更新缓存
     data_event_id key{execveEvent->process.pid, execveEvent->process.ktime};
-    mProcessCacheManager->UpdateCache(key, execveEvent);
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
     key = {pExecveEvent->process.pid, pExecveEvent->process.ktime};
-    mProcessCacheManager->UpdateCache(key, pExecveEvent);
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 测试进程标签生成
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -475,7 +476,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, execveEvent);
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -488,7 +489,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, pExecveEvent);
+    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -536,7 +537,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, execveEvent);
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -549,7 +550,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, pExecveEvent);
+    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -598,7 +599,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, execveEvent);
+    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -611,7 +612,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, pExecveEvent);
+    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();

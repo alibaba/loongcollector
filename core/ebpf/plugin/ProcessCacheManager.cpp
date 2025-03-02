@@ -107,7 +107,6 @@ bool ProcessCacheManager::Init() {
     ebpfConfig->mConfig = pconfig;
     mRunFlag = true;
     mPoller = async(std::launch::async, &ProcessCacheManager::PollPerfBuffers, this);
-    mCacheUpdater = async(std::launch::async, &ProcessCacheManager::HandleCacheUpdate, this);
     bool status = mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
         LOG_ERROR(sLogger, ("failed to start process security plugin", ""));
@@ -151,15 +150,6 @@ void ProcessCacheManager::Stop() {
             LOG_INFO(sLogger, ("poller thread", "stopped successfully"));
         } else {
             LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
-        }
-    }
-
-    std::future_status s2 = mCacheUpdater.wait_for(std::chrono::seconds(1));
-    if (mCacheUpdater.valid()) {
-        if (s2 == std::future_status::ready) {
-            LOG_INFO(sLogger, ("cachee updater thread", "stopped successfully"));
-        } else {
-            LOG_WARNING(sLogger, ("cachee updater thread", "forced to stopped"));
         }
     }
     mInited = false;
@@ -252,7 +242,7 @@ std::string DecodeArgs(std::string_view& rawArgs) {
 
 void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     // copy msg
-    auto event = std::make_unique<MsgExecveEventUnix>();
+    auto event = std::make_shared<MsgExecveEventUnix>();
     static_assert(offsetof(msg_execve_event, buffer) == sizeof(MsgExecveEvent),
                   "offsetof(msg_execve_event, buffer) must be equal to sizeof(MsgExecveEvent)");
     std::memcpy(&event->msg, eventPtr, sizeof(MsgExecveEvent));
@@ -416,7 +406,7 @@ void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
 }
 
 void ProcessCacheManager::PostHandlerExecveEvent(msg_execve_event* eventPtr,
-                                                 std::unique_ptr<MsgExecveEventUnix>&& event) {
+                                                 std::shared_ptr<MsgExecveEventUnix>&& event) {
     // set binary
     if (event->process.filename.size()) {
         if (event->process.filename[0] == '/') {
@@ -440,15 +430,15 @@ void ProcessCacheManager::PostHandlerExecveEvent(msg_execve_event* eventPtr,
 #endif
     );
 
-    mRecordQueue.enqueue(std::move(event));
+    handleCacheUpdate(std::move(event));
 
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessEvent>(eventPtr->process.pid,
-                                                    eventPtr->process.ktime,
-                                                    KernelEventType::PROCESS_EXECVE_EVENT,
-                                                    eventPtr->common.ktime);
+        auto processEvent = std::make_shared<ProcessEvent>(eventPtr->process.pid,
+                                                           eventPtr->process.ktime,
+                                                           KernelEventType::PROCESS_EXECVE_EVENT,
+                                                           eventPtr->common.ktime);
         if (event) {
-            mCommonEventQueue.enqueue(std::move(event));
+            mCommonEventQueue.enqueue(std::move(processEvent));
         }
     }
 }
@@ -702,7 +692,7 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
     cwd = cwdRes.first;
     flags = cwdRes.second;
 
-    auto event = std::make_unique<MsgExecveEventUnix>();
+    auto event = std::make_shared<MsgExecveEventUnix>();
     if (event == nullptr) {
         LOG_ERROR(sLogger, ("failed to alloc MsgExecveEventUnix", ""));
         return 1;
@@ -780,7 +770,7 @@ int ProcessCacheManager::PushExecveEvent(const std::shared_ptr<Procs>& proc) {
         event->process.cwd = cwd;
     }
 
-    mRecordQueue.enqueue(std::move(event));
+    handleCacheUpdate(std::move(event));
     return 0;
 }
 
@@ -801,39 +791,19 @@ std::string ProcessCacheManager::GenerateExecId(uint32_t pid, uint64_t ktime) {
 }
 
 // consume record queue
-void ProcessCacheManager::HandleCacheUpdate() {
-    std::vector<std::unique_ptr<MsgExecveEventUnix>> items(mMaxBatchConsumeSize);
+void ProcessCacheManager::handleCacheUpdate(std::shared_ptr<MsgExecveEventUnix>&& event) {
+    event->process.user.name = mProcParser.GetUserNameByUid(event->process.uid);
+    std::string execKey = GenerateExecId(event->process.pid, event->process.ktime);
 
-    while (mRunFlag) {
-        size_t count = mRecordQueue.wait_dequeue_bulk_timed(
-            items.data(), mMaxBatchConsumeSize, std::chrono::milliseconds(mMaxWaitTimeMS));
+    std::string parentKey = GenerateParentExecId(event);
+    event->exec_id = execKey;
+    event->parent_exec_id = parentKey;
+    LOG_DEBUG(sLogger,
+              ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)("ktime", event->process.ktime)(
+                  "execId", execKey)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
+                  "filename", mProcParser.GetPIDExePath(event->process.pid))("args", event->process.args));
 
-        if (!count) {
-            continue;
-        }
-
-        for (size_t i = 0; i < count; ++i) {
-            // set args
-            std::shared_ptr<MsgExecveEventUnix> event(std::move(items[i]));
-
-            event->process.user.name = mProcParser.GetUserNameByUid(event->process.uid);
-            std::string execKey = GenerateExecId(event->process.pid, event->process.ktime);
-
-            std::string parentKey = GenerateParentExecId(event);
-            event->exec_id = execKey;
-            event->parent_exec_id = parentKey;
-            LOG_DEBUG(
-                sLogger,
-                ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)("ktime", event->process.ktime)(
-                    "execId", execKey)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
-                    "filename", mProcParser.GetPIDExePath(event->process.pid))("args", event->process.args));
-
-            UpdateCache({event->process.pid, event->process.ktime}, event);
-        }
-
-        items.clear();
-        items.resize(mMaxBatchConsumeSize);
-    }
+    UpdateCache({event->process.pid, event->process.ktime}, std::move(event));
 }
 
 SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>& sb, uint32_t pid, uint64_t ktime) {

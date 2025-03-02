@@ -58,8 +58,8 @@ public:
     void ReleaseCache(const data_event_id& key) { mCache.remove(key); }
 
     // thread-safe
-    void UpdateCache(const data_event_id& key, std::shared_ptr<MsgExecveEventUnix>& value) {
-        mCache.insert(key, value);
+    void UpdateCache(const data_event_id& key, std::shared_ptr<MsgExecveEventUnix>&& value) {
+        mCache.emplace(key, std::move(value));
     }
 
     std::vector<std::shared_ptr<Procs>> ListRunningProcs();
@@ -68,7 +68,7 @@ public:
     int PushExecveEvent(const std::shared_ptr<Procs>& proc);
 
     void RecordExecveEvent(msg_execve_event* eventPtr);
-    void PostHandlerExecveEvent(msg_execve_event*, std::unique_ptr<MsgExecveEventUnix>&&);
+    void PostHandlerExecveEvent(msg_execve_event*, std::shared_ptr<MsgExecveEventUnix>&&);
     void RecordExitEvent(msg_exit* eventPtr);
     void RecordCloneEvent(msg_clone_event* eventPtr);
     void RecordDataEvent(msg_data* eventPtr);
@@ -89,7 +89,7 @@ public:
     void Stop();
 
 private:
-    void HandleCacheUpdate();
+    void handleCacheUpdate(std::shared_ptr<MsgExecveEventUnix>&& event);
 
     std::atomic_bool mInited = false;
     std::atomic_bool mRunFlag = false;
@@ -123,16 +123,11 @@ private:
     std::filesystem::path mHostPathPrefix;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
 
-    // record execve event, used to update process cache ...
-    moodycamel::BlockingConcurrentQueue<std::unique_ptr<MsgExecveEventUnix>> mRecordQueue;
-
-
     int mMaxBatchConsumeSize = 1024;
     int mMaxWaitTimeMS = 200;
 
     std::atomic_bool mFlushProcessEvent = false;
     std::future<void> mPoller;
-    std::future<void> mCacheUpdater;
 
     FrequencyManager mFrequencyMgr;
 };
