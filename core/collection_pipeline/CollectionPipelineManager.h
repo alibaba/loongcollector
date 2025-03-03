@@ -38,6 +38,14 @@ public:
         return &instance;
     }
 
+    void RegisterInputRunner(InputRunner* runner) { mInputRunners.push_back(runner); }
+
+    void InputRunnerEventGC() {
+        for (auto runner : mInputRunners) {
+            runner->EventGC();
+        }
+    }
+
     void UpdatePipelines(CollectionConfigDiff& diff);
     const std::shared_ptr<CollectionPipeline>& FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
@@ -52,7 +60,7 @@ public:
     void ClearAllPipelines(); // only used when exiting
 
 private:
-    CollectionPipelineManager();
+    CollectionPipelineManager() = default;
     ~CollectionPipelineManager() = default;
 
     virtual std::shared_ptr<CollectionPipeline> BuildPipeline(CollectionConfig&& config); // virtual for ut

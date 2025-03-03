@@ -240,6 +240,10 @@ bool PrometheusInputRunner::HasRegisteredPlugins() const {
     return !mTargetSubscriberSchedulerMap.empty();
 }
 
+void PrometheusInputRunner::EventGC() {
+    mEventPool.CheckGC();
+}
+
 HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
     HttpResponse httpResponse;
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -287,7 +291,4 @@ string PrometheusInputRunner::GetAllProjects() {
     return result;
 }
 
-void PrometheusInputRunner::CheckGC() {
-    mEventPool.CheckGC();
-}
 }; // namespace logtail

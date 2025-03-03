@@ -39,16 +39,6 @@ using namespace std;
 
 namespace logtail {
 
-CollectionPipelineManager::CollectionPipelineManager()
-    : mInputRunners({
-          PrometheusInputRunner::GetInstance(),
-#if defined(__linux__) && !defined(__ANDROID__)
-          ebpf::eBPFServer::GetInstance(),
-          HostMonitorInputRunner::GetInstance(),
-#endif
-      }) {
-}
-
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
 void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
