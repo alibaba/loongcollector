@@ -44,14 +44,20 @@ bool K8sMetadata::Enable() {
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #endif
-    // TODO check network
-    return AppConfig::GetInstance()->IsPurageContainerMode();
+    return mEnable;
 }
 
 K8sMetadata::~K8sMetadata() {
     mFlag = false;
+    mCv.notify_all();
+    mNetDetectorCv.notify_all();
+
     if (mQueryThread.joinable()) {
         mQueryThread.join();
+    }
+
+    if (mNetDetector.joinable()) {
+        mNetDetector.join();
     }
 }
 
@@ -59,22 +65,27 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     : mIpCache(ipCacheSize, 20), mContainerCache(cidCacheSize, 20), mExternalIpCache(externalIpCacheSize, 20) {
     mServiceHost = STRING_FLAG(singleton_service);
     mServicePort = INT32_FLAG(singleton_port);
-    // TODO @qianlu.kk
     const char* value = getenv("_node_ip_");
     if (value != NULL) {
         mHostIp = StringTo<string>(value);
     } else {
         mHostIp = GetHostIp();
     }
-    mFlag = true;
-    mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
-#ifndef APSARA_UNIT_TEST_MAIN
-    LOG_INFO(sLogger, ("[metadata] host ip", mHostIp));
-#else
+#ifdef APSARA_UNIT_TEST_MAIN
     mServiceHost = "47.95.70.43";
     mServicePort = 8899;
     mHostIp = "172.16.57.207";
 #endif
+    mEnable = getenv("KUBERNETES_SERVICE_HOST") && AppConfig::GetInstance()->IsPurageContainerMode()
+        && mServiceHost.size() && mServicePort > 0;
+    LOG_INFO(sLogger,
+             ("k8smetadata enable status", mEnable)("host ip", mHostIp)("serviceHost", mServiceHost)("servicePort",
+                                                                                                     mServicePort));
+
+    // batch query metadata ...
+    mFlag = true;
+    mNetDetector = std::thread(&K8sMetadata::DetectNetwork, this);
+    mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
 }
 
 bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) {
@@ -168,10 +179,24 @@ K8sMetadata::BuildRequest(const std::string& path, const std::string& reqBody, u
                                          maxTryCnt);
 }
 
+void K8sMetadata::UpdateStatus(bool status) {
+    if (status) {
+        mFailCount = 0;
+        mIsValid = true;
+    } else if (++mFailCount > 5 && mIsValid) {
+        mIsValid = false;
+        mNetDetectorCv.notify_one();
+    }
+}
+
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                                         const std::string& query,
                                         containerInfoType infoType,
                                         std::vector<std::string>& resKey) {
+    if (!mIsValid) {
+        LOG_DEBUG(sLogger, ("remote status invalid", "skip query"));
+        return false;
+    }
     HttpResponse res;
     std::string path = CONTAINER_ID_METADATA_PATH;
     if (infoType == containerInfoType::IpInfo) {
@@ -190,9 +215,11 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     LOG_DEBUG(sLogger, ("res body", *res.GetBody<std::string>()));
     if (success) {
         if (res.GetStatusCode() != 200) {
+            UpdateStatus(false);
             LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail, code is ", res.GetStatusCode()));
             return false;
         }
+        UpdateStatus(true);
         Json::CharReaderBuilder readerBuilder;
         std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
         Json::Value root;
@@ -216,6 +243,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
 
         return true;
     } else {
+        UpdateStatus(false);
         LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail", urlHost));
         return false;
     }
@@ -340,6 +368,10 @@ bool K8sMetadata::IsExternalIp(const std::string& ip) const {
 }
 
 void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& key) {
+    if (key.empty()) {
+        LOG_DEBUG(sLogger, ("empty key", ""));
+        return;
+    }
     std::unique_lock<std::mutex> lock(mStateMux);
     if (mPendingKeys.find(key) != mPendingKeys.end()) {
         // already in query queue ...
@@ -349,28 +381,59 @@ void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& 
     mBatchKeys.push_back(key);
 }
 
+const static std::string LOCALHOST_IP = "127.0.0.1";
+
+void K8sMetadata::DetectMetadataServer() {
+    std::vector<std::string> ips = {LOCALHOST_IP};
+    bool status = false;
+    GetByIpsFromServer(ips, status);
+    LOG_DEBUG(sLogger, ("detect network, res", status));
+    return;
+}
+
+void K8sMetadata::DetectNetwork() {
+    LOG_INFO(sLogger, ("begin to start k8smetadata network detector", ""));
+    std::unique_lock<std::mutex> lock(mNetDetectorMtx);
+    while (mFlag) {
+        // detect network every seconds
+        mNetDetectorCv.wait_for(lock, chrono::seconds(1));
+        if (!mFlag) {
+            return;
+        }
+        // detect network
+        DetectMetadataServer();
+    }
+    LOG_INFO(sLogger, ("stop k8smetadata network detector", ""));
+}
+
 void K8sMetadata::ProcessBatch() {
-    while (true) {
+    while (mFlag) {
         std::vector<std::string> keysToProcess;
         {
             std::unique_lock<std::mutex> lock(mStateMux);
             // merge requests in 100ms
-            mCv.wait_for(lock, std::chrono::milliseconds(100), [this] { return !mBatchKeys.empty() || !mFlag; });
-            if (!mFlag && mBatchKeys.empty()) {
+            mCv.wait_for(lock, chrono::milliseconds(100));
+            if (!mFlag) {
                 break;
+            }
+            if (!mIsValid || mBatchKeys.empty()) {
+                continue;
             }
             keysToProcess.swap(mBatchKeys);
         }
 
         if (!keysToProcess.empty()) {
             bool status = false;
-            std::vector<std::string> results = GetByIpsFromServer(keysToProcess, status);
+            if (mIsValid) {
+                GetByIpsFromServer(keysToProcess, status);
+            }
             if (!status) {
                 std::unique_lock<std::mutex> lock(mStateMux);
                 for (const auto& ip : keysToProcess) {
-                    mBatchKeys.push_back(ip);
+                    if (ip.size()) {
+                        mBatchKeys.push_back(ip);
+                    }
                 }
-                mCv.notify_one();
             } else {
                 // request success
                 std::unique_lock<std::mutex> lock(mStateMux);

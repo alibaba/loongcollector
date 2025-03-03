@@ -202,7 +202,7 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP"};
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-    manager->Stop();
+    manager->Destroy();
 
     auto statsEvent = CreateConnStatsEvent();
     manager->AcceptNetStatsEvent(&statsEvent);

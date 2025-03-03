@@ -76,15 +76,25 @@ private:
     mutable std::condition_variable mCv;
     std::vector<std::string> mBatchKeys;
     std::atomic_bool mEnable = false;
-    bool mFlag;
+    bool mFlag = false;
     std::thread mQueryThread;
+    std::atomic_bool mIsValid = true;
+    std::atomic_int mFailCount = 0;
+
+    std::mutex mNetDetectorMtx;
+    mutable std::condition_variable mNetDetectorCv;
+    std::thread mNetDetector;
 
     K8sMetadata(size_t ipCacheSize = 1024, size_t cidCacheSize = 1024, size_t externalIpCacheSize = 1024);
     K8sMetadata(const K8sMetadata&) = delete;
     K8sMetadata& operator=(const K8sMetadata&) = delete;
 
+    void UpdateStatus(bool status);
+    void DetectMetadataServer();
+
     std::unique_ptr<HttpRequest>
     BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
+    void DetectNetwork();
     void SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
     void SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
     void SetExternalIpCache(const std::string&);

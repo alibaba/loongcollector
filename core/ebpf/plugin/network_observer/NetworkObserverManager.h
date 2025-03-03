@@ -41,7 +41,7 @@ public:
     }
 
     NetworkObserverManager() = delete;
-    ~NetworkObserverManager() { Destroy(); }
+    ~NetworkObserverManager() override {}
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
@@ -49,14 +49,14 @@ public:
                            std::shared_ptr<Timer> scheduler);
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+
     int Destroy() override;
+
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
     int HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& event) override { return 0; }
 
     int PollPerfBuffer() override { return 0; }
-
-    void Stop();
 
     void RecordEventLost(enum callback_type_e type, uint64_t lost_count);
 
@@ -164,7 +164,6 @@ private:
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
     std::string mClusterId;
-
 
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

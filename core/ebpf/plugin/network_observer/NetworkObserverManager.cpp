@@ -1193,8 +1193,7 @@ void NetworkObserverManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event)
     mConnectionManager->AcceptNetCtrlEvent(event);
 }
 
-
-void NetworkObserverManager::Stop() {
+int NetworkObserverManager::Destroy() {
     LOG_INFO(sLogger, ("prepare to destroy", ""));
     mSourceManager->StopPlugin(PluginType::NETWORK_OBSERVE);
     LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
@@ -1209,10 +1208,6 @@ void NetworkObserverManager::Stop() {
         this->mRecordConsume.join();
     }
     LOG_INFO(sLogger, ("destroy stage", "release consumer thread"));
-}
-
-int NetworkObserverManager::Destroy() {
-    Stop();
     return 0;
 }
 
@@ -1224,7 +1219,6 @@ void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableC
     }
 
     for (auto& cid : disableCids) {
-        // TODO?? black or delete ??
         LOG_INFO(sLogger, ("UpdateBlacklists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, false);
     }

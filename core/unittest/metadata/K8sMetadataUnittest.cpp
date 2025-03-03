@@ -530,6 +530,21 @@ public:
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByIpFromCache("10.41.0.2") != nullptr);
         delete processor;
     }
+
+    void TestNetworkCheck() {
+        auto& k8sMetadata = K8sMetadata::GetInstance();
+        APSARA_TEST_EQUAL(k8sMetadata.mIsValid, true);
+        for (int i = 0; i < 10; i++) {
+            // fail request
+            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i));
+            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i + 1));
+            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i + 2));
+            // shoule query for 10 times ...
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
+        APSARA_TEST_EQUAL(k8sMetadata.mIsValid, false);
+        APSARA_TEST_GT(k8sMetadata.mFailCount, 5);
+    }
 };
 
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByContainerIds, 0);
@@ -538,6 +553,7 @@ APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToMetric, 2);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToSpan, 3);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestExternalIpOperations, 4);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAsyncQueryMetadata, 5);
+APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestNetworkCheck, 6);
 
 } // end of namespace logtail
 

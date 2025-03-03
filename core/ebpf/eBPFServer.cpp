@@ -208,6 +208,11 @@ void eBPFServer::Stop() {
     }
     mInited = false;
 
+    mRunning = false;
+
+    LOG_INFO(sLogger, ("begin to stop timer", ""));
+    mScheduler->Stop();
+
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     for (int i = 0; i < int(PluginType::MAX); i++) {
         auto pipelineName = mLoadedPipeline[i];
@@ -219,10 +224,6 @@ void eBPFServer::Stop() {
         }
     }
 
-    LOG_INFO(sLogger, ("begin to stop timer", ""));
-    mScheduler->Stop();
-
-    mRunning = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
     std::future_status s2 = mHandler.wait_for(std::chrono::seconds(1));
     if (mPoller.valid()) {
