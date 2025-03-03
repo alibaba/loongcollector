@@ -289,7 +289,7 @@ protected:
     friend class EventDispatcherDirUnittest;
     friend class ModifyHandlerUnittest;
 
-    void CleanEnviroments();
+    void CleanEnvironments();
     int32_t GetInotifyWatcherCount();
 #endif
 };
