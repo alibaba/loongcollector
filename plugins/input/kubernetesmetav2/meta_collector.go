@@ -353,11 +353,11 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
 	log.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkSrcEntityTypeFieldName, content.Get(entityTypeFieldName))
-	log.Contents.Add(entityLinkSrcEntityIDFieldName, content.Get(entityIDFieldName))
+	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
+	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey("", "", ""))
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey("", "", ""))
+	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
+	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
 
 	log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
 	log.Contents.Add(entityMethodFieldName, content.Get(entityMethodFieldName))
