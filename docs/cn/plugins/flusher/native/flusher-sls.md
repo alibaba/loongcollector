@@ -10,6 +10,23 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * LoongCollector 正式版（v3.0.5）之前更新优化不断，在此省略。
+  * LoongCollector v3.0.5
+    * improve sls authentication logic ([#1894](https://github.com/alibaba/loongcollector/pull/1894))
+    * refactor sls client manager ([#1954](https://github.com/alibaba/loongcollector/pull/1954))
+    * support project anonymous write ([#1959](https://github.com/alibaba/loongcollector/pull/1959))
+    * Optimize the limiter code to meet better isolation and recovery scenarios ([#1985](https://github.com/alibaba/loongcollector/pull/1985))
+    * fix the issue where flusher_sls does not work when coexisting with extended flushers ([#2015](https://github.com/alibaba/loongcollector/pull/2015))
+    * feat: supports subpath routing ([#2026](https://github.com/alibaba/loongcollector/pull/2026))
+    * disable group batch when flusher_sls.telemetrytype equals metrics ([#2029](https://github.com/alibaba/loongcollector/pull/2029))
+    * fix use after free in flusher sls ([#2053](https://github.com/alibaba/loongcollector/pull/2053))
+    * fix possible send fail for enterprise local config on upgrade from ilogtail ([#2105](https://github.com/alibaba/loongcollector/pull/2105))
+    * feat: support set TOS in curl ([#2106](https://github.com/alibaba/loongcollector/pull/2106))
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |

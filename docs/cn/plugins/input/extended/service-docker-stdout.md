@@ -27,6 +27,41 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.0.29
+    * fix wrong matching lables for stdout input ([#78](https://github.com/alibaba/loongcollector/pull/78))
+    * Fix label matching ([#79](https://github.com/alibaba/loongcollector/pull/79))
+  * iLogtail v1.0.30
+    * fix Customize the authentication token in Windows artifact ([#91](https://github.com/alibaba/loongcollector/pull/91))
+  * iLogtail v1.0.31
+    * Enhance mem cost ([#76](https://github.com/alibaba/loongcollector/pull/76))
+    * fix-process-raw-log-tag-sequence ([#100](https://github.com/alibaba/loongcollector/pull/100))
+  * iLogtail v1.1.0
+    * enhance container export api ([#140](https://github.com/alibaba/loongcollector/pull/140))
+  * iLogtail v1.2.0
+    * Improve Eci and DaemonSet container stop ([#392](https://github.com/alibaba/loongcollector/pull/392))
+  * iLogtail v1.3.0
+    * fix #529, fix docker fd leak and event lost ([#530](https://github.com/alibaba/loongcollector/pull/530))
+  * iLogtail v1.4.0
+    * add container info ([#567](https://github.com/alibaba/loongcollector/pull/567))
+    * add switch for collect containers ([#699](https://github.com/alibaba/loongcollector/pull/699))
+  * iLogtail v1.7.0
+    * feat: support nanosecond ([#952](https://github.com/alibaba/loongcollector/pull/952))
+  * iLogtail v1.7.1
+    * fix: go pb has TimeNs when not set ([#1012](https://github.com/alibaba/loongcollector/pull/1012))
+    * fix symlink broken in container log filepath ([#1042](https://github.com/alibaba/loongcollector/pull/1042))
+    * refine container info code ([#1049](https://github.com/alibaba/loongcollector/pull/1049))
+  * iLogtail v1.8.0
+    * fix container log path symlink not work ([#1121](https://github.com/alibaba/loongcollector/pull/1121))
+  * LoongCollector Alpha(v0.2.0)
+    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
+  * LoongCollector v3.0.5
+    * Fix the problem of increasing container meta information in Docker Center and add UT to this module ([#1938](https://github.com/alibaba/loongcollector/pull/1938))
+    * ParseContainerLogLine when no new line ([#2090](https://github.com/alibaba/loongcollector/pull/2090))
+
 ## 配置参数
 
 ### 基本参数
@@ -44,7 +79,7 @@
 | ----------------- | ---------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IncludeLabel      | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>容器Label白名单，用于指定待采集的容器。默认为空，表示采集所有容器的标准输出。如果您要设置容器Label白名单，那么LabelKey必填，LabelValue可选填。</p><ul><li>如果LabelValue为空，则容器Label中包含LabelKey的容器都匹配。</li><li><p>如果LabelValue不为空，则容器Label中包含LabelKey=LabelValue的容器才匹配。</p><p>LabelValue默认为字符串匹配，即只有LabelValue和容器Label的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配。例如设置LabelKey为`io.kubernetes.container.name`，设置LabelValue为`^(nginx\|cube)$`，表示可匹配名为nginx、cube的容器。</p></li></ul><p>多个白名单之间为或关系，即只要容器Label满足任一白名单即可匹配。</p>                                                                |
 | ExcludeLabel      | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>容器Label黑名单，用于排除不采集的容器。默认为空，表示不排除任何容器。如果您要设置容器Label黑名单，那么LabelKey必填，LabelValue可选填。</p><ul><li>如果LabelValue为空，则容器Label中包含LabelKey的容器都将被排除。</li><li><p>如果LabelValue不为空，则容器Label中包含LabelKey=LabelValue的容器才会被排除。</p><p>LabelValue默认为字符串匹配，即只有LabelValue和容器Label的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配。例如设置LabelKey为`io.kubernetes.container.name`，设置LabelValue为`^(nginx\|cube)$`，表示可匹配名为nginx、cube的容器。</p></li></ul><p>多个黑名单之间为或关系，即只要容器Label满足任一黑名单对即可被排除。</p>                                                              |
-| IncludeEnv        | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设环境变量白名单，用于指定待采集的容器。默认为空，表示采集所有容器的标准输出。如果您要设置环境变量白名单，那么EnvKey必填，EnvValue可选填。</p><ul><li>如果EnvValue为空，则容器环境变量中包含EnvKey的容器都匹配。</li><li><p>如果EnvValue不为空，则容器环境变量中包含EnvKey=EnvValue的容器才匹配。</p><p>EnvValue默认为字符串匹配，即只有EnvValue和环境变量的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配，例如设置EnvKey为`NGINX_SERVICE_PORT`，设置EnvValue为`^(80|6379)$`，表示可匹配服务端口为80、6379的容器。</p></li></ul><p>多个白名单之间为或关系，即只要容器的环境变量满足任一键值对即可匹配。</p>                                                                                                             |
+| IncludeEnv        | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设环境变量白名单，用于指定待采集的容器。默认为空，表示采集所有容器的标准输出。如果您要设置环境变量白名单，那么EnvKey必填，EnvValue可选填。</p><ul><li>如果EnvValue为空，则容器环境变量中包含EnvKey的容器都匹配。</li><li><p>如果EnvValue不为空，则容器环境变量中包含EnvKey=EnvValue的容器才匹配。</p><p>EnvValue默认为字符串匹配，即只有EnvValue和环境变量的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配，例如设置EnvKey为`NGINX_SERVICE_PORT`，设置EnvValue为`^(80\|6379)$`，表示可匹配服务端口为80、6379的容器。</p></li></ul><p>多个白名单之间为或关系，即只要容器的环境变量满足任一键值对即可匹配。</p> |
 | ExcludeEnv        | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>环境变量黑名单，用于排除不采集的容器。默认为空，表示不排除任何容器。如果您要设置环境变量黑名单，那么EnvKey必填，EnvValue可选填。</p><ul><li>如果EnvValue为空，则容器环境变量中包含EnvKey的容器的日志都将被排除。</li><li><p>如果EnvValue不为空，则容器环境变量中包含EnvKey=EnvValue的容器才会被排除。</p><p>EnvValue默认为字符串匹配，即只有EnvValue和环境变量的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配，例如设置EnvKey为`NGINX_SERVICE_PORT`，设置EnvValue为`^(80\|6379)$`，表示可匹配服务端口为80、6379的容器。</p></li></ul><p>多个黑名单之间为或关系，即只要容器的环境变量满足任一键值对即可被排除。</p>                                                                                                          |
 | IncludeK8sLabel   | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>通过Kubernetes Label（定义在template.metadata中）白名单指定待采集的容器。如果您要设置Kubernetes Label白名单，那么LabelKey必填，LabelValue可选填。</p><ul><li>如果LabelValue为空，则Kubernetes Label中包含LabelKey的容器都匹配。</li><li><p>如果LabelValue不为空，则Kubernetes Label中包含LabelKey=LabelValue的容器才匹配。</p><p>LabelValue默认为字符串匹配，即只有LabelValue和Kubernetes Label的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配。例如设置LabelKey为`app`，设置LabelValue为`^(test1\|test2)$`，表示匹配Kubernetes Label中包含app:test1、app:test2的容器。</p></li></ul><p>多个白名单之间为或关系，即只要Kubernetes Label满足任一白名单即可匹配。</p>      |
 | ExcludeK8sLabel   | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>通过Kubernetes Label（定义在template.metadata中）黑名单排除不采集的容器。如果您要设置Kubernetes Label黑名单，那么LabelKey必填，LabelValue可选填。</p><ul><li>如果LabelValue为空，则Kubernetes Label中包含LabelKey的容器都被排除。</li><li><p>如果LabelValue不为空，则Kubernetes Label中包含LabelKey=LabelValue的容器才会被排除。</p><p>LabelValue默认为字符串匹配，即只有LabelValue和Kubernetes Label的值完全相同才会匹配。如果该值以`^`开头并且以`$`结尾，则为正则匹配。例如设置LabelKey为`app`，设置LabelValue为`^(test1\|test2)$`，表示匹配Kubernetes Label中包含app:test1、app:test2的容器。</p></li></ul><p>多个黑名单之间为或关系，即只要Kubernetes Label满足任一黑名单对即可被排除。</p> |

@@ -8,6 +8,16 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.6.0
+    * pure plugin support file-to-file test ([#869](https://github.com/alibaba/loongcollector/pull/869))
+    * user_contrib ([#888](https://github.com/alibaba/loongcollector/pull/888))
+  * iLogtail v1.7.1
+    * add v2 interface to processor_json ([#984](https://github.com/alibaba/loongcollector/pull/984))
+
 ## 配置参数
 
 | 参数                | 类型      | 是否必选 | 说明                                                                         |

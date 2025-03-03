@@ -8,6 +8,11 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：LoongCollector Alpha(v0.2.0)
+* 更新记录：-
+
 ## 配置参数
 
 关于具体指标的详情，请参见[自监控指标说明](../../../developer-guide/self-monitor/metrics/internal-metrics-description.md)。

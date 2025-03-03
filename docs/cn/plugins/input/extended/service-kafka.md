@@ -8,6 +8,20 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.6.0
+    * feat: upgrade kafka sarama client ([#824](https://github.com/alibaba/loongcollector/pull/824))
+  * iLogtail v2.0.4
+    * dependency: bump sarama to 1.42.2 ([#1364](https://github.com/alibaba/loongcollector/pull/1364))
+  * LoongCollector Alpha(v0.2.0)
+    * fix: input_kafka consumer wont close due to ctx never done. ([#1615](https://github.com/alibaba/loongcollector/pull/1615))
+    * Add a default content key for the service_kafka plugin ([#1754](https://github.com/alibaba/loongcollector/pull/1754))
+  * 【待发布】
+    * fix: handle error in kafka consumer loop to prevent premature return ([#2100](https://github.com/alibaba/loongcollector/pull/2100))
+
 ## 配置参数
 
 | 参数                        | 类型      | 是否必选 | 说明                                                                                                                                          |
@@ -22,7 +36,7 @@
 | Offset                    | String  | 否    | Kafka初始消费位移类型，可选值包括：oldest和newest。如果未添加该参数，则默认使用oldest，表示从最早可用的位移处开始消费。                                                                     |
 | MaxMessageLen（Deprecated） | Integer | 否    | Kafka消息的最大允许长度，单位为字节，取值范围为：1～524288。如果未添加该参数，则默认使用524288，即512KB。 ilogtail 1.6.0不再使用此参数                                                      |
 | SASLUsername              | String  | 否    | SASL用户名。                                                                                                                                    |
-| SASLPassword              | String  | 否    | SASL密码。                                                                                                                                     |                                                               |
+| SASLPassword              | String  | 否    | SASL密码。  |
 | Assignor                  | String  | 否    | 消费组消费分区分配策略。可以设置选项：range, roundrobin, sticky，默认值：range                                                                                      |
 | DisableUncompress         | Boolean | 否    | ilogtail 1.6.0新增，禁用对于请求数据的解压缩, 默认取值为:`false`<p>目前仅针对Raw Format有效</p><p>仅v2版本有效</p>                                                          |
 | FieldsExtend              | Boolean | 否    | <p>是否支持非integer以外的数据类型(如String)</p><p>目前仅针对有 String、Bool 等额外类型的 influxdb Format 有效，仅v2版本有效</p>                                              |

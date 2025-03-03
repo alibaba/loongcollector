@@ -16,6 +16,16 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.7.1
+    * add v2 interface to processor_json ([#984](https://github.com/alibaba/loongcollector/pull/984))
+    * json processor support parsing array ([#972](https://github.com/alibaba/loongcollector/pull/972))
+  * iLogtail v1.8.0
+    * json processor: add expand array switch for backward compatibility ([#1094](https://github.com/alibaba/loongcollector/pull/1094))
+
 ## 配置参数
 
 | 参数                     | 类型      | 是否必选 | 说明                                                |

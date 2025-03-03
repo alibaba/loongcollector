@@ -14,6 +14,24 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.0.32
+    * recover the stdout and stderr when open only stdout in flusher_stdout ([#117](https://github.com/alibaba/loongcollector/pull/117))
+  * iLogtail v1.3.0
+    * fix: flush buffer before stopping ([#468](https://github.com/alibaba/loongcollector/pull/468))
+  * iLogtail v1.4.0
+    * feat: Define the metrics data model and modify the plugin manager to support procress the metrics data ([#519](https://github.com/alibaba/loongcollector/pull/519))
+    * Define span model and byteArray model ([#571](https://github.com/alibaba/loongcollector/pull/571))
+    * feat: add metadata group aggregator supporting group pipelineGroupEvents by metadata keys & enable http flusher and http server input supporting raw protocol  ([#599](https://github.com/alibaba/loongcollector/pull/599))
+    * feat: suppprt log event model ([#647](https://github.com/alibaba/loongcollector/pull/647))
+  * iLogtail v1.7.1
+    * add v2 interface to processor_json ([#984](https://github.com/alibaba/loongcollector/pull/984))
+  * iLogtail v2.0.4
+    * fix: correct pipeline version recognition issue ([#1427](https://github.com/alibaba/loongcollector/pull/1427))
+
 ## 配置参数
 
 | 参数            | 类型      | 是否必选 | 说明                                |

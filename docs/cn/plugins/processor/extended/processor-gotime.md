@@ -4,6 +4,20 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.31
+* 更新记录：
+  * iLogtail v1.6.0
+    * fix: processor_gotime empty time zone ([#841](https://github.com/alibaba/loongcollector/pull/841))
+  * iLogtail v1.7.0
+    * feat: support nanosecond ([#952](https://github.com/alibaba/loongcollector/pull/952))
+  * iLogtail v1.7.1
+    * fix: go pb has TimeNs when not set ([#1012](https://github.com/alibaba/loongcollector/pull/1012))
+  * LoongCollector Alpha(v0.2.0)
+    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
+    * Add processor_gotime with nanosecond to other time format conversion capability ([#1671](https://github.com/alibaba/loongcollector/pull/1671))
+
 ## 配置参数
 
 | 参数 | 类型 | 是否必选 | 说明 |

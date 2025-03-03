@@ -8,6 +8,16 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * LoongCollector Alpha(v0.2.0)
+    * Add UseDecimal parameter to the service_canal plugin. When UseDecimal is set to true, the binlog parsing outputs the original DECIMAL format instead of scientific notation ([#1509](https://github.com/alibaba/loongcollector/pull/1509))
+    * fix: GTID Truncation Issue and Improve Consistency in Checkpoint Management ([#1644](https://github.com/alibaba/loongcollector/pull/1644))
+    * fix crash if input_canal fallback to binlog-file mode ([#1691](https://github.com/alibaba/loongcollector/pull/1691))
+    * fix: do not use gtid if gtid is disabled ([#1781](https://github.com/alibaba/loongcollector/pull/1781))
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |

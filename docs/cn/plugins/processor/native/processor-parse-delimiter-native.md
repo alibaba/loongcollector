@@ -8,6 +8,14 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v2.0.0
+* 更新记录：
+  * LoongCollector Alpha(v0.2.0)
+    * improve worst case performance when all events failed to process ([#1465](https://github.com/alibaba/loongcollector/pull/1465)) ([#1472](https://github.com/alibaba/loongcollector/pull/1472))
+    * fix processor delimiter parse double quote ([#1664](https://github.com/alibaba/loongcollector/pull/1664))
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
@@ -27,13 +35,13 @@
 
 采集分隔符格式文件`/home/test-log/delimiter.log`，解析日志内容并提取字段，并将结果输出到stdout。
 
-- 输入
+* 输入
 
 ```plain
 127.0.0.1,07/Jul/2022:10:43:30 +0800,POST,PutData?Category=YunOsAccountOpLog,0.024,18204,200,37,-,aliyun-sdk-java
 ```
 
-- 采集配置
+* 采集配置
 
 ```yaml
 enable: true
@@ -62,7 +70,7 @@ flushers:
     OnlyStdout: true
 ```
 
-- 输出
+* 输出
 
 ```json
 {
