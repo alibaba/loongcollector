@@ -2,11 +2,16 @@
 
 ## 简介
 
-`input_container_stdio` `input`插件可以实现从容器标准输出/标准错误流中采集日志，采集的日志内容将会保存在`content`字段中。支持通过容器元信息筛选待采集容器，并支持多行文本切分、添加容器Meta信息等数据处理操作，仅支持 iLogtail 2.1 及以后版本。
+`input_container_stdio` `input`插件可以实现从容器标准输出/标准错误流中采集日志，采集的日志内容将会保存在`content`字段中。支持通过容器元信息筛选待采集容器，并支持多行文本切分、添加容器Meta信息等数据处理操作。
 
 ## 版本
 
 [Stable](../../stability-level.md)
+
+## 版本说明
+
+* 发布版本：LoongCollector Alpha(v0.2.0)
+* 更新记录：-
 
 ## 配置参数
 

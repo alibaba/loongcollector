@@ -8,6 +8,13 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.8.0
+    * Unify metrics format ([#1060](https://github.com/alibaba/loongcollector/pull/1060))
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |

@@ -10,6 +10,11 @@
 
 [Alpha](../stability-level.md)
 
+## 版本说明
+
+* 发布版本：LoongCollector Alpha(v0.2.0)
+* 更新记录：-
+
 ## 配置参数
 
 | 参数          | 类型     | 是否必选 | 说明                                                                                                        |

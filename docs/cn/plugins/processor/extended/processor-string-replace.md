@@ -8,6 +8,13 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.5.0
+* 更新记录：
+  * iLogtail v1.6.0
+    * Processor stringreplace fix bug ([#892](https://github.com/alibaba/loongcollector/pull/892))
+
 ## 配置参数
 
 | 参数           | 类型       | 是否必选 | 说明                                                                        |

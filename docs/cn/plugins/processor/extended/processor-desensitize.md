@@ -8,6 +8,16 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.3.0
+* 更新记录：
+  * iLogtail v1.4.0
+    * fix 3 bugs in v1.3.0 ([#574](https://github.com/alibaba/loongcollector/pull/574))
+    * fix processor_desensitize ([#640](https://github.com/alibaba/loongcollector/pull/640))
+  * iLogtail v1.6.0
+    * Processor desensitize improve performance ([#891](https://github.com/alibaba/loongcollector/pull/891))
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |

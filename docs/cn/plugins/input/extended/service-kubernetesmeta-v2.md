@@ -8,6 +8,15 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：LoongCollector Alpha(v0.2.0)
+* 更新记录：
+  * LoongCollector v3.0.5
+    * fix: k8s meta index ([#2032](https://github.com/alibaba/loongcollector/pull/2032))
+  * 【待发布】
+    * feat: support host monitor ([#1890](https://github.com/alibaba/loongcollector/pull/1890))
+
 ## 配置参数
 
 **注意：** 本插件需要在Kubernetes集群中运行，且需要有访问Kubernetes API的权限。并且部署模式为单例模式，且配置环境变量`DEPLOY_MODE`为`singleton`，`ENABLE_KUBERNETES_META`为`true`。

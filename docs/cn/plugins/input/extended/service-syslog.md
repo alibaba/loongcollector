@@ -8,6 +8,13 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.0.27
+* 更新记录：
+  * iLogtail v1.0.31
+    * add content _client_ip_ for syslog ([#60](https://github.com/alibaba/loongcollector/pull/60))
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |

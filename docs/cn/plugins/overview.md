@@ -113,7 +113,7 @@
 | `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | 将采集到的数据输出到Pulsar。 |
 | `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | 将采集到的数据输出到ClickHouse。 |
 | `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | 将采集到的数据输出到ElasticSearch。 |
-| `flusher_loki`<br>[Loki](flusher/extended/loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | 将采集到的数据输出到Loki。 |
+| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | 将采集到的数据输出到Loki。 |
 | `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br>| 将采集到的数据，经过处理后，通过http格式发送到指定的 Prometheus RemoteWrite 地址。 |
 
 ## 扩展

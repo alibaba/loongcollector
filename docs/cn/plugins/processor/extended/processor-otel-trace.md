@@ -4,6 +4,11 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 发布版本：iLogtail v1.7.1
+* 更新记录：-
+
 ## 配置参数
 
 下面是修复后的表格：

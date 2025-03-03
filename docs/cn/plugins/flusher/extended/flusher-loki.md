@@ -6,7 +6,16 @@
 
 ## 版本
 
-Alpha
+[Alpha](../../stability-level.md)
+
+## 版本说明
+
+* 发布版本：iLogtail v1.5.0
+* 更新记录：
+  * iLogtail v2.0.0
+    * Support contents only for loki flusher ([#1256](https://github.com/alibaba/loongcollector/pull/1256))
+  * LoongCollector Alpha(v0.2.0)
+    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 
@@ -70,12 +79,12 @@ flushers:
 
 接下来，我们通过`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段。
 
-- time
-- level
-- application
-- thread
-- class
-- message
+* time
+* level
+* application
+* thread
+* class
+* message
 
 最后推送到`Loki`的数据样例如下：
 
@@ -111,8 +120,8 @@ DynamicLabels:
 `flusher_loki` 会将去除前缀后的字符串作为存入 Loki 的 label。之后，在 Loki 中即可以 `{application="springboot-docker"}` 进行查询。
 `DynamicLabels` 表达式规则：
 
-- `content.fieldname`：`content` 代表从 `contents` 中解析指定字段值。
-- `tag.fieldname`：`tag` 代表从 `tags` 中解析指定字段值。
+* `content.fieldname`：`content` 代表从 `contents` 中解析指定字段值。
+* `tag.fieldname`：`tag` 代表从 `tags` 中解析指定字段值。
 
 ### tag 重命名
 

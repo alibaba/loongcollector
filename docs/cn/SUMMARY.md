@@ -125,7 +125,7 @@
     * [Prometheus](plugins/flusher/extended/flusher-prometheus.md)
     * [Pulsar](plugins/flusher/extended/flusher-pulsar.md)
     * [标准输出/文件](plugins/flusher/extended/flusher-stdout.md)
-    * [Loki](plugins/flusher/extended/loki.md)
+    * [Loki](plugins/flusher/extended/flusher-loki.md)
 * 扩展插件
   * [什么是扩展插件](plugins/extension/extensions.md)
   * [BasicAuth鉴权](plugins/extension/ext-basicauth.md)
