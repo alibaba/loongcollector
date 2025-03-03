@@ -14,7 +14,7 @@
 
 * 发布版本：iLogtail v1.0.27
 * 更新记录：
-  * LoongCollector 正式版（v3.0.5）之前更新优化不断，在此省略。
+  * LoongCollector Alpha(v0.2.0)之前更新优化不断，在此省略。
   * LoongCollector v3.0.5
     * improve sls authentication logic ([#1894](https://github.com/alibaba/loongcollector/pull/1894))
     * refactor sls client manager ([#1954](https://github.com/alibaba/loongcollector/pull/1954))
