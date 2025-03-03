@@ -151,7 +151,7 @@ bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
 void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, const string& value) const {
     auto it = mPipelineMetaTagKey.find(tagKey);
     if (it != mPipelineMetaTagKey.end()) {
-        if (!it->second.empty()) {
+        if (!value.empty() && !it->second.empty()) {
             auto sb = logGroup.GetSourceBuffer()->CopyString(value);
             logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
         }
@@ -163,7 +163,7 @@ void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, con
 void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const {
     auto it = mPipelineMetaTagKey.find(tagKey);
     if (it != mPipelineMetaTagKey.end()) {
-        if (!it->second.empty()) {
+        if (!value.empty() && !it->second.empty()) {
             logGroup.SetTagNoCopy(it->second, value);
         }
         // empty value means delete
