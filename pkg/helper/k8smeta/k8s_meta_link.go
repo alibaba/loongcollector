@@ -55,7 +55,7 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	case REPLICASET_DEPLOYMENT:
 		return g.getReplicaSetDeploymentLink(events)
 	case INGRESS_SERVICE:
-
+		return g.getIngressServiceLink(events)
 	default:
 		return nil
 	}
