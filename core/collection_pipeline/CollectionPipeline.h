@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "json/json.h"
@@ -38,6 +39,8 @@ namespace logtail {
 
 class CollectionPipeline {
 public:
+    static std::string GenPluginTypeWithID(const std::string& pluginType, const std::string& pluginID);
+
     // copy/move control functions are deleted because of mContext
     bool Init(CollectionConfig&& config);
     void Start();
@@ -69,7 +72,6 @@ public:
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
     std::string GetNowPluginID();
-    static std::string GenPluginTypeWithID(std::string pluginType, std::string pluginID);
     PluginInstance::PluginMeta GenNextPluginMeta(bool lastOne);
 
     bool HasGoPipelineWithInput() const { return !mGoPipelineWithInput.isNull(); }
