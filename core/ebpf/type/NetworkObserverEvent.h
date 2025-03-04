@@ -30,28 +30,6 @@ namespace ebpf {
 
 class Connection;
 
-// class NetDataEvent {
-// public:
-//     std::shared_ptr<Connection> mConnection;
-//     uint64_t mStartTs;
-//     uint64_t mEndTs;
-//     support_proto_e mProtocol;
-//     enum support_role_e mRole;
-//     std::string mReqMsg;
-//     std::string mRespMsg;
-
-//     NetDataEvent(std::shared_ptr<Connection> connection) : mConnection(connection) {}
-
-//     explicit NetDataEvent(struct conn_data_event_t* data)
-//         : mStartTs(data->start_ts),
-//           mEndTs(data->end_ts),
-//           mProtocol(data->protocol),
-//           mRole(data->role) {
-//         mReqMsg = std::string(data->msg, data->request_len);
-//         mRespMsg = std::string(data->msg + data->request_len, data->response_len);
-//     }
-// };
-
 enum class RecordType {
     APP_RECORD,
     CONN_STATS_RECORD,
@@ -115,15 +93,15 @@ public:
     std::string GetSpanName() override { return "CONN_STATS"; }
     DataTableSchema GetMetricsTableSchema() const override { return kNetMetricsTable; }
     DataTableSchema GetTableSchema() const override { return kNetTable; }
-    uint64_t mDropCount;
-    uint64_t mConnSum;
-    uint64_t mRttVar;
-    uint64_t mRtt;
-    uint64_t mRetransCount;
-    uint64_t mRecvPackets;
-    uint64_t mSendPackets;
-    uint64_t mRecvBytes;
-    uint64_t mSendBytes;
+    int mState;
+    uint64_t mDropCount = 0;
+    uint64_t mRttVar = 0;
+    uint64_t mRtt = 0;
+    uint64_t mRetransCount = 0;
+    uint64_t mRecvPackets = 0;
+    uint64_t mSendPackets = 0;
+    uint64_t mRecvBytes = 0;
+    uint64_t mSendBytes = 0;
 };
 
 // AbstractAppRecord is intentionally designed to distinguish L5 and L7 Record of AbstractNetRecord. AbstractAppRecord
@@ -131,6 +109,7 @@ public:
 class AbstractAppRecord : public AbstractNetRecord {
 public:
     explicit AbstractAppRecord(std::shared_ptr<Connection> connection) : AbstractNetRecord(connection) {}
+    ~AbstractAppRecord() override {}
 
     void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
     void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
@@ -160,8 +139,10 @@ const static std::string STATUS_CODE_5XX = "5xx";
 
 class HttpRecord : public AbstractAppRecord {
 public:
-    ~HttpRecord() override {}
-    HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) {}
+    static std::atomic_int sConstructCount;
+    static std::atomic_int sDestructCount;
+    ~HttpRecord() override { sDestructCount++; }
+    HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) { sConstructCount++; }
 
     DataTableSchema GetTableSchema() const override { return kHTTPTable; }
 
@@ -221,23 +202,21 @@ public:
     std::string GetRealPath() const { return mRealPath; }
     std::string GetSpanName() override { return mPath; }
 
-    std::string mStatusCode;
     int mCode = 0;
+    size_t mReqBodySize = 0;
+    size_t mRespBodySize = 0;
+    std::string mStatusCode;
     std::string mPath;
     std::string mRealPath;
     std::string mConvPath;
     std::string mReqBody;
-    size_t mReqBodySize = 0;
     std::string mRespBody;
-    size_t mRespBodySize = 0;
     std::string mHttpMethod;
     std::string mProtocolVersion;
     std::string mRespMsg;
     HeadersMap mReqHeaderMap;
     HeadersMap mRespHeaderMap;
 };
-
-class AppRecord : public AbstractRecord {};
 
 class MetricData {
 public:
@@ -278,18 +257,34 @@ public:
     std::string mSpanName;
 };
 
+#define LC_TCP_MAX_STATES 13
 class NetMetricData : public MetricData {
 public:
     NetMetricData(std::shared_ptr<Connection> conn) : MetricData(conn) {}
     ~NetMetricData() {}
-    uint64_t mDropCount;
-    uint64_t mRetransCount;
-    uint64_t mRtt;
-    uint64_t mRecvBytes;
-    uint64_t mSendBytes;
-    uint64_t mRecvPkts;
-    uint64_t mSendPkts;
-    // std::array<> attrs ??
+    uint64_t mDropCount = 0;
+    uint64_t mRetransCount = 0;
+    uint64_t mRtt = 0;
+    uint64_t mRttCount = 0;
+    uint64_t mRecvBytes = 0;
+    uint64_t mSendBytes = 0;
+    uint64_t mRecvPkts = 0;
+    uint64_t mSendPkts = 0;
+    std::array<int, LC_TCP_MAX_STATES> mStateCounts = {0};
+
+    // level1
+    std::string mAppId;
+    std::string mAppName;
+    std::string mHost;
+    std::string mIp;
+
+    // level2
+    std::string mNamespace;
+    std::string mWorkloadName;
+    std::string mWorkloadKind;
+    std::string mPeerNamespace;
+    std::string mPeerWorkloadName;
+    std::string mPeerWorkloadKind;
 };
 
 class AppSpanGroup {

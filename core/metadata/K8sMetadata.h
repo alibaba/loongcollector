@@ -75,6 +75,7 @@ private:
 
     mutable std::condition_variable mCv;
     std::vector<std::string> mBatchKeys;
+    std::vector<std::string> mBatchCids;
     std::atomic_bool mEnable = false;
     bool mFlag = false;
     std::thread mQueryThread;

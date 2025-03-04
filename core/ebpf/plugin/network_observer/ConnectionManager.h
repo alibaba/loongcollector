@@ -42,6 +42,8 @@ public:
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(it_interval_ms, report_interval_sec));
     }
 
+    using ConnStatsHandler = std::function<void(const std::shared_ptr<AbstractRecord>& record)>;
+
     ~ConnectionManager() {}
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
@@ -50,10 +52,13 @@ public:
 
     void Iterations(int count);
 
+    void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
+
+    void RegisterConnStatsFunc(ConnStatsHandler fn) { mConnStatsHandler = fn; }
+
 private:
     ConnectionManager(int64_t itIntervalMs, int64_t reportIntervalSec)
         : mItIntervalMs(itIntervalMs), mReportIntervalSec(reportIntervalSec), mConnectionTotal(0) {}
-
 
     const std::shared_ptr<Connection> GetOrCreateConnection(const ConnId&);
     void DeleteConnection(const ConnId&);
@@ -62,13 +67,16 @@ private:
     int mItIntervalMs;
     int mReportIntervalSec;
 
+    std::atomic_bool mEnableConnStats = false;
+    ConnStatsHandler mConnStatsHandler = nullptr;
+
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects
     // lock used to protect conn_trackers map
     // mutable ReadWriteLock mReadWriteLock;
     std::unordered_map<ConnId, std::shared_ptr<Connection>> mConnections;
 
-    int64_t mLastReportTs = INT64_MIN;
+    int64_t mLastReportTs = -1;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;

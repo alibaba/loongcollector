@@ -48,6 +48,10 @@ bool K8sMetadata::Enable() {
 }
 
 K8sMetadata::~K8sMetadata() {
+    if (!mEnable) {
+        return;
+    }
+
     mFlag = false;
     mCv.notify_all();
     mNetDetectorCv.notify_all();
@@ -75,17 +79,21 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mServiceHost = "47.95.70.43";
     mServicePort = 8899;
     mHostIp = "172.16.57.207";
-#endif
+    mEnable = true;
+#else
     mEnable = getenv("KUBERNETES_SERVICE_HOST") && AppConfig::GetInstance()->IsPurageContainerMode()
         && mServiceHost.size() && mServicePort > 0;
     LOG_INFO(sLogger,
              ("k8smetadata enable status", mEnable)("host ip", mHostIp)("serviceHost", mServiceHost)("servicePort",
                                                                                                      mServicePort));
+#endif
 
     // batch query metadata ...
-    mFlag = true;
-    mNetDetector = std::thread(&K8sMetadata::DetectNetwork, this);
-    mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
+    if (mEnable) {
+        mFlag = true;
+        mNetDetector = std::thread(&K8sMetadata::DetectNetwork, this);
+        mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
+    }
 }
 
 bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) {
@@ -156,9 +164,6 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json,
         bool fromJsonIsOk = FromInfoJson(json[key], info);
         if (!fromJsonIsOk) {
             continue;
-        }
-        if (infoType == containerInfoType::HostInfo) {
-            info.podIp = key;
         }
         data->containers[key] = info;
     }
@@ -253,19 +258,23 @@ void K8sMetadata::HandleMetadataResponse(containerInfoType infoType,
                                          const std::shared_ptr<ContainerData>& data,
                                          std::vector<std::string>& resKey) {
     for (const auto& pair : data->containers) {
-        // record result
-        resKey.push_back(pair.first);
         // update cache
         auto info = std::make_shared<k8sContainerInfo>(pair.second);
         if (infoType == containerInfoType::ContainerIdInfo) {
+            // record result
+            resKey.push_back(pair.first);
             SetContainerCache(pair.first, info);
         } else if (infoType == containerInfoType::IpInfo) {
+            // record result
+            resKey.push_back(pair.first);
             SetIpCache(pair.first, info);
         } else {
             // set ip cache
-            SetIpCache(pair.first, info);
+            SetIpCache(info->podIp, info);
             // set containerid cache
             for (const auto& cid : info->containerIds) {
+                // record result
+                resKey.push_back(cid);
                 SetContainerCache(cid, info);
             }
         }
@@ -378,7 +387,11 @@ void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& 
         return;
     }
     mPendingKeys.insert(key);
-    mBatchKeys.push_back(key);
+    if (type == containerInfoType::IpInfo) {
+        mBatchKeys.push_back(key);
+    } else if (type == containerInfoType::ContainerIdInfo) {
+        mBatchCids.push_back(key);
+    }
 }
 
 const static std::string LOCALHOST_IP = "127.0.0.1";
@@ -400,6 +413,9 @@ void K8sMetadata::DetectNetwork() {
         if (!mFlag) {
             return;
         }
+        if (mIsValid) {
+            continue;
+        }
         // detect network
         DetectMetadataServer();
     }
@@ -407,8 +423,34 @@ void K8sMetadata::DetectNetwork() {
 }
 
 void K8sMetadata::ProcessBatch() {
+    auto batchProcessor = [this](auto&& processFunc,
+                                 std::vector<std::string>& srcItems,
+                                 std::vector<std::string>& pendingItems,
+                                 std::unordered_set<std::string>& pendingSet) {
+        if (!srcItems.empty()) {
+            bool status = false;
+            if (mIsValid) {
+                processFunc(srcItems, status);
+            }
+
+            std::unique_lock<std::mutex> lock(mStateMux);
+            if (!status) {
+                for (const auto& item : srcItems) {
+                    if (!item.empty()) {
+                        pendingItems.emplace_back(item);
+                    }
+                }
+            } else {
+                for (const auto& item : srcItems) {
+                    pendingSet.erase(item);
+                }
+            }
+        }
+    };
+
     while (mFlag) {
         std::vector<std::string> keysToProcess;
+        std::vector<std::string> cidKeysToProcess;
         {
             std::unique_lock<std::mutex> lock(mStateMux);
             // merge requests in 100ms
@@ -416,32 +458,22 @@ void K8sMetadata::ProcessBatch() {
             if (!mFlag) {
                 break;
             }
-            if (!mIsValid || mBatchKeys.empty()) {
+            if (!mIsValid || (mBatchKeys.empty() && mBatchCids.empty())) {
                 continue;
             }
             keysToProcess.swap(mBatchKeys);
+            cidKeysToProcess.swap(mBatchCids);
         }
 
-        if (!keysToProcess.empty()) {
-            bool status = false;
-            if (mIsValid) {
-                GetByIpsFromServer(keysToProcess, status);
-            }
-            if (!status) {
-                std::unique_lock<std::mutex> lock(mStateMux);
-                for (const auto& ip : keysToProcess) {
-                    if (ip.size()) {
-                        mBatchKeys.push_back(ip);
-                    }
-                }
-            } else {
-                // request success
-                std::unique_lock<std::mutex> lock(mStateMux);
-                for (const auto& ip : keysToProcess) {
-                    mPendingKeys.erase(ip);
-                }
-            }
-        }
+        batchProcessor([this](auto&& items, bool& status) { GetByIpsFromServer(items, status); },
+                       keysToProcess,
+                       mBatchKeys,
+                       mPendingKeys);
+
+        batchProcessor([this](auto&& items, bool& status) { GetByContainerIdsFromServer(items, status); },
+                       cidKeysToProcess,
+                       mBatchCids,
+                       mPendingKeys);
     }
 }
 

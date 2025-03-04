@@ -33,7 +33,7 @@ namespace ebpf {
 
 class ParseResult {
     int status;
-    std::vector<std::unique_ptr<AbstractRecord>> records;
+    std::vector<std::shared_ptr<AbstractRecord>> records;
 };
 
 class ProtocolParserManager {
@@ -53,7 +53,7 @@ public:
     bool RemoveParser(support_proto_e type);
     std::set<support_proto_e> AvaliableProtocolTypes() const;
 
-    std::vector<std::unique_ptr<AbstractRecord>> Parse(support_proto_e type,
+    std::vector<std::shared_ptr<AbstractRecord>> Parse(support_proto_e type,
                                                        const std::shared_ptr<Connection>& conn,
                                                        struct conn_data_event_t* data,
                                                        const std::shared_ptr<Sampler>& sampler = nullptr);

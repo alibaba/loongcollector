@@ -94,7 +94,9 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
 
 void ConnectionManager::Iterations(int count) {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    // auto nowTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    auto nowTs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    // report every seconds ...
+    bool needGenRecord = (nowTs - mLastReportTs > 1);
     LOG_DEBUG(sLogger,
               ("[Iterations] it", count)("conn tracker map size", mConnections.size())("total count",
                                                                                        mConnectionTotal.load()));
@@ -103,30 +105,35 @@ void ConnectionManager::Iterations(int count) {
     for (const auto& it : mConnections) {
         auto connId = it.first;
         if (!it.second) {
+            // should not happen ...
             LOG_WARNING(sLogger, ("no conn tracker??? pid", connId.tgid)("fd", connId.fd)("start", connId.start));
             deleteQueue.push(it.first);
-            continue;
-        }
-        // LOG(INFO) << "Iterations:" << count << " conntracker pid:" << conn_id.tgid << " fd:" << conn_id.fd << "
-        // start:" << conn_id.start
-        //     << " is_close:" << it.second->IsClose() << " epoch:" << it.second->GetEpoch() << " readyToDestroy:"
-        //     << it.second->ReadyToDestroy(now) << " now:" << now_ts << " last_active:" << it.second->GetLastActiveTs()
-        //     << " last_update:" << it.second->GetLastUpdateTs()
-        //     << " dip:" << it.second->dip_ << " daddr:" << it.second->daddr_
-        //     << " containerid:" << it.second->container_id_trim_
-        //     << " k8s_meta_attached_: " << it.second->k8s_meta_attached_ << " k8s_peer_meta_attached_: "<<
-        //     it.second->k8s_peer_meta_attached_
-        //     << " protocol_set_: " << it.second->protocol_set_ << " net_meta_attached_: "<<
-        //     it.second->net_meta_attached_;
-
-        if (it.second && it.second->ReadyToDestroy(now)) {
-            deleteQueue.push(it.first);
-            n++;
             continue;
         }
 
         it.second->TryAttachPeerMeta();
         it.second->TryAttachSelfMeta();
+
+        bool forceGenRecord = false;
+        if (it.second && it.second->ReadyToDestroy(now)) {
+            forceGenRecord = true;
+            // push conn stats ...
+            deleteQueue.push(it.first);
+            n++;
+            continue;
+        }
+
+        if ((needGenRecord || forceGenRecord) && mEnableConnStats) {
+            std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(it.second);
+            LOG_DEBUG(sLogger,
+                      ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
+                                                                                             forceGenRecord));
+            bool res = it.second->GenerateConnStatsRecord(record);
+            if (res && mConnStatsHandler)
+                mConnStatsHandler(record);
+            if (needGenRecord)
+                mLastReportTs = nowTs; // update report ts
+        }
 
         // when we query for conn tracker, we record active
         it.second->CountDown();

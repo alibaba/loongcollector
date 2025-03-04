@@ -70,6 +70,7 @@ public:
     std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
     std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&);
+    std::array<size_t, 2> GenerateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&);
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
@@ -101,6 +102,7 @@ private:
     bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    bool ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec);
 

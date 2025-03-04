@@ -123,8 +123,36 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     mLastStats.mRecvBytes = event->last_output_rd_bytes;
     mLastStats.mSendPackets = event->last_output_wr_pkts;
     mLastStats.mRecvPackets = event->last_output_rd_pkts;
+    LOG_DEBUG(sLogger,
+              ("stage", "updateConnStates")("mSendBytes", event->wr_bytes)("mRecvBytes", event->rd_bytes)(
+                  "mSendPackets", event->wr_pkts)("mRecvPackets", event->rd_pkts)("last", "")(
+                  "mSendBytes", event->last_output_wr_bytes)("mRecvBytes", event->last_output_rd_bytes)(
+                  "mSendPackets", event->last_output_wr_pkts)("mRecvPackets", event->last_output_rd_pkts));
 
     this->UnsafeRecordLastUpdateTs(event->ts);
+}
+
+bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in) {
+    ConnStatsRecord* record = static_cast<ConnStatsRecord*>(in.get());
+    if (!record)
+        return false;
+    record->mDropCount = mCurrStats.mDropCount - mLastStats.mDropCount;
+    record->mRetransCount = mCurrStats.mRetransCount - mLastStats.mRetransCount;
+    record->mRecvPackets = mCurrStats.mRecvPackets - mLastStats.mRecvPackets;
+    record->mSendPackets = mCurrStats.mSendPackets - mLastStats.mSendPackets;
+    record->mRecvBytes = mCurrStats.mRecvBytes - mLastStats.mRecvBytes;
+    record->mSendBytes = mCurrStats.mSendBytes - mLastStats.mSendBytes;
+    record->mRtt = mCurrStats.mRtt;
+    LOG_DEBUG(
+        sLogger,
+        ("stage", "GenerateConnStatsRecord")("mSendBytes", mCurrStats.mSendBytes)("mRecvBytes", mCurrStats.mRecvBytes)(
+            "mSendPackets", mCurrStats.mSendPackets)("mRecvPackets", mCurrStats.mRecvPackets)("last", "")(
+            "mSendBytes", mLastStats.mSendBytes)("mRecvBytes", mLastStats.mRecvBytes)(
+            "mSendPackets", mLastStats.mSendPackets)("mRecvPackets", mLastStats.mRecvPackets)("record", "")(
+            "dropCount", record->mDropCount)("retrans", record->mRetransCount)("sendPkts", record->mSendPackets)(
+            "sendBytes", record->mSendBytes)("recvPkts", record->mRecvPackets)("recvBytes", record->mRecvPackets));
+
+    return true;
 }
 
 void Connection::TrySafeUpdateProtocolAttr() {

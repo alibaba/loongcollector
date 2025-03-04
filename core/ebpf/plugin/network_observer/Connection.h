@@ -22,6 +22,7 @@
 
 #include "common/Lock.h"
 #include "ebpf/plugin/network_observer/Type.h"
+#include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/table/AppTable.h"
 #include "metadata/ContainerInfo.h"
 
@@ -32,17 +33,19 @@ extern "C" {
 namespace logtail {
 namespace ebpf {
 
+class AbstractRecord;
+class ConnStatsRecord;
+
 struct ConnStatsData {
 public:
-    uint64_t mDropCount;
-    uint64_t mConnSum;
-    uint64_t mRttVar;
-    uint64_t mRtt;
-    uint64_t mRetransCount;
-    uint64_t mRecvPackets;
-    uint64_t mSendPackets;
-    uint64_t mRecvBytes;
-    uint64_t mSendBytes;
+    uint64_t mDropCount = 0;
+    uint64_t mRttVar = 0;
+    uint64_t mRtt = 0;
+    uint64_t mRetransCount = 0;
+    uint64_t mRecvPackets = 0;
+    uint64_t mSendPackets = 0;
+    uint64_t mRecvBytes = 0;
+    uint64_t mSendBytes = 0;
 };
 
 enum class MetadataAttachStatus {
@@ -135,6 +138,8 @@ public:
     void SafeUpdateRole(enum support_role_e role);
 
     void SafeUpdateProtocol(support_proto_e protocol);
+
+    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& record);
 
     support_role_e GetRole() const {
         ReadLock lock(mProtocolAndRoleLock);

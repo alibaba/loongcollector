@@ -67,7 +67,7 @@ constexpr DataElement kPodUid = {
 
 constexpr DataElement kPodIp = {
     "pod_ip",
-    "pod_ip", // metric
+    "podIp", // metric
     "k8s.pod.ip", // span
     "k8s.pod.ip", // log, inside pod
     "",
@@ -448,7 +448,8 @@ constexpr DataElement kSaddr
     = {"source.addr", "saddr", "saddr", "network.saddr", "source address", AggregationType::NoAggregate};
 constexpr DataElement kDaddr = {"dest.addr", "", "", "network.daddr", "dest address", AggregationType::NoAggregate};
 constexpr DataElement kSport = {"source.port", "", "", "network.sport", "source port", AggregationType::NoAggregate};
-constexpr DataElement kState = {"state", "", "", "network.state", "connection state", AggregationType::NoAggregate};
+constexpr DataElement kState
+    = {"state", "state", "", "network.state", "connection state", AggregationType::NoAggregate};
 constexpr DataElement kDport = {"dest.port", "", "", "network.dport", "dest port", AggregationType::NoAggregate};
 
 constexpr DataElement kL4Protocol

@@ -14,6 +14,7 @@
 
 #include "HttpParser.h"
 
+#include <atomic>
 #include <map>
 
 #include "ebpf/type/NetworkObserverEvent.h"
@@ -27,16 +28,18 @@ inline constexpr char kContentLength[] = "Content-Length";
 inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
-std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
+std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
                                                                        const std::shared_ptr<Connection>& conn,
                                                                        const std::shared_ptr<Sampler>& sampler) {
     // 处理 HTTP 协议数据
-    std::vector<std::unique_ptr<AbstractRecord>> records;
-    auto record = std::make_unique<HttpRecord>(conn);
+    std::vector<std::shared_ptr<AbstractRecord>> records;
+    records.reserve(1);
+    auto record = std::make_shared<HttpRecord>(conn);
     // record->SetEndTs(dataEvent->mEndTs);
     // record->SetStartTs(dataEvent->mStartTs);
     record->SetEndTs(dataEvent->end_ts);
     record->SetStartTs(dataEvent->start_ts);
+    // bool isSample = false;
     auto spanId = GenerateSpanID();
     bool isSample = sampler->ShouldSample(spanId);
     if (isSample) {
@@ -62,19 +65,11 @@ std::vector<std::unique_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         // Message result;
         std::string_view buf(dataEvent->msg + dataEvent->request_len, dataEvent->response_len);
         ParseState state = http::ParseResponse(&buf, record, true, isSample);
-        // if (state == ParseState::kSuccess) {
-        //     record->SetRespBody(result.body);
-        //     record->SetStatusCode(std::to_string(result.resp_status));
-        //     record->SetRespHeaderMap(result.headers);
-        // }
-
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
         }
     }
-
-    records.push_back(std::move(record));
-
+    records.emplace_back(std::move(record));
     return records;
 }
 
@@ -106,7 +101,7 @@ const std::string ROOT_PATH = "/";
 const char QUESTION_MARK = '?';
 const std::string HTTP1_PREFIX = "http1.";
 
-ParseState ParseRequest(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool sample) {
+ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool sample) {
     HTTPRequest req;
     int retval = http::ParseHttpRequest(*buf, &req);
     if (retval >= 0) {
@@ -184,7 +179,7 @@ ParseState ParseChunked(std::string_view* data, size_t body_size_limit_bytes, st
     return PicoParseChunked(data, body_size_limit_bytes, result, body_size);
 }
 
-ParseState ParseRequestBody(std::string_view* buf, std::unique_ptr<HttpRecord>& result) {
+ParseState ParseRequestBody(std::string_view* buf, std::shared_ptr<HttpRecord>& result) {
     // Case 1: Content-Length
     const auto content_length_iter = result->GetReqHeaderMap().find(kContentLength);
     if (content_length_iter != result->GetReqHeaderMap().end()) {
@@ -273,7 +268,7 @@ bool starts_with_http(const std::string_view* buf) {
     return buf->size() >= prefix.size() && buf->substr(0, prefix.size()) == prefix;
 }
 
-ParseState ParseResponseBody(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool closed) {
+ParseState ParseResponseBody(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool closed) {
     HTTPResponse r;
     bool adjacent_resp = starts_with_http(buf) && (ParseHttpResponse(*buf, &r) > 0);
 
@@ -332,7 +327,7 @@ ParseState ParseResponseBody(std::string_view* buf, std::unique_ptr<HttpRecord>&
     return ParseState::kSuccess;
 }
 
-ParseState ParseResponse(std::string_view* buf, std::unique_ptr<HttpRecord>& result, bool closed, bool sample) {
+ParseState ParseResponse(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool closed, bool sample) {
     HTTPResponse resp;
     int retval = ParseHttpResponse(*buf, &resp);
 
