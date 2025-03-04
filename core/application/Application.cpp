@@ -48,7 +48,6 @@
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
-#include "prometheus/PrometheusInputRunner.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "runner/sink/http/HttpSink.h"
