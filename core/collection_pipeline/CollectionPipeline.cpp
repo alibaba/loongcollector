@@ -16,9 +16,9 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <memory>
 #include <utility>
 

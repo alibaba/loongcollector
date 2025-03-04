@@ -16,12 +16,12 @@
 
 #include "ProcessEntityCollector.h"
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <sched.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <exception>
 #include <functional>
 #include <memory>

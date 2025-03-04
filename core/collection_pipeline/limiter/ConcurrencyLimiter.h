@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
 
