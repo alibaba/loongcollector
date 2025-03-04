@@ -16,9 +16,9 @@
 
 #include "host_monitor/HostMonitorInputRunner.h"
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>

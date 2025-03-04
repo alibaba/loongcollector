@@ -15,9 +15,9 @@
  */
 
 #pragma once
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 

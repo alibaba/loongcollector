@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "json/json.h"
@@ -38,6 +39,8 @@ namespace logtail {
 
 class CollectionPipeline {
 public:
+    static std::string GenPluginTypeWithID(const std::string& pluginType, const std::string& pluginID);
+
     // copy/move control functions are deleted because of mContext
     bool Init(CollectionConfig&& config);
     void Start();
@@ -64,15 +67,11 @@ public:
     const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
     const std::vector<std::unique_ptr<FlusherInstance>>& GetFlushers() const { return mFlushers; }
     bool IsFlushingThroughGoPipeline() const { return !mGoPipelineWithoutInput.isNull(); }
-    const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& GetPluginStatistics() const {
-        return mPluginCntMap;
-    }
 
     // only for input_file
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
     std::string GetNowPluginID();
-    static std::string GenPluginTypeWithID(std::string pluginType, std::string pluginID);
     PluginInstance::PluginMeta GenNextPluginMeta(bool lastOne);
 
     bool HasGoPipelineWithInput() const { return !mGoPipelineWithInput.isNull(); }
@@ -101,7 +100,6 @@ private:
     Json::Value mGoPipelineWithInput;
     Json::Value mGoPipelineWithoutInput;
     mutable CollectionPipelineContext mContext;
-    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
     std::unique_ptr<Json::Value> mConfig;
     std::optional<std::string> mSingletonInput;
     std::atomic_uint16_t mPluginID;

@@ -1,6 +1,5 @@
 
 #include <chrono> // Include the <chrono> header for sleep_for
-
 #include <thread> // Include the <thread> header for this_thread
 
 #include "json/json.h"
