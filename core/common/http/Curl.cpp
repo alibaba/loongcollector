@@ -15,13 +15,18 @@
 #include "common/http/Curl.h"
 
 #include <cstdint>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
 
 #include <map>
 #include <string>
 
 #include "app_config/AppConfig.h"
 #include "common/DNSCache.h"
+#include "common/Flags.h"
 #include "common/StringTools.h"
+#include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 
@@ -99,6 +104,14 @@ static size_t header_write_callback(char* buffer,
     return sizes;
 }
 
+static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
+    auto* socket = static_cast<CurlSocket*>(socketData);
+    if (socket->mTOS.has_value()) {
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &socket->mTOS, sizeof(socket->mTOS));
+    }
+    return 0;
+}
+
 CURL* CreateCurlHandler(const string& method,
                         bool httpsFlag,
                         const string& host,
@@ -113,7 +126,9 @@ CURL* CreateCurlHandler(const string& method,
                         bool replaceHostWithIp,
                         const string& intf,
                         bool followRedirects,
-                        optional<CurlTLS> tls) {
+                        const optional<CurlTLS>& tls,
+                        const optional<CurlSocket>& socket // socket is used async, the lifespan must be longer
+) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 
     CURL* curl = curl_easy_init();
@@ -182,6 +197,10 @@ CURL* CreateCurlHandler(const string& method,
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
     curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
     curl_easy_setopt(curl, CURLOPT_NETRC, CURL_NETRC_IGNORED);
+    if (socket.has_value()) {
+        curl_easy_setopt(curl, CURLOPT_SOCKOPTDATA, &socket.value());
+        curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, socket_write_callback);
+    }
 
     return curl;
 }
@@ -202,7 +221,8 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
-                                   request->mTls);
+                                   request->mTls,
+                                   request->mSocket);
     if (curl == NULL) {
         LOG_ERROR(sLogger,
                   ("failed to init curl handler", "failed to init curl client")("request address", request.get()));
@@ -262,7 +282,8 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
-                                   request->mTls);
+                                   request->mTls,
+                                   request->mSocket);
     if (curl == NULL) {
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
         LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));

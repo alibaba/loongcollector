@@ -18,6 +18,7 @@
 | `ebpf.receive_event_chan_cap` | Int | 用于接收内核事件的队列大小，默认为 4096 |
 | `ebpf.admin_config.debug_mode` | Bool | 是否开启 ebpf debug 模式，默认为 false |
 | `ebpf.admin_config.log_level` | String | ebpf 相关的日志级别，包括 info warn 和 debug，默认为 warn |
+| `sls_request_dscp` | Int | 设置C++部分发送到SLS网络请求中的 DSCP 字段，取值范围为0到63。默认不设置。 |
 
 ### 典型配置
 

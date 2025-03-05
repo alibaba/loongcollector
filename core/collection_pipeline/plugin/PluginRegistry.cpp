@@ -30,6 +30,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/input/InputStaticFile.h"
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -155,6 +156,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 

@@ -104,9 +104,10 @@ bool ProcessorSplitMultilineLogStringNative::IsSupportedEvent(const PipelineEven
     mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                    "unexpected error: unsupported log event.\tprocessor: " + sName
                                        + "\tconfig: " + mContext->GetConfigName(),
+                                   mContext->GetRegion(),
                                    mContext->GetProjectName(),
-                                   mContext->GetLogstoreName(),
-                                   mContext->GetRegion());
+                                   mContext->GetConfigName(),
+                                   mContext->GetLogstoreName());
     return false;
 }
 
@@ -135,9 +136,10 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
         mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                        "unexpected error: " + errorMsg + ".\tprocessor: " + sName
                                            + "\tconfig: " + mContext->GetConfigName(),
+                                       mContext->GetRegion(),
                                        mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
+                                       mContext->GetConfigName(),
+                                       mContext->GetLogstoreName());
         return;
     }
 
@@ -360,9 +362,10 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
             "unmatched log string, first line:" + sourceVal.substr(0, fisrtLogSize).to_string() + "\taction: "
                 + UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment) + "\tfilepath: "
                 + logPath.to_string() + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName(),
+            mContext->GetRegion(),
             mContext->GetProjectName(),
-            mContext->GetLogstoreName(),
-            mContext->GetRegion());
+            mContext->GetConfigName(),
+            mContext->GetLogstoreName());
     }
 }
 

@@ -179,6 +179,9 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             if (!messagePtr->mCategory.empty()) {
                 logEvent->SetContent("category", messagePtr->mCategory);
             }
+            if (!messagePtr->mConfig.empty()) {
+                logEvent->SetContent("config", messagePtr->mConfig);
+            }
         }
         lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
         alarmMap.clear();
@@ -214,9 +217,10 @@ AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(cons
 
 void AlarmManager::SendAlarm(const AlarmType alarmType,
                              const std::string& message,
+                             const std::string& region,
                              const std::string& projectName,
-                             const std::string& category,
-                             const std::string& region) {
+                             const std::string& config,
+                             const std::string& category) {
     if (alarmType < 0 || alarmType >= ALL_LOGTAIL_ALARM_NUM) {
         return;
     }
@@ -228,10 +232,10 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",
     // mMessageType[alarmType])("msg", message));
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
-    string key = projectName + "_" + category;
+    string key = projectName + "_" + category + "_" + config;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();

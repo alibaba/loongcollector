@@ -16,17 +16,16 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 
-#include "file_server/ConfigManager.h"
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
+
+#include "common/timer/Timer.h"
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
 #include "file_server/StaticFileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "prometheus/PrometheusInputRunner.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-#include "ebpf/eBPFServer.h"
-#endif
-#include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
-#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
@@ -36,16 +35,6 @@
 using namespace std;
 
 namespace logtail {
-
-CollectionPipelineManager::CollectionPipelineManager()
-    : mInputRunners({
-          PrometheusInputRunner::GetInstance(),
-          StaticFileServer::GetInstance(),
-#if defined(__linux__) && !defined(__ANDROID__)
-          ebpf::eBPFServer::GetInstance(),
-#endif
-      }) {
-}
 
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
@@ -64,13 +53,15 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
     if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-
+    // other threads only read mPipelineNameEntityMap, so we don't need to lock read here
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
-        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
-        mPipelineNameEntityMap.erase(iter);
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap.erase(name);
+        }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
                                                                                      ConfigFeedbackStatus::DELETED);
     }
@@ -83,9 +74,10 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
+                config.mRegion,
                 config.mProject,
-                config.mLogstore,
-                config.mRegion);
+                config.mName,
+                config.mLogstore);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;
@@ -95,10 +87,10 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
         iter->second->Stop(false);
-        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
-
-        mPipelineNameEntityMap[config.mName] = p;
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap[config.mName] = p;
+        }
         p->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
@@ -111,17 +103,20 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
+                config.mRegion,
                 config.mProject,
-                config.mLogstore,
-                config.mRegion);
+                config.mName,
+                config.mLogstore);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger,
                  ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
-        mPipelineNameEntityMap[config.mName] = p;
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap[config.mName] = p;
+        }
         p->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
@@ -155,6 +150,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 }
 
 const shared_ptr<CollectionPipeline>& CollectionPipelineManager::FindConfigByName(const string& configName) const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
@@ -163,22 +159,12 @@ const shared_ptr<CollectionPipeline>& CollectionPipelineManager::FindConfigByNam
 }
 
 vector<string> CollectionPipelineManager::GetAllConfigNames() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     vector<string> res;
     for (const auto& item : mPipelineNameEntityMap) {
         res.push_back(item.first);
     }
     return res;
-}
-
-string CollectionPipelineManager::GetPluginStatistics() const {
-    Json::Value root;
-    ScopedSpinLock lock(mPluginCntMapLock);
-    for (const auto& item : mPluginCntMap) {
-        for (const auto& plugin : item.second) {
-            root[item.first][plugin.first] = Json::Value(plugin.second);
-        }
-    }
-    return root.toStyledString();
 }
 
 void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
@@ -196,6 +182,7 @@ void CollectionPipelineManager::StopAllPipelines() {
 
     LogtailPlugin::GetInstance()->StopAllPipelines(true);
 
+    Timer::GetInstance()->Stop();
     ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();
@@ -204,6 +191,11 @@ void CollectionPipelineManager::StopAllPipelines() {
 
     // Sender should be stopped after profiling threads are stopped.
     LOG_INFO(sLogger, ("stop all pipelines", "succeeded"));
+}
+
+void CollectionPipelineManager::ClearAllPipelines() {
+    unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    mPipelineNameEntityMap.clear();
 }
 
 shared_ptr<CollectionPipeline> CollectionPipelineManager::BuildPipeline(CollectionConfig&& config) {
@@ -216,30 +208,14 @@ shared_ptr<CollectionPipeline> CollectionPipelineManager::BuildPipeline(Collecti
 }
 
 void CollectionPipelineManager::FlushAllBatch() {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     for (const auto& item : mPipelineNameEntityMap) {
         item.second->FlushBatch();
     }
 }
 
-void CollectionPipelineManager::IncreasePluginUsageCnt(
-    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
-    for (const auto& item : statistics) {
-        for (const auto& plugin : item.second) {
-            mPluginCntMap[item.first][plugin.first] += plugin.second;
-        }
-    }
-}
-
-void CollectionPipelineManager::DecreasePluginUsageCnt(
-    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
-    for (const auto& item : statistics) {
-        for (const auto& plugin : item.second) {
-            mPluginCntMap[item.first][plugin.first] -= plugin.second;
-        }
-    }
-}
-
 bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& diff) {
+    // private method, no need to lock mPipelineNameEntityMapMutex
     for (const auto& name : diff.mRemoved) {
         string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
         if (inputType == "input_file" || inputType == "input_container_stdio") {

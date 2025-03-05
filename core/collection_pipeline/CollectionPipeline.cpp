@@ -16,9 +16,9 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <memory>
 #include <utility>
 
@@ -124,7 +124,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
         }
-        ++mPluginCntMap["inputs"][pluginType];
     }
 
     for (size_t i = 0; i < config.mProcessors.size(); ++i) {
@@ -148,7 +147,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                 AddPluginToGoPipeline(pluginType, detail, "processors", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["processors"][pluginType];
     }
 
     if (config.mAggregators.empty() && config.IsFlushingThroughGoPipelineExisted()) {
@@ -165,7 +163,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         } else {
             AddPluginToGoPipeline(pluginType, detail, "aggregators", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["aggregators"][pluginType];
     }
 
     for (size_t i = 0; i < config.mFlushers.size(); ++i) {
@@ -197,7 +194,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                 AddPluginToGoPipeline(pluginType, detail, "flushers", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["flushers"][pluginType];
     }
 
     // route is only enabled in native flushing mode, thus the index in config is the same as that in mFlushers
@@ -215,7 +211,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         if (!mGoPipelineWithoutInput.isNull()) {
             AddPluginToGoPipeline(pluginType, detail, "extensions", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["extensions"][pluginType];
     }
 
     // global module must be initialized at last, since native input or flusher plugin may generate global param in Go
@@ -509,7 +504,7 @@ void CollectionPipeline::MergeGoPipeline(const Json::Value& src, Json::Value& ds
     }
 }
 
-std::string CollectionPipeline::GenPluginTypeWithID(std::string pluginType, std::string pluginID) {
+string CollectionPipeline::GenPluginTypeWithID(const string& pluginType, const string& pluginID) {
     return pluginType + "/" + pluginID;
 }
 
@@ -570,9 +565,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             return false;
         }
     }
@@ -589,9 +585,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             if (!mGoPipelineWithoutInput.isNull()) {
                 LogtailPlugin::GetInstance()->UnloadPipeline(GetConfigNameOfGoPipelineWithoutInput());
             }
@@ -601,13 +598,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
     return true;
 }
 
-std::string CollectionPipeline::GetNowPluginID() {
-    return std::to_string(mPluginID.load());
+string CollectionPipeline::GetNowPluginID() {
+    return to_string(mPluginID.load());
 }
 
 PluginInstance::PluginMeta CollectionPipeline::GenNextPluginMeta(bool lastOne) {
     mPluginID.fetch_add(1);
-    return PluginInstance::PluginMeta(std::to_string(mPluginID.load()));
+    return PluginInstance::PluginMeta(to_string(mPluginID.load()));
 }
 
 void CollectionPipeline::WaitAllItemsInProcessFinished() {
@@ -620,10 +617,11 @@ void CollectionPipeline::WaitAllItemsInProcessFinished() {
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
             AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
                                                    string("pipeline stop too slow, config: ") + mName
-                                                       + "; cost:" + std::to_string(duration),
+                                                       + "; cost:" + to_string(duration),
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             alarmOnce = true;
         }
     }

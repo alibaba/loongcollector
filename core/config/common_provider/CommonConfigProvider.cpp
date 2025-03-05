@@ -134,8 +134,6 @@ void CommonConfigProvider::Stop() {
 
 void CommonConfigProvider::LoadConfigFile() {
     error_code ec;
-    lock_guard<mutex> pipelineInfomaplock(mContinuousPipelineInfoMapMux);
-    lock_guard<mutex> lockPipeline(mContinuousPipelineMux);
     for (auto const& entry : filesystem::directory_iterator(mContinuousPipelineConfigDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
@@ -147,12 +145,13 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            mContinuousPipelineConfigInfoMap[info.name] = info;
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mContinuousPipelineConfigInfoMap[info.name] = info;
+            }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(info.name, this);
         }
     }
-    lock_guard<mutex> instanceInfomaplock(mInstanceInfoMapMux);
-    lock_guard<mutex> lockInstance(mInstanceMux);
     for (auto const& entry : filesystem::directory_iterator(mInstanceSourceDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
@@ -164,7 +163,10 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            mInstanceConfigInfoMap[info.name] = info;
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mInstanceConfigInfoMap[info.name] = info;
+            }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(info.name, this);
         }
     }
@@ -282,19 +284,21 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     heartbeatReq.set_running_status("running");
     heartbeatReq.set_startup_time(mStartTime);
 
-    lock_guard<mutex> pipelineinfomaplock(mContinuousPipelineInfoMapMux);
-    for (const auto& configInfo : mContinuousPipelineConfigInfoMap) {
-        addConfigInfoToRequest(configInfo, heartbeatReq.add_continuous_pipeline_configs());
-    }
-    lock_guard<mutex> instanceinfomaplock(mInstanceInfoMapMux);
-    for (const auto& configInfo : mInstanceConfigInfoMap) {
-        addConfigInfoToRequest(configInfo, heartbeatReq.add_instance_configs());
+    {
+        lock_guard<mutex> lockInfoMap(mInfoMapMux);
+        for (const auto& configInfo : mContinuousPipelineConfigInfoMap) {
+            addConfigInfoToRequest(configInfo, heartbeatReq.add_continuous_pipeline_configs());
+        }
+
+        for (const auto& configInfo : mInstanceConfigInfoMap) {
+            addConfigInfoToRequest(configInfo, heartbeatReq.add_instance_configs());
+        }
+
+        for (const auto& configInfo : mOnetimePipelineConfigInfoMap) {
+            addConfigInfoToRequest(configInfo, heartbeatReq.add_onetime_pipeline_configs());
+        }
     }
 
-    lock_guard<mutex> onetimeinfomaplock(mOnetimePipelineInfoMapMux);
-    for (const auto& configInfo : mOnetimePipelineConfigInfoMap) {
-        addConfigInfoToRequest(configInfo, heartbeatReq.add_onetime_pipeline_configs());
-    }
     return heartbeatReq;
 }
 
@@ -409,27 +413,33 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
                       "dir", sourceDir.string())("error code", ec.value())("error msg", ec.message()));
         return;
     }
-
+    // 保证每次往磁盘上dump文件的时候，config watcher不会读到一半的内容，相当于是个目录锁
     lock_guard<mutex> lock(mContinuousPipelineMux);
-    lock_guard<mutex> infomaplock(mContinuousPipelineInfoMapMux);
     for (const auto& config : configs) {
         filesystem::path filePath = sourceDir / (config.name() + ".json");
         if (config.version() == -1) {
-            mContinuousPipelineConfigInfoMap.erase(config.name());
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mContinuousPipelineConfigInfoMap.erase(config.name());
+            }
             filesystem::remove(filePath, ec);
             ConfigFeedbackReceiver::GetInstance().UnregisterContinuousPipelineConfig(config.name());
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
                                                                              .version = config.version(),
                                                                              .status = ConfigFeedbackStatus::FAILED,
                                                                              .detail = config.detail()};
                 continue;
             }
-            mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                         .version = config.version(),
-                                                                         .status = ConfigFeedbackStatus::APPLYING,
-                                                                         .detail = config.detail()};
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                                                                             .version = config.version(),
+                                                                             .status = ConfigFeedbackStatus::APPLYING,
+                                                                             .detail = config.detail()};
+            }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
     }
@@ -447,35 +457,34 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
                       "dir", sourceDir.string())("error code", ec.value())("error msg", ec.message()));
         return;
     }
-
+    // 保证每次往磁盘上dump文件的时候，config watcher不会读到一半的内容，相当于是个目录锁
     lock_guard<mutex> lock(mInstanceMux);
-    lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
     for (const auto& config : configs) {
         filesystem::path filePath = sourceDir / (config.name() + ".json");
         if (config.version() == -1) {
-            mInstanceConfigInfoMap.erase(config.name());
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mInstanceConfigInfoMap.erase(config.name());
+            }
             filesystem::remove(filePath, ec);
             ConfigFeedbackReceiver::GetInstance().UnregisterInstanceConfig(config.name());
         } else {
-            filesystem::path filePath = sourceDir / (config.name() + ".json");
-            if (config.version() == -1) {
-                mInstanceConfigInfoMap.erase(config.name());
-                filesystem::remove(filePath, ec);
-                ConfigFeedbackReceiver::GetInstance().UnregisterInstanceConfig(config.name());
-            } else {
-                if (!DumpConfigFile(config, sourceDir)) {
-                    mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                       .version = config.version(),
-                                                                       .status = ConfigFeedbackStatus::FAILED,
-                                                                       .detail = config.detail()};
-                    continue;
-                }
+            if (!DumpConfigFile(config, sourceDir)) {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                                                                   .version = config.version(),
+                                                                   .status = ConfigFeedbackStatus::FAILED,
+                                                                   .detail = config.detail()};
+                continue;
+            }
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
                                                                    .version = config.version(),
                                                                    .status = ConfigFeedbackStatus::APPLYING,
                                                                    .detail = config.detail()};
-                ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
             }
+            ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
     }
 }
@@ -536,7 +545,7 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
 
 void CommonConfigProvider::FeedbackContinuousPipelineConfigStatus(const std::string& name,
                                                                   ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mContinuousPipelineInfoMapMux);
+    lock_guard<mutex> lockInfoMap(mInfoMapMux);
     auto info = mContinuousPipelineConfigInfoMap.find(name);
     if (info != mContinuousPipelineConfigInfoMap.end()) {
         info->second.status = status;
@@ -546,7 +555,7 @@ void CommonConfigProvider::FeedbackContinuousPipelineConfigStatus(const std::str
                                                                                                ToStringView(status)));
 }
 void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
+    lock_guard<mutex> lockInfoMap(mInfoMapMux);
     auto info = mInstanceConfigInfoMap.find(name);
     if (info != mInstanceConfigInfoMap.end()) {
         info->second.status = status;
@@ -557,7 +566,7 @@ void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name,
 void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& type,
                                                                const std::string& name,
                                                                ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mOnetimePipelineInfoMapMux);
+    lock_guard<mutex> lockInfoMap(mInfoMapMux);
     auto info = mOnetimePipelineConfigInfoMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
     if (info != mOnetimePipelineConfigInfoMap.end()) {
         info->second.status = status;

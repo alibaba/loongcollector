@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -38,6 +39,17 @@ struct CurlTLS {
     bool mInsecureSkipVerify = true;
 };
 
+struct CurlSocket {
+    // TOS 8 bits: first 6 bits are DSCP (user customized), last 2 bits are ECN (auto set by OS)
+    std::optional<uint32_t> mTOS;
+
+    CurlSocket(int32_t dscp) {
+        if (dscp >= 0 && dscp <= 63) {
+            mTOS = dscp << 2;
+        }
+    }
+};
+
 struct HttpRequest {
     std::string mMethod;
     // TODO: upgrade curl to 7.62, and replace the following 4 members
@@ -54,6 +66,7 @@ struct HttpRequest {
     uint32_t mMaxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt));
     bool mFollowRedirects = false;
     std::optional<CurlTLS> mTls = std::nullopt;
+    std::optional<CurlSocket> mSocket = std::nullopt;
 
     uint32_t mTryCnt = 1;
     std::chrono::system_clock::time_point mLastSendTime;
@@ -69,7 +82,8 @@ struct HttpRequest {
                 uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
                 uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                 bool followRedirects = false,
-                std::optional<CurlTLS> tls = std::nullopt)
+                std::optional<CurlTLS> tls = std::nullopt,
+                std::optional<CurlSocket> socket = std::nullopt)
         : mMethod(method),
           mHTTPSFlag(httpsFlag),
           mUrl(url),
@@ -81,7 +95,8 @@ struct HttpRequest {
           mTimeout(timeout),
           mMaxTryCnt(maxTryCnt),
           mFollowRedirects(followRedirects),
-          mTls(std::move(tls)) {}
+          mTls(std::move(tls)),
+          mSocket(std::move(socket)) {}
     virtual ~HttpRequest() = default;
 };
 
@@ -102,7 +117,8 @@ struct AsynHttpRequest : public HttpRequest {
                     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
                     uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                     bool followRedirects = false,
-                    std::optional<CurlTLS> tls = std::nullopt)
+                    std::optional<CurlTLS> tls = std::nullopt,
+                    std::optional<CurlSocket> socket = std::nullopt)
         : HttpRequest(method,
                       httpsFlag,
                       host,
@@ -114,7 +130,8 @@ struct AsynHttpRequest : public HttpRequest {
                       timeout,
                       maxTryCnt,
                       followRedirects,
-                      std::move(tls)),
+                      std::move(tls),
+                      std::move(socket)),
           mResponse(std::move(response)) {}
 
     virtual bool IsContextValid() const = 0;

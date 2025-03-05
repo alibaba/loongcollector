@@ -165,9 +165,10 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
             + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName();
         AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                errorMsg,
+                                               GetContext().GetRegion(),
                                                GetContext().GetProjectName(),
-                                               GetContext().GetLogstoreName(),
-                                               GetContext().GetRegion());
+                                               GetContext().GetConfigName(),
+                                               GetContext().GetLogstoreName());
     }
     return shouldKeepEvent;
 }

@@ -20,12 +20,14 @@ namespace logtail {
 
 class InputRunner {
 public:
+    InputRunner();
     virtual ~InputRunner() = default;
 
     virtual void Init() = 0;
     virtual void Stop() = 0;
     virtual bool HasRegisteredPlugins() const = 0;
     virtual void ClearUnusedCheckpoints() {}
+    virtual void EventGC() {}
 };
 
 } // namespace logtail

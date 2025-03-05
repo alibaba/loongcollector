@@ -98,6 +98,7 @@ private:
     friend class ProcessQueueManagerUnittest;
     friend class PipelineUnittest;
     friend class PipelineUpdateUnittest;
+    friend class HostMonitorInputRunnerUnittest;
 #endif
 };
 
