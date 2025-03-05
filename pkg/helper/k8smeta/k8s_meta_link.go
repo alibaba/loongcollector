@@ -76,7 +76,7 @@ func (g *LinkGenerator) getPodNodeLink(podList []*K8sMetaEvent) []*K8sMetaEvent 
 					EventType: event.EventType,
 					Object: &ObjectWrapper{
 						ResourceType: POD_NODE,
-						Raw: &NodePod{
+						Raw: &PodNode{
 							Node: n.Raw.(*v1.Node),
 							Pod:  pod,
 						},

@@ -62,9 +62,9 @@ var AllResources = []string{
 	INGRESS,
 }
 
-type NodePod struct {
-	Node *v1.Node
+type PodNode struct {
 	Pod  *v1.Pod
+	Node *v1.Node
 }
 
 type PodDeployment struct {

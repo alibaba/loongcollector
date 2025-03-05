@@ -239,7 +239,7 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 }
 
 func (m *metaCollector) processPodNodeLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*k8smeta.NodePod); ok {
+	if obj, ok := data.Raw.(*k8smeta.PodNode); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Node.Kind, "", obj.Node.Name, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, method, data.FirstObservedTime, data.LastObservedTime)
