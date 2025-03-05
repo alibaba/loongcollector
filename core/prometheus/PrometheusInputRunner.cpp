@@ -25,14 +25,12 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
-#include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
@@ -50,8 +48,6 @@ PrometheusInputRunner::PrometheusInputRunner()
       mPodName(STRING_FLAG(_pod_name_)),
       mEventPool(true),
       mUnRegisterMs(0) {
-    mTimer = std::make_shared<Timer>();
-
     // self monitor
     MetricLabels labels;
     labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS);
@@ -84,7 +80,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->InitSelfMonitor(defaultLabels);
 
     targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
-    targetSubscriber->SetComponent(mTimer, &mEventPool);
+    targetSubscriber->SetComponent(&mEventPool);
     auto currSystemTime = chrono::system_clock::now();
     auto randSleepMilliSec
         = GetRandSleepMilliSec(targetSubscriber->GetId(),
@@ -138,7 +134,7 @@ void PrometheusInputRunner::Init() {
     mIsStarted = true;
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Init();
+    Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
 
@@ -175,6 +171,8 @@ void PrometheusInputRunner::Init() {
                                 mUnRegisterMs = 0;
                             } else {
                                 mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                // adjust unRegisterMs to scrape targets for zero-cost
+                                mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
                             }
                         }
@@ -205,7 +203,6 @@ void PrometheusInputRunner::Stop() {
     }
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif

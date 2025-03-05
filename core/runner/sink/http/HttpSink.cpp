@@ -14,6 +14,8 @@
 
 #include "runner/sink/http/HttpSink.h"
 
+#include <optional>
+
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/plugin/interface/HttpFlusher.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
@@ -131,7 +133,10 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
                                    headers,
                                    request->mTimeout,
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
-                                   AppConfig::GetInstance()->GetBindInterface());
+                                   AppConfig::GetInstance()->GetBindInterface(),
+                                   false,
+                                   std::nullopt,
+                                   std::move(request->mSocket));
     if (curl == nullptr) {
         request->mItem->mStatus = SendingStatus::IDLE;
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");

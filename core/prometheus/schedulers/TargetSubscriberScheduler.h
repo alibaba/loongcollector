@@ -17,11 +17,10 @@
 #pragma once
 
 #include <cstdint>
+#include <json/json.h>
 
 #include <memory>
 #include <string>
-
-#include "json/json.h"
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/http/HttpResponse.h"
@@ -61,21 +60,24 @@ public:
 
     // zero cost upgrade
     uint64_t mUnRegisterMs;
+    static std::chrono::steady_clock::time_point mLastUpdateTime;
+    static uint64_t sDelaySeconds;
 
 private:
-    bool ParseScrapeSchedulerGroup(const std::string& content, std::vector<Labels>& scrapeSchedulerGroup);
+    bool ParseScrapeSchedulerGroup(const std::string& content, std::vector<PromTargetInfo>& scrapeSchedulerGroup);
 
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>
-    BuildScrapeSchedulerSet(std::vector<Labels>& scrapeSchedulerGroup);
+    BuildScrapeSchedulerSet(std::vector<PromTargetInfo>& scrapeSchedulerGroup);
 
     std::unique_ptr<TimerEvent> BuildSubscriberTimerEvent(std::chrono::steady_clock::time_point execTime);
+    std::string TargetsInfoToString() const;
     void UpdateScrapeScheduler(std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>&);
 
     void CancelAllScrapeScheduler();
 
     std::shared_ptr<ScrapeConfig> mScrapeConfigPtr;
 
-    ReadWriteLock mRWLock;
+    mutable ReadWriteLock mRWLock;
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> mScrapeSchedulerMap;
 
     std::string mJobName;

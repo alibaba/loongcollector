@@ -409,14 +409,23 @@ bool ScrapeConfig::InitExternalLabels(const Json::Value& externalLabels) {
         LOG_ERROR(sLogger, ("external_labels config error", ""));
         return false;
     }
+    set<string> dups;
     for (auto& key : externalLabels.getMemberNames()) {
         if (externalLabels[key].isString()) {
+            if (dups.find(key) != dups.end()) {
+                LOG_ERROR(sLogger, ("duplicated key in external_labels", key));
+                return false;
+            }
+            dups.insert(key);
             mExternalLabels.emplace_back(key, externalLabels[key].asString());
         } else {
             LOG_ERROR(sLogger, ("external_labels config error", ""));
             return false;
         }
     }
+    std::sort(mExternalLabels.begin(), mExternalLabels.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+    });
     return true;
 }
 

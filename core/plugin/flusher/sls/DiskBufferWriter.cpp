@@ -876,7 +876,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
 #ifdef __ENTERPRISE__
     if (bufferMeta.endpointmode() == sls_logs::EndpointMode::DEFAULT) {
         EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
-            region, {bufferMeta.endpoint()}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::CREATE);
+            region, {bufferMeta.endpoint()}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::APPEND);
     }
     auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(
         region, bufferMeta.project(), GetEndpointMode(bufferMeta.endpointmode()));
