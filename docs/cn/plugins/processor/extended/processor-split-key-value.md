@@ -11,10 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.5.0
-    * Jinchen #558 ([#758](https://github.com/alibaba/loongcollector/pull/758))
-    * Feature add support of quote in processor_split_key_value plugin ([#766](https://github.com/alibaba/loongcollector/pull/766))
 
 ## 配置参数
 

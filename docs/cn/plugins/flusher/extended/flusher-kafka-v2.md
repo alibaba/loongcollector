@@ -11,19 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.3.0
-* 更新记录：
-  * iLogtail v1.4.0
-    * feat: flusher kafka v2 support TLS and Kerberos ([#602](https://github.com/alibaba/loongcollector/pull/602))
-  * iLogtail v1.6.0
-    * feat: upgrade kafka sarama client ([#824](https://github.com/alibaba/loongcollector/pull/824))
-  * iLogtail v1.8.0
-    * feat: flusher kafka v2 support send message with headers ([#1066](https://github.com/alibaba/loongcollector/pull/1066))
-  * iLogtail v2.0.0
-    * feat: add kafka net config MaxOpenRequests ([#1224](https://github.com/alibaba/loongcollector/pull/1224))
-  * iLogtail v2.0.4
-    * dependency: bump sarama to 1.42.2 ([#1364](https://github.com/alibaba/loongcollector/pull/1364))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 

@@ -11,15 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.4.0
-* 更新记录：
-  * iLogtail v1.4.0
-    * feat: add Extension type plugin && http flusher support Authenticator、Filter ([#648](https://github.com/alibaba/loongcollector/pull/648))
-  * iLogtail v2.0.0
-    * feat: add flusher_http queue buffer and async interceptor settings ([#1203](https://github.com/alibaba/loongcollector/pull/1203))
-    * Support jsonline protocol ([#1265](https://github.com/alibaba/loongcollector/pull/1265))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
-    * feat: enhance flusher_http, e.g. supporting prometheus encoder, snappy compression, etc. ([#1726](https://github.com/alibaba/loongcollector/pull/1726))
 
 ## 配置参数
 

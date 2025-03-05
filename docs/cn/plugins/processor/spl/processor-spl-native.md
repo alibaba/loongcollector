@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v2.0.0
-* 更新记录：
-  * iLogtail v2.0.4
-    * open spl errorSampling to reduce error print ([#1331](https://github.com/alibaba/loongcollector/pull/1331))
-  * LoongCollector Alpha(v0.2.0)
-    * chore: update development image ([#1855](https://github.com/alibaba/loongcollector/pull/1855))
 
 ## 配置参数
 

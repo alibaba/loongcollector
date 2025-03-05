@@ -7,13 +7,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.5.0
-* 更新记录：
-  * iLogtail v1.6.0
-    * kubernetes add support kruise ([#878](https://github.com/alibaba/loongcollector/pull/878))
-  * iLogtail v1.7.1
-    * fix service_go_profile nil panic ([#1036](https://github.com/alibaba/loongcollector/pull/1036))
-  * iLogtail v2.0.0
-    * Improve goprofile plugin to support real local IP inclusion ([#1281](https://github.com/alibaba/loongcollector/pull/1281))
 
 ## 配置参数
 

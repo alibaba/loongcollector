@@ -11,9 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.2.0
-* 更新记录：
-  * iLogtail v1.4.0
-    * Grok processor report match errors by default ([#645](https://github.com/alibaba/loongcollector/pull/645))
 
 ## 配置参数
 

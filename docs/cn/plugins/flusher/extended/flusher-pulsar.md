@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.4.0
-* 更新记录：
-  * iLogtail v1.6.0
-    * feat: optimize-flusher-pulsar ([#819](https://github.com/alibaba/loongcollector/pull/819))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 

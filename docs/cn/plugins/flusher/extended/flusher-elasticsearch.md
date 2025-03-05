@@ -11,13 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.4.0
-* 更新记录：
-  * iLogtail v1.7.1
-    * Elasticsearch flusher 新功能特性 ([#979](https://github.com/alibaba/loongcollector/pull/979))
-  * iLogtail V2.0.0
-    * elasticsearch flusher authentication fix tls config and http config ([#1174](https://github.com/alibaba/loongcollector/pull/1174))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 

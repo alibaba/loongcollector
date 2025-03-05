@@ -11,12 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.2.0
-    * fix context aggregator bug([#377](https://github.com/alibaba/loongcollector/pull/377))
-  * iLogtail v2.0.0
-    * add UsingOldContentTag. When UsingOldContentTag is set to false, the tag is now put into the context during cgo. ([#1169](https://github.com/alibaba/loongcollector/pull/1169))
-    * fix: aggregator context implement aggregatorV2 ([#1235](https://github.com/alibaba/loongcollector/pull/1235))
 
 ## 配置参数
 

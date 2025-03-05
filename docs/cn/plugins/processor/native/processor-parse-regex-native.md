@@ -11,9 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v2.0.0
-* 更新记录：
-  * LoongCollector Alpha(v0.2.0)
-    * improve worst case performance when all events failed to process ([#1465](https://github.com/alibaba/loongcollector/pull/1465)) ([#1472](https://github.com/alibaba/loongcollector/pull/1472))
 
 ## 配置参数
 

@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.0.28
-    * [add] support custom hash partition ([#26](https://github.com/alibaba/loongcollector/pull/26))
-  * iLogtail v2.0.4
-    * dependency: bump sarama to 1.42.2 ([#1364](https://github.com/alibaba/loongcollector/pull/1364))
 
 ## 配置参数
 

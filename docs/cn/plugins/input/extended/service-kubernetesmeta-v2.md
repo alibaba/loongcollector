@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：LoongCollector Alpha(v0.2.0)
-* 更新记录：
-  * LoongCollector v3.0.5
-    * fix: k8s meta index ([#2032](https://github.com/alibaba/loongcollector/pull/2032))
-  * 【待发布】
-    * feat: support host monitor ([#1890](https://github.com/alibaba/loongcollector/pull/1890))
 
 ## 配置参数
 

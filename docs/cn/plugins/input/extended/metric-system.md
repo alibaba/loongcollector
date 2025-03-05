@@ -11,15 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.6.0
-    * fix system disk total val ([#835](https://github.com/alibaba/loongcollector/pull/835))
-  * iLogtail v1.7.0
-    * add timeout func when collect disk metrics ([#933](https://github.com/alibaba/loongcollector/pull/933))
-  * iLogtail v1.8.0
-    * Unify metrics format ([#1060](https://github.com/alibaba/loongcollector/pull/1060))
-  * iLogtail v2.0.0
-    * fix: Implement panic recovery mechanism in plugin export ([#1252](https://github.com/alibaba/loongcollector/pull/1252))
 
 ## 配置参数
 

@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.5.0
-* 更新记录：
-  * iLogtail v2.0.0
-    * Support contents only for loki flusher ([#1256](https://github.com/alibaba/loongcollector/pull/1256))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 

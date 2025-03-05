@@ -11,12 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.4.0
-    * feat: Define the metrics data model and modify the plugin manager to support procress the metrics data ([#519](https://github.com/alibaba/loongcollector/pull/519))
-    * Define span model and byteArray model ([#571](https://github.com/alibaba/loongcollector/pull/571))
-  * iLogtail v1.8.0
-    * Unify metrics format ([#1060](https://github.com/alibaba/loongcollector/pull/1060))
 
 ## 配置参数
 

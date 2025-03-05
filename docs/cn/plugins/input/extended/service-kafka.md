@@ -11,16 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.6.0
-    * feat: upgrade kafka sarama client ([#824](https://github.com/alibaba/loongcollector/pull/824))
-  * iLogtail v2.0.4
-    * dependency: bump sarama to 1.42.2 ([#1364](https://github.com/alibaba/loongcollector/pull/1364))
-  * LoongCollector Alpha(v0.2.0)
-    * fix: input_kafka consumer wont close due to ctx never done. ([#1615](https://github.com/alibaba/loongcollector/pull/1615))
-    * Add a default content key for the service_kafka plugin ([#1754](https://github.com/alibaba/loongcollector/pull/1754))
-  * 【待发布】
-    * fix: handle error in kafka consumer loop to prevent premature return ([#2100](https://github.com/alibaba/loongcollector/pull/2100))
 
 ## 配置参数
 

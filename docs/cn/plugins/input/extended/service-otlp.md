@@ -11,19 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.4.0
-* 更新记录：
-  * iLogtail v1.5.0
-    * feat: add Extension type plugin && http flusher support Authenticator、Filter ([#648](https://github.com/alibaba/loongcollector/pull/648))
-    * feat: otlp-log-v2 ([#778](https://github.com/alibaba/loongcollector/pull/778))
-  * iLogtail v1.6.0
-    * otlp decoder for metrics(v1)  ([#827](https://github.com/alibaba/loongcollector/pull/827))
-    * feat: service-otlp-input supports gzip decompression ([#874](https://github.com/alibaba/loongcollector/pull/874))
-  * iLogtail v1.7.1
-    * Fixed the abnormal shutdown issue of service_otlp ([#1040](https://github.com/alibaba/loongcollector/pull/1040))
-  * iLogtail v1.8.0
-    * unify_otel_metrics_decoder ([#1158](https://github.com/alibaba/loongcollector/pull/1158))
-  * LoongCollector Alpha(v0.2.0)
-    * Enable OTLP Trace flushing to SLS ([#1906](https://github.com/alibaba/loongcollector/pull/1906))
 
 ## 配置参数
 

@@ -30,37 +30,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.0.29
-    * fix wrong matching lables for stdout input ([#78](https://github.com/alibaba/loongcollector/pull/78))
-    * Fix label matching ([#79](https://github.com/alibaba/loongcollector/pull/79))
-  * iLogtail v1.0.30
-    * fix Customize the authentication token in Windows artifact ([#91](https://github.com/alibaba/loongcollector/pull/91))
-  * iLogtail v1.0.31
-    * Enhance mem cost ([#76](https://github.com/alibaba/loongcollector/pull/76))
-    * fix-process-raw-log-tag-sequence ([#100](https://github.com/alibaba/loongcollector/pull/100))
-  * iLogtail v1.1.0
-    * enhance container export api ([#140](https://github.com/alibaba/loongcollector/pull/140))
-  * iLogtail v1.2.0
-    * Improve Eci and DaemonSet container stop ([#392](https://github.com/alibaba/loongcollector/pull/392))
-  * iLogtail v1.3.0
-    * fix #529, fix docker fd leak and event lost ([#530](https://github.com/alibaba/loongcollector/pull/530))
-  * iLogtail v1.4.0
-    * add container info ([#567](https://github.com/alibaba/loongcollector/pull/567))
-    * add switch for collect containers ([#699](https://github.com/alibaba/loongcollector/pull/699))
-  * iLogtail v1.7.0
-    * feat: support nanosecond ([#952](https://github.com/alibaba/loongcollector/pull/952))
-  * iLogtail v1.7.1
-    * fix: go pb has TimeNs when not set ([#1012](https://github.com/alibaba/loongcollector/pull/1012))
-    * fix symlink broken in container log filepath ([#1042](https://github.com/alibaba/loongcollector/pull/1042))
-    * refine container info code ([#1049](https://github.com/alibaba/loongcollector/pull/1049))
-  * iLogtail v1.8.0
-    * fix container log path symlink not work ([#1121](https://github.com/alibaba/loongcollector/pull/1121))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
-  * LoongCollector v3.0.5
-    * Fix the problem of increasing container meta information in Docker Center and add UT to this module ([#1938](https://github.com/alibaba/loongcollector/pull/1938))
-    * ParseContainerLogLine when no new line ([#2090](https://github.com/alibaba/loongcollector/pull/2090))
 
 ## 配置参数
 

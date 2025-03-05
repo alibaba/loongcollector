@@ -12,14 +12,6 @@ v1流水线目前只支持Logs数据，v2流水线支持Logs/Metrics/Traces三�
 ## 版本说明
 
 * 发布版本：iLogtail v1.4.0
-* 更新记录：
-  * iLogtail v1.5.0
-    * feat: otlp-log-v2 ([#778](https://github.com/alibaba/loongcollector/pull/778))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
-  * LoongCollector v3.0.5
-    * fix: flusher_otlp stop nil log/metric/trace client ([#1994](https://github.com/alibaba/loongcollector/pull/1994))
-    * flusher_otlp: Ensure headers are correctly passed when sending data ([#2017](https://github.com/alibaba/loongcollector/pull/2017))
 
 ## 配置参数
 

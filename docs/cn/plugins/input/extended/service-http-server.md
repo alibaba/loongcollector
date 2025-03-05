@@ -11,21 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.3.0
-    * service_http_server support OTLP log input ([#438](https://github.com/alibaba/loongcollector/pull/438))
-  * iLogtail v1.4.0
-    * feat: Define the metrics data model and modify the plugin manager to support procress the metrics data ([#519](https://github.com/alibaba/loongcollector/pull/519))
-    * feat: add http flusher supporting influxdb protocol & add group aggregator supproting group logs by keys ([#521](https://github.com/alibaba/loongcollector/pull/521))
-    * feat: add metadata group aggregator supporting group pipelineGroupEvents by metadata keys & enable http flusher and http server input supporting raw protocol  ([#599](https://github.com/alibaba/loongcollector/pull/599))
-    * feat: otlp grpc/http input service for logs, metrics, and traces (v2) ([#611](https://github.com/alibaba/loongcollector/pull/611))
-    * Add pyroscope input new v1 ([#673](https://github.com/alibaba/loongcollector/pull/673))
-  * iLogtail v1.5.0
-    * feat: add Extension type plugin && http flusher support Authenticator、Filter ([#648](https://github.com/alibaba/loongcollector/pull/648))
-  * iLogtail v1.6.0
-    * feat: prometheus decoder optimize ([#866](https://github.com/alibaba/loongcollector/pull/866))
-  * iLogtail v1.8.0
-    * Unify metrics format ([#1060](https://github.com/alibaba/loongcollector/pull/1060))
 
 ## 配置参数
 

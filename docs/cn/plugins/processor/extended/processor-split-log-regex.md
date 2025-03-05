@@ -14,17 +14,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail 1.3.0
-    * feature : Support for add  _file_offset_ tag to go plugins ([#474](https://github.com/alibaba/loongcollector/pull/474))
-  * iLogtail v1.6.0
-    * user_contrib ([#888](https://github.com/alibaba/loongcollector/pull/888))
-  * iLogtail v1.7.0
-    * feat: support nanosecond ([#952](https://github.com/alibaba/loongcollector/pull/952))
-  * iLogtail v1.7.1
-    * fix: go pb has TimeNs when not set ([#1012](https://github.com/alibaba/loongcollector/pull/1012))
-  * LoongCollector Alpha(v0.2.0)
-    * Fix Go Plugin nanosecond ([#1496](https://github.com/alibaba/loongcollector/pull/1496))
 
 ## 配置参数
 

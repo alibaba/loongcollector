@@ -11,11 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v1.0.27
-* 更新记录：
-  * iLogtail v1.0.33
-    * add processor_fields_with_condition to support process actions after switch-case conditions … ([#139](https://github.com/alibaba/loongcollector/pull/139))
-  * iLogtail v1.1.0
-    * enhance container export api ([#140](https://github.com/alibaba/loongcollector/pull/140))
 
 ## 配置参数
 

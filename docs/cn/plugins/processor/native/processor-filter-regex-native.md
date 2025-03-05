@@ -11,12 +11,6 @@
 ## 版本说明
 
 * 发布版本：iLogtail v2.0.0
-* 更新记录：
-  * iLogtail v2.0.4
-    * fix: deprecate param Include in processor_filter_regex_native and add replacement instead ([#1327](https://github.com/alibaba/loongcollector/pull/1327))
-    * fix: maintain sequential info of the original log content and allow multivalue for single key for apsara processor ([#1408](https://github.com/alibaba/loongcollector/pull/1408))
-  * LoongCollector Alpha(v0.2.0)
-    * improve worst case performance when all events failed to process ([#1465](https://github.com/alibaba/loongcollector/pull/1465)) ([#1472](https://github.com/alibaba/loongcollector/pull/1472))
 
 ## 配置参数
 
