@@ -48,7 +48,6 @@
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
-#include "prometheus/PrometheusInputRunner.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "runner/sink/http/HttpSink.h"
@@ -304,6 +303,7 @@ void Application::Start() { // GCOVR_EXCL_START
             SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
         }
+        CollectionPipelineManager::GetInstance()->InputRunnerEventGC();
         if (curTime - lastUpdateMetricTime >= 40) {
             CheckCriticalCondition(curTime);
             lastUpdateMetricTime = curTime;
@@ -325,7 +325,6 @@ void Application::Start() { // GCOVR_EXCL_START
 
         // destruct event handlers here so that it will not block file reading task
         ConfigManager::GetInstance()->DeleteHandlers();
-        PrometheusInputRunner::GetInstance()->CheckGC();
 
         this_thread::sleep_for(chrono::seconds(1));
     }

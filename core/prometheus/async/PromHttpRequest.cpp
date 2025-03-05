@@ -1,8 +1,8 @@
 #include "prometheus/async/PromHttpRequest.h"
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <string>
 #include <utility>
 

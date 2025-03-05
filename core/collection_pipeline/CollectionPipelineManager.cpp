@@ -21,14 +21,10 @@
 #include <shared_mutex>
 #include <unordered_map>
 
+#include "common/timer/Timer.h"
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "host_monitor/HostMonitorInputRunner.h"
-#include "prometheus/PrometheusInputRunner.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-#include "ebpf/eBPFServer.h"
-#endif
-#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
@@ -38,16 +34,6 @@
 using namespace std;
 
 namespace logtail {
-
-CollectionPipelineManager::CollectionPipelineManager()
-    : mInputRunners({
-          PrometheusInputRunner::GetInstance(),
-#if defined(__linux__) && !defined(__ANDROID__)
-          ebpf::eBPFServer::GetInstance(),
-          HostMonitorInputRunner::GetInstance(),
-#endif
-      }) {
-}
 
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
@@ -70,7 +56,6 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
-        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
@@ -101,12 +86,10 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
         iter->second->Stop(false);
-        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = p;
         }
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
@@ -133,7 +116,6 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = p;
         }
-        IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
@@ -184,17 +166,6 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
     return res;
 }
 
-string CollectionPipelineManager::GetPluginStatistics() const {
-    Json::Value root;
-    ScopedSpinLock lock(mPluginCntMapLock);
-    for (const auto& item : mPluginCntMap) {
-        for (const auto& plugin : item.second) {
-            root[item.first][plugin.first] = Json::Value(plugin.second);
-        }
-    }
-    return root.toStyledString();
-}
-
 void CollectionPipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "starts"));
     for (auto& item : mInputRunners) {
@@ -233,24 +204,6 @@ void CollectionPipelineManager::FlushAllBatch() {
     shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     for (const auto& item : mPipelineNameEntityMap) {
         item.second->FlushBatch();
-    }
-}
-
-void CollectionPipelineManager::IncreasePluginUsageCnt(
-    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
-    for (const auto& item : statistics) {
-        for (const auto& plugin : item.second) {
-            mPluginCntMap[item.first][plugin.first] += plugin.second;
-        }
-    }
-}
-
-void CollectionPipelineManager::DecreasePluginUsageCnt(
-    const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {
-    for (const auto& item : statistics) {
-        for (const auto& plugin : item.second) {
-            mPluginCntMap[item.first][plugin.first] -= plugin.second;
-        }
     }
 }
 

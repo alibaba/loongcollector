@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <map>
 #include <optional>
 #include <string>

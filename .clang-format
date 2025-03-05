@@ -67,17 +67,17 @@ SpacesInContainerLiterals: true
 SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
-InsertNewlineAtEOF: true # uncomment when clang-format is upgraded to 16.0.0
+InsertNewlineAtEOF: true
 IncludeCategories:
   - Regex: '^<.*\.h>'
     Priority: 1
-  - Regex: '^<co.*>' # exclude non-c standard library headers like <complex> or <conditional_variable>
+  - Regex: '^<(condition_variable|complex|chrono)>' # exclude non-c standard library headers
     Priority: 2
   - Regex: '^<c.*'
     Priority: 1
   - Regex: '^<.*'
     Priority: 2
-  - Regex: '^"(spl|curl|spdlog|gflags|gperftools|gtest|boost|json|rapidjson|yaml-cpp|re2|lz4|zstd|zlib).*'
+  - Regex: '^"(spl|curl|spdlog|gflags|gperftools|gtest|boost|json|rapidjson|yaml-cpp|re2|lz4|zstd|zlib|leveldb).*'
     Priority: 3
   - Regex: '.*'
     Priority: 4
