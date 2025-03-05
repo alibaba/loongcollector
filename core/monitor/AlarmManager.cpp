@@ -15,17 +15,12 @@
 #include "monitor/AlarmManager.h"
 
 #include "app_config/AppConfig.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
-#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
-#include "common/Thread.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
-#include "go_pipeline/LogtailPlugin.h"
 #include "monitor/SelfMonitorServer.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);
@@ -116,10 +111,6 @@ AlarmManager::AlarmManager() {
 }
 
 void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEventGroupList) {
-    // 发送前同步一次go的alarm
-    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
-        LogtailPlugin::GetInstance()->GetGoAlarms();
-    }
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
