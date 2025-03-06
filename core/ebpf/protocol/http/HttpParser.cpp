@@ -31,19 +31,37 @@ inline constexpr char kUpgrade[] = "Upgrade";
 std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
                                                                        const std::shared_ptr<Connection>& conn,
                                                                        const std::shared_ptr<Sampler>& sampler) {
-    // 处理 HTTP 协议数据
     std::vector<std::shared_ptr<AbstractRecord>> records;
     records.reserve(1);
     auto record = std::make_shared<HttpRecord>(conn);
-    // record->SetEndTs(dataEvent->mEndTs);
-    // record->SetStartTs(dataEvent->mStartTs);
     record->SetEndTs(dataEvent->end_ts);
     record->SetStartTs(dataEvent->start_ts);
-    // bool isSample = false;
     auto spanId = GenerateSpanID();
-    bool isSample = sampler->ShouldSample(spanId);
-    if (isSample) {
-        // LOG
+    // slow request
+    if (record->GetLatencyMs() > 500) {
+        record->MarkSample();
+    } else if (sampler->ShouldSample(spanId)) {
+        record->MarkSample();
+    }
+
+    // ParseResponse may set SAMPLE flag, depending on HTTP status code ...
+    if (dataEvent->response_len > 0) {
+        std::string_view buf(dataEvent->msg + dataEvent->request_len, dataEvent->response_len);
+        ParseState state = http::ParseResponse(&buf, record, true, false);
+        if (state != ParseState::kSuccess) {
+            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
+        }
+    }
+
+    if (dataEvent->request_len > 0) {
+        std::string_view buf(dataEvent->msg, dataEvent->request_len);
+        ParseState state = http::ParseRequest(&buf, record, false);
+        if (state != ParseState::kSuccess) {
+            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
+        }
+    }
+
+    if (record->ShouldSample()) {
         auto traceId = GenerateTraceID();
         LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId))("traceId", FromTraceId(traceId)));
         record->SetSpanId(FromSpanId(spanId));
@@ -52,23 +70,6 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         LOG_DEBUG(sLogger, ("sampler", "reject"));
     }
 
-    if (dataEvent->request_len) {
-        // Message result;
-        std::string_view buf(dataEvent->msg, dataEvent->request_len);
-        ParseState state = http::ParseRequest(&buf, record, isSample);
-        if (state != ParseState::kSuccess) {
-            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
-        }
-    }
-
-    if (dataEvent->response_len > 0) {
-        // Message result;
-        std::string_view buf(dataEvent->msg + dataEvent->request_len, dataEvent->response_len);
-        ParseState state = http::ParseResponse(&buf, record, true, isSample);
-        if (state != ParseState::kSuccess) {
-            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
-        }
-    }
     records.emplace_back(std::move(record));
     return records;
 }
@@ -101,7 +102,7 @@ const std::string ROOT_PATH = "/";
 const char QUESTION_MARK = '?';
 const std::string HTTP1_PREFIX = "http1.";
 
-ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool sample) {
+ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool forceSample) {
     HTTPRequest req;
     int retval = http::ParseHttpRequest(*buf, &req);
     if (retval >= 0) {
@@ -121,7 +122,7 @@ ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& resu
             }
         }
 
-        if (sample) {
+        if (result->ShouldSample() || forceSample) {
             result->SetProtocolVersion(HTTP1_PREFIX + std::to_string(req.minor_version));
             result->SetMethod(std::string(req.method, req.method_len));
             result->SetReqHeaderMap(http::GetHTTPHeadersMap(req.headers, req.num_headers));
@@ -157,8 +158,8 @@ PicoParseChunked(std::string_view* data, size_t body_size_limit_bytes, std::stri
         return ParseState::kNeedsMoreData;
     } else if (retval >= 0) {
         // Found a complete message.
-        // data_copy.resize(std::min(buf_size, body_size_limit_bytes));
-        data_copy.resize(buf_size);
+        data_copy.resize(std::min(buf_size, body_size_limit_bytes));
+        // data_copy.resize(buf_size);
         data_copy.shrink_to_fit();
         *result = std::move(data_copy);
         *body_size = buf_size;
@@ -252,8 +253,8 @@ ParseState ParseContent(std::string_view content_len_str,
         return ParseState::kNeedsMoreData;
     }
 
-    // *result = data->substr(0, std::min(len, body_size_limit_bytes));
-    *result = data->substr(0, len);
+    *result = data->substr(0, std::min(len, body_size_limit_bytes));
+    // *result = data->substr(0, len);
 
     *body_size = len;
     data->remove_prefix(std::min(len, data->size()));
@@ -264,7 +265,7 @@ bool starts_with_http(const std::string_view* buf) {
     if (buf == nullptr) {
         return false;
     }
-    std::string_view prefix = "HTTP";
+    const std::string_view prefix = "HTTP";
     return buf->size() >= prefix.size() && buf->substr(0, prefix.size()) == prefix;
 }
 
@@ -273,7 +274,6 @@ ParseState ParseResponseBody(std::string_view* buf, std::shared_ptr<HttpRecord>&
     bool adjacent_resp = starts_with_http(buf) && (ParseHttpResponse(*buf, &r) > 0);
 
     if (adjacent_resp || (buf->empty() && closed)) {
-        // result->mRespBody = "";
         return ParseState::kSuccess;
     }
 
@@ -304,10 +304,8 @@ ParseState ParseResponseBody(std::string_view* buf, std::shared_ptr<HttpRecord>&
         if (result->mCode == 101) {
             const auto upgrade_iter = result->GetRespHeaderMap().find(kUpgrade);
             if (upgrade_iter == result->GetRespHeaderMap().end()) {
-                //    LOG(WARNING) << "Expected an Upgrade header with HTTP status 101";
             }
 
-            //  LOG(WARNING) << "HTTP upgrades are not yet supported";
             return ParseState::kEOS;
         }
 
@@ -327,28 +325,25 @@ ParseState ParseResponseBody(std::string_view* buf, std::shared_ptr<HttpRecord>&
     return ParseState::kSuccess;
 }
 
-ParseState ParseResponse(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool closed, bool sample) {
+ParseState ParseResponse(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample) {
     HTTPResponse resp;
     int retval = ParseHttpResponse(*buf, &resp);
 
     if (retval >= 0) {
         buf->remove_prefix(retval);
         result->SetStatusCode(resp.status);
+        // for 4xx 5xx
+        if (result->GetStatusCode() >= 400) {
+            result->MarkSample();
+        }
 
-        if (!sample) {
-            return ParseState::kSuccess;
-        } else {
+        if (result->ShouldSample() || forceSample) {
             result->SetRespHeaderMap(http::GetHTTPHeadersMap(resp.headers, resp.num_headers));
             result->SetRespMsg(std::string(resp.msg, resp.msg_len));
             return ParseResponseBody(buf, result, closed);
+        } else {
+            return ParseState::kSuccess;
         }
-        // result->minor_version = resp.minor_version;
-        // result->headers = http::GetHTTPHeadersMap(resp.headers, resp.num_headers);
-        // result->resp_status = resp.status;
-        // result->resp_message = std::string(resp.msg, resp.msg_len);
-        // result->headers_byte_size = retval;
-
-        // return ParseResponseBody(buf, result, closed);
     }
     if (retval == -2) {
         return ParseState::kNeedsMoreData;

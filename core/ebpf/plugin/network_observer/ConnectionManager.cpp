@@ -123,7 +123,7 @@ void ConnectionManager::Iterations(int count) {
             continue;
         }
 
-        if ((needGenRecord || forceGenRecord) && mEnableConnStats) {
+        if (mEnableConnStats && it.second->MetaAttachReadyForNet() && (needGenRecord || forceGenRecord)) {
             std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(it.second);
             LOG_DEBUG(sLogger,
                       ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",

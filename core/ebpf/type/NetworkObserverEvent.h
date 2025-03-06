@@ -45,7 +45,7 @@ public:
     uint64_t GetStartTimeStamp() { return mStartTs; }
     uint64_t GetEndTimeStamp() { return mEndTs; }
     double GetLatencyNs() const { return mEndTs - mStartTs; }
-    double GetLatencyMs() const { return (mEndTs - mStartTs) / 1000; }
+    double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
     void SetStartTs(uint64_t startTsNs) { mStartTs = startTsNs; }
     void SetEndTs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
     int RollbackCount() const { return mRollbackCount; }
@@ -64,7 +64,7 @@ public:
 protected:
     uint64_t mStartTs;
     uint64_t mEndTs;
-    bool mIsSample;
+    bool mIsSample = false;
     int mRollbackCount = 0;
 };
 
@@ -118,6 +118,8 @@ public:
 
     virtual std::string GetReqBody() const = 0;
     virtual std::string GetRespBody() const = 0;
+    virtual size_t GetReqBodySize() const = 0;
+    virtual size_t GetRespBodySize() const = 0;
     virtual std::string GetMethod() const = 0;
     virtual const HeadersMap& GetReqHeaderMap() const = 0;
     virtual const HeadersMap& GetRespHeaderMap() const = 0;

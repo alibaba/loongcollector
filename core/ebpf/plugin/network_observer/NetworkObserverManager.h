@@ -132,7 +132,7 @@ private:
     std::shared_ptr<Sampler> mSampler;
 
     // store parsed records
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRecordQueue;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRollbackQueue;
 
     // coreThread used for polling kernel event...
     std::thread mCoreThread;

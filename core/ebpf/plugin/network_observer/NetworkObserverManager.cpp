@@ -66,7 +66,7 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               base->mCount++;
               base->mErrCount += other->IsError();
               base->mSlowCount += other->IsSlow();
-              base->mSum += double(other->GetLatencyMs() / 1000);
+              base->mSum += other->GetLatencyMs();
           },
           [this](const std::shared_ptr<AbstractRecord>& i) -> std::unique_ptr<AppMetricData> {
               auto* in = static_cast<AbstractAppRecord*>(i.get());
@@ -131,13 +131,13 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               return data;
           }),
       mSpanAggregator(
-          10240,
+          1024, // 1024 span per second
           [this](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<AbstractRecord>& other) {
               base->mRecords.push_back(other);
           },
           [this](const std::shared_ptr<AbstractRecord>& in) { return std::make_unique<AppSpanGroup>(); }),
       mLogAggregator(
-          10240,
+          1024, // 1024 log per second
           [this](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<AbstractRecord>& other) {
               base->mRecords.push_back(other);
           },
@@ -474,7 +474,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
     lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
-    LOG_INFO(sLogger, ("enter net aggregator ...", nodes.size())("node size", aggTree.NodeCount()));
+    LOG_DEBUG(sLogger, ("enter net aggregator ...", nodes.size())("node size", aggTree.NodeCount()));
     if (nodes.empty()) {
         LOG_DEBUG(sLogger, ("empty nodes...", "")("node size", aggTree.NodeCount()));
         return true;
@@ -889,6 +889,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 spanEvent->SetName(record->GetSpanName());
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), record->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), record->GetRespBody());
+                spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(record->GetReqBodySize()));
+                spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(record->GetRespBodySize()));
                 spanEvent->SetTag(kHTTPVersion.SpanKey(), record->GetProtocolVersion());
 
                 auto startTime = record->GetStartTimeStamp() + this->mTimeDiff.count();
@@ -1037,12 +1039,11 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     if (value != NULL) {
         mClusterId = StringTo<std::string>(value);
     }
-    // if purage container mode
 
     // TODO @qianlu.kk init converger later ...
 
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
-        2,
+        1,
         [this](const std::chrono::steady_clock::time_point& execTime) {
             return this->ConsumeSpanAggregateTree(execTime);
         },
@@ -1057,7 +1058,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         mStartUid);
 
     std::unique_ptr<AggregateEvent> appLogEvent = std::make_unique<AggregateEvent>(
-        5,
+        1,
         [this](const std::chrono::steady_clock::time_point& execTime) {
             return this->ConsumeLogAggregateTree(execTime);
         },
@@ -1209,7 +1210,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         return -1;
     }
 
-    mRecordQueue = moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>>(4096);
+    mRollbackQueue = moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>>(4096);
 
     LOG_INFO(sLogger, ("begin to start ebpf ... ", ""));
     this->mFlag = true;
@@ -1308,7 +1309,7 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                     LOG_WARNING(sLogger,
                                 ("app meta not ready, rollback app record, times",
                                  times)("connection", appRecord->GetConnection()->DumpConnection()));
-                    mRecordQueue.enqueue(record);
+                    mRollbackQueue.try_enqueue(std::move(record));
                 }
                 return;
             } else {
@@ -1317,15 +1318,15 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                            record->RollbackCount())("connection", appRecord->GetConnection()->DumpConnection()));
             }
 
-            if (mEnableLog) {
+            if (mEnableLog && record->ShouldSample()) {
                 ProcessRecordAsLog(record);
             }
             if (mEnableMetric) {
-                // do converge ...
+                // TODO: add converge ...
                 // aggregate ...
                 ProcessRecordAsMetric(record);
             }
-            if (mEnableSpan) {
+            if (mEnableSpan && record->ShouldSample()) {
                 ProcessRecordAsSpan(record);
             }
             break;
@@ -1347,7 +1348,7 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                     LOG_WARNING(sLogger,
                                 ("net meta not ready, rollback net record, times",
                                  times)("connection", connStatsRecord->GetConnection()->DumpConnection()));
-                    mRecordQueue.enqueue(record);
+                    mRollbackQueue.enqueue(record);
                 }
                 return;
             }
@@ -1377,7 +1378,7 @@ void NetworkObserverManager::ConsumeRecords() {
         } else {
             mConsumerFreqMgr.Reset(now);
         }
-        size_t count = mRecordQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
+        size_t count = mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
         LOG_DEBUG(sLogger, ("get records:", count));
         // handle ....
         if (count == 0) {
@@ -1467,7 +1468,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
     // add records to span/event generate queue
     for (auto& record : records) {
         ProcessRecord(record);
-        // mRecordQueue.enqueue(std::move(record));
+        // mRollbackQueue.enqueue(std::move(record));
     }
 }
 
