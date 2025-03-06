@@ -78,7 +78,7 @@ static bool isNotSubPath(const string& basePath, const string& path) {
 
     // For wildcard Windows path C:\*, mWildcardPaths[0] will be C:\, will
     //   fail on following check because of path[basePathSize].
-    // Advaned check for such case if flag enable_root_path_collection is enabled.
+    // Advanced check for such case if flag enable_root_path_collection is enabled.
     auto checkPos = basePathSize;
 #if defined(_MSC_VER)
     if (BOOL_FLAG(enable_root_path_collection)) {
