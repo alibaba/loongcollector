@@ -4,6 +4,7 @@ import (
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1"
 )
 
 const (
@@ -24,12 +25,13 @@ const (
 	STORAGECLASS          = "storageclass"
 	INGRESS               = "ingress"
 	CONTAINER             = "container"
-	// entity link type
+	// entity link type, the direction is from resource which will be trigger to linked resource
 	//revive:disable:var-naming
 	LINK_SPLIT_CHARACTER     = "->"
 	POD_NODE                 = "pod->node"
-	REPLICASET_DEPLOYMENT    = "replicaset->deployment"
+	POD_DEPLOYMENT           = "pod->deployment"
 	POD_REPLICASET           = "pod->replicaset"
+	REPLICASET_DEPLOYMENT    = "replicaset->deployment"
 	POD_STATEFULSET          = "pod->statefulset"
 	POD_DAEMONSET            = "pod->daemonset"
 	JOB_CRONJOB              = "job->cronjob"
@@ -38,7 +40,7 @@ const (
 	POD_CONFIGMAP            = "pod->configmap"
 	POD_SERVICE              = "pod->service"
 	POD_CONTAINER            = "pod->container"
-	POD_PROCESS              = "pod->process"
+	INGRESS_SERVICE          = "ingress->service"
 	//revive:enable:var-naming
 )
 
@@ -60,9 +62,14 @@ var AllResources = []string{
 	INGRESS,
 }
 
-type NodePod struct {
-	Node *v1.Node
+type PodNode struct {
 	Pod  *v1.Pod
+	Node *v1.Node
+}
+
+type PodDeployment struct {
+	Pod        *v1.Pod
+	Deployment *app.Deployment
 }
 
 type ReplicaSetDeployment struct {
@@ -108,6 +115,11 @@ type PodConfigMap struct {
 type PodService struct {
 	Service *v1.Service
 	Pod     *v1.Pod
+}
+
+type IngressService struct {
+	Ingress *networking.Ingress
+	Service *v1.Service
 }
 
 type PodContainer struct {

@@ -239,11 +239,11 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 }
 
 func (m *metaCollector) processPodNodeLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*k8smeta.NodePod); ok {
+	if obj, ok := data.Raw.(*k8smeta.PodNode); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Node.Kind, "", obj.Node.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
+		m.processEntityLinkCommonPart(log.Contents, obj.Node.Kind, "", obj.Node.Name, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Node2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -255,7 +255,7 @@ func (m *metaCollector) processPodPVCLink(data *k8smeta.ObjectWrapper, method st
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.PersistentVolumeClaim.Kind, obj.PersistentVolumeClaim.Namespace, obj.PersistentVolumeClaim.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2PersistentVolumeClaim)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -267,7 +267,7 @@ func (m *metaCollector) processPodConfigMapLink(data *k8smeta.ObjectWrapper, met
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.ConfigMap.Kind, obj.ConfigMap.Namespace, obj.ConfigMap.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2ConfigMap)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -278,8 +278,8 @@ func (m *metaCollector) processPodServiceLink(data *k8smeta.ObjectWrapper, metho
 	if obj, ok := data.Raw.(*k8smeta.PodService); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Service.Kind, obj.Service.Namespace, obj.Service.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		m.processEntityLinkCommonPart(log.Contents, obj.Service.Kind, obj.Service.Namespace, obj.Service.Name, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Service2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -291,7 +291,7 @@ func (m *metaCollector) processPodContainerLink(data *k8smeta.ObjectWrapper, met
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, "container", obj.Pod.Namespace, obj.Pod.Name+obj.Container.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "contains")
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2Container)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
