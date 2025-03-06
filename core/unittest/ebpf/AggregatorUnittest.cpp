@@ -217,8 +217,6 @@ void AggregatorUnittest::TestAggregator() {
 }
 
 void AggregatorUnittest::TestAggManager() {
-    auto now = std::chrono::steady_clock::now();
-
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         1,
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler

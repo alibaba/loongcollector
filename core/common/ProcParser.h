@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <filesystem>
 #include <istream>
 #include <map>
@@ -68,6 +70,45 @@ inline bool operator&(ApiEventFlag lhs, ApiEventFlag rhs) {
     return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
 }
 
+struct Proc {
+public:
+    uint32_t ppid; // parent pid
+    uint64_t pktime;
+    // uint32_t pnspid;
+    // uint32_t pflags;
+    // std::string pcmdline;
+    // std::string pexe;
+    std::vector<uint32_t> uids; // Real UID, Effective UID, Saved Set-UID, Filesystem UID
+    std::vector<uint32_t> gids;
+    uint32_t pid;
+    uint32_t tid;
+    uint32_t nspid;
+    uint32_t auid; // Audit UID, loginuid
+    uint32_t flags;
+    uint64_t ktime;
+    std::string cmdline; // \0 separated binary and args
+    std::string comm;
+    std::string cwd;
+#ifdef APSARA_UNIT_TEST_MAIN
+    std::string environ;
+#endif
+    std::string exe;
+    std::string container_id;
+    uint64_t effective;
+    uint64_t inheritable;
+    uint64_t permitted;
+    uint32_t uts_ns;
+    uint32_t ipc_ns;
+    uint32_t mnt_ns;
+    uint32_t pid_ns;
+    uint32_t pid_for_children_ns;
+    uint32_t net_ns;
+    uint32_t time_ns;
+    uint32_t time_for_children_ns;
+    uint32_t cgroup_ns;
+    uint32_t user_ns;
+};
+
 struct Status {
 public:
     std::vector<std::string> uids;
@@ -98,6 +139,7 @@ public:
 class ProcParser {
 public:
     ProcParser(const std::string& prefix) : mProcPath(prefix + "/proc") {}
+    bool ParseProc(uint32_t pid, Proc& proc) const;
 
     std::string GetPIDCmdline(uint32_t pid) const;
     std::string GetPIDComm(uint32_t pid) const;
@@ -112,7 +154,6 @@ public:
     uint32_t GetPIDNsInode(uint32_t pid, const std::string& nsStr) const;
     std::string GetPIDExePath(uint32_t pid) const;
     std::tuple<std::string, int> LookupContainerId(const std::string& cgroup, bool bpfSource, bool walkParent) const;
-    uint32_t invalid_uid_ = UINT32_MAX;
     std::tuple<std::string, std::string> ProcsFilename(const std::string& args);
 
     std::string GetUserNameByUid(uid_t uid);
@@ -133,7 +174,5 @@ private:
     static constexpr size_t kBpfContainerIdLength = 64;
     //  const int DOCKER_ID_LENGTH = 128;
     static constexpr size_t kCgroupNameLength = 128;
-    static constexpr int64_t kNanoPerSeconds = 1000000000;
-    static constexpr int64_t kClktck = 100;
 };
 } // namespace logtail

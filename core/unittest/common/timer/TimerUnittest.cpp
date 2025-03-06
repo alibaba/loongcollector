@@ -76,7 +76,7 @@ void TimerUnittest::TestPeriodicEvent() {
     mStartUid++;
     std::this_thread::sleep_for(std::chrono::seconds(2));
     APSARA_TEST_TRUE(timer.mQueue.empty());
-    APSARA_TEST_EQUAL(mVec.size(), 5);
+    APSARA_TEST_EQUAL(mVec.size(), 5UL);
     timer.Stop();
 }
 

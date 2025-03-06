@@ -106,7 +106,7 @@ void NetworkObserverEventUnittest::TestHeadersMap() {
         values.push_back(it->second);
     }
 
-    APSARA_TEST_EQUAL(values.size(), 2);
+    APSARA_TEST_EQUAL(values.size(), 2UL);
     APSARA_TEST_TRUE(std::find(values.begin(), values.end(), "application/json") != values.end());
     APSARA_TEST_TRUE(std::find(values.begin(), values.end(), "text/plain") != values.end());
 }
@@ -152,13 +152,13 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
     HeadersMap reqHeaders;
     reqHeaders.insert({"Content-Type", "application/json"});
     record.SetReqHeaderMap(std::move(reqHeaders));
-    APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1);
+    APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1UL);
 
     // 测试响应头
     HeadersMap respHeaders;
     respHeaders.insert({"Content-Length", "100"});
     record.SetRespHeaderMap(std::move(respHeaders));
-    APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1);
+    APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1UL);
 }
 
 void NetworkObserverEventUnittest::TestAppMetricData() {
@@ -175,14 +175,14 @@ void NetworkObserverEventUnittest::TestAppMetricData() {
     data.m4xxCount = 8;
     data.m5xxCount = 2;
 
-    APSARA_TEST_EQUAL(data.mCount, 100);
+    APSARA_TEST_EQUAL(data.mCount, 100UL);
     APSARA_TEST_EQUAL(data.mSum, 1000.0);
-    APSARA_TEST_EQUAL(data.mSlowCount, 5);
-    APSARA_TEST_EQUAL(data.mErrCount, 2);
-    APSARA_TEST_EQUAL(data.m2xxCount, 80);
-    APSARA_TEST_EQUAL(data.m3xxCount, 10);
-    APSARA_TEST_EQUAL(data.m4xxCount, 8);
-    APSARA_TEST_EQUAL(data.m5xxCount, 2);
+    APSARA_TEST_EQUAL(data.mSlowCount, 5UL);
+    APSARA_TEST_EQUAL(data.mErrCount, 2UL);
+    APSARA_TEST_EQUAL(data.m2xxCount, 80UL);
+    APSARA_TEST_EQUAL(data.m3xxCount, 10UL);
+    APSARA_TEST_EQUAL(data.m4xxCount, 8UL);
+    APSARA_TEST_EQUAL(data.m5xxCount, 2UL);
 }
 
 void NetworkObserverEventUnittest::TestNetMetricData() {
@@ -198,21 +198,21 @@ void NetworkObserverEventUnittest::TestNetMetricData() {
     data.mRecvPkts = 100;
     data.mSendPkts = 200;
 
-    APSARA_TEST_EQUAL(data.mDropCount, 10);
-    APSARA_TEST_EQUAL(data.mRetransCount, 5);
-    APSARA_TEST_EQUAL(data.mRtt, 100);
-    APSARA_TEST_EQUAL(data.mRecvBytes, 1024);
-    APSARA_TEST_EQUAL(data.mSendBytes, 2048);
-    APSARA_TEST_EQUAL(data.mRecvPkts, 100);
-    APSARA_TEST_EQUAL(data.mSendPkts, 200);
+    APSARA_TEST_EQUAL(data.mDropCount, 10UL);
+    APSARA_TEST_EQUAL(data.mRetransCount, 5UL);
+    APSARA_TEST_EQUAL(data.mRtt, 100UL);
+    APSARA_TEST_EQUAL(data.mRecvBytes, 1024UL);
+    APSARA_TEST_EQUAL(data.mSendBytes, 2048UL);
+    APSARA_TEST_EQUAL(data.mRecvPkts, 100UL);
+    APSARA_TEST_EQUAL(data.mSendPkts, 200UL);
 }
 
 void NetworkObserverEventUnittest::TestConnIdMove() {
     ConnId id1(1, 1000, 123456);
     ConnId id2(std::move(id1));
     APSARA_TEST_EQUAL(id2.fd, 1);
-    APSARA_TEST_EQUAL(id2.tgid, 1000);
-    APSARA_TEST_EQUAL(id2.start, 123456);
+    APSARA_TEST_EQUAL(id2.tgid, 1000U);
+    APSARA_TEST_EQUAL(id2.start, 123456UL);
 }
 
 void NetworkObserverEventUnittest::TestConnIdFromConnectId() {
@@ -223,8 +223,8 @@ void NetworkObserverEventUnittest::TestConnIdFromConnectId() {
 
     ConnId id(conn_id);
     APSARA_TEST_EQUAL(id.fd, 5);
-    APSARA_TEST_EQUAL(id.tgid, 2000);
-    APSARA_TEST_EQUAL(id.start, 789012);
+    APSARA_TEST_EQUAL(id.tgid, 2000U);
+    APSARA_TEST_EQUAL(id.start, 789012UL);
 }
 
 void NetworkObserverEventUnittest::TestHeadersMapCaseInsensitive() {
@@ -243,7 +243,7 @@ void NetworkObserverEventUnittest::TestHeadersMapCaseInsensitive() {
     // 测试多值插入
     headers.insert({"Accept", "text/plain"});
     headers.insert({"ACCEPT", "application/xml"});
-    APSARA_TEST_EQUAL(headers.size(), 3);
+    APSARA_TEST_EQUAL(headers.size(), 3UL);
 
     // 测试不存在的键
     APSARA_TEST_TRUE(headers.find("nonexistent") == headers.end());
@@ -256,10 +256,10 @@ void NetworkObserverEventUnittest::TestHttpRecordTimestamps() {
     record.SetStartTs(1000000);
     record.SetEndTs(2000000);
 
-    APSARA_TEST_EQUAL(record.GetStartTimeStamp(), 1000000);
-    APSARA_TEST_EQUAL(record.GetEndTimeStamp(), 2000000);
-    APSARA_TEST_EQUAL(record.GetLatencyNs(), 1000000);
-    APSARA_TEST_EQUAL(record.GetLatencyMs(), 1000);
+    APSARA_TEST_EQUAL(record.GetStartTimeStamp(), 1000000UL);
+    APSARA_TEST_EQUAL(record.GetEndTimeStamp(), 2000000UL);
+    APSARA_TEST_EQUAL(record.GetLatencyNs(), 1000000.0);
+    APSARA_TEST_EQUAL(record.GetLatencyMs(), 1000.0);
 }
 
 void NetworkObserverEventUnittest::TestHttpRecordStatus() {
@@ -287,8 +287,8 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
     respHeaders.insert({"Content-Length", "100"});
     record.SetRespHeaderMap(std::move(respHeaders));
 
-    APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1);
-    APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1);
+    APSARA_TEST_EQUAL(record.GetReqHeaderMap().size(), 1UL);
+    APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1UL);
 }
 
 void NetworkObserverEventUnittest::TestAbstractNetRecord() {

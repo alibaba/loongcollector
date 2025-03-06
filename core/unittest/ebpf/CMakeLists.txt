@@ -39,6 +39,7 @@ add_unittest(networkobserver_unittest NetworkObserverUnittest.cpp)
 # add_unittest(worker_unittest WorkerUnittest.cpp)
 add_unittest(connection_unittest ConnectionUnittest.cpp)
 add_unittest(connection_manager_unittest ConnectionManagerUnittest.cpp)
+add_unittest(process_cache_manager_unittest ProcessCacheManagerUnittest.cpp)
 
 add_driver_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
 add_driver_unittest(ebpf_driver_unittest eBPFDriverUnittest.cpp)

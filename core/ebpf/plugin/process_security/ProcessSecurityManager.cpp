@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <mutex>
+#include <utility>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -43,7 +44,7 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManag
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                std::shared_ptr<Timer> scheduler)
-    : AbstractManager(baseMgr, sourceManager, queue, scheduler),
+    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(scheduler)),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -54,7 +55,8 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManag
           }) {
 }
 
-bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime) {
+bool ProcessSecurityManager::ConsumeAggregateTree(
+    [[maybe_unused]] const std::chrono::steady_clock::time_point& execTime) {
     if (!mFlag || mSuspendFlag) {
         return false;
     }
@@ -108,7 +110,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                     }
                     case KernelEventType::PROCESS_EXIT_EVENT: {
                         CommonEvent* ce = innerEvent.get();
-                        ProcessExitEvent* exitEvent = static_cast<ProcessExitEvent*>(ce);
+                        auto* exitEvent = static_cast<ProcessExitEvent*>(ce);
                         logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kExitValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
                         logEvent->SetContent(ProcessSecurityManager::kExitCodeKey,
@@ -194,22 +196,21 @@ int ProcessSecurityManager::Destroy() {
 
 std::array<size_t, 1> GenerateAggKeyForProcessEvent(const std::shared_ptr<CommonEvent>& event) {
     // calculate agg key
-    std::array<size_t, 1> hash_result;
-    hash_result.fill(0UL);
+    std::array<size_t, 1> hashResult{};
     std::hash<uint64_t> hasher;
 
     std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr) {
-        hash_result[0] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
+        hashResult[0] ^= hasher(x) + 0x9e3779b9 + (hashResult[0] << 6) + (hashResult[0] >> 2);
     }
-    return hash_result;
+    return hashResult;
 }
 
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (!event) {
         return 1;
     }
-    ProcessEvent* processEvent = static_cast<ProcessEvent*>(event.get());
+    auto* processEvent = static_cast<ProcessEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
                                                                           magic_enum::enum_name(event->mEventType)));
@@ -222,10 +223,10 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
 
     // calculate agg key
-    std::array<size_t, 1> hash_result = GenerateAggKeyForProcessEvent(event);
+    std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(event);
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, hashResult);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
 

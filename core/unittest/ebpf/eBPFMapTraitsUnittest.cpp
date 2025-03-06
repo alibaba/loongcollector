@@ -23,7 +23,7 @@ void BPFMapTraitsUnittest::TestAddr4MapTraits() {
     APSARA_TEST_EQUAL_DESC(
         sizeof(BPFMapTraits<Addr4Map>::outter_key_type), sizeof(uint32_t), "Addr4Map outer key size should be 4 bytes");
     APSARA_TEST_EQUAL_DESC(
-        sizeof(BPFMapTraits<Addr4Map>::inner_key_type), 8, "Addr4Map inner key size should be 8 bytes");
+        sizeof(BPFMapTraits<Addr4Map>::inner_key_type), 8UL, "Addr4Map inner key size should be 8 bytes");
     APSARA_TEST_EQUAL_DESC(
         sizeof(BPFMapTraits<Addr4Map>::inner_val_type), sizeof(uint8_t), "Addr4Map inner value size should be 1 byte");
     APSARA_TEST_EQUAL_DESC(BPFMapTraits<Addr4Map>::outter_map_type,
@@ -40,7 +40,7 @@ void BPFMapTraitsUnittest::TestAddr6MapTraits() {
     APSARA_TEST_EQUAL_DESC(
         sizeof(BPFMapTraits<Addr6Map>::outter_key_type), sizeof(uint32_t), "Addr6Map outer key size should be 4 bytes");
     APSARA_TEST_EQUAL_DESC(
-        sizeof(BPFMapTraits<Addr6Map>::inner_key_type), 20, "Addr6Map inner key size should be 20 bytes");
+        sizeof(BPFMapTraits<Addr6Map>::inner_key_type), 20UL, "Addr6Map inner key size should be 20 bytes");
     APSARA_TEST_EQUAL_DESC(
         sizeof(BPFMapTraits<Addr6Map>::inner_val_type), sizeof(uint8_t), "Addr6Map inner value size should be 1 byte");
     APSARA_TEST_EQUAL_DESC(BPFMapTraits<Addr6Map>::outter_map_type,

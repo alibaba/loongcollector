@@ -345,7 +345,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(manager->mSpanEventGroups.size(), 1UL);
     APSARA_TEST_EQUAL(manager->mSpanEventGroups[0].GetEvents().size(), 100UL);
     auto tags = manager->mSpanEventGroups[0].GetTags();
-    APSARA_TEST_EQUAL(tags.size(), 6);
+    APSARA_TEST_EQUAL(tags.size(), 6UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "test-pod-ip");
@@ -355,7 +355,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
 
     LOG_INFO(sLogger, ("====== consume metric ======", ""));
     APSARA_TEST_TRUE(manager->ConsumeMetricAggregateTree(now));
-    APSARA_TEST_EQUAL(manager->mMetricEventGroups.size(), 1);
+    APSARA_TEST_EQUAL(manager->mMetricEventGroups.size(), 1UL);
     APSARA_TEST_EQUAL(manager->mMetricEventGroups[0].GetEvents().size(), 301UL);
     tags = manager->mMetricEventGroups[0].GetTags();
     APSARA_TEST_EQUAL(tags.size(), 6UL);

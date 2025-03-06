@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
+
 #include <array>
 #include <regex>
 #include <set>
@@ -56,7 +58,7 @@ protected:
 void CommonUtilUnittest::TestTraceIDGeneration() {
     // 测试生成的 TraceID 数组大小
     auto traceId = GenerateTraceID();
-    APSARA_TEST_EQUAL(traceId.size(), 32);
+    APSARA_TEST_EQUAL(traceId.size(), 32UL);
 
     // 测试生成的数组不全为0
     bool allZero = true;
@@ -74,7 +76,7 @@ void CommonUtilUnittest::TestTraceIDFormat() {
     std::string hexString = FromTraceId(traceId);
 
     // 验证转换后的字符串长度（32字节 = 64个十六进制字符）
-    APSARA_TEST_EQUAL(hexString.length(), 64);
+    APSARA_TEST_EQUAL(hexString.length(), 64UL);
 
     // 验证是否为有效的十六进制字符串
     APSARA_TEST_TRUE(IsValidHexString(hexString));
@@ -92,13 +94,13 @@ void CommonUtilUnittest::TestTraceIDUniqueness() {
     }
 
     // 验证没有重复的 TraceID
-    APSARA_TEST_EQUAL(traceIds.size(), numIds);
+    APSARA_TEST_EQUAL(traceIds.size(), size_t(numIds));
 }
 
 void CommonUtilUnittest::TestSpanIDGeneration() {
     // 测试生成的 SpanID 数组大小
     auto spanId = GenerateSpanID();
-    APSARA_TEST_EQUAL(spanId.size(), 16);
+    APSARA_TEST_EQUAL(spanId.size(), 16UL);
 
     // 测试生成的数组不全为0
     bool allZero = true;
@@ -116,7 +118,7 @@ void CommonUtilUnittest::TestSpanIDFormat() {
     std::string hexString = FromSpanId(spanId);
 
     // 验证转换后的字符串长度（16字节 = 32个十六进制字符）
-    APSARA_TEST_EQUAL(hexString.length(), 32);
+    APSARA_TEST_EQUAL(hexString.length(), 32UL);
 
     // 验证是否为有效的十六进制字符串
     APSARA_TEST_TRUE(IsValidHexString(hexString));
@@ -134,7 +136,7 @@ void CommonUtilUnittest::TestSpanIDUniqueness() {
     }
 
     // 验证没有重复的 SpanID
-    APSARA_TEST_EQUAL(spanIds.size(), numIds);
+    APSARA_TEST_EQUAL(spanIds.size(), size_t(numIds));
 }
 
 void CommonUtilUnittest::TestTraceIDConversion() {
@@ -186,7 +188,7 @@ void CommonUtilUnittest::TestInitialState() {
     APSARA_TEST_EQUAL(manager.Period().count(), 0);
 
     // 验证初始计数为0
-    APSARA_TEST_EQUAL(manager.Count(), 0);
+    APSARA_TEST_EQUAL(manager.Count(), 0U);
 
     // 验证初始状态下已过期（因为周期为0）
     auto now = std::chrono::steady_clock::now();

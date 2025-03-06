@@ -13,18 +13,19 @@
 // limitations under the License.
 
 #include <charconv>
+#include <climits>
 #include <cstring>
-#include <limits.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+
+#include "common/TimeUtil.h"
 
 #if defined(__linux__)
 #include <pwd.h>
@@ -92,6 +93,77 @@ std::string ProcParser::ReadPIDFile(uint32_t pid, const std::string& filename) c
     } catch (const std::ios_base::failure& e) {
     }
     return "";
+}
+
+bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
+    proc.pid = pid;
+    proc.tid = pid;
+    proc.cmdline = GetPIDCmdline(pid);
+    proc.comm = GetPIDComm(pid);
+    proc.exe = GetPIDExePath(pid);
+
+    std::tie(proc.cwd, proc.flags) = GetPIDCWD(pid);
+    proc.flags |= static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
+
+    ProcStat stats;
+    if (0 != GetProcStatStrings(pid, stats)) {
+        LOG_WARNING(sLogger, ("GetProcStatStrings", "failed"));
+        return false;
+    }
+    auto ppid = stats.stats[3];
+
+    // get ppid
+    const auto* ppidLast = ppid.data() + ppid.size();
+    auto [ptr, ec] = std::from_chars(ppid.data(), ppidLast, proc.ppid);
+    if (ec != std::errc() || ptr != ppidLast) {
+        LOG_WARNING(sLogger, ("Parse ppid", "failed"));
+        return false;
+    }
+    proc.ktime = GetStatsKtime(stats);
+
+    Status status;
+    if (0 != GetStatus(pid, status)) {
+        LOG_WARNING(sLogger, ("GetStatus failed", "failed"));
+        return false;
+    }
+    proc.uids = status.GetUids();
+    proc.gids = status.GetGids();
+    proc.auid = status.GetLoginUid();
+
+
+    std::tie(proc.nspid, proc.permitted, proc.effective, proc.inheritable) = GetPIDCaps(pid);
+    proc.uts_ns = GetPIDNsInode(pid, "uts");
+    proc.ipc_ns = GetPIDNsInode(pid, "ipc");
+    proc.mnt_ns = GetPIDNsInode(pid, "mnt");
+    proc.pid_ns = GetPIDNsInode(pid, "pid");
+    proc.pid_for_children_ns = GetPIDNsInode(pid, "pid_for_children");
+    proc.net_ns = GetPIDNsInode(pid, "net");
+    proc.cgroup_ns = GetPIDNsInode(pid, "cgroup");
+    proc.user_ns = GetPIDNsInode(pid, "user");
+    proc.time_ns = GetPIDNsInode(pid, "time");
+    proc.time_for_children_ns = GetPIDNsInode(pid, "time_for_children");
+
+    proc.container_id = GetPIDDockerId(pid);
+    if (proc.container_id.empty()) {
+        proc.nspid = 0;
+    }
+
+    if (proc.ppid) {
+        // proc.pcmdline = GetPIDCmdline(proc.ppid);
+        // auto parentComm = GetPIDComm(proc.ppid);
+        ProcStat parentStats;
+        GetProcStatStrings(proc.ppid, parentStats);
+        proc.pktime = GetStatsKtime(parentStats);
+        // proc.pexe = GetPIDExePath(proc.ppid);
+        // auto [pnspid, ppermitted, peffective, pinheritable] = GetPIDCaps(proc.ppid);
+        // std::string pDockerId = GetPIDDockerId(proc.ppid);
+        // if (pDockerId.empty()) {
+        //     pnspid = 0;
+        // }
+        // proc.pnspid = pnspid;
+        // proc.pflags = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
+    }
+    return true;
 }
 
 std::string ProcParser::GetPIDCmdline(uint32_t pid) const {
@@ -194,7 +266,7 @@ std::pair<std::string, uint32_t> ProcParser::GetPIDCWD(uint32_t pid) const {
             flags |= ApiEventFlag::RootCWD;
         }
         return {cwd, static_cast<uint32_t>(flags)};
-    } catch (const std::filesystem::filesystem_error&) {
+    } catch (const std::filesystem::filesystem_error&) { // possibly kernel thread
         flags |= (ApiEventFlag::RootCWD | ApiEventFlag::ErrorCWD);
         return {"", static_cast<uint32_t>(flags)};
     }
@@ -308,7 +380,7 @@ int64_t ProcParser::GetStatsKtime(ProcStat& procStat) const {
         LOG_WARNING(sLogger, ("Parse ktime", "failed"));
         return -1;
     }
-    return ktime * (kNanoPerSeconds / kClktck);
+    return ktime * (kNanoPerSeconds / GetTicksPerSecond());
 }
 
 uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& nsStr) const {

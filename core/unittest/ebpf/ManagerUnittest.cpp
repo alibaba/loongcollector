@@ -71,13 +71,6 @@ protected:
     // 测试Manager的错误处理
     void TestManagerErrorHandling();
 
-    // ProcessCacheManager测试用例
-    void TestProcessCacheManagerCache();
-    void TestProcessCacheManagerProcessEvents();
-    void TestProcessCacheManagerDataEvents();
-    void TestProcessCacheManagerProcessTags();
-    void TestProcessCacheManagerPerfBuffer();
-
 protected:
     std::shared_ptr<SourceManager> mSourceManager;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
@@ -232,127 +225,6 @@ void ManagerUnittest::TestManagerErrorHandling() {
     manager->Destroy();
 }
 
-
-void ManagerUnittest::TestProcessCacheManagerCache() {
-    // 测试缓存操作
-    data_event_id key{12345, 1234567890};
-    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
-
-    // 测试缓存更新
-
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
-    APSARA_TEST_TRUE(mProcessCacheManager->ContainsKey(key));
-
-    // 测试缓存查找
-    auto cachedEvent = mProcessCacheManager->LookupCache(key);
-    APSARA_TEST_TRUE(cachedEvent != nullptr);
-    APSARA_TEST_EQUAL(cachedEvent->process.pid, execveEvent->process.pid);
-    APSARA_TEST_EQUAL(cachedEvent->process.ktime, execveEvent->process.ktime);
-    APSARA_TEST_EQUAL(cachedEvent->process.uid, execveEvent->process.uid);
-    APSARA_TEST_EQUAL(cachedEvent->process.binary, execveEvent->process.binary);
-
-    // 测试缓存释放
-    mProcessCacheManager->ReleaseCache(key);
-    APSARA_TEST_FALSE(mProcessCacheManager->ContainsKey(key));
-}
-
-void ManagerUnittest::TestProcessCacheManagerProcessEvents() {
-    // 测试Execve事件处理
-    auto execveEvent = std::make_unique<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
-
-    msg_execve_event kernelExecveEvent;
-    kernelExecveEvent.process.pid = execveEvent->process.pid;
-    kernelExecveEvent.process.ktime = execveEvent->process.ktime;
-    mProcessCacheManager->RecordExecveEvent(&kernelExecveEvent);
-
-    // 测试Exit事件处理
-    msg_exit exitEvent;
-    exitEvent.current.pid = 1234;
-    exitEvent.current.ktime = 5678;
-    exitEvent.info.code = 0;
-    mProcessCacheManager->RecordExitEvent(&exitEvent);
-
-    // 测试Clone事件处理
-    msg_clone_event cloneEvent;
-    cloneEvent.tgid = 1234;
-    cloneEvent.ktime = 5678;
-    mProcessCacheManager->RecordCloneEvent(&cloneEvent);
-}
-
-void ManagerUnittest::TestProcessCacheManagerDataEvents() {
-    // 测试数据事件处理
-    std::string testArg = "test_arg";
-    msg_data dataEvent;
-    dataEvent.id.pid = 1234;
-    dataEvent.id.time = 5678;
-    memcpy(dataEvent.arg, testArg.c_str(), testArg.size());
-    dataEvent.common.size = offsetof(msg_data, arg) + testArg.size();
-
-    mProcessCacheManager->RecordDataEvent(&dataEvent);
-
-    // 测试数据事件ID生成和查找
-    data_event_desc desc{};
-    desc.id.pid = 1234;
-    desc.id.time = 5678;
-    desc.size = testArg.size();
-    desc.leftover = 0;
-
-    // mProcessCacheManager->DataAdd(&dataEvent);
-    std::string retrievedData = mProcessCacheManager->DataGetAndRemove(&desc);
-    APSARA_TEST_FALSE(retrievedData.empty());
-}
-
-void ManagerUnittest::TestProcessCacheManagerProcessTags() {
-    // 创建进程事件
-    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
-    execveEvent->msg.cleanup_key.ktime = 0;
-    execveEvent->msg.parent.pid = 2345;
-    execveEvent->msg.parent.ktime = 6789;
-
-    // parent
-    auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
-    pExecveEvent->process.pid = 2345;
-    pExecveEvent->process.ktime = 6789;
-    pExecveEvent->process.uid = 1000;
-    pExecveEvent->process.binary = "test_binary_parent";
-
-    // 更新缓存
-    data_event_id key{execveEvent->process.pid, execveEvent->process.ktime};
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
-    key = {pExecveEvent->process.pid, pExecveEvent->process.ktime};
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
-
-    // 测试进程标签生成
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    auto tags
-        = mProcessCacheManager->FinalizeProcessTags(sourceBuffer, execveEvent->process.pid, execveEvent->process.ktime);
-    APSARA_TEST_FALSE(tags.mInner.empty());
-}
-
-void ManagerUnittest::TestProcessCacheManagerPerfBuffer() {
-    // 初始化ProcessCacheManager
-    APSARA_TEST_TRUE(mProcessCacheManager->Init());
-
-    // 测试PerfBuffer轮询
-    mProcessCacheManager->PollPerfBuffers();
-
-    // 测试停止操作
-    mProcessCacheManager->Stop();
-}
-
-
 void ManagerUnittest::TestNetworkSecurityManagerBasic() {
     auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
 
@@ -476,7 +348,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
+    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -489,7 +361,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
+    mProcessCacheManager->updateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -537,7 +409,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
+    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -550,7 +422,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
+    mProcessCacheManager->updateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -599,7 +471,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     execveEvent->msg.parent.ktime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->UpdateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
+    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
 
     auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
     data_event_id pkey{2345, 6789};
@@ -612,7 +484,7 @@ void ManagerUnittest::TestFileSecurityManagerAggregation() {
     pExecveEvent->process.args = "test_arg";
     pExecveEvent->process.cmdline = "test_cmdline";
 
-    mProcessCacheManager->UpdateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
+    mProcessCacheManager->updateCache(pkey, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -627,10 +499,6 @@ UNIT_TEST_CASE(ManagerUnittest, TestProcessSecurityManagerEventHandling);
 UNIT_TEST_CASE(ManagerUnittest, TestFileSecurityManagerEventHandling);
 UNIT_TEST_CASE(ManagerUnittest, TestManagerConcurrency);
 UNIT_TEST_CASE(ManagerUnittest, TestManagerErrorHandling);
-UNIT_TEST_CASE(ManagerUnittest, TestProcessCacheManagerCache);
-UNIT_TEST_CASE(ManagerUnittest, TestProcessCacheManagerProcessEvents);
-UNIT_TEST_CASE(ManagerUnittest, TestProcessCacheManagerDataEvents);
-UNIT_TEST_CASE(ManagerUnittest, TestProcessCacheManagerProcessTags);
 // UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerBasic);
 UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerEventHandling);
 UNIT_TEST_CASE(ManagerUnittest, TestNetworkSecurityManagerAggregation);
