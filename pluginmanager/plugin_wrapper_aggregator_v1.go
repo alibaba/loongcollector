@@ -42,7 +42,7 @@ func (wrapper *AggregatorWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error 
 
 	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
 	if err != nil {
-		logger.Error(wrapper.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), util.PLUGIN_INIT_ALARM, "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
 		return err
 	}
 	if interval == 0 {

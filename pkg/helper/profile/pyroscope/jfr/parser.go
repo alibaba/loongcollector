@@ -30,6 +30,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -154,7 +155,7 @@ func (r *RawProfile) parseChunk(ctx context.Context, meta *profile.Meta, c parse
 
 	for id, fs := range stackMap {
 		if len(valMap[id]) == 0 || len(typeMap[id]) == 0 || len(unitMap[id]) == 0 || len(aggtypeMap[id]) == 0 || len(labelMap[id]) == 0 {
-			logger.Warning(ctx, "PPROF_PROFILE_ALARM", "stack don't have enough meta or values", fs)
+			logger.Warning(ctx, util.INNER_PROFILE_ALARM, "stack don't have enough meta or values", fs)
 			continue
 		}
 		convertCb(id, fs, valMap[id], typeMap[id], unitMap[id], aggtypeMap[id], meta.StartTime.UnixNano(), meta.EndTime.UnixNano(), labelMap[id])

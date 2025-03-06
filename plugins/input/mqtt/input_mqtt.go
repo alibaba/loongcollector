@@ -149,7 +149,7 @@ func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan s
 	}
 
 	connOpts.OnConnectionLost = func(c MQTT.Client, err error) {
-		logger.Error(p.context.GetRuntimeContext(), "MQTT_CONNECTION_LOST_ALARM", "connection lost", p.Server, "error", err)
+		logger.Error(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "connection lost", p.Server, "error", err)
 		if connLostChannel != nil {
 			connLostChannel <- struct{}{}
 		}
@@ -162,7 +162,7 @@ func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan s
 	connSuccess := false
 	for {
 		if token := client.Connect(); token.Wait() && token.Error() != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "MQTT_CONNECT_ALARM", "connect", p.Server, "error", token.Error())
+			logger.Warning(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "connect", p.Server, "error", token.Error())
 			if util.RandomSleep(waitTime, 0.1, p.shutdown) {
 				err = errors.New("MQTT connect failed")
 				break
@@ -180,7 +180,7 @@ func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan s
 				multiTopics[topic] = byte(p.QoS)
 			}
 			if token := client.SubscribeMultiple(multiTopics, nil); token.Wait() && token.Error() != nil {
-				logger.Error(p.context.GetRuntimeContext(), "MQTT_SUBSCRIBE_ALARM", "subscribe topic", multiTopics, "error", token.Error())
+				logger.Error(p.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "subscribe topic", multiTopics, "error", token.Error())
 			} else {
 				logger.Info(p.context.GetRuntimeContext(), "subscribe success, topic", multiTopics)
 			}

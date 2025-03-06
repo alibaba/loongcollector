@@ -18,6 +18,7 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -194,6 +195,10 @@ void SelfMonitorServer::RemoveAlarmPipeline() {
 }
 
 void SelfMonitorServer::SendAlarms() {
+    // 发送前同步一次go的alarm
+    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
+        LogtailPlugin::GetInstance()->GetGoAlarms();
+    }
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__

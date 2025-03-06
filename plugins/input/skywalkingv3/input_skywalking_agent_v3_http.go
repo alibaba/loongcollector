@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -120,7 +121,7 @@ func (s *SkywalkingHTTPServerInput) registerErrorLogsHandler(handler errorLogsHa
 		for dec.More() {
 			var result map[string]interface{}
 			if e := dec.Decode(&result); e != nil {
-				logger.Error(s.context.GetRuntimeContext(), "Failed to decode error log", e)
+				logger.Error(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "Failed to decode error log", e)
 				continue
 			} else {
 				d, _ := json.Marshal(result)
@@ -202,7 +203,7 @@ func (s *SkywalkingHTTPServerInput) registerTraceSegmentsHandler(handler traceSe
 		for dec.More() {
 			var result map[string]interface{}
 			if e := dec.Decode(&result); e != nil {
-				logger.Error(s.context.GetRuntimeContext(), "Failed to decode error log", e)
+				logger.Error(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "Failed to decode error log", e)
 				continue
 			} else {
 				d, _ := json.Marshal(result)
@@ -242,7 +243,7 @@ func (s *SkywalkingHTTPServerInput) registerHandler(parser parameterParser, hand
 
 func (s *SkywalkingHTTPServerInput) writeResponse(writer http.ResponseWriter, data []byte) {
 	if _, e := writer.Write(data); e != nil {
-		logger.Error(s.context.GetRuntimeContext(), "Failed to write response", e)
+		logger.Error(s.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "Failed to write response", e)
 	}
 }
 

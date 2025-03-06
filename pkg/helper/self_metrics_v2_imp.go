@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var (
@@ -451,15 +452,15 @@ type errorNumericMetric struct {
 }
 
 func (e *errorNumericMetric) Add(f int64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "add", e.err)
+	logger.Warning(context.Background(), util.INNER_PROFILE_ALARM, "add", e.err)
 }
 
 func (e *errorNumericMetric) Set(f float64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	logger.Warning(context.Background(), util.INNER_PROFILE_ALARM, "set", e.err)
 }
 
 func (e *errorNumericMetric) Observe(f float64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "observe", e.err)
+	logger.Warning(context.Background(), util.INNER_PROFILE_ALARM, "observe", e.err)
 }
 
 func (e *errorNumericMetric) Serialize(log *protocol.Log) {}
@@ -487,7 +488,7 @@ type errorStrMetric struct {
 }
 
 func (e errorStrMetric) Set(s string) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	logger.Warning(context.Background(), util.INNER_PROFILE_ALARM, "set", e.err)
 }
 
 func (e errorStrMetric) Collect() pipeline.MetricValue[string] {

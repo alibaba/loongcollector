@@ -19,6 +19,7 @@ import (
 	"flag"
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +60,7 @@ func TestOptionWarnLevel(t *testing.T) {
 	initTestLogger(OptionWarnLevel)
 	Info(context.Background(), "line")
 	assert.True(t, readLog(0) == "")
-	Warning(context.Background(), "ALARM", "line")
+	Warning(context.Background(), util.ALL_LOGTAIL_ALARM_NUM, "ALARM", "line")
 	assert.True(t, readLog(0) != "")
 }
 
@@ -69,9 +70,9 @@ func TestOptionErrorLevel(t *testing.T) {
 	excludeFlag()
 	clean()
 	initTestLogger(OptionErrorLevel)
-	Warning(context.Background(), "line")
+	Warning(context.Background(), util.ALL_LOGTAIL_ALARM_NUM)
 	assert.True(t, readLog(0) == "")
-	Error(context.Background(), "ALARM", "line")
+	Error(context.Background(), util.ALL_LOGTAIL_ALARM_NUM, "ALARM", "line")
 	assert.True(t, readLog(0) != "")
 }
 

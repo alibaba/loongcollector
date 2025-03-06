@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // Following variables are exported so that tests of main package can reference them.
@@ -44,29 +45,6 @@ var DisabledLogtailConfigLock sync.RWMutex
 var DisabledLogtailConfig = make(map[*LogstoreConfig]struct{})
 
 var LastUnsendBuffer = make(map[string]PluginRunner)
-
-// Two built-in logtail configs to report statistics and alarm (from system and other logtail configs).
-var AlarmConfig *LogstoreConfig
-
-var alarmConfigJSON = `{
-    "global": {
-        "InputIntervalMs" :  30000,
-        "AggregatIntervalMs": 1000,
-        "FlushIntervalMs": 1000,
-        "DefaultLogQueueSize": 4,
-		"DefaultLogGroupQueueSize": 4,
-		"Tags" : {
-			"base_version" : "` + config.BaseVersion + `",
-			"` + config.LoongcollectorGlobalConfig.LoongCollectorVersionTag + `" : "` + config.BaseVersion + `"
-		}
-    },
-	"inputs" : [
-		{
-			"type" : "metric_alarm",
-			"detail" : null
-		}
-	]
-}`
 
 var containerConfigJSON = `{
     "global": {
@@ -92,7 +70,7 @@ func panicRecover(pluginType string) {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "plugin", pluginType, "panicked", err, "stack", string(trace))
+		logger.Error(context.Background(), util.PLUGIN_RUNTIME_ALARM, "plugin", pluginType, "panicked", err, "stack", string(trace))
 	}
 }
 
@@ -103,13 +81,8 @@ func Init() (err error) {
 	if err = CheckPointManager.Init(); err != nil {
 		return
 	}
-	if AlarmConfig, err = loadBuiltinConfig("alarm", "sls-admin", "logtail_alarm",
-		"logtail_alarm", alarmConfigJSON); err != nil {
-		logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load alarm config fail", err)
-		return
-	}
 	if ContainerConfig, err = loadBuiltinConfig("container", "sls-admin", "logtail_containers", "logtail_containers", containerConfigJSON); err != nil {
-		logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load container config fail", err)
+		logger.Error(context.Background(), util.CATEGORY_CONFIG_ALARM, "load container config fail", err)
 		return
 	}
 	logger.Info(context.Background(), "loadBuiltinConfig container")
@@ -170,7 +143,7 @@ func StopAllPipelines(withInput bool) error {
 			logger.Info(logstoreConfig.Context.GetRuntimeContext(), "Stop config", configName)
 			if hasStopped := timeoutStop(logstoreConfig, true); !hasStopped {
 				// TODO: This alarm can not be sent to server in current alarm design.
-				logger.Error(logstoreConfig.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
+				logger.Error(logstoreConfig.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM,
 					"timeout when stop config, goroutine might leak")
 				// TODO: The key should be versioned. Current implementation will overwrite the previous version when reload a block config multiple times.
 				DisabledLogtailConfigLock.Lock()
@@ -244,18 +217,8 @@ func DeleteLogstoreConfigFromLogtailConfig(configName string, removedFlag bool) 
 	LogtailConfigLock.Unlock()
 }
 
-// StopBuiltInModulesConfig stops built-in services (self monitor, alarm, container and checkpoint manager).
+// StopBuiltInModulesConfig stops built-in services (container and checkpoint manager).
 func StopBuiltInModulesConfig() {
-	if AlarmConfig != nil {
-		if *flags.ForceSelfCollect {
-			logger.Info(context.Background(), "force collect the alarm metrics")
-			control := pipeline.NewAsyncControl()
-			AlarmConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
-			control.WaitCancel()
-		}
-		_ = AlarmConfig.Stop(true)
-		AlarmConfig = nil
-	}
 	if ContainerConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the container metrics")
@@ -276,7 +239,7 @@ func Stop(configName string, removedFlag bool) error {
 	if config, exists := LogtailConfig[configName]; exists {
 		LogtailConfigLock.RUnlock()
 		if hasStopped := timeoutStop(config, removedFlag); !hasStopped {
-			logger.Error(config.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
+			logger.Error(config.Context.GetRuntimeContext(), util.CATEGORY_CONFIG_ALARM,
 				"timeout when stop config, goroutine might leak")
 			DisabledLogtailConfigLock.Lock()
 			DisabledLogtailConfig[config] = struct{}{}

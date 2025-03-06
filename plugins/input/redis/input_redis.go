@@ -27,6 +27,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InputRedis struct {
@@ -88,7 +89,7 @@ func (r *InputRedis) Collect(collector pipeline.Collector) error {
 
 		u, err := url.Parse(serv)
 		if err != nil {
-			logger.Warning(r.context.GetRuntimeContext(), "REDIS_PARSE_ADDRESS_ALARM", "Unable to parse to address", serv, "error", err)
+			logger.Warning(r.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "Unable to parse to address", serv, "error", err)
 			continue
 		} else if u.Scheme == "" {
 			// fallback to simple string based address (i.e. "10.0.0.1:10000")
@@ -108,7 +109,7 @@ func (r *InputRedis) Collect(collector pipeline.Collector) error {
 			defer wg.Done()
 			err := r.gatherServer(url, collector)
 			if err != nil {
-				logger.Error(r.context.GetRuntimeContext(), "REDIS_COLLECT_ALARM", err)
+				logger.Error(r.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, err)
 			}
 		}(u)
 	}

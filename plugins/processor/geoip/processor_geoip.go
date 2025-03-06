@@ -104,7 +104,7 @@ func (p *ProcessorGeoIP) ProcessLog(log *protocol.Log) {
 		}
 	}
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "cannot find key", p.SourceKey)
 	}
 }
 
@@ -127,13 +127,13 @@ func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
 	}
 	if ip == nil {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "invalid ip", *val)
+			logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "invalid ip", *val)
 		}
 		return
 	}
 	record, err := p.db.City(ip)
 	if err != nil && p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "parse ip", ip, "error", err)
+		logger.Warning(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "parse ip", ip, "error", err)
 		return
 	}
 

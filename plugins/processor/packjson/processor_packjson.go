@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorPackjson struct {
@@ -78,11 +79,11 @@ func (p *ProcessorPackjson) processLog(log *protocol.Log) {
 				emptyKeys = append(emptyKeys, key)
 			}
 		}
-		logger.Warningf(p.context.GetRuntimeContext(), "PACK_JSON_ALARM", "SourceKeys not found %v", emptyKeys)
+		logger.Warningf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "SourceKeys not found %v", emptyKeys)
 	}
 	newValue, err := json.Marshal(packMap)
 	if err != nil {
-		logger.Errorf(p.context.GetRuntimeContext(), "PACK_JSON_ALARM", "package json error %v packMap: %v", err, packMap)
+		logger.Errorf(p.context.GetRuntimeContext(), util.PARSE_LOG_FAIL_ALARM, "package json error %v packMap: %v", err, packMap)
 		return
 	}
 	newContent := &protocol.Log_Content{
