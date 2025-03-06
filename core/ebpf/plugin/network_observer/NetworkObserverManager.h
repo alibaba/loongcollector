@@ -126,8 +126,6 @@ private:
     mutable std::atomic_int64_t mParseHttpRecordsFailedTotal = 0;
     mutable std::atomic_int64_t mAggMapEntitiesNum = 0;
 
-    double mSampleRate = 1.0;
-
     mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;
 

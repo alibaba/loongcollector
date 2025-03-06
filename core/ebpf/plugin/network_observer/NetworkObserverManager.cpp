@@ -1501,6 +1501,51 @@ int NetworkObserverManager::Destroy() {
     if (this->mRecordConsume.joinable()) {
         this->mRecordConsume.join();
     }
+
+    LOG_INFO(sLogger, ("destroy stage", "destroy connection manager"));
+    mConnectionManager.reset(nullptr);
+    LOG_INFO(sLogger, ("destroy stage", "destroy sampler"));
+    {
+        WriteLock lk(mSamplerLock);
+        mSampler.reset();
+    }
+
+    mEnabledCids.clear();
+    mPreviousOpt.reset(nullptr);
+
+    LOG_INFO(sLogger, ("destroy stage", "clear statistics"));
+
+    mDataEventsDropTotal = 0;
+    mConntrackerNum = 0;
+    mRecvConnStatEventsTotal = 0;
+    mRecvCtrlEventsTotal = 0;
+    mRecvHttpDataEventsTotal = 0;
+    mLostConnStatEventsTotal = 0;
+    mLostCtrlEventsTotal = 0;
+    mLostDataEventsTotal = 0;
+
+    mParseHttpRecordsSuccessTotal = 0;
+    mParseHttpRecordsFailedTotal = 0;
+    mAggMapEntitiesNum = 0;
+
+    LOG_INFO(sLogger, ("destroy stage", "clear agg tree"));
+    {
+        WriteLock lk(mAppAggLock);
+        mAppAggregator.Reset();
+    }
+    {
+        WriteLock lk(mNetAggLock);
+        mNetAggregator.Reset();
+    }
+    {
+        WriteLock lk(mSpanAggLock);
+        mSpanAggregator.Reset();
+    }
+    {
+        WriteLock lk(mLogAggLock);
+        mLogAggregator.Reset();
+    }
+
     LOG_INFO(sLogger, ("destroy stage", "release consumer thread"));
     return 0;
 }

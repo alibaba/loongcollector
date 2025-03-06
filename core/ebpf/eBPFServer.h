@@ -106,7 +106,10 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                              PluginMetricManagerPtr mgr);
-    eBPFServer() : mDataEventQueue(4096) {}
+    eBPFServer()
+        : mSourceManager(std::make_shared<SourceManager>()),
+          mScheduler(std::make_shared<Timer>()),
+          mDataEventQueue(4096) {}
     ~eBPFServer() = default;
 
     void

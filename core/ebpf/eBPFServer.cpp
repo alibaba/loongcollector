@@ -171,7 +171,6 @@ void eBPFServer::Init() {
 #endif
 
     LOG_INFO(sLogger, ("begin to start timer", ""));
-    mScheduler = std::make_unique<Timer>();
     mScheduler->Init();
     LOG_INFO(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
@@ -192,7 +191,6 @@ void eBPFServer::Init() {
     mStopPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL);
     mSuspendPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL);
 
-    mSourceManager = std::make_shared<SourceManager>();
     mSourceManager->Init();
 
     mProcessCacheManager
