@@ -16,11 +16,13 @@
 
 #pragma once
 #include <algorithm>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#include <boost/lexical_cast.hpp>
+#pragma GCC diagnostic pop
+#include <boost/regex.hpp>
 #include <string>
 #include <vector>
-
-#include "boost/lexical_cast.hpp"
-#include "boost/regex.hpp"
 
 #include "models/StringView.h"
 
@@ -152,5 +154,100 @@ void RemoveFilePathTrailingSlash(std::string& path);
 #define FNM_PATHNAME 0
 int fnmatch(const char* pattern, const char* dirPath, int flag);
 #endif
+
+// trim from start (returns a new string_view)
+static inline std::string_view Ltrim(std::string_view s, const std::string_view blank = " \t\n\r\f\v") {
+    s.remove_prefix(std::min(s.find_first_not_of(blank), s.size()));
+    return s;
+}
+
+// trim from end (returns a new string_view)
+static inline std::string_view Rtrim(std::string_view s, const std::string_view blank = " \t\n\r\f\v") {
+    s.remove_suffix(std::min(s.size() - s.find_last_not_of(blank) - 1, s.size()));
+    return s;
+}
+
+// trim from both ends (returns a new string_view)
+static inline std::string_view Trim(std::string_view s) {
+    return Ltrim(Rtrim(s));
+}
+
+class StringViewSplitterIterator {
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::string_view;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+    StringViewSplitterIterator() = default;
+
+    StringViewSplitterIterator(std::string_view str, std::string_view delimiter)
+        : mStr(str), mDelimiter(delimiter), mPos(0) {
+        findNext();
+    }
+
+    value_type operator*() { return mField; }
+
+    pointer operator->() { return &mField; }
+
+    StringViewSplitterIterator& operator++() {
+        findNext();
+        return *this;
+    }
+
+    StringViewSplitterIterator operator++(int) {
+        StringViewSplitterIterator tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+
+    friend bool operator==(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return a.mPos == b.mPos;
+    }
+
+    friend bool operator!=(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return !(a == b);
+    }
+
+private:
+    void findNext() {
+        if (mPos == std::string_view::npos) {
+            mField = {};
+            return;
+        }
+
+        auto end = mStr.find(mDelimiter, mPos);
+        if (end == std::string_view::npos) {
+            mField = mStr.substr(mPos);
+            mPos = std::string_view::npos;
+        } else {
+            mField = mStr.substr(mPos, end - mPos);
+            mPos = end + mDelimiter.size();
+        }
+    }
+
+    std::string_view mStr;
+    std::string_view mDelimiter;
+    std::string_view mField;
+    size_t mPos = std::string_view::npos;
+};
+
+class StringViewSplitter {
+public:
+    using value_type = std::string_view;
+    using iterator = StringViewSplitterIterator;
+
+    StringViewSplitter(std::string_view str, std::string_view delimiter) : mStr(str), mDelimiter(delimiter) {}
+
+    iterator begin() const { return iterator(mStr, mDelimiter); }
+
+    iterator end() const { return iterator(); }
+
+private:
+    std::string_view mStr;
+    std::string_view mDelimiter;
+};
+
 
 } // namespace logtail
