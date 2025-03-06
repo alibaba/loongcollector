@@ -10,7 +10,7 @@
 
 ## 版本说明
 
-* 发布版本：LoongCollector v3.0.5
+* 推荐版本：LoongCollector v3.0.5
 
 ## 配置参数
 

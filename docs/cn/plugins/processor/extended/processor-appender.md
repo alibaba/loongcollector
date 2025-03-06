@@ -10,7 +10,7 @@
 
 ## 版本说明
 
-- 发布版本：iLogtail v1.0.27
+* 推荐版本：iLogtail v1.0.27
 
 ## 配置参数
 
@@ -33,13 +33,13 @@
 
 为 `__labels__` 追加一些本机特有的值：
 
-- 输入
+* 输入
 
 ```text
 "__labels__":"a#$#b"
 ```
 
-- 配置详情
+* 配置详情
 
 ```yaml
 processors:
@@ -48,7 +48,7 @@ processors:
     Value: "|host#$#{{__host__}}|ip#$#{{__ip__}}"
 ```
 
-- 配置后结果
+* 配置后结果
 
 ```text
 "__labels__":"a#$#b|host#$#david|ip#$#30.40.60.150"

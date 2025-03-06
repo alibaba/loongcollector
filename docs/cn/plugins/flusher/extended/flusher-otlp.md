@@ -11,7 +11,7 @@ v1流水线目前只支持Logs数据，v2流水线支持Logs/Metrics/Traces三�
 
 ## 版本说明
 
-* 发布版本：iLogtail v1.4.0
+* 推荐版本：iLogtail v1.5.0
 
 ## 配置参数
 
