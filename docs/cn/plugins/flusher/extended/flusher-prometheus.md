@@ -11,7 +11,7 @@
 
 ## 版本说明
 
-* 推荐版本：LoongCollector Alpha(v0.2.0)
+* 推荐版本：LoongCollector v3.0.5 及以上
 
 ## 配置参数
 
