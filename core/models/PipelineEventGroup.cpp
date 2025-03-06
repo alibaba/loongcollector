@@ -304,13 +304,15 @@ void PipelineEventGroup::DelTag(StringView key) {
 }
 
 size_t PipelineEventGroup::GetTagsHash() const {
-    size_t seed = 0;
+    size_t res = 0;
     for (const auto& item : mTags.mInner) {
+        size_t seed = 0;
         HashCombine(seed, hash<string>{}(item.first.to_string()));
         HashCombine(seed, hash<string>{}(item.second.to_string()));
+        res ^= seed;
     }
-    HashCombine(seed, hash<string>{}(GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string()));
-    return seed;
+    HashCombine(res, hash<string>{}(GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string()));
+    return res;
 }
 
 size_t PipelineEventGroup::DataSize() const {
