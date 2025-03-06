@@ -8,6 +8,10 @@
 
 [Alpha](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.6.0 及以上
+
 ## 配置参数
 
 | 参数                                    | 类型       | 是否必选 | 说明                                                                                                         |
@@ -79,12 +83,12 @@ flushers:
 
 以上面这行日志为例 , 我们通`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段：
 
-- time
-- loglevel
-- appname
-- thread
-- class
-- message
+* time
+* loglevel
+* appname
+* thread
+* class
+* message
 
 最后推送到`kafka`的数据样例如下：
 
@@ -121,10 +125,10 @@ Topic: test_%{content.application}
 
 `topic`动态表达式规则：
 
-- `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
-- `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
-- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka-v2`中的使用。
-- 其它方式暂不支持
+* `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
+* `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
+* `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka-v2`中的使用。
+* 其它方式暂不支持
 
 ### TagFieldsRename
 
@@ -190,7 +194,7 @@ flushers:
     Topic: PulsarTestTopic
 ```
 
-- `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
+* `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
   例如重名为`messege`，则应该配置为`messege.application`
 
 ### 数据平铺
@@ -259,10 +263,10 @@ flushers:
 
 `flusher_pulsar`支持多种安全认证连接`pulsar`服务端。
 
-- `TLS`认证;
-- `Token`JWT Token认证;
-- `Athenz` pulsar租户域认证;
-- `OAuth2`认证；
+* `TLS`认证;
+* `Token`JWT Token认证;
+* `Athenz` pulsar租户域认证;
+* `OAuth2`认证；
 
 JWT Token认证配置比较简单，参照前面的配置表配置即可，下面主要介绍下`OAuth2`,`TLS`和`Athenz`两种认证的配置。
 
@@ -323,8 +327,8 @@ flushers:
     Topic: PulsarTestTopic
 ```
 
-- `EnableTLS` 如果要启用`TLS`必须设置为`true`。开始`TLS`的情况下，URL头部为`pulsar+ssl://`
-- `TLSTrustCertsFilePath`根证书需要设置。
+* `EnableTLS` 如果要启用`TLS`必须设置为`true`。开始`TLS`的情况下，URL头部为`pulsar+ssl://`
+* `TLSTrustCertsFilePath`根证书需要设置。
 **注:** 配置仅供参考，证书文件请自行生成后根据事情情况配置。
 
 ## Athenz认证配置参考(待验证)
@@ -352,5 +356,5 @@ flushers:
     Topic: PulsarTestTopic
 ```
 
-- `EnableTLS` 如果要启用`Athenz`认证必须设置为`true`。开始`TLS`的情况下，`URL`头部为`pulsar+ssl://`
-- `TLSTrustCertsFilePath`根证书需要设置。
+* `EnableTLS` 如果要启用`Athenz`认证必须设置为`true`。开始`TLS`的情况下，`URL`头部为`pulsar+ssl://`
+* `TLSTrustCertsFilePath`根证书需要设置。
