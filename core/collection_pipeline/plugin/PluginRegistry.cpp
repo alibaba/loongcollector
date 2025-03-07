@@ -17,9 +17,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if !defined(_MSC_VER)
 #include <dirent.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#endif
 
 #include <string>
 
@@ -30,15 +32,15 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
-#include "plugin/input/InputHostMeta.h"
-#include "plugin/input/InputPrometheus.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-#include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputPrometheus.h"
 #endif
 #include "collection_pipeline/plugin/creator/CProcessor.h"
 #include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
@@ -135,10 +137,10 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
+    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);

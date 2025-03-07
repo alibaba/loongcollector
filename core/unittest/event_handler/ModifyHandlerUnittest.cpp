@@ -30,6 +30,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -76,6 +77,11 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+#if defined(_MSC_VER)
+        std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
+#else
+        std::string jsonLogPath = logPath;
+#endif
         // new pipeline
         configStr = R"(
             {
@@ -84,7 +90,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPath + R"("
+            + jsonLogPath + R"("
                         ]
                     }
                 ],

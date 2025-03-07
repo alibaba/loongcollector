@@ -16,6 +16,7 @@
 #include "json/json.h"
 
 #include "AppConfig.h"
+#include "Application.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/version.h"
@@ -75,7 +76,10 @@ public:
 
     static void SetUpTestCase() {}
 
-    static void TearDownTestCase() { FileServer::GetInstance()->Stop(); }
+    static void TearDownTestCase() {
+        Application::GetInstance()->SetSigTermSignalFlag(true);
+        FileServer::GetInstance()->Stop();
+    }
 
     // 在每个测试用例开始前的设置
     void SetUp() override {
@@ -85,6 +89,7 @@ public:
             ilogtailConfigPath = mRootDir + PS + STRING_FLAG(ilogtail_config);
             std::ofstream fout(ilogtailConfigPath.c_str());
             fout << "" << std::endl;
+            fout.close();
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();
@@ -96,6 +101,7 @@ public:
             AppConfig::GetInstance()->LoadAppConfig(ilogtailConfigPath);
             std::ofstream fout(ilogtailConfigPath.c_str());
             fout << "" << std::endl;
+            fout.close();
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();

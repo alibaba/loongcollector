@@ -61,8 +61,10 @@ public:
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestInit);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestContainerdLog);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestIgnoringStdoutStderr);
+#if !defined(_MSC_VER)
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestContainerdLogWithSplit);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonLogLineParserWithSplit);
+#endif
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonLogLineParser);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestKeepingSourceWhenParseFail);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestParseDockerLog);

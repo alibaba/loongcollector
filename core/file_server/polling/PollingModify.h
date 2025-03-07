@@ -106,6 +106,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PollingUnittest;
+    friend class PollingPreservedDirDepthUnittest;
     bool FindNewFile(const std::string& dir, const std::string& fileName);
 #endif
 };
