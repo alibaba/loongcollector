@@ -44,6 +44,7 @@ jobs:
           submodules: true
       - name: Build Binary
         env:
+          BUILD_LOGTAIL_UT: OFF
         run: scripts/windows64_build.bat
 
   result:
