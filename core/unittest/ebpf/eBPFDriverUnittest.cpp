@@ -15,9 +15,9 @@
 #include "common/magic_enum.hpp"
 #include "ebpf/driver/BPFMapTraits.h"
 #include "ebpf/driver/CallName.h"
-#include "ebpf/driver/EbpfDriver.h"
 #include "ebpf/driver/FileFilter.h"
 #include "ebpf/driver/NetworkFilter.h"
+#include "ebpf/driver/eBPFDriver.h"
 #include "ebpf/driver/eBPFWrapper.h"
 #include "ebpf/include/export.h"
 #include "unittest/Unittest.h"
@@ -62,16 +62,16 @@ protected:
             buffer[sizeof(buffer) - 1] = '\0';
             switch (printLevel) {
                 case eBPFLogType::NAMI_LOG_TYPE_WARN:
-                    LOG_WARNING(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                    LOG_WARNING(sLogger, ("module", "eBPFDriver")("msg", buffer));
                     break;
                 case eBPFLogType::NAMI_LOG_TYPE_INFO:
-                    LOG_INFO(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                    LOG_INFO(sLogger, ("module", "eBPFDriver")("msg", buffer));
                     break;
                 case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
-                    LOG_DEBUG(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                    LOG_DEBUG(sLogger, ("module", "eBPFDriver")("msg", buffer));
                     break;
                 default:
-                    LOG_INFO(sLogger, ("module", "EbpfDriver")("level", int(level))("msg", buffer));
+                    LOG_INFO(sLogger, ("module", "eBPFDriver")("level", int(level))("msg", buffer));
                     break;
             }
             return 0;

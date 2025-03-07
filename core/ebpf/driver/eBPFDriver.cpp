@@ -27,7 +27,7 @@ extern "C" {
 #include <coolbpf/security/msg_type.h>
 #include <sys/resource.h>
 
-#include "ebpf/driver/EbpfDriver.h"
+#include "ebpf/driver/eBPFDriver.h"
 }
 
 #include "FileFilter.h"

@@ -23,7 +23,7 @@ ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 BIN="${ROOTDIR}/${OUT_DIR}/loongcollector"
 ADAPTER="${ROOTDIR}/${OUT_DIR}/libGoPluginAdapter.so"
 PLUGIN="${ROOTDIR}/${OUT_DIR}/libGoPluginBase.so"
-EBPF_DRIVER="${ROOTDIR}/${OUT_DIR}/libEbpfDriver.so"
+EBPF_DRIVER="${ROOTDIR}/${OUT_DIR}/libeBPFDriver.so"
 
 # check if the symbols in loongcollector are compatible with GLIBC_2.5
 awk_script=$(cat <<- EOF

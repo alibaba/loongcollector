@@ -529,10 +529,8 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
     // mRecordQueue.enqueue(std::move(event));
 
     if (mFlushProcessEvent) {
-        auto tgid = eventPtr->tgid;
-        auto ktime = eventPtr->ktime;
-        auto commonKtime = eventPtr->common.ktime;
-        auto event = std::make_shared<ProcessEvent>(tgid, ktime, KernelEventType::PROCESS_CLONE_EVENT, commonKtime);
+        auto event = std::make_shared<ProcessEvent>(
+            eventPtr->tgid, eventPtr->ktime, KernelEventType::PROCESS_CLONE_EVENT, eventPtr->common.ktime);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -723,14 +721,11 @@ std::string ProcessCacheManager::GenerateExecId(uint32_t pid, uint64_t ktime) {
 // consume record queue
 void ProcessCacheManager::handleCacheUpdate(std::shared_ptr<MsgExecveEventUnix>&& event) {
     event->process.user.name = mProcParser.GetUserNameByUid(event->process.uid);
-    std::string execKey = GenerateExecId(event->process.pid, event->process.ktime);
-
-    std::string parentKey = GenerateParentExecId(event);
-    event->exec_id = execKey;
-    event->parent_exec_id = parentKey;
+    event->exec_id = GenerateExecId(event->process.pid, event->process.ktime);
+    event->parent_exec_id = GenerateParentExecId(event);
     LOG_DEBUG(sLogger,
               ("[RecordExecveEvent][DUMP] begin update cache pid", event->process.pid)("ktime", event->process.ktime)(
-                  "execId", execKey)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
+                  "execId", event->exec_id)("cmdline", mProcParser.GetPIDCmdline(event->process.pid))(
                   "filename", mProcParser.GetPIDExePath(event->process.pid))("args", event->process.args));
     updateCache({event->process.pid, event->process.ktime}, std::move(event));
 }
@@ -817,7 +812,7 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     auto inheritable = GetCapabilities(proc->msg.creds.caps.inheritable, *sb);
     res.Insert(kCapInheritable.LogKey(), inheritable);
 
-    auto parentProc = LookupCache({pid, ktime});
+    auto parentProc = LookupCache({proc->msg.parent.pid, proc->msg.parent.ktime});
     // for parent
     if (!parentProc) {
         return res;

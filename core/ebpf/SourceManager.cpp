@@ -21,7 +21,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
-#include "ebpf/driver/EbpfDriver.h"
+#include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -133,16 +133,16 @@ void SourceManager::Init() {
         buffer[sizeof(buffer) - 1] = '\0';
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
-                LOG_WARNING(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                LOG_WARNING(sLogger, ("module", "eBPFDriver")("msg", buffer));
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
-                LOG_INFO(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                LOG_INFO(sLogger, ("module", "eBPFDriver")("msg", buffer));
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
-                LOG_DEBUG(sLogger, ("module", "EbpfDriver")("msg", buffer));
+                LOG_DEBUG(sLogger, ("module", "eBPFDriver")("msg", buffer));
                 break;
             default:
-                LOG_INFO(sLogger, ("module", "EbpfDriver")("level", int(level))("msg", buffer));
+                LOG_INFO(sLogger, ("module", "eBPFDriver")("level", int(level))("msg", buffer));
                 break;
         }
         return 0;
