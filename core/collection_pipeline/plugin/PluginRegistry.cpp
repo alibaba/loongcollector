@@ -34,8 +34,9 @@
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
-#include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputHostMeta.h"
+#include "plugin/input/InputPrometheus.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
@@ -136,15 +137,16 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
+    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
     RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());

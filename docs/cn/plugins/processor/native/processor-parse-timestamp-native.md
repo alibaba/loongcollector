@@ -8,6 +8,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v2.0.0 及以上
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
@@ -17,7 +21,7 @@
 |  SourceFormat  |  string  |  是  |  /  |  日志时间格式。更多信息，请参见表1。  |
 |  SourceTimezone  |  string  |  否  |  空  |  日志时间所属时区。格式为GMT+HH:MM（东区）或GMT-HH:MM（西区）。  |
 
-- 表1：时间格式
+* 表1：时间格式
 
 | **时间格式** | **说明** | **示例** |
 | --- | --- | --- |
@@ -56,13 +60,13 @@
 
 采集文件`/home/test-log/reg.log`，通过正则表达式解析日志内容并提取字段，然后将解析日志中的时间作为事件的__time__，最后将结果输出到stdout。
 
-- 输入
+* 输入
 
 ```plain
 127.0.0.1 - - [2023-12-28T08:07:12.187340] "POST /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"
 ```
 
-- 采集配置
+* 采集配置
 
 ```yaml
 enable: true
@@ -93,7 +97,7 @@ flushers:
     OnlyStdout: true
 ```
 
-- 输出
+* 输出
 
 ```json
 {

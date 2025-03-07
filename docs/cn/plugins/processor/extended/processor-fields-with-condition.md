@@ -24,6 +24,10 @@
 * 与现有插件processor_add_fields、processor_drop保持近似的使用习惯。
 * 可以支持多组条件（Case）进行动态字段处理，但是按顺序匹配上一条后即退出。
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.0.33 及以上
+
 ## 配置参数
 
 ### `processor_fields_with_condition`配置

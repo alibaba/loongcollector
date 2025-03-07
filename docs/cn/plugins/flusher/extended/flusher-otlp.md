@@ -9,6 +9,10 @@ v1流水线目前只支持Logs数据，v2流水线支持Logs/Metrics/Traces三�
 
 [Alpha](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.5.0 及以上
+
 ## 配置参数
 
 | 参数                | 类型       | 是否必选 | 说明                                       |

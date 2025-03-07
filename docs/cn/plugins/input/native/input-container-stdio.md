@@ -2,17 +2,21 @@
 
 ## 简介
 
-`input_container_stdio` `input`插件可以实现从容器标准输出/标准错误流中采集日志，采集的日志内容将会保存在`content`字段中。支持通过容器元信息筛选待采集容器，并支持多行文本切分、添加容器Meta信息等数据处理操作，仅支持 iLogtail 2.1 及以后版本。
+`input_container_stdio` `input`插件可以实现从容器标准输出/标准错误流中采集日志，采集的日志内容将会保存在`content`字段中。支持通过容器元信息筛选待采集容器，并支持多行文本切分、添加容器Meta信息等数据处理操作。
 
 ## 版本
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：LoongCollector v3.0.5 及以上
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_container\_log。  |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_container\_stdio。  |
 |  IgnoringStdout  |  Boolean  |  否  |  false  |  是否忽略标准输出stdout。  |
 |  IgnoringStderr  |  Boolean  |  否  |  false  |  是否忽略标准出错信息stderr。 |
 |  TailSizeKB  |  uint  |  否  |  1024  |  配置首次生效时，标准输出文件的起始采集位置距离文件结尾的大小。如果文件大小小于该值，则从头开始采集，取值范围为0～10485760KB。  |

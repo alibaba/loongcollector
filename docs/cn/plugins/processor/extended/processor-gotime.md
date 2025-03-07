@@ -4,6 +4,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.7.1 及以上
+
 ## 配置参数
 
 | 参数 | 类型 | 是否必选 | 说明 |

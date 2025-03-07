@@ -8,6 +8,10 @@
 
 [Deprecated](../../stability-level.md)，请使用`flusher_kafka_v2`
 
+## 版本说明
+
+* 推荐版本：无
+
 ## 配置参数
 
 | 参数              | 类型       | 是否必选 | 说明                                                          |

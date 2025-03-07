@@ -35,7 +35,7 @@
 #include "unittest/pipeline/LogtailPluginMock.h"
 #endif
 
-DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
+DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", true);
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 DECLARE_FLAG_INT32(file_tags_update_interval);
 DECLARE_FLAG_STRING(agent_host_id);

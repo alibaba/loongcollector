@@ -8,6 +8,10 @@ using namespace std;
 namespace logtail {
 void BaseScheduler::ExecDone() {
     mExecCount++;
+    while (mLatestExecTime > mFirstExecTime + chrono::seconds(mExecCount * mInterval)) {
+        mExecCount++;
+    }
+
     mLatestExecTime = mFirstExecTime + chrono::seconds(mExecCount * mInterval);
     mLatestScrapeTime = mFirstScrapeTime + chrono::seconds(mExecCount * mInterval);
 }
@@ -45,8 +49,7 @@ bool BaseScheduler::IsCancelled() {
     return !mValidState;
 }
 
-void BaseScheduler::SetComponent(shared_ptr<Timer> timer, EventPool* eventPool) {
-    mTimer = std::move(timer);
+void BaseScheduler::SetComponent(EventPool* eventPool) {
     mEventPool = eventPool;
 }
 } // namespace logtail

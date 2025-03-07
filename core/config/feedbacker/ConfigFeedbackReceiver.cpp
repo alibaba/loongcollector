@@ -61,28 +61,46 @@ void ConfigFeedbackReceiver::UnregisterOnetimePipelineConfig(const std::string& 
 
 void ConfigFeedbackReceiver::FeedbackContinuousPipelineConfigStatus(const std::string& name,
                                                                     ConfigFeedbackStatus status) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    auto iter = mContinuousPipelineConfigFeedbackableMap.find(name);
-    if (iter != mContinuousPipelineConfigFeedbackableMap.end()) {
-        iter->second->FeedbackContinuousPipelineConfigStatus(name, status);
+    ConfigFeedbackable* feedbackable = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        auto iter = mContinuousPipelineConfigFeedbackableMap.find(name);
+        if (iter != mContinuousPipelineConfigFeedbackableMap.end()) {
+            feedbackable = iter->second;
+        }
+    }
+    if (feedbackable) {
+        feedbackable->FeedbackContinuousPipelineConfigStatus(name, status);
     }
 }
 
 void ConfigFeedbackReceiver::FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    auto iter = mInstanceConfigFeedbackableMap.find(name);
-    if (iter != mInstanceConfigFeedbackableMap.end()) {
-        iter->second->FeedbackInstanceConfigStatus(name, status);
+    ConfigFeedbackable* feedbackable = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        auto iter = mInstanceConfigFeedbackableMap.find(name);
+        if (iter != mInstanceConfigFeedbackableMap.end()) {
+            feedbackable = iter->second;
+        }
+    }
+    if (feedbackable) {
+        feedbackable->FeedbackInstanceConfigStatus(name, status);
     }
 }
 
 void ConfigFeedbackReceiver::FeedbackOnetimePipelineConfigStatus(const std::string& type,
                                                                  const std::string& name,
                                                                  ConfigFeedbackStatus status) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    auto iter = mOnetimePipelineConfigFeedbackableMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
-    if (iter != mOnetimePipelineConfigFeedbackableMap.end()) {
-        iter->second->FeedbackOnetimePipelineConfigStatus(type, name, status);
+    ConfigFeedbackable* feedbackable = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        auto iter = mOnetimePipelineConfigFeedbackableMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
+        if (iter != mOnetimePipelineConfigFeedbackableMap.end()) {
+            feedbackable = iter->second;
+        }
+    }
+    if (feedbackable) {
+        feedbackable->FeedbackOnetimePipelineConfigStatus(type, name, status);
     }
 }
 

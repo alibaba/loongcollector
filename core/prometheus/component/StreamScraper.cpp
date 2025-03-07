@@ -107,7 +107,7 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
 void StreamScraper::SendMetrics() {
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC,
                             ToString(mScrapeTimestampMilliSec));
-    mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID, GetId() + ToString(mScrapeTimestampMilliSec));
+    mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID, GetId());
 
     SetTargetLabels(mEventGroup);
     PushEventGroup(std::move(mEventGroup));
@@ -132,7 +132,7 @@ void StreamScraper::SetAutoMetricMeta(double scrapeDurationSeconds, bool upState
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(scrapeDurationSeconds));
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(mRawSize));
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(upState));
-    mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID, GetId() + ToString(mScrapeTimestampMilliSec));
+    mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID, GetId());
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_TOTAL, ToString(mStreamIndex));
 }
 std::string StreamScraper::GetId() {

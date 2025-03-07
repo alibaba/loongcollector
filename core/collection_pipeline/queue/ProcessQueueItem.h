@@ -17,7 +17,6 @@
 #pragma once
 
 #include <chrono>
-
 #include <memory>
 
 #include "collection_pipeline/CollectionPipelineManager.h"

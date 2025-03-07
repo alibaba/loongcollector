@@ -29,9 +29,6 @@ const string METRIC_GO_KEY_LABELS = "labels";
 const string METRIC_GO_KEY_COUNTERS = "counters";
 const string METRIC_GO_KEY_GAUGES = "gauges";
 
-SelfMonitorMetricEvent::SelfMonitorMetricEvent() {
-}
-
 SelfMonitorMetricEvent::SelfMonitorMetricEvent(MetricsRecord* metricRecord) {
     // category
     mCategory = metricRecord->GetCategory();
@@ -131,14 +128,14 @@ void SelfMonitorMetricEvent::CreateKey() {
 }
 
 void SelfMonitorMetricEvent::SetInterval(size_t interval) {
-    mLastSendInterval = 0;
+    mIntervalsSinceLastSend = 0;
     mSendInterval = interval;
 }
 
-void SelfMonitorMetricEvent::Merge(SelfMonitorMetricEvent& event) {
+void SelfMonitorMetricEvent::Merge(const SelfMonitorMetricEvent& event) {
     if (mSendInterval != event.mSendInterval) {
         mSendInterval = event.mSendInterval;
-        mLastSendInterval = 0;
+        mIntervalsSinceLastSend = 0;
     }
     for (auto counter = event.mCounters.begin(); counter != event.mCounters.end(); counter++) {
         if (mCounters.find(counter->first) != mCounters.end())
@@ -153,12 +150,12 @@ void SelfMonitorMetricEvent::Merge(SelfMonitorMetricEvent& event) {
 }
 
 bool SelfMonitorMetricEvent::ShouldSend() {
-    mLastSendInterval++;
-    return (mLastSendInterval >= mSendInterval) && mUpdatedFlag;
+    mIntervalsSinceLastSend++;
+    return (mIntervalsSinceLastSend >= mSendInterval) && mUpdatedFlag;
 }
 
 bool SelfMonitorMetricEvent::ShouldDelete() {
-    return (mLastSendInterval >= mSendInterval) && !mUpdatedFlag;
+    return (mIntervalsSinceLastSend >= mSendInterval) && !mUpdatedFlag;
 }
 
 void SelfMonitorMetricEvent::ReadAsMetricEvent(MetricEvent* metricEventPtr) {
@@ -182,8 +179,29 @@ void SelfMonitorMetricEvent::ReadAsMetricEvent(MetricEvent* metricEventPtr) {
             gauge->first, {UntypedValueMetricType::MetricTypeGauge, gauge->second});
     }
     // set flags
-    mLastSendInterval = 0;
+    mIntervalsSinceLastSend = 0;
     mUpdatedFlag = false;
+}
+
+std::string SelfMonitorMetricEvent::GetLabel(const std::string& labelKey) {
+    if (mLabels.find(labelKey) != mLabels.end()) {
+        return mLabels.at(labelKey);
+    }
+    return "";
+}
+
+uint64_t SelfMonitorMetricEvent::GetCounter(const std::string& counterName) {
+    if (mCounters.find(counterName) != mCounters.end()) {
+        return mCounters.at(counterName);
+    }
+    return 0;
+}
+
+double SelfMonitorMetricEvent::GetGauge(const std::string& gaugeName) {
+    if (mGauges.find(gaugeName) != mGauges.end()) {
+        return mGauges.at(gaugeName);
+    }
+    return 0;
 }
 
 } // namespace logtail

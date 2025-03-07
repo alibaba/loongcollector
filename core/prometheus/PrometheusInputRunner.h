@@ -41,7 +41,6 @@ public:
         static PrometheusInputRunner sInstance;
         return &sInstance;
     }
-    void CheckGC();
 
     // input plugin update
     void UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
@@ -53,6 +52,7 @@ public:
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
+    void EventGC() override;
 
 private:
     PrometheusInputRunner();
@@ -74,7 +74,6 @@ private:
     int32_t mServicePort;
     std::string mPodName;
 
-    std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;

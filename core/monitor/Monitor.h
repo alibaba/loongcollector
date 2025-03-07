@@ -20,8 +20,10 @@
 #include <future>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "MetricManager.h"
+#include "MetricTypes.h"
 
 #if defined(_MSC_VER)
 #include <Windows.h>
@@ -188,6 +190,11 @@ public:
     void Init();
     void Stop();
 
+    bool GetAgentMetric(SelfMonitorMetricEvent& event);
+    void SetAgentMetric(const SelfMonitorMetricEvent& event);
+    bool GetRunnerMetric(const std::string& runnerName, SelfMonitorMetricEvent& event);
+    void SetRunnerMetric(const std::string& runnerName, const SelfMonitorMetricEvent& event);
+
     void SetAgentCpu(double cpu) { SET_GAUGE(mAgentCpu, cpu); }
     void SetAgentMemory(uint64_t mem) { SET_GAUGE(mAgentMemory, mem); }
     void SetAgentGoMemory(uint64_t mem) { SET_GAUGE(mAgentGoMemory, mem); }
@@ -213,6 +220,16 @@ public:
 private:
     LoongCollectorMonitor();
     ~LoongCollectorMonitor();
+
+    // 一个全局级别指标的副本，由 SelfMonitorServer::PushSelfMonitorMetricEvents 更新，格式为：
+    // {MetricCategory: {key:MetricValue}}
+    // 现支持 Agent 和 Runner 指标的保存、获取
+    struct GlobalMetrics {
+        SelfMonitorMetricEvent mAgentMetric;
+        std::unordered_map<std::string, SelfMonitorMetricEvent> mRunnerMetrics;
+    };
+    std::mutex mGlobalMetricsMux;
+    GlobalMetrics mGlobalMetrics;
 
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;

@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "MetricConstants.h"
+#include "MetricRecord.h"
+#include "Monitor.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
 #include "unittest/Unittest.h"
@@ -27,6 +30,7 @@ public:
     void TestCreateFromGoMetricMap();
     void TestMerge();
     void TestSendInterval();
+    void TestGlobalMetrics();
 
 private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
@@ -38,6 +42,7 @@ APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestCreateFromMetricEvent,
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestCreateFromGoMetricMap, 1);
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestMerge, 2);
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestSendInterval, 3);
+APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestGlobalMetrics, 4);
 
 void SelfMonitorMetricEventUnittest::TestCreateFromMetricEvent() {
     std::vector<std::pair<std::string, std::string>> labels;
@@ -165,7 +170,7 @@ void SelfMonitorMetricEventUnittest::TestMerge() {
         event1.Merge(event2);
 
         // 检验间隔是否被设置为 event2 的间隔
-        APSARA_TEST_EQUAL(0, event1.mLastSendInterval);
+        APSARA_TEST_EQUAL(0, event1.mIntervalsSinceLastSend);
         APSARA_TEST_EQUAL(10, event1.mSendInterval);
         // 检验计数器是否正确合并
         APSARA_TEST_EQUAL(300, event1.mCounters["counter1"]);
@@ -196,6 +201,59 @@ void SelfMonitorMetricEventUnittest::TestSendInterval() {
     APSARA_TEST_FALSE(event.ShouldDelete());
     APSARA_TEST_FALSE(event.ShouldSend());
     APSARA_TEST_TRUE(event.ShouldDelete()); // 第三次调用，间隔计数达到3，应返回true
+}
+
+void SelfMonitorMetricEventUnittest::TestGlobalMetrics() {
+    { // test set/get agent metric
+        SelfMonitorMetricEvent originAgentEvent;
+        SelfMonitorMetricEvent wantAgentEvent;
+
+        // set
+        originAgentEvent.mCategory = MetricCategory::METRIC_CATEGORY_AGENT;
+        originAgentEvent.mLabels = {{METRIC_LABEL_KEY_PROJECT, "test_project"}, {METRIC_LABEL_KEY_OS, "Linux"}};
+        originAgentEvent.mCounters = {{"test_counter", 1}};
+        originAgentEvent.mGauges = {{METRIC_AGENT_CPU, 0.3}, {METRIC_AGENT_MEMORY, 99}};
+        LoongCollectorMonitor::GetInstance()->SetAgentMetric(originAgentEvent);
+
+        // get
+        APSARA_TEST_TRUE(LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent));
+        APSARA_TEST_EQUAL(MetricCategory::METRIC_CATEGORY_AGENT, wantAgentEvent.mCategory);
+        APSARA_TEST_EQUAL("test_project", wantAgentEvent.GetLabel(METRIC_LABEL_KEY_PROJECT));
+        APSARA_TEST_EQUAL("Linux", wantAgentEvent.GetLabel(METRIC_LABEL_KEY_OS));
+        APSARA_TEST_EQUAL("", wantAgentEvent.GetLabel(""));
+        APSARA_TEST_EQUAL(1, wantAgentEvent.GetCounter("test_counter"));
+        APSARA_TEST_EQUAL(0, wantAgentEvent.GetCounter(""));
+        APSARA_TEST_EQUAL(0.3, wantAgentEvent.GetGauge(METRIC_AGENT_CPU));
+        APSARA_TEST_EQUAL(99, wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY));
+        APSARA_TEST_EQUAL(0, wantAgentEvent.GetGauge(""));
+    }
+    { // test set/get runner metric
+        SelfMonitorMetricEvent originRunnerEvent;
+        SelfMonitorMetricEvent wantRunnerEvent;
+        APSARA_TEST_FALSE(LoongCollectorMonitor::GetInstance()->GetRunnerMetric("", wantRunnerEvent));
+
+        // set
+        std::string runnerName = METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK;
+        originRunnerEvent.mCategory = MetricCategory::METRIC_CATEGORY_RUNNER;
+        originRunnerEvent.mLabels
+            = {{METRIC_LABEL_KEY_RUNNER_NAME, runnerName}, {METRIC_LABEL_KEY_PROJECT, "test_project"}};
+        originRunnerEvent.mCounters = {{METRIC_RUNNER_IN_EVENTS_TOTAL, 1}, {METRIC_RUNNER_TOTAL_DELAY_MS, 99}};
+        originRunnerEvent.mGauges = {{METRIC_RUNNER_LAST_RUN_TIME, 1111111}};
+        LoongCollectorMonitor::GetInstance()->SetRunnerMetric(runnerName, originRunnerEvent);
+
+        // get
+        APSARA_TEST_FALSE(LoongCollectorMonitor::GetInstance()->GetRunnerMetric("", wantRunnerEvent));
+        APSARA_TEST_TRUE(LoongCollectorMonitor::GetInstance()->GetRunnerMetric(runnerName, wantRunnerEvent));
+        APSARA_TEST_EQUAL(MetricCategory::METRIC_CATEGORY_RUNNER, wantRunnerEvent.mCategory);
+        APSARA_TEST_EQUAL("test_project", wantRunnerEvent.GetLabel(METRIC_LABEL_KEY_PROJECT));
+        APSARA_TEST_EQUAL(runnerName, wantRunnerEvent.GetLabel(METRIC_LABEL_KEY_RUNNER_NAME));
+        APSARA_TEST_EQUAL("", wantRunnerEvent.GetLabel(""));
+        APSARA_TEST_EQUAL(1, wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_EVENTS_TOTAL));
+        APSARA_TEST_EQUAL(99, wantRunnerEvent.GetCounter(METRIC_RUNNER_TOTAL_DELAY_MS));
+        APSARA_TEST_EQUAL(0, wantRunnerEvent.GetCounter(""));
+        APSARA_TEST_EQUAL(1111111, wantRunnerEvent.GetGauge(METRIC_RUNNER_LAST_RUN_TIME));
+        APSARA_TEST_EQUAL(0, wantRunnerEvent.GetGauge(""));
+    }
 }
 
 } // namespace logtail

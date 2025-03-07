@@ -14,11 +14,11 @@
 
 #include "TimeUtil.h"
 
-#include <chrono>
 #include <cmath>
 #include <memory.h>
 
 #include <atomic>
+#include <chrono>
 #include <limits>
 #if defined(__linux__)
 #include <sys/sysinfo.h>
