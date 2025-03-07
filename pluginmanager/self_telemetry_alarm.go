@@ -15,11 +15,9 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InputAlarm struct {
@@ -37,21 +35,12 @@ func (r *InputAlarm) Description() string {
 
 func (r *InputAlarm) Collect(collector pipeline.Collector) error {
 	loggroup := &protocol.LogGroup{}
-	LogtailConfigLock.RLock()
-	for _, config := range LogtailConfig {
-		alarm := config.Context.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
-		if alarm != nil {
-			alarm.SerializeToPb(loggroup)
-		}
-	}
-	LogtailConfigLock.RUnlock()
-	util.GlobalAlarm.SerializeToPb(loggroup)
+	GetAlarms(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		for _, log := range loggroup.Logs {
 			AlarmConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 		}
 	}
-	util.RegisterAlarmsSerializeToPb(loggroup)
 	logger.Debug(r.context.GetRuntimeContext(), "InputAlarm", *loggroup)
 	return nil
 }

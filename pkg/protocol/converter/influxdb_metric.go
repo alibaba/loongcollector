@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // ConvertToInfluxdbProtocolStream converts @logGroup to []byte in the influxdb line protocol,
@@ -97,7 +98,7 @@ func (c *Converter) ConvertToInfluxdbProtocolStreamV2(groupEvents *models.Pipeli
 		metric, ok := event.(*models.Metric)
 		if !ok {
 			if c.IgnoreUnExpectedData {
-				logger.Warningf(context.Background(), "CONVERT_ALARM", "unsupported event type[%T] for converter with influxdb protocol", event)
+				logger.Warningf(context.Background(), util.ProtocolAlarm, "convert failed, unsupported event type[%T] for converter with influxdb protocol", event)
 				continue
 			}
 			return nil, nil, fmt.Errorf("unsupported event type: %v", event.GetType())

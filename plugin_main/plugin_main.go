@@ -119,7 +119,7 @@ func changePluginConfigIO(pluginCfg string) string {
 			cfg, _ := json.Marshal(newCfg)
 			pluginCfg = string(cfg)
 		} else {
-			logger.Error(context.Background(), "PLUGIN_UNMARSHAL_ALARM", "err", err)
+			logger.Error(context.Background(), util.CategoryConfigAlarm, "Unmarshal config json err", err)
 		}
 		return pluginCfg
 	}
@@ -153,7 +153,7 @@ func main() {
 		instance := k8smeta.GetMetaManagerInstance()
 		err := instance.Init("")
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+			logger.Error(context.Background(), util.K8sMetaAlarm, "init k8s meta manager fail", err)
 			return
 		}
 		stopCh := make(chan struct{})
@@ -166,7 +166,7 @@ func main() {
 		l := fmt.Sprintf("PluginLogstore_%d", i)
 		c := fmt.Sprintf("1.0#PluginProject_%d##Config%d", i, i)
 		if LoadPipeline(p, l, c, 123, cfg) != 0 {
-			logger.Warningf(context.Background(), "START_PLUGIN_ALARM", "%s_%s_%s start fail, config is %s", p, l, c, cfg)
+			logger.Warningf(context.Background(), util.CategoryConfigAlarm, "%s_%s_%s start fail, config is %s", p, l, c, cfg)
 			return
 		}
 		Start(c)

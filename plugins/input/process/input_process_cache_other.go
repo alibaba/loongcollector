@@ -45,7 +45,7 @@ type processCacheOther struct {
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
 	processes, err := process.Processes()
 	if err != nil {
-		logger.Errorf(context.Background(), "PROCESS_LIST_ALARM", "error: %v", err)
+		logger.Errorf(context.Background(), util.InputCollectAlarm, "process listen error: %v", err)
 		return nil, err
 	}
 	if len(processes) == 0 {
@@ -130,7 +130,7 @@ func (pc *processCacheOther) Labels(customLabels *helper.MetricLabels) *helper.M
 			processLabels := customLabels.Clone()
 			processLabels.Append("pid", strconv.Itoa(pc.GetPid()))
 			if pc.meta.maxLabelLength < len(name) {
-				logger.Warningf(context.Background(), "PROCESS_LABEL_TOO_LONG_ALARM", "the stat cmdline label is over %d chars: %s", pc.meta.maxLabelLength, name)
+				logger.Warningf(context.Background(), util.InputCollectAlarm, "process label too long, the stat cmdline label is over %d chars: %s", pc.meta.maxLabelLength, name)
 				processLabels.Append("comm", name[:pc.meta.maxLabelLength])
 			} else {
 				processLabels.Append("comm", name)
