@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        runner: [loongcollector_windows]
+        runner: [Windows]
       fail-fast: true
     steps:
       - name: Check out code
@@ -48,7 +48,7 @@ jobs:
         run: scripts/windows64_build.bat
 
   result:
-    runs-on: loongcollector_windows
+    runs-on: Windows
     timeout-minutes: 60
     needs: [CI]
     steps:
