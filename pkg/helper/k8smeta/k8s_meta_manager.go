@@ -17,6 +17,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var metaManager *MetaManager
@@ -163,7 +164,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 		m.linkRegisterMap[configName] = append(m.linkRegisterMap[configName], resourceType)
 		m.registerLock.Unlock()
 	} else {
-		logger.Error(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", resourceType)
+		logger.Error(context.Background(), util.EntityPipelineRegisterAlarm, "resourceType not support", resourceType)
 	}
 }
 

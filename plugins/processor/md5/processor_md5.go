@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorMD5 struct {
@@ -57,7 +58,7 @@ func (p *ProcessorMD5) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 			}
 		}
 		if !found && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "MD5_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "processor_md5 cannot find key", p.SourceKey)
 		}
 	}
 	return logArray

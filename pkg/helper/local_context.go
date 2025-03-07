@@ -135,7 +135,7 @@ func (p *LocalContext) GetCheckPoint(key string) (value []byte, exist bool) {
 func (p *LocalContext) SaveCheckPointObject(key string, obj interface{}) error {
 	val, err := json.Marshal(obj)
 	if err != nil {
-		logger.Debug(p.ctx, "CHECKPOINT_INVALID_ALARM", "save checkpoint error, invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
+		logger.Debug(p.ctx, util.CheckpointInvalidAlarm.String(), "save checkpoint error, invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
 		return err
 	}
 	return p.SaveCheckPoint(key, val)
@@ -148,7 +148,7 @@ func (p *LocalContext) GetCheckPointObject(key string, obj interface{}) (exist b
 	}
 	err := json.Unmarshal(val, obj)
 	if err != nil {
-		logger.Debug(p.ctx, "CHECKPOINT_INVALID_ALARM", "get checkpoint error, invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
+		logger.Debug(p.ctx, util.CheckpointInvalidAlarm.String(), "get checkpoint error, invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
 		return false
 	}
 	return true

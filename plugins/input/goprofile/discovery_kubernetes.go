@@ -23,6 +23,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery"
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery/targetgroup"
@@ -65,23 +66,23 @@ func (k *KubernetesConfig) InitDiscoverer() {
 	var err error
 	k.IncludeEnv, k.includeEnvRegex, err = helper.SplitRegexFromMap(k.IncludeEnv)
 	if err != nil {
-		logger.Warning(context.Background(), "INVALID_REGEX_ALARM", "init include env regex error", err)
+		logger.Warning(context.Background(), util.InputInitAlarm, "init include env regex error", err)
 	}
 	k.ExcludeEnv, k.excludeEnvRegex, err = helper.SplitRegexFromMap(k.ExcludeEnv)
 	if err != nil {
-		logger.Warning(context.Background(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
+		logger.Warning(context.Background(), util.InputInitAlarm, "init exclude env regex error", err)
 	}
 	k.IncludeContainerLabel, k.includeContainerLabelRegex, err = helper.SplitRegexFromMap(k.IncludeContainerLabel)
 	if err != nil {
-		logger.Warning(context.Background(), "INVALID_REGEX_ALARM", "init include label regex error", err)
+		logger.Warning(context.Background(), util.InputInitAlarm, "init include label regex error", err)
 	}
 	k.ExcludeContainerLabel, k.excludeContainerLabelRegex, err = helper.SplitRegexFromMap(k.ExcludeContainerLabel)
 	if err != nil {
-		logger.Warning(context.Background(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
+		logger.Warning(context.Background(), util.InputInitAlarm, "init exclude label regex error", err)
 	}
 	k.k8sFilter, err = helper.CreateK8SFilter(k.K8sNamespaceRegex, k.K8sPodRegex, k.K8sContainerRegex, k.IncludeK8sLabel, k.ExcludeK8sLabel)
 	if err != nil {
-		logger.Warning(context.Background(), "INVALID_REGEX_ALARM", "init k8s filter error", err)
+		logger.Warning(context.Background(), util.InputInitAlarm, "init k8s filter error", err)
 	}
 	logger.Debug(context.Background(), "profile_go_kubernetes inited successfully")
 }

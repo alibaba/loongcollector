@@ -48,7 +48,7 @@ func NewLogtailContextMeta(project, logstore, configName string) (context.Contex
 	} else {
 		meta.loggerHeader = "[" + configName + "," + logstore + "]\t"
 	}
-	meta.alarm.Init(project, logstore)
+	meta.alarm.Init(project, logstore, config.GetRealConfigName(configName))
 	ctx := context.WithValue(context.Background(), LogTailMeta, meta)
 	return ctx, meta
 }
@@ -88,7 +88,7 @@ func (c *LogtailContextMeta) GetAlarm() *util.Alarm {
 	return c.alarm
 }
 
-func (c *LogtailContextMeta) RecordAlarm(alarmType, msg string) {
+func (c *LogtailContextMeta) RecordAlarm(alarmType util.AlarmType, msg string) {
 	if c.alarm == nil {
 		return
 	}

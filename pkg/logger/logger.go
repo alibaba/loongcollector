@@ -186,26 +186,26 @@ func Infof(ctx context.Context, format string, params ...interface{}) {
 	}
 }
 
-func Warning(ctx context.Context, alarmType string, kvPairs ...interface{}) {
+func Warning(ctx context.Context, alarmType util.AlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Warningf(ctx context.Context, alarmType string, format string, params ...interface{}) {
+func Warningf(ctx context.Context, alarmType util.AlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -213,38 +213,38 @@ func Warningf(ctx context.Context, alarmType string, format string, params ...in
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Error(ctx context.Context, alarmType string, kvPairs ...interface{}) {
+func Error(ctx context.Context, alarmType util.AlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
 	}
 }
 
-func Errorf(ctx context.Context, alarmType string, format string, params ...interface{}) {
+func Errorf(ctx context.Context, alarmType util.AlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -252,12 +252,12 @@ func Errorf(ctx context.Context, alarmType string, format string, params ...inte
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			ltCtx.RecordAlarm(alarmType, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", alarmType, "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
 			util.GlobalAlarm.Record(alarmType, msg)
 		}
@@ -377,7 +377,7 @@ func catchStandardOutput() {
 					time.Sleep(100 * time.Millisecond)
 					continue
 				} else if errRead != nil {
-					Error(context.Background(), "CATCH_STANDARD_OUTPUT_ALARM", "err", errRead)
+					Error(context.Background(), util.StandardOutputAlarm, "catch standard output err", errRead)
 					break
 				}
 				logger(line)
@@ -392,14 +392,14 @@ func catchStandardOutput() {
 			return
 		},
 		func(text []byte) {
-			Info(context.Background(), "stdout", string(text))
+			Info(context.Background(), "catch stdout", string(text))
 		},
 		func(old *os.File) {
 			os.Stdout = old
 			_, _ = fmt.Fprint(os.Stdout, "recover stdout\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDOUT_ALARM", "err", err)
+		Error(context.Background(), util.StandardOutputAlarm, "init catch stdout err", err)
 		return
 	}
 	err = catch(
@@ -409,14 +409,14 @@ func catchStandardOutput() {
 			return
 		},
 		func(text []byte) {
-			Error(context.Background(), "STDERR_ALARM", "stderr", string(text))
+			Error(context.Background(), util.StandardOutputAlarm, "catch stderr", string(text))
 		},
 		func(old *os.File) {
 			os.Stderr = old
 			_, _ = fmt.Fprint(os.Stderr, "recover stderr\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDERR_ALARM", "err", err)
+		Error(context.Background(), util.StandardOutputAlarm, "init catch stderr err", err)
 	}
 }
 

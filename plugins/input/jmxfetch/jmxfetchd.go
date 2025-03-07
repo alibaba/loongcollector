@@ -69,7 +69,7 @@ func (m *Manager) execJmxfetchd(command string, needOutput bool) (output []byte,
 		err = cmd.Run()
 	}
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_RUNTIME_ALARM", "%v error, output: %v, error: %v", command, string(output), err)
+		logger.Warningf(m.managerMeta.GetContext(), util.JmxfetchAlarm, "%v error, output: %v, error: %v", command, string(output), err)
 	}
 	return
 }

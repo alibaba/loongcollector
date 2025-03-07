@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorGrok struct {
@@ -66,7 +67,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 		for _, path := range p.CustomPatternDir {
 			err = p.addPatternsFromPath(path)
 			if err != nil {
-				logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
+				logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "init grok's custom pattern in dir error", err)
 				return err
 			}
 		}
@@ -78,13 +79,13 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 
 	err = p.buildPatterns()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
+		logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "build grok's pattern error", err)
 		return err
 	}
 
 	err = p.compileMatchs()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
+		logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "compile grok's matchs error", err)
 		return err
 	}
 
@@ -111,12 +112,12 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 			// no match error
 			if parseResult == matchFail && p.NoMatchError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "all match fail", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "grok all match fail", p.SourceKey, cont.Value)
 			}
 
 			// tome out error
 			if parseResult == matchTimeOut && p.TimeoutError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "match time out", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "grok match time out", p.SourceKey, cont.Value)
 			}
 
 			// keep source
@@ -128,7 +129,7 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 	// no key err
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "anchor cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "grok anchor cannot find key", p.SourceKey)
 	}
 }
 
