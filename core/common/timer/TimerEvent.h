@@ -29,6 +29,7 @@ public:
     virtual bool Execute() = 0;
 
     std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
+    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
 
 private:
     std::chrono::steady_clock::time_point mExecTime;

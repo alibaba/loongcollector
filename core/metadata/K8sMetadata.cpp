@@ -13,9 +13,9 @@
 
 #include "K8sMetadata.h"
 
-#include <chrono>
 #include <ctime>
 
+#include <chrono>
 #include <thread>
 
 #include "common/MachineInfoUtil.h"

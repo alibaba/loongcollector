@@ -59,4 +59,40 @@ private:
     size_t mAllocatedSize = 0;
 };
 
+class SizedVectorTags {
+    friend class ProcessorPromRelabelMetricNative;
+
+public:
+    void Insert(StringView key, StringView val) {
+        auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
+        if (iter != mInner.end()) {
+            mAllocatedSize += val.size() - iter->second.size();
+            iter->second = val;
+        } else {
+            mAllocatedSize += key.size() + val.size();
+            mInner.emplace_back(key, val);
+        }
+    }
+
+    void Erase(StringView key) {
+        auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
+        if (iter != mInner.end()) {
+            mAllocatedSize -= (iter->first.size() + iter->second.size());
+            mInner.erase(iter);
+        }
+    }
+
+    size_t DataSize() const { return sizeof(decltype(mInner)) + mAllocatedSize; }
+
+    void Clear() {
+        mInner.clear();
+        mAllocatedSize = 0;
+    }
+
+    std::vector<std::pair<StringView, StringView>> mInner;
+
+private:
+    size_t mAllocatedSize = 0;
+};
+
 } // namespace logtail

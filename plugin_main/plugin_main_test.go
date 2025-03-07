@@ -115,8 +115,7 @@ func TestHangConfigWhenStop(t *testing.T) {
 	// Stop config, it will hang.
 	Stop(configName, 0)
 	time.Sleep(time.Second * 2)
-	config, exists = pluginmanager.DisabledLogtailConfig[configName]
-	require.Equal(t, configName, config.ConfigName)
+	_, exists = pluginmanager.DisabledLogtailConfig[config]
 	require.True(t, exists)
 	// Load again, succeed. Changed since independently reload
 	time.Sleep(time.Second)
@@ -145,9 +144,8 @@ func TestHangConfigWhenStop(t *testing.T) {
 	// Stop config, hang again.
 	Stop(config.ConfigNameWithSuffix, 0)
 	time.Sleep(time.Second * 2)
-	config, exists = pluginmanager.DisabledLogtailConfig[config.ConfigNameWithSuffix]
+	_, exists = pluginmanager.DisabledLogtailConfig[config]
 	require.True(t, exists)
-	require.Equal(t, configName, config.ConfigName)
 
 	// Change config detail, load a new pipeline.
 	validConfigStr := fmt.Sprintf(configTemplateJSONStr, 4)
@@ -196,9 +194,8 @@ func TestSlowConfigWhenStop(t *testing.T) {
 
 	// Stop config, it will hang.
 	Stop(configName, 0)
-	config, exists = pluginmanager.DisabledLogtailConfig[configName]
+	_, exists = pluginmanager.DisabledLogtailConfig[config]
 	require.True(t, exists)
-	require.Equal(t, configName, config.ConfigName)
 	// Load again, success. Changed since independently reload
 	time.Sleep(time.Second)
 	require.Equal(t, 0, LoadPipeline("project", "logstore", configName, 0, badConfigStr))

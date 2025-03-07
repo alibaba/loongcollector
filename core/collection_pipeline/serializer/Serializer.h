@@ -17,7 +17,6 @@
 #pragma once
 
 #include <chrono>
-
 #include <string>
 
 #include "collection_pipeline/batch/BatchedEvents.h"
