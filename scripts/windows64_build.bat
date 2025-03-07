@@ -41,11 +41,11 @@ echo looncollector dir: %LOONGCOLLECTOR_SRC_PATH%
 REM Change to where boost_1_68_0 locates
 set BOOST_ROOT=C:\workspace\boost_1_68_0
 REM Change to where ilogtail-deps.windows-x64 locates
-set LOONCOLLECTOR_DEPS_PATH=C:\workspace\ilogtail-deps.windows-x64
+set LOONCOLLECTOR_DEPS_PATH=C:\taiye-open-source\ilogtail-deps.windows-x64
 REM avoid '\' beed treated as escape.
 set LOONCOLLECTOR_DEPS_PATH=%LOONCOLLECTOR_DEPS_PATH:\=/%
 REM Change to where cmake locates
-set CMAKE_BIN="C:\Program Files\CMake\bin\cmake"
+set CMAKE_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
 REM Change to where mingw locates

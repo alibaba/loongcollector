@@ -135,13 +135,12 @@ set(SUB_DIRECTORIES_LIST
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         parser
-        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/observer ebpf/security ebpf/handler)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/observer ebpf/security ebpf/handler host_monitor host_monitor/collector)
 elseif(MSVC)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
