@@ -434,21 +434,15 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
             info.detail = config.detail();
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{config.name(),
-                                                                            config.version(),
-                                                                            ConfigFeedbackStatus::FAILED,
-                                                                            "",
-                                                                            config.detail()};
+                mContinuousPipelineConfigInfoMap[config.name()]
+                    = ConfigInfo{config.name(), config.version(), ConfigFeedbackStatus::FAILED, "", config.detail()};
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{config.name(),
-                                                                            config.version(),
-                                                                            ConfigFeedbackStatus::APPLYING,
-                                                                            "",
-                                                                            config.detail()};
-                    }
+                mContinuousPipelineConfigInfoMap[config.name()]
+                    = ConfigInfo{config.name(), config.version(), ConfigFeedbackStatus::APPLYING, "", config.detail()};
+            }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
     }
@@ -480,20 +474,14 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{config.name(),
-                                                                    config.version(),
-                                                                    ConfigFeedbackStatus::FAILED,
-                                                                    "",
-                                                                    config.detail()};
+                mInstanceConfigInfoMap[config.name()]
+                    = ConfigInfo{config.name(), config.version(), ConfigFeedbackStatus::FAILED, "", config.detail()};
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{config.name(),
-                                                                    config.version(),
-                                                                    ConfigFeedbackStatus::APPLYING,
-                                                                    "",
-                                                                    config.detail()};
+                mInstanceConfigInfoMap[config.name()]
+                    = ConfigInfo{config.name(), config.version(), ConfigFeedbackStatus::APPLYING, "", config.detail()};
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
