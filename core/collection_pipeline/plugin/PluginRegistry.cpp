@@ -35,12 +35,12 @@
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
 #if defined(__linux__) && !defined(__ANDROID__)
-#include "plugin/input/InputHostMeta.h"
-#include "plugin/input/InputPrometheus.h"
 #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputPrometheus.h"
 #endif
 #include "collection_pipeline/plugin/creator/CProcessor.h"
 #include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
