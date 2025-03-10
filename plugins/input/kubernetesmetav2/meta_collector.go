@@ -50,8 +50,9 @@ func (m *metaCollector) Start() error {
 		k8smeta.STORAGECLASS:             m.processStorageClassEntity,
 		k8smeta.INGRESS:                  m.processIngressEntity,
 		k8smeta.POD_NODE:                 m.processPodNodeLink,
-		k8smeta.REPLICASET_DEPLOYMENT:    m.processReplicaSetDeploymentLink,
+		k8smeta.POD_DEPLOYMENT:           m.processPodDeploymentLink,
 		k8smeta.POD_REPLICASET:           m.processPodReplicaSetLink,
+		k8smeta.REPLICASET_DEPLOYMENT:    m.processReplicaSetDeploymentLink,
 		k8smeta.POD_STATEFULSET:          m.processPodStatefulSetLink,
 		k8smeta.POD_DAEMONSET:            m.processPodDaemonSetLink,
 		k8smeta.JOB_CRONJOB:              m.processJobCronJobLink,
@@ -60,6 +61,7 @@ func (m *metaCollector) Start() error {
 		k8smeta.POD_CONFIGMAP:            m.processPodConfigMapLink,
 		k8smeta.POD_SERVICE:              m.processPodServiceLink,
 		k8smeta.POD_CONTAINER:            m.processPodContainerLink,
+		k8smeta.INGRESS_SERVICE:          m.processIngressServiceLink,
 	}
 
 	if m.serviceK8sMeta.Pod {
@@ -107,38 +109,45 @@ func (m *metaCollector) Start() error {
 	if m.serviceK8sMeta.Ingress {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Node {
+
+	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Node && m.serviceK8sMeta.Node2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NODE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Deployment && m.serviceK8sMeta.ReplicaSet {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+	if m.serviceK8sMeta.Deployment && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Deployment2Pod != "" {
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.ReplicaSet && m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.ReplicaSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.ReplicaSet2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_REPLICASET, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.StatefulSet && m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.Deployment && m.serviceK8sMeta.ReplicaSet && m.serviceK8sMeta.Deployment2ReplicaSet != "" {
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+	}
+	if m.serviceK8sMeta.StatefulSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.StatefulSet2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.DaemonSet && m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.DaemonSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.DaemonSet2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.CronJob && m.serviceK8sMeta.Job {
+	if m.serviceK8sMeta.CronJob && m.serviceK8sMeta.Job && m.serviceK8sMeta.CronJob2Job != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Job && m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.Job && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Job2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_JOB, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.PersistentVolumeClaim {
+	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.PersistentVolumeClaim && m.serviceK8sMeta.Pod2PersistentVolumeClaim != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_PERSISENTVOLUMECLAIN, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Configmap {
+	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Configmap && m.serviceK8sMeta.Pod2ConfigMap != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Service && m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.Service && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Service2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod {
+	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Container && m.serviceK8sMeta.Pod2Container != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONTAINER, m.handleEvent, m.serviceK8sMeta.Interval)
+	}
+	if m.serviceK8sMeta.Ingress && m.serviceK8sMeta.Service && m.serviceK8sMeta.Ingress2Service != "" {
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	go m.sendInBackground()
 	return nil
@@ -344,11 +353,11 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
 	log.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkSrcEntityTypeFieldName, content.Get(entityTypeFieldName))
-	log.Contents.Add(entityLinkSrcEntityIDFieldName, content.Get(entityIDFieldName))
+	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
+	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey("", "", ""))
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey("", "", ""))
+	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
+	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
 
 	log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
 	log.Contents.Add(entityMethodFieldName, content.Get(entityMethodFieldName))

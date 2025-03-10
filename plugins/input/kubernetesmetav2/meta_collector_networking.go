@@ -25,3 +25,15 @@ func (m *metaCollector) processIngressEntity(data *k8smeta.ObjectWrapper, method
 	}
 	return nil
 }
+
+func (m *metaCollector) processIngressServiceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.IngressService); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Ingress.Name, obj.Ingress.Kind, obj.Ingress.Namespace, obj.Service.Name, obj.Service.Kind, obj.Service.Namespace, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Ingress2Service)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}

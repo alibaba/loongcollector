@@ -34,6 +34,19 @@
 | PersistentVolumeClaim | bool, false | 是否采集PersistentVolumeClaim元数据。 |
 | StorageClass | bool, false | 是否采集StorageClass元数据。 |
 | Ingress | bool, false | 是否采集Ingress元数据。 |
+| Node2Pod | string, 无默认值（可选） | Node到Pod的关系名，不填则不生成关系。 |
+| Deployment2Pod | string, 无默认值（可选） | Deployment到Pod的关系名，不填则不生成关系。 |
+| ReplicaSet2Pod | string, 无默认值（可选） | ReplicaSet到Pod的关系名，不填则不生成关系。 |
+| Deployment2ReplicaSet | string, 无默认值（可选） | Deployment到ReplicaSet的关系名，不填则不生成关系。 |
+| StatefulSet2Pod | string, 无默认值（可选） | StatefulSet到Pod的关系名，不填则不生成关系。 |
+| DaemonSet2Pod | string, 无默认值（可选） | DaemonSet到Pod的关系名，不填则不生成关系。 |
+| Service2Pod | string, 无默认值（可选） | Service到Pod的关系名，不填则不生成关系。 |
+| Pod2Container | string, 无默认值（可选） | Pod到Container的关系名，不填则不生成关系。 |
+| CronJob2Job | string, 无默认值（可选） | CronJob到Job的关系名，不填则不生成关系。 |
+| Job2Pod | string, 无默认值（可选） | Job到Pod的关系名，不填则不生成关系。 |
+| Ingress2Service | string, 无默认值（可选） | Ingress到Service的关系名，不填则不生成关系。 |
+| Pod2PersistentVolumeClaim | string, 无默认值（可选） | Pod到PersistentVolumeClaim的关系名，不填则不生成关系。 |
+| Pod2Configmap | string, 无默认值（可选） | Pod到Configmap的关系名，不填则不生成关系。 |
 
 ## 环境变量
 
