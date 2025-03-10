@@ -111,7 +111,7 @@ const (
 	HoldonLogtailPluginAlarm
 	InfluxdbSubscriberAlarm
 	LogtailComposeAlarm
-	SshExecAlarm
+	SshExecAlarm // nolint:revive
 	StartDockerComposeAlarm
 	StopDockerComposeAlarm
 )
