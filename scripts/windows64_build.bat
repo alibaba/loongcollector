@@ -79,6 +79,7 @@ if not %ERRORLEVEL% == 0 (
 %DEVENV_BIN% loongcollector.sln /Build "Release|x64" 1>build.stdout 2>build.stderr
 if not %ERRORLEVEL% == 0 (
     echo Build looncollector source failed.
+	type "%LOONGCOLLECTOR_SRC_PATH%\core\build\build.stdout"
     exit /b 1
 )
 echo Build core success
