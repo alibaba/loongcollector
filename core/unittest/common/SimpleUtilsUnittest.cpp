@@ -16,7 +16,11 @@
 #include "FileSystemUtilUnittest.h"
 #include "LoadParameterUnittest.h"
 #include "RandomUtilUnittest.h"
+// TODO: windows
+// windows no strptime function implement.
+#if !defined(_MSC_VER)
 #include "TimeUtilUnittest.h"
+#endif
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

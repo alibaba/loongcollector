@@ -62,6 +62,17 @@ class PollingPreservedDirDepthUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
         gRootDir = GetProcessExecutionDir() + "var" + PATH_SEPARATOR;
+#if defined(_MSC_VER)
+        gTestMatrix = {
+            {"log", "log\\app\\0", "log\\app\\1", 0, false, true, true, false, true},
+            {"*\\log", "app\\log\\0", "app\\log\\1", 0, true, true, false, false, true},
+            {"log", "app\\log\\0", "app\\log\\1", 1, false, false, false, false, false},
+            {"log", "log\\0", "log\\1", 0, false, true, true, false, true},
+            {"*\\log", "log\\0", "log\\1", 1, true, false, false, false, false},
+            {"*\\log", "app\\log\\0", "app\\log\\1", 1, true, true, true, true, true},
+            {"log", "log\\app\\0", "log\\app\\0\\1", 0, false, true, true, false, false},
+        };
+#else
         gTestMatrix = {
             {"log", "log/app/0", "log/app/1", 0, false, true, true, false, true},
             {"*/log", "app/log/0", "app/log/1", 0, true, true, false, false, true},
@@ -71,6 +82,7 @@ public:
             {"*/log", "app/log/0", "app/log/1", 1, true, true, true, true, true},
             {"log", "log/app/0", "log/app/0/1", 0, false, true, true, false, false},
         };
+#endif
 
         sLogger->set_level(spdlog::level::trace);
         srand(time(nullptr));
@@ -101,6 +113,7 @@ public:
     static void TearDownTestCase() {
         PollingDirFile::GetInstance()->mRuningFlag = false;
         PollingModify::GetInstance()->mRuningFlag = false;
+        Application::GetInstance()->SetSigTermSignalFlag(true);
         Application::GetInstance()->Exit();
     }
 
@@ -267,8 +280,13 @@ public:
     void TestPollingDirFile6() { testPollingDirFile(gTestMatrix[6]); }
 
     void TestCheckpoint() {
+#if defined(_MSC_VER)
+        auto configInputFilePath = gRootDir + "log\\**\\0.log";
+        auto testFile = gRootDir + "log\\0\\0.log";
+#else
         auto configInputFilePath = gRootDir + "log/**/0.log";
         auto testFile = gRootDir + "log/0/0.log";
+#endif
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, 0);
         CollectionConfig pipelineConfig("polling", std::move(configJson));
@@ -317,6 +335,8 @@ public:
     }
 };
 
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile0);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile1);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile2);
@@ -324,6 +344,7 @@ UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile3);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile4);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile5);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestCheckpoint);
+#endif
 
 std::string PollingPreservedDirDepthUnittest::gRootDir;
 std::string PollingPreservedDirDepthUnittest::gCheckpoint = "checkpoint";

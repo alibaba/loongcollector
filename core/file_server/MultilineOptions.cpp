@@ -222,15 +222,18 @@ bool MultilineOptions::ParseRegex(const string& pattern, shared_ptr<boost::regex
 
 const string& UnmatchedContentTreatmentToString(MultilineOptions::UnmatchedContentTreatment unmatchedContentTreatment) {
     switch (unmatchedContentTreatment) {
-        case MultilineOptions::UnmatchedContentTreatment::DISCARD:
+        case MultilineOptions::UnmatchedContentTreatment::DISCARD: {
             static string discardStr = "discard";
             return discardStr;
-        case MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE:
+        }
+        case MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE: {
             static string singleLine = "single line";
             return singleLine;
-        default:
+        }
+        default: {
             static string unkonwn = "";
             return unkonwn;
+        }
     }
 }
 

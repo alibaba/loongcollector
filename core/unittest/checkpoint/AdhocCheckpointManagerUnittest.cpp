@@ -242,7 +242,11 @@ AdhocFileKey* AdhocCheckpointManagerUnittest::GetAdhocFileKey(const std::string&
 long AdhocCheckpointManagerUnittest::GetFileUpdateTime(const std::string& filePath) {
     struct stat statbuf;
     stat(filePath.c_str(), &statbuf);
+#if defined(__linux__)
     return statbuf.st_mtim.tv_nsec;
+#else
+    return statbuf.st_mtime;
+#endif
 }
 
 } // namespace logtail

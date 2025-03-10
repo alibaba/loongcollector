@@ -61,6 +61,10 @@
 #endif
 #else
 #include "provider/Provider.h"
+#if defined(_MSC_VER)
+#include "common/WindowsDaemonUtil.h"
+#include "direct.h"
+#endif
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
