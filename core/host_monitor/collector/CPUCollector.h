@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <chrono>
-
 #include <vector>
 
 #include "host_monitor/collector/BaseCollector.h"
