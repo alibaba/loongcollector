@@ -48,7 +48,7 @@ public:
     }
 
     ~ProcessSecurityManager() {}
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
@@ -61,15 +61,13 @@ public:
     int PollPerfBuffer() override { return 0; }
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
-        override {
+        [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
-        override {
+    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
         LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0;

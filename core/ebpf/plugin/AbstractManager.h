@@ -49,7 +49,7 @@ public:
                              PluginMetricManagerPtr mgr);
     virtual ~AbstractManager();
 
-    virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) = 0;
+    virtual int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
 
     virtual int Destroy() = 0;
 
@@ -69,7 +69,7 @@ public:
 
     int GetCallNameIdx(const std::string& callName);
 
-    virtual logtail::ebpf::PluginType GetPluginType() = 0;
+    virtual PluginType GetPluginType() = 0;
 
     virtual int Suspend() {
         WriteLock lock(mMtx);
@@ -82,7 +82,7 @@ public:
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
+    virtual int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;
@@ -95,12 +95,10 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
-        = 0;
+    virtual std::unique_ptr<PluginConfig>
+    GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
 
-    virtual int
-    Update([[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
+    virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         bool ret = mSourceManager->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));

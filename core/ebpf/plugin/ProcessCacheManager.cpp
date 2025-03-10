@@ -199,8 +199,14 @@ void ProcessCacheManager::Stop() {
     mInited = false;
 }
 
+constexpr size_t kArgOffset = offsetof(msg_data, arg);
+
 void ProcessCacheManager::dataAdd(msg_data* dataPtr) {
-    auto size = dataPtr->common.size - offsetof(msg_data, arg);
+    if (dataPtr->common.size < kArgOffset) {
+        LOG_ERROR(sLogger, ("size is negative, dataPtr.common.size", dataPtr->common.size)("arg offset", kArgOffset));
+        return;
+    }
+    size_t size = dataPtr->common.size - offsetof(msg_data, arg);
     if (size <= MSG_DATA_ARG_LEN) {
         // std::vector<uint64_t> key = {dataPtr->id.pid, dataPtr->id.time};
         std::lock_guard<std::mutex> lk(mDataMapMutex);
@@ -552,8 +558,8 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
     if (mFlushProcessEvent) {
         uint32_t pid = eventPtr->tgid;
         uint64_t kt = eventPtr->ktime;
-        auto event = std::make_shared<ProcessEvent>(
-            pid, kt, KernelEventType::PROCESS_CLONE_EVENT, eventPtr->common.ktime);
+        uint64_t eventKt = eventPtr->common.ktime;
+        auto event = std::make_shared<ProcessEvent>(pid, kt, KernelEventType::PROCESS_CLONE_EVENT, eventKt);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -577,7 +583,7 @@ std::vector<std::shared_ptr<Proc>> ProcessCacheManager::ListRunningProcs() {
         if (!entry.is_directory()) {
             continue;
         }
-        auto dirName = entry.path().filename().string();
+        std::string dirName = entry.path().filename().string();
         int32_t pid = 0;
         const char* dirNameLast = dirName.data() + dirName.size();
         auto convresult = std::from_chars(dirName.data(), dirNameLast, pid);

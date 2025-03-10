@@ -31,7 +31,7 @@ namespace ebpf {
 
 enum class ObserverType { PROCESS, FILE, NETWORK };
 bool InitObserverNetworkOption(const Json::Value& config,
-                               logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
+                               ObserverNetworkOption& thisObserverNetworkOption,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName);
 
@@ -46,7 +46,7 @@ public:
               const CollectionPipelineContext* mContext,
               const std::string& sName);
 
-    std::vector<logtail::ebpf::SecurityOption> mOptionList;
+    std::vector<SecurityOption> mOptionList;
     SecurityProbeType mProbeType;
 };
 

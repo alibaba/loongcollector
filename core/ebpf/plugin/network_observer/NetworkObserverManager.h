@@ -48,7 +48,7 @@ public:
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            PluginMetricManagerPtr mgr);
 
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
     int Destroy() override;
 
@@ -73,22 +73,20 @@ public:
     std::array<size_t, 2> GenerateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&);
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options)
-        override {
+        [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::NETWORK_OBSERVE;
         return ebpfConfig;
     }
 
-    virtual int Update(
-        [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+    virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
     virtual int Suspend() override {
         mSuspendFlag = true;
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
+    virtual int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         mSuspendFlag = false;
         return 0;
     }

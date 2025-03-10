@@ -996,7 +996,7 @@ int GuessContainerIdOffset() {
 }
 
 int NetworkObserverManager::Update(
-    [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
+    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     auto* opt = std::get<ObserverNetworkOption*>(options);
 
     // diff opt

@@ -63,8 +63,8 @@ public:
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
+    std::unique_ptr<PluginConfig>
+    GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;

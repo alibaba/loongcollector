@@ -48,7 +48,7 @@ public:
     }
 
     ~FileSecurityManager() {}
-    int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
+    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     void RecordFileEvent(file_data_t* event);
@@ -60,8 +60,8 @@ public:
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override {
+    std::unique_ptr<PluginConfig>
+    GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;

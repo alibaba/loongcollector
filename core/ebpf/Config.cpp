@@ -47,7 +47,7 @@ static const std::unordered_map<SecurityProbeType, std::unordered_set<std::strin
        {SecurityProbeType::NETWORK, {"tcp_connect", "tcp_close", "tcp_sendmsg"}}};
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
-                                    logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
+                                    ObserverNetworkOption& thisObserverNetworkOption,
                                     const CollectionPipelineContext* mContext,
                                     const std::string& sName) {
     std::string errorMsg;
@@ -214,7 +214,7 @@ bool ExtractProbeConfig(const Json::Value& config,
 }
 
 bool InitObserverNetworkOption(const Json::Value& config,
-                               logtail::ebpf::ObserverNetworkOption& thisObserverNetworkOption,
+                               ObserverNetworkOption& thisObserverNetworkOption,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName) {
     Json::Value probeConfig;
@@ -405,26 +405,26 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
         }
-        logtail::ebpf::SecurityOption thisSecurityOption;
+        SecurityOption thisSecurityOption;
         GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
         mOptionList.emplace_back(std::move(thisSecurityOption));
         return true;
     }
     const auto& innerConfig = config["ProbeConfig"];
-    logtail::ebpf::SecurityOption thisSecurityOption;
+    SecurityOption thisSecurityOption;
     // Genral Filter (Optional)
-    std::variant<std::monostate, logtail::ebpf::SecurityFileFilter, logtail::ebpf::SecurityNetworkFilter> thisFilter;
+    std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> thisFilter;
     switch (probeType) {
         case SecurityProbeType::FILE: {
-            logtail::ebpf::SecurityFileFilter thisFileFilter;
+            SecurityFileFilter thisFileFilter;
             InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
-            thisFilter.emplace<logtail::ebpf::SecurityFileFilter>(std::move(thisFileFilter));
+            thisFilter.emplace<SecurityFileFilter>(std::move(thisFileFilter));
             break;
         }
         case SecurityProbeType::NETWORK: {
-            logtail::ebpf::SecurityNetworkFilter thisNetworkFilter;
+            SecurityNetworkFilter thisNetworkFilter;
             InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
-            thisFilter.emplace<logtail::ebpf::SecurityNetworkFilter>(std::move(thisNetworkFilter));
+            thisFilter.emplace<SecurityNetworkFilter>(std::move(thisNetworkFilter));
             break;
         }
         case SecurityProbeType::PROCESS: {

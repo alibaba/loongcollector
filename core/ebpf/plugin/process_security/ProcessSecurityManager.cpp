@@ -155,7 +155,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
 }
 
 int ProcessSecurityManager::Init(
-    [[maybe_unused]] const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) {
+    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // just set timer ...
     // register base manager ...
     mFlag = true;
