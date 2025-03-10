@@ -92,7 +92,7 @@ ProcessorRunner::GetInstance()->PushQueue(queueKey, inputIdx, std::move(group));
    b. 在`PluginRegistry`类的`LoadStaticPlugins()`函数中新增如下行：
 
     ```c++
-    RegisterInputCreator(new StaticInputCreator<Inputxxx>());
+    RegisterInputCreator(new StaticInputCreator<Inputxxx>(), false);
     ```
 
    c. 在`PipelineManager`类的构造函数中注册该插件的管理类

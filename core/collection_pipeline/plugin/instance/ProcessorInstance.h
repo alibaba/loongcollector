@@ -57,6 +57,7 @@ private:
     friend class ProcessorDesensitizeNativeUnittest;
     friend class ProcessorSplitLogStringNativeUnittest;
     friend class InputFileUnittest;
+    friend class InputStaticFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
     friend class PipelineUpdateUnittest;
