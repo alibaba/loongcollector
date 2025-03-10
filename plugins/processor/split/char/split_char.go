@@ -105,7 +105,7 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 							i++
 							newValue = append(newValue, value[i])
 						} else {
-							logger.Warning(p.context.GetRuntimeContext(), "SPLIT_LOG_ALARM", "no continue quote", p.quoteChar, "log", util.CutString(value, 1024))
+							logger.Warning(p.context.GetRuntimeContext(), util.SplitLogAlarm, "no continue quote", p.quoteChar, "log", util.CutString(value, 1024))
 							return false
 						}
 					} else {
@@ -150,7 +150,7 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 		keyIndex++
 	}
 	if keyIndex < len(p.SplitKeys) && p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), "SPLIT_LOG_ALARM", "split keys not match, split len", keyIndex, "log", util.CutString(value, 1024))
+		logger.Warning(p.context.GetRuntimeContext(), util.SplitLogAlarm, "split keys not match, split len", keyIndex, "log", util.CutString(value, 1024))
 	}
 	return true
 }
@@ -169,7 +169,7 @@ func (p *ProcessorSplitChar) ProcessLogs(logArray []*protocol.Log) []*protocol.L
 			}
 		}
 		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "SPLIT_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), util.SplitFindAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 

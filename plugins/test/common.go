@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/checker"
@@ -43,7 +44,7 @@ func GetTestConfig(configName string) string {
 	fileName := "./" + configName + ".json"
 	byteStr, err := os.ReadFile(filepath.Clean(fileName))
 	if err != nil {
-		logger.Warning(context.Background(), "read", fileName, "error", err)
+		logger.Warning(context.Background(), util.OpenLogFileFailAlarm, "read", fileName, "error", err)
 	}
 	return string(byteStr)
 }

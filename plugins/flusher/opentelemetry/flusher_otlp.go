@@ -36,6 +36,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type Version string
@@ -64,7 +65,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 	logger.Info(f.context.GetRuntimeContext(), "otlp flusher init", "initializing")
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlp converter fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init otlp converter fail, error", err)
 		return err
 	}
 	f.converter = convert
@@ -72,7 +73,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 	if f.Logs != nil {
 		grpcConn, err := buildGrpcClientConn(f.Logs)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlp logs gRPC conn fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init otlp logs gRPC conn fail, error", err)
 		} else {
 			logger.Info(f.context.GetRuntimeContext(), "otlp logs flusher endpoint", f.Logs.Endpoint)
 			logMeta := metadata.New(f.Logs.Headers)
@@ -82,7 +83,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 	if f.Metrics != nil {
 		grpcConn, err := buildGrpcClientConn(f.Metrics)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlp metrics gRPC conn fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init otlp metrics gRPC conn fail, error", err)
 		} else {
 			logger.Info(f.context.GetRuntimeContext(), "otlp metrics flusher endpoint", f.Metrics.Endpoint)
 			metricMeta := metadata.New(f.Metrics.Headers)
@@ -93,7 +94,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 	if f.Traces != nil {
 		grpcConn, err := buildGrpcClientConn(f.Traces)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlp traces gRPC conn fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init otlp traces gRPC conn fail, error", err)
 		} else {
 			logger.Info(f.context.GetRuntimeContext(), "otlp traces flusher endpoint", f.Traces.Endpoint)
 			traceMeta := metadata.New(f.Traces.Headers)
@@ -103,7 +104,7 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 	}
 
 	if f.logClient == nil && f.metricClient == nil && f.traceClient == nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlp flusher fail, error", "invalid gRPC configs")
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init otlp flusher fail, error", "invalid gRPC configs")
 		return fmt.Errorf("invalid_grpc_configs")
 	}
 
@@ -150,7 +151,7 @@ func (f *FlusherOTLP) IsReady(projectName string, logstoreName string, logstoreK
 		(f.traceClient == nil || f.traceClient.isReady())
 
 	if !ready {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_READY_ALARM", "otlp flusher is not ready, all gRPC conn is nil")
+		logger.Warning(f.context.GetRuntimeContext(), util.FlusherReadyAlarm, "otlp flusher is not ready, all gRPC conn is nil")
 	}
 	return ready
 }
@@ -162,21 +163,21 @@ func (f *FlusherOTLP) Stop() error {
 	if f.logClient != nil && f.logClient.grpcConn != nil {
 		err = f.logClient.grpcConn.Close()
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_STOP_ALARM", "stop otlp logs flusher fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherStopAlarm, "stop otlp logs flusher fail, error", err)
 		}
 	}
 
 	if f.metricClient != nil && f.metricClient.grpcConn != nil {
 		err = f.metricClient.grpcConn.Close()
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_STOP_ALARM", "stop otlp metrics flusher fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherStopAlarm, "stop otlp metrics flusher fail, error", err)
 		}
 	}
 
 	if f.traceClient != nil && f.traceClient.grpcConn != nil {
 		err = f.traceClient.grpcConn.Close()
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_STOP_ALARM", "stop otlp traces flusher fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherStopAlarm, "stop otlp traces flusher fail, error", err)
 		}
 	}
 
@@ -191,7 +192,7 @@ func (f *FlusherOTLP) convertPipelinesGroupeEventsToRequest(pipelinegroupeEventS
 	for _, ps := range pipelinegroupeEventSlice {
 		resourceLog, resourceMetric, resourceTrace, err := converter.ConvertPipelineEventToOtlpEvent(f.converter, ps)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init gRPC client options fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init gRPC client options fail, error", err)
 		}
 		if resourceLog.ScopeLogs().Len() > 0 {
 			newLog := logs.ResourceLogs().AppendEmpty()
@@ -245,7 +246,7 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			}
 
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "send data to otlp server fail, error", err)
+				logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "send data to otlp server fail, error", err)
 			}
 			errChan <- err
 		}()
@@ -263,7 +264,7 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			}
 
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "send metric data to otlp server fail, error", err)
+				logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "send metric data to otlp server fail, error", err)
 			}
 			errChan <- err
 		}()
@@ -281,7 +282,7 @@ func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricot
 			}
 
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "send trace data to otlp server fail, error", err)
+				logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "send trace data to otlp server fail, error", err)
 			}
 			errChan <- err
 		}()

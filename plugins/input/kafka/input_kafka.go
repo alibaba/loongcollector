@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -122,7 +123,7 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 	case "newest":
 		config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	default:
-		logger.Warningf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Kafka consumer invalid offset '%s', using 'oldest'",
+		logger.Warningf(k.context.GetRuntimeContext(), util.InputInitAlarm, "Kafka consumer invalid offset '%s', using 'oldest'",
 			k.Offset)
 		config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	}
@@ -135,20 +136,20 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 	case "range":
 		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.BalanceStrategyRange}
 	default:
-		logger.Warningf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Unrecognized consumer group partition assignor '%s', using 'oldest'",
+		logger.Warningf(k.context.GetRuntimeContext(), util.InputInitAlarm, "Unrecognized consumer group partition assignor '%s', using 'oldest'",
 			k.Assignor)
 		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.BalanceStrategyRange}
 	}
 
 	newClient, err := sarama.NewClient(k.Brokers, config)
 	if err != nil {
-		logger.Warningf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Kafka consumer invalid offset '%s', using 'oldest'",
+		logger.Warningf(k.context.GetRuntimeContext(), util.InputInitAlarm, "Kafka consumer invalid offset '%s', using 'oldest'",
 			k.Offset)
 		return 0, err
 	}
 	consumerGroup, err := sarama.NewConsumerGroupFromClient(k.ConsumerGroup, newClient)
 	if err != nil {
-		logger.Warningf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM",
+		logger.Warningf(k.context.GetRuntimeContext(), util.InputInitAlarm,
 			"failed to creating consumer group client, [group]%s", k.ConsumerGroup)
 		return 0, err
 	}
@@ -163,7 +164,7 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 			if err := k.consumerGroupClient.Consume(cancelCtx, k.Topics, k); err != nil {
 				// Keep retrying Consume when error occurs.
 				// This loop will only exit when the context is canceled (i.e., when loongcollector process is stopping)
-				logger.Error(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Error from kafka consumer", err)
+				logger.Error(k.context.GetRuntimeContext(), util.InputInitAlarm, "Error from kafka consumer", err)
 
 				// Add a retry delay to avoid busy loop.
 				select {
@@ -259,7 +260,7 @@ func (k *InputKafka) onMessage(msg *sarama.ConsumerMessage) {
 		case v2:
 			data, err := k.decoder.DecodeV2(msg.Value, nil)
 			if err != nil {
-				logger.Warning(k.context.GetRuntimeContext(), "DECODE_MESSAGE_FAIL_ALARM", "decode message failed", err)
+				logger.Warning(k.context.GetRuntimeContext(), util.InputCollectAlarm, "decode message failed", err)
 				return
 			}
 			k.collectorV2.CollectList(data...)
@@ -276,7 +277,7 @@ func (k *InputKafka) Stop() error {
 	err := k.consumerGroupClient.Close()
 	if err != nil {
 		e := fmt.Errorf("[inputs.kafka_consumer] Error closing consumer: %v", err)
-		logger.Errorf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "%v", e)
+		logger.Errorf(k.context.GetRuntimeContext(), util.InputInitAlarm, "%v", e)
 		return e
 	}
 	return nil

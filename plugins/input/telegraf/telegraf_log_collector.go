@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LogCollector struct {
@@ -32,7 +33,7 @@ type LogCollector struct {
 const (
 	runninglogPath    = "telegraf.log"
 	startLogPath      = "start_telegraf.log"
-	TelegrafAlarmType = "TELEGRAF_ALARM"
+	TelegrafAlarmType = util.TelegrafAlarm
 )
 
 // NewLogCollector create a log collector to read telegraf log.

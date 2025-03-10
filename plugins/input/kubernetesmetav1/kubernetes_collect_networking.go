@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"k8s.io/apimachinery/pkg/labels"
 	networking "k8s.io/client-go/listers/networking/v1beta1"
@@ -29,7 +30,7 @@ import (
 func (in *InputKubernetesMeta) collectIngresses(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	ingresses, err := lister.(networking.IngressLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Error(in.context.GetRuntimeContext(), util.K8sMetaAlarm, "err", err)
 		return
 	}
 	if in.Ingress {

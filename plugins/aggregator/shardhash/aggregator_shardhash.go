@@ -174,7 +174,7 @@ func (s *AggregatorShardHash) Add(log *protocol.Log, ctx map[string]interface{})
 			}
 		}
 		if !found && s.ErrIfKeyNotFound {
-			logger.Warning(s.context.GetRuntimeContext(), "AGG_SHARDHASH_NOT_FOUND_KEY", key)
+			logger.Warning(s.context.GetRuntimeContext(), util.AggregatorAddAlarm, "shardbash found key error, key", key)
 		}
 
 		isFirstKey := 0 == idx

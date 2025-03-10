@@ -163,7 +163,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 
 	maxFileNo := 0
 	if err := overWriteSymLink(filepath.Join(dirPath, strconv.Itoa(maxFileNo)+logSuffix), filePath); err != nil {
-		logger.Error(context.Background(), "overwrite symbol link error, from", maxFileNo, "to", filePath, "error", err)
+		logger.Error(context.Background(), util.DockerCenterAlarm, "overwrite symbol link error, from", maxFileNo, "to", filePath, "error", err)
 	} else {
 		logger.Info(context.Background(), "overwrite symbol link success, from", maxFileNo, "to", filePath)
 	}
@@ -196,7 +196,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 				logger.Info(context.Background(), "overwrite symbol link success, from", fileNo, "to", filePath, "max", maxFileNo)
 				maxFileNo = fileNo
 			} else {
-				logger.Error(context.Background(), "overwrite symbol link error, from", fileNo, "to", filePath, "error", err, "max", maxFileNo)
+				logger.Error(context.Background(), util.DockerCenterAlarm, "overwrite symbol link error, from", fileNo, "to", filePath, "error", err, "max", maxFileNo)
 			}
 		}
 	}

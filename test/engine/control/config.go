@@ -26,6 +26,7 @@ import (
 
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
@@ -111,12 +112,12 @@ func RemoveHTTPConfig(ctx context.Context, configName string) (context.Context, 
 		endpointPrefix := "http://" + address
 		resp, err := http.Get(endpointPrefix + "/holdon")
 		if err != nil {
-			logger.Error(context.Background(), "HOLDON_LOGTAILPLUGIN_ALARM", "err", err)
+			logger.Error(context.Background(), util.HoldonLogtailPluginAlarm, "err", err)
 			return ctx, err
 		}
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logger.Error(context.Background(), "HOLDON_LOGTAILPLUGIN_ALARM", "statusCode", resp.StatusCode)
+			logger.Error(context.Background(), util.HoldonLogtailPluginAlarm, "statusCode", resp.StatusCode)
 			return ctx, fmt.Errorf("failed to hold on logtail plugin, the response code is %d", resp.StatusCode)
 		}
 	} else {

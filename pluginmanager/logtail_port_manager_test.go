@@ -28,6 +28,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 func TestLogtailPortManager(t *testing.T) {
@@ -79,7 +80,7 @@ func (s *logtailPortManagerTestSuite) TestExportLogtailLitsenPorts() {
 		err := server.ListenAndServe()
 		defer server.Close()
 		if err != nil && err != http.ErrServerClosed {
-			logger.Error(context.Background(), "export logtail's ports failed", err.Error())
+			logger.Error(context.Background(), util.PortManagerAlarm, "export logtail's ports failed", err.Error())
 			return
 		}
 	}()

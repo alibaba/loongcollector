@@ -153,7 +153,7 @@ func (c *ContainerDiscoverManager) Clean() {
 
 func (c *ContainerDiscoverManager) LogAlarm(err error, msg string) {
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), util.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -167,7 +167,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 		var err error
 		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
 		if err != nil {
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+			logger.Errorf(context.Background(), util.DockerCenterAlarm, "[CRIRuntime] creare cri-runtime client error: %v", err)
 			criRuntimeWrapper = nil
 		} else {
 			logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
@@ -179,7 +179,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 			DefaultLogtailMountPath = ""
 		}
 	} else {
-		logger.Warning(context.Background(), "check docker mount path error", err.Error())
+		logger.Warning(context.Background(), util.DockerCenterAlarm, "check docker mount path error", err.Error())
 	}
 	c.enableCRIDiscover = criRuntimeWrapper != nil
 	c.enableDockerDiscover = dockerCenterInstance.initClient() == nil
@@ -253,13 +253,13 @@ func (c *ContainerDiscoverManager) Init() bool {
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
+			logger.Errorf(context.Background(), util.DockerCenterAlarm, "fetch docker containers error, close docker discover, will retry")
 		}
 	}
 	if c.enableCRIDiscover {
 		if err = c.fetchCRI(); err != nil {
 			c.enableCRIDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
+			logger.Errorf(context.Background(), util.DockerCenterAlarm, "fetch cri containers error, close cri discover, will retry")
 		}
 	}
 	if c.enableStaticDiscover {
