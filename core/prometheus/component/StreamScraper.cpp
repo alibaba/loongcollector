@@ -17,6 +17,7 @@
 #include "runner/ProcessorRunner.h"
 
 DEFINE_FLAG_INT64(prom_stream_bytes_size, "stream bytes size", 1024 * 1024);
+DEFINE_FLAG_INT64(prom_max_sample_length, "max sample length", 8 * 1024);
 
 DEFINE_FLAG_BOOL(enable_prom_stream_scrape, "enable prom stream scrape", true);
 
@@ -48,8 +49,8 @@ size_t StreamScraper::MetricWriteCallback(char* buffer, size_t size, size_t nmem
 
     if (begin < sizes) {
         body->mCache.append(buffer + begin, sizes - begin);
-        // limit the last line cache size to 8K bytes
-        if (body->mCache.size() > 8192) {
+        // limit the last line cache size to prom_max_sample_length bytes
+        if (body->mCache.size() > (size_t)INT64_FLAG(prom_max_sample_length)) {
             LOG_WARNING(sLogger, ("stream scraper", "cache is too large, drop it."));
             body->mCache.clear();
         }
