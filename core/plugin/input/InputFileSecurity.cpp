@@ -27,11 +27,11 @@ const std::string InputFileSecurity::sName = "input_file_security";
 
 bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY)) {
+    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -42,6 +42,8 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
@@ -52,17 +54,22 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
 }
 
 bool InputFileSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, nami::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::FILE_SECURITY,
+                                                         mContext,
+                                                         &mSecurityOptions,
+                                                         mPluginMgr);
 }
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::FILE_SECURITY);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
     // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
-    ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), nami::PluginType::FILE_SECURITY);
+    ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
     return true;
 }
 
