@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "Monitor.h"
+
+#include "MetricRecord.h"
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
@@ -177,7 +179,9 @@ void LogtailMonitor::Monitor() {
                 lastCheckHardLimitTime = monitorTime;
 
                 GetMemStat();
+                LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
                 CalCpuStat(curCpuStat, mCpuStat);
+                LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
                 if (CheckHardMemLimit()) {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",
@@ -247,10 +251,6 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
         sleep(10);
         _exit(1);
     }
-    // CPU usage of Logtail process.
-    LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
-    // Memory usage of Logtail process.
-    LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
 
     return mIsThreadRunning;
 }
@@ -633,6 +633,37 @@ void LoongCollectorMonitor::Init() {
 void LoongCollectorMonitor::Stop() {
     SelfMonitorServer::GetInstance()->Stop();
     LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
+}
+
+bool LoongCollectorMonitor::GetAgentMetric(SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    event = mGlobalMetrics.mAgentMetric;
+    return true;
+}
+
+void LoongCollectorMonitor::SetAgentMetric(const SelfMonitorMetricEvent& event) {
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    mGlobalMetrics.mAgentMetric = event;
+}
+
+bool LoongCollectorMonitor::GetRunnerMetric(const std::string& runnerName, SelfMonitorMetricEvent& event) {
+    if (runnerName.empty()) {
+        return false;
+    }
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    if (mGlobalMetrics.mRunnerMetrics.find(runnerName) != mGlobalMetrics.mRunnerMetrics.end()) {
+        event = mGlobalMetrics.mRunnerMetrics[runnerName];
+        return true;
+    }
+    return false;
+}
+
+void LoongCollectorMonitor::SetRunnerMetric(const std::string& runnerName, const SelfMonitorMetricEvent& event) {
+    if (runnerName.empty()) {
+        return;
+    }
+    lock_guard<mutex> lock(mGlobalMetricsMux);
+    mGlobalMetrics.mRunnerMetrics[runnerName] = event;
 }
 
 } // namespace logtail

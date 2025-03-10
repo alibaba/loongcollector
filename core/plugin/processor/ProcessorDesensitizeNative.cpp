@@ -159,7 +159,7 @@ void ProcessorDesensitizeNative::Process(PipelineEventGroup& logGroup) {
 
 void ProcessorDesensitizeNative::ProcessEvent(PipelineEventPtr& e) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return;
     }
 
@@ -186,12 +186,12 @@ void ProcessorDesensitizeNative::ProcessEvent(PipelineEventPtr& e) {
         processed = true;
     }
     if (processed) {
-        mOutSuccessfulEventsTotal->Add(1);
+        ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     } else {
         if (hasKey) {
-            mOutKeyNotFoundEventsTotal->Add(1);
+            ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         } else {
-            mOutFailedEventsTotal->Add(1);
+            ADD_COUNTER(mOutFailedEventsTotal, 1);
         }
     }
 }

@@ -53,46 +53,46 @@ if __name__ == '__main__':
 
     with open(args.path, 'r') as file:
         coverage = json.load(file)
-    not_satified = {}
-    not_satified_count = 0
-    satified_count = 0
+    not_satisfied = {}
+    not_satisfied_count = 0
+    satisfied_count = 0
 
     for file in coverage['files']:
         if 'core/' + file['file'] in changed_lines:
             file_name = 'core/' + file['file']
-            cur_satified = []
-            cur_not_satified = []
+            cur_satisfied = []
+            cur_not_satisfied = []
             i = 0
             j = 0
             while i < len(file['lines']) and j < len(changed_lines[file_name]):
                 if file['lines'][i]['line_number'] == changed_lines[file_name][j]:
                     if file['lines'][i]['count'] == 0:
-                        cur_not_satified.append(file['lines'][i]['line_number'])
+                        cur_not_satisfied.append(file['lines'][i]['line_number'])
                     else:
-                        cur_satified.append(file['lines'][i]['line_number'])
+                        cur_satisfied.append(file['lines'][i]['line_number'])
                     i += 1
                     j += 1
                 elif file['lines'][i]['line_number'] < changed_lines[file_name][j]:
                     i += 1
                 else:
                     j += 1
-            if len(cur_satified) > 0 or len(cur_not_satified) > 0:
+            if len(cur_satisfied) > 0 or len(cur_not_satisfied) > 0:
                 print('file: ', file_name)
-                if len(cur_satified) > 0:
-                    print('covered lines: ', cur_satified)
-                    satified_count += len(cur_satified)
-                if len(cur_not_satified) > 0:
-                    print(f'{ERROR_COLOR}not covered lines:{RESET_COLOR} ', cur_not_satified)
-                    not_satified_count += len(cur_not_satified)
+                if len(cur_satisfied) > 0:
+                    print('covered lines: ', cur_satisfied)
+                    satisfied_count += len(cur_satisfied)
+                if len(cur_not_satisfied) > 0:
+                    print(f'{ERROR_COLOR}not covered lines:{RESET_COLOR} ', cur_not_satisfied)
+                    not_satisfied_count += len(cur_not_satisfied)
                 print('')
-            if len(cur_not_satified) > 0:
-                not_satified[file_name] = cur_not_satified
+            if len(cur_not_satisfied) > 0:
+                not_satisfied[file_name] = cur_not_satisfied
     
-    if not_satified_count + satified_count == 0:
+    if not_satisfied_count + satisfied_count == 0:
         print('No line to cover', flush=True)
         sys.exit(0)
 
-    coverage_rate = ((satified_count) / (not_satified_count + satified_count) ) * 100
+    coverage_rate = ((satisfied_count) / (not_satisfied_count + satisfied_count) ) * 100
     print('='*20)
     if coverage_rate < 60:
         print(f'{ERROR_COLOR}Diff coverage rate is less than 60%: {coverage_rate:.1f}%{RESET_COLOR}', flush=True)

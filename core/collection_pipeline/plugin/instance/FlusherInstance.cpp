@@ -40,13 +40,13 @@ bool FlusherInstance::Init(const Json::Value& config,
 }
 
 bool FlusherInstance::Send(PipelineEventGroup&& g) {
-    mInGroupsTotal->Add(1);
-    mInEventsTotal->Add(g.GetEvents().size());
-    mInSizeBytes->Add(g.DataSize());
+    ADD_COUNTER(mInGroupsTotal, 1);
+    ADD_COUNTER(mInEventsTotal, g.GetEvents().size());
+    ADD_COUNTER(mInSizeBytes, g.DataSize());
 
     auto before = chrono::system_clock::now();
     auto res = mPlugin->Send(std::move(g));
-    mTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mTotalPackageTimeMs, chrono::system_clock::now() - before);
     return res;
 }
 

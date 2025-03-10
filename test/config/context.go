@@ -24,4 +24,5 @@ const (
 	QueryKey                    ContextKey = "query"
 	AgentPIDKey                 ContextKey = "agentPID"
 	EndpointIPKey               ContextKey = "endpointIP"
+	RotateIntervalKey           ContextKey = "rotateInterval"
 )

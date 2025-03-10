@@ -45,7 +45,6 @@ public:
             it.second->Stop(true);
         }
         mPipelineNameEntityMap.clear();
-        mPluginCntMap.clear();
     }
 
 private:

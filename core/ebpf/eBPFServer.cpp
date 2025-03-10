@@ -359,7 +359,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     }
 
     if (ret) {
-        mStartPluginTotal->Add(1);
+        ADD_COUNTER(mStartPluginTotal, 1);
     }
 
     return ret;

@@ -20,6 +20,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "curl/curl.h"
@@ -45,7 +46,8 @@ CURL* CreateCurlHandler(const std::string& method,
                         bool replaceHostWithIp = true,
                         const std::string& intf = "",
                         bool followRedirects = false,
-                        std::optional<CurlTLS> tls = std::nullopt);
+                        const std::optional<CurlTLS>& tls = std::nullopt,
+                        const std::optional<CurlSocket>& socket = std::nullopt);
 
 bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response);
 

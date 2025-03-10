@@ -119,18 +119,18 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                               StringView& timeStrCache,
                                               const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
-        mOutKeyNotFoundEventsTotal->Add(1);
+        ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         return true;
     }
     bool sourceKeyOverwritten = false;
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     if (buffer.size() == 0) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     int64_t logTime_in_micro = 0;
@@ -152,10 +152,11 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
 
         GetContext().GetAlarm().SendAlarm(PARSE_TIME_FAIL_ALARM,
                                           bufOut.to_string() + " $ " + ToString(logTime),
+                                          GetContext().GetRegion(),
                                           GetContext().GetProjectName(),
-                                          GetContext().GetLogstoreName(),
-                                          GetContext().GetRegion());
-        mOutFailedEventsTotal->Add(1);
+                                          GetContext().GetConfigName(),
+                                          GetContext().GetLogstoreName());
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         sourceEvent.DelContent(mSourceKey);
         if (mCommonParserOptions.ShouldAddSourceContent(false)) {
             AddLog(mCommonParserOptions.mRenamedSourceKey, buffer, sourceEvent, false);
@@ -164,7 +165,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
             AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
         }
         if (mCommonParserOptions.ShouldEraseEvent(false, sourceEvent, metadata)) {
-            mDiscardedEventsTotal->Add(1);
+            ADD_COUNTER(mDiscardedEventsTotal, 1);
             return false;
         }
         return true;
@@ -187,12 +188,13 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
             GetContext().GetAlarm().SendAlarm(OUTDATED_LOG_ALARM,
                                               std::string("logTime: ") + ToString(logTime)
                                                   + ", log:" + bufOut.to_string(),
+                                              GetContext().GetRegion(),
                                               GetContext().GetProjectName(),
-                                              GetContext().GetLogstoreName(),
-                                              GetContext().GetRegion());
+                                              GetContext().GetConfigName(),
+                                              GetContext().GetLogstoreName());
         }
-        mHistoryFailureTotal->Add(1);
-        mDiscardedEventsTotal->Add(1);
+        ADD_COUNTER(mHistoryFailureTotal, 1);
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
         return false;
     }
 
@@ -234,7 +236,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
     if (mCommonParserOptions.ShouldAddSourceContent(true)) {
         AddLog(mCommonParserOptions.mRenamedSourceKey, buffer, sourceEvent, false);
     }
-    mOutSuccessfulEventsTotal->Add(1);
+    ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     return true;
 }
 

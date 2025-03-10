@@ -17,7 +17,6 @@
 #include "PrometheusInputRunner.h"
 
 #include <chrono>
-
 #include <memory>
 #include <string>
 
@@ -25,14 +24,12 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
-#include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
@@ -50,8 +47,6 @@ PrometheusInputRunner::PrometheusInputRunner()
       mPodName(STRING_FLAG(_pod_name_)),
       mEventPool(true),
       mUnRegisterMs(0) {
-    mTimer = std::make_shared<Timer>();
-
     // self monitor
     MetricLabels labels;
     labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS);
@@ -84,7 +79,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->InitSelfMonitor(defaultLabels);
 
     targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
-    targetSubscriber->SetComponent(mTimer, &mEventPool);
+    targetSubscriber->SetComponent(&mEventPool);
     auto currSystemTime = chrono::system_clock::now();
     auto randSleepMilliSec
         = GetRandSleepMilliSec(targetSubscriber->GetId(),
@@ -102,7 +97,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->ScheduleNext();
     {
         ReadLock lock(mSubscriberMapRWLock);
-        mPromJobNum->Set(mTargetSubscriberSchedulerMap.size());
+        SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
     }
     // 3. add project name to mJobNameToProjectNameMap for self monitor
     {
@@ -117,7 +112,7 @@ void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
         if (mTargetSubscriberSchedulerMap.count(jobName)) {
             mTargetSubscriberSchedulerMap[jobName]->Cancel();
             mTargetSubscriberSchedulerMap.erase(jobName);
-            mPromJobNum->Set(mTargetSubscriberSchedulerMap.size());
+            SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
         }
     }
     {
@@ -138,7 +133,7 @@ void PrometheusInputRunner::Init() {
     mIsStarted = true;
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Init();
+    Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
 
@@ -153,7 +148,7 @@ void PrometheusInputRunner::Init() {
                 ++retry;
                 auto httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
                 if (httpResponse.GetStatusCode() != 200) {
-                    mPromRegisterRetryTotal->Add(1);
+                    ADD_COUNTER(mPromRegisterRetryTotal, 1);
                     if (retry % 10 == 0) {
                         LOG_INFO(sLogger,
                                  ("register failed, retried", retry)("statusCode", httpResponse.GetStatusCode()));
@@ -175,11 +170,13 @@ void PrometheusInputRunner::Init() {
                                 mUnRegisterMs = 0;
                             } else {
                                 mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                // adjust unRegisterMs to scrape targets for zero-cost
+                                mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
                             }
                         }
                     }
-                    mPromRegisterState->Set(1);
+                    SET_GAUGE(mPromRegisterState, 1);
                     LOG_INFO(sLogger, ("Register Success", mPodName));
                     // subscribe immediately
                     SubscribeOnce();
@@ -205,7 +202,6 @@ void PrometheusInputRunner::Stop() {
     }
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif
@@ -228,7 +224,7 @@ void PrometheusInputRunner::Stop() {
                     LOG_ERROR(sLogger, ("unregister failed, statusCode", httpResponse.GetStatusCode()));
                 } else {
                     LOG_INFO(sLogger, ("Unregister Success", mPodName));
-                    mPromRegisterState->Set(0);
+                    SET_GAUGE(mPromRegisterState, 0);
                     break;
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -241,6 +237,10 @@ void PrometheusInputRunner::Stop() {
 bool PrometheusInputRunner::HasRegisteredPlugins() const {
     ReadLock lock(mSubscriberMapRWLock);
     return !mTargetSubscriberSchedulerMap.empty();
+}
+
+void PrometheusInputRunner::EventGC() {
+    mEventPool.CheckGC();
 }
 
 HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
@@ -290,7 +290,4 @@ string PrometheusInputRunner::GetAllProjects() {
     return result;
 }
 
-void PrometheusInputRunner::CheckGC() {
-    mEventPool.CheckGC();
-}
 }; // namespace logtail

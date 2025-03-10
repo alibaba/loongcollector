@@ -38,7 +38,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/jcmturner/dnsutils](https://pkg.go.dev/github.com/jcmturner/dnsutils?tab=licenses)
 - [github.com/jcmturner/gokrb5](https://pkg.go.dev/github.com/jcmturner/gokrb5?tab=licenses)
 - [github.com/jcmturner/rpc](https://pkg.go.dev/github.com/jcmturner/rpc?tab=licenses)
-- [github.com/matttproud/golang\_protobuf\_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
+- [github.com/matttproud/golang_protobuf_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
 - [github.com/moby/locker](https://pkg.go.dev/github.com/moby/locker?tab=licenses)
 - [github.com/moby/spdystream](https://pkg.go.dev/github.com/moby/spdystream?tab=licenses)
 - [github.com/moby/sys/mountinfo](https://pkg.go.dev/github.com/moby/sys/mountinfo?tab=licenses)
@@ -52,8 +52,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/opencontainers/runtime-spec](https://pkg.go.dev/github.com/opencontainers/runtime-spec?tab=licenses)
 - [github.com/opencontainers/selinux](https://pkg.go.dev/github.com/opencontainers/selinux?tab=licenses)
 - [github.com/pingcap/log](https://pkg.go.dev/github.com/pingcap/log?tab=licenses)
-- [github.com/prometheus/client\_golang](https://pkg.go.dev/github.com/prometheus/client_golang?tab=licenses)
-- [github.com/prometheus/client\_model](https://pkg.go.dev/github.com/prometheus/client_model?tab=licenses)
+- [github.com/prometheus/client_golang](https://pkg.go.dev/github.com/prometheus/client_golang?tab=licenses)
+- [github.com/prometheus/client_model](https://pkg.go.dev/github.com/prometheus/client_model?tab=licenses)
 - [github.com/prometheus/common](https://pkg.go.dev/github.com/prometheus/common?tab=licenses)
 - [github.com/prometheus/procfs](https://pkg.go.dev/github.com/prometheus/procfs?tab=licenses)
 - [github.com/prometheus/prometheus](https://pkg.go.dev/github.com/prometheus/prometheus?tab=licenses)
@@ -238,6 +238,11 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
 - [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
+- [github.com/gabriel-vasile/mimetype](https://pkg.go.dev/github.com/gabriel-vasile/mimetype?tab=licenses)
+- [github.com/go-playground/locales](https://pkg.go.dev/github.com/go-playground/locales?tab=licenses)
+- [github.com/go-playground/universal-translator](https://pkg.go.dev/github.com/go-playground/universal-translator?tab=licenses)
+- [github.com/go-playground/validator](https://pkg.go.dev/github.com/go-playground/validator?tab=licenses)
+- [github.com/leodido/go-urn](https://pkg.go.dev/github.com/leodido/go-urn?tab=licenses)
 
 ## ISC licenses
 

@@ -17,7 +17,7 @@
 set -ue
 set -o pipefail
 
-# intialize variables
+# initialize variables
 OUT_DIR=${1:-output}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 BIN="${ROOTDIR}/${OUT_DIR}/loongcollector"

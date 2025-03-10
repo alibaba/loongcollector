@@ -167,7 +167,7 @@ func Test_Flusher_Export_Logs(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsLogSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 				r := <-service.ch
 				r2, _, _ := f.convertPipelinesGroupeEventsToRequest(PipelineGroupEventsSlice)
@@ -212,7 +212,7 @@ func Test_Flusher_Export_Metrics(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsMetricSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				r := <-service.ch
@@ -255,7 +255,7 @@ func Test_Flusher_Export_Traces(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsTraceSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				r := <-service.ch
@@ -312,7 +312,7 @@ func Test_Flusher_Export_All(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush traces", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsTraceSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				r := <-traceService.ch
@@ -338,7 +338,7 @@ func Test_Flusher_Export_All(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush metrics", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsMetricSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				r := <-metricService.ch
@@ -395,7 +395,7 @@ func Test_Flusher_Export_All_Disable_Trace(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush traces", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsTraceSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				time.Sleep(1 * time.Second)
@@ -404,7 +404,7 @@ func Test_Flusher_Export_All_Disable_Trace(t *testing.T) {
 
 			convey.Convey("When FlusherOTLP flush metrics", func() {
 				PipelineGroupEventsSlice := makeTestPipelineGroupEventsMetricSlice()
-				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineConext())
+				err := f.Export(PipelineGroupEventsSlice, helper.NewNoopPipelineContext())
 				convey.So(err, convey.ShouldBeNil)
 
 				r := <-metricService.ch

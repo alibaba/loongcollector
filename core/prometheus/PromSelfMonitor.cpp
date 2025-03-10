@@ -22,7 +22,7 @@ void PromSelfMonitorUnsafe::AddCounter(const std::string& metricName, uint64_t s
     if (!mMetricsCounterMap.count(metricName) || !mMetricsCounterMap[metricName].count(status)) {
         mMetricsCounterMap[metricName][status] = GetOrCreateReentrantMetricsRecordRef(status)->GetCounter(metricName);
     }
-    mMetricsCounterMap[metricName][status]->Add(val);
+    ADD_COUNTER(mMetricsCounterMap[metricName][status], val);
 }
 
 void PromSelfMonitorUnsafe::SetIntGauge(const std::string& metricName, uint64_t statusCode, uint64_t value) {
@@ -30,7 +30,7 @@ void PromSelfMonitorUnsafe::SetIntGauge(const std::string& metricName, uint64_t 
     if (!mMetricsIntGaugeMap.count(metricName) || !mMetricsIntGaugeMap[metricName].count(status)) {
         mMetricsIntGaugeMap[metricName][status] = GetOrCreateReentrantMetricsRecordRef(status)->GetIntGauge(metricName);
     }
-    mMetricsIntGaugeMap[metricName][status]->Set(value);
+    SET_GAUGE(mMetricsIntGaugeMap[metricName][status], value);
 }
 
 ReentrantMetricsRecordRef PromSelfMonitorUnsafe::GetOrCreateReentrantMetricsRecordRef(const std::string& status) {

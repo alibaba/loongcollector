@@ -48,17 +48,17 @@ void ProcessorInstance::Process(vector<PipelineEventGroup>& eventGroupList) {
         return;
     }
     for (const auto& eventGroup : eventGroupList) {
-        mInEventsTotal->Add(eventGroup.GetEvents().size());
-        mInSizeBytes->Add(eventGroup.DataSize());
+        ADD_COUNTER(mInEventsTotal, eventGroup.GetEvents().size());
+        ADD_COUNTER(mInSizeBytes, eventGroup.DataSize());
     }
 
     auto before = chrono::system_clock::now();
     mPlugin->Process(eventGroupList);
-    mTotalProcessTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mTotalProcessTimeMs, chrono::system_clock::now() - before);
 
     for (const auto& eventGroup : eventGroupList) {
-        mOutEventsTotal->Add(eventGroup.GetEvents().size());
-        mOutSizeBytes->Add(eventGroup.DataSize());
+        ADD_COUNTER(mOutEventsTotal, eventGroup.GetEvents().size());
+        ADD_COUNTER(mOutSizeBytes, eventGroup.DataSize());
     }
 }
 

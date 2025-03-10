@@ -16,12 +16,15 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "collection_pipeline/CollectionPipeline.h"
-#include "common/Lock.h"
 #include "config/ConfigDiff.h"
 #include "runner/InputRunner.h"
 
@@ -37,33 +40,35 @@ public:
         return &instance;
     }
 
-    void UpdatePipelines(CollectionConfigDiff& diff);
+    void RegisterInputRunner(InputRunner* runner) { mInputRunners.push_back(runner); }
+    void InputRunnerEventGC() {
+        for (auto runner : mInputRunners) {
+            runner->EventGC();
+        }
+    }
+
     const std::shared_ptr<CollectionPipeline>& FindConfigByName(const std::string& configName) const;
+    void UpdatePipelines(CollectionConfigDiff& diff);
+    void StopAllPipelines();
+    void ClearAllPipelines();
     std::vector<std::string> GetAllConfigNames() const;
-    std::string GetPluginStatistics() const;
+
     // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;
     }
-    // 过渡使用
-    void StopAllPipelines();
 
 private:
-    CollectionPipelineManager();
+    CollectionPipelineManager() = default;
     ~CollectionPipelineManager() = default;
 
     virtual std::shared_ptr<CollectionPipeline> BuildPipeline(CollectionConfig&& config); // virtual for ut
-    void IncreasePluginUsageCnt(
-        const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
-    void DecreasePluginUsageCnt(
-        const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void FlushAllBatch();
     // TODO: 长期过渡使用
     bool CheckIfFileServerUpdated(CollectionConfigDiff& diff);
 
+    mutable std::shared_mutex mPipelineNameEntityMapMutex;
     std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>> mPipelineNameEntityMap;
-    mutable SpinLock mPluginCntMapLock;
-    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
 
     std::vector<InputRunner*> mInputRunners;
 

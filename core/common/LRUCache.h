@@ -32,6 +32,8 @@
 #include <cstdint>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <list>
 #include <mutex>
 #include <stdexcept>

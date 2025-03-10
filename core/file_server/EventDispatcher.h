@@ -116,7 +116,7 @@ public:
      *
      * @param path for whom event handler will be removed.
      */
-    void StopAllDir(const std::string& baseDir);
+    void StopAllDir(const std::string& baseDir, const std::string& containerID);
 
     EventHandler* GetHandler(const char* path) {
         MapType<std::string, int>::Type::iterator itr = mPathWdMap.find(path);
@@ -287,6 +287,7 @@ protected:
     friend class FuseFileUnittest;
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
+    friend class ModifyHandlerUnittest;
 
     void CleanEnviroments();
     int32_t GetInotifyWatcherCount();

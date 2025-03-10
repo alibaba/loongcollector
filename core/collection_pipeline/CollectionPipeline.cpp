@@ -16,9 +16,9 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 
-#include <chrono>
 #include <cstdint>
 
+#include <chrono>
 #include <memory>
 #include <utility>
 
@@ -122,7 +122,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
         }
-        ++mPluginCntMap["inputs"][pluginType];
     }
 
     for (size_t i = 0; i < config.mProcessors.size(); ++i) {
@@ -146,7 +145,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                 AddPluginToGoPipeline(pluginType, detail, "processors", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["processors"][pluginType];
     }
 
     if (config.mAggregators.empty() && config.IsFlushingThroughGoPipelineExisted()) {
@@ -163,7 +161,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         } else {
             AddPluginToGoPipeline(pluginType, detail, "aggregators", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["aggregators"][pluginType];
     }
 
     for (size_t i = 0; i < config.mFlushers.size(); ++i) {
@@ -195,7 +192,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                 AddPluginToGoPipeline(pluginType, detail, "flushers", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["flushers"][pluginType];
     }
 
     // route is only enabled in native flushing mode, thus the index in config is the same as that in mFlushers
@@ -213,7 +209,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         if (!mGoPipelineWithoutInput.isNull()) {
             AddPluginToGoPipeline(pluginType, detail, "extensions", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["extensions"][pluginType];
     }
 
     // global module must be initialized at last, since native input or flusher plugin may generate global param in Go
@@ -384,17 +379,18 @@ void CollectionPipeline::Start() {
         input->Start();
     }
 
-    mStartTime->Set(chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
+    SET_GAUGE(mStartTime,
+              chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
     // #endif
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
 void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputIndex) {
     for (const auto& logGroup : logGroupList) {
-        mProcessorsInEventsTotal->Add(logGroup.GetEvents().size());
-        mProcessorsInSizeBytes->Add(logGroup.DataSize());
+        ADD_COUNTER(mProcessorsInEventsTotal, logGroup.GetEvents().size());
+        ADD_COUNTER(mProcessorsInSizeBytes, logGroup.DataSize());
     }
-    mProcessorsInGroupsTotal->Add(logGroupList.size());
+    ADD_COUNTER(mProcessorsInGroupsTotal, logGroupList.size())
 
     auto before = chrono::system_clock::now();
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
@@ -406,15 +402,15 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
-    mProcessorsTotalProcessTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mProcessorsTotalProcessTimeMs, chrono::system_clock::now() - before);
 }
 
 bool CollectionPipeline::Send(vector<PipelineEventGroup>&& groupList) {
     for (const auto& group : groupList) {
-        mFlushersInEventsTotal->Add(group.GetEvents().size());
-        mFlushersInSizeBytes->Add(group.DataSize());
+        ADD_COUNTER(mFlushersInEventsTotal, group.GetEvents().size());
+        ADD_COUNTER(mFlushersInSizeBytes, group.DataSize());
     }
-    mFlushersInGroupsTotal->Add(groupList.size());
+    ADD_COUNTER(mFlushersInGroupsTotal, groupList.size());
 
     auto before = chrono::system_clock::now();
     bool allSucceeded = true;
@@ -434,7 +430,7 @@ bool CollectionPipeline::Send(vector<PipelineEventGroup>&& groupList) {
             allSucceeded = mFlushers[item.first]->Send(std::move(item.second)) && allSucceeded;
         }
     }
-    mFlushersTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
+    ADD_COUNTER(mFlushersTotalPackageTimeMs, chrono::system_clock::now() - before);
     return allSucceeded;
 }
 
@@ -494,7 +490,7 @@ void CollectionPipeline::MergeGoPipeline(const Json::Value& src, Json::Value& ds
     }
 }
 
-std::string CollectionPipeline::GenPluginTypeWithID(std::string pluginType, std::string pluginID) {
+string CollectionPipeline::GenPluginTypeWithID(const string& pluginType, const string& pluginID) {
     return pluginType + "/" + pluginID;
 }
 
@@ -555,9 +551,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             return false;
         }
     }
@@ -574,9 +571,10 @@ bool CollectionPipeline::LoadGoPipelines() const {
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             if (!mGoPipelineWithoutInput.isNull()) {
                 LogtailPlugin::GetInstance()->UnloadPipeline(GetConfigNameOfGoPipelineWithoutInput());
             }
@@ -586,13 +584,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
     return true;
 }
 
-std::string CollectionPipeline::GetNowPluginID() {
-    return std::to_string(mPluginID.load());
+string CollectionPipeline::GetNowPluginID() {
+    return to_string(mPluginID.load());
 }
 
 PluginInstance::PluginMeta CollectionPipeline::GenNextPluginMeta(bool lastOne) {
     mPluginID.fetch_add(1);
-    return PluginInstance::PluginMeta(std::to_string(mPluginID.load()));
+    return PluginInstance::PluginMeta(to_string(mPluginID.load()));
 }
 
 void CollectionPipeline::WaitAllItemsInProcessFinished() {
@@ -605,10 +603,11 @@ void CollectionPipeline::WaitAllItemsInProcessFinished() {
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
             AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
                                                    string("pipeline stop too slow, config: ") + mName
-                                                       + "; cost:" + std::to_string(duration),
+                                                       + "; cost:" + to_string(duration),
+                                                   mContext.GetRegion(),
                                                    mContext.GetProjectName(),
-                                                   mContext.GetLogstoreName(),
-                                                   mContext.GetRegion());
+                                                   mContext.GetConfigName(),
+                                                   mContext.GetLogstoreName());
             alarmOnce = true;
         }
     }

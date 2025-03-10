@@ -27,7 +27,7 @@ function arch() {
   fi
 }
 
-# intialize variables
+# initialize variables
 OUT_DIR=${1:-output}
 DIST_DIR=${2:-dist}
 PACKAGE_DIR=${3:-loongcollector-0.0.1}

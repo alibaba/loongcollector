@@ -81,6 +81,7 @@ namespace ebpf {
 //     mRefAndLabels.emplace_back(std::make_pair<>(ref, pushSpansLabels));
 // }
 
+<<<<<<< HEAD
 // void BaseBPFMonitor::UpdateMetricInner(nami::eBPFStatistics& currStat) {
 //     if (!currStat.updated_)
 //         return;
@@ -92,6 +93,19 @@ namespace ebpf {
 //     mPushSpansTotal->Add(currStat.push_spans_total_);
 //     mPushEventsTotal->Add(currStat.push_events_total_);
 // }
+=======
+void BaseBPFMonitor::UpdateMetricInner(nami::eBPFStatistics& currStat) {
+    if (!currStat.updated_)
+        return;
+    SET_GAUGE(mProcessCacheEntitiesNum, currStat.process_cache_entities_num_);
+    ADD_COUNTER(mRecvKernelEventsTotal, currStat.recv_kernel_events_total_);
+    ADD_COUNTER(mLossKernelEventsTotal, currStat.loss_kernel_events_total_);
+    ADD_COUNTER(mProcessCacheMissTotal, currStat.miss_process_cache_total_);
+    ADD_COUNTER(mPushMetricsTotal, currStat.push_metrics_total_);
+    ADD_COUNTER(mPushSpansTotal, currStat.push_spans_total_);
+    ADD_COUNTER(mPushEventsTotal, currStat.push_events_total_);
+}
+>>>>>>> upstream/dev/ebpf_observe
 
 // /////////////////////////// NetworkObserverSelfMonitor ///////////////////////////
 // void NetworkObserverSelfMonitor::InitMetric() {
@@ -163,6 +177,7 @@ namespace ebpf {
 //     assert(stats.plugin_type_ == logtail::ebpf::PluginType::NETWORK_OBSERVE);
 //     nami::NetworkObserverStatistics* currNetworkStatsPtr = static_cast<nami::NetworkObserverStatistics*>(&stats);
 
+<<<<<<< HEAD
 //     mRecvConnStatsTotal->Add(currNetworkStatsPtr->recv_conn_stat_events_total_);
 //     mRecvCtrlEventsTotal->Add(currNetworkStatsPtr->recv_ctrl_events_total_);
 //     mRecvHTTPDataEventsTotal->Add(currNetworkStatsPtr->recv_http_data_events_total_);
@@ -174,6 +189,19 @@ namespace ebpf {
 //     mParseHTTPEventsFailTotal->Add(currNetworkStatsPtr->parse_http_records_failed_total_);
 //     mAggMapEntitiesNum->Set(currNetworkStatsPtr->agg_map_entities_num_);
 // }
+=======
+    ADD_COUNTER(mRecvConnStatsTotal, currNetworkStatsPtr->recv_conn_stat_events_total_);
+    ADD_COUNTER(mRecvCtrlEventsTotal, currNetworkStatsPtr->recv_ctrl_events_total_);
+    ADD_COUNTER(mRecvHTTPDataEventsTotal, currNetworkStatsPtr->recv_http_data_events_total_);
+
+    // cache relative metric
+    SET_GAUGE(mConnTrackerNum, currNetworkStatsPtr->conntracker_num_);
+
+    ADD_COUNTER(mParseHTTPEventsSuccessTotal, currNetworkStatsPtr->parse_http_records_success_total_);
+    ADD_COUNTER(mParseHTTPEventsFailTotal, currNetworkStatsPtr->parse_http_records_failed_total_);
+    SET_GAUGE(mAggMapEntitiesNum, currNetworkStatsPtr->agg_map_entities_num_);
+}
+>>>>>>> upstream/dev/ebpf_observe
 
 // eBPFSelfMonitorMgr::eBPFSelfMonitorMgr() = default;
 
