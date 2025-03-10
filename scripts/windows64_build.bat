@@ -48,6 +48,8 @@ REM Change to where cmake locates
 set CMAKE_BIN="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
+set GO_BIN="D:\loongcollector-windows-build\go1.24.1.windows-amd64\go\bin\go"
+
 
 set OUTPUT_DIR=%LOONGCOLLECTOR_SRC_PATH%\output
 set LOONCOLLECTOR_CORE_BUILD_PATH=%LOONGCOLLECTOR_SRC_PATH%\core\build
@@ -88,7 +90,7 @@ del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_debug.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_windows.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_linux.go
-go run -mod=mod %LOONGCOLLECTOR_SRC_UNIX_PATH%\tools\builder -root-dir=%LOONGCOLLECTOR_SRC_UNIX_PATH% -modfile="go.mod"
+%GO_BIN% run -mod=mod %LOONGCOLLECTOR_SRC_UNIX_PATH%\tools\builder -root-dir=%LOONGCOLLECTOR_SRC_UNIX_PATH% -modfile="go.mod"
 echo generating plugins finished successfully
 
 REM Build plugins (GoPluginBase.dll, GoPluginBase.h)
