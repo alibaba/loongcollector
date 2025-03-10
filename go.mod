@@ -7,6 +7,8 @@ require (
 	github.com/IBM/sarama v1.42.2
 	github.com/VictoriaMetrics/VictoriaMetrics v1.83.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
+	github.com/aliyun/aliyun-datahub-sdk-go v0.2.1
+	github.com/aliyun/aliyun-odps-go-sdk v0.4.6
 	github.com/apache/pulsar-client-go v0.10.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.2.0
