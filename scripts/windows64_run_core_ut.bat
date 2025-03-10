@@ -34,9 +34,27 @@ call :search_files %TARGET_ARTIFACT_PATH%
 
 :search_files
 setlocal EnableDelayedExpansion
+
+set success=true
+
 for /r %%f in ("%~1\*_unittest.exe") do (
     echo ============== %%~nxf ==============
     call "%%f"
+	IF ERRORLEVEL 1 (
+        echo %%~nxf failed!
+        set success=false
+    ) ELSE (
+        echo %%~nxf passed successfully!
+    )
     echo ====================================
 )
+
+if "%success%" == "false" (
+    echo One or more tests failed.
+    exit /B 1
+) ELSE (
+    echo All tests passed successfully!
+    exit /B 0
+)
+
 goto :eof
