@@ -33,9 +33,9 @@ echo unittest dir: %TARGET_ARTIFACT_PATH%
 call :search_files %TARGET_ARTIFACT_PATH%
 
 :search_files
+echo ============== search_files ==============
 setlocal EnableDelayedExpansion
-
-set success=true
+echo ============== search_files2 ==============
 
 for /r %%f in ("%~1\*_unittest.exe") do (
     echo ============== %%~nxf ==============
@@ -49,12 +49,11 @@ for /r %%f in ("%~1\*_unittest.exe") do (
     echo ====================================
 )
 
-if "%success%" == "false" (
+if "!success!" == "false" (
     echo One or more tests failed.
     exit /B 1
 ) ELSE (
     echo All tests passed successfully!
     exit /B 0
 )
-
 goto :eof
