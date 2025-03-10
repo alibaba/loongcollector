@@ -1,4 +1,4 @@
-// Copyright 2024 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputHostMeta.h"
-
-#include "json/value.h"
+#include "plugin/input/InputHostMonitor.h"
 
 #include "common/ParamExtractor.h"
-#include "constants/EntityConstants.h"
 #include "host_monitor/HostMonitorInputRunner.h"
-#include "host_monitor/collector/ProcessEntityCollector.h"
-#include "logger/Logger.h"
+#include "host_monitor/collector/CPUCollector.h"
 
 namespace logtail {
 
-const std::string InputHostMeta::sName = "input_host_meta";
+const std::string InputHostMonitor::sName = "input_host_monitor";
 const uint32_t kMinInterval = 5; // seconds
 
-bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -45,18 +41,35 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
                         "new interval", kMinInterval));
         mInterval = kMinInterval;
     }
+
+    // TODO: add more collectors
+    // cpu
+    bool enableCPU = true;
+    if (!GetOptionalBoolParam(config, "CPU", enableCPU, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableCPU) {
+        mCollectors.push_back(CPUCollector::sName);
+    }
     return true;
 }
 
-bool InputHostMeta::Start() {
+bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        {ProcessEntityCollector::sName}, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
+        mCollectors, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
-bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector({ProcessEntityCollector::sName});
+bool InputHostMonitor::Stop(bool isPipelineRemoving) {
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mCollectors);
     return true;
 }
 
