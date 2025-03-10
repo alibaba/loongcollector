@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-#include "Constants.h"
+#include "host_monitor/Constants.h"
 
+#include <unistd.h>
 
 namespace logtail {
 
 std::filesystem::path PROCESS_DIR = "/proc";
 const std::filesystem::path PROCESS_STAT = "stat";
+const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail

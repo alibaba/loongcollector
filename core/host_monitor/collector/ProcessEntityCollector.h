@@ -157,9 +157,9 @@ private:
                          std::string& entityType,
                          std::string& hostEntityType,
                          StringView& hostEntityID);
+    int64_t GetHostSystemBootTime();
 
     steady_clock::time_point mProcessSortTime;
-    std::vector<ProcessStatPtr> mSortProcessStats;
     std::unordered_map<pid_t, ProcessStatPtr> mPrevProcessStat;
 
     const int mProcessSilentCount;
