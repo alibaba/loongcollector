@@ -20,7 +20,7 @@ const (
 	AggregatorAddAlarm AlarmType = iota
 	AggregatorInitAlarm
 	AnchorFindAlarm
-	AnchorJsonAlarm
+	AnchorJsonAlarm // nolint:revive
 	CannalInvalidAlarm
 	CanalRuntimeAlarm
 	CategoryConfigAlarm
@@ -46,12 +46,12 @@ const (
 	FlusherReadyAlarm
 	FlusherStopAlarm
 	GeoipAlarm
-	HttpCollectAlarm
-	HttpInitAlarm
-	HttpLoadAddressAlarm
-	HttpParseAlarm
+	HttpCollectAlarm     // nolint:revive
+	HttpInitAlarm        // nolint:revive
+	HttpLoadAddressAlarm // nolint:revive
+	HttpParseAlarm       // nolint:revive
 	InitCheckpointAlarm
-	InitHttpServerAlarm
+	InitHttpServerAlarm // nolint:revive
 	InputCanalAlarm
 	InputCollectAlarm
 	InputInitAlarm
@@ -98,9 +98,25 @@ const (
 	TelegrafAlarm
 	WrongProtobufAlarm
 	AllLoongCollectorAlarmNum
+	// for test
+	BootStopAlarm
+	CadvisorComposeAlarm
+	ClickhouseSubscriberAlarm
+	CopyLogAlarm
+	DockerExecAlarm
+	DownDockerComposeAlarm
+	ElasticsearchSubscriberAlarm
+	FetchCoverageAlarm
+	GrpcServerAlarm
+	HoldonLogtailPluginAlarm
+	InfluxdbSubscriberAlarm
+	LogtailComposeAlarm
+	SshExecAlarm
+	StartDockerComposeAlarm
+	StopDockerComposeAlarm
 )
 
-var AlarmTypeName map[AlarmType]string = map[AlarmType]string{
+var AlarmTypeName = map[AlarmType]string{
 	AggregatorAddAlarm:          "AGGREGATOR_ADD_ALARM",
 	AggregatorInitAlarm:         "AGGREGATOR_INIT_ALARM",
 	AnchorFindAlarm:             "ANCHOR_FIND_ALARM",
@@ -182,12 +198,27 @@ var AlarmTypeName map[AlarmType]string = map[AlarmType]string{
 	TelegrafAlarm:               "TELEGRAF_ALARM",
 	WrongProtobufAlarm:          "WRONG_PROTOBUF_ALARM",
 	AllLoongCollectorAlarmNum:   "ALL_LOONGCOLLECTOR_ALARM_NUM",
+	// for test
+	BootStopAlarm:                "BOOT_STOP_ALARM",
+	CadvisorComposeAlarm:         "CADVISOR_COMPOSE_ALARM",
+	ClickhouseSubscriberAlarm:    "CLICKHOUSE_SUBSCRIBER_ALARM",
+	CopyLogAlarm:                 "COPY_LOG_ALARM",
+	DockerExecAlarm:              "DOCKER_EXEC_ALARM",
+	DownDockerComposeAlarm:       "DOWN_DOCKER_COMPOSE_ALARM",
+	ElasticsearchSubscriberAlarm: "ELASTICSEARCH_SUBSCRIBER_ALARM",
+	FetchCoverageAlarm:           "FETCH_COVERAGE_ALARM",
+	GrpcServerAlarm:              "GRPC_SERVER_ALARM",
+	HoldonLogtailPluginAlarm:     "HOLDON_LOGTAILPLUGIN_ALARM",
+	InfluxdbSubscriberAlarm:      "INFLUXDB_SUBSCRIBER_ALARM",
+	LogtailComposeAlarm:          "LOGTAIL_COMPOSE_ALARM",
+	SshExecAlarm:                 "SSH_EXEC_ALARM",
+	StartDockerComposeAlarm:      "START_DOCKER_COMPOSE_ALARM",
+	StopDockerComposeAlarm:       "STOP_DOCKER_COMPOSE_ALARM",
 }
 
 func (t AlarmType) String() string {
 	if name, ok := AlarmTypeName[t]; ok {
 		return name
-	} else {
-		return ""
 	}
+	return ""
 }

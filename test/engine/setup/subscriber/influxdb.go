@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const influxdbName = "influxdb"
@@ -75,18 +76,18 @@ func (i *InfluxdbSubscriber) GetData(_ string, startTime int32) ([]*protocol.Log
 	if i.CreateDb {
 		err = i.createDatabase()
 		if err != nil {
-			logger.Warningf(context.Background(), "INFLUXDB_SUBSCRIBER_ALARM", "failed to create database %s, err: %s", i.DbName, err)
+			logger.Warningf(context.Background(), util.InfluxdbSubscriberAlarm, "failed to create database %s, err: %s", i.DbName, err)
 		}
 	}
 
 	sql := fmt.Sprintf(querySQL, i.Measurement, i.lastTimestamp)
 	resp, err := i.client.Query(client.NewQuery(sql, i.DbName, "1"))
 	if err != nil {
-		logger.Warning(context.Background(), "INFLUXDB_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), util.InfluxdbSubscriberAlarm, "err", err)
 		return nil, err
 	}
 	if err = resp.Error(); err != nil {
-		logger.Warning(context.Background(), "INFLUXDB_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), util.InfluxdbSubscriberAlarm, "err", err)
 		return nil, err
 	}
 	logGroup := i.queryRecords2LogGroup(resp.Results)
