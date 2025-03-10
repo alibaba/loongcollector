@@ -197,7 +197,7 @@ func TestNoKeyError(t *testing.T) {
 	processor.processLog(log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
+	assert.True(t, strings.Contains(memoryLog, "PARSE_LOG_FAIL_ALARM\tcannot find key s_key"))
 }
 
 func TestExpandArray(t *testing.T) {
@@ -378,7 +378,7 @@ func TestNoKeyErrorV2(t *testing.T) {
 	processor.processEvent(log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
+	assert.True(t, strings.Contains(memoryLog, "PARSE_LOG_FAIL_ALARM\tcannot find key s_key"))
 }
 
 func TestExpandArrayV2(t *testing.T) {

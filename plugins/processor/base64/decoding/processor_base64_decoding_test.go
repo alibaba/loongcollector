@@ -69,7 +69,7 @@ func TestDecodeError(t *testing.T) {
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
-	assert.True(t, strings.Contains(memoryLog, "AlarmType:BASE64_D_ALARM\tdecode base64 error"))
+	assert.True(t, strings.Contains(memoryLog, "AlarmType:PROCESSOR_PROCESS_ALARM\tdecode base64 error"))
 }
 
 func TestNoKeyError(t *testing.T) {
@@ -88,7 +88,7 @@ func TestNoKeyError(t *testing.T) {
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
-	assert.True(t, strings.Contains(memoryLog, "AlarmType:BASE64_D_FIND_ALARM\tcannot find key:src"))
+	assert.True(t, strings.Contains(memoryLog, "AlarmType:PROCESSOR_PROCESS_ALARM\tcannot find key:src"))
 }
 
 func TestDescription(t *testing.T) {

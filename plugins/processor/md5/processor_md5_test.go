@@ -69,7 +69,7 @@ func TestNoKeyError(t *testing.T) {
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
-	assert.True(t, strings.Contains(memoryLog, "AlarmType:MD5_FIND_ALARM\tcannot find key:src"))
+	assert.True(t, strings.Contains(memoryLog, "AlarmType:PROCESSOR_PROCESS_ALARM\tprocessor_md5 cannot find key:src"))
 }
 
 func TestDescription(t *testing.T) {

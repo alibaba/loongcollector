@@ -55,14 +55,14 @@ func (p *ProcessorBase64Decoding) ProcessLogs(logArray []*protocol.Log) []*proto
 					}
 					log.Contents = append(log.Contents, newContent)
 				} else if p.DecodeError {
-					logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "decode base64 error", err)
+					logger.Warning(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "decode base64 error", err)
 				}
 				found = true
 				break
 			}
 		}
 		if !found && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 	return logArray

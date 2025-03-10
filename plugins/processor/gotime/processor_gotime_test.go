@@ -97,7 +97,7 @@ func TestNoKeyError(t *testing.T) {
 	processor.processLog(log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "GOTIME_FIND_ALARM\tcannot find key s_key"))
+	assert.True(t, strings.Contains(memoryLog, "PARSE_TIME_FAIL_ALARM\tGotime cannot find key s_key"))
 }
 
 func TestAlarmIfFail(t *testing.T) {
@@ -110,7 +110,7 @@ func TestAlarmIfFail(t *testing.T) {
 	processor.processLog(log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "GOTIME_PARSE_ALARM\tParseInLocation(2006-01-02 15:04:05, 2019-07-05-19:28:01, SpecifiedTimezone) "+
+	assert.True(t, strings.Contains(memoryLog, "PARSE_TIME_FAIL_ALARM\tGotime ParseInLocation(2006-01-02 15:04:05, 2019-07-05-19:28:01, SpecifiedTimezone) "+
 		"failed: parsing time \"2019-07-05-19:28:01\" as \"2006-01-02 15:04:05\": cannot parse \"-19:28:01\" as \" \""))
 }
 

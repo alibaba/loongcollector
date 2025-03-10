@@ -61,7 +61,7 @@ func (p *ProcessorBase64Encoding) ProcessLogs(logArray []*protocol.Log) []*proto
 			}
 		}
 		if !found && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), util.ParseLogFailAlarm, "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 	return logArray
