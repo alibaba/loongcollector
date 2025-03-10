@@ -21,6 +21,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	skywalking "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
@@ -59,7 +60,7 @@ func panicRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "skywalking v3 runtime panic error", err, "stack", string(trace))
+		logger.Error(context.Background(), util.PLUGIN_RUNTIME_ALARM, "skywalking v3 runtime panic error", err, "stack", string(trace))
 	}
 }
 
@@ -86,7 +87,7 @@ func (h *TracingHandler) CollectInSync(ctx context.Context, req *skywalking.Segm
 	for _, segment := range req.Segments {
 		err := h.collectSegment(segment, h.compIDMessagingSystemMapping)
 		if err != nil {
-			logger.Warning(h.context.GetRuntimeContext(), "SKYWALKING_COLLECT_TRACE_ERROR", "error", err)
+			logger.Warning(h.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "error", err)
 			continue
 		}
 	}
@@ -97,12 +98,12 @@ func (h *TracingHandler) collectSegment(segment *skywalking.SegmentObject, mappi
 	for _, span := range segment.Spans {
 		otTrace := ParseSegment(span, segment, h.cache, mapping)
 		if otTrace == nil {
-			logger.Warning(h.context.GetRuntimeContext(), "SKYWALKING_RESOURCE_NOT_READY", "err", "resource properties not found, drop this segment")
+			logger.Warning(h.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "err", "resource properties not found, drop this segment")
 			continue
 		}
 		log, err := otTrace.ToLog()
 		if err != nil {
-			logger.Error(h.context.GetRuntimeContext(), "SKYWALKING_TO_OT_TRACE_ERR", "err", err)
+			logger.Error(h.context.GetRuntimeContext(), util.PLUGIN_RUNTIME_ALARM, "err", err)
 			return err
 		}
 		h.collector.AddRawLog(log)

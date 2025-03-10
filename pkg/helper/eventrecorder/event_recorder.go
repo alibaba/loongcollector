@@ -29,6 +29,7 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type EventRecorder struct {
@@ -63,12 +64,12 @@ func Init(nodeIPStr, nodeNameStr, podNameStr, podNamespaceStr string) {
 	podName = podNameStr
 	podNamespace = podNamespaceStr
 	if err != nil {
-		logger.Error(context.Background(), "INIT_ALARM", "Error create EventRecorder: %s", err.Error())
+		logger.Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "Error create EventRecorder: %s", err.Error())
 		return
 	}
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		logger.Error(context.Background(), "INIT_ALARM", "Error create EventRecorder: %s", err.Error())
+		logger.Error(context.Background(), util.INTERNAL_SERVICE_ERROR, "Error create EventRecorder: %s", err.Error())
 		return
 	}
 	SetEventRecorder(kubeClient, "logtail")
