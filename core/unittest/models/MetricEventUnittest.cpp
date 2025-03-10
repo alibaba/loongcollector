@@ -173,7 +173,9 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 
 
 // TODO: windows
-#if defined(__linux__)
+#if defined(_MSC_VER)
+void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {}
+#elif defined(__linux__)
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});

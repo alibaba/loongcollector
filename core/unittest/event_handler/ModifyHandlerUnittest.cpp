@@ -155,7 +155,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        bfs::p(gRootDir);
+        bfs::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 

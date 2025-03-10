@@ -69,7 +69,9 @@ void ProcessorTagNativeUnittest::TestInit() {
 }
 
 // TODO: windows
-#if defined(__linux__)
+#if defined(_MSC_VER)
+void ProcessorTagNativeUnittest::TestProcess() {}
+#elif defined(__linux__)
 void ProcessorTagNativeUnittest::TestProcess() {
     { // native branch default
         Json::Value config;

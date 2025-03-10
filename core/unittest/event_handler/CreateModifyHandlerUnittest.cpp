@@ -178,7 +178,9 @@ private:
 };
 
 // TODO: windows
-#if defined(__linux__)
+#if defined(_MSC_VER)
+void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent(){}
+#elif defined(__linux__)
 void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
     LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
     CreateModifyHandler createModifyHandler(&mCreateHandler);
