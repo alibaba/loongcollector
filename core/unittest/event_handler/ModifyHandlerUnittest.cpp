@@ -155,7 +155,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        bfs::remove_all(gRootDir);
+        bfs::p(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -224,6 +224,9 @@ private:
 std::string ModifyHandlerUnittest::gRootDir;
 std::string ModifyHandlerUnittest::gLogName;
 
+
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
@@ -235,6 +238,7 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartC
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase5);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
+#endif
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));

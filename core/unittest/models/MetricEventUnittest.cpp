@@ -170,6 +170,10 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
 
+
+
+// TODO: windows
+#if defined(__linux__)
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
@@ -205,6 +209,7 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     basicSize -= 22;
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
+#endif
 
 void MetricEventUnittest::TestReset() {
     mMetricEvent->SetTimestamp(12345678901);

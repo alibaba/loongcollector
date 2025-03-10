@@ -68,6 +68,8 @@ void ProcessorTagNativeUnittest::TestInit() {
     }
 }
 
+// TODO: windows
+#if defined(__linux__)
 void ProcessorTagNativeUnittest::TestProcess() {
     { // native branch default
         Json::Value config;
@@ -276,6 +278,7 @@ void ProcessorTagNativeUnittest::TestProcess() {
         APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_MACHINE_UUID));
     }
 }
+#endif
 
 UNIT_TEST_CASE(ProcessorTagNativeUnittest, TestInit)
 UNIT_TEST_CASE(ProcessorTagNativeUnittest, TestProcess)

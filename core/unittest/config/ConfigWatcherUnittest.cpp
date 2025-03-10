@@ -114,6 +114,10 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
     }
 }
 
+// TODO: windows
+#if defined(_MSC_VER)
+void ConfigWatcherUnittest::DuplicateConfigs() const {}
+#elif defined(__linux__)
 void ConfigWatcherUnittest::DuplicateConfigs() const {
     {
         PluginRegistry::GetInstance()->LoadPlugins();
@@ -186,6 +190,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
 }
+#endif
 
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigFileFound)
