@@ -39,17 +39,15 @@ set LOONGCOLLECTOR_SRC_UNIX_PATH=%LOONGCOLLECTOR_SRC_PATH:\=/%
 echo looncollector dir: %LOONGCOLLECTOR_SRC_PATH%
 
 REM Change to where boost_1_68_0 locates
-set BOOST_ROOT=C:\workspace\boost_1_68_0
+set BOOST_ROOT=D:\loongcollector-windows-build\boost_1_68_0
 REM Change to where ilogtail-deps.windows-x64 locates
-set LOONCOLLECTOR_DEPS_PATH=C:\taiye-open-source\ilogtail-deps.windows-x64
+set LOONCOLLECTOR_DEPS_PATH=D:\loongcollector-windows-build\ilogtail-deps.windows-x64\ilogtail-deps.windows-x64
 REM avoid '\' beed treated as escape.
 set LOONCOLLECTOR_DEPS_PATH=%LOONCOLLECTOR_DEPS_PATH:\=/%
 REM Change to where cmake locates
-set CMAKE_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
+set CMAKE_BIN="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
-REM Change to where mingw locates
-set MINGW_PATH=C:\workspace\mingw64\bin
 
 set OUTPUT_DIR=%LOONGCOLLECTOR_SRC_PATH%\output
 set LOONCOLLECTOR_CORE_BUILD_PATH=%LOONGCOLLECTOR_SRC_PATH%\core\build
@@ -74,12 +72,12 @@ cd build
 %CMAKE_BIN% -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=%LOONCOLLECTOR_VERSION% -DDEPS_ROOT=%LOONCOLLECTOR_DEPS_PATH% ..
 if not %ERRORLEVEL% == 0 (
     echo Run cmake failed.
-    goto quit
+    exit /b 1
 )
 %DEVENV_BIN% loongcollector.sln /Build "Release|x64" 1>build.stdout 2>build.stderr
 if not %ERRORLEVEL% == 0 (
     echo Build looncollector source failed.
-    goto quit
+    exit /b 1
 )
 echo Build core success
 
@@ -103,7 +101,7 @@ set LDFLAGS="-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion=%LOONCOLL
 go build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\PluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
 if not %ERRORLEVEL% == 0 (
     echo Build iLogtail plugin source failed.
-    goto quit
+    exit /b 1
 )
 echo Build plugins success
 
@@ -130,7 +128,6 @@ REM TODO
 
 dir %OUTPUT_DIR%
 
-:quit
-pause
-
 goto :eof
+
+exit /b 0
