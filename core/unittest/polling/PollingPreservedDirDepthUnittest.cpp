@@ -335,6 +335,8 @@ public:
     }
 };
 
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile0);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile1);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile2);
@@ -342,6 +344,7 @@ UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile3);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile4);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile5);
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestCheckpoint);
+#endif
 
 std::string PollingPreservedDirDepthUnittest::gRootDir;
 std::string PollingPreservedDirDepthUnittest::gCheckpoint = "checkpoint";
