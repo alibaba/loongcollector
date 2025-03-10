@@ -100,7 +100,7 @@ IF exist output ( rd /s /q output )
 mkdir output
 xcopy /Y %LOONCOLLECTOR_CORE_BUILD_PATH%\go_pipeline\Release\GoPluginAdapter.dll %LOONGCOLLECTOR_SRC_PATH%\pkg\logtail\
 set LDFLAGS="-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion=%LOONCOLLECTOR_VERSION%""
-go build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\PluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
+%GO_BIN% build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\PluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
 if not %ERRORLEVEL% == 0 (
     echo Build iLogtail plugin source failed.
     exit /b 1
