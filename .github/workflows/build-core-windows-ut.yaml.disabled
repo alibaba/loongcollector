@@ -42,8 +42,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Build Binary
         env:
-          BUILD_LOGTAIL_UT: OFF
+          BUILD_LOGTAIL_UT: ON
         run: scripts/windows64_build.bat
+      - name: Run UT
+        run: scripts/windows64_run_core_ut.bat
 
   result:
     runs-on: Windows
