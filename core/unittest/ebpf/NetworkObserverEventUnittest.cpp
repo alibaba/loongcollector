@@ -259,7 +259,7 @@ void NetworkObserverEventUnittest::TestHttpRecordTimestamps() {
     APSARA_TEST_EQUAL(record.GetStartTimeStamp(), 1000000UL);
     APSARA_TEST_EQUAL(record.GetEndTimeStamp(), 2000000UL);
     APSARA_TEST_EQUAL(record.GetLatencyNs(), 1000000.0);
-    APSARA_TEST_EQUAL(record.GetLatencyMs(), 1000.0);
+    APSARA_TEST_EQUAL(record.GetLatencyMs(), 1.0);
 }
 
 void NetworkObserverEventUnittest::TestHttpRecordStatus() {

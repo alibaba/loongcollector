@@ -18,22 +18,57 @@
 
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 namespace ebpf {
 
 const std::string AbstractManager::sKprobeValue = "kprobe";
 
-
 AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCacheMgr,
                                  std::shared_ptr<SourceManager> sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                 std::shared_ptr<Timer> scheduler)
-    : mProcessCacheManager(processCacheMgr),
-      mSourceManager(sourceManager),
-      mCommonEventQueue(queue),
-      mScheduler(scheduler) {
+                                 PluginMetricManagerPtr mgr)
+    : mProcessCacheManager(processCacheMgr), mSourceManager(sourceManager), mCommonEventQueue(queue), mMetricMgr(mgr) {
     mTimeDiff = GetTimeDiffFromMonotonic();
+
+    if (!mMetricMgr) {
+        return;
+    }
+
+    // init metrics
+    MetricLabels pollKernelEventsLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_POLL_KERNEL}};
+    auto ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(pollKernelEventsLabels);
+    mRefAndLabels.emplace_back(pollKernelEventsLabels);
+    mRecvKernelEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
+    mLossKernelEventsTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL);
+
+    MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+    ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+    mRefAndLabels.emplace_back(eventTypeLabels);
+    mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+    eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}};
+    ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+    mRefAndLabels.emplace_back(eventTypeLabels);
+    mPushMetricsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mPushMetricGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+    eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}};
+    mRefAndLabels.emplace_back(eventTypeLabels);
+    ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+    mPushSpansTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mPushSpanGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+}
+
+AbstractManager::~AbstractManager() {
+    for (auto& item : mRefAndLabels) {
+        if (mMetricMgr) {
+            mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+        }
+    }
 }
 
 int AbstractManager::GetCallNameIdx(const std::string& callName) {

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <chrono>
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
 #include <thread>
 
@@ -36,83 +36,64 @@ namespace ebpf {
 class ManagerUnittest : public ::testing::Test {
 protected:
     void SetUp() override {
+        Timer::GetInstance()->Init();
         mSourceManager = std::make_shared<SourceManager>();
-        mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
-        mTimer = std::make_shared<Timer>();
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(
+            mSourceManager, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr);
     }
 
-    void TearDown() override { mTimer->Stop(); }
+    void TearDown() override { Timer::GetInstance()->Stop(); }
 
-    // 测试ProcessSecurityManager的基本功能
     void TestProcessSecurityManagerBasic();
-    // 测试ProcessSecurityManager的事件处理
     void TestProcessSecurityManagerEventHandling();
-    // 测试ProcessSecurityManager的聚合功能
     void TestProcessSecurityManagerAggregation();
 
-    // 测试FileSecurityManager的基本功能
     void TestFileSecurityManagerBasic();
-    // 测试FileSecurityManager的事件处理
     void TestFileSecurityManagerEventHandling();
-    // 测试FileSecurityManager的聚合功能
     void TestFileSecurityManagerAggregation();
 
-    // 测试NetworkSecurityManager的基本功能
     void TestNetworkSecurityManagerBasic();
-    // 测试NetworkSecurityManager的事件处理
     void TestNetworkSecurityManagerEventHandling();
-    // 测试NetworkSecurityManager的聚合功能
     void TestNetworkSecurityManagerAggregation();
 
-    // 测试Manager的并发处理
     void TestManagerConcurrency();
-    // 测试Manager的资源管理
     void TestManagerResourceManagement();
-    // 测试Manager的错误处理
     void TestManagerErrorHandling();
 
 protected:
     std::shared_ptr<SourceManager> mSourceManager;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
-    std::shared_ptr<Timer> mTimer;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
 
 void ManagerUnittest::TestProcessSecurityManagerBasic() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
 
-    // 测试初始化
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
-    // 测试暂停
     APSARA_TEST_EQUAL(manager->Suspend(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 
-    // 测试恢复
     APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
-    // 测试销毁
     APSARA_TEST_EQUAL(manager->Destroy(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 }
 
 void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 创建并处理Execve事件
     auto execveEvent = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 799);
     APSARA_TEST_EQUAL(manager->HandleEvent(execveEvent), 0);
 
-    // 创建并处理Exit事件
     auto exitEvent = std::make_shared<ProcessExitEvent>(1234, 5678, KernelEventType::PROCESS_EXIT_EVENT, 789, 0, 1234);
     APSARA_TEST_EQUAL(manager->HandleEvent(exitEvent), 0);
 
-    // 创建并处理Clone事件
     auto cloneEvent = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_CLONE_EVENT, 789);
     APSARA_TEST_EQUAL(manager->HandleEvent(cloneEvent), 0);
 
@@ -120,32 +101,27 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestFileSecurityManagerBasic() {
-    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
 
-    // 测试初始化
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
-    // 测试暂停
     APSARA_TEST_EQUAL(manager->Suspend(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 
-    // 测试恢复
     APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
-    // 测试销毁
     APSARA_TEST_EQUAL(manager->Destroy(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 }
 
 void ManagerUnittest::TestFileSecurityManagerEventHandling() {
-    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 测试文件权限事件
     auto permissionEvent = std::make_shared<FileEvent>(1234,
                                                        5678,
                                                        KernelEventType::FILE_PERMISSION_EVENT,
@@ -153,7 +129,6 @@ void ManagerUnittest::TestFileSecurityManagerEventHandling() {
                                                        "/test/file.txt");
     APSARA_TEST_EQUAL(manager->HandleEvent(permissionEvent), 0);
 
-    // 测试文件mmap事件
     auto mmapEvent = std::make_shared<FileEvent>(1234,
                                                  5678,
                                                  KernelEventType::FILE_MMAP,
@@ -161,7 +136,6 @@ void ManagerUnittest::TestFileSecurityManagerEventHandling() {
                                                  "/test/mmap.txt");
     APSARA_TEST_EQUAL(manager->HandleEvent(mmapEvent), 0);
 
-    // 测试文件truncate事件
     auto truncateEvent = std::make_shared<FileEvent>(1234,
                                                      5678,
                                                      KernelEventType::FILE_PATH_TRUNCATE,
@@ -174,14 +148,14 @@ void ManagerUnittest::TestFileSecurityManagerEventHandling() {
 
 void ManagerUnittest::TestManagerConcurrency() {
     auto processManager
-        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
-    auto fileManager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
+    auto fileManager
+        = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
 
     SecurityOptions options;
     processManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
     fileManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 创建多个线程同时处理事件
     std::vector<std::thread> threads;
     for (int i = 0; i < 5; ++i) {
         threads.emplace_back([&processManager, i]() {
@@ -199,7 +173,6 @@ void ManagerUnittest::TestManagerConcurrency() {
         });
     }
 
-    // 等待所有线程完成
     for (auto& thread : threads) {
         thread.join();
     }
@@ -209,7 +182,7 @@ void ManagerUnittest::TestManagerConcurrency() {
 }
 
 void ManagerUnittest::TestManagerErrorHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
 
     auto event = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 0);
     APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
@@ -226,7 +199,7 @@ void ManagerUnittest::TestManagerErrorHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerBasic() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
 
     // 测试初始化
     SecurityOptions options;
@@ -241,13 +214,12 @@ void ManagerUnittest::TestNetworkSecurityManagerBasic() {
     APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
-    // 测试销毁
     APSARA_TEST_EQUAL(manager->Destroy(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -303,7 +275,7 @@ void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -371,7 +343,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
 }
 
 void ManagerUnittest::TestProcessSecurityManagerAggregation() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -432,7 +404,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
 }
 
 void ManagerUnittest::TestFileSecurityManagerAggregation() {
-    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+    auto manager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 

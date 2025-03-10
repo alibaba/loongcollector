@@ -39,21 +39,23 @@ public:
     NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           std::shared_ptr<Timer> scheduler);
+                           PluginMetricManagerPtr mgr);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
     Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           std::shared_ptr<Timer> scheduler) {
-        return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, scheduler);
+           PluginMetricManagerPtr metricMgr) {
+        return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, metricMgr);
     }
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     void RecordNetworkEvent(tcp_data_t* event);
+
+    void UpdateLossKernelEventsTotal(uint64_t cnt);
 
     bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 

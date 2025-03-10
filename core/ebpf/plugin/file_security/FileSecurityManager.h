@@ -37,14 +37,14 @@ public:
     FileSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                         std::shared_ptr<SourceManager> sourceManager,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        std::shared_ptr<Timer> scheduler);
+                        PluginMetricManagerPtr mgr);
 
     static std::shared_ptr<FileSecurityManager>
     Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           std::shared_ptr<Timer> scheduler) {
-        return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, scheduler);
+           PluginMetricManagerPtr metricMgr) {
+        return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, metricMgr);
     }
 
     ~FileSecurityManager() {}
@@ -52,6 +52,7 @@ public:
     int Destroy() override;
 
     void RecordFileEvent(file_data_t* event);
+    void UpdateLossKernelEventsTotal(uint64_t cnt);
 
     bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 

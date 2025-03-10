@@ -38,7 +38,7 @@ public:
 
 private:
     std::vector<int> mVec;
-    int mStartUid = 0;
+    int mFlag = 0;
 };
 
 void TimerUnittest::TestPushEvent() {
@@ -58,26 +58,25 @@ void TimerUnittest::TestPushEvent() {
 }
 
 void TimerUnittest::TestPeriodicEvent() {
-    Timer timer;
-    timer.Init();
+    Timer::GetInstance()->Init();
+    mFlag = true;
     std::unique_ptr<ebpf::AggregateEvent> event = std::make_unique<ebpf::AggregateEvent>(
         1, // interval second
         [this](const std::chrono::steady_clock::time_point& execTime) { // handler
             this->mVec.push_back(1);
             return true;
         },
-        [this](int currentUid) { // validator
-            return currentUid != this->mStartUid;
-        },
-        mStartUid);
-    timer.PushEvent(std::move(event));
+        [this]() { // validator
+            return !this->mFlag;
+        });
+    Timer::GetInstance()->PushEvent(std::move(event));
     std::this_thread::sleep_for(std::chrono::seconds(5));
     // update start uid, invalid event schedule ...
-    mStartUid++;
+    mFlag = false;
     std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_TRUE(timer.mQueue.empty());
+    APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.empty());
     APSARA_TEST_EQUAL(mVec.size(), 5UL);
-    timer.Stop();
+    Timer::GetInstance()->Stop();
 }
 
 UNIT_TEST_CASE(TimerUnittest, TestPushEvent)

@@ -56,8 +56,8 @@ protected:
 void TableUnittest::TestProcessTable() {
     // 测试 ProcessCommonTable
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("exec_id"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_exec_id"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("process_pid"));
+    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_process_pid"));
+    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_uid"));
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("uid"));
     APSARA_TEST_TRUE(kProcessCommonTable.HasCol("binary"));
 
@@ -124,7 +124,7 @@ void TableUnittest::TestNetworkSecurityTable() {
 
 void TableUnittest::TestNetTable() {
     // 测试 NetMetricsTable
-    APSARA_TEST_TRUE(kNetMetricsTable.HasCol("host"));
+    APSARA_TEST_TRUE(kNetMetricsTable.HasCol("host_name"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("app_id"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("ip"));
     APSARA_TEST_TRUE(kNetMetricsTable.HasCol("app"));

@@ -169,9 +169,8 @@ void eBPFServer::Init() {
         LOG_INFO(sLogger, ("running in host mode", "would not set host path prefix ..."));
     }
 #endif
-
-    LOG_INFO(sLogger, ("begin to start timer", ""));
-    mScheduler->Init();
+    LOG_INFO(sLogger, ("begin to init timer", ""));
+    Timer::GetInstance()->Init();
     LOG_INFO(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
     LOG_INFO(sLogger, ("begin to start handler", ""));
@@ -190,11 +189,19 @@ void eBPFServer::Init() {
     mStartPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL);
     mStopPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL);
     mSuspendPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL);
+    mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+    mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+    mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
 
     mSourceManager->Init();
 
-    mProcessCacheManager
-        = std::make_shared<ProcessCacheManager>(mSourceManager, mHostName, mHostPathPrefix, mDataEventQueue);
+    mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager,
+                                                                 mHostName,
+                                                                 mHostPathPrefix,
+                                                                 mDataEventQueue,
+                                                                 mPollProcessEventsTotal,
+                                                                 mLossProcessEventsTotal,
+                                                                 mProcessCacheMissTotal);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -207,9 +214,6 @@ void eBPFServer::Stop() {
     mInited = false;
 
     mRunning = false;
-
-    LOG_INFO(sLogger, ("begin to stop timer", ""));
-    mScheduler->Stop();
 
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     for (int i = 0; i < int(PluginType::MAX); i++) {
@@ -299,8 +303,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr
-                    = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
@@ -312,8 +315,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
-                pluginMgr
-                    = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
@@ -329,8 +331,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr
-                    = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
@@ -343,8 +344,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr
-                    = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mScheduler);
+                pluginMgr = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
@@ -391,7 +391,7 @@ bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
     auto nsMgr = mPlugins[static_cast<int>(PluginType::NETWORK_SECURITY)];
     auto psMgr = mPlugins[static_cast<int>(PluginType::PROCESS_SECURITY)];
     auto fsMgr = mPlugins[static_cast<int>(PluginType::FILE_SECURITY)];
-    if ((nsMgr && nsMgr->IsRunning()) || (psMgr && psMgr->IsRunning()) || (fsMgr && fsMgr->IsRunning())) {
+    if ((nsMgr && nsMgr->IsExists()) || (psMgr && psMgr->IsExists()) || (fsMgr && fsMgr->IsExists())) {
         return false;
     } else {
         LOG_INFO(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
@@ -415,10 +415,12 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
 
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipeline_name));
     auto pluginManager = GetPluginManager(type);
-    if (pluginManager && pluginManager->IsRunning()) {
+    if (pluginManager && pluginManager->IsExists()) {
         pluginManager->UpdateContext(nullptr, -1, -1);
         int ret = pluginManager->Destroy();
         if (ret == 0) {
+            ADD_COUNTER(mStopPluginTotal, 1);
+            UpdatePluginManager(type, nullptr);
             pluginManager->UpdateProcessCacheManager(nullptr);
             LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
@@ -480,7 +482,7 @@ bool eBPFServer::SuspendPlugin(const std::string&, PluginType type) {
         LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(type)));
         return false;
     }
-    mSuspendPluginTotal->Add(1);
+    ADD_COUNTER(mSuspendPluginTotal, 1);
     return true;
 }
 

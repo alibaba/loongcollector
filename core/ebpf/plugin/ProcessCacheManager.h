@@ -30,6 +30,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "models/SizedContainer.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "util/FrequencyManager.h"
 
 namespace logtail {
@@ -41,7 +42,10 @@ public:
     ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                         const std::string& hostName,
                         const std::string& hostPathPrefix,
-                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        CounterPtr pollEventsTotal,
+                        CounterPtr lossEventsTotal,
+                        CounterPtr cacheMissTotal);
     ~ProcessCacheManager() = default;
 
     bool ContainsKey(const data_event_id& key) const {
@@ -58,6 +62,9 @@ public:
         }
         return nullptr;
     }
+
+    void UpdateRecvEventTotal(uint64_t count = 1);
+    void UpdateLossEventTotal(uint64_t count);
 
     std::vector<std::shared_ptr<Proc>> ListRunningProcs();
     int WriteProcToBPFMap(const std::shared_ptr<Proc>& proc);
@@ -138,6 +145,10 @@ private:
     std::string mHostName;
     std::filesystem::path mHostPathPrefix;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
+
+    CounterPtr mPollProcessEventsTotal;
+    CounterPtr mLossProcessEventsTotal;
+    CounterPtr mProcessCacheMissTotal;
 
     std::atomic_bool mFlushProcessEvent = false;
     std::future<void> mPoller;

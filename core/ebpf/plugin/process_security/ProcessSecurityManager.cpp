@@ -25,7 +25,9 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
+#include "ebpf/eBPFServer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/PeriodicalEvent.h"
@@ -33,6 +35,8 @@
 
 namespace logtail {
 namespace ebpf {
+
+class eBPFServer;
 
 const std::string ProcessSecurityManager::kExitTidKey = "exit_tid";
 const std::string ProcessSecurityManager::kExitCodeKey = "exit_code";
@@ -43,8 +47,8 @@ const std::string ProcessSecurityManager::kExitValue = "exit";
 ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               std::shared_ptr<Timer> scheduler)
-    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(scheduler)),
+                                               PluginMetricManagerPtr mgr)
+    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(mgr)),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -136,6 +140,8 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
             return true;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
         if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
@@ -155,7 +161,6 @@ int ProcessSecurityManager::Init(
     mFlag = true;
     mSuspendFlag = false;
 
-    mStartUid++;
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
         LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
@@ -163,22 +168,25 @@ int ProcessSecurityManager::Init(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
+
+    std::shared_ptr<AbstractManager> managerPtr
+        = eBPFServer::GetInstance()->GetPluginManager(PluginType::PROCESS_SECURITY);
+
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
-        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            return this->ConsumeAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) { // handler
+            ProcessSecurityManager* mgr = static_cast<ProcessSecurityManager*>(managerPtr.get());
+            return mgr->ConsumeAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule"));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
+            return false;
+        });
 
-    mScheduler->PushEvent(std::move(event));
+    Timer::GetInstance()->PushEvent(std::move(event));
 
     return 0;
 }

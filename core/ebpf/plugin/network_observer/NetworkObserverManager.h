@@ -36,17 +36,17 @@ public:
     Create(std::shared_ptr<ProcessCacheManager>& mgr,
            std::shared_ptr<SourceManager> sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           std::shared_ptr<Timer> scheduler) {
-        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, scheduler);
+           PluginMetricManagerPtr metricMgr) {
+        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, metricMgr);
     }
 
     NetworkObserverManager() = delete;
-    ~NetworkObserverManager() override {}
+    ~NetworkObserverManager() override { LOG_INFO(sLogger, ("begin destruct plugin", "network_observer")); }
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                            std::shared_ptr<SourceManager> sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           std::shared_ptr<Timer> scheduler);
+                           PluginMetricManagerPtr mgr);
 
     int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) override;
 
@@ -93,18 +93,18 @@ public:
         return 0;
     }
 
-private:
-    void ProcessRecord(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
-
     bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec);
+
+private:
+    void ProcessRecord(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
+    void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
 
     void RunInThread();
 
@@ -122,9 +122,17 @@ private:
     mutable std::atomic_int64_t mLostCtrlEventsTotal = 0;
     mutable std::atomic_int64_t mLostDataEventsTotal = 0;
 
-    mutable std::atomic_int64_t mParseHttpRecordsSuccessTotal = 0;
-    mutable std::atomic_int64_t mParseHttpRecordsFailedTotal = 0;
-    mutable std::atomic_int64_t mAggMapEntitiesNum = 0;
+    // recv kernel events metric
+    // CounterPtr mRecvConnStatsEventsTotal;
+    // CounterPtr mRecvCtrlEventsTotal;
+    // CounterPtr mRecvHTTPDataEventsTotal;
+
+    // cache relative metric
+    // IntGaugePtr mConnTrackerNum;
+
+    // metadata relative metric
+    // CounterPtr mSelfMetadataMatchTotal;
+    // CounterPtr mPeerMetadataMatchTotal;
 
     mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;

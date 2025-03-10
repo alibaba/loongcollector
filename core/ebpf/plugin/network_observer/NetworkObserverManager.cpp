@@ -21,6 +21,7 @@
 #include "common/StringTools.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
+#include "ebpf/eBPFServer.h"
 #include "ebpf/include/export.h"
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/PeriodicalEvent.h"
@@ -35,6 +36,8 @@ extern "C" {
 
 namespace logtail {
 namespace ebpf {
+
+class eBPFServer;
 
 static constexpr uint32_t APP_ID_INDEX = kConnTrackerTable.ColIndex(kAppId.Name());
 static constexpr uint32_t APP_NAME_INDEX = kConnTrackerTable.ColIndex(kAppName.Name());
@@ -52,8 +55,8 @@ static constexpr uint32_t PEER_NAMESPACE_INDEX = kConnTrackerTable.ColIndex(kPee
 NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               std::shared_ptr<Timer> scheduler)
-    : AbstractManager(baseMgr, sourceManager, queue, scheduler),
+                                               PluginMetricManagerPtr mgr)
+    : AbstractManager(baseMgr, sourceManager, queue, mgr),
       mAppAggregator(
           10240,
           [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractRecord>& o) {
@@ -360,6 +363,9 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
             }
         });
 #ifdef APSARA_UNIT_TEST_MAIN
+        auto eventSize = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventSize);
+        ADD_COUNTER(mPushLogGroupTotal, 1);
         mLogEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init && needPush) {
@@ -368,6 +374,8 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 return true;
             }
             auto eventSize = eventGroup.GetEvents().size();
+            ADD_COUNTER(mPushLogsTotal, eventSize);
+            ADD_COUNTER(mPushLogGroupTotal, 1);
             LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
             std::unique_ptr<ProcessQueueItem> item
                 = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
@@ -599,6 +607,9 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
             }
         });
 #ifdef APSARA_UNIT_TEST_MAIN
+        auto eventSize = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushMetricsTotal, eventSize);
+        ADD_COUNTER(mPushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
         std::lock_guard lk(mContextMutex);
@@ -606,6 +617,8 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
             return true;
         }
         auto eventSize = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushMetricsTotal, eventSize);
+        ADD_COUNTER(mPushMetricGroupTotal, 1);
         LOG_DEBUG(sLogger, ("net event group size", eventGroup.GetEvents().size()));
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
@@ -777,6 +790,9 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             }
         });
 #ifdef APSARA_UNIT_TEST_MAIN
+        auto eventSize = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushMetricsTotal, eventSize);
+        ADD_COUNTER(mPushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (needPush) {
@@ -785,6 +801,8 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
                 return true;
             }
             auto eventSize = eventGroup.GetEvents().size();
+            ADD_COUNTER(mPushMetricsTotal, eventSize);
+            ADD_COUNTER(mPushMetricGroupTotal, 1);
             LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
             std::unique_ptr<ProcessQueueItem> item
                 = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
@@ -903,6 +921,9 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
             }
         });
 #ifdef APSARA_UNIT_TEST_MAIN
+        auto eventSize = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushMetricsTotal, eventSize);
+        ADD_COUNTER(mPushMetricGroupTotal, 1);
         mSpanEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init && needPush) {
@@ -911,6 +932,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 return true;
             }
             auto eventSize = eventGroup.GetEvents().size();
+            ADD_COUNTER(mPushSpansTotal, eventSize);
+            ADD_COUNTER(mPushSpanGroupTotal, 1);
             LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
             std::unique_ptr<ProcessQueueItem> item
                 = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
@@ -1023,7 +1046,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     UpdateParsers(opt->mEnableProtocols, {});
 
     mFlag = true;
-    mStartUid++;
 
     mConnectionManager = ConnectionManager::Create();
     mConnectionManager->SetConnStatsStatus(!opt->mDisableConnStats);
@@ -1040,72 +1062,71 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         mClusterId = StringTo<std::string>(value);
     }
 
+    std::shared_ptr<AbstractManager> managerPtr
+        = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+
     // TODO @qianlu.kk init converger later ...
 
     std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
         1,
-        [this](const std::chrono::steady_clock::time_point& execTime) {
-            return this->ConsumeSpanAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
+            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
+            return networkObserverManager->ConsumeSpanAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
+            return false;
+        });
 
     std::unique_ptr<AggregateEvent> appLogEvent = std::make_unique<AggregateEvent>(
         1,
-        [this](const std::chrono::steady_clock::time_point& execTime) {
-            return this->ConsumeLogAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
+            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
+            return networkObserverManager->ConsumeLogAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
+            return false;
+        });
 
     std::unique_ptr<AggregateEvent> appMetricEvent = std::make_unique<AggregateEvent>(
         15,
-        [this](const std::chrono::steady_clock::time_point& execTime) {
-            return this->ConsumeMetricAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
+            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
+            return networkObserverManager->ConsumeMetricAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
+            return false;
+        });
 
     std::unique_ptr<AggregateEvent> netMetricEvent = std::make_unique<AggregateEvent>(
         15,
-        [this](const std::chrono::steady_clock::time_point& execTime) {
-            return this->ConsumeNetMetricAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
+            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
+            return networkObserverManager->ConsumeNetMetricAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
+            return false;
+        });
 
-    mScheduler->PushEvent(std::move(appMetricEvent));
-    mScheduler->PushEvent(std::move(netMetricEvent));
-    mScheduler->PushEvent(std::move(appTraceEvent));
-    mScheduler->PushEvent(std::move(appLogEvent));
+    Timer::GetInstance()->PushEvent(std::move(appMetricEvent));
+    Timer::GetInstance()->PushEvent(std::move(netMetricEvent));
+    Timer::GetInstance()->PushEvent(std::move(appTraceEvent));
+    Timer::GetInstance()->PushEvent(std::move(appLogEvent));
     // init sampler
     {
         if (opt->mSampleRate < 0 || opt->mSampleRate > 1) {
@@ -1140,37 +1161,31 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     if (K8sMetadata::GetInstance().Enable()) {
         config.mCidOffset = mCidOffset;
         config.mEnableCidFilter = true;
+
         std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
             5,
-            [this](const std::chrono::steady_clock::time_point& execTime) {
+            [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
+                NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
                 std::vector<std::string> podIpVec;
                 bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
                 if (res) {
-                    this->HandleHostMetadataUpdate(podIpVec);
+                    networkObserverManager->HandleHostMetadataUpdate(podIpVec);
                 } else {
                     LOG_DEBUG(sLogger, ("failed to request host metada", ""));
                 }
                 return true;
             },
-            [this](int currentUid) { // validator
-                auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-                if (isStop) {
-                    LOG_INFO(
-                        sLogger,
-                        ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+            [managerPtr]() { // stop checker
+                if (!managerPtr->IsExists()) {
+                    LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
+                    return true;
                 }
-                return isStop;
-            },
-            mStartUid);
-        mScheduler->PushEvent(std::move(hostMetaUpdateTask));
+                return false;
+            });
+        Timer::GetInstance()->PushEvent(std::move(hostMetaUpdateTask));
     }
 
     config.mDataHandler = [](void* custom_data, struct conn_data_event_t* event) {
-        // LOG_DEBUG(sLogger,
-        //           ("[DUMP] stats event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)(
-        //               "start", event->conn_id.start)("role", int(event->role))("startTs", event->start_ts)(
-        //               "endTs", event->end_ts)("protocol", int(event->protocol))("req_len", event->request_len)(
-        //               "resp_len", event->response_len)("data", event->msg));
         auto mgr = static_cast<NetworkObserverManager*>(custom_data);
         if (mgr == nullptr) {
             LOG_ERROR(sLogger, ("assert network observer handler failed", ""));
@@ -1430,6 +1445,7 @@ void NetworkObserverManager::PollBufferWrapper() {
 }
 
 void NetworkObserverManager::RecordEventLost(enum callback_type_e type, uint64_t lost_count) {
+    ADD_COUNTER(mLossKernelEventsTotal, lost_count);
     switch (type) {
         case STAT_HAND:
             mLostConnStatEventsTotal.fetch_add(lost_count);
@@ -1446,6 +1462,7 @@ void NetworkObserverManager::RecordEventLost(enum callback_type_e type, uint64_t
 }
 
 void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
     const auto conn = mConnectionManager->AcceptNetDataEvent(event);
     mRecvHttpDataEventsTotal.fetch_add(1);
 
@@ -1473,6 +1490,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
 }
 
 void NetworkObserverManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
     LOG_DEBUG(
         sLogger,
         ("[DUMP] stats event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)("start", event->conn_id.start)(
@@ -1481,6 +1499,7 @@ void NetworkObserverManager::AcceptNetStatsEvent(struct conn_stats_event_t* even
 }
 
 void NetworkObserverManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
     LOG_DEBUG(sLogger,
               ("[DUMP] ctrl event handle, fd", event->conn_id.fd)("pid", event->conn_id.tgid)(
                   "start", event->conn_id.start)("type", int(event->type))("eventTs", event->ts));
@@ -1523,10 +1542,6 @@ int NetworkObserverManager::Destroy() {
     mLostConnStatEventsTotal = 0;
     mLostCtrlEventsTotal = 0;
     mLostDataEventsTotal = 0;
-
-    mParseHttpRecordsSuccessTotal = 0;
-    mParseHttpRecordsFailedTotal = 0;
-    mAggMapEntitiesNum = 0;
 
     LOG_INFO(sLogger, ("destroy stage", "clear agg tree"));
     {

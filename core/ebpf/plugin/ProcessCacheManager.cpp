@@ -38,6 +38,7 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "logger/Logger.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "type/table/BaseElements.h"
 #include "util/FrequencyManager.h"
 
@@ -64,6 +65,8 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
         LOG_ERROR(sLogger, ("data is null!", ""));
         return;
     }
+
+    processCacheMgr->UpdateRecvEventTotal();
 
     auto* common = static_cast<struct msg_common*>(data);
     switch (common->op) {
@@ -96,21 +99,39 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
     }
 }
 
-void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long lost_cnt) {
-    LOG_WARNING(sLogger, ("lost events", lost_cnt)("cpu", cpu));
-    // TODO self monitor...
+void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long cnt) {
+    auto* processCacheMgr = static_cast<ProcessCacheManager*>(ctx);
+    if (!processCacheMgr) {
+        LOG_ERROR(sLogger, ("ProcessCacheManager is null!", "")("lost events", cnt)("cpu", cpu));
+        return;
+    }
+    processCacheMgr->UpdateLossEventTotal(cnt);
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////
+
+void ProcessCacheManager::UpdateRecvEventTotal(uint64_t count) {
+    ADD_COUNTER(mPollProcessEventsTotal, count);
+}
+void ProcessCacheManager::UpdateLossEventTotal(uint64_t count) {
+    ADD_COUNTER(mLossProcessEventsTotal, count);
+}
 
 ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                                          const std::string& hostName,
                                          const std::string& hostPathPrefix,
-                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         CounterPtr pollEventsTotal,
+                                         CounterPtr lossEventsTotal,
+                                         CounterPtr cacheMissTotal)
     : mSourceManager(sm),
       mProcParser(hostPathPrefix),
       mHostName(hostName),
       mHostPathPrefix(hostPathPrefix),
-      mCommonEventQueue(queue) {
+      mCommonEventQueue(queue),
+      mPollProcessEventsTotal(pollEventsTotal),
+      mLossProcessEventsTotal(lossEventsTotal),
+      mProcessCacheMissTotal(cacheMissTotal) {
     mCache.reserve(kInitCacheSize);
     mDataMap.reserve(kInitDataMapSize);
 }
@@ -768,6 +789,7 @@ SizedMap ProcessCacheManager::FinalizeProcessTags(std::shared_ptr<SourceBuffer>&
     SizedMap res;
     auto proc = LookupCache({pid, ktime});
     if (!proc) {
+        ADD_COUNTER(mProcessCacheMissTotal, 1);
         LOG_WARNING(sLogger,
                     ("cannot find proc in cache, pid",
                      pid)("ktime", ktime)("contains", proc.get() != nullptr)("size", mCache.size()));

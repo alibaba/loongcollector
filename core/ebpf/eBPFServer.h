@@ -26,7 +26,6 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
@@ -106,10 +105,7 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                              PluginMetricManagerPtr mgr);
-    eBPFServer()
-        : mSourceManager(std::make_shared<SourceManager>()),
-          mScheduler(std::make_shared<Timer>()),
-          mDataEventQueue(4096) {}
+    eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
     ~eBPFServer() = default;
 
     void
@@ -136,11 +132,12 @@ private:
     CounterPtr mStartPluginTotal;
     CounterPtr mStopPluginTotal;
     CounterPtr mSuspendPluginTotal;
+    CounterPtr mPollProcessEventsTotal;
+    CounterPtr mLossProcessEventsTotal;
+    CounterPtr mProcessCacheMissTotal;
 
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
-
-    std::shared_ptr<Timer> mScheduler;
 
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;
 

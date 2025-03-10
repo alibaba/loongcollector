@@ -20,6 +20,7 @@
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
+#include "ebpf/eBPFServer.h"
 #include "ebpf/type/PeriodicalEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
@@ -27,6 +28,8 @@
 
 namespace logtail {
 namespace ebpf {
+
+class eBPFServer;
 
 const std::string NetworkSecurityManager::kTcpSendMsgValue = "tcp_sendmsg";
 const std::string NetworkSecurityManager::kTcpCloseValue = "tcp_close";
@@ -42,8 +45,6 @@ void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
         return;
     tcp_data_t* event = static_cast<tcp_data_t*>(data);
     ss->RecordNetworkEvent(event);
-    // TODO @qianlu.kk  self monitor
-    //   ss->UpdateRecvKernelEventsTotal();
     return;
 }
 
@@ -55,12 +56,16 @@ void HandleNetworkKernelEventLoss(void* ctx, int cpu, __u64 num) {
     NetworkSecurityManager* ss = static_cast<NetworkSecurityManager*>(ctx);
     if (ss == nullptr)
         return;
-    //   ss->UpdateLossKernelEventsTotal(lost_cnt);
-
+    ss->UpdateLossKernelEventsTotal(num);
     return;
 }
 
+void NetworkSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
+    ADD_COUNTER(mLossKernelEventsTotal, cnt);
+}
+
 void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
     KernelEventType type = KernelEventType::TCP_SENDMSG_EVENT;
     switch (event->func) {
         case TRACEPOINT_FUNC_TCP_SENDMSG:
@@ -97,8 +102,8 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               std::shared_ptr<Timer> scheduler)
-    : AbstractManager(base, sourceManager, queue, scheduler),
+                                               PluginMetricManagerPtr mgr)
+    : AbstractManager(base, sourceManager, queue, mgr),
       mAggregateTree(
           4096,
           [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -222,6 +227,8 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
             return true;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
         if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
@@ -242,22 +249,23 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     mFlag = true;
 
-    mStartUid++;
+    std::shared_ptr<AbstractManager> managerPtr
+        = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_SECURITY);
+
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
-        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            return this->ConsumeAggregateTree(execTime);
+        [managerPtr](const std::chrono::steady_clock::time_point& execTime) { // handler
+            NetworkSecurityManager* mgr = static_cast<NetworkSecurityManager*>(managerPtr.get());
+            return mgr->ConsumeAggregateTree(execTime);
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
-            if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+        [managerPtr]() { // stop checker
+            if (!managerPtr->IsExists()) {
+                LOG_INFO(sLogger, ("plugin not exists", "stop schedule"));
+                return true;
             }
-            return isStop;
-        },
-        mStartUid);
-    mScheduler->PushEvent(std::move(event));
+            return false;
+        });
+    Timer::GetInstance()->PushEvent(std::move(event));
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::NETWORK_SECURITY;

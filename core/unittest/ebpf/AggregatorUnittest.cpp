@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <chrono>
 #include <json/json.h>
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <random>
 
@@ -48,8 +48,8 @@ namespace ebpf {
 
 class AggregatorUnittest : public testing::Test {
 public:
-    AggregatorUnittest() { mTimer.Init(); }
-    ~AggregatorUnittest() { mTimer.Stop(); }
+    AggregatorUnittest() { Timer::GetInstance()->Init(); }
+    ~AggregatorUnittest() { Timer::GetInstance()->Stop(); }
 
     void TestBasicAgg();
     void TestGetAndReset();
@@ -103,9 +103,7 @@ protected:
     }
 
 private:
-    Timer mTimer;
     std::atomic_bool mFlag = true;
-    int mStartUid = 0;
     std::vector<int> mVec;
     int mIntervalSec = 1;
     std::unique_ptr<SIZETAggTree<HT, std::vector<std::string>>> agg;
@@ -226,17 +224,15 @@ void AggregatorUnittest::TestAggManager() {
             this->mVec.push_back(1);
             return true;
         },
-        [this](int currentUid) { // validator
-            auto isStop = !this->mFlag.load() || currentUid != this->mStartUid;
+        [this]() { // validator
+            auto isStop = !this->mFlag.load();
             if (isStop) {
-                LOG_INFO(sLogger,
-                         ("stop schedule, mflag", this->mFlag)("currentUid", currentUid)("pluginUid", this->mStartUid));
+                LOG_INFO(sLogger, ("stop schedule, mflag", this->mFlag));
             }
             return isStop;
-        },
-        mStartUid);
+        });
 
-    mTimer.PushEvent(std::move(event));
+    Timer::GetInstance()->PushEvent(std::move(event));
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
     mFlag = false;

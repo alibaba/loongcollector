@@ -21,6 +21,7 @@
 #include <set>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
@@ -32,6 +33,7 @@
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/util/AggregateTree.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 namespace ebpf {
@@ -44,8 +46,8 @@ public:
     explicit AbstractManager(std::shared_ptr<ProcessCacheManager>,
                              std::shared_ptr<SourceManager> sourceManager,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             std::shared_ptr<Timer> scheduler);
-    virtual ~AbstractManager() {}
+                             PluginMetricManagerPtr mgr);
+    virtual ~AbstractManager();
 
     virtual int Init(const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*>& options) = 0;
 
@@ -62,6 +64,8 @@ public:
     }
 
     bool IsRunning() { return mFlag && !mSuspendFlag; }
+
+    bool IsExists() { return mFlag; }
 
     int GetCallNameIdx(const std::string& callName);
 
@@ -132,7 +136,7 @@ protected:
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<SourceManager> mSourceManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
-    std::shared_ptr<Timer> mScheduler;
+    PluginMetricManagerPtr mMetricMgr;
 
     mutable std::mutex mContextMutex;
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
@@ -142,7 +146,18 @@ protected:
 
     // static ...
     std::chrono::nanoseconds mTimeDiff;
-    std::atomic_int mStartUid = 0;
+    // std::atomic_int mStartUid = 0;
+
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushSpansTotal;
+    CounterPtr mPushSpanGroupTotal;
+    CounterPtr mPushMetricsTotal;
+    CounterPtr mPushMetricGroupTotal;
+
+    std::vector<MetricLabels> mRefAndLabels;
 };
 
 } // namespace ebpf

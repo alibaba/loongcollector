@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #include <chrono>
-
 #include <memory>
 #include <thread>
 
 #include "common/TimeUtil.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
+#include "ebpf/eBPFServer.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/plugin/network_observer/NetworkObserverManager.h"
 #include "ebpf/protocol/ProtocolParser.h"
@@ -45,22 +45,21 @@ public:
 
 protected:
     void SetUp() override {
-        mTimer = std::make_shared<Timer>();
-        mTimer->Init();
+        Timer::GetInstance()->Init();
         mSourceManager = std::make_shared<SourceManager>();
         mSourceManager->Init();
-        mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager, "test_host", "/", mEventQueue);
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(
+            mSourceManager, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
     }
 
-    void TearDown() override { mTimer->Stop(); }
+    void TearDown() override { Timer::GetInstance()->Stop(); }
 
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, mTimer);
+        return NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
     }
 
-    std::shared_ptr<Timer> mTimer;
     std::shared_ptr<SourceManager> mSourceManager;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
@@ -68,9 +67,9 @@ private:
 
 void NetworkObserverManagerUnittest::TestInitialization() {
     auto manager = CreateManager();
+    eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, manager);
     EXPECT_NE(manager, nullptr);
 
-    // 测试正常初始化
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP", "MySQL", "Redis"};
     options.mEnableCids = {"container1", "container2"};
@@ -80,18 +79,20 @@ void NetworkObserverManagerUnittest::TestInitialization() {
     EXPECT_EQ(result, 0);
     EXPECT_EQ(manager->GetPluginType(), PluginType::NETWORK_OBSERVE);
 
-    // 测试销毁
     result = manager->Destroy();
+    eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
+    std::this_thread::sleep_for(std::chrono::seconds(15));
+    LOG_INFO(sLogger, ("aa", "aa"));
     EXPECT_EQ(result, 0);
 }
 
 void NetworkObserverManagerUnittest::TestEventHandling() {
-    auto manager = CreateManager();
+    auto manager = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
+    EXPECT_NE(manager, nullptr);
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP"};
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 测试连接建立事件
     struct conn_ctrl_event_t connectEvent = {};
     connectEvent.conn_id.fd = 1;
     connectEvent.conn_id.tgid = 1000;
@@ -99,7 +100,6 @@ void NetworkObserverManagerUnittest::TestEventHandling() {
     connectEvent.type = EventConnect;
     manager->AcceptNetCtrlEvent(&connectEvent);
 
-    // 测试连接统计事件
     struct conn_stats_event_t statsEvent = {};
     statsEvent.conn_id = connectEvent.conn_id;
     statsEvent.protocol = support_proto_e::ProtoHTTP;
@@ -112,12 +112,10 @@ void NetworkObserverManagerUnittest::TestEventHandling() {
     statsEvent.si.ap.dport = htons(80);
     manager->AcceptNetStatsEvent(&statsEvent);
 
-    // 测试连接关闭事件
     struct conn_ctrl_event_t closeEvent = connectEvent;
     closeEvent.type = EventClose;
     manager->AcceptNetCtrlEvent(&closeEvent);
 
-    // 测试事件丢失处理
     manager->RecordEventLost(callback_type_e::CTRL_HAND, 1);
     manager->RecordEventLost(callback_type_e::INFO_HANDLE, 2);
     manager->RecordEventLost(callback_type_e::STAT_HAND, 3);
@@ -256,17 +254,14 @@ void NetworkObserverManagerUnittest::TestWhitelistManagement() {
     options.mEnableProtocols = {"HTTP"};
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 测试添加白名单
     std::vector<std::string> enableCids = {"container1", "container2"};
     std::vector<std::string> disableCids;
     manager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
 
-    // 测试添加黑名单
     enableCids.clear();
     disableCids = {"container3", "container4"};
     manager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
 
-    // 测试同时更新白名单和黑名单
     enableCids = {"container5"};
     disableCids = {"container6"};
     manager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
@@ -278,11 +273,9 @@ void NetworkObserverManagerUnittest::TestPerfBufferOperations() {
     options.mEnableProtocols = {"HTTP"};
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    // 测试正常轮询
     int result = manager->PollPerfBuffer();
     EXPECT_EQ(result, 0);
 
-    // 测试连续轮询
     for (int i = 0; i < 5; i++) {
         result = manager->PollPerfBuffer();
         EXPECT_EQ(result, 0);
