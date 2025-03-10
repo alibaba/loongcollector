@@ -20,7 +20,7 @@ namespace logtail {
 
 void TimeoutFlushManager::UpdateRecord(
     const string& config, size_t index, size_t key, uint32_t timeoutSecs, Flusher* f) {
-    lock_guard<mutex> lock(mMux);
+    lock_guard<recursive_mutex> lock(mMux);
     auto& item = mTimeoutRecords[config];
     auto it = item.find({index, key});
     if (it == item.end()) {
@@ -31,19 +31,16 @@ void TimeoutFlushManager::UpdateRecord(
 }
 
 void TimeoutFlushManager::FlushTimeoutBatch() {
+    lock_guard<recursive_mutex> lock(mMux);
     vector<pair<Flusher*, size_t>> records;
-    {
-        lock_guard<mutex> lock(mMux);
-        for (auto& item : mTimeoutRecords) {
-            for (auto it = item.second.begin(); it != item.second.end();) {
-                if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
-                    // cannot flush here, since flush may also update record, which will lead to both deadlock and map
-                    // iterator invalidation problems
-                    records.emplace_back(it->second.mFlusher, it->second.mKey);
-                    it = item.second.erase(it);
-                } else {
-                    ++it;
-                }
+    for (auto& item : mTimeoutRecords) {
+        for (auto it = item.second.begin(); it != item.second.end();) {
+            if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
+                // cannot flush here, since flush may also update record, which might invalidate map iterator
+                records.emplace_back(it->second.mFlusher, it->second.mKey);
+                it = item.second.erase(it);
+            } else {
+                ++it;
             }
         }
     }
@@ -53,7 +50,7 @@ void TimeoutFlushManager::FlushTimeoutBatch() {
 }
 
 void TimeoutFlushManager::ClearRecords(const string& config) {
-    lock_guard<mutex> lock(mMux);
+    lock_guard<recursive_mutex> lock(mMux);
     mTimeoutRecords.erase(config);
 }
 
