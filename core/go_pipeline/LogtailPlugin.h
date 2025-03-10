@@ -271,7 +271,6 @@ private:
     StartFun mStartFun;
     volatile bool mPluginValid;
     logtail::FlusherSLS mPluginAlarmConfig;
-    logtail::FlusherSLS mPluginProfileConfig;
     logtail::FlusherSLS mPluginContainerConfig;
     ProcessLogsFun mProcessLogsFun;
     ProcessLogGroupFun mProcessLogGroupFun;

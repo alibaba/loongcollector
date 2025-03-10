@@ -54,7 +54,6 @@ type ServiceWrapper struct {
 // metric plugin is an input plugin used for actively pulling data.
 type MetricWrapper struct {
 	InputWrapper
-	LatencyMetric pipeline.LatencyMetric
 }
 
 /*---------------------

@@ -148,7 +148,6 @@ func (p *pluginv1Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 	wrapper.Input = input
 
 	wrapper.LogsChan = p.LogsChan
-	wrapper.LatencyMetric = p.LogstoreConfig.Statistics.CollecLatencytMetric
 	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
 	return wrapper.Init(pluginMeta, inputInterval)
 }
@@ -213,7 +212,6 @@ func (p *pluginv1Runner) runMetricInput(async *pipeline.AsyncControl) {
 			state:           m.Input,
 			interval:        m.Interval,
 			context:         m.Config.Context,
-			latencyMetric:   m.Config.Statistics.CollecLatencytMetric,
 		}
 		async.Run(func(ac *pipeline.AsyncControl) {
 			runner.Run(func(state interface{}) error {
@@ -257,7 +255,6 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				processorTag.ProcessV1(logCtx)
 			}
 			logs := []*protocol.Log{logCtx.Log}
-			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(logs)))
 			for _, processor := range p.ProcessorPlugins {
 				logs = processor.Process(logs)
 				if len(logs) == 0 {
@@ -267,7 +264,6 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 			nowTime := time.Now()
 
 			if len(logs) > 0 {
-				p.LogstoreConfig.Statistics.SplitLogMetric.Add(int64(len(logs)))
 				for _, aggregator := range p.AggregatorPlugins {
 					for _, l := range logs {
 						if len(l.Contents) == 0 {
@@ -331,13 +327,11 @@ func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 			for i := 1; i < listLen; i++ {
 				logGroups[i] = <-p.LogGroupsChan
 			}
-			p.LogstoreConfig.Statistics.FlushLogGroupMetric.Add(int64(len(logGroups)))
 
 			for _, logGroup := range logGroups {
 				if len(logGroup.Logs) == 0 {
 					continue
 				}
-				p.LogstoreConfig.Statistics.FlushLogMetric.Add(int64(len(logGroup.Logs)))
 				logGroup.Source = util.GetIPAddress()
 			}
 
@@ -355,11 +349,8 @@ func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 				}
 				if allReady {
 					for _, flusher := range p.FlusherPlugins {
-						p.LogstoreConfig.Statistics.FlushReadyMetric.Add(1)
-						begin := time.Now()
 						err := flusher.Flush(p.LogstoreConfig.ProjectName,
 							p.LogstoreConfig.LogstoreName, p.LogstoreConfig.ConfigName, logGroups)
-						p.LogstoreConfig.Statistics.FlushLatencyMetric.Observe(float64(time.Since(begin)))
 						if err != nil {
 							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)
