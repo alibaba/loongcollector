@@ -19,8 +19,9 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 func excludeFlag() {
