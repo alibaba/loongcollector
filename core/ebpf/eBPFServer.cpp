@@ -167,6 +167,7 @@ void eBPFServer::Init() {
         LOG_INFO(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
     } else {
         LOG_INFO(sLogger, ("running in host mode", "would not set host path prefix ..."));
+        mHostPathPrefix = "/";
     }
 #endif
     LOG_INFO(sLogger, ("begin to init timer", ""));

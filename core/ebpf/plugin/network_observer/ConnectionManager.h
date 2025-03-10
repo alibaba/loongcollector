@@ -14,9 +14,8 @@
 
 #pragma once
 
-#include <chrono>
-
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <queue>

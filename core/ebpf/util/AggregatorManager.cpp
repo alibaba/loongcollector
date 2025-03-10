@@ -14,10 +14,9 @@
 
 #include "AggregatorManager.h"
 
-#include <chrono>
-
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <queue>
 #include <unordered_map>

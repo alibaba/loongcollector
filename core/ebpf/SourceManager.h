@@ -19,10 +19,10 @@
 
 #include <array>
 #include <atomic>
-#include <memory>
 #include <chrono>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "common/DynamicLibHelper.h"

@@ -550,8 +550,10 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
     // mRecordQueue.enqueue(std::move(event));
 
     if (mFlushProcessEvent) {
+        uint32_t pid = eventPtr->tgid;
+        uint64_t kt = eventPtr->ktime;
         auto event = std::make_shared<ProcessEvent>(
-            eventPtr->tgid, eventPtr->ktime, KernelEventType::PROCESS_CLONE_EVENT, eventPtr->common.ktime);
+            pid, kt, KernelEventType::PROCESS_CLONE_EVENT, eventPtr->common.ktime);
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
