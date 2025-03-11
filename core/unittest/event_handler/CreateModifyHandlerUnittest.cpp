@@ -177,10 +177,6 @@ private:
     }
 };
 
-// TODO: windows
-#if defined(_MSC_VER)
-void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent(){}
-#elif defined(__linux__)
 void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
     LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
     CreateModifyHandler createModifyHandler(&mCreateHandler);
@@ -198,12 +194,14 @@ void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
     createModifyHandler.Handle(event2);
     APSARA_TEST_EQUAL_FATAL(pHanlder->handle_count, 2);
 }
-#endif
 
 std::string CreateModifyHandlerUnittest::gRootDir;
 std::string CreateModifyHandlerUnittest::gLogName;
 
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(CreateModifyHandlerUnittest, TestHandleContainerStoppedEvent);
+#endif
 } // end of namespace logtail
 
 int main(int argc, char** argv) {
