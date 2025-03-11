@@ -150,8 +150,8 @@ void MetricEventUnittest::TestTag() {
 }
 
 void MetricEventUnittest::TestUntypedSingleValueSize() {
-    size_t basicSize
-        = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedSingleValue)
+        + sizeof(vector<std::pair<StringView, StringView>>);
     mMetricEvent->SetName("test");
     basicSize += 4;
 
@@ -174,8 +174,8 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
-    size_t basicSize
-        = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedMultiDoubleValues)
+        + sizeof(vector<std::pair<StringView, StringView>>);
     basicSize += 4;
 
     // add tag, and key not existed
