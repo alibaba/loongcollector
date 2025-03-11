@@ -206,7 +206,6 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     basicSize -= 22;
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
-#endif
 
 void MetricEventUnittest::TestReset() {
     mMetricEvent->SetTimestamp(12345678901);
