@@ -335,7 +335,6 @@ public:
     }
 };
 
-
 // TODO: windows
 #if defined(__linux__)
 UNIT_TEST_CASE(PollingPreservedDirDepthUnittest, TestPollingDirFile0);
