@@ -150,7 +150,7 @@ void MetricEventUnittest::TestTag() {
 }
 
 void MetricEventUnittest::TestUntypedSingleValueSize() {
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedSingleValue)
+    size_t basicSize = sizeof(time_t) + sizeof(int64_t) + sizeof(UntypedSingleValue)
         + sizeof(vector<std::pair<StringView, StringView>>);
     mMetricEvent->SetName("test");
     basicSize += 4;
@@ -174,7 +174,7 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedMultiDoubleValues)
+    size_t basicSize = sizeof(time_t) + sizeof(int64_t) + sizeof(UntypedMultiDoubleValues)
         + sizeof(vector<std::pair<StringView, StringView>>);
     basicSize += 4;
 
@@ -401,11 +401,8 @@ UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValues)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
-// TODO: windows
-#if defined(__linux__)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesSize)
-#endif
 UNIT_TEST_CASE(MetricEventUnittest, TestReset)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesToJson)
