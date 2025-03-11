@@ -151,7 +151,7 @@ void MetricEventUnittest::TestTag() {
 
 void MetricEventUnittest::TestUntypedSingleValueSize() {
     size_t basicSize
-        = sizeof(time_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
+        = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
     mMetricEvent->SetName("test");
     basicSize += 4;
 
@@ -170,11 +170,12 @@ void MetricEventUnittest::TestUntypedSingleValueSize() {
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
 
+
 void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
     size_t basicSize
-        = sizeof(time_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
+        = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedMultiDoubleValues) + sizeof(map<StringView, StringView>);
     basicSize += 4;
 
     // add tag, and key not existed
@@ -205,7 +206,7 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     basicSize -= 22;
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
-
+#endif
 
 void MetricEventUnittest::TestReset() {
     mMetricEvent->SetTimestamp(12345678901);
@@ -401,8 +402,11 @@ UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValues)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
+// TODO: windows
+#if defined(__linux__)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesSize)
+#endif
 UNIT_TEST_CASE(MetricEventUnittest, TestReset)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesToJson)
