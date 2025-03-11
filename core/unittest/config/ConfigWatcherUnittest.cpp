@@ -61,7 +61,9 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
 
-        { ofstream fout("continuous_pipeline_config"); }
+        {
+            ofstream fout("continuous_pipeline_config");
+        }
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.IsEmpty());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
@@ -71,7 +73,9 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
 
-        { ofstream fout("instance_config"); }
+        {
+            ofstream fout("instance_config");
+        }
         diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
         filesystem::remove_all("instance_config");
@@ -83,8 +87,12 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
         filesystem::create_directories(configDir);
 
         filesystem::create_directories(configDir / "dir");
-        { ofstream fout(configDir / "unsupported_extenstion.zip"); }
-        { ofstream fout(configDir / "empty_file.json"); }
+        {
+            ofstream fout(configDir / "unsupported_extenstion.zip");
+        }
+        {
+            ofstream fout(configDir / "empty_file.json");
+        }
         {
             ofstream fout(configDir / "invalid_format.json");
             fout << "[}";
@@ -102,8 +110,12 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
         filesystem::create_directories(instanceConfigDir);
 
         filesystem::create_directories(instanceConfigDir / "dir");
-        { ofstream fout(instanceConfigDir / "unsupported_extenstion.zip"); }
-        { ofstream fout(instanceConfigDir / "empty_file.json"); }
+        {
+            ofstream fout(instanceConfigDir / "unsupported_extenstion.zip");
+        }
+        {
+            ofstream fout(instanceConfigDir / "empty_file.json");
+        }
         {
             ofstream fout(instanceConfigDir / "invalid_format.json");
             fout << "[}";
@@ -116,7 +128,8 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
 
 // TODO: windows
 #if defined(_MSC_VER)
-void ConfigWatcherUnittest::DuplicateConfigs() const {}
+void ConfigWatcherUnittest::DuplicateConfigs() const {
+}
 #elif defined(__linux__)
 void ConfigWatcherUnittest::DuplicateConfigs() const {
     {
@@ -145,7 +158,9 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
             }
         )";
         }
-        { ofstream fout("dir2/config.json"); }
+        {
+            ofstream fout("dir2/config.json");
+        }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         size_t builtinPipelineCnt = 0;
 #ifdef __ENTERPRISE__
@@ -179,7 +194,9 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
             }
         )";
         }
-        { ofstream fout("dir2/config.json"); }
+        {
+            ofstream fout("dir2/config.json");
+        }
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_FALSE(diff.IsEmpty());
         APSARA_TEST_EQUAL(1U, diff.mAdded.size());

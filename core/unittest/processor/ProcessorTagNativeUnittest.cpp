@@ -70,7 +70,8 @@ void ProcessorTagNativeUnittest::TestInit() {
 
 // TODO: windows
 #if defined(_MSC_VER)
-void ProcessorTagNativeUnittest::TestProcess() {}
+void ProcessorTagNativeUnittest::TestProcess() {
+}
 #elif defined(__linux__)
 void ProcessorTagNativeUnittest::TestProcess() {
     { // native branch default
