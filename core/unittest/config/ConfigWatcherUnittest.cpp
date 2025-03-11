@@ -146,9 +146,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
             }
         )";
         }
-        {
-            ofstream fout("dir2/config.json");
-        }
+        { ofstream fout("dir2/config.json"); }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         size_t builtinPipelineCnt = 0;
 #ifdef __ENTERPRISE__
@@ -182,9 +180,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
             }
         )";
         }
-        {
-            ofstream fout("dir2/config.json");
-        }
+        { ofstream fout("dir2/config.json"); }
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_FALSE(diff.IsEmpty());
         APSARA_TEST_EQUAL(1U, diff.mAdded.size());
