@@ -48,7 +48,9 @@ const size_t ProcessTopN = 20;
 
 const std::string ProcessEntityCollector::sName = "process_entity";
 
+// clang-format off
 ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {};
+// clang-format on
 
 bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
                                      PipelineEventGroup* group) {

@@ -82,18 +82,26 @@ void CPUCollectorUnittest::TestCollect() const {
 
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_EQUAL_FATAL(2 * 10, group.GetEvents().size());
-    vector<int64_t> expected1 = {14708487 / SYSTEM_HERTZ,
-                                 14216 / SYSTEM_HERTZ,
-                                 4613031 / SYSTEM_HERTZ,
-                                 2108180843 / SYSTEM_HERTZ,
-                                 57199 / SYSTEM_HERTZ,
-                                 0,
-                                 424744 / SYSTEM_HERTZ,
-                                 0,
-                                 1 / SYSTEM_HERTZ,
-                                 2 / SYSTEM_HERTZ};
-    vector<int64_t> expected2
-        = {14708487 / SYSTEM_HERTZ, 14216 / SYSTEM_HERTZ, 4613031 / SYSTEM_HERTZ, 2108180843, 0, 0, 0, 0, 0, 0};
+    vector<double> expected1 = {14708487.0 / SYSTEM_HERTZ,
+                                14216.0 / SYSTEM_HERTZ,
+                                4613031.0 / SYSTEM_HERTZ,
+                                2108180843.0 / SYSTEM_HERTZ,
+                                57199.0 / SYSTEM_HERTZ,
+                                0.0,
+                                424744.0 / SYSTEM_HERTZ,
+                                0.0,
+                                1.0 / SYSTEM_HERTZ,
+                                2.0 / SYSTEM_HERTZ};
+    vector<double> expected2 = {14708487.0 / SYSTEM_HERTZ,
+                                14216.0 / SYSTEM_HERTZ,
+                                4613031.0 / SYSTEM_HERTZ,
+                                2108180843.0 / SYSTEM_HERTZ,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0};
     vector<string> expectedMode = {"user", "nice", "system", "idle", "iowait", "irq", "softirq", "steal"};
     for (size_t i = 0; i < 8; ++i) {
         auto event = group.GetEvents()[i].Cast<MetricEvent>();
@@ -132,7 +140,8 @@ void CPUCollectorUnittest::TestCollectWrongData() const {
 
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_EQUAL_FATAL(10, group.GetEvents().size());
-    vector<int64_t> expected = {0, 0, 0, 0, 0, 0, 424744 / SYSTEM_HERTZ, 0, 1 / SYSTEM_HERTZ, 2 / SYSTEM_HERTZ};
+    vector<double> expected
+        = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 424744.0 / SYSTEM_HERTZ, 0.0, 1.0 / SYSTEM_HERTZ, 2.0 / SYSTEM_HERTZ};
     vector<string> expectedMode = {"user", "nice", "system", "idle", "iowait", "irq", "softirq", "steal"};
     for (size_t i = 0; i < 8; ++i) {
         auto event = group.GetEvents()[i].Cast<MetricEvent>();
