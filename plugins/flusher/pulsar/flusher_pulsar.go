@@ -99,7 +99,7 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	f.context = context
 	// Validate config of flusher
 	if err := f.Validate(); err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init pulsar flusher fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init pulsar flusher fail, error", err)
 		return err
 	}
 	// Set default value while not set
@@ -112,7 +112,7 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	// Init converter
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init pulsar flusher converter fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init pulsar flusher converter fail, error", err)
 		return err
 	}
 	f.converter = convert
@@ -120,7 +120,7 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	// Obtain topic keys from dynamic topic expression
 	topicKeys, err := fmtstr.CompileKeys(f.Topic)
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init pulsar flusher fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init pulsar flusher fail, error", err)
 		return err
 	}
 	f.topicKeys = topicKeys
@@ -128,7 +128,7 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	options := f.initClientOptions()
 	client, err := pulsar.NewClient(options)
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init pulsar flusher fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init pulsar flusher fail, error", err)
 		return err
 	}
 	f.pulsarClient = client
@@ -139,7 +139,7 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	// Init Producer options
 	producerOptions, err := f.initProducerOptions()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init pulsar flusher producer options fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherInitAlarm, "init pulsar flusher producer options fail, error", err)
 		return err
 	}
 	f.producerOptions = producerOptions
@@ -188,21 +188,21 @@ func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configNam
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		logs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.selectFields)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush pulsar convert log fail, error", err)
+			logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			valueMap := values[index]
 			if len(f.topicKeys) > 0 {
 				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
 				if err != nil {
-					logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush pulsar format topic fail, error", err)
+					logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
 				} else {
 					topic = *formattedTopic
 				}
 			}
 			producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "load pulsar producer fail,topic", topic, "err", err)
+				logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
 				return err
 			}
 
@@ -214,7 +214,7 @@ func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configNam
 			}
 			producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
 				if err != nil {
-					logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "send message to pulsar fail,error", err)
+					logger.Error(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "send message to pulsar fail,error", err)
 				} else {
 					logger.Debug(f.context.GetRuntimeContext(), "Pulsar success send events: messageID: %s ", msgId)
 				}
@@ -238,7 +238,7 @@ func (f *FlusherPulsar) IsReady(projectName string, logstoreName string, logstor
 func (f *FlusherPulsar) Stop() error {
 	err := f.producers.Close()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_STOP_ALARM", "stop pulsar flusher fail, error", err)
+		logger.Error(f.context.GetRuntimeContext(), util.FlusherStopAlarm, "stop pulsar flusher fail, error", err)
 	}
 	f.pulsarClient.Close()
 	return err
@@ -314,7 +314,7 @@ func (f *FlusherPulsar) hashPartitionKey(valueMap map[string]string, defaultKey 
 		}
 	}
 	if len(notMatchKeys) > 0 {
-		logger.Warning(f.context.GetRuntimeContext(), "Some fields in PartitionKeys cannot be matched in the log content, keys", notMatchKeys)
+		logger.Warning(f.context.GetRuntimeContext(), util.FlusherFlushAlarm, "Some fields in PartitionKeys cannot be matched in the log content, keys", notMatchKeys)
 	}
 	if len(hashData) == 0 {
 		hashData = append(hashData, defaultKey)

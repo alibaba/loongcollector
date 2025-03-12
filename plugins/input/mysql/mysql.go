@@ -95,7 +95,7 @@ func (m *Mysql) Init(context pipeline.Context) (int, error) {
 		if err != nil && len(data) > 0 {
 			m.StateMent = string(data)
 		} else {
-			logger.Warning(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "init sql statement error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.MysqlInitAlarm, "init sql statement error", err)
 		}
 	}
 	if len(m.StateMent) == 0 {
@@ -122,7 +122,7 @@ func (m *Mysql) Description() string {
 func (m *Mysql) initMysql() error {
 	tlsConfig, err := util.GetTLSConfig(m.SSLCert, m.SSLKey, m.SSLCA, false)
 	if err != nil {
-		logger.Error(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "MySQL Error registering TLS config", err)
+		logger.Error(m.context.GetRuntimeContext(), util.MysqlInitAlarm, "MySQL Error registering TLS config", err)
 	}
 
 	if tlsConfig != nil {
@@ -143,7 +143,7 @@ func (m *Mysql) initMysql() error {
 					logger.Debug(m.context.GetRuntimeContext(), "sql connect success, ping error", m.dbInstance.Ping())
 					break
 				} else {
-					logger.Warning(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "init db statement error, err", err)
+					logger.Warning(m.context.GetRuntimeContext(), util.MysqlInitAlarm, "init db statement error, err", err)
 					break
 				}
 			}
@@ -196,7 +196,7 @@ func (m *Mysql) dsnConfig() (string, error) {
 		if err != nil {
 			conf.Loc = loc
 		} else {
-			logger.Error(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "Set Mysql location error, loc", m.Location, "error", err)
+			logger.Error(m.context.GetRuntimeContext(), util.MysqlInitAlarm, "Set Mysql location error, loc", m.Location, "error", err)
 		}
 	}
 
@@ -214,7 +214,7 @@ func (m *Mysql) InitCheckPointFromString(val string) {
 	// if m.CheckPointColumnType == "time" {
 	// 	t, err := time.Parse("2006-01-02 15:04:05", val)
 	// 	if err != nil {
-	// 		logger.Warning("MYSQL_INIT_ALARM", "init time checkpoint error, value", val, "error", err)
+	// 		logger.Warning(util.MysqlInitAlarm, "init time checkpoint error, value", val, "error", err)
 	// 		m.checkpointValue = time.Unix(0, 0)
 	// 	} else {
 	// 		m.checkpointValue = t
@@ -248,11 +248,11 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 
 			switch {
 			case err != nil:
-				logger.Error(m.context.GetRuntimeContext(), "MYSQL_CHECKPOING_ALARM", "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
+				logger.Error(m.context.GetRuntimeContext(), util.MysqlCheckpoingAlarm, "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
 			case cp.CheckPointColumn == m.CheckPointColumn && m.CheckPointColumnType == cp.CheckPointColumnType:
 				m.checkpointValue = cp.Value
 			default:
-				logger.Warning(m.context.GetRuntimeContext(), "MYSQL_CHECKPOING_ALARM", "not matched checkpoint, may be config update, last column",
+				logger.Warning(m.context.GetRuntimeContext(), util.MysqlCheckpoingAlarm, "not matched checkpoint, may be config update, last column",
 					cp.CheckPointColumn, "now column", m.CheckPointColumn, "last type", cp.CheckPointColumnType, "now type", m.CheckPointColumnType)
 			}
 		}
@@ -274,12 +274,12 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 			startTime := time.Now()
 			err = m.Collect(collector)
 			if err != nil {
-				logger.Error(m.context.GetRuntimeContext(), "MYSQL_QUERY_ALARM", "sql query error", err)
+				logger.Error(m.context.GetRuntimeContext(), util.MusqlQueryAlarm, "sql query error", err)
 			}
 			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()
 			if endTime.Sub(startTime) > time.Duration(m.IntervalMs)*time.Millisecond/2 {
-				logger.Warning(m.context.GetRuntimeContext(), "MYSQL_TIMEOUT_ALARM", "sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
+				logger.Warning(m.context.GetRuntimeContext(), util.MysqlTimeoutAlarm, "sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
 				timer.Reset(time.Duration(m.IntervalMs) * time.Millisecond)
 			} else {
 				timer.Reset(time.Duration(m.IntervalMs)*time.Millisecond - endTime.Sub(startTime))
@@ -359,7 +359,7 @@ func (m *Mysql) SaveCheckPoint(collector pipeline.Collector) {
 	cp := CheckPoint{CheckPointColumn: m.CheckPointColumn, CheckPointColumnType: m.CheckPointColumnType, Value: m.CheckPointToString(), LastUpdateTime: time.Now()}
 	buf, err := json.Marshal(&cp)
 	if err != nil {
-		logger.Warning(m.context.GetRuntimeContext(), "MYSQL_CHECKPOINT_ALARM", "save checkpoint marshal error, checkpoint", cp, "error", err)
+		logger.Warning(m.context.GetRuntimeContext(), util.MysqlCheckpointAlarm, "save checkpoint marshal error, checkpoint", cp, "error", err)
 		return
 	}
 	err = m.context.SaveCheckPoint(m.CheckPointColumn, buf)
@@ -367,7 +367,7 @@ func (m *Mysql) SaveCheckPoint(collector pipeline.Collector) {
 		m.checkpointMetric.Set(m.CheckPointColumn)
 	}
 	if err != nil {
-		logger.Warning(m.context.GetRuntimeContext(), "MYSQL_CHECKPOINT_ALARM", "save checkpoint dump error, checkpoint", cp, "error", err)
+		logger.Warning(m.context.GetRuntimeContext(), util.MysqlCheckpointAlarm, "save checkpoint dump error, checkpoint", cp, "error", err)
 	}
 }
 
@@ -379,7 +379,7 @@ func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
 	if m.columnsKeyBuffer == nil {
 		columns, err := rows.Columns()
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "MYSQL_PARSE_ALARM", "no columns info, use default columns info, error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.MysqlParseAlarm, "no columns info, use default columns info, error", err)
 		}
 		m.columnsKeyBuffer = make([]string, len(columns))
 		m.checkpointColumnIndex = 0
@@ -397,7 +397,7 @@ func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
 			}
 		}
 		if m.CheckPoint && len(m.CheckPointColumn) != 0 && !foundCheckpointColumn {
-			logger.Warning(m.context.GetRuntimeContext(), "MYSQL_PARSE_ALARM", "no checkpoint column", m.CheckPointColumn)
+			logger.Warning(m.context.GetRuntimeContext(), util.MysqlParseAlarm, "no checkpoint column", m.CheckPointColumn)
 		}
 
 		m.columnValues = make([]sql.NullString, len(m.columnsKeyBuffer))
@@ -414,7 +414,7 @@ func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
 	for rows.Next() {
 		err := rows.Scan(m.columnValuePointers...)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "MYSQL_PARSE_ALARM", "scan error, row", rowCount, "error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.MysqlParseAlarm, "scan error, row", rowCount, "error", err)
 			return rowCount
 		}
 		for index, val := range m.columnValues {

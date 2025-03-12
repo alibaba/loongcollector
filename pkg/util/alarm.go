@@ -54,29 +54,32 @@ type AlarmItem struct {
 }
 
 type Alarm struct {
-	AlarmMap map[string]*AlarmItem
+	AlarmMap map[AlarmType]*AlarmItem
 	Project  string
 	Logstore string
+	Config   string
 }
 
-func (p *Alarm) Init(project, logstore string) {
+func (p *Alarm) Init(project, logstore, config string) {
 	mu.Lock()
-	p.AlarmMap = make(map[string]*AlarmItem)
+	p.AlarmMap = make(map[AlarmType]*AlarmItem)
 	p.Project = project
 	p.Logstore = logstore
+	p.Config = config
 	mu.Unlock()
 }
 
-func (p *Alarm) Update(project, logstore string) {
+func (p *Alarm) Update(project, logstore, config string) {
 	mu.Lock()
 	defer mu.Unlock()
 	p.Project = project
 	p.Logstore = logstore
+	p.Config = config
 }
 
-func (p *Alarm) Record(alarmType, message string) {
+func (p *Alarm) Record(alarmType AlarmType, message string) {
 	// donot record empty alarmType
-	if len(alarmType) == 0 {
+	if alarmType < 0 || alarmType >= AllLoongCollectorAlarmNum {
 		return
 	}
 	mu.Lock()
@@ -100,7 +103,8 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project_name", Value: p.Project})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: p.Logstore})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: alarmType})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "config", Value: p.Config})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: alarmType.String()})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: GetIPAddress()})
@@ -115,6 +119,6 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 
 func init() {
 	GlobalAlarm = new(Alarm)
-	GlobalAlarm.Init("", "")
+	GlobalAlarm.Init("", "", "")
 	RegisterAlarms = make(map[string]*Alarm)
 }

@@ -163,7 +163,7 @@ func TestDebug(t *testing.T) {
 		want string
 	}{
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:     ctx,
 				kvPairs: []interface{}{"a", "b"},
@@ -171,7 +171,7 @@ func TestDebug(t *testing.T) {
 			want: ".*\\[DBG\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\t\\[a b\\]:.*",
 		},
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:     context.Background(),
 				kvPairs: []interface{}{"a", "b"},
@@ -207,7 +207,7 @@ func TestLogLevelFromEnv(t *testing.T) {
 		want string
 	}{
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:     ctx,
 				kvPairs: []interface{}{"a", "b"},
@@ -215,7 +215,7 @@ func TestLogLevelFromEnv(t *testing.T) {
 			want: ".*\\[DBG\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\t\\[a b\\]:.*",
 		},
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:     context.Background(),
 				kvPairs: []interface{}{"a", "b"},
@@ -251,7 +251,7 @@ func TestDebugf(t *testing.T) {
 		want string
 	}{
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:    context.Background(),
 				format: "test %s",
@@ -260,7 +260,7 @@ func TestDebugf(t *testing.T) {
 			want: ".*\\[DBG\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] test \\[a\\].*",
 		},
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:    ctx,
 				format: "test %s",
@@ -295,7 +295,7 @@ func TestInfo(t *testing.T) {
 		want string
 	}{
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:     ctx,
 				kvPairs: []interface{}{"a", "b"},
@@ -303,7 +303,7 @@ func TestInfo(t *testing.T) {
 			want: ".*\\[INF\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\t\\[a b\\]:.*",
 		},
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:     context.Background(),
 				kvPairs: []interface{}{"a", "b"},
@@ -339,7 +339,7 @@ func TestInfof(t *testing.T) {
 		want string
 	}{
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:    context.Background(),
 				format: "test %s",
@@ -348,7 +348,7 @@ func TestInfof(t *testing.T) {
 			want: ".*\\[INF\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] test \\[a\\].*",
 		},
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:    ctx,
 				format: "test %s",
@@ -375,7 +375,7 @@ func TestWarn(t *testing.T) {
 	initNormalLogger()
 	type args struct {
 		ctx       context.Context
-		alarmType string
+		alarmType util.AlarmType
 		kvPairs   []interface{}
 	}
 	tests := []struct {
@@ -385,25 +385,25 @@ func TestWarn(t *testing.T) {
 		getter func() *util.Alarm
 	}{
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:       ctx,
-				alarmType: "WITH_HEADER",
+				alarmType: util.InputCollectAlarm,
 				kvPairs:   []interface{}{"a", "b"},
 			},
-			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\t\\[a b\\]:.*",
+			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:INPUT_COLLECT_ALARM\t\\[a b\\]:.*",
 			getter: func() *util.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:       context.Background(),
-				alarmType: "WITHOUT_HEADER",
+				alarmType: util.CategoryConfigAlarm,
 				kvPairs:   []interface{}{"a", "b"},
 			},
-			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\t\\[a b\\]:.*",
+			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:CATEGORY_CONFIG_ALARM\t\\[a b\\]:.*",
 			getter: func() *util.Alarm {
 				return util.GlobalAlarm
 			},
@@ -438,7 +438,7 @@ func TestWarnf(t *testing.T) {
 	type args struct {
 		ctx       context.Context
 		format    string
-		alarmType string
+		alarmType util.AlarmType
 		params    []interface{}
 	}
 	tests := []struct {
@@ -448,27 +448,27 @@ func TestWarnf(t *testing.T) {
 		getter func() *util.Alarm
 	}{
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:       context.Background(),
-				alarmType: "WITHOUT_HEADER",
+				alarmType: util.CategoryConfigAlarm,
 				format:    "test %s",
 				params:    []interface{}{"a"},
 			},
-			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\ttest \\[a\\].*",
+			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:CATEGORY_CONFIG_ALARM\ttest \\[a\\].*",
 			getter: func() *util.Alarm {
 				return util.GlobalAlarm
 			},
 		},
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:       ctx,
-				alarmType: "WITH_HEADER",
+				alarmType: util.InputCollectAlarm,
 				format:    "test %s",
 				params:    []interface{}{"a"},
 			},
-			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\ttest \\[a\\].*",
+			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:INPUT_COLLECT_ALARM\ttest \\[a\\].*",
 
 			getter: func() *util.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
@@ -505,7 +505,7 @@ func TestError(t *testing.T) {
 	initNormalLogger()
 	type args struct {
 		ctx       context.Context
-		alarmType string
+		alarmType util.AlarmType
 		kvPairs   []interface{}
 	}
 	tests := []struct {
@@ -515,25 +515,25 @@ func TestError(t *testing.T) {
 		getter func() *util.Alarm
 	}{
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:       ctx,
-				alarmType: "WITH_HEADER",
+				alarmType: util.InputCollectAlarm,
 				kvPairs:   []interface{}{"a", "b"},
 			},
-			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\t\\[a b\\]:.*",
+			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:INPUT_COLLECT_ALARM\t\\[a b\\]:.*",
 			getter: func() *util.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:       context.Background(),
-				alarmType: "WITHOUT_HEADER",
+				alarmType: util.CategoryConfigAlarm,
 				kvPairs:   []interface{}{"a", "b"},
 			},
-			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\t\\[a b\\]:.*",
+			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:CATEGORY_CONFIG_ALARM\t\\[a b\\]:.*",
 			getter: func() *util.Alarm {
 				return util.GlobalAlarm
 			},
@@ -568,7 +568,7 @@ func TestErrorf(t *testing.T) {
 	type args struct {
 		ctx       context.Context
 		format    string
-		alarmType string
+		alarmType util.AlarmType
 		params    []interface{}
 	}
 	tests := []struct {
@@ -578,27 +578,27 @@ func TestErrorf(t *testing.T) {
 		getter func() *util.Alarm
 	}{
 		{
-			name: "without-header",
+			name: "category-config",
 			args: args{
 				ctx:       context.Background(),
-				alarmType: "WITHOUT_HEADER",
+				alarmType: util.CategoryConfigAlarm,
 				format:    "test %s",
 				params:    []interface{}{"a"},
 			},
-			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\ttest \\[a\\].*",
+			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:CATEGORY_CONFIG_ALARM\ttest \\[a\\].*",
 			getter: func() *util.Alarm {
 				return util.GlobalAlarm
 			},
 		},
 		{
-			name: "with-header",
+			name: "input-collect",
 			args: args{
 				ctx:       ctx,
-				alarmType: "WITH_HEADER",
+				alarmType: util.InputCollectAlarm,
 				format:    "test %s",
 				params:    []interface{}{"a"},
 			},
-			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\ttest \\[a\\].*",
+			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:INPUT_COLLECT_ALARM\ttest \\[a\\].*",
 			getter: func() *util.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
@@ -629,13 +629,13 @@ func TestOffRemote(t *testing.T) {
 	defer mu.Unlock()
 	clean()
 	initTestLogger()
-	Warning(context.Background(), "ALARM_TYPE", "a", "b")
+	Warning(context.Background(), util.AllLoongCollectorAlarmNum, "a", "b")
 	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
-	Error(context.Background(), "ALARM_TYPE", "a", "b")
+	Error(context.Background(), util.AllLoongCollectorAlarmNum, "a", "b")
 	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
-	Warningf(context.Background(), "ALARM_TYPE", "test %s", "b")
+	Warningf(context.Background(), util.AllLoongCollectorAlarmNum, "test %s", "b")
 	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
-	Errorf(context.Background(), "ALARM_TYPE", "test %s", "b")
+	Errorf(context.Background(), util.AllLoongCollectorAlarmNum, "test %s", "b")
 	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
-	delete(util.GlobalAlarm.AlarmMap, "ALARM_TYPE")
+	delete(util.GlobalAlarm.AlarmMap, util.AllLoongCollectorAlarmNum)
 }

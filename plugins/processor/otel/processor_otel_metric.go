@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorOtelMetricParser struct {
@@ -40,7 +41,7 @@ const otelMetricPluginName = "processor_otel_metric"
 func (p *ProcessorOtelMetricParser) Init(context pipeline.Context) error {
 	p.context = context
 	if p.Format == "" {
-		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_METRIC_DATA_FORMAT", "data format is empty, use protobuf")
+		logger.Warningf(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_otel_metric data format is empty, use protobuf")
 		return errors.New("The format field is empty")
 	}
 	return nil
@@ -54,7 +55,7 @@ func (p *ProcessorOtelMetricParser) ProcessLogs(logArray []*protocol.Log) []*pro
 	var logs = make([]*protocol.Log, 0)
 	for _, log := range logArray {
 		if l, err := p.processLog(log); err != nil {
-			logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_TRACE_PARSER_ALARM", "parser otel trace error %v", err)
+			logger.Errorf(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "processor_otel_metric parser otel trace error %v", err)
 		} else {
 			logs = append(logs, l...)
 		}
@@ -91,7 +92,7 @@ func (p *ProcessorOtelMetricParser) processLog(log *protocol.Log) (logs []*proto
 	}
 
 	if !findKey && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_METRIC_FIND_ALARM", "cannot find key %v", p.SourceKey)
+		logger.Warningf(p.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "processor_otel_metric cannot find key %v", p.SourceKey)
 		return logs, nil
 	}
 

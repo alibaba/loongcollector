@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	management "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/management/v3"
 )
@@ -78,7 +79,7 @@ func (r *ResourcePropertiesCache) save(ctx pipeline.Context) {
 	r.lock.Unlock()
 	err := ctx.SaveCheckPoint(r.cacheKey, jsonBytes)
 	if err != nil {
-		logger.Error(ctx.GetRuntimeContext(), "SKYWALKING_SAVE_CHECKPOINT_FAIL", "err", err.Error())
+		logger.Error(ctx.GetRuntimeContext(), util.CheckpointAlarm, "skywalking save checpoint fail, err", err.Error())
 	}
 }
 
@@ -87,7 +88,7 @@ func (r *ResourcePropertiesCache) load(ctx pipeline.Context) bool {
 	if ok {
 		err := json.Unmarshal(bytes, &r.cache)
 		if err != nil {
-			logger.Error(ctx.GetRuntimeContext(), "SKYWALKING_LOAD_CHECKPOINT_FAIL", "err", err.Error())
+			logger.Error(ctx.GetRuntimeContext(), util.CheckpointAlarm, "skywalking load checkpoint fail, err", err.Error())
 			return false
 		}
 	}

@@ -90,7 +90,7 @@ func TestNoKeyError(t *testing.T) {
 	assert.Equal(t, "c", log.Contents[0].Key)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "RENAME_FIND_ALARM\tcannot find key [b]"), "got: %s", memoryLog)
+	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_PROCESS_ALARM\tprocessor_rename cannot find key [b]"), "got: %s", memoryLog)
 }
 
 func TestProcessLogEvent(t *testing.T) {
@@ -155,5 +155,5 @@ func TestNoKeyErrorV2(t *testing.T) {
 	assert.Equal(t, "test_value", contents.Get("c"))
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "RENAME_FIND_ALARM\tcannot find key [b]"), "got: %s", memoryLog)
+	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_PROCESS_ALARM\tprocessor_rename cannot find key [b]"), "got: %s", memoryLog)
 }

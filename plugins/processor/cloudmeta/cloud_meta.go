@@ -53,13 +53,13 @@ func (c *ProcessorCloudMeta) Init(context pipeline.Context) error {
 	m := platformmeta.GetManager(c.Platform)
 	if m == nil {
 		// don't direct return to support still work on unknown host with auto mode.
-		logger.Error(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "not support platform", c.Platform)
+		logger.Error(c.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_cloud_meta not support platform", c.Platform)
 	} else {
 		c.manager = m
 		c.manager.StartCollect()
 	}
 	if len(c.Metadata) == 0 {
-		logger.Error(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "metadata is required")
+		logger.Error(c.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_cloud_meta metadata is required")
 		return errors.New("metadata is required")
 	}
 	c.JSONPath = strings.TrimSpace(c.JSONPath)
@@ -96,7 +96,7 @@ func (c *ProcessorCloudMeta) ProcessLog(log *protocol.Log) {
 	}
 	res := make(map[string]interface{})
 	if err := json.Unmarshal(util.ZeroCopyStringToBytes(content.Value), &res); err != nil {
-		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "json deserialize err", err)
+		logger.Warning(c.context.GetRuntimeContext(), util.ProcessorProcessAlarm, "json deserialize err", err)
 		return
 	}
 	// append metadata to json
