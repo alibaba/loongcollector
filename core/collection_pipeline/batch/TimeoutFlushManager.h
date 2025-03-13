@@ -58,7 +58,7 @@ private:
     TimeoutFlushManager() = default;
     ~TimeoutFlushManager() = default;
 
-    std::mutex mMux;
+    std::recursive_mutex mMux;
     std::map<std::string, std::map<std::pair<size_t, size_t>, TimeoutRecord>> mTimeoutRecords;
 
 #ifdef APSARA_UNIT_TEST_MAIN
