@@ -105,6 +105,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
 - [github.com/aliyun/aliyun-datahub-sdk-go](https://pkg.go.dev/github.com/aliyun/aliyun-datahub-sdk-go?tab=licenses)
 - [github.com/aliyun/aliyun-odps-go-sdk](https://pkg.go.dev/github.com/aliyun/aliyun-odps-go-sdk?tab=licenses)
+- [github.com/alibabacloud-go/debug](https://pkg.go.dev/github.com/alibabacloud-go/debug?tab=licenses)
+- [github.com/alibabacloud-go/tea](https://pkg.go.dev/github.com/alibabacloud-go/tea?tab=licenses)
+- [github.com/aliyun/credentials-go](https://pkg.go.dev/github.com/aliyun/credentials-go?tab=licenses)
 
 ## BSD licenses
 
