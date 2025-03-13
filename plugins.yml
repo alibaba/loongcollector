@@ -39,6 +39,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/opentelemetry"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/prometheus"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/pulsar"
+    - import: "github.com/alibaba/ilogtail/plugins/flusher/s3"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sleep"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sls"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/statistics"
