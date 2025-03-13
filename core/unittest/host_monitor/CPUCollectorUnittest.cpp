@@ -25,13 +25,13 @@ class CPUCollectorUnittest : public testing::Test {
 public:
     void TestGetHostSystemCPUStat() const;
     void TestCollect() const;
-    void TestCollectWrongData() const;
 
 protected:
     void SetUp() override {
         ofstream ofs("./stat", std::ios::trunc);
         ofs << "cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0\n";
         ofs << "cpu0 14708487 14216 4613031 2108180843 57199 0 424744 0 1 2\n";
+        ofs << "cpua a b c d e f 424744 0 1 2\n";
         ofs << "cpu1 14708487 14216 4613031 2108180843"; // test old linux kernel
         ofs.close();
         PROCESS_DIR = ".";
@@ -129,39 +129,8 @@ void CPUCollectorUnittest::TestCollect() const {
     }
 }
 
-void CPUCollectorUnittest::TestCollectWrongData() const {
-    ofstream ofs("./stat", std::ios::trunc);
-    ofs << "cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0\n";
-    ofs << "cpu0 a b c d e f 424744 0 1 2";
-    ofs.close();
-    auto collector = CPUCollector();
-    PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
-
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_EQUAL_FATAL(10, group.GetEvents().size());
-    vector<double> expected
-        = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 424744.0 / SYSTEM_HERTZ, 0.0, 1.0 / SYSTEM_HERTZ, 2.0 / SYSTEM_HERTZ};
-    vector<string> expectedMode = {"user", "nice", "system", "idle", "iowait", "irq", "softirq", "steal"};
-    for (size_t i = 0; i < 8; ++i) {
-        auto event = group.GetEvents()[i].Cast<MetricEvent>();
-        APSARA_TEST_EQUAL_FATAL("node_cpu_seconds_total", event.GetName());
-        APSARA_TEST_EQUAL_FATAL(expected[i], event.GetValue<UntypedSingleValue>()->mValue);
-        APSARA_TEST_EQUAL_FATAL("0", event.GetTag("cpu"));
-        APSARA_TEST_EQUAL_FATAL(expectedMode[i], event.GetTag("mode"));
-    }
-    for (size_t i = 8; i < 10; ++i) {
-        auto event = group.GetEvents()[i].Cast<MetricEvent>();
-        APSARA_TEST_EQUAL_FATAL("node_cpu_guest_seconds_total", event.GetName());
-        APSARA_TEST_EQUAL_FATAL(expected[i], event.GetValue<UntypedSingleValue>()->mValue);
-        APSARA_TEST_EQUAL_FATAL("0", event.GetTag("cpu"));
-        APSARA_TEST_EQUAL_FATAL(expectedMode[i - 8], event.GetTag("mode"));
-    }
-}
-
 UNIT_TEST_CASE(CPUCollectorUnittest, TestGetHostSystemCPUStat);
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollect);
-UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectWrongData);
 
 } // namespace logtail
 

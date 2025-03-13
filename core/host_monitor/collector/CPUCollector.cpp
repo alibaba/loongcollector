@@ -58,9 +58,10 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         {"node_cpu_guest_seconds_total", "user", &CPUStat::guest},
         {"node_cpu_guest_seconds_total", "nice", &CPUStat::guestNice},
     };
-    for (size_t i = 1; i < cpus.size(); ++i) {
-        const std::string cpuIDStr = std::to_string(i - 1);
-        const CPUStat& cpu = cpus[i];
+    for (const auto& cpu : cpus) {
+        if (cpu.index == -1) {
+            continue;
+        }
         for (const auto& def : metrics) {
             auto* metricEvent = group->AddMetricEvent(true);
             if (!metricEvent) {
@@ -69,7 +70,7 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
             metricEvent->SetName(def.name);
             metricEvent->SetTimestamp(now, 0);
             metricEvent->SetValue<UntypedSingleValue>(cpu.*(def.value) / SYSTEM_HERTZ);
-            metricEvent->SetTag(kMetricLabelCPU, cpuIDStr);
+            metricEvent->SetTag(kMetricLabelCPU, std::to_string(cpu.index));
             metricEvent->SetTagNoCopy(kMetricLabelMode, def.mode);
         }
     }
@@ -92,6 +93,16 @@ bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
         boost::split(cpuMetric, line, boost::is_any_of(" "), boost::token_compress_on);
         if (cpuMetric.size() > 0 && cpuMetric[0].substr(0, 3) == "cpu") {
             CPUStat cpuStat{};
+            if (cpuMetric[0] == "cpu") {
+                cpuStat.index = -1;
+            } else {
+                try {
+                    cpuStat.index = StringTo<int32_t>(cpuMetric[0].substr(3));
+                } catch (...) {
+                    LOG_ERROR(sLogger, ("failed to parse cpu index", "skip")("wrong cpu index", cpuMetric[0]));
+                    continue;
+                }
+            }
             cpuStat.user = ParseMetric(cpuMetric, EnumCpuKey::user);
             cpuStat.nice = ParseMetric(cpuMetric, EnumCpuKey::nice);
             cpuStat.system = ParseMetric(cpuMetric, EnumCpuKey::system);

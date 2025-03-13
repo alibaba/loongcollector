@@ -38,6 +38,7 @@ enum class EnumCpuKey : int {
 };
 
 struct CPUStat {
+    int32_t index; // -1 means total cpu
     double user;
     double nice;
     double system;
