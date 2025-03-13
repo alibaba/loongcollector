@@ -56,7 +56,7 @@ void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
         runner->IsCollectTaskValid(std::chrono::steady_clock::now() - std::chrono::seconds(60), MockCollector::sName));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
     APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
-    runner->RemoveCollector();
+    runner->RemoveCollector({MockCollector::sName});
     APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid(std::chrono::steady_clock::now(), MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
