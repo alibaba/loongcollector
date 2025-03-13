@@ -54,15 +54,15 @@ protected:
 // ... 保留之前的测试方法 ...
 
 void TableUnittest::TestProcessTable() {
-    // 测试 ProcessCommonTable
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("exec_id"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_process_pid"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("parent_uid"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("uid"));
-    APSARA_TEST_TRUE(kProcessCommonTable.HasCol("binary"));
+    // 测试 ProcessCacheTable
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("exec_id"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("parent_process_pid"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("parent_uid"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("uid"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("binary"));
 
     // 验证表大小
-    APSARA_TEST_EQUAL(kProcessCommonTableSize, std::size(kProcessCommonElements));
+    APSARA_TEST_EQUAL(kProcessCacheTableSize, std::size(kProcessCacheElements));
 
     // 测试 ProcessSecurityTable
     APSARA_TEST_TRUE(kProcessSecurityTable.HasCol("event_time"));
@@ -73,7 +73,7 @@ void TableUnittest::TestProcessTable() {
     APSARA_TEST_EQUAL(kProcessSecurityTableSize, std::size(kProcessSecurityElements));
 
     // 验证表名
-    APSARA_TEST_EQUAL(std::string(kProcessCommonTable.Name()), "process_common_table");
+    APSARA_TEST_EQUAL(std::string(kProcessCacheTable.Name()), "process_cache_table");
     APSARA_TEST_EQUAL(std::string(kProcessSecurityTable.Name()), "process_security_table");
 }
 

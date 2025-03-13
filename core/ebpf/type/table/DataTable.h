@@ -54,10 +54,14 @@ public:
                           StringView logKey,
                           StringView desc,
                           AggregationType aggType = AggregationType::NoAggregate)
-        : mName(name), mEtricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc), mAggType(aggType) {}
+        : mName(name), mMetricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc), mAggType(aggType) {}
+
+    constexpr bool operator==(const DataElement& rhs) const { return mName == rhs.mName; }
+
+    constexpr bool operator!=(const DataElement& rhs) const { return !(*this == rhs); }
 
     constexpr StringView Name() const { return mName; }
-    constexpr StringView MetricKey() const { return mEtricKey; }
+    constexpr StringView MetricKey() const { return mMetricKey; }
     constexpr StringView SpanKey() const { return mSpanKey; }
     constexpr StringView LogKey() const { return mLogKey; }
     constexpr StringView Desc() const { return mDesc; }
@@ -66,7 +70,7 @@ public:
 
 protected:
     const StringView mName;
-    const StringView mEtricKey;
+    const StringView mMetricKey;
     const StringView mSpanKey;
     const StringView mLogKey;
     const StringView mDesc;
@@ -113,6 +117,11 @@ private:
     const StringView mDesc;
     const ArrayView<DataElement> mElements;
 };
+
+template <std::size_t N>
+constexpr std::size_t FindIndex(const DataElement (&elements)[N], const DataElement& target, std::size_t idx = 0) {
+    return idx == N ? N : (elements[idx] == target ? idx : FindIndex(elements, target, idx + 1));
+}
 
 } // namespace ebpf
 } // namespace logtail

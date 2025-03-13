@@ -91,7 +91,7 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
+    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
     APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
     APSARA_TEST_EQUAL(false, thisObserver.mDisableConnStats);
@@ -125,7 +125,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
+    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
     APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
     APSARA_TEST_EQUAL(false, thisObserver.mDisableConnStats);

@@ -20,34 +20,38 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kProcessCommonElements[] = {kExecId,
-                                                         kProcessId,
-                                                         kUid,
-                                                         kUser,
-                                                         kBinary,
-                                                         kArguments,
-                                                         kCWD,
-                                                         kKtime,
-                                                         kCapInheritable,
-                                                         kCapPermitted,
-                                                         kCapEffective,
-                                                         kParentProcessId,
-                                                         kParentUid,
-                                                         kParentUser,
-                                                         kParentBinary,
-                                                         kParentArguments,
-                                                         kParentCWD,
-                                                         kParentKtime,
-                                                         kParentCapInheritable,
-                                                         kParentCapPermitted,
-                                                         kParentCapEffective,
-                                                         kContainerId};
+static constexpr DataElement kProcessCacheElements[] = {
+    kExecId, kProcessId, kUid, kUser, kBinary, kArguments, kCWD, kKtime, kCapInheritable, kCapPermitted, kCapEffective};
 
-static constexpr size_t kProcessCommonTableSize = std::size(kProcessCommonElements);
+static constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements);
 
-static constexpr auto kProcessCommonTable = DataTableSchema("process_common_table", "", kProcessCommonElements);
+static constexpr auto kProcessCacheTable = DataTableSchema("process_cache_table", "", kProcessCacheElements);
 
-static constexpr DataElement kProcessSecurityElements[] = {kEventTime, kCallName, kEventType};
+static constexpr DataElement kProcessSecurityElements[] = {kExecId,
+                                                           kProcessId,
+                                                           kUid,
+                                                           kUser,
+                                                           kBinary,
+                                                           kArguments,
+                                                           kCWD,
+                                                           kKtime,
+                                                           kCapInheritable,
+                                                           kCapPermitted,
+                                                           kCapEffective,
+                                                           kParentProcessId,
+                                                           kParentUid,
+                                                           kParentUser,
+                                                           kParentBinary,
+                                                           kParentArguments,
+                                                           kParentCWD,
+                                                           kParentKtime,
+                                                           kParentCapInheritable,
+                                                           kParentCapPermitted,
+                                                           kParentCapEffective,
+                                                           kContainerId,
+                                                           kEventTime,
+                                                           kCallName,
+                                                           kEventType};
 
 static constexpr size_t kProcessSecurityTableSize = std::size(kProcessSecurityElements);
 

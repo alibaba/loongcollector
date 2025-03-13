@@ -162,34 +162,33 @@ int fnmatch(const char* pattern, const char* dirPath, int flag);
 #endif
 
 // trim from start (returns a new string_view)
-static inline std::string_view Ltrim(std::string_view s, const std::string_view blank = " \t\n\r\f\v") {
+static inline StringView Ltrim(StringView s, const StringView blank = " \t\n\r\f\v") {
     s.remove_prefix(std::min(s.find_first_not_of(blank), s.size()));
     return s;
 }
 
 // trim from end (returns a new string_view)
-static inline std::string_view Rtrim(std::string_view s, const std::string_view blank = " \t\n\r\f\v") {
+static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f\v") {
     s.remove_suffix(std::min(s.size() - s.find_last_not_of(blank) - 1, s.size()));
     return s;
 }
 
 // trim from both ends (returns a new string_view)
-static inline std::string_view Trim(std::string_view s) {
+static inline StringView Trim(StringView s) {
     return Ltrim(Rtrim(s));
 }
 
 class StringViewSplitterIterator {
 public:
     using iterator_category = std::forward_iterator_tag;
-    using value_type = std::string_view;
+    using value_type = StringView;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
     using reference = value_type&;
 
     StringViewSplitterIterator() = default;
 
-    StringViewSplitterIterator(std::string_view str, std::string_view delimiter)
-        : mStr(str), mDelimiter(delimiter), mPos(0) {
+    StringViewSplitterIterator(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter), mPos(0) {
         findNext();
     }
 
@@ -218,41 +217,41 @@ public:
 
 private:
     void findNext() {
-        if (mPos == std::string_view::npos) {
+        if (mPos == StringView::npos) {
             mField = {};
             return;
         }
 
         auto end = mStr.find(mDelimiter, mPos);
-        if (end == std::string_view::npos) {
+        if (end == StringView::npos) {
             mField = mStr.substr(mPos);
-            mPos = std::string_view::npos;
+            mPos = StringView::npos;
         } else {
             mField = mStr.substr(mPos, end - mPos);
             mPos = end + mDelimiter.size();
         }
     }
 
-    std::string_view mStr;
-    std::string_view mDelimiter;
-    std::string_view mField;
-    size_t mPos = std::string_view::npos;
+    StringView mStr;
+    StringView mDelimiter;
+    StringView mField;
+    size_t mPos = StringView::npos;
 };
 
 class StringViewSplitter {
 public:
-    using value_type = std::string_view;
+    using value_type = StringView;
     using iterator = StringViewSplitterIterator;
 
-    StringViewSplitter(std::string_view str, std::string_view delimiter) : mStr(str), mDelimiter(delimiter) {}
+    StringViewSplitter(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter) {}
 
     iterator begin() const { return iterator(mStr, mDelimiter); }
 
     iterator end() const { return iterator(); }
 
 private:
-    std::string_view mStr;
-    std::string_view mDelimiter;
+    StringView mStr;
+    StringView mDelimiter;
 };
 
 

@@ -123,24 +123,21 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
         LOG_DEBUG(sLogger, ("child num", node->child.size()));
         // convert to a item and push to process queue
-        SizedMap processTags;
-        bool init = false;
+        auto processCacheMgr = GetProcessCacheManager();
+        if (processCacheMgr == nullptr) {
+            LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
+            return false;
+        }
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
-            if (!init) {
-                auto processCacheMgr = GetProcessCacheManager();
-                if (processCacheMgr == nullptr) {
-                    LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
-                    return;
-                }
-                processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
-                init = true;
-            }
-            if (processTags.mInner.empty()) {
+            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            if (!hit) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
@@ -148,8 +145,8 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
                 // attach process tags
-                for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
-                    logEvent->SetContentNoCopy(it->first, it->second);
+                for (const auto& it : *sharedEvent) {
+                    logEvent->SetContentNoCopy(it.first, it.second);
                 }
                 auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));

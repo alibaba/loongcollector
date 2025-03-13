@@ -18,7 +18,6 @@
 #include <ctime>
 
 #include <atomic>
-#include <deque>
 #include <future>
 #include <mutex>
 #include <unordered_map>
@@ -27,10 +26,11 @@
 #include "common/memory/SourceBuffer.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
+#include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/ProcessEvent.h"
-#include "models/SizedContainer.h"
-#include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "models/LogEvent.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "util/FrequencyManager.h"
 
 namespace logtail {
@@ -48,67 +48,40 @@ public:
                         CounterPtr cacheMissTotal);
     ~ProcessCacheManager() = default;
 
-    bool ContainsKey(const data_event_id& key) const {
-        std::lock_guard<std::mutex> lock(mCacheMutex);
-        return mCache.find(key) != mCache.end();
-    }
-
-    // thread-safe
-    std::shared_ptr<MsgExecveEventUnix> LookupCache(const data_event_id& key) {
-        std::lock_guard<std::mutex> lock(mCacheMutex);
-        auto it = mCache.find(key);
-        if (it != mCache.end()) {
-            return it->second;
-        }
-        return nullptr;
-    }
-
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);
 
     std::vector<std::shared_ptr<Proc>> ListRunningProcs();
     int WriteProcToBPFMap(const std::shared_ptr<Proc>& proc);
     int SyncAllProc();
-    void ProcToExecveEvent(const Proc& proc, MsgExecveEventUnix& event);
     void PushExecveEvent(const Proc& proc);
 
     void RecordExecveEvent(msg_execve_event* eventPtr);
-    void PostHandlerExecveEvent(msg_execve_event*, std::shared_ptr<MsgExecveEventUnix>&&);
     void RecordExitEvent(msg_exit* eventPtr);
     void RecordCloneEvent(msg_clone_event* eventPtr);
     void RecordDataEvent(msg_data* eventPtr);
 
     std::string GenerateExecId(uint32_t pid, uint64_t ktime);
-    std::string GenerateParentExecId(const std::shared_ptr<MsgExecveEventUnix>& event);
-
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
-    SizedMap FinalizeProcessTags(std::shared_ptr<SourceBuffer>& sb, uint32_t pid, uint64_t ktime);
+    bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
 
     bool Init();
     void Stop();
 
 private:
+    std::shared_ptr<ProcessCacheValue> procToProcessCacheValue(const Proc& proc);
+
     void pollPerfBuffers();
 
-    void handleCacheUpdate(std::shared_ptr<MsgExecveEventUnix>&& event);
-
-    // thread-safe
-    void releaseCache(const data_event_id& key);
-    // thread-safe
-    void updateCache(const data_event_id& key, std::shared_ptr<MsgExecveEventUnix>&& value);
-    // thread-safe
-    void clearCache();
-    // NOT thread-safe
-    void enqueueExpiredEntry(const data_event_id& key, time_t ktime);
-    // NOT thread-safe
-    void clearExpiredCache(time_t ktime);
-
+    std::shared_ptr<ProcessCacheValue> msgExecveEventToProcessCacheValue(const msg_execve_event& event);
+    bool fillProcessDataFields(const msg_execve_event& event, ProcessCacheValue& cacheValue);
+    std::shared_ptr<ProcessCacheValue> msgCloneEventToProcessCacheValue(const msg_clone_event& event);
 
     // NOT thread-safe
     void dataAdd(msg_data* data);
     // NOT thread-safe
-    std::string dataGetAndRemove(data_event_desc*);
+    std::string dataGetAndRemove(const data_event_desc* desc);
     // NOT thread-safe
     void clearExpiredData(time_t ktime);
 
@@ -116,26 +89,7 @@ private:
     std::atomic_bool mRunFlag = false;
     std::shared_ptr<SourceManager> mSourceManager = nullptr;
 
-    struct DataEventIdHash {
-        std::size_t operator()(const data_event_id& deid) const { return deid.pid ^ ((deid.time >> 12) << 16); }
-    };
-
-    struct DataEventIdEqual {
-        bool operator()(const data_event_id& lhs, const data_event_id& rhs) const {
-            return lhs.pid == rhs.pid && lhs.time == rhs.time;
-        }
-    };
-
-    using ExecveEventMap
-        = std::unordered_map<data_event_id, std::shared_ptr<MsgExecveEventUnix>, DataEventIdHash, DataEventIdEqual>;
-    mutable std::mutex mCacheMutex;
-    ExecveEventMap mCache;
-    struct ExitedEntry {
-        time_t time;
-        data_event_id key;
-    };
-    std::deque<ExitedEntry> mCacheExpireQueue;
-
+    ProcessCache mProcessCache;
     using DataEventMap = std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual>;
     mutable std::mutex mDataMapMutex;
     DataEventMap mDataMap; // TODO：ebpf中也没区分filename和args，如果两者都超长会导致filename被覆盖为args

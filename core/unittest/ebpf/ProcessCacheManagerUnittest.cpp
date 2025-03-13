@@ -20,9 +20,12 @@
 #include <unordered_map>
 
 #include "ProcParser.h"
+#include "common/memory/SourceBuffer.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "type/table/BaseElements.h"
 #include "unittest/Unittest.h"
 #include "unittest/ebpf/ProcFsStub.h"
 
@@ -48,7 +51,7 @@ protected:
     // ProcessCacheManager测试用例
     void TestListRunningProcs();
     // void TestWriteProcToBPFMap();
-    void TestProcToExecveEvent();
+    void TestProcToProcessCacheValue();
     void TestProcessExecveEvents();
     void TestProcessCloneEventEvent();
     void TestProcessExitEvent();
@@ -197,126 +200,92 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
     }
 }
 
-void ProcessCacheManagerUnittest::TestProcToExecveEvent() {
+void ProcessCacheManagerUnittest::TestProcToProcessCacheValue() {
     { // kernel thread
         Proc proc = CreateStubProc();
         FillKernelThreadProc(proc);
-        MsgExecveEventUnix event;
-        mProcessCacheManager->ProcToExecveEvent(proc, event);
-        APSARA_TEST_EQUAL(event.kernel_thread, true);
-        APSARA_TEST_EQUAL(event.msg.parent.pid, proc.ppid);
-        APSARA_TEST_EQUAL(event.msg.parent.ktime, proc.ktime);
-        APSARA_TEST_EQUAL(event.process.pid, proc.pid);
-        APSARA_TEST_EQUAL(event.process.tid, proc.tid);
-        APSARA_TEST_EQUAL(event.process.nspid, proc.nspid);
-        APSARA_TEST_EQUAL(event.process.uid, 0U);
-        APSARA_TEST_EQUAL(event.process.auid, std::numeric_limits<uint32_t>::max());
-        APSARA_TEST_EQUAL(event.process.flags, static_cast<uint32_t>(ApiEventFlag::ProcFS));
-        APSARA_TEST_EQUAL(event.process.ktime, proc.ktime);
-        APSARA_TEST_EQUAL(event.process.cwd, proc.cwd);
-        APSARA_TEST_EQUAL(event.process.filename, proc.comm);
-        APSARA_TEST_EQUAL(event.process.binary, proc.comm);
+        auto cacheValuePtr = mProcessCacheManager->procToProcessCacheValue(proc);
+        auto& cacheValue = *cacheValuePtr;
+        APSARA_TEST_EQUAL(cacheValue.mPPid, proc.ppid);
+        APSARA_TEST_EQUAL(cacheValue.mPKtime, proc.ktime);
+        APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(proc.pid));
+        APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(0U));
+        APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(proc.ktime));
+        APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), proc.cwd);
+        APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), proc.comm);
     }
     { // cwd is root and invalid ppid
         Proc proc = CreateStubProc();
         FillRootCwdProc(proc);
-        MsgExecveEventUnix event;
-        mProcessCacheManager->ProcToExecveEvent(proc, event);
-        APSARA_TEST_EQUAL(event.kernel_thread, false);
-        APSARA_TEST_EQUAL(event.msg.common.op, MSG_OP_EXECVE);
-        APSARA_TEST_EQUAL(event.msg.common.size, uint32_t(SIZEOF_EVENT));
-        APSARA_TEST_EQUAL(event.kube.docker, proc.container_id);
-        APSARA_TEST_EQUAL(event.msg.parent.pid, proc.ppid);
-        APSARA_TEST_EQUAL(event.msg.parent.ktime, proc.pktime);
-        APSARA_TEST_EQUAL(event.msg.ns.uts_inum, proc.uts_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.ipc_inum, proc.ipc_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.mnt_inum, proc.mnt_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.pid_inum, proc.pid_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.pid_for_children_inum, proc.pid_for_children_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.net_inum, proc.net_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.time_inum, proc.time_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.time_for_children_inum, proc.time_for_children_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.cgroup_inum, proc.cgroup_ns);
-        APSARA_TEST_EQUAL(event.msg.ns.user_inum, proc.user_ns);
-        APSARA_TEST_EQUAL(event.process.pid, proc.pid);
-        APSARA_TEST_EQUAL(event.process.tid, proc.tid);
-        APSARA_TEST_EQUAL(event.process.nspid, proc.nspid);
-        APSARA_TEST_EQUAL(event.process.uid, proc.uids[1]);
-        APSARA_TEST_EQUAL(event.process.auid, proc.auid);
-        APSARA_TEST_EQUAL(event.msg.creds.uid, proc.uids[0]);
-        APSARA_TEST_EQUAL(event.msg.creds.gid, proc.uids[1]);
-        APSARA_TEST_EQUAL(event.msg.creds.suid, proc.uids[2]);
-        APSARA_TEST_EQUAL(event.msg.creds.sgid, proc.uids[3]);
-        APSARA_TEST_EQUAL(event.msg.creds.euid, proc.gids[0]);
-        APSARA_TEST_EQUAL(event.msg.creds.egid, proc.gids[1]);
-        APSARA_TEST_EQUAL(event.msg.creds.fsuid, proc.gids[2]);
-        APSARA_TEST_EQUAL(event.msg.creds.fsgid, proc.gids[3]);
-        APSARA_TEST_EQUAL(event.msg.creds.caps.permitted, proc.permitted);
-        APSARA_TEST_EQUAL(event.msg.creds.caps.effective, proc.effective);
-        APSARA_TEST_EQUAL(event.msg.creds.caps.inheritable, proc.inheritable);
-        APSARA_TEST_EQUAL(event.process.flags, proc.flags);
-        APSARA_TEST_EQUAL(event.process.ktime, proc.ktime);
-        APSARA_TEST_EQUAL(event.msg.common.ktime, proc.ktime);
-        APSARA_TEST_EQUAL(event.process.filename, proc.exe);
-        APSARA_TEST_EQUAL(event.process.binary, proc.exe);
-        APSARA_TEST_EQUAL(event.process.cmdline, proc.cmdline);
-        APSARA_TEST_EQUAL(event.process.cwd, proc.cwd);
+        auto cacheValuePtr = mProcessCacheManager->procToProcessCacheValue(proc);
+        auto& cacheValue = *cacheValuePtr;
+        APSARA_TEST_EQUAL(cacheValue.mPPid, proc.ppid);
+        APSARA_TEST_EQUAL(cacheValue.mPKtime, proc.ktime);
+        APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(proc.pid));
+        APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(0U));
+        APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(proc.ktime));
+        APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), proc.cwd);
+        APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), proc.comm);
+
+        APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string());
     }
 }
 
 void ProcessCacheManagerUnittest::TestUpdateCacheNormal() {
     // 测试缓存操作
     data_event_id key{12345, 1234567890};
-    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
+    auto execveEvent = std::make_shared<ProcessCacheValue>();
+    execveEvent->SetContent(kProcessId, StringView("1234"));
+    execveEvent->SetContent(kKtime, StringView("5678"));
+    execveEvent->SetContent(kUid, StringView("1000"));
+    execveEvent->SetContent(kBinary, StringView("test_binary"));
 
     // 测试缓存更新
+    mProcessCacheManager->mProcessCache.AddCache(key, std::move(execveEvent));
 
-    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
-    APSARA_TEST_TRUE(mProcessCacheManager->ContainsKey(key));
+    APSARA_TEST_TRUE(mProcessCacheManager->mProcessCache.Contains(key));
 
     // 测试缓存查找
-    auto cachedEvent = mProcessCacheManager->LookupCache(key);
+    auto cachedEvent = mProcessCacheManager->mProcessCache.Lookup(key);
     APSARA_TEST_TRUE(cachedEvent != nullptr);
-    APSARA_TEST_EQUAL(cachedEvent->process.pid, execveEvent->process.pid);
-    APSARA_TEST_EQUAL(cachedEvent->process.ktime, execveEvent->process.ktime);
-    APSARA_TEST_EQUAL(cachedEvent->process.uid, execveEvent->process.uid);
-    APSARA_TEST_EQUAL(cachedEvent->process.binary, execveEvent->process.binary);
+    APSARA_TEST_EQUAL((*cachedEvent)[kProcessId], StringView("1234"));
+    APSARA_TEST_EQUAL((*cachedEvent)[kKtime], StringView("5678"));
+    APSARA_TEST_EQUAL((*cachedEvent)[kUid], StringView("1000"));
+    APSARA_TEST_EQUAL((*cachedEvent)[kBinary], StringView("test_binary"));
 
     // 测试缓存释放
-    mProcessCacheManager->releaseCache(key);
-    APSARA_TEST_FALSE(mProcessCacheManager->ContainsKey(key));
+    mProcessCacheManager->mProcessCache.removeCache(key);
+    APSARA_TEST_FALSE(mProcessCacheManager->mProcessCache.Contains(key));
 }
 
-void ProcessCacheManagerUnittest::TestProcessExecveEvents() {
-    // 测试Execve事件处理
-    auto execveEvent = std::make_unique<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
+// void ProcessCacheManagerUnittest::TestProcessExecveEvents() {
+//     // 测试Execve事件处理
+//     auto execveEvent = std::make_unique<MsgExecveEventUnix>();
+//     execveEvent->process.pid = 1234;
+//     execveEvent->process.ktime = 5678;
+//     execveEvent->process.uid = 1000;
+//     execveEvent->process.binary = "test_binary";
 
-    msg_execve_event kernelExecveEvent;
-    kernelExecveEvent.process.pid = execveEvent->process.pid;
-    kernelExecveEvent.process.ktime = execveEvent->process.ktime;
-    mProcessCacheManager->RecordExecveEvent(&kernelExecveEvent);
+//     msg_execve_event kernelExecveEvent;
+//     kernelExecveEvent.process.pid = execveEvent->process.pid;
+//     kernelExecveEvent.process.ktime = execveEvent->process.ktime;
+//     mProcessCacheManager->RecordExecveEvent(&kernelExecveEvent);
 
-    // 测试Exit事件处理
-    msg_exit exitEvent;
-    exitEvent.current.pid = 1234;
-    exitEvent.current.ktime = 5678;
-    exitEvent.info.code = 0;
-    mProcessCacheManager->RecordExitEvent(&exitEvent);
+//     // 测试Exit事件处理
+//     msg_exit exitEvent;
+//     exitEvent.current.pid = 1234;
+//     exitEvent.current.ktime = 5678;
+//     exitEvent.info.code = 0;
+//     mProcessCacheManager->RecordExitEvent(&exitEvent);
 
-    // 测试Clone事件处理
-    msg_clone_event cloneEvent;
-    cloneEvent.tgid = 1234;
-    cloneEvent.ktime = 5678;
-    mProcessCacheManager->RecordCloneEvent(&cloneEvent);
-}
+//     // 测试Clone事件处理
+//     msg_clone_event cloneEvent;
+//     cloneEvent.tgid = 1234;
+//     cloneEvent.ktime = 5678;
+//     mProcessCacheManager->RecordCloneEvent(&cloneEvent);
+// }
 
 void ProcessCacheManagerUnittest::TestProcessDataEventNormal() {
     // 测试数据事件处理
@@ -343,33 +312,39 @@ void ProcessCacheManagerUnittest::TestProcessDataEventNormal() {
 
 void ProcessCacheManagerUnittest::TestFinalizeProcessTags() {
     // 创建进程事件
-    auto execveEvent = std::make_shared<MsgExecveEventUnix>();
-    execveEvent->process.pid = 1234;
-    execveEvent->process.ktime = 5678;
-    execveEvent->process.uid = 1000;
-    execveEvent->process.binary = "test_binary";
-    execveEvent->msg.cleanup_key.ktime = 0;
-    execveEvent->msg.parent.pid = 2345;
-    execveEvent->msg.parent.ktime = 6789;
+    data_event_id key{1234, 5678};
+    auto execveEvent = std::make_shared<ProcessCacheValue>();
+    execveEvent->SetContent(kProcessId, StringView("1234"));
+    execveEvent->SetContent(kKtime, StringView("5678"));
+    execveEvent->SetContent(kUid, StringView("1000"));
+    execveEvent->SetContent(kBinary, StringView("test_binary"));
+    execveEvent->mPPid = 2345;
+    execveEvent->mPKtime = 6789;
 
     // parent
-    auto pExecveEvent = std::make_shared<MsgExecveEventUnix>();
-    pExecveEvent->process.pid = 2345;
-    pExecveEvent->process.ktime = 6789;
-    pExecveEvent->process.uid = 1000;
-    pExecveEvent->process.binary = "test_binary_parent";
+    data_event_id pKey{2345, 6789};
+    auto pExecveEvent = std::make_shared<ProcessCacheValue>();
+    pExecveEvent->SetContent(kProcessId, StringView("2345"));
+    pExecveEvent->SetContent(kKtime, StringView("6789"));
+    pExecveEvent->SetContent(kUid, StringView("1000"));
+    pExecveEvent->SetContent(kBinary, StringView("test_binary_parent"));
 
     // 更新缓存
-    data_event_id key{execveEvent->process.pid, execveEvent->process.ktime};
-    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(execveEvent));
-    key = {pExecveEvent->process.pid, pExecveEvent->process.ktime};
-    mProcessCacheManager->updateCache(key, std::shared_ptr<MsgExecveEventUnix>(pExecveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(key, std::move(execveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(pKey, std::move(pExecveEvent));
 
     // 测试进程标签生成
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    auto tags
-        = mProcessCacheManager->FinalizeProcessTags(sourceBuffer, execveEvent->process.pid, execveEvent->process.ktime);
-    APSARA_TEST_FALSE(tags.mInner.empty());
+    PipelineEventGroup sharedEventGroup(std::make_shared<SourceBuffer>());
+    auto sharedEvent = sharedEventGroup.CreateLogEvent();
+    APSARA_TEST_TRUE(mProcessCacheManager->FinalizeProcessTags(key.pid, key.time, *sharedEvent));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kProcessId.LogKey()), StringView("1234"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kKtime.LogKey()), StringView("5678"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kUid.LogKey()), StringView("1000"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kBinary.LogKey()), StringView("test_binary"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kParentProcessId.LogKey()), StringView("2345"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kParentKtime.LogKey()), StringView("6789"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kParentUid.LogKey()), StringView("1000"));
+    APSARA_TEST_EQUAL(sharedEvent->GetContent(kParentBinary.LogKey()), StringView("test_binary_parent"));
 }
 
 // void ProcessCacheManagerUnittest::TestPollPerfBuffers() {
@@ -384,7 +359,7 @@ void ProcessCacheManagerUnittest::TestFinalizeProcessTags() {
 // }
 
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestListRunningProcs);
-UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcToExecveEvent);
+UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcToProcessCacheValue);
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestFinalizeProcessTags);
 
 UNIT_TEST_MAIN

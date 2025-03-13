@@ -40,12 +40,12 @@ void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return;
     }
-    NetworkSecurityManager* ss = static_cast<NetworkSecurityManager*>(ctx);
-    if (ss == nullptr)
+    auto* ss = static_cast<NetworkSecurityManager*>(ctx);
+    if (ss == nullptr) {
         return;
-    tcp_data_t* event = static_cast<tcp_data_t*>(data);
+    }
+    auto* event = static_cast<tcp_data_t*>(data);
     ss->RecordNetworkEvent(event);
-    return;
 }
 
 void HandleNetworkKernelEventLoss(void* ctx, int cpu, __u64 num) {
@@ -95,7 +95,6 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
     LOG_DEBUG(sLogger,
               ("[record_network_event] pid", event->key.pid)("ktime", event->key.ktime)("saddr", event->saddr)(
                   "daddr", event->daddr)("sport", event->sport)("dport", event->dport));
-    return;
 }
 
 
@@ -141,33 +140,24 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     // do we need to aggregate all the events into a eventgroup??
     // use source buffer to hold the memory
     auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
         // convert to a item and push to process queue
         LOG_DEBUG(sLogger, ("child num", node->child.size()));
-        bool init = false;
-        SizedMap processTags;
+        auto processCacheMgr = GetProcessCacheManager();
+        if (processCacheMgr == nullptr) {
+            LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
+            return false;
+        }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
             LOG_DEBUG(sLogger, ("step", "enter for each"));
-            // set process tag
-            if (!init) {
-                auto processCacheMgr = GetProcessCacheManager();
-                if (processCacheMgr == nullptr) {
-                    LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
-                    return;
-                }
-                LOG_DEBUG(sLogger,
-                          ("step", "before finalize process tags")("pid", group->mPid)("ktime", group->mKtime));
-                processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
-                init = true;
-            }
-            LOG_DEBUG(sLogger, ("step", "after finalize process tags"));
-            // attach process tags
-            if (processTags.mInner.empty()) {
+            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            if (!hit) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
-            LOG_DEBUG(sLogger, ("step: after attach process tags, tag size", processTags.DataSize()));
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));
@@ -179,8 +169,8 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
 
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
-                for (auto it = processTags.mInner.begin(); it != processTags.mInner.end(); it++) {
-                    logEvent->SetContentNoCopy(it->first, it->second);
+                for (const auto& it : *sharedEvent) {
+                    logEvent->SetContentNoCopy(it.first, it.second);
                 }
                 logEvent->SetContentNoCopy(kL4Protocol.LogKey(), StringView(protocolSb.data, protocolSb.size));
                 logEvent->SetContentNoCopy(kFamily.LogKey(), StringView(familySb.data, familySb.size));

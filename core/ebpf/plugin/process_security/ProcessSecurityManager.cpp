@@ -78,26 +78,27 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
         LOG_DEBUG(sLogger, ("child num", node->child.size()));
         // convert to a item and push to process queue
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-            SizedMap processTags;
+            auto sharedEvent = sharedEventGroup.CreateLogEvent();
             // represent a process ...
             auto processCacheMgr = GetProcessCacheManager();
             if (processCacheMgr == nullptr) {
                 LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            processTags = processCacheMgr->FinalizeProcessTags(sourceBuffer, group->mPid, group->mKtime);
-            if (processTags.mInner.empty()) {
+            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            if (!hit) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
             }
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
-                for (auto& it : processTags.mInner) {
+                for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
                 auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
