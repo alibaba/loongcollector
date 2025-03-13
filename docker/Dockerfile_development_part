@@ -37,6 +37,7 @@ RUN chown -R $(whoami) /loongcollector && \
 COPY --from=build /src/output/libGoPluginBase.so /loongcollector/
 COPY --from=build /src/example_config/quick_start/loongcollector_config.json /loongcollector/conf/instance_config/local/loongcollector_config.json
 COPY --from=build /src/core/build/go_pipeline/libGoPluginAdapter.so /loongcollector/
+COPY --from=build /src/core/build/ebpf/driver/libeBPFDriver.so /loongcollector/
 
 ENV HOST_OS=$HOST_OS
 ENV LOGTAIL_VERSION=$VERSION

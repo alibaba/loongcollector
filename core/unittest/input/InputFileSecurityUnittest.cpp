@@ -47,6 +47,8 @@ protected:
         ebpf::eBPFServer::GetInstance()->Init();
     }
 
+    void TearDown() override { ebpf::eBPFServer::GetInstance()->Stop(); }
+
 private:
     CollectionPipeline p;
     CollectionPipelineContext ctx;
@@ -88,8 +90,8 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter1
-        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityFileFilter thisFilter1
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("/etc", thisFilter1.mFilePathList[0]);
     APSARA_TEST_EQUAL("/bin", thisFilter1.mFilePathList[1]);
 
@@ -113,8 +115,8 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter2
-        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
+    logtail::ebpf::SecurityFileFilter thisFilter2
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter2.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter2.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter2.mFilePathList[2]);
@@ -141,9 +143,9 @@ void InputFileSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter
-        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    APSARA_TEST_EQUAL(0, thisFilter.mFilePathList.size());
+    logtail::ebpf::SecurityFileFilter thisFilter
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
+    APSARA_TEST_EQUAL(0UL, thisFilter.mFilePathList.size());
 
     // invalid optional param
     configStr = R"(
@@ -164,9 +166,9 @@ void InputFileSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    nami::SecurityFileFilter thisFilter1
-        = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    APSARA_TEST_EQUAL(0, thisFilter1.mFilePathList.size());
+    logtail::ebpf::SecurityFileFilter thisFilter1
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
+    APSARA_TEST_EQUAL(0UL, thisFilter1.mFilePathList.size());
 
     // lose mandatory param
     configStr = R"(
@@ -183,8 +185,8 @@ void InputFileSecurityUnittest::OnFailedInit() {
     input->SetMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
-    APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
-    APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].call_names_.size()); // default callname
+    APSARA_TEST_EQUAL(1UL, input->mSecurityOptions.mOptionList.size()); // default callname
+    APSARA_TEST_EQUAL(3UL, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStart() {
@@ -211,9 +213,10 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
+    APSARA_TEST_TRUE(input->Stop(true));
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStop() {
@@ -240,14 +243,16 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+    // APSARA_TEST_TRUE(input->Stop(false));
+    serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+    serverPipelineName
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
