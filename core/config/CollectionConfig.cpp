@@ -56,7 +56,7 @@ static bool ReplaceEnvVarRefInStr(const string& inStr, string& outStr) {
     for (; it != end; ++it) {
         outStr.append(UnescapeDollar(lastMatchEnd, (*it)[0].first)); // original part
         char* env = getenv((*it)[1].str().c_str());
-        if (env != NULL) // replace to enviroment variable
+        if (env != NULL) // replace to environment variable
         {
             outStr.append(env);
         } else if ((*it).size() == 4) // replace to default value
@@ -193,7 +193,7 @@ bool CollectionConfig::Parse() {
                                mRegion);
         }
         const string pluginType = it->asString();
-        // when input is singleton, there should only one input to simpify config load transaction
+        // when input is singleton, there should only one input to simplify config load transaction
         if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType)) {
             mSingletonInput = pluginType;
             if (itr->size() > 1) {

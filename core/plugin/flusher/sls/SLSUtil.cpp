@@ -299,7 +299,7 @@ string GetUrlSignature(const string& httpMethod,
         }
     }
 
-    signature = Base64Enconde(CalcSHA1(osstream, signKey));
+    signature = Base64Encode(CalcSHA1(osstream, signKey));
 
     return signature;
 }
