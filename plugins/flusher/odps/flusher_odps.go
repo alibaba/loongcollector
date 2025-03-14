@@ -1,6 +1,8 @@
 package odps
 
 import (
+	"fmt"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -9,7 +11,10 @@ import (
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 )
 
-const OdpsAlarm string = "ODPS_FLUSHER_ALARM"
+const (
+	VERSION   = "0.0.1"
+	OdpsAlarm = "ODPS_FLUSHER_ALARM"
+)
 
 type OdpsFlusher struct {
 	AccessKeyId     string
@@ -79,6 +84,7 @@ func (o *OdpsFlusher) CreateTunnel() (*tunnel.Tunnel, error) {
 	}
 
 	odpsIns := odps.NewOdps(aliAccount, o.Endpoint)
+	odpsIns.SetUserAgent(fmt.Sprintf("loongcollector/%s-%s", VERSION, getLocalIp()))
 	odpsIns.SetDefaultProjectName(o.ProjectName)
 	project := odpsIns.DefaultProject()
 	tunnelEndpoint, err := project.GetTunnelEndpoint()
