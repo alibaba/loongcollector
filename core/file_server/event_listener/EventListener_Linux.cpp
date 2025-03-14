@@ -95,7 +95,7 @@ int32_t logtail::EventListener::ReadEvents(std::vector<logtail::Event*>& eventVe
 
 
             // when interrupt (config update), must check event buf tail, if not a whole packet, next read will crash
-            if (LogInput::GetInstance()->IsInterupt()) {
+            if (LogInput::GetInstance()->IsInterrupt()) {
                 n += sizeof(struct inotify_event) + event->len;
                 continue;
             }

@@ -21,10 +21,10 @@ namespace logtail {
 
 class LogFileReader;
 
-class GloablFileDescriptorManager {
+class GlobalFileDescriptorManager {
 public:
-    static GloablFileDescriptorManager* GetInstance() {
-        static GloablFileDescriptorManager singleton;
+    static GlobalFileDescriptorManager* GetInstance() {
+        static GlobalFileDescriptorManager singleton;
         return &singleton;
     }
 

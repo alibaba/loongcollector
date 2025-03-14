@@ -146,14 +146,14 @@ protected:
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
-        LogInput::GetInstance()->CleanEnviroments();
+        LogInput::GetInstance()->CleanEnvironments();
         ProcessorRunner::GetInstance()->Init();
         isFileServerStart = false; // file server stop is not reentrant, so we stop it only when start it
     }
 
     void TearDown() override {
-        LogInput::GetInstance()->CleanEnviroments();
-        EventDispatcher::GetInstance()->CleanEnviroments();
+        LogInput::GetInstance()->CleanEnvironments();
+        EventDispatcher::GetInstance()->CleanEnvironments();
         for (auto& pipeline : CollectionPipelineManager::GetInstance()->GetAllPipelines()) {
             pipeline.second->Stop(true);
         }
@@ -395,7 +395,7 @@ void PipelineUpdateUnittest::TestFileServerStart() {
 
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(2U, pipelineManager->GetAllPipelines().size());
-    APSARA_TEST_EQUAL_FATAL(false, LogInput::GetInstance()->mInteruptFlag);
+    APSARA_TEST_EQUAL_FATAL(false, LogInput::GetInstance()->mInterruptFlag);
 }
 
 void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
