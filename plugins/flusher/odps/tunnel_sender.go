@@ -53,7 +53,6 @@ func (ts *TunnelSenderImpl) Init() error {
 	}
 
 	logger.Infof(ts.context.GetRuntimeContext(), "Init odps tunnel sender success, config:[%s] columns:%v", ts.partitionConfig, ts.partition.columns)
-
 	return nil
 }
 func (ts *TunnelSenderImpl) Send(logGroup *protocol.LogGroup, log *protocol.Log) error {
@@ -82,15 +81,14 @@ func (ts *TunnelSenderImpl) Flush() error {
 		writer := writers[idx]
 		if writer.RecordCount() > 0 {
 			start := time.Now()
-			traceId, recordCount, bytesSend, err := writer.Flush()
+			traceID, recordCount, bytesSend, err := writer.Flush()
 			cost := time.Since(start)
 			if err != nil {
-				return fmt.Errorf("Flush data failed, partition:%s traceId: %s, err: %v", partition, traceId, err)
-			} else {
-				logger.Infof(ts.context.GetRuntimeContext(),
-					"Flush odps(%s/%s/%s) success, partition:%s traceId: %s, recordCount: %d, bytesSend: %d, cost:%v",
-					ts.projectName, ts.schemaName, ts.tableName, partition, traceId, recordCount, bytesSend, cost)
+				return fmt.Errorf("Flush data failed, partition:%s traceID: %s, err: %v", partition, traceID, err)
 			}
+			logger.Debugf(ts.context.GetRuntimeContext(),
+				"Flush odps(%s/%s/%s) success, partition:%s traceID: %s, recordCount: %d, bytesSend: %d, cost:%v",
+				ts.projectName, ts.schemaName, ts.tableName, partition, traceID, recordCount, bytesSend, cost)
 		}
 	}
 

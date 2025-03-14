@@ -3,11 +3,10 @@ package datahub
 import (
 	"encoding/json"
 	"fmt"
-	"net"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
@@ -30,10 +29,8 @@ const (
 )
 
 const (
-	LogtailPath     = "__path__"
-	LogtailHostname = "__hostname__"
-	LogtailPackId   = "__pack_id__"
-	LogtailTopic    = "__topic__"
+	LogtailPath  = "__path__"
+	LogtailTopic = "__topic__"
 )
 
 type RecordBuilder interface {
@@ -66,8 +63,8 @@ type RecordBuilderImpl struct {
 }
 
 func (rb *RecordBuilderImpl) Init() error {
-	rb.hostIp = getLocalIp()
-	rb.hostname, _ = os.Hostname()
+	rb.hostIp = config.LoongcollectorGlobalConfig.HostIP
+	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 
 	return rb.doFreshRecordSchema()
 }
@@ -192,7 +189,7 @@ func (rb *RecordBuilderImpl) log2BlobRecord(log *protocol.Log) (datahub.IRecord,
 	}
 
 	buf, _ := json.Marshal(m)
-	record := datahub.NewBlobRecord([]byte(buf), 0)
+	record := datahub.NewBlobRecord(buf, 0)
 	return record, nil
 }
 
@@ -225,19 +222,4 @@ func validateFieldValue(fieldType datahub.FieldType, value string) (interface{},
 	default:
 		return nil, fmt.Errorf("unsupported field type %s", fieldType)
 	}
-}
-
-func getLocalIp() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
 }

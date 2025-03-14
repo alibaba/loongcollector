@@ -3,6 +3,7 @@ package odps
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -11,39 +12,32 @@ import (
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 )
 
-const (
-	VERSION   = "0.0.1"
-	OdpsAlarm = "ODPS_FLUSHER_ALARM"
-)
-
 type OdpsFlusher struct {
-	AccessKeyId     string
+	AccessKeyID     string
 	AccessKeySecret string
 	SecurityToken   string
-	BearerToken     string
 	Endpoint        string
 	ProjectName     string
 	SchemaName      string
 	TableName       string
-	ExtraLevel      int
-	TimeRange       int
 	PartitionConfig string
-	context         pipeline.Context
+	TimeRange       int
+	extraLevel      int
 	sender          TunnelSender
+	context         pipeline.Context
 }
 
 func NewOdpsFlusher() *OdpsFlusher {
 	return &OdpsFlusher{
-		AccessKeyId:     "",
+		AccessKeyID:     "",
 		AccessKeySecret: "",
 		SecurityToken:   "",
-		BearerToken:     "",
 		Endpoint:        "",
 		ProjectName:     "",
 		TableName:       "",
-		ExtraLevel:      1,
-		TimeRange:       15,
 		PartitionConfig: "",
+		TimeRange:       15,
+		extraLevel:      1,
 	}
 }
 
@@ -52,14 +46,14 @@ func (o *OdpsFlusher) Init(context pipeline.Context) error {
 
 	tunnelIns, err := o.CreateTunnel()
 	if err != nil {
-		logger.Errorf(o.context.GetRuntimeContext(), OdpsAlarm, "Create (%s/%s/%s) tunnel failed, error:%v",
+		logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Create (%s/%s/%s) tunnel failed, error:%v",
 			o.ProjectName, o.SchemaName, o.TableName, err)
 		return err
 	}
 
-	o.sender = NewTunnelSender(context, o.ProjectName, o.SchemaName, o.TableName, o.PartitionConfig, o.TimeRange, o.ExtraLevel, tunnelIns)
+	o.sender = NewTunnelSender(context, o.ProjectName, o.SchemaName, o.TableName, o.PartitionConfig, o.TimeRange, o.extraLevel, tunnelIns)
 	if err := o.sender.Init(); err != nil {
-		logger.Errorf(o.context.GetRuntimeContext(), OdpsAlarm, "Init (%s/%s/%s) tunnel sender failed, error:%v",
+		logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Init (%s/%s/%s) tunnel sender failed, error:%v",
 			o.ProjectName, o.SchemaName, o.TableName, err)
 		return err
 	}
@@ -71,20 +65,14 @@ func (o *OdpsFlusher) Init(context pipeline.Context) error {
 
 func (o *OdpsFlusher) CreateTunnel() (*tunnel.Tunnel, error) {
 	var aliAccount account.Account
-	if len(o.BearerToken) > 0 {
-		logger.Infof(o.context.GetRuntimeContext(), "Use bearer token to create odps flusher: %s", o.BearerToken)
-		aliAccount = account.NewBearerTokenAccount(o.BearerToken)
+	if len(o.SecurityToken) > 0 {
+		aliAccount = account.NewStsAccount(o.AccessKeyID, o.AccessKeySecret, o.SecurityToken)
 	} else {
-		logger.Infof(o.context.GetRuntimeContext(), "Use AK to create odps flusher: %s", o.AccessKeyId)
-		if len(o.SecurityToken) > 0 {
-			aliAccount = account.NewStsAccount(o.AccessKeyId, o.AccessKeySecret, o.SecurityToken)
-		} else {
-			aliAccount = account.NewAliyunAccount(o.AccessKeyId, o.AccessKeySecret)
-		}
+		aliAccount = account.NewAliyunAccount(o.AccessKeyID, o.AccessKeySecret)
 	}
 
 	odpsIns := odps.NewOdps(aliAccount, o.Endpoint)
-	odpsIns.SetUserAgent(fmt.Sprintf("loongcollector/%s-%s", VERSION, getLocalIp()))
+	odpsIns.SetUserAgent(fmt.Sprintf("loongcollector/%s-%s", config.BaseVersion, config.LoongcollectorGlobalConfig.HostIP))
 	odpsIns.SetDefaultProjectName(o.ProjectName)
 	project := odpsIns.DefaultProject()
 	tunnelEndpoint, err := project.GetTunnelEndpoint()
@@ -103,7 +91,7 @@ func (o *OdpsFlusher) Flush(projectName string, logstoreName string, configName 
 	for _, logGroup := range logGroupList {
 		for _, log := range logGroup.Logs {
 			if err := o.sender.Send(logGroup, log); err != nil {
-				logger.Errorf(o.context.GetRuntimeContext(), OdpsAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
+				logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
 				return err
 			}
 		}
@@ -111,7 +99,7 @@ func (o *OdpsFlusher) Flush(projectName string, logstoreName string, configName 
 	return o.sender.Flush()
 }
 
-func (o *OdpsFlusher) IsReady(ProjectName string, logstoreName string, logstoreKey int64) bool {
+func (o *OdpsFlusher) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return o.sender != nil
 }
 

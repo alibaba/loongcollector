@@ -79,7 +79,7 @@ func (sc *SessionCache) cleanup() {
 	for key, val := range sc.sessionMap {
 		if now.Sub(val.accessTime) > sc.expireTime {
 			delete(sc.sessionMap, key)
-			logger.Infof(sc.context.GetRuntimeContext(), "Delete odps(%s/%s/%s) expire session, partition: %s, last access time: %s",
+			logger.Debugf(sc.context.GetRuntimeContext(), "Delete odps(%s/%s/%s) expire session, partition: %s, last access time: %s",
 				sc.projectName, sc.schemaName, sc.tableName, val.partition, val.accessTime)
 		}
 	}
@@ -92,11 +92,11 @@ func (sc *SessionCache) GetWriter(partition string) (*tunnel.StreamUploadSession
 	} else {
 		newSession, err := sc.createSessionItem(partition)
 		if err != nil {
-			logger.Errorf(sc.context.GetRuntimeContext(), OdpsAlarm, "Create odps(%s/%s/%s) session failed, partition: %s",
+			logger.Errorf(sc.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Create odps(%s/%s/%s) session failed, partition: %s",
 				sc.projectName, sc.schemaName, sc.tableName, partition)
 			return nil, nil, err
 		}
-		logger.Infof(sc.context.GetRuntimeContext(), "Create odps(%s/%s/%s) session success, partition: %s",
+		logger.Debugf(sc.context.GetRuntimeContext(), "Create odps(%s/%s/%s) session success, partition: %s",
 			sc.projectName, sc.schemaName, sc.tableName, partition)
 		item = newSession
 		sc.sessionMap[partition] = newSession

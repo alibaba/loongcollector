@@ -24,7 +24,7 @@ func TestConnectAndWrite(t *testing.T) {
 	tableName := "blob_1"
 	partitionConfig := "pt=%Y%m%d"
 	d := &OdpsFlusher{
-		AccessKeyId:     "xx",
+		AccessKeyID:     "xx",
 		AccessKeySecret: "xx",
 		Endpoint:        "",
 		ProjectName:     projectName,

@@ -44,8 +44,8 @@ func TestFreshShardIds(t *testing.T) {
 	assert.Equal(t, 3, len(s.shardInfo.shardIds))
 
 	m := []string{"1", "2", "3"}
-	for idx, shardId := range m {
-		assert.Equal(t, shardId, s.shardInfo.shardIds[idx])
+	for idx, shardID := range m {
+		assert.Equal(t, shardID, s.shardInfo.shardIds[idx])
 	}
 }
 

@@ -2,11 +2,10 @@ package odps
 
 import (
 	"fmt"
-	"net"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/datatype"
@@ -16,9 +15,7 @@ import (
 const (
 	ExtraInfoColumn = "__dwarf_info__"
 
-	LogtailPath     = "__path__"
-	LogtailHostname = "__hostname__"
-	LogtailPackId   = "__pack_id__"
+	LogtailPath = "__path__"
 )
 
 type RecordBuilder interface {
@@ -42,13 +39,13 @@ func NewRecordBuilder(extraLevel int) RecordBuilder {
 
 type RecordBuilderImpl struct {
 	extraLevel int
-	hostIp     string
+	hostIP     string
 	hostname   string
 }
 
 func (rb *RecordBuilderImpl) Init() {
-	rb.hostname, _ = os.Hostname()
-	rb.hostIp = getLocalIp()
+	rb.hostIP = config.LoongcollectorGlobalConfig.HostIP
+	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 }
 
 func findLogTag(logTags []*protocol.LogTag, key string) (string, bool) {
@@ -72,7 +69,7 @@ func (rb *RecordBuilderImpl) genExtraInfo(logGroup *protocol.LogGroup, log *prot
 		if path, ok := findLogTag(logGroup.LogTags, LogtailPath); ok {
 			info.CollectPath = path
 		}
-		info.HostIp = rb.hostIp
+		info.HostIp = rb.hostIP
 	}
 
 	if rb.extraLevel >= 2 {
@@ -96,7 +93,7 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 			continue
 		}
 
-		var value *string = nil
+		var value *string
 		for _, content := range log.Contents {
 			if column.Name == content.Key {
 				value = &content.Value
@@ -215,19 +212,4 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 	}
 
 	return record, nil
-}
-
-func getLocalIp() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
 }

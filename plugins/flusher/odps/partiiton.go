@@ -100,7 +100,7 @@ func validateTimeFormat(format string) (string, error) {
 			return "", fmt.Errorf("invalid time format %s", format)
 		}
 
-		newFormat = newFormat + gofmt
+		newFormat += gofmt
 	}
 	return newFormat, nil
 }
@@ -194,14 +194,15 @@ func (ph *PartitionHelper) GenPartition(log *protocol.Log) string {
 	str := ""
 	ts := time.Unix(int64(ph.leftAlign(log.Time)), 0)
 	for _, col := range ph.columns {
-		if col.colType == Default {
-			str = str + col.format
-		} else if col.colType == Time {
-			str = str + ts.Format(col.format)
-		} else {
+		switch col.colType {
+		case Default:
+			str += col.format
+		case Time:
+			str += ts.Format(col.format)
+		case Data:
 			for _, content := range log.Contents {
 				if content.Key == col.format {
-					str = str + content.Value
+					str += content.Value
 					break
 				}
 			}

@@ -12,7 +12,7 @@ import (
 
 func TestGenRecordWithoutParse(t *testing.T) {
 	builder := RecordBuilderImpl{
-		hostIp:     "127.0.0.1",
+		hostIP:     "127.0.0.1",
 		hostname:   "hostname",
 		extraLevel: 1,
 	}
@@ -48,7 +48,7 @@ func TestGenRecordWithoutParse(t *testing.T) {
 
 func TestGenRecordWithParse(t *testing.T) {
 	builder := RecordBuilderImpl{
-		hostIp:   "127.0.0.1",
+		hostIP:   "127.0.0.1",
 		hostname: "hostname",
 	}
 
@@ -211,7 +211,7 @@ func TestTypeMissMatch(t *testing.T) {
 
 func TestGenRecordWithExtraInfo(t *testing.T) {
 	builder := RecordBuilderImpl{
-		hostIp:     "127.0.0.1",
+		hostIP:     "127.0.0.1",
 		hostname:   "hostname",
 		extraLevel: 1,
 	}

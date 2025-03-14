@@ -3,6 +3,7 @@ package datahub
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -10,19 +11,15 @@ import (
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
 
-const (
-	VERSION = "0.0.1"
-)
-
 type DatahubFlusher struct {
-	AccessKeyId     string
+	AccessKeyID     string
 	AccessKeySecret string
 	SecurityToken   string
 	Endpoint        string
 	ProjectName     string
 	TopicName       string
-	CompressType    datahub.CompressorType
-	ExtraLevel      int
+	compressType    datahub.CompressorType
+	extraLevel      int
 	recordBuilder   RecordBuilder
 	producer        Producer
 	context         pipeline.Context
@@ -30,31 +27,31 @@ type DatahubFlusher struct {
 
 func NewDatahubFlusher() *DatahubFlusher {
 	return &DatahubFlusher{
-		AccessKeyId:     "",
+		AccessKeyID:     "",
 		AccessKeySecret: "",
 		SecurityToken:   "",
 		Endpoint:        "",
 		ProjectName:     "",
 		TopicName:       "",
-		CompressType:    datahub.ZSTD,
-		ExtraLevel:      1,
+		compressType:    datahub.ZSTD,
+		extraLevel:      1,
 	}
 }
 
 func (d *DatahubFlusher) Init(context pipeline.Context) error {
 	d.context = context
-	logger.Infof(d.context.GetRuntimeContext(), "Init datahub flusher:%v", *d)
+	logger.Debugf(d.context.GetRuntimeContext(), "Init datahub flusher:%v", *d)
 
 	var account datahub.Account
 	if len(d.SecurityToken) > 0 {
-		account = datahub.NewStsCredential(d.AccessKeyId, d.AccessKeySecret, d.SecurityToken)
+		account = datahub.NewStsCredential(d.AccessKeyID, d.AccessKeySecret, d.SecurityToken)
 	} else {
-		account = datahub.NewAliyunAccount(d.AccessKeyId, d.AccessKeySecret)
+		account = datahub.NewAliyunAccount(d.AccessKeyID, d.AccessKeySecret)
 	}
 
 	config := &datahub.Config{
-		UserAgent:            fmt.Sprintf("loongcollector/%s-%s", VERSION, getLocalIp()),
-		CompressorType:       d.CompressType,
+		UserAgent:            fmt.Sprintf("loongcollector/%s-%s", config.BaseVersion, config.LoongcollectorGlobalConfig.HostIP),
+		CompressorType:       d.compressType,
 		EnableBinary:         true,
 		EnableSchemaRegistry: false,
 		HttpClient:           datahub.DefaultHttpClient(),
@@ -62,23 +59,22 @@ func (d *DatahubFlusher) Init(context pipeline.Context) error {
 
 	client := datahub.NewClientWithConfig(d.Endpoint, config, account)
 
-	d.recordBuilder = NewRecordBuilder(d.ProjectName, d.TopicName, d.ExtraLevel, client, d.context)
+	d.recordBuilder = NewRecordBuilder(d.ProjectName, d.TopicName, d.extraLevel, client, d.context)
 	err := d.recordBuilder.Init()
 	if err != nil {
 		logger.Errorf(d.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Init datahub(%s/%s) record builder failed, error:%v", d.ProjectName, d.TopicName, err)
 		return err
-	} else {
-		logger.Infof(d.context.GetRuntimeContext(), "Init datahub(%s/%s) record builder success", d.ProjectName, d.TopicName)
 	}
+	logger.Debugf(d.context.GetRuntimeContext(), "Init datahub(%s/%s) record builder success", d.ProjectName, d.TopicName)
 
 	d.producer = NewProducer(d.ProjectName, d.TopicName, client, d.context)
 	err = d.producer.Init()
 	if err != nil {
 		logger.Errorf(d.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Init datahub(%s/%s) producer failed, error:%v", d.ProjectName, d.TopicName, err)
 		return err
-	} else {
-		logger.Infof(d.context.GetRuntimeContext(), "Init datahub(%s/%s) producer success", d.ProjectName, d.TopicName)
 	}
+	logger.Infof(d.context.GetRuntimeContext(), "Init datahub(%s/%s) producer success", d.ProjectName, d.TopicName)
+
 	return nil
 }
 
@@ -104,7 +100,7 @@ func (d *DatahubFlusher) Flush(projectName string, logstoreName string, configNa
 	return nil
 }
 
-func (d *DatahubFlusher) IsReady(ProjectName string, logstoreName string, logstoreKey int64) bool {
+func (d *DatahubFlusher) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return d.producer != nil && d.recordBuilder != nil
 }
 
