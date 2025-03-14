@@ -178,7 +178,7 @@ func (f *FlusherS3) upload(key string, data []byte) {
 	for count < 5 {
 		select {
 		case <-f.context.GetRuntimeContext().Done():
-			logger.Warningf(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "upload data cancelled to S3: %s/%s", f.Bucket, key)
+			logger.Warningf(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "upload data canceled to S3: %s/%s", f.Bucket, key)
 			return
 		default:
 			_, err := f.uploader.Upload(&s3manager.UploadInput{
