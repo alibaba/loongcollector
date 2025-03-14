@@ -113,8 +113,10 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
     mItem.emplace_back(std::move(item));
     return;
 #endif
-    while (true) {
-        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+    int i = 0;
+    QueueStatus res = QueueStatus::QUEUE_FULL;
+    while (i++ < 1000) {
+        res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
         if (res == QueueStatus::OK) {
             break;
         }
@@ -123,6 +125,9 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
             break;
         }
         usleep(10 * 1000);
+    }
+    if (res == QueueStatus::QUEUE_FULL) {
+        LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue is full"));
     }
 }
 
