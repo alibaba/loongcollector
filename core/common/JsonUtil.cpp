@@ -19,6 +19,7 @@
 
 #include "AppConfig.h"
 #include "common/ExceptionBase.h"
+#include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 
@@ -30,6 +31,39 @@ bool ParseJsonTable(const string& config, Json::Value& res, string& errorMsg) {
     Json::CharReaderBuilder builder;
     const unique_ptr<Json::CharReader> reader(builder.newCharReader());
     return reader->parse(config.c_str(), config.c_str() + config.size(), &res, &errorMsg);
+}
+
+size_t Hash(const Json::Value& value) {
+    size_t hash = 0;
+    if (value.isNull()) {
+        hash ^= std::hash<std::string>{}("null");
+    } else if (value.isBool()) {
+        hash ^= std::hash<bool>{}(value.asBool());
+    } else if (value.isInt()) {
+        hash ^= std::hash<int>{}(value.asInt());
+    } else if (value.isInt64()) {
+        hash ^= std::hash<long>{}(value.asInt64());
+    } else if (value.isUInt()) {
+        hash ^= std::hash<unsigned int>{}(value.asUInt());
+    } else if (value.isUInt64()) {
+        hash ^= std::hash<unsigned long>{}(value.asUInt64());
+    } else if (value.isDouble()) {
+        hash ^= std::hash<double>{}(value.asDouble());
+    } else if (value.isString()) {
+        hash ^= std::hash<std::string>{}(value.asString());
+    } else if (value.isArray()) {
+        for (const auto& item : value) {
+            HashCombine(hash, Hash(item));
+        }
+    } else if (value.isObject()) {
+        for (const auto& key : value.getMemberNames()) {
+            size_t seed = 0;
+            HashCombine(seed, std::hash<std::string>{}(key));
+            HashCombine(seed, Hash(value[key]));
+            hash ^= seed;
+        }
+    }
+    return hash;
 }
 
 bool IsValidJson(const char* buffer, int32_t size) {

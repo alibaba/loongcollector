@@ -32,6 +32,7 @@
 #include "common/version.h"
 #include "config/InstanceConfigManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
+#include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
@@ -175,13 +176,6 @@ DEFINE_FLAG_STRING(inotify_watcher_dirs_dump_filename, "", "inotify_watcher_dirs
 DEFINE_FLAG_STRING(logtail_snapshot_dir, "snapshot dir on local disk", "snapshot");
 DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
-
-
-#if defined(__linux__)
-DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "/tmp/logtail_adhoc_checkpoint");
-#elif defined(_MSC_VER)
-DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "C:\\LogtailData\\logtail_adhoc_checkpoint");
-#endif
 
 #if defined(__linux__)
 DEFINE_FLAG_STRING(check_point_filename, "", "/tmp/logtail_check_point");
@@ -483,14 +477,6 @@ std::string GetAgentAppInfoFile() {
         file = GetAgentRunDir() + "app_info.json";
     }
     return file;
-}
-
-string GetAdhocCheckpointDirPath() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return STRING_FLAG(adhoc_check_point_file_dir);
-    } else {
-        return GetAgentDataDir() + "adhoc_checkpoint";
-    }
 }
 
 string GetCheckPointFileName() {
