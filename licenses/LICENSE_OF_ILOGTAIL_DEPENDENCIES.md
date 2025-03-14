@@ -108,6 +108,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/alibabacloud-go/debug](https://pkg.go.dev/github.com/alibabacloud-go/debug?tab=licenses)
 - [github.com/alibabacloud-go/tea](https://pkg.go.dev/github.com/alibabacloud-go/tea?tab=licenses)
 - [github.com/aliyun/credentials-go](https://pkg.go.dev/github.com/aliyun/credentials-go?tab=licenses)
+- [github.com/google/flatbuffers](https://pkg.go.dev/github.com/google/flatbuffers?tab=licenses)
+- [golang.org/x/xerrors](https://pkg.go.dev/golang.org/x/xerrors?tab=licenses)
+- [gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1?tab=licenses)
 
 ## BSD licenses
 
