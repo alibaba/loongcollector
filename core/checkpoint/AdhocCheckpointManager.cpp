@@ -23,6 +23,9 @@
 #include "common/Thread.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
+#if defined(_MSC_VER)
+#include "windows.h"
+#endif
 
 DEFINE_FLAG_INT32(adhoc_checkpoint_dump_thread_wait_interval, "microseconds", 5 * 1000);
 
@@ -68,6 +71,8 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
         uint64_t fileSignatureHash = 0;
         uint32_t fileSignatureSize = 0;
         char firstLine[1025];
+
+#if !defined(_MSC_VER)
         int fd = open(filePath.c_str(), O_RDONLY);
         // Check if the file handle is opened successfully.
         if (fd == -1) {
@@ -75,11 +80,28 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
             return nullptr;
         }
         int nbytes = pread(fd, firstLine, 1024, 0);
+        close(fd);
         if (nbytes < 0) {
-            close(fd);
             LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
             return nullptr;
         }
+#else
+        // TODO: windows
+        // need fopen with "rb"?
+        std::FILE* file = std::fopen(filePath.c_str(), "r");
+        // Check if the file handle is opened successfully.
+        if (file == nullptr) {
+            LOG_ERROR(sLogger, ("fail to open file", filePath));
+            return nullptr;
+        }
+        int nbytes = std::fread(firstLine, sizeof(char), 1024, file);
+        std::fclose(file);
+        if (nbytes < 0) {
+            LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
+            return nullptr;
+        }
+#endif
+
         firstLine[nbytes] = '\0';
         CheckAndUpdateSignature(std::string(firstLine), fileSignatureHash, fileSignatureSize);
         AdhocFileCheckpointPtr fileCheckpoint
@@ -93,7 +115,6 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
                                                     jobName, // job name
                                                     filePath); // real file path
 
-        close(fd);
         return fileCheckpoint;
     } else {
         LOG_WARNING(sLogger, ("Create file checkpoint fail, job name", jobName)("file path", filePath));

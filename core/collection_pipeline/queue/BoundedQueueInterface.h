@@ -78,6 +78,7 @@ private:
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

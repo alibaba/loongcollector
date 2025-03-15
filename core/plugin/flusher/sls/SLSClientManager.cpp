@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/flusher/sls/SLSClientManager.h"
-
 #ifdef __linux__
 #include <sys/utsname.h>
 #endif
@@ -32,6 +30,12 @@
 #include "plugin/flusher/sls/SLSUtil.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
+#include "plugin/flusher/sls/SLSClientManager.h"
+
+// for windows compatability, to avoid conflict with the same function defined in windows.h
+#ifdef SetPort
+#undef SetPort
 #endif
 
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
