@@ -32,7 +32,8 @@ protected:
         ofs << "cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0\n";
         ofs << "cpu0 14708487 14216 4613031 2108180843 57199 0 424744 0 1 2\n";
         ofs << "cpua a b c d e f 424744 0 1 2\n";
-        ofs << "cpu1 14708487 14216 4613031 2108180843"; // test old linux kernel
+        ofs << "cpu1 14708487 14216 4613031 2108180843\n"; // test old linux kernel
+        ofs << "cpu3 14708487 14216 4613031 2108180843"; // test old linux kernel
         ofs.close();
         PROCESS_DIR = ".";
     }
@@ -42,7 +43,8 @@ void CPUCollectorUnittest::TestGetHostSystemCPUStat() const {
     auto collector = CPUCollector();
     auto cpus = vector<CPUStat>();
     APSARA_TEST_TRUE(collector.GetHostSystemCPUStat(cpus));
-    APSARA_TEST_EQUAL_FATAL(3, cpus.size());
+    APSARA_TEST_EQUAL_FATAL(4, cpus.size());
+    APSARA_TEST_EQUAL_FATAL(-1, cpus[0].index);
     APSARA_TEST_EQUAL_FATAL(1195061569, cpus[0].user);
     APSARA_TEST_EQUAL_FATAL(1728645, cpus[0].nice);
     APSARA_TEST_EQUAL_FATAL(418424132, cpus[0].system);
@@ -53,6 +55,7 @@ void CPUCollectorUnittest::TestGetHostSystemCPUStat() const {
     APSARA_TEST_EQUAL_FATAL(0, cpus[0].steal);
     APSARA_TEST_EQUAL_FATAL(0, cpus[0].guest);
     APSARA_TEST_EQUAL_FATAL(0, cpus[0].guestNice);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[1].index);
     APSARA_TEST_EQUAL_FATAL(14708487, cpus[1].user);
     APSARA_TEST_EQUAL_FATAL(14216, cpus[1].nice);
     APSARA_TEST_EQUAL_FATAL(4613031, cpus[1].system);
@@ -63,6 +66,7 @@ void CPUCollectorUnittest::TestGetHostSystemCPUStat() const {
     APSARA_TEST_EQUAL_FATAL(0, cpus[1].steal);
     APSARA_TEST_EQUAL_FATAL(1, cpus[1].guest);
     APSARA_TEST_EQUAL_FATAL(2, cpus[1].guestNice);
+    APSARA_TEST_EQUAL_FATAL(1, cpus[2].index);
     APSARA_TEST_EQUAL_FATAL(14708487, cpus[2].user);
     APSARA_TEST_EQUAL_FATAL(14216, cpus[2].nice);
     APSARA_TEST_EQUAL_FATAL(4613031, cpus[2].system);
@@ -73,6 +77,17 @@ void CPUCollectorUnittest::TestGetHostSystemCPUStat() const {
     APSARA_TEST_EQUAL_FATAL(0, cpus[2].steal);
     APSARA_TEST_EQUAL_FATAL(0, cpus[2].guest);
     APSARA_TEST_EQUAL_FATAL(0, cpus[2].guestNice);
+    APSARA_TEST_EQUAL_FATAL(3, cpus[3].index);
+    APSARA_TEST_EQUAL_FATAL(14708487, cpus[3].user);
+    APSARA_TEST_EQUAL_FATAL(14216, cpus[3].nice);
+    APSARA_TEST_EQUAL_FATAL(4613031, cpus[3].system);
+    APSARA_TEST_EQUAL_FATAL(2108180843, cpus[3].idle);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].iowait);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].irq);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].softirq);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].steal);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].guest);
+    APSARA_TEST_EQUAL_FATAL(0, cpus[3].guestNice);
 }
 
 void CPUCollectorUnittest::TestCollect() const {
@@ -81,7 +96,7 @@ void CPUCollectorUnittest::TestCollect() const {
     HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
 
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_EQUAL_FATAL(2 * 10, group.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(3 * 10, group.GetEvents().size());
     vector<double> expected1 = {14708487.0 / SYSTEM_HERTZ,
                                 14216.0 / SYSTEM_HERTZ,
                                 4613031.0 / SYSTEM_HERTZ,
@@ -93,6 +108,16 @@ void CPUCollectorUnittest::TestCollect() const {
                                 1.0 / SYSTEM_HERTZ,
                                 2.0 / SYSTEM_HERTZ};
     vector<double> expected2 = {14708487.0 / SYSTEM_HERTZ,
+                                14216.0 / SYSTEM_HERTZ,
+                                4613031.0 / SYSTEM_HERTZ,
+                                2108180843.0 / SYSTEM_HERTZ,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0};
+    vector<double> expected3 = {14708487.0 / SYSTEM_HERTZ,
                                 14216.0 / SYSTEM_HERTZ,
                                 4613031.0 / SYSTEM_HERTZ,
                                 2108180843.0 / SYSTEM_HERTZ,
@@ -114,6 +139,11 @@ void CPUCollectorUnittest::TestCollect() const {
         APSARA_TEST_EQUAL_FATAL(expected2[i], event2.GetValue<UntypedSingleValue>()->mValue);
         APSARA_TEST_EQUAL_FATAL("1", event2.GetTag("cpu"));
         APSARA_TEST_EQUAL_FATAL(expectedMode[i], event2.GetTag("mode"));
+        auto event3 = group.GetEvents()[i + 20].Cast<MetricEvent>();
+        APSARA_TEST_EQUAL_FATAL("node_cpu_seconds_total", event3.GetName());
+        APSARA_TEST_EQUAL_FATAL(expected3[i], event3.GetValue<UntypedSingleValue>()->mValue);
+        APSARA_TEST_EQUAL_FATAL("3", event3.GetTag("cpu"));
+        APSARA_TEST_EQUAL_FATAL(expectedMode[i], event3.GetTag("mode"));
     }
     for (size_t i = 8; i < 10; ++i) {
         auto event = group.GetEvents()[i].Cast<MetricEvent>();
@@ -126,6 +156,11 @@ void CPUCollectorUnittest::TestCollect() const {
         APSARA_TEST_EQUAL_FATAL(expected2[i], event2.GetValue<UntypedSingleValue>()->mValue);
         APSARA_TEST_EQUAL_FATAL("1", event2.GetTag("cpu"));
         APSARA_TEST_EQUAL_FATAL(expectedMode[i - 8], event2.GetTag("mode"));
+        auto event3 = group.GetEvents()[i + 20].Cast<MetricEvent>();
+        APSARA_TEST_EQUAL_FATAL("node_cpu_guest_seconds_total", event3.GetName());
+        APSARA_TEST_EQUAL_FATAL(expected3[i], event3.GetValue<UntypedSingleValue>()->mValue);
+        APSARA_TEST_EQUAL_FATAL("3", event3.GetTag("cpu"));
+        APSARA_TEST_EQUAL_FATAL(expectedMode[i - 8], event3.GetTag("mode"));
     }
 }
 

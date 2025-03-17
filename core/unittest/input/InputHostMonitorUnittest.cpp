@@ -94,7 +94,8 @@ void InputHostMonitorUnittest::OnFailedInit() {
     input.reset(new InputHostMonitor());
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
-    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL_FATAL(input->mInterval, 15);
 }
 
 void InputHostMonitorUnittest::OnSuccessfulStart() {

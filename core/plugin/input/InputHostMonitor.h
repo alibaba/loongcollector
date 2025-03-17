@@ -36,6 +36,9 @@ public:
 private:
     uint32_t mInterval = 0;
     std::vector<std::string> mCollectors;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InpuInputHostMonitorUnittest;
+#endif
 };
 
 } // namespace logtail
