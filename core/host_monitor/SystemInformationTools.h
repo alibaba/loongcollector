@@ -21,6 +21,6 @@
 
 namespace logtail {
 
-bool GetHostSystemStat(std::vector<std::string>& lines);
+bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
 
 } // namespace logtail

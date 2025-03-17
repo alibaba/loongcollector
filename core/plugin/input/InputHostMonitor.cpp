@@ -14,6 +14,9 @@
 
 #include "plugin/input/InputHostMonitor.h"
 
+#include <sys/types.h>
+
+#include "StringTools.h"
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
@@ -22,30 +25,39 @@ namespace logtail {
 
 const std::string InputHostMonitor::sName = "input_host_monitor";
 const uint32_t kMinInterval = 5; // seconds
+const uint32_t kDefaultInterval = 15; // seconds
 
 bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
+    mInterval = kDefaultInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
     }
     if (mInterval < kMinInterval) {
-        LOG_WARNING(sLogger,
-                    ("input host meta", "interval is too small, set to min interval")("original interval", mInterval)(
-                        "new interval", kMinInterval));
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "uint param Interval is smaller than" + ToString(kMinInterval),
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
         mInterval = kMinInterval;
     }
 
     // TODO: add more collectors
     // cpu
     bool enableCPU = true;
-    if (!GetOptionalBoolParam(config, "CPU", enableCPU, errorMsg)) {
+    if (!GetOptionalBoolParam(config, "EnableCPU", enableCPU, errorMsg)) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
                            mContext->GetAlarm(),
                            errorMsg,

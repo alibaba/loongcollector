@@ -29,6 +29,9 @@ public:
 
     virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
     virtual const std::string& Name() const = 0;
+
+protected:
+    bool mValidState = true;
 };
 
 } // namespace logtail

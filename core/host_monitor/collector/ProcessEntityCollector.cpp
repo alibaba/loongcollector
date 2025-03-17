@@ -267,9 +267,14 @@ ProcessStatPtr ProcessEntityCollector::ParseProcessStat(pid_t pid, std::string& 
 bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
                                             const std::function<void(const std::string&)>& callback) {
     if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        LOG_ERROR(sLogger, ("ProcessEntityCollector", "root path is not a directory or not exist")("root", root));
+        if (mValidState) {
+            LOG_ERROR(sLogger,
+                      ("root path is not a directory or not exist", "invalid ProcessEntity collector")("root", root));
+            mValidState = false;
+        }
         return false;
     }
+    mValidState = true;
 
     for (const auto& dirEntry :
          std::filesystem::directory_iterator{root, std::filesystem::directory_options::skip_permission_denied}) {
@@ -316,10 +321,9 @@ int64_t ProcessEntityCollector::GetHostSystemBootTime() {
     }
     int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     std::vector<std::string> lines = {};
-    if (!GetHostSystemStat(lines)) {
-        LOG_WARNING(
-            sLogger,
-            ("failed to get system boot time", "use current time instead")("error msg", "failed to read /proc/stat"));
+    std::string errorMessage;
+    if (!GetHostSystemStat(lines, errorMessage)) {
+        LOG_WARNING(sLogger, ("failed to get system boot time", "use current time instead")("error msg", errorMessage));
         return currentSeconds;
     }
     for (auto const& line : lines) {

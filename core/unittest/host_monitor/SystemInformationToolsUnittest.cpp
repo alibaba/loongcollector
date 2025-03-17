@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "boost/filesystem/operations.hpp"
 
 #include "SystemInformationTools.h"
@@ -36,7 +38,8 @@ protected:
 
 void SystemInformationToolsUnittest::TestGetHostSystemStat() const {
     auto lines = vector<string>();
-    APSARA_TEST_TRUE(GetHostSystemStat(lines));
+    std::string errorMessage;
+    APSARA_TEST_TRUE(GetHostSystemStat(lines, errorMessage));
     APSARA_TEST_EQUAL(1, lines.size());
     APSARA_TEST_EQUAL("btime 1731142542", lines[0]);
 }

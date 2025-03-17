@@ -23,22 +23,22 @@
 #include "common/FileSystemUtil.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
+#include "logger/Logger.h"
 
 using namespace std;
 using namespace std::chrono;
 
 namespace logtail {
 
-bool GetHostSystemStat(vector<string>& lines) {
+bool GetHostSystemStat(vector<string>& lines, string& errorMessage) {
+    errorMessage.clear();
     if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
-        std::cout << "not exist " << PROCESS_DIR / PROCESS_STAT << std::endl;
+        errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_STAT).string();
         return false;
     }
 
-    string errorMessage;
     int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, lines, true, &errorMessage);
     if (ret != 0 || lines.empty()) {
-        std::cout << errorMessage << PROCESS_DIR / PROCESS_STAT << std::endl;
         return false;
     }
     return true;

@@ -79,10 +79,15 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 
 bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
     std::vector<std::string> cpuLines;
-    if (!GetHostSystemStat(cpuLines)) {
-        LOG_WARNING(sLogger, ("failed to get system cpu", "return empty")("error msg", "failed to read /proc/stat"));
+    std::string errorMessage;
+    if (!GetHostSystemStat(cpuLines, errorMessage)) {
+        if (mValidState) {
+            LOG_WARNING(sLogger, ("failed to get system cpu", "invalid CPU collector")("error msg", errorMessage));
+            mValidState = false;
+        }
         return false;
     }
+    mValidState = true;
     // cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0
     // cpu0 14708487 14216 4613031 2108180843 57199 0 424744 0 0 0
     // ...
