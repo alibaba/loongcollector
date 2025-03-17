@@ -38,6 +38,11 @@ namespace ebpf {
 
 class ProcessCacheManager {
 public:
+    static constexpr size_t kInitDataMapSize = 1024UL;
+    static constexpr size_t kMaxCacheSize = 4194304UL;
+    static constexpr size_t kMaxDataMapSize = kInitDataMapSize * 4;
+    static constexpr int kMaxBatchConsumeSize = 1024;
+    static constexpr int kMaxWaitTimeMS = 200;
     ProcessCacheManager() = delete;
     ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                         const std::string& hostName,
@@ -94,7 +99,7 @@ private:
     using DataEventMap = std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual>;
     mutable std::mutex mDataMapMutex;
     DataEventMap mDataMap; // TODO：ebpf中也没区分filename和args，如果两者都超长会导致filename被覆盖为args
-    std::chrono::time_point<std::chrono::system_clock> mLastDataMapClearTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> mLastDataMapClearTime;
 
     ProcParser mProcParser;
     std::string mHostName;

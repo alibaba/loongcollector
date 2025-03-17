@@ -14,6 +14,8 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
+#include <iostream>
+
 #include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
 #include "type/table/ProcessTable.h"
@@ -23,10 +25,19 @@ namespace logtail {
 ProcessCacheValue::ProcessCacheValue() : mSourceBuffer(std::make_shared<SourceBuffer>()) {
 }
 
+// avoid infinite execve to cause memory leak
+static long kMaxProcessCacheValueSourceBufferReuse = 100;
 ProcessCacheValue* ProcessCacheValue::CloneContents() {
     auto* newValue = new ProcessCacheValue();
-    newValue->mContents = mContents;
-    newValue->mSourceBuffer = mSourceBuffer;
+    if (mSourceBuffer.use_count() < kMaxProcessCacheValueSourceBufferReuse) {
+        newValue->mSourceBuffer = mSourceBuffer;
+        newValue->mContents = mContents;
+    } else {
+        for (size_t i = 0; i < mContents.size(); ++i) {
+            StringBuffer cp = newValue->mSourceBuffer->CopyString(mContents[i]);
+            newValue->mContents[i] = {cp.data, cp.size};
+        }
+    }
     return newValue;
 }
 
@@ -53,30 +64,30 @@ void ProcessCacheValue::SetContent(const ebpf::DataElement& key, const char* dat
 
 void ProcessCacheValue::SetContent(const ebpf::DataElement& key, int32_t val) {
     auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
-    char* out = buf.data;
-    fmt::format_to_n(out, buf.capacity, "{}", val);
-    *out = '\0';
+    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+    *end.out = '\0';
+    buf.size = end.size;
     mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
 }
 void ProcessCacheValue::SetContent(const ebpf::DataElement& key, uint32_t val) {
     auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
-    char* out = buf.data;
-    fmt::format_to_n(out, buf.capacity, "{}", val);
-    *out = '\0';
+    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+    *end.out = '\0';
+    buf.size = end.size;
     mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
 }
 void ProcessCacheValue::SetContent(const ebpf::DataElement& key, int64_t val) {
     auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
-    char* out = buf.data;
-    fmt::format_to_n(out, buf.capacity, "{}", val);
-    *out = '\0';
+    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+    *end.out = '\0';
+    buf.size = end.size;
     mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
 }
 void ProcessCacheValue::SetContent(const ebpf::DataElement& key, uint64_t val) {
     auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
-    char* out = buf.data;
-    fmt::format_to_n(out, buf.capacity, "{}", val);
-    *out = '\0';
+    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+    *end.out = '\0';
+    buf.size = end.size;
     mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
 }
 
@@ -131,10 +142,9 @@ void ProcessCache::IncRef(const data_event_id& key) {
 void ProcessCache::DecRef(const data_event_id& key, time_t curktime) {
     auto v = Lookup(key);
     if (v) {
-        --(v->mRefCount);
-    }
-    if (v && v->mRefCount == 0) {
-        enqueueExpiredEntry(key, curktime);
+        if (--(v->mRefCount) == 0) {
+            enqueueExpiredEntry(key, curktime);
+        }
     }
 }
 

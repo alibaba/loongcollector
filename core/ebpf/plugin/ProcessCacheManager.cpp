@@ -19,11 +19,13 @@
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <coolbpf/security/msg_type.h>
+#include <cstdint>
 
 #include <algorithm>
 #include <atomic>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -45,12 +47,6 @@
 
 namespace logtail {
 namespace ebpf {
-
-static constexpr size_t kInitDataMapSize = 1024UL;
-static constexpr size_t kMaxCacheSize = 4194304UL;
-static constexpr size_t kMaxDataMapSize = kInitDataMapSize * 4;
-static constexpr int kMaxBatchConsumeSize = 1024;
-static constexpr int kMaxWaitTimeMS = 200;
 
 /////////// ================= for perfbuffer handlers ================= ///////////
 void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
@@ -128,10 +124,10 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
       mHostName(hostName),
       mHostPathPrefix(hostPathPrefix),
       mCommonEventQueue(queue),
-      mPollProcessEventsTotal(pollEventsTotal),
-      mLossProcessEventsTotal(lossEventsTotal),
-      mProcessCacheMissTotal(cacheMissTotal),
-      mProcessCacheSize(cacheSize) {
+      mPollProcessEventsTotal(std::move(pollEventsTotal)),
+      mLossProcessEventsTotal(std::move(lossEventsTotal)),
+      mProcessCacheMissTotal(std::move(cacheMissTotal)),
+      mProcessCacheSize(std::move(cacheSize)) {
     mDataMap.reserve(kInitDataMapSize);
 }
 
@@ -199,14 +195,15 @@ void ProcessCacheManager::Stop() {
     mInited = false;
 }
 
-constexpr size_t kArgOffset = offsetof(msg_data, arg);
+constexpr size_t kDataArgOffset = offsetof(msg_data, arg);
 
 void ProcessCacheManager::dataAdd(msg_data* dataPtr) {
-    if (dataPtr->common.size < kArgOffset) {
-        LOG_ERROR(sLogger, ("size is negative, dataPtr.common.size", dataPtr->common.size)("arg offset", kArgOffset));
+    if (dataPtr->common.size < kDataArgOffset) {
+        LOG_ERROR(sLogger,
+                  ("size is negative, dataPtr.common.size", dataPtr->common.size)("arg offset", kDataArgOffset));
         return;
     }
-    size_t size = dataPtr->common.size - offsetof(msg_data, arg);
+    size_t size = dataPtr->common.size - kDataArgOffset;
     if (size <= MSG_DATA_ARG_LEN) {
         // std::vector<uint64_t> key = {dataPtr->id.pid, dataPtr->id.time};
         std::lock_guard<std::mutex> lk(mDataMapMutex);
@@ -221,13 +218,13 @@ void ProcessCacheManager::dataAdd(msg_data* dataPtr) {
             // restrict memory usage in abnormal conditions
             // if there is some unused old data, clear it
             // if we cannot clear old data, just clear all
-            if (mDataMap.size() > kMaxDataMapSize
+            if (mDataMap.size() >= kMaxDataMapSize
                 && mLastDataMapClearTime < std::chrono::system_clock::now() - std::chrono::minutes(1)) {
                 clearExpiredData(dataPtr->id.time);
                 mLastDataMapClearTime = std::chrono::system_clock::now();
                 LOG_WARNING(sLogger, ("data map size exceed limit", kInitDataMapSize)("size", mDataMap.size()));
             }
-            if (mDataMap.size() > kMaxDataMapSize) {
+            if (mDataMap.size() >= kMaxDataMapSize) {
                 LOG_WARNING(sLogger, ("data map size exceed limit", kInitDataMapSize)("size", mDataMap.size()));
                 mDataMap.clear();
             }
@@ -284,7 +281,7 @@ std::string DecodeArgs(StringView& rawArgs) {
         return args;
     }
     args.reserve(rawArgs.size() * 2);
-    StringViewSplitter splitter(args, "\0");
+    StringViewSplitter splitter(rawArgs, kNullSv);
     bool first = true;
     for (auto field : splitter) {
         if (first) {
@@ -314,22 +311,18 @@ std::string DecodeArgs(StringView& rawArgs) {
     }
     return args;
 }
-
-static bool hasIndependentParent(const msg_execve_event& event) {
-    return event.cleanup_key.ktime == 0 || (event.process.flags & EVENT_CLONE) != 0;
-}
-
 void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
-    if (hasIndependentParent(*eventPtr)) {
-        mProcessCache.IncRef({eventPtr->parent.pid, eventPtr->parent.ktime});
-    } else {
+    auto cacheValue = msgExecveEventToProcessCacheValue(*eventPtr);
+    mProcessCache.IncRef({cacheValue->mPPid, cacheValue->mPKtime});
+    mProcessCache.AddCache({eventPtr->process.pid, eventPtr->process.ktime}, std::move(cacheValue));
+
+    if (eventPtr->cleanup_key.ktime != 0) {
+        mProcessCache.DecRef({eventPtr->cleanup_key.pid, eventPtr->cleanup_key.ktime}, eventPtr->common.ktime);
         auto parent = mProcessCache.Lookup({eventPtr->cleanup_key.pid, eventPtr->cleanup_key.ktime});
         if (parent) { // dec grand parent's ref count
-            mProcessCache.DecRef({parent->mPPid, parent->mPKtime}, eventPtr->process.ktime);
+            mProcessCache.DecRef({parent->mPPid, parent->mPKtime}, eventPtr->common.ktime);
         }
     }
-    auto cacheValue = msgExecveEventToProcessCacheValue(*eventPtr);
-    mProcessCache.AddCache({eventPtr->process.pid, eventPtr->process.ktime}, std::move(cacheValue));
     if (mFlushProcessEvent) {
         auto processEvent = std::make_shared<ProcessEvent>(eventPtr->process.pid,
                                                            eventPtr->process.ktime,
@@ -350,7 +343,7 @@ void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
 std::shared_ptr<ProcessCacheValue>
 ProcessCacheManager::msgExecveEventToProcessCacheValue(const msg_execve_event& event) {
     auto cacheValue = std::make_shared<ProcessCacheValue>();
-    if (hasIndependentParent(event)) {
+    if (event.cleanup_key.ktime == 0 || (event.process.flags & EVENT_CLONE) != 0) {
         cacheValue->mPPid = event.parent.pid;
         cacheValue->mPKtime = event.parent.ktime;
     } else { // process created from execve only
@@ -387,6 +380,8 @@ ProcessCacheManager::msgExecveEventToProcessCacheValue(const msg_execve_event& e
 }
 
 bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, ProcessCacheValue& cacheValue) {
+    // When filename or args are in event.buffer, they are null terminated.
+    // When they are in data_event, they are not null terminated.
     // args && filename
     static const StringView kENoMem = "enomem";
     thread_local std::string filename;
@@ -418,7 +413,7 @@ bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, P
             cacheValue.SetContentNoCopy(kCWD, kENoMem);
             return false;
         }
-        auto* desc = reinterpret_cast<const data_event_desc*>(buffer);
+        const auto* desc = reinterpret_cast<const data_event_desc*>(buffer);
         LOG_DEBUG(sLogger,
                   ("EVENT_DATA_FILENAME, size",
                    desc->size)("leftover", desc->leftover)("pid", desc->id.pid)("ktime", desc->id.time));
@@ -526,7 +521,11 @@ bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, P
         } else if (!cwd.empty()) {
             // argsdata is not used anymore, as args and cwd has already been SetContent
             argsdata.reserve(cwd.size() + 1 + filename.size());
-            argsdata.assign(cwd.data(), cwd.size()).append("/").append(filename);
+            if (cwd.back() != '/') {
+                argsdata.assign(cwd.data(), cwd.size()).append("/").append(filename);
+            } else {
+                argsdata.assign(cwd.data(), cwd.size()).append(filename);
+            }
             filename.swap(argsdata);
         }
         cacheValue.SetContent(kBinary, filename);
@@ -567,8 +566,10 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
     mProcessCache.IncRef({eventPtr->parent.pid, eventPtr->parent.ktime});
     mProcessCache.AddCache({eventPtr->tgid, eventPtr->ktime}, std::move(cacheValue));
     if (mFlushProcessEvent) {
-        auto event = std::make_shared<ProcessEvent>(
-            eventPtr->tgid, eventPtr->ktime, KernelEventType::PROCESS_CLONE_EVENT, eventPtr->common.ktime);
+        auto event = std::make_shared<ProcessEvent>(static_cast<uint32_t>(eventPtr->tgid),
+                                                    static_cast<uint64_t>(eventPtr->ktime),
+                                                    KernelEventType::PROCESS_CLONE_EVENT,
+                                                    static_cast<uint64_t>(eventPtr->common.ktime));
         if (event) {
             mCommonEventQueue.enqueue(std::move(event));
         }
@@ -716,6 +717,7 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::procToProcessCacheValue(
         auto permitted = GetCapabilities(proc.permitted, *cacheValue->mSourceBuffer);
         auto effective = GetCapabilities(proc.effective, *cacheValue->mSourceBuffer);
         auto inheritable = GetCapabilities(proc.inheritable, *cacheValue->mSourceBuffer);
+        cacheValue->SetContentNoCopy(kUser, userName);
         cacheValue->SetContentNoCopy(kCapPermitted, permitted);
         cacheValue->SetContentNoCopy(kCapEffective, effective);
         cacheValue->SetContentNoCopy(kCapInheritable, inheritable);

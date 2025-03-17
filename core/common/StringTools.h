@@ -16,6 +16,7 @@
 
 #pragma once
 #include <algorithm>
+#include <iostream>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <boost/lexical_cast.hpp>
@@ -178,6 +179,8 @@ static inline StringView Trim(StringView s) {
     return Ltrim(Rtrim(s));
 }
 
+static constexpr StringView kNullSv("\0", 1);
+
 class StringViewSplitterIterator {
 public:
     using iterator_category = std::forward_iterator_tag;
@@ -222,10 +225,20 @@ private:
             return;
         }
 
-        auto end = mStr.find(mDelimiter, mPos);
+        size_t end = 0;
+        if (mDelimiter.empty()) {
+            end = mPos + 1;
+        } else {
+            end = mStr.find(mDelimiter, mPos);
+        }
         if (end == StringView::npos) {
-            mField = mStr.substr(mPos);
-            mPos = StringView::npos;
+            if (mPos <= mStr.size()) { // last field
+                mField = mStr.substr(mPos);
+                mPos = mStr.size() + 1;
+            } else { // equivalent to end
+                mField = {};
+                mPos = StringView::npos;
+            }
         } else {
             mField = mStr.substr(mPos, end - mPos);
             mPos = end + mDelimiter.size();

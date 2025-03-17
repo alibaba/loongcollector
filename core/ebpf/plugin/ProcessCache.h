@@ -57,8 +57,8 @@ public:
 
     std::array<StringView, ebpf::kProcessCacheTableSize> mContents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
-    uint32_t mPPid;
-    uint64_t mPKtime;
+    uint32_t mPPid = 0;
+    uint64_t mPKtime = 0;
     int mRefCount = 0;
 };
 

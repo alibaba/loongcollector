@@ -72,20 +72,21 @@ inline bool operator&(ApiEventFlag lhs, ApiEventFlag rhs) {
 
 struct Proc {
 public:
-    uint32_t ppid; // parent pid
-    uint64_t pktime;
+    uint32_t ppid = 0U; // parent pid
+    uint64_t pktime = 0U;
     // uint32_t pnspid;
     // uint32_t pflags;
     // std::string pcmdline;
     // std::string pexe;
-    std::vector<uint32_t> uids; // Real UID, Effective UID, Saved Set-UID, Filesystem UID
-    std::vector<uint32_t> gids;
-    uint32_t pid;
-    uint32_t tid;
-    uint32_t nspid;
-    uint32_t auid; // Audit UID, loginuid
-    uint32_t flags;
-    uint64_t ktime;
+    std::vector<uint32_t> uids = {0, 0, 0, 0}; // Real UID, Effective UID, Saved Set-UID, Filesystem UID
+    std::vector<uint32_t> gids = {0, 0, 0, 0};
+    ;
+    uint32_t pid = 0;
+    uint32_t tid = 0;
+    uint32_t nspid = 0;
+    uint32_t auid = 0; // Audit UID, loginuid
+    uint32_t flags = 0;
+    uint64_t ktime = 0;
     std::string cmdline; // \0 separated binary and args
     std::string comm;
     std::string cwd;
@@ -94,19 +95,19 @@ public:
 #endif
     std::string exe;
     std::string container_id;
-    uint64_t effective;
-    uint64_t inheritable;
-    uint64_t permitted;
-    uint32_t uts_ns;
-    uint32_t ipc_ns;
-    uint32_t mnt_ns;
-    uint32_t pid_ns;
-    uint32_t pid_for_children_ns;
-    uint32_t net_ns;
-    uint32_t time_ns;
-    uint32_t time_for_children_ns;
-    uint32_t cgroup_ns;
-    uint32_t user_ns;
+    uint64_t effective = 0;
+    uint64_t inheritable = 0;
+    uint64_t permitted = 0;
+    uint32_t uts_ns = 0;
+    uint32_t ipc_ns = 0;
+    uint32_t mnt_ns = 0;
+    uint32_t pid_ns = 0;
+    uint32_t pid_for_children_ns = 0;
+    uint32_t net_ns = 0;
+    uint32_t time_ns = 0;
+    uint32_t time_for_children_ns = 0;
+    uint32_t cgroup_ns = 0;
+    uint32_t user_ns = 0;
 };
 
 struct Status {
