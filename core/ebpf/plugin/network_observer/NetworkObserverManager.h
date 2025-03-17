@@ -15,6 +15,7 @@
 #pragma once
 
 #include <atomic>
+#include <queue>
 #include <vector>
 
 #include "ConnectionManager.h"
@@ -66,6 +67,7 @@ public:
 
     void PollBufferWrapper();
     void ConsumeRecords();
+    void HandleRollbackRecords(const std::chrono::steady_clock::time_point&);
 
     std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
@@ -137,6 +139,7 @@ private:
 
     // store parsed records
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRollbackQueue;
+    std::deque<std::shared_ptr<AbstractRecord>> mRollbackRecords;
 
     // coreThread used for polling kernel event...
     std::thread mCoreThread;
@@ -156,11 +159,11 @@ private:
     std::unordered_set<std::string> mEnabledCids;
 
     ReadWriteLock mAppAggLock;
-    SIZETAggTree<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
+    SIZETAggTreeWithSourceBuffer<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
 
 
     ReadWriteLock mNetAggLock;
-    SIZETAggTree<NetMetricData, std::shared_ptr<AbstractRecord>> mNetAggregator;
+    SIZETAggTreeWithSourceBuffer<NetMetricData, std::shared_ptr<AbstractRecord>> mNetAggregator;
 
 
     ReadWriteLock mSpanAggLock;

@@ -84,8 +84,8 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-    // EnableMetric (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "EnableCidFilter", thisObserverNetworkOption.mEnableCidFilter, errorMsg)) {
+    // DisableMetadata (Optional)
+    if (!GetOptionalBoolParam(probeConfig, "DisableMetadata", thisObserverNetworkOption.mDisableMetadata, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,

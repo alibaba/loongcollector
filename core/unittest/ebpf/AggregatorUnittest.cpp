@@ -68,7 +68,7 @@ protected:
                 }
                 base->val++;
             },
-            [](const std::vector<std::string>& in) {
+            [](const std::vector<std::string>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
                 // LOG_INFO(sLogger, ("enter generate ... ", ""));
                 return std::make_unique<HT>(0);
             });
@@ -129,7 +129,7 @@ void AggregatorUnittest::TestAggregator() {
         [this](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<FileEvent>& other) {
             base->mInnerEvents.emplace_back(std::move(other));
         },
-        [this](const std::shared_ptr<FileEvent>& in) {
+        [this](const std::shared_ptr<FileEvent>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
             LOG_INFO(sLogger, ("generate node", ""));
             return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
         });
@@ -165,8 +165,8 @@ void AggregatorUnittest::TestAggregator() {
     for (auto& node : nodes) {
         // convert to a item and push to process queue
         // represent a pid, ktime
-        auto pid = node->child.begin()->second->data->mPid;
-        auto ktime = node->child.begin()->second->data->mKtime;
+        auto pid = node->mChild.begin()->second->mData->mPid;
+        auto ktime = node->mChild.begin()->second->mData->mKtime;
         PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
         this->mAggregateTree->ForEach(node, [&](const FileEventGroup* group) {
             // path level

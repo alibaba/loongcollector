@@ -36,4 +36,6 @@ int64_t HashSignatureString(const char* str, size_t strLen);
 
 void HashCombine(size_t& seed, size_t value);
 
+void AttrHashCombine(size_t& result, size_t value);
+
 } // namespace logtail

@@ -45,7 +45,8 @@ public:
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         CounterPtr pollEventsTotal,
                         CounterPtr lossEventsTotal,
-                        CounterPtr cacheMissTotal);
+                        CounterPtr cacheMissTotal,
+                        IntGaugePtr cacheSize);
     ~ProcessCacheManager() = default;
 
     void UpdateRecvEventTotal(uint64_t count = 1);
@@ -103,6 +104,7 @@ private:
     CounterPtr mPollProcessEventsTotal;
     CounterPtr mLossProcessEventsTotal;
     CounterPtr mProcessCacheMissTotal;
+    IntGaugePtr mProcessCacheSize;
 
     std::atomic_bool mFlushProcessEvent = false;
     std::future<void> mPoller;

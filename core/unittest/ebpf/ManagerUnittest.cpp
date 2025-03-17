@@ -40,7 +40,7 @@ protected:
         Timer::GetInstance()->Init();
         mSourceManager = std::make_shared<SourceManager>();
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mSourceManager, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr);
+            mSourceManager, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
     }
 
     void TearDown() override { Timer::GetInstance()->Stop(); }

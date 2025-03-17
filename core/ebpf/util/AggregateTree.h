@@ -20,21 +20,24 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/memory/SourceBuffer.h"
 #include "logger/Logger.h"
 
 namespace logtail {
 
-template <class Data, class Value, class KeyType>
+template <class Data, class Value, class KeyType, bool NeedSourceBuffer>
 class AggTree;
 
 template <class Data, class KeyType>
 class AggNode {
 public:
-    std::unordered_map<KeyType, std::unique_ptr<AggNode>> child;
-    std::unique_ptr<Data> data;
+    AggNode(const std::shared_ptr<SourceBuffer>& sourceBuffer = nullptr) : mSourceBuffer(sourceBuffer) {}
+    std::unordered_map<KeyType, std::unique_ptr<AggNode>> mChild;
+    std::shared_ptr<SourceBuffer> mSourceBuffer;
+    std::unique_ptr<Data> mData;
 };
 
-template <class Data, class Value, class KeyType>
+template <class Data, class Value, class KeyType, bool NeedSourceBuffer>
 class AggTree {
 private:
     size_t mMaxNodes = 0UL;
@@ -45,27 +48,28 @@ private:
 
     std::function<void(std::unique_ptr<Data>& base, const Value& n)> mAggregateFunc;
 
-    std::function<std::unique_ptr<Data>(const Value& n)> mBuildFunc;
+    std::function<std::unique_ptr<Data>(const Value& n, std::shared_ptr<SourceBuffer>& sourceBuffer)> mBuildFunc;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 public:
     AggTree(size_t maxNodes,
             const std::function<void(std::unique_ptr<Data>&, const Value&)>& aggregateFunc,
-            const std::function<std::unique_ptr<Data>(const Value& n)>& buildFunc)
+            const std::function<std::unique_ptr<Data>(const Value& n, std::shared_ptr<SourceBuffer>& sourceBuffer)>&
+                buildFunc)
         : mMaxNodes(maxNodes),
           mRootNode(std::make_unique<AggNode<Data, KeyType>>()),
           mAggregateFunc(aggregateFunc),
           mBuildFunc(buildFunc) {}
 
-    AggTree(AggTree<Data, Value, KeyType>&& other) noexcept
+    AggTree(AggTree<Data, Value, KeyType, NeedSourceBuffer>&& other) noexcept
         : mMaxNodes(other.mMaxNodes),
           mNodeCount(other.mNodeCount),
           mRootNode(std::move(other.mRootNode)),
           mAggregateFunc(other.mAggregateFunc),
           mBuildFunc(other.mBuildFunc) {}
 
-    AggTree& operator=(AggTree<Data, Value, KeyType>&& other) noexcept {
+    AggTree& operator=(AggTree<Data, Value, KeyType, NeedSourceBuffer>&& other) noexcept {
         mMaxNodes = other.mMaxNodes;
         mNodeCount = other.mNodeCount;
         mRootNode = std::move(other.mRootNode);
@@ -74,8 +78,8 @@ public:
         return *this;
     }
 
-    AggTree<Data, Value, KeyType> GetAndReset() {
-        AggTree<Data, Value, KeyType> res = std::move(*this);
+    AggTree<Data, Value, KeyType, NeedSourceBuffer> GetAndReset() {
+        AggTree<Data, Value, KeyType, NeedSourceBuffer> res = std::move(*this);
         Reset();
         return res;
     }
@@ -84,27 +88,36 @@ public:
     bool Aggregate(const Value& d, const ContainerType& agg_keys) {
         auto p = mRootNode.get();
         for (auto& val : agg_keys) {
-            auto result = p->child.find(val);
-            if (result == p->child.end() && mNodeCount >= mMaxNodes) {
+            auto result = p->mChild.find(val);
+            if (result == p->mChild.end() && mNodeCount >= mMaxNodes) {
                 // when we exceed the maximum limit, we will drop new metrics
                 LOG_ERROR(sLogger, ("maximum limit exceeded", mMaxNodes));
                 return false;
             }
-            if (result == p->child.end()) {
-                auto new_node = std::make_unique<AggNode<Data, KeyType>>();
-                auto ptr = new_node.get();
-                p->child[val] = std::move(new_node);
+            if (result == p->mChild.end()) {
+                auto newNode = std::make_unique<AggNode<Data, KeyType>>();
+                if (!p->mSourceBuffer) {
+                    if (NeedSourceBuffer) {
+                        // level1 nodes will setup new sourcebuffer ...
+                        newNode->mSourceBuffer = std::make_shared<SourceBuffer>();
+                    }
+                } else {
+                    // level2 or lower nodes will hold the ref of level1 node's
+                    newNode->mSourceBuffer = p->mSourceBuffer;
+                }
+                auto ptr = newNode.get();
+                p->mChild[val] = std::move(newNode);
                 p = ptr;
                 mNodeCount++;
             } else {
                 p = result->second.get();
             }
         }
-        if (!p->data) {
+        if (!p->mData) {
             // generate new node ...
-            p->data = mBuildFunc(d);
+            p->mData = mBuildFunc(d, p->mSourceBuffer);
         }
-        mAggregateFunc(p->data, d);
+        mAggregateFunc(p->mData, d);
         return true;
     }
 
@@ -117,6 +130,7 @@ public:
     void ForEach(const std::function<void(const Data*)>& call) { ForEach(mRootNode.get(), call); }
 
     void Reset() {
+        // mRootNode = std::make_unique<AggNode<Data, KeyType>>(nullptr);
         mRootNode = std::make_unique<AggNode<Data, KeyType>>();
         mNodeCount = 0;
     }
@@ -125,10 +139,10 @@ public:
         if (root == nullptr) {
             return;
         }
-        if (root->data != nullptr) {
-            call(root->data.get());
+        if (root->mData != nullptr) {
+            call(root->mData.get());
         }
-        for (auto& entry : root->child) {
+        for (auto& entry : root->mChild) {
             ForEach(entry.second.get(), call);
         }
     }
@@ -141,29 +155,32 @@ private:
                   size_t target_depth,
                   std::vector<AggNode<Data, KeyType>*>& ans) {
         if (depth >= target_depth) {
-            // we are done, add child to ans and return
-            for (auto& c : root->child) {
+            // we are done, add mChild to ans and return
+            for (auto& c : root->mChild) {
                 ans.push_back(c.second.get());
             }
             return;
         }
         // go to next depth
-        for (auto& c : root->child) {
+        for (auto& c : root->mChild) {
             GetNodes(depth + 1, c.second, target_depth, ans);
         }
     }
 };
 
+// template <typename T, typename U>
+// using StringAggTree = AggTree<T, U, std::string, false>;
+
+// template <typename T>
+// using StringAggNode = AggNode<T, std::string, false>;
+
 template <typename T, typename U>
-using StringAggTree = AggTree<T, U, std::string>;
-
-template <typename T>
-using StringAggNode = AggNode<T, std::string>;
+using SIZETAggTree = AggTree<T, U, size_t, false>;
 
 template <typename T, typename U>
-using SIZETAggTree = AggTree<T, U, size_t>;
+using SIZETAggTreeWithSourceBuffer = AggTree<T, U, size_t, true>;
 
-template <typename T>
-using SIZETAggNode = AggNode<T, size_t>;
+// template <typename T>
+// using SIZETAggNode = AggNode<T, size_t, false>;
 
 } // namespace logtail

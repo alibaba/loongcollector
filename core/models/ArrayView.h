@@ -20,19 +20,19 @@ namespace logtail {
 template <class T>
 class ArrayView {
 private:
-    const T* const elements_;
-    const size_t size_;
+    const T* const mElements;
+    const size_t mSize;
 
 public:
-    constexpr ArrayView() : elements_(nullptr), size_(0) {}
+    constexpr ArrayView() : mElements(nullptr), mSize(0) {}
     template <std::size_t N>
-    constexpr ArrayView(const T (&a)[N]) : elements_(a), size_(N) {}
-    constexpr ArrayView(const T* ptr, size_t size) : elements_(ptr), size_(size) {}
+    constexpr ArrayView(const T (&a)[N]) : mElements(a), mSize(N) {}
+    constexpr ArrayView(const T* ptr, size_t size) : mElements(ptr), mSize(size) {}
     template <std::size_t N>
-    constexpr ArrayView(const std::array<T, N>& arr) : elements_(arr.data()), size_(arr.size()) {}
+    constexpr ArrayView(const std::array<T, N>& arr) : mElements(arr.data()), mSize(arr.size()) {}
 
-    constexpr size_t size() const { return size_; }
-    constexpr const T& operator[](size_t i) const { return elements_[i]; }
+    constexpr size_t size() const { return mSize; }
+    constexpr const T& operator[](size_t i) const { return mElements[i]; }
 
     class iterator {
     public:
@@ -47,8 +47,8 @@ public:
     private:
         const T* ptr;
     };
-    iterator begin() const { return iterator(elements_); }
-    iterator end() const { return iterator(elements_ + size_); }
+    iterator begin() const { return iterator(mElements); }
+    iterator end() const { return iterator(mElements + mSize); }
 };
 
 } // namespace logtail

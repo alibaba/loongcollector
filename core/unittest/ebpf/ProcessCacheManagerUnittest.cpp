@@ -39,7 +39,7 @@ protected:
         mTestRoot = std::filesystem::path(GetProcessExecutionDir()) / "ProcessCacheManagerUnittest";
         mProcDir = mTestRoot / "proc";
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mSourceManager, "test_host", mTestRoot.string(), mEventQueue, nullptr, nullptr, nullptr);
+            mSourceManager, "test_host", mTestRoot.string(), mEventQueue, nullptr, nullptr, nullptr, nullptr);
     }
 
     void TearDown() override {

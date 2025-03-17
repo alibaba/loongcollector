@@ -26,6 +26,9 @@
 #include "common/LRUCache.h"
 #include "common/Lock.h"
 #include "common/http/HttpRequest.h"
+#include "models/StringView.h"
+#include "monitor/metric_models/MetricRecord.h"
+#include "monitor/metric_models/MetricTypes.h"
 
 DECLARE_FLAG_STRING(singleton_service);
 DECLARE_FLAG_INT32(singleton_port);
@@ -68,14 +71,21 @@ private:
     int32_t mServicePort;
     std::string mHostIp;
 
+    MetricsRecordRef mRef; // for self monitor
+    IntGaugePtr mCidCacheSize;
+    IntGaugePtr mIpCacheSize;
+    IntGaugePtr mExternalIpCacheSize;
+    CounterPtr mRequestMetaServerTotal;
+    CounterPtr mRequestMetaServerFailedTotal;
+
     void ProcessBatch();
 
     mutable std::mutex mStateMux;
-    std::unordered_set<std::string> mPendingKeys;
+    std::unordered_set<std::string> mPendingKeys; // 增加上限
 
     mutable std::condition_variable mCv;
-    std::vector<std::string> mBatchKeys;
-    std::vector<std::string> mBatchCids;
+    std::vector<std::string> mBatchKeys; // 增加上限
+    std::vector<std::string> mBatchCids; // 增加上限
     std::atomic_bool mEnable = false;
     bool mFlag = false;
     std::thread mQueryThread;
@@ -123,16 +133,19 @@ public:
     //
     std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status);
     // get info by container id from cache
-    std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
+    // std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
+    std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const StringView& containerId);
     // get info by ip from cache
-    std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
-    bool IsExternalIp(const std::string& ip) const;
+    // std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
+    std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const StringView& ip);
+    bool IsExternalIp(const StringView& ip) const;
     bool SendRequestToOperator(const std::string& urlHost,
                                const std::string& request,
                                containerInfoType infoType,
                                std::vector<std::string>& resKey);
 
-    void AsyncQueryMetadata(containerInfoType type, const std::string& key);
+    void AsyncQueryMetadata(containerInfoType type, const StringView& key);
+    // CIDR 问题 gflag 支持配置
 
 #ifdef APSARA_UNIT_TEST_MAIN
     HttpRequest* mRequest;

@@ -21,8 +21,10 @@
 #include "ebpf/plugin/network_observer/Connection.h"
 #include "ebpf/plugin/network_observer/Type.h"
 #include "ebpf/type/table/AppTable.h"
+#include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/HttpTable.h"
 #include "ebpf/type/table/NetTable.h"
+#include "ebpf/type/table/StaticDataRow.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -230,9 +232,19 @@ public:
 
 class AppMetricData : public MetricData {
 public:
-    AppMetricData(std::shared_ptr<Connection> conn, const std::string& spanName)
-        : MetricData(conn), mSpanName(spanName) {}
+    AppMetricData(std::shared_ptr<Connection> conn, const StringView& spanName) : MetricData(conn) {
+        mTags.SetNoCopy<kRpc>(spanName);
+    }
     ~AppMetricData() {}
+
+    std::string ToString() const {
+        std::string res;
+        for (size_t i = 0; i < kAppMetricsNum; i++) {
+            res += std::string(mTags[i]);
+            res += ",";
+        }
+        return res;
+    }
 
     uint64_t mCount = 0;
     double mSum = 0;
@@ -243,20 +255,7 @@ public:
     uint64_t m4xxCount = 0;
     uint64_t m5xxCount = 0;
 
-    // std::array<> ??
-    std::string mAppId;
-    std::string mAppName;
-    std::string mHost;
-    std::string mIp;
-    std::string mNamespace;
-    std::string mWorkloadName;
-    std::string mWorkloadKind;
-    std::string mDestId;
-    std::string mEndpoint;
-    std::string mRpcType;
-    std::string mCallType;
-    std::string mCallKind;
-    std::string mSpanName;
+    StaticDataRow<&kAppMetricsTable> mTags;
 };
 
 #define LC_TCP_MAX_STATES 13
@@ -264,6 +263,15 @@ class NetMetricData : public MetricData {
 public:
     NetMetricData(std::shared_ptr<Connection> conn) : MetricData(conn) {}
     ~NetMetricData() {}
+    std::string ToString() const {
+        std::string res;
+        for (size_t i = 0; i < kNetMetricsNum; i++) {
+            res += std::string(mTags[i]);
+            res += ",";
+        }
+        return res;
+    }
+
     uint64_t mDropCount = 0;
     uint64_t mRetransCount = 0;
     uint64_t mRtt = 0;
@@ -273,20 +281,7 @@ public:
     uint64_t mRecvPkts = 0;
     uint64_t mSendPkts = 0;
     std::array<int, LC_TCP_MAX_STATES> mStateCounts = {0};
-
-    // level1
-    std::string mAppId;
-    std::string mAppName;
-    std::string mHost;
-    std::string mIp;
-
-    // level2
-    std::string mNamespace;
-    std::string mWorkloadName;
-    std::string mWorkloadKind;
-    std::string mPeerNamespace;
-    std::string mPeerWorkloadName;
-    std::string mPeerWorkloadKind;
+    StaticDataRow<&kNetMetricsTable> mTags;
 };
 
 class AppSpanGroup {

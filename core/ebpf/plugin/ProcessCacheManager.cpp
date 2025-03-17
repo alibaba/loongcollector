@@ -121,7 +121,8 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          CounterPtr pollEventsTotal,
                                          CounterPtr lossEventsTotal,
-                                         CounterPtr cacheMissTotal)
+                                         CounterPtr cacheMissTotal,
+                                         IntGaugePtr cacheSize)
     : mSourceManager(sm),
       mProcParser(hostPathPrefix),
       mHostName(hostName),
@@ -129,7 +130,8 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
       mCommonEventQueue(queue),
       mPollProcessEventsTotal(pollEventsTotal),
       mLossProcessEventsTotal(lossEventsTotal),
-      mProcessCacheMissTotal(cacheMissTotal) {
+      mProcessCacheMissTotal(cacheMissTotal),
+      mProcessCacheSize(cacheSize) {
     mDataMap.reserve(kInitDataMapSize);
 }
 
@@ -176,6 +178,7 @@ void ProcessCacheManager::pollPerfBuffers() {
         LOG_DEBUG(sLogger, ("poll event num", ret));
     }
     LOG_DEBUG(sLogger, ("exit poller thread", ""));
+    SET_GAUGE(mProcessCacheSize, mProcessCache.Size());
 }
 
 void ProcessCacheManager::Stop() {

@@ -59,7 +59,7 @@ static constexpr DataElement kConnTrackerElements[] = {
 
 static constexpr size_t kConnTrackerElementsTableSize = std::size(kConnTrackerElements);
 
-static constexpr auto kConnTrackerTable = DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
+inline constexpr auto kConnTrackerTable = DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
 
 static constexpr DataElement kAppMetricsElements[] = {
     kHostName, // host
@@ -67,6 +67,7 @@ static constexpr DataElement kAppMetricsElements[] = {
     kIp, // server ip
     kAppName, // service
 
+    kNamespace,
     kWorkloadKind,
     kWorkloadName,
 
@@ -81,7 +82,7 @@ static constexpr DataElement kAppMetricsElements[] = {
 
 static constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
-static constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
+inline constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
 static constexpr DataElement kAppTraceElements[] = {
     kNamespace,
@@ -116,7 +117,7 @@ static constexpr DataElement kAppTraceElements[] = {
 
 static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 
-static constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
+inline constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
 static constexpr DataElement kAppLogElements[] = {
     kHostName, // host
@@ -140,7 +141,7 @@ static constexpr DataElement kAppLogElements[] = {
 
 static constexpr size_t kAppLogNum = std::size(kAppLogElements);
 
-static constexpr auto kAppLogTable = DataTableSchema("app_log", "app log table", kAppLogElements);
+inline constexpr auto kAppLogTable = DataTableSchema("app_log", "app log table", kAppLogElements);
 
 } // namespace ebpf
 } // namespace logtail

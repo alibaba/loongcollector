@@ -394,5 +394,9 @@ void HashCombine(size_t& seed, size_t value) {
     boost::hash_combine(seed, value);
 }
 
+void AttrHashCombine(size_t& result, size_t value) {
+    result ^= value + 0x9e3779b9 + (result << 6) + (result >> 2);
+}
+
 
 } // namespace logtail

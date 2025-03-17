@@ -17,6 +17,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/HashUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
@@ -100,7 +101,7 @@ FileSecurityManager::FileSecurityManager(std::shared_ptr<ProcessCacheManager>& b
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(std::move(other));
           },
-          [](const std::shared_ptr<CommonEvent>& ce) {
+          [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               FileEvent* in = static_cast<FileEvent*>(ce.get());
               return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
           }) {
@@ -126,7 +127,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
-        LOG_DEBUG(sLogger, ("child num", node->child.size()));
+        LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         // convert to a item and push to process queue
         auto processCacheMgr = GetProcessCacheManager();
         if (processCacheMgr == nullptr) {
@@ -236,16 +237,16 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
     FileEvent* event = static_cast<FileEvent*>(ce.get());
     // calculate agg key
-    std::array<size_t, 2> hash_result;
-    hash_result.fill(0UL);
+    std::array<size_t, 2> result;
+    result.fill(0UL);
     std::hash<uint64_t> hasher;
     std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr) {
-        hash_result[0] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
+        AttrHashCombine(result[0], hasher(x));
     }
     std::hash<std::string> strHasher;
-    hash_result[1] ^= strHasher(event->mPath) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
-    return hash_result;
+    AttrHashCombine(result[1], strHasher(event->mPath));
+    return result;
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {

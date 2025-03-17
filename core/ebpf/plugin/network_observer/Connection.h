@@ -24,6 +24,8 @@
 #include "ebpf/plugin/network_observer/Type.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/table/AppTable.h"
+#include "ebpf/type/table/NetTable.h"
+#include "ebpf/type/table/StaticDataRow.h"
 #include "metadata/ContainerInfo.h"
 
 extern "C" {
@@ -61,9 +63,9 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
-    const std::array<std::string, kConnTrackerElementsTableSize>& GetConnTrackerAttrs() {
+    const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() {
         ReadLock lock(mAttrLock);
-        return mAttrs;
+        return mTags;
     }
 
     const ConnId GetConnId() const { return mConnId; };
@@ -92,7 +94,7 @@ public:
         std::string res;
         ReadLock lock(mAttrLock);
         for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
-            res += mAttrs[i];
+            res += std::string(mTags[i]);
             res += ",";
         }
 
@@ -109,19 +111,19 @@ public:
 
     MetadataAttachStatus GetPeerMetadataAttachStatus() const { return mPeerMetadataAttachStatus; }
 
-    const std::string& GetContainerId() const {
+    const StringView& GetContainerId() const {
         ReadLock lock(mAttrLock);
-        return mAttrs[kConnTrackerTable.ColIndex(kContainerId.Name())];
+        return mTags.Get<kContainerId>();
     }
 
-    const std::string& GetRemoteIp() const {
+    const StringView& GetRemoteIp() const {
         ReadLock lock(mAttrLock);
-        return mAttrs[kConnTrackerTable.ColIndex(kRemoteIp.Name())];
+        return mTags.Get<kRemoteIp>();
     }
 
-    const std::string& GetSourceIp() const {
+    const StringView& GetSourceIp() const {
         ReadLock lock(mAttrLock);
-        return mAttrs[kConnTrackerTable.ColIndex(kIp.Name())];
+        return mTags.Get<kIp>();
     }
 
     bool IsLocalhost() const;
@@ -185,7 +187,7 @@ private:
 
     mutable ReadWriteLock mAttrLock;
     // accessed by multiple threads ...
-    std::array<std::string, kConnTrackerElementsTableSize> mAttrs;
+    StaticDataRow<&kConnTrackerTable> mTags;
 
     std::atomic_int mEpoch = 10;
     std::atomic_bool mIsClose = false;

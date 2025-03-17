@@ -18,8 +18,10 @@
 
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
+#include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
 #include "type/table/BaseElements.h"
+
 extern "C" {
 #include <coolbpf/net.h>
 }
@@ -162,16 +164,16 @@ void Connection::TrySafeUpdateProtocolAttr() {
 
     {
         WriteLock lock(mAttrLock);
-        mAttrs[kConnTrackerTable.ColIndex(kProtocol.Name())] = std::string(magic_enum::enum_name(mProtocol));
+        mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
         if (mRole == support_role_e::IsClient) {
-            mAttrs[kConnTrackerTable.ColIndex(kRpcType.Name())] = RPC_25_STR;
-            mAttrs[kConnTrackerTable.ColIndex(kCallKind.Name())] = HTTP_CLIENT_STR;
-            mAttrs[kConnTrackerTable.ColIndex(kCallType.Name())] = HTTP_CLIENT_STR;
+            mTags.Set<kRpcType>(RPC_25_STR);
+            mTags.Set<kCallKind>(HTTP_CLIENT_STR);
+            mTags.Set<kCallType>(HTTP_CLIENT_STR);
             mProtocolAttached = true;
         } else if (mRole == support_role_e::IsServer) {
-            mAttrs[kConnTrackerTable.ColIndex(kRpcType.Name())] = RPC_0_STR;
-            mAttrs[kConnTrackerTable.ColIndex(kCallKind.Name())] = HTTP_STR;
-            mAttrs[kConnTrackerTable.ColIndex(kCallType.Name())] = HTTP_STR;
+            mTags.Set<kRpcType>(RPC_0_STR);
+            mTags.Set<kCallKind>(HTTP_STR);
+            mTags.Set<kCallType>(HTTP_STR);
             mProtocolAttached = true;
         }
 
@@ -222,18 +224,18 @@ void Connection::SafeUpdateNetMetaAttr(struct conn_stats_event_t* event) {
     // update attributes ...
     {
         WriteLock lock(mAttrLock);
-        mAttrs[kConnTrackerTable.ColIndex(kFd.Name())] = std::to_string(mConnId.fd);
-        mAttrs[kConnTrackerTable.ColIndex(kProcessId.Name())] = std::to_string(mConnId.tgid);
-        mAttrs[kConnTrackerTable.ColIndex(kStartTsNs.Name())] = std::to_string(mConnId.start);
-        mAttrs[kConnTrackerTable.ColIndex(kContainerId.Name())] = cidTrim;
-        mAttrs[kConnTrackerTable.ColIndex(kLocalAddr.Name())] = saddr;
-        mAttrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())] = daddr;
-        mAttrs[kConnTrackerTable.ColIndex(kRemotePort.Name())] = std::to_string(dport);
-        mAttrs[kConnTrackerTable.ColIndex(kNetNs.Name())] = std::to_string(netns);
-        mAttrs[kConnTrackerTable.ColIndex(kFamily.Name())] = family;
-        mAttrs[kConnTrackerTable.ColIndex(kTraceRole.Name())] = std::string(magic_enum::enum_name(mRole));
-        mAttrs[kConnTrackerTable.ColIndex(kIp.Name())] = sip;
-        mAttrs[kConnTrackerTable.ColIndex(kRemoteIp.Name())] = dip;
+        mTags.Set<kFd>(std::to_string(mConnId.fd));
+        mTags.Set<kProcessId>(std::to_string(mConnId.tgid));
+        mTags.Set<kStartTsNs>(std::to_string(mConnId.start));
+        mTags.Set<kContainerId>(cidTrim);
+        mTags.Set<kLocalAddr>(saddr);
+        mTags.Set<kRemoteAddr>(daddr);
+        mTags.Set<kRemotePort>(std::to_string(dport));
+        mTags.Set<kNetNs>(std::to_string(netns));
+        mTags.Set<kFamily>(family);
+        mTags.Set<kTraceRole>(std::string(magic_enum::enum_name(mRole)));
+        mTags.Set<kIp>(sip);
+        mTags.Set<kRemoteIp>(dip);
     }
 
     if (IsLocalhost()) {
@@ -263,7 +265,7 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
 
     if (!pod) {
         // no meta info ...
-        LOG_WARNING(sLogger, ("no pod info ... cid:", mAttrs[kConnTrackerTable.ColIndex(kContainerId.Name())]));
+        LOG_WARNING(sLogger, ("no pod info ... cid:", mTags.Get<kContainerId>()));
         return;
     }
 
@@ -274,14 +276,14 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
 
     {
         WriteLock lock(mAttrLock);
-        mAttrs[kConnTrackerTable.ColIndex(kAppId.Name())] = pod->appId;
-        mAttrs[kConnTrackerTable.ColIndex(kAppName.Name())] = pod->appName;
-        mAttrs[kConnTrackerTable.ColIndex(kPodName.Name())] = pod->podName;
-        mAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())] = pod->podIp;
-        mAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())] = pod->workloadName;
-        mAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())] = workloadKind;
-        mAttrs[kConnTrackerTable.ColIndex(kNamespace.Name())] = pod->k8sNamespace;
-        mAttrs[kConnTrackerTable.ColIndex(kHostName.Name())] = pod->podName;
+        mTags.Set<kAppId>(pod->appId);
+        mTags.Set<kAppName>(pod->appName);
+        mTags.Set<kPodName>(pod->podName);
+        mTags.Set<kPodIp>(pod->podIp);
+        mTags.Set<kWorkloadName>(pod->workloadName);
+        mTags.Set<kWorkloadKind>(workloadKind);
+        mTags.Set<kNamespace>(pod->k8sNamespace);
+        mTags.Set<kHostName>(pod->podName);
         MarkPodMetaAttached();
     }
 }
@@ -298,17 +300,17 @@ void Connection::UnsafeUpdatePeerPodMetaForExternal() {
     if (mK8sPeerMetaAttached) {
         return;
     }
-    mAttrs[kConnTrackerTable.ColIndex(kPeerAppName.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodName.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodIp.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadName.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadKind.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerNamespace.Name())] = EXTERNAL_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerServiceName.Name())] = EXTERNAL_STR;
+    mTags.Set<kPeerAppName>(EXTERNAL_STR);
+    mTags.Set<kPeerPodName>(EXTERNAL_STR);
+    mTags.Set<kPeerPodIp>(EXTERNAL_STR);
+    mTags.Set<kPeerWorkloadName>(EXTERNAL_STR);
+    mTags.Set<kPeerWorkloadKind>(EXTERNAL_STR);
+    mTags.Set<kPeerNamespace>(EXTERNAL_STR);
+    mTags.Set<kPeerServiceName>(EXTERNAL_STR);
     if (mRole == IsClient) {
-        auto daddr = mAttrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())];
-        mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = daddr;
-        mAttrs[kConnTrackerTable.ColIndex(kEndpoint.Name())] = daddr;
+        auto daddr = mTags.Get<kRemoteAddr>();
+        mTags.SetNoCopy<kDestId>(daddr);
+        mTags.SetNoCopy<kEndpoint>(daddr);
     }
     MarkPeerPodMetaAttached();
 }
@@ -318,14 +320,14 @@ void Connection::UpdatePeerPodMetaForLocalhost() {
         return;
     }
     WriteLock lock(mAttrLock);
-    mAttrs[kConnTrackerTable.ColIndex(kPeerAppName.Name())] = LOCALHOST_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodName.Name())] = LOCALHOST_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodIp.Name())] = LOCALHOST_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadName.Name())] = LOCALHOST_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadKind.Name())] = LOCALHOST_STR;
+    mTags.Set<kPeerAppName>(LOCALHOST_STR);
+    mTags.Set<kPeerPodName>(LOCALHOST_STR);
+    mTags.Set<kPeerPodIp>(LOCALHOST_STR);
+    mTags.Set<kPeerWorkloadName>(LOCALHOST_STR);
+    mTags.Set<kPeerWorkloadKind>(LOCALHOST_STR);
     if (mRole == IsClient) {
-        mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = LOCALHOST_STR;
-        mAttrs[kConnTrackerTable.ColIndex(kEndpoint.Name())] = LOCALHOST_STR;
+        mTags.Set<kDestId>(LOCALHOST_STR);
+        mTags.Set<kEndpoint>(LOCALHOST_STR);
     }
     MarkPeerPodMetaAttached();
 }
@@ -335,13 +337,14 @@ void Connection::UpdateSelfPodMetaForUnknown() {
         return;
     }
     WriteLock lock(mAttrLock);
-    mAttrs[kConnTrackerTable.ColIndex(kAppName.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kAppId.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPodIp.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kWorkloadName.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kWorkloadKind.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kNamespace.Name())] = UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kHostName.Name())] = UNKNOWN_STR;
+    mTags.Set<kAppName>(UNKNOWN_STR);
+    // mTags.Set<kAppName>(UNKNOWN_STR);
+    mTags.Set<kAppId>(UNKNOWN_STR);
+    mTags.Set<kPodIp>(UNKNOWN_STR);
+    mTags.Set<kWorkloadName>(UNKNOWN_STR);
+    mTags.Set<kWorkloadKind>(UNKNOWN_STR);
+    mTags.Set<kNamespace>(UNKNOWN_STR);
+    mTags.Set<kHostName>(UNKNOWN_STR);
     MarkPodMetaAttached();
 }
 
@@ -361,31 +364,27 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mAttrs[kConnTrackerTable.ColIndex(kPeerAppName.Name())] = pod->appName.size() ? pod->appName : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodName.Name())] = pod->podName.size() ? pod->podName : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerPodIp.Name())] = pod->podIp.size() ? pod->podIp : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadName.Name())]
-        = pod->workloadName.size() ? pod->workloadName : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerWorkloadKind.Name())]
-        = peerWorkloadKind.size() ? peerWorkloadKind : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerNamespace.Name())]
-        = pod->k8sNamespace.size() ? pod->k8sNamespace : UNKNOWN_STR;
-    mAttrs[kConnTrackerTable.ColIndex(kPeerServiceName.Name())]
-        = pod->serviceName.size() ? pod->serviceName : UNKNOWN_STR;
+    mTags.Set<kPeerAppName>(pod->appName.size() ? pod->appName : UNKNOWN_STR);
+    mTags.Set<kPeerPodName>(pod->podName.size() ? pod->podName : UNKNOWN_STR);
+    mTags.Set<kPeerPodIp>(pod->podIp.size() ? pod->podIp : UNKNOWN_STR);
+    mTags.Set<kPeerWorkloadName>(pod->workloadName.size() ? pod->workloadName : UNKNOWN_STR);
+    mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : UNKNOWN_STR);
+    mTags.Set<kPeerNamespace>(pod->k8sNamespace.size() ? pod->k8sNamespace : UNKNOWN_STR);
+    mTags.Set<kPeerServiceName>(pod->serviceName.size() ? pod->serviceName : UNKNOWN_STR);
 
     // set destId and endpoint ...
     if (mRole == IsClient) {
         if (pod->appName.size()) {
-            mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = pod->appName;
+            mTags.Set<kDestId>(pod->appName);
         } else if (pod->workloadName.size()) {
-            mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = pod->workloadName;
+            mTags.Set<kDestId>(pod->workloadName);
         } else if (pod->serviceName.size()) {
-            mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = pod->serviceName;
+            mTags.Set<kDestId>(pod->serviceName);
         } else {
             // TODO set to rpc value...
-            mAttrs[kConnTrackerTable.ColIndex(kDestId.Name())] = UNKNOWN_STR;
+            mTags.Set<kDestId>(UNKNOWN_STR);
         }
-        mAttrs[kConnTrackerTable.ColIndex(kEndpoint.Name())] = mAttrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())];
+        mTags.Set<kEndpoint>(mTags.Get<kRemoteAddr>());
     }
 
     MarkPeerPodMetaAttached();

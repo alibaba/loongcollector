@@ -26,6 +26,8 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#include "models/StringView.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
 
@@ -87,6 +89,19 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
              ("k8smetadata enable status", mEnable)("host ip", mHostIp)("serviceHost", mServiceHost)("servicePort",
                                                                                                      mServicePort));
 #endif
+
+    // self monitor
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mRef,
+        MetricCategory::METRIC_CATEGORY_RUNNER,
+        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA}});
+
+    mCidCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_CID_CACHE_SIZE);
+    mIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_IP_CACHE_SIZE);
+    mExternalIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE);
+    mRequestMetaServerTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL);
+    ;
+    mRequestMetaServerFailedTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL);
 
     // batch query metadata ...
     if (mEnable) {
@@ -211,6 +226,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
     auto request = BuildRequest(path, query);
     LOG_DEBUG(sLogger, ("host", mServiceHost)("port", mServicePort)("path", path)("query", query));
+    ADD_COUNTER(mRequestMetaServerTotal, 1);
 #ifdef APSARA_UNIT_TEST_MAIN
     mRequest = request.get();
     bool success = false;
@@ -221,6 +237,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     if (success) {
         if (res.GetStatusCode() != 200) {
             UpdateStatus(false);
+            ADD_COUNTER(mRequestMetaServerFailedTotal, 1);
             LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail, code is ", res.GetStatusCode()));
             return false;
         }
@@ -249,6 +266,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
         return true;
     } else {
         UpdateStatus(false);
+        ADD_COUNTER(mRequestMetaServerFailedTotal, 1);
         LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail", urlHost));
         return false;
     }
@@ -350,21 +368,23 @@ std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string
     return res;
 }
 
-std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(const std::string& containerId) {
+std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(const StringView& containerId) {
     if (containerId.empty()) {
         return nullptr;
     }
-    if (mContainerCache.contains(containerId)) {
-        return mContainerCache.get(containerId);
+    auto cid = std::string(containerId);
+    if (mContainerCache.contains(cid)) {
+        return mContainerCache.get(cid);
     } else {
         return nullptr;
     }
 }
 
-std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::string& ip) {
-    if (ip.empty()) {
+std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& ipv) {
+    if (ipv.empty()) {
         return nullptr;
     }
+    auto ip = std::string(ipv);
     if (mIpCache.contains(ip)) {
         return mIpCache.get(ip);
     } else {
@@ -372,15 +392,16 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::s
     }
 }
 
-bool K8sMetadata::IsExternalIp(const std::string& ip) const {
-    return mExternalIpCache.contains(ip);
+bool K8sMetadata::IsExternalIp(const StringView& ip) const {
+    return mExternalIpCache.contains(std::string(ip));
 }
 
-void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const std::string& key) {
-    if (key.empty()) {
+void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const StringView& str) {
+    if (str.empty()) {
         LOG_DEBUG(sLogger, ("empty key", ""));
         return;
     }
+    std::string key = std::string(str);
     std::unique_lock<std::mutex> lock(mStateMux);
     if (mPendingKeys.find(key) != mPendingKeys.end()) {
         // already in query queue ...
@@ -413,6 +434,9 @@ void K8sMetadata::DetectNetwork() {
         if (!mFlag) {
             return;
         }
+        SET_GAUGE(mCidCacheSize, mContainerCache.size());
+        SET_GAUGE(mIpCacheSize, mIpCache.size());
+        SET_GAUGE(mExternalIpCacheSize, mExternalIpCache.size());
         if (mIsValid) {
             continue;
         }

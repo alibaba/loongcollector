@@ -27,8 +27,8 @@ struct ObserverNetworkOption {
     bool mEnableSpan = false;
     bool mEnableMetric = false;
     bool mEnableLog = false;
-    bool mEnableCidFilter = false;
     double mSampleRate = 0.01;
+    bool mDisableMetadata = false;
     std::vector<std::string> mEnableCids;
     std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;

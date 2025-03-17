@@ -27,6 +27,7 @@
 #include "ebpf/type/table/NetTable.h"
 #include "ebpf/type/table/NetworkSecurityTable.h"
 #include "ebpf/type/table/ProcessTable.h"
+#include "ebpf/type/table/StaticDataRow.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
@@ -45,6 +46,7 @@ public:
     void TestFileSecurityTable();
     void TestNetworkSecurityTable();
     void TestNetTable();
+    void TestCompileOperations();
 
 protected:
     void SetUp() override {}
@@ -56,8 +58,8 @@ protected:
 void TableUnittest::TestProcessTable() {
     // 测试 ProcessCacheTable
     APSARA_TEST_TRUE(kProcessCacheTable.HasCol("exec_id"));
-    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("parent_process_pid"));
-    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("parent_uid"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("ktime"));
+    APSARA_TEST_TRUE(kProcessCacheTable.HasCol("process_pid"));
     APSARA_TEST_TRUE(kProcessCacheTable.HasCol("uid"));
     APSARA_TEST_TRUE(kProcessCacheTable.HasCol("binary"));
 
@@ -155,11 +157,35 @@ void TableUnittest::TestNetTable() {
     APSARA_TEST_EQUAL(std::string(kNetElements[remoteAddrIdx].Desc()), "IP address of the remote endpoint.");
 }
 
+void TableUnittest::TestCompileOperations() {
+    constexpr uint32_t appIdIdx = kConnTrackerTable.ColIndex(kAppId.Name());
+    constexpr uint32_t appNameIdx = kConnTrackerTable.ColIndex(kAppName.Name());
+    static_assert(appIdIdx == 2);
+    static_assert(appNameIdx == 1);
+    constexpr StringView s1 = "hello";
+    constexpr StringView s2 = "hello";
+    constexpr bool eq = s1 == s2;
+    static_assert(eq, "static check pass ... ");
+
+    StaticDataRow<&kConnTrackerTable> tb;
+    tb.Set<kAppId>(StringView("hhh"));
+
+    constexpr std::array<size_t, 2> elements
+        = {kConnTrackerTable.ColIndex(kAppId.Name()), kConnTrackerTable.ColIndex(kAppName.Name())};
+    for (size_t i = 0; i < elements.size(); i++) {
+        // constexpr uint32_t idx = kConnTrackerTable.ColIndex(elements[i].Name());
+        // constexpr uint32_t sIdx = 2;
+        // tb.GetTagValue<sIdx>();
+    }
+}
+
 // 注册新增的测试用例
 UNIT_TEST_CASE(TableUnittest, TestProcessTable);
 UNIT_TEST_CASE(TableUnittest, TestFileSecurityTable);
 UNIT_TEST_CASE(TableUnittest, TestNetworkSecurityTable);
 UNIT_TEST_CASE(TableUnittest, TestNetTable);
+UNIT_TEST_CASE(TableUnittest, TestCompileOperations);
+
 
 } // namespace ebpf
 } // namespace logtail

@@ -86,6 +86,7 @@ public:
     constexpr StringView Name() const { return mName; }
     constexpr StringView Desc() const { return mDesc; }
     constexpr ArrayView<DataElement> Elements() const { return mElements; }
+    constexpr size_t Size() const { return mElements.size(); }
 
     constexpr uint32_t ColIndex(StringView key) const {
         uint32_t i = 0;

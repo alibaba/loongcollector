@@ -121,36 +121,52 @@ void ConnectionUnittest::TestProtocolHandling() {
     tracker->UpdateConnStats(&statsEvent);
     APSARA_TEST_FALSE(tracker->mProtocolAttached);
     support_proto_e pt = tracker->GetProtocol();
-    auto& attrs = tracker->GetConnTrackerAttrs();
+    const StaticDataRow<&kConnTrackerTable>& attrs = tracker->GetConnTrackerAttrs();
     APSARA_TEST_EQUAL(pt, support_proto_e::ProtoHTTP);
     APSARA_TEST_EQUAL(tracker->GetSourceIp(), "127.0.0.1");
     APSARA_TEST_EQUAL(tracker->GetRemoteIp(), "192.168.1.1");
     // role not set, so we cannot fill rpc attr
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "");
+    APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "");
+    APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "");
+    APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "");
+
+    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // mock receive a data event
     tracker->SafeUpdateRole(support_role_e::IsClient);
     tracker->SafeUpdateProtocol(support_proto_e::ProtoHTTP);
     APSARA_TEST_TRUE(tracker->mProtocolAttached);
+    APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
+    APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
+    APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
     // now rpc attributes all set
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
+    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // role chage ...
     tracker->SafeUpdateRole(support_role_e::IsServer);
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
+    APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
+    APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
+    APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
+
+    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
+    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
+    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
+    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // protocol change ...
     tracker->SafeUpdateProtocol(support_proto_e::ProtoMySQL);
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
-    APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
+    APSARA_TEST_EQUAL(std::string(attrs.Get<kRpcType>()), "25");
+    APSARA_TEST_EQUAL(std::string(attrs.Get<kCallKind>()), "http_client");
+    APSARA_TEST_EQUAL(std::string(attrs.Get<kCallType>()), "http_client");
+
+    // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())]), "25");
+    // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())]), "http_client");
+    // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kCallType.Name())]), "http_client");
     APSARA_TEST_EQUAL(tracker->GetProtocol(), support_proto_e::ProtoHTTP);
+    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 }
 
 void ConnectionUnittest::TestMetadataManagement() {
@@ -195,7 +211,7 @@ void ConnectionUnittest::TestMetadataManagement() {
     podInfo->k8sNamespace = "test-namespace";
 
     LOG_INFO(sLogger, ("step", "0-0"));
-    K8sMetadata::GetInstance().mContainerCache.insert(tracker->GetContainerId(), podInfo);
+    K8sMetadata::GetInstance().mContainerCache.insert(std::string(tracker->GetContainerId()), podInfo);
     LOG_INFO(sLogger, ("step", "0-1"));
 
     tracker->TryAttachSelfMeta();
@@ -215,13 +231,13 @@ void ConnectionUnittest::TestMetadataManagement() {
     peerPodInfo->podIp = "peer-pod-ip";
     peerPodInfo->podName = "peer-pod-name";
     peerPodInfo->k8sNamespace = "peer-namespace";
-    K8sMetadata::GetInstance().mIpCache.insert(tracker->GetRemoteIp(), peerPodInfo);
+    K8sMetadata::GetInstance().mIpCache.insert(std::string(tracker->GetRemoteIp()), peerPodInfo);
     LOG_INFO(sLogger, ("step", "2"));
 
     tracker->TryAttachSelfMeta();
     tracker->TryAttachPeerMeta();
-    K8sMetadata::GetInstance().mIpCache.remove(tracker->GetRemoteIp());
-    K8sMetadata::GetInstance().mContainerCache.remove(tracker->GetContainerId());
+    K8sMetadata::GetInstance().mIpCache.remove(std::string(tracker->GetRemoteIp()));
+    K8sMetadata::GetInstance().mContainerCache.remove(std::string(tracker->GetContainerId()));
     APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
     APSARA_TEST_TRUE(tracker->mK8sPeerMetaAttached);
     APSARA_TEST_TRUE(tracker->mNetMetaAttached);

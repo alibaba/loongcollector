@@ -23,6 +23,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/HashUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
@@ -54,7 +55,7 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManag
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& in) {
+          [](const std::shared_ptr<CommonEvent>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
           }) {
 }
@@ -81,7 +82,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
-        LOG_DEBUG(sLogger, ("child num", node->child.size()));
+        LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         // convert to a item and push to process queue
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
             auto sharedEvent = sharedEventGroup.CreateLogEvent();
@@ -210,7 +211,7 @@ std::array<size_t, 1> GenerateAggKeyForProcessEvent(const std::shared_ptr<Common
 
     std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr) {
-        hashResult[0] ^= hasher(x) + 0x9e3779b9 + (hashResult[0] << 6) + (hashResult[0] >> 2);
+        AttrHashCombine(hashResult[0], hasher(x));
     }
     return hashResult;
 }

@@ -189,7 +189,7 @@ void ConnectionManagerUnittest::TestProtocolDetection() {
     statsEvent.ts = 1;
     manager->AcceptNetStatsEvent(&statsEvent);
 
-    auto attrs = tracker->GetConnTrackerAttrs();
+    auto& attrs = tracker->GetConnTrackerAttrs();
     APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kIp.Name())], "127.0.0.1");
 }
 

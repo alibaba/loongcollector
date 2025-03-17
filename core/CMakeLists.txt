@@ -126,7 +126,7 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+        ebpf ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         parser
         host_monitor host_monitor/collector
         )

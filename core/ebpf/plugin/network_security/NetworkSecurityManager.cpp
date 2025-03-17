@@ -17,6 +17,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/HashUtil.h"
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
@@ -108,7 +109,7 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManag
           [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(std::move(other));
           },
-          [this](const std::shared_ptr<CommonEvent>& ce) {
+          [this](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               NetworkEvent* in = static_cast<NetworkEvent*>(ce.get());
               return std::make_unique<NetworkEventGroup>(in->mPid,
                                                          in->mKtime,
@@ -144,7 +145,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
         // convert to a item and push to process queue
-        LOG_DEBUG(sLogger, ("child num", node->child.size()));
+        LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         auto processCacheMgr = GetProcessCacheManager();
         if (processCacheMgr == nullptr) {
             LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
@@ -281,13 +282,13 @@ int NetworkSecurityManager::Destroy() {
 std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<CommonEvent>& in) {
     NetworkEvent* event = static_cast<NetworkEvent*>(in.get());
     // calculate agg key
-    std::array<size_t, 2> hash_result;
-    hash_result.fill(0UL);
+    std::array<size_t, 2> result;
+    result.fill(0UL);
     std::hash<uint64_t> hasher;
 
     std::array<uint64_t, 2> arr1 = {uint64_t(event->mPid), event->mKtime};
     for (uint64_t x : arr1) {
-        hash_result[0] ^= hasher(x) + 0x9e3779b9 + (hash_result[0] << 6) + (hash_result[0] >> 2);
+        AttrHashCombine(result[0], hasher(x));
     }
     std::array<uint64_t, 5> arr2 = {uint64_t(event->mDaddr),
                                     uint64_t(event->mSaddr),
@@ -296,9 +297,9 @@ std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<Common
                                     uint64_t(event->mNetns)};
 
     for (uint64_t x : arr2) {
-        hash_result[1] ^= hasher(x) + 0x9e3779b9 + (hash_result[1] << 6) + (hash_result[1] >> 2);
+        AttrHashCombine(result[1], hasher(x));
     }
-    return hash_result;
+    return result;
 }
 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
@@ -316,11 +317,11 @@ int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
 
     // calculate agg key
-    std::array<size_t, 2> hash_result = GenerateAggKeyForNetworkEvent(event);
+    std::array<size_t, 2> result = GenerateAggKeyForNetworkEvent(event);
 
     {
         WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, hash_result);
+        bool ret = mAggregateTree.Aggregate(event, result);
         LOG_DEBUG(sLogger, ("after aggregate", ret));
     }
     return 0;

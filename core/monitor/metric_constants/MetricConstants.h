@@ -275,6 +275,7 @@ extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA;
 
 // metric keys
 extern const std::string& METRIC_RUNNER_IN_EVENTS_TOTAL;
@@ -323,5 +324,15 @@ extern const std::string METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE;
+
+/**********************************************************
+ *   k8s metadata
+ **********************************************************/
+extern const std::string METRIC_RUNNER_METADATA_CID_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_METADATA_IP_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL;
+extern const std::string METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL;
 
 } // namespace logtail

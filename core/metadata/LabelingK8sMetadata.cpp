@@ -89,7 +89,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
-        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerId);
+        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerIdView);
         if (containerInfo == nullptr) {
             containerVec.push_back(containerId);
             res = false;
@@ -104,7 +104,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
-        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIp);
+        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIpView);
         if (ipInfo == nullptr) {
             remoteIpVec.push_back(remoteIp);
             res = false;

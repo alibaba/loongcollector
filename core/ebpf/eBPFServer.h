@@ -135,6 +135,7 @@ private:
     CounterPtr mPollProcessEventsTotal;
     CounterPtr mLossProcessEventsTotal;
     CounterPtr mProcessCacheMissTotal;
+    IntGaugePtr mProcessCacheSize;
 
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;

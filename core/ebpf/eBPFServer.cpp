@@ -193,6 +193,7 @@ void eBPFServer::Init() {
     mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
     mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
     mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+    mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
 
     mSourceManager->Init();
 
@@ -202,7 +203,8 @@ void eBPFServer::Init() {
                                                                  mDataEventQueue,
                                                                  mPollProcessEventsTotal,
                                                                  mLossProcessEventsTotal,
-                                                                 mProcessCacheMissTotal);
+                                                                 mProcessCacheMissTotal,
+                                                                 mProcessCacheSize);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -306,9 +308,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
-            } else {
-                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
+            // else {
+            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
+            // }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             ret = (pluginMgr->Init(options) == 0);
             break;
@@ -318,9 +321,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
-            } else {
-                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
+            // else {
+            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
+            // }
             NetworkObserveConfig nconfig;
             // TODO @qianlu.kk register k8s metadata callback for metric ??
 
@@ -334,9 +338,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
-            } else {
-                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
+            // else {
+            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
+            // }
 
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             ret = (pluginMgr->Init(options) == 0);
@@ -347,9 +352,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             if (!pluginMgr) {
                 pluginMgr = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
-            } else {
-                pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
             }
+            // else {
+            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
+            // }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             ret = (pluginMgr->Init(options) == 0);
             break;
@@ -422,7 +428,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
         if (ret == 0) {
             ADD_COUNTER(mStopPluginTotal, 1);
             UpdatePluginManager(type, nullptr);
-            pluginManager->UpdateProcessCacheManager(nullptr);
+            // pluginManager->UpdateProcessCacheManager(nullptr); // deprecated ... TODO @qianlu.kk
             LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
                 || type == PluginType::FILE_SECURITY) {
