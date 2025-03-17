@@ -24,7 +24,7 @@ type RecordBuilder interface {
 }
 
 type ExtraInfo struct {
-	HostIp      string `json:"host_ip,omitempty"`
+	HostIP      string `json:"host_ip,omitempty"`
 	CollectPath string `json:"path,omitempty"`
 	Hostname    string `json:"hostname,omitempty"`
 	CollectTime string `json:"collect_time,omitempty"`
@@ -69,7 +69,7 @@ func (rb *RecordBuilderImpl) genExtraInfo(logGroup *protocol.LogGroup, log *prot
 		if path, ok := findLogTag(logGroup.LogTags, LogtailPath); ok {
 			info.CollectPath = path
 		}
-		info.HostIp = rb.hostIP
+		info.HostIP = rb.hostIP
 	}
 
 	if rb.extraLevel >= 2 {

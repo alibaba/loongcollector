@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOdpsFlusher(t *testing.T) {
-	d := NewOdpsFlusher()
+func TestFlusherOdps(t *testing.T) {
+	d := NewFlusherOdps()
 	require.NotNil(t, d)
 }
 
@@ -23,7 +23,7 @@ func TestConnectAndWrite(t *testing.T) {
 	projectName := "test_logagent_to_mc"
 	tableName := "blob_1"
 	partitionConfig := "pt=%Y%m%d"
-	d := &OdpsFlusher{
+	d := &FlusherOdps{
 		AccessKeyID:     "xx",
 		AccessKeySecret: "xx",
 		Endpoint:        "",

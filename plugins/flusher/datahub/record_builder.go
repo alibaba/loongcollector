@@ -21,7 +21,7 @@ const (
 )
 
 const (
-	HostIpKey      = "host_ip"
+	HostIPKey      = "host_ip"
 	CollectPathKey = "path"
 	HostnameKey    = "hostname"
 	CollectTimeKey = "collect_time"
@@ -58,12 +58,12 @@ type RecordBuilderImpl struct {
 	context       pipeline.Context
 	nextFreshTime time.Time
 
-	hostIp   string
+	hostIP   string
 	hostname string
 }
 
 func (rb *RecordBuilderImpl) Init() error {
-	rb.hostIp = config.LoongcollectorGlobalConfig.HostIP
+	rb.hostIP = config.LoongcollectorGlobalConfig.HostIP
 	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 
 	return rb.doFreshRecordSchema()
@@ -95,7 +95,10 @@ func (rb *RecordBuilderImpl) freshRecordSchema() error {
 }
 
 func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protocol.Log) (datahub.IRecord, error) {
-	rb.freshRecordSchema()
+	if err := rb.freshRecordSchema(); err != nil {
+		return nil, err
+	}
+
 	var record datahub.IRecord
 	var err error
 	if rb.schema == nil {
@@ -131,10 +134,8 @@ func (rb *RecordBuilderImpl) addExtraInfo(logGroup *protocol.LogGroup, log *prot
 }
 
 func (rb *RecordBuilderImpl) addLevelExtraInfo(logGroup *protocol.LogGroup, log *protocol.Log, record datahub.IRecord, level int) {
-	if level <= 0 {
-		return
-	} else if level == 1 {
-		record.SetAttribute(HostIpKey, rb.hostIp)
+	if level == 1 {
+		record.SetAttribute(HostIPKey, rb.hostIP)
 		if val, ok := findLogTag(logGroup.LogTags, LogtailPath); ok {
 			record.SetAttribute(CollectPathKey, val)
 		}
@@ -206,11 +207,11 @@ func validateFieldValue(fieldType datahub.FieldType, value string) (interface{},
 	case datahub.TINYINT:
 		return strconv.ParseInt(value, 10, 8)
 	case datahub.FLOAT:
-		if tmp, err := strconv.ParseFloat(value, 32); err != nil {
+		tmp, err := strconv.ParseFloat(value, 32)
+		if err != nil {
 			return nil, err
-		} else {
-			return float32(tmp), nil
 		}
+		return float32(tmp), nil
 	case datahub.DOUBLE:
 		return strconv.ParseFloat(value, 64)
 	case datahub.TIMESTAMP:

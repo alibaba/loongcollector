@@ -80,7 +80,7 @@ func (pi *ProducerImpl) freshShardIds(force bool) error {
 	return nil
 }
 
-func (pi *ProducerImpl) nextShardId() (string, error) {
+func (pi *ProducerImpl) nextShardID() (string, error) {
 	err := pi.freshShardIds(false)
 	if err != nil {
 		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "fresh datahub %s/%s shard failed, error:%v, ingnore error", pi.projectName, pi.topicName, err)
@@ -95,34 +95,34 @@ func (pi *ProducerImpl) nextShardId() (string, error) {
 }
 
 func (pi *ProducerImpl) DoSend(records []datahub.IRecord, isRecursive bool) (string, *datahub.PutRecordsByShardResult, error) {
-	shardId, err := pi.nextShardId()
+	shardID, err := pi.nextShardID()
 	if err != nil {
 		return "", nil, err
 	}
 
-	res, err := pi.client.PutRecordsByShard(pi.projectName, pi.topicName, shardId, records)
+	res, err := pi.client.PutRecordsByShard(pi.projectName, pi.topicName, shardID, records)
 	if err == nil {
-		return shardId, res, nil
+		return shardID, res, nil
 	}
 
 	if isRecursive {
-		return shardId, nil, err
+		return shardID, nil, err
 	}
 
 	if _, ok := err.(*datahub.ShardSealedError); ok {
 		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard (%s/%s/%s) sealed, try to fresh shard",
-			pi.projectName, pi.topicName, shardId)
+			pi.projectName, pi.topicName, shardID)
 		err = pi.freshShardIds(true)
 		if err != nil {
 			logger.Errorf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard(%s/%s/%s) sealed, and fresh shard failed, error",
-				pi.projectName, pi.topicName, shardId, err)
-			return shardId, nil, fmt.Errorf("Flush to datahub(%s/%s) failed because of shard sealed", pi.projectName, pi.topicName)
+				pi.projectName, pi.topicName, shardID, err)
+			return shardID, nil, fmt.Errorf("Flush to datahub(%s/%s) failed because of shard sealed", pi.projectName, pi.topicName)
 		}
 		logger.Debugf(pi.context.GetRuntimeContext(), "Fresh datahub (%s/%s) shard success", pi.projectName, pi.topicName)
 		return pi.DoSend(records, true)
 	}
 
-	return shardId, nil, err
+	return shardID, nil, err
 }
 
 func (pi *ProducerImpl) Send(records []datahub.IRecord) error {
@@ -130,19 +130,19 @@ func (pi *ProducerImpl) Send(records []datahub.IRecord) error {
 		return nil
 	}
 
-	var err error = nil
+	var err error
 	for retry := 0; retry < maxRetryCount; retry++ {
 		start := time.Now()
-		shardId, res, err := pi.DoSend(records, false)
+		shardID, res, err := pi.DoSend(records, false)
 		cost := time.Since(start)
 		if err == nil {
 			logger.Debugf(pi.context.GetRuntimeContext(), "Flush datahub(%s/%s/%s) success, rid:%s, records:%d, rawSize:%d, reqSize:%d, cost:%v",
-				pi.projectName, pi.topicName, shardId, res.RequestId, len(records), res.RawSize, res.ReqSize, cost)
+				pi.projectName, pi.topicName, shardID, res.RequestId, len(records), res.RawSize, res.ReqSize, cost)
 			return nil
 		}
 
 		logger.Errorf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Flush datahub(%s/%s/%s) failed, cost:%v, retry:%v, error:%v",
-			pi.projectName, pi.topicName, shardId, cost, retry, err)
+			pi.projectName, pi.topicName, shardID, cost, retry, err)
 		time.Sleep(500 * time.Millisecond)
 	}
 

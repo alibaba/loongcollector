@@ -8,11 +8,11 @@ import (
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
 
-type mockDataHubApi struct {
+type mockDataHubAPI struct {
 	datahub.DataHubApi
 }
 
-func (m *mockDataHubApi) ListShard(projectName string, topicName string) (*datahub.ListShardResult, error) {
+func (m *mockDataHubAPI) ListShard(projectName string, topicName string) (*datahub.ListShardResult, error) {
 	return &datahub.ListShardResult{
 		Shards: []datahub.ShardEntry{
 			{ShardId: "0", State: "CLOSED"},
@@ -28,15 +28,15 @@ func (m *mockDataHubApi) ListShard(projectName string, topicName string) (*datah
 	}, nil
 }
 
-func newMockDataHubApi() *mockDataHubApi {
-	return &mockDataHubApi{}
+func newMockDataHubAPI() *mockDataHubAPI {
+	return &mockDataHubAPI{}
 }
 
 func TestFreshShardIds(t *testing.T) {
 	s := &ProducerImpl{
 		projectName: "test_project",
 		topicName:   "test_topic",
-		client:      newMockDataHubApi(),
+		client:      newMockDataHubAPI(),
 	}
 
 	err := s.freshShardIds(true)
@@ -53,22 +53,22 @@ func TestGetShardId(t *testing.T) {
 	s := &ProducerImpl{
 		projectName: "test_project",
 		topicName:   "test_topic",
-		client:      newMockDataHubApi(),
+		client:      newMockDataHubAPI(),
 	}
 
-	_, err := s.nextShardId()
+	_, err := s.nextShardID()
 	assert.Nil(t, err)
 	s.shardInfo.index = 0
-	shard, err := s.nextShardId()
+	shard, err := s.nextShardID()
 	assert.Nil(t, err)
 	assert.Equal(t, "2", shard)
-	shard, err = s.nextShardId()
+	shard, err = s.nextShardID()
 	assert.Nil(t, err)
 	assert.Equal(t, "3", shard)
-	shard, err = s.nextShardId()
+	shard, err = s.nextShardID()
 	assert.Nil(t, err)
 	assert.Equal(t, "1", shard)
-	shard, err = s.nextShardId()
+	shard, err = s.nextShardID()
 	assert.Nil(t, err)
 	assert.Equal(t, "2", shard)
 }

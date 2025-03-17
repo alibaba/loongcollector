@@ -11,34 +11,35 @@ import (
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
 
-type DatahubFlusher struct {
+const (
+	compressTypeDefault = datahub.ZSTD
+	extraLevelDefault   = 1
+)
+
+type FlusherDatahub struct {
 	AccessKeyID     string
 	AccessKeySecret string
 	SecurityToken   string
 	Endpoint        string
 	ProjectName     string
 	TopicName       string
-	compressType    datahub.CompressorType
-	extraLevel      int
 	recordBuilder   RecordBuilder
 	producer        Producer
 	context         pipeline.Context
 }
 
-func NewDatahubFlusher() *DatahubFlusher {
-	return &DatahubFlusher{
+func NewFlusherDatahub() *FlusherDatahub {
+	return &FlusherDatahub{
 		AccessKeyID:     "",
 		AccessKeySecret: "",
 		SecurityToken:   "",
 		Endpoint:        "",
 		ProjectName:     "",
 		TopicName:       "",
-		compressType:    datahub.ZSTD,
-		extraLevel:      1,
 	}
 }
 
-func (d *DatahubFlusher) Init(context pipeline.Context) error {
+func (d *FlusherDatahub) Init(context pipeline.Context) error {
 	d.context = context
 	logger.Debugf(d.context.GetRuntimeContext(), "Init datahub flusher:%v", *d)
 
@@ -51,7 +52,7 @@ func (d *DatahubFlusher) Init(context pipeline.Context) error {
 
 	config := &datahub.Config{
 		UserAgent:            fmt.Sprintf("loongcollector/%s-%s", config.BaseVersion, config.LoongcollectorGlobalConfig.HostIP),
-		CompressorType:       d.compressType,
+		CompressorType:       compressTypeDefault,
 		EnableBinary:         true,
 		EnableSchemaRegistry: false,
 		HttpClient:           datahub.DefaultHttpClient(),
@@ -59,7 +60,7 @@ func (d *DatahubFlusher) Init(context pipeline.Context) error {
 
 	client := datahub.NewClientWithConfig(d.Endpoint, config, account)
 
-	d.recordBuilder = NewRecordBuilder(d.ProjectName, d.TopicName, d.extraLevel, client, d.context)
+	d.recordBuilder = NewRecordBuilder(d.ProjectName, d.TopicName, extraLevelDefault, client, d.context)
 	err := d.recordBuilder.Init()
 	if err != nil {
 		logger.Errorf(d.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Init datahub(%s/%s) record builder failed, error:%v", d.ProjectName, d.TopicName, err)
@@ -78,11 +79,11 @@ func (d *DatahubFlusher) Init(context pipeline.Context) error {
 	return nil
 }
 
-func (d *DatahubFlusher) Description() string {
+func (d *FlusherDatahub) Description() string {
 	return "datahub flusher"
 }
 
-func (d *DatahubFlusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+func (d *FlusherDatahub) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		records := make([]datahub.IRecord, len(logGroup.Logs))
 		for id, log := range logGroup.Logs {
@@ -100,20 +101,20 @@ func (d *DatahubFlusher) Flush(projectName string, logstoreName string, configNa
 	return nil
 }
 
-func (d *DatahubFlusher) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
+func (d *FlusherDatahub) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return d.producer != nil && d.recordBuilder != nil
 }
 
-func (d *DatahubFlusher) SetUrgent(flag bool) {
+func (d *FlusherDatahub) SetUrgent(flag bool) {
 }
 
-func (d *DatahubFlusher) Stop() error {
+func (d *FlusherDatahub) Stop() error {
 	return nil
 }
 
 func init() {
 	pipeline.Flushers["flusher_datahub"] = func() pipeline.Flusher {
-		f := NewDatahubFlusher()
+		f := NewFlusherDatahub()
 		return f
 	}
 }
