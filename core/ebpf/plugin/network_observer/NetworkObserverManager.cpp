@@ -228,11 +228,11 @@ NetworkObserverManager::GenerateAggKeyForNetMetric(const std::shared_ptr<Abstrac
                                     PEER_NAMESPACE_INDEX};
 
     for (auto& x : idxes0) {
-        std::string_view attr(connTrackerAttrs[x].data());
+        std::string_view attr(connTrackerAttrs[x].data(), connTrackerAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
     }
     for (auto& x : idxes1) {
-        std::string_view attr(connTrackerAttrs[x].data());
+        std::string_view attr(connTrackerAttrs[x].data(), connTrackerAttrs[x].size());
         AttrHashCombine(result[1], hasher(attr));
     }
     return result;
@@ -263,11 +263,11 @@ NetworkObserverManager::GenerateAggKeyForAppMetric(const std::shared_ptr<Abstrac
 
     auto& ctAttrs = connection->GetConnTrackerAttrs();
     for (auto x : idxes0) {
-        std::string_view attr(ctAttrs[x].data());
+        std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
     }
     for (auto x : idxes1) {
-        std::string_view attr(ctAttrs[x].data());
+        std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[1], hasher(attr));
     }
     std::string_view rpc(record->GetSpanName());
@@ -292,7 +292,7 @@ NetworkObserverManager::GenerateAggKeyForSpan(const std::shared_ptr<AbstractReco
     auto& ctAttrs = connection->GetConnTrackerAttrs();
     static constexpr auto idxes = {APP_ID_INDEX, APP_NAME_INDEX, HOST_NAME_INDEX, HOST_IP_INDEX};
     for (auto& x : idxes) {
-        std::string_view attr(ctAttrs[x].data());
+        std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
     }
 
