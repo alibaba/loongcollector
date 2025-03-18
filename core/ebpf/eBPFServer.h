@@ -16,21 +16,24 @@
 
 #include <array>
 #include <atomic>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <variant>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/queue/blockingconcurrentqueue.h"
+#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
-#include "ebpf/handler/AbstractHandler.h"
-#include "ebpf/handler/ObserveHandler.h"
-#include "ebpf/handler/SecurityHandler.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
+#include "type/CommonDataEvent.h"
+#include "util/FrequencyManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -38,7 +41,7 @@ namespace ebpf {
 class EnvManager {
 public:
     void InitEnvInfo();
-    bool IsSupportedEnv(nami::PluginType type);
+    bool IsSupportedEnv(PluginType type);
     bool AbleToLoadDyLib();
 
 private:
@@ -57,6 +60,8 @@ public:
     eBPFServer(const eBPFServer&) = delete;
     eBPFServer& operator=(const eBPFServer&) = delete;
 
+    ~eBPFServer() = default;
+
     void Init() override;
 
     static eBPFServer* GetInstance() {
@@ -66,65 +71,82 @@ public:
 
     void Stop() override;
 
-    std::string CheckLoadedPipelineName(nami::PluginType type);
+    std::string CheckLoadedPipelineName(PluginType type);
 
-    void UpdatePipelineName(nami::PluginType type, const std::string& name, const std::string& project);
+    void UpdatePipelineName(PluginType type, const std::string& name, const std::string& project);
 
     bool EnablePlugin(const std::string& pipeline_name,
                       uint32_t plugin_index,
-                      nami::PluginType type,
+                      PluginType type,
                       const logtail::CollectionPipelineContext* ctx,
-                      const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                      const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                       PluginMetricManagerPtr mgr);
 
-    bool DisablePlugin(const std::string& pipeline_name, nami::PluginType type);
+    bool DisablePlugin(const std::string& pipeline_name, PluginType type);
 
-    bool SuspendPlugin(const std::string& pipeline_name, nami::PluginType type);
+    bool SuspendPlugin(const std::string& pipeline_name, PluginType type);
 
     bool HasRegisteredPlugins() const override;
 
-    bool IsSupportedEnv(nami::PluginType type);
+    bool IsSupportedEnv(PluginType type);
 
     std::string GetAllProjects();
+
+    bool CheckIfNeedStopProcessCacheManager() const;
+
+    void PollPerfBuffers();
+    void HandlerEvents();
+
+    std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
+    void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
 
 private:
     bool StartPluginInternal(const std::string& pipeline_name,
                              uint32_t plugin_index,
-                             nami::PluginType type,
+                             PluginType type,
                              const logtail::CollectionPipelineContext* ctx,
-                             const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                             const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                              PluginMetricManagerPtr mgr);
-    eBPFServer() = default;
-    ~eBPFServer() = default;
+    eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
 
-    void UpdateCBContext(nami::PluginType type,
-                         const logtail::CollectionPipelineContext* ctx,
-                         logtail::QueueKey key,
-                         int idx);
+    void
+    UpdateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
 
-    std::unique_ptr<SourceManager> mSourceManager;
-    // source manager
-    std::unique_ptr<EventHandler> mEventCB;
-    std::unique_ptr<MeterHandler> mMeterCB;
-    std::unique_ptr<SpanHandler> mSpanCB;
-    std::unique_ptr<SecurityHandler> mNetworkSecureCB;
-    std::unique_ptr<SecurityHandler> mProcessSecureCB;
-    std::unique_ptr<SecurityHandler> mFileSecureCB;
+    std::shared_ptr<SourceManager> mSourceManager;
 
     mutable std::mutex mMtx;
-    std::array<std::string, (int)nami::PluginType::MAX> mLoadedPipeline = {};
-    std::array<std::string, (int)nami::PluginType::MAX> mPluginProject = {};
+    std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};
+    std::array<std::string, static_cast<size_t>(PluginType::MAX)> mPluginProject = {};
+    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
 
     eBPFAdminConfig mAdminConfig;
-    volatile bool mInited = false;
+    std::atomic_bool mInited = false;
+    std::atomic_bool mRunning = false;
+
+    std::string mHostIp;
+    std::string mHostName;
+    std::filesystem::path mHostPathPrefix;
 
     EnvManager mEnvMgr;
-    std::unique_ptr<eBPFSelfMonitorMgr> mMonitorMgr;
     MetricsRecordRef mRef;
 
     CounterPtr mStartPluginTotal;
     CounterPtr mStopPluginTotal;
     CounterPtr mSuspendPluginTotal;
+    CounterPtr mPollProcessEventsTotal;
+    CounterPtr mLossProcessEventsTotal;
+    CounterPtr mProcessCacheMissTotal;
+    IntGaugePtr mProcessCacheSize;
+
+    // hold some managers ...
+    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
+
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;
+
+    std::future<void> mPoller;
+    std::future<void> mHandler;
+
+    FrequencyManager mFrequencyMgr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

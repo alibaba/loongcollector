@@ -12,83 +12,147 @@
 // See the License for the specific l
 #pragma once
 
+#include <atomic>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <string>
 
 #include "json/json.h"
 
+#include "ContainerInfo.h"
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/LRUCache.h"
+#include "common/Lock.h"
+#include "common/http/HttpRequest.h"
+#include "models/StringView.h"
+#include "monitor/metric_models/MetricRecord.h"
+#include "monitor/metric_models/MetricTypes.h"
 
-DECLARE_FLAG_STRING(operator_service);
-DECLARE_FLAG_INT32(k8s_meta_service_port);
+DECLARE_FLAG_STRING(singleton_service);
+DECLARE_FLAG_INT32(singleton_port);
 
 namespace logtail {
 
-const static std::string appIdKey = "armsAppId";
+const static std::string appIdKey = "armseBPFAppId";
+const static std::string appNameKey = "armseBPFCreateAppName";
 const static std::string imageKey = "images";
 const static std::string labelsKey = "labels";
 const static std::string namespaceKey = "namespace";
 const static std::string workloadKindKey = "workloadKind";
 const static std::string workloadNameKey = "workloadName";
 const static std::string serviceNameKey = "serviceName";
+const static std::string podNameKey = "podName";
+const static std::string podIpKey = "podIP";
+const static std::string envKey = "envs";
+const static std::string containerIdKey = "containerIDs";
+const static std::string startTimeKey = "startTime";
 
-struct k8sContainerInfo {
-    std::unordered_map<std::string, std::string> images;
-    std::unordered_map<std::string, std::string> labels;
-    std::string k8sNamespace;
-    std::string serviceName;
-    std::string workloadKind;
-    std::string workloadName;
-    std::time_t timestamp;
-    std::string appId;
-};
-
-// 定义顶层的结构体
 struct ContainerData {
     std::unordered_map<std::string, k8sContainerInfo> containers;
 };
 
-enum class containerInfoType { ContainerIdInfo, IpInfo };
+enum class containerInfoType {
+    ContainerIdInfo,
+    IpInfo,
+    HostInfo,
+};
+
+using HostMetadataPostHandler = std::function<bool(uint32_t pluginIndex, std::vector<std::string>& containerIds)>;
 
 class K8sMetadata {
 private:
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>> containerCache;
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>> ipCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mIpCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mContainerCache;
+    lru11::Cache<std::string, uint8_t, std::mutex> mExternalIpCache;
+
     std::string mServiceHost;
     int32_t mServicePort;
-    K8sMetadata(size_t cacheSize) : containerCache(cacheSize, 0), ipCache(cacheSize, 0) {
-        mServiceHost = STRING_FLAG(operator_service);
-        mServicePort = INT32_FLAG(k8s_meta_service_port);
-    }
+    std::string mHostIp;
+
+    MetricsRecordRef mRef; // for self monitor
+    IntGaugePtr mCidCacheSize;
+    IntGaugePtr mIpCacheSize;
+    IntGaugePtr mExternalIpCacheSize;
+    CounterPtr mRequestMetaServerTotal;
+    CounterPtr mRequestMetaServerFailedTotal;
+
+    void ProcessBatch();
+
+    mutable std::mutex mStateMux;
+    std::unordered_set<std::string> mPendingKeys; // 增加上限
+
+    mutable std::condition_variable mCv;
+    std::vector<std::string> mBatchKeys; // 增加上限
+    std::vector<std::string> mBatchCids; // 增加上限
+    std::atomic_bool mEnable = false;
+    bool mFlag = false;
+    std::thread mQueryThread;
+    std::atomic_bool mIsValid = true;
+    std::atomic_int mFailCount = 0;
+
+    std::mutex mNetDetectorMtx;
+    mutable std::condition_variable mNetDetectorCv;
+    std::thread mNetDetector;
+
+    K8sMetadata(size_t ipCacheSize = 1024, size_t cidCacheSize = 1024, size_t externalIpCacheSize = 1024);
     K8sMetadata(const K8sMetadata&) = delete;
     K8sMetadata& operator=(const K8sMetadata&) = delete;
 
-    void SetIpCache(const Json::Value& root);
-    void SetContainerCache(const Json::Value& root);
+    void UpdateStatus(bool status);
+    void DetectMetadataServer();
+
+    std::unique_ptr<HttpRequest>
+    BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
+    void DetectNetwork();
+    void SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
+    void SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
+    void SetExternalIpCache(const std::string&);
+    void UpdateExternalIpCache(const std::vector<std::string>& queryIps, const std::vector<std::string>& retIps);
     bool FromInfoJson(const Json::Value& json, k8sContainerInfo& info);
-    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data);
+    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, containerInfoType infoType);
+    void HandleMetadataResponse(containerInfoType infoType,
+                                const std::shared_ptr<ContainerData>& data,
+                                std::vector<std::string>& resKey);
 
 public:
     static K8sMetadata& GetInstance() {
-        static K8sMetadata instance(500);
+        static K8sMetadata instance(1024, 1024, 1024);
         return instance;
     }
-    // 公共方法
+    ~K8sMetadata();
+
+    bool Enable();
+
     // if cache not have,get from server
-    bool GetByContainerIdsFromServer(std::vector<std::string> containerIds);
-    void GetByLocalHostFromServer();
-    bool GetByIpsFromServer(std::vector<std::string> ips);
+    std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string>& containerIds, bool& status);
+    // get pod metadatas for local host
+    bool GetByLocalHostFromServer();
+    bool GetByLocalHostFromServer(std::vector<std::string>& podIpVec);
+    //
+    std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status, bool force = false);
     // get info by container id from cache
-    std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
+    // std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
+    std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const StringView& containerId);
     // get info by ip from cache
-    std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
-    bool SendRequestToOperator(const std::string& urlHost, const std::string& output, containerInfoType infoType);
+    // std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
+    std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const StringView& ip);
+    bool IsExternalIp(const StringView& ip) const;
+    bool SendRequestToOperator(const std::string& urlHost,
+                               const std::string& request,
+                               containerInfoType infoType,
+                               std::vector<std::string>& resKey,
+                               bool force = false);
+
+    void AsyncQueryMetadata(containerInfoType type, const StringView& key);
+    // CIDR 问题 gflag 支持配置
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    HttpRequest* mRequest;
     friend class k8sMetadataUnittest;
+    friend class ConnectionUnittest;
+    friend class ConnectionManagerUnittest;
 #endif
 };
-
 } // namespace logtail

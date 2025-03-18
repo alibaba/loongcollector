@@ -36,4 +36,16 @@ int64_t HashSignatureString(const char* str, size_t strLen);
 
 void HashCombine(size_t& seed, size_t value);
 
+/**
+ * This implementation is adapted from the OpenTelemetry project
+ * Original source: https://github.com/open-telemetry/opentelemetry-cpp
+ * (https://github.com/open-telemetry/opentelemetry-cpp/blob/edfeabe4cefbec2ba3697e41664e76f8bfcee52c/sdk/include/opentelemetry/sdk/common/attributemap_hash.h#L50)
+ * Copyright The OpenTelemetry Authors
+ * Licensed under the Apache License, Version 2.0 (the "License")
+ * See original license at:
+ * https://github.com/open-telemetry/opentelemetry-cpp/blob/main/LICENSE
+ */
+inline void AttrHashCombine(size_t& result, size_t value) {
+    result ^= value + 0x9e3779b9 + (result << 6) + (result >> 2);
+}
 } // namespace logtail

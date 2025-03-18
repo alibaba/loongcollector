@@ -20,12 +20,8 @@
 
 namespace logtail {
 
-const static std::string containerIdKey = "container.id";
-const static std::string pidKey = "pid";
-const static std::string remoteIpKey = "remote_ip";
-const static std::string peerWorkloadNameKey = "peerWorkloadName";
-const static std::string peerWorkloadKindKey = "peerWorkloadKind";
-const static std::string peerNamespaceKey = "peerNamespace";
+const static std::string containerIdKeyFromTags = "container.id";
+const static std::string remoteIpKeyFromTag = "remote_ip";
 
 class LabelingK8sMetadata {
 public:

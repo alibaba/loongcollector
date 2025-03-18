@@ -21,6 +21,7 @@
 #include <chrono>
 #include <limits>
 #if defined(__linux__)
+#include <ctime>
 #include <sys/sysinfo.h>
 #include <utmp.h>
 #endif
@@ -402,6 +403,29 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
         result = result.substr(result.length() - length, length);
     }
     return result;
+}
+
+long GetTicksPerSecond() {
+    static long sTicksPerSecond = sysconf(_SC_CLK_TCK);
+    return sTicksPerSecond;
+}
+
+std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
+#if defined(__linux__)
+    struct timespec t;
+    int ret = clock_gettime(CLOCK_MONOTONIC, &t);
+    if (ret != 0) {
+        LOG_ERROR(sLogger, ("failed to get monotonic, ret", ret));
+        return std::chrono::nanoseconds(0);
+    }
+    auto now = std::chrono::system_clock::now();
+    auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+    auto boot_ns = t.tv_sec * 1000000000ULL + t.tv_nsec;
+    return std::chrono::nanoseconds(now_ns - boot_ns);
+// linux windows
+#elif defined(__APPLE__)
+    return std::chrono::nanoseconds(0);
+#endif
 }
 
 } // namespace logtail

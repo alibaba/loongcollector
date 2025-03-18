@@ -20,7 +20,6 @@
 
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
