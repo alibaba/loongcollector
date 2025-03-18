@@ -24,6 +24,9 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/StringTools.h"
+#if defined(_MSC_VER)
+#include "EncodingConverter.h"
+#endif
 
 using namespace std;
 

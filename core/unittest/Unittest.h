@@ -16,7 +16,7 @@
 
 #pragma once
 #if defined(_MSC_VER)
-#include <Winsock2.h>
+#include <windows.h>
 #endif
 #include <cstdlib>
 #include <gtest/gtest.h>
