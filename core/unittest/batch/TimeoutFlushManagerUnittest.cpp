@@ -81,7 +81,12 @@ void TimeoutFlushManagerUnittest::TestClearRecords() {
     TimeoutFlushManager::GetInstance()->UpdateRecord("test_config", 0, 1, 3, sFlusher.get());
     TimeoutFlushManager::GetInstance()->ClearRecords("test_config");
 
-    APSARA_TEST_EQUAL(0U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
+    APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mDeletedConfigs.size());
+    APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
+
+    TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
+    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mDeletedConfigs.empty());
+    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mTimeoutRecords.empty());
 }
 
 UNIT_TEST_CASE(TimeoutFlushManagerUnittest, TestUpdateRecord)

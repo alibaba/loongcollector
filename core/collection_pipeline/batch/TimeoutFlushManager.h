@@ -21,6 +21,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -58,8 +59,13 @@ private:
     TimeoutFlushManager() = default;
     ~TimeoutFlushManager() = default;
 
-    std::recursive_mutex mMux;
+    // visited by all processor runner threads
+    mutable std::mutex mTimeoutRecordsMux;
     std::map<std::string, std::map<std::pair<size_t, size_t>, TimeoutRecord>> mTimeoutRecords;
+
+    // visited by main thread and num 0 processor runner thread
+    mutable std::mutex mDeletedConfigsMux;
+    std::set<std::string> mDeletedConfigs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineUnittest;
