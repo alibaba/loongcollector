@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <models/StringView.h>
 
 #include <array>
@@ -8,12 +9,15 @@
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/NetTable.h"
+#include "ebpf/type/table/ProcessTable.h"
 #include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {
 
 constexpr StringView kEmptyStrRet = "INDEX_OUT_OF_RANGE";
+constexpr size_t kMaxInt32Width = 11;
+constexpr size_t kMaxInt64Width = 20;
 
 // static data row
 template <const DataTableSchema* schema>
@@ -21,8 +25,14 @@ class StaticDataRow {
 public:
     StaticDataRow() : mSourceBuffer(std::make_shared<SourceBuffer>()) {}
 
-    StaticDataRow(const StaticDataRow&) = delete;
-    StaticDataRow& operator=(const StaticDataRow&) = delete;
+    constexpr size_t Size() const { return schema->Size(); }
+
+    template <const DataElement& TElement>
+    inline void SetNoCopy(const StringView& val) {
+        constexpr uint32_t idx = schema->ColIndex(TElement.Name());
+        static_assert(idx < schema->Size());
+        mRow[idx] = val;
+    }
 
     template <const DataElement& TElement>
     inline void Set(const std::string& val) {
@@ -40,11 +50,55 @@ public:
         mRow[idx] = StringView(v.data, v.size);
     }
 
-    template <const DataElement& TElement>
-    inline void SetNoCopy(const StringView& val) {
-        constexpr uint32_t idx = schema->ColIndex(TElement.Name());
-        static_assert(idx < schema->Size());
-        mRow[idx] = val;
+    template <const ebpf::DataElement& key>
+    void Set(const char* data, size_t len) {
+        Set<key>(StringView(data, len));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(int32_t val) {
+        auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
+        auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+        *end.out = '\0';
+        buf.size = end.size;
+        Set<key>(StringView(buf.data, buf.size));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(uint32_t val) {
+        auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
+        auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+        *end.out = '\0';
+        buf.size = end.size;
+        Set<key>(StringView(buf.data, buf.size));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(int64_t val) {
+        auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
+        auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+        *end.out = '\0';
+        buf.size = end.size;
+        Set<key>(StringView(buf.data, buf.size));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(uint64_t val) {
+        auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
+        auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+        *end.out = '\0';
+        buf.size = end.size;
+        Set<key>(StringView(buf.data, buf.size));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(long long val) {
+        Set<key>(int64_t(val));
+    }
+
+    template <const ebpf::DataElement& key>
+    void Set(unsigned long long val) {
+        Set<key>(uint64_t(val));
     }
 
     template <const size_t TIndex>
@@ -67,6 +121,8 @@ public:
         }
         return mRow[idx];
     }
+
+    StringView& operator[](size_t idx) { return mRow[idx]; }
 
     template <const size_t TIndex>
     constexpr const StringView& GetColName() const {
@@ -92,6 +148,8 @@ public:
         return schema->ColSpanKey(TIndex);
     }
 
+    std::shared_ptr<SourceBuffer> GetSourceBuffer() { return mSourceBuffer; }
+
 private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     std::array<StringView, schema->Size()> mRow;
@@ -100,6 +158,8 @@ private:
 extern template class StaticDataRow<&kConnTrackerTable>;
 extern template class StaticDataRow<&kAppMetricsTable>;
 extern template class StaticDataRow<&kNetMetricsTable>;
+
+extern template class StaticDataRow<&kProcessCacheTable>;
 
 } // namespace ebpf
 } // namespace logtail

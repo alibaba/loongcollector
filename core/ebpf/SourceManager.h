@@ -31,6 +31,9 @@
 namespace logtail {
 namespace ebpf {
 
+inline constexpr int kDefaultMaxBatchConsumeSize = 1024;
+inline constexpr int kDefaultMaxWaitTimeMS = 200;
+
 class SourceManager {
 public:
     const std::string mDriverLibName = "eBPFDriver";

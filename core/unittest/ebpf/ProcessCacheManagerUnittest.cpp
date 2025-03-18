@@ -91,8 +91,7 @@ void ProcessCacheManagerUnittest::FillKernelThreadProc(Proc& proc) {
     proc.ppid = 0;
     proc.tid = proc.pid;
     proc.nspid = 0; // no container_id
-    proc.flags = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID
-                                       | ApiEventFlag::RootCWD);
+    proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID | EVENT_ROOT_CWD);
     proc.cwd = "/";
     proc.comm = "ksoftirqd/18";
     proc.cmdline = ""; // \0 separated binary and args
@@ -163,8 +162,7 @@ void ProcessCacheManagerUnittest::FillRootCwdProc(Proc& proc) {
     proc.ppid = 99999;
     proc.tid = proc.pid;
     proc.nspid = 0; // no container_id
-    proc.flags = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID
-                                       | ApiEventFlag::RootCWD);
+    proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID | EVENT_ROOT_CWD);
     proc.cwd = "/";
     proc.comm = "cat";
     constexpr char cmdline[] = "cat\0/etc/host.conf\0/etc/resolv.conf";
@@ -187,7 +185,7 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
         proc.gids = {i + 500, i + 500, i + 500, i + 500};
         proc.tid = proc.pid;
         proc.nspid = proc.pid;
-        proc.flags = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
+        proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID);
         proc.cwd = "/home/user";
         proc.comm = "test program";
         proc.cmdline = proc.comm + '\0' + std::to_string(i) + '\0' + "arg2"; // \0 separated binary and args
@@ -222,7 +220,7 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
     for (auto& proc : pidMap) {
         procFsStub.CreatePidDir(proc.second);
     }
-    auto procs = mProcessCacheManager->ListRunningProcs();
+    auto procs = mProcessCacheManager->listRunningProcs();
     for (const auto& proc : procs) {
         const auto it = pidMap.find(proc->pid);
         APSARA_TEST_TRUE_FATAL(it != pidMap.end());
@@ -262,8 +260,7 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
             // APSARA_TEST_EQUAL(proc->pcmdline, pexpected.cmdline);
             // APSARA_TEST_EQUAL(proc->pexe, pexpected.exe);
             // APSARA_TEST_EQUAL(proc->pnspid, pexpected.nspid);
-            // APSARA_TEST_EQUAL(proc->pflags, static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD |
-            // ApiEventFlag::NeedsAUID);
+            // APSARA_TEST_EQUAL(proc->pflags, static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID);
         }
     }
 }
@@ -276,12 +273,12 @@ void ProcessCacheManagerUnittest::TestProcToProcessCacheValue() {
         auto& cacheValue = *cacheValuePtr;
         APSARA_TEST_EQUAL(cacheValue.mPPid, proc.ppid);
         APSARA_TEST_EQUAL(cacheValue.mPKtime, proc.ktime);
-        APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(proc.pid));
-        APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(0U));
-        APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-        APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(proc.ktime));
-        APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), proc.cwd);
-        APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), proc.comm);
+        APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(proc.pid));
+        APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(0U));
+        APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+        APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(proc.ktime));
+        APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), proc.cwd);
+        APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), proc.comm);
     }
     { // cwd is root and invalid ppid
         Proc proc = CreateStubProc();
@@ -290,16 +287,16 @@ void ProcessCacheManagerUnittest::TestProcToProcessCacheValue() {
         auto& cacheValue = *cacheValuePtr;
         APSARA_TEST_EQUAL(cacheValue.mPPid, proc.ppid);
         APSARA_TEST_EQUAL(cacheValue.mPKtime, proc.ktime);
-        APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(proc.pid));
-        APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(0U));
-        APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-        APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(proc.ktime));
-        APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), proc.cwd);
-        APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), proc.exe);
-        APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), "/etc/host.conf /etc/resolv.conf");
-        APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string());
-        APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string());
-        APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(proc.pid));
+        APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(0U));
+        APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+        APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(proc.ktime));
+        APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), proc.cwd);
+        APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), proc.exe);
+        APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "/etc/host.conf /etc/resolv.conf");
+        APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string());
     }
 }
 
@@ -444,17 +441,18 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueNoClone()
     auto& cacheValue = *cacheValuePtr;
     APSARA_TEST_EQUAL(cacheValue.mPPid, event.cleanup_key.pid);
     APSARA_TEST_EQUAL(cacheValue.mPKtime, event.cleanup_key.ktime);
-    APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(event.process.pid));
-    APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(event.process.uid));
-    APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-    APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(event.process.ktime));
-    APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), "/root");
-    APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), "/usr/bin/ls");
-    APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), "-l \"/root/one more thing\"");
+    APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(event.process.pid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(event.process.uid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), "/root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), "/usr/bin/ls");
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\"");
 
-    APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string("CAP_CHOWN CAP_FSETID"));
-    APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
-    APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
+                      std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
 }
 
 void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongFilename() {
@@ -491,17 +489,18 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongFilen
     auto& cacheValue = *cacheValuePtr;
     APSARA_TEST_EQUAL(cacheValue.mPPid, event.parent.pid);
     APSARA_TEST_EQUAL(cacheValue.mPKtime, event.parent.ktime);
-    APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(event.process.pid));
-    APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(event.process.uid));
-    APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-    APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(event.process.ktime));
-    APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), "/");
-    APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), "/" + filename);
-    APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), "-l \"/root/one more thing\"");
+    APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(event.process.pid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(event.process.uid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), "/");
+    APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), "/" + filename);
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\"");
 
-    APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string("CAP_CHOWN CAP_FSETID"));
-    APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
-    APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
+                      std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
 }
 
 void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongArgs() {
@@ -553,17 +552,18 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongArgs(
     auto& cacheValue = *cacheValuePtr;
     APSARA_TEST_EQUAL(cacheValue.mPPid, event.parent.pid);
     APSARA_TEST_EQUAL(cacheValue.mPKtime, event.parent.ktime);
-    APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(event.process.pid));
-    APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(event.process.uid));
-    APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-    APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(event.process.ktime));
-    APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), cwd);
-    APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), binary);
-    APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), arguments);
+    APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(event.process.pid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(event.process.uid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), cwd);
+    APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), binary);
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), arguments);
 
-    APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string("CAP_CHOWN CAP_FSETID"));
-    APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
-    APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
+                      std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
 }
 
 void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueNoArgs() {
@@ -584,17 +584,18 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueNoArgs() 
     auto& cacheValue = *cacheValuePtr;
     APSARA_TEST_EQUAL(cacheValue.mPPid, event.parent.pid);
     APSARA_TEST_EQUAL(cacheValue.mPKtime, event.parent.ktime);
-    APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(event.process.pid));
-    APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(event.process.uid));
-    APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-    APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(event.process.ktime));
-    APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), cwd);
-    APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), binary);
-    APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), "");
+    APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(event.process.pid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(event.process.uid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), cwd);
+    APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), binary);
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "");
 
-    APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string("CAP_CHOWN CAP_FSETID"));
-    APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
-    APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
+                      std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
 }
 
 void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueNoArgsNoCwd() {
@@ -610,17 +611,18 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueNoArgsNoC
     auto& cacheValue = *cacheValuePtr;
     APSARA_TEST_EQUAL(cacheValue.mPPid, event.parent.pid);
     APSARA_TEST_EQUAL(cacheValue.mPKtime, event.parent.ktime);
-    APSARA_TEST_EQUAL(cacheValue[kProcessId].to_string(), std::to_string(event.process.pid));
-    APSARA_TEST_EQUAL(cacheValue[kUid].to_string(), std::to_string(event.process.uid));
-    APSARA_TEST_EQUAL(cacheValue[kUser].to_string(), "root");
-    APSARA_TEST_EQUAL(cacheValue[kKtime].to_string(), std::to_string(event.process.ktime));
-    APSARA_TEST_EQUAL(cacheValue[kCWD].to_string(), "");
-    APSARA_TEST_EQUAL(cacheValue[kBinary].to_string(), binary);
-    APSARA_TEST_EQUAL(cacheValue[kArguments].to_string(), "");
+    APSARA_TEST_EQUAL(cacheValue.Get<kProcessId>().to_string(), std::to_string(event.process.pid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUid>().to_string(), std::to_string(event.process.uid));
+    APSARA_TEST_EQUAL(cacheValue.Get<kUser>().to_string(), "root");
+    APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), "");
+    APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), binary);
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "");
 
-    APSARA_TEST_EQUAL(cacheValue[kCapPermitted].to_string(), std::string("CAP_CHOWN CAP_FSETID"));
-    APSARA_TEST_EQUAL(cacheValue[kCapEffective].to_string(), std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
-    APSARA_TEST_EQUAL(cacheValue[kCapInheritable].to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
+                      std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
 }
 
 void ProcessCacheManagerUnittest::TestMsgCloneEventToProcessCacheValue() {
@@ -628,11 +630,11 @@ void ProcessCacheManagerUnittest::TestMsgCloneEventToProcessCacheValue() {
     data_event_id parentkey{12345, 123456789};
     auto parentExecId = mProcessCacheManager->GenerateExecId(parentkey.pid, parentkey.time);
     auto parentCacheValue = std::make_shared<ProcessCacheValue>();
-    parentCacheValue->SetContent(kProcessId, StringView("1234"));
-    parentCacheValue->SetContent(kKtime, StringView("123456789"));
-    parentCacheValue->SetContent(kExecId, parentExecId);
-    parentCacheValue->SetContent(kUid, StringView("1000"));
-    parentCacheValue->SetContent(kBinary, StringView("test_binary"));
+    parentCacheValue->SetContent<kProcessId>(StringView("1234"));
+    parentCacheValue->SetContent<kKtime>(StringView("123456789"));
+    parentCacheValue->SetContent<kExecId>(parentExecId);
+    parentCacheValue->SetContent<kUid>(StringView("1000"));
+    parentCacheValue->SetContent<kBinary>(StringView("test_binary"));
 
     // 测试缓存更新
     mProcessCacheManager->mProcessCache.AddCache(parentkey, std::move(parentCacheValue));
@@ -647,11 +649,11 @@ void ProcessCacheManagerUnittest::TestMsgCloneEventToProcessCacheValue() {
     APSARA_TEST_TRUE(cacheValue != nullptr);
     APSARA_TEST_EQUAL(cacheValue->mPPid, event.parent.pid);
     APSARA_TEST_EQUAL(cacheValue->mPKtime, event.parent.ktime);
-    APSARA_TEST_EQUAL((*cacheValue)[kProcessId].to_string(), std::to_string(event.tgid));
-    APSARA_TEST_EQUAL((*cacheValue)[kKtime].to_string(), std::to_string(event.ktime));
-    APSARA_TEST_EQUAL((*cacheValue)[kExecId].to_string(), execId);
-    APSARA_TEST_EQUAL((*cacheValue)[kUid].to_string(), "1000");
-    APSARA_TEST_EQUAL((*cacheValue)[kBinary].to_string(), "test_binary");
+    APSARA_TEST_EQUAL((*cacheValue).Get<kProcessId>().to_string(), std::to_string(event.tgid));
+    APSARA_TEST_EQUAL((*cacheValue).Get<kKtime>().to_string(), std::to_string(event.ktime));
+    APSARA_TEST_EQUAL((*cacheValue).Get<kExecId>().to_string(), execId);
+    APSARA_TEST_EQUAL((*cacheValue).Get<kUid>().to_string(), "1000");
+    APSARA_TEST_EQUAL((*cacheValue).Get<kBinary>().to_string(), "test_binary");
 }
 
 void ProcessCacheManagerUnittest::TestMsgCloneEventToProcessCacheValueParentNotFound() {
@@ -736,30 +738,30 @@ void ProcessCacheManagerUnittest::TestRecordEventCloneExecveExit() {
     auto shProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{shExecveEvent.process.pid, shExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(shProc != nullptr);
-    APSARA_TEST_EQUAL((*shProc)[kBinary].to_string(), shBinary);
+    APSARA_TEST_EQUAL((*shProc).Get<kBinary>().to_string(), shBinary);
     APSARA_TEST_EQUAL(shProc->mRefCount, 2);
 
     auto daemonClone
         = mProcessCacheManager->mProcessCache.Lookup(data_event_id{daemonCloneEvent.tgid, daemonCloneEvent.ktime});
     APSARA_TEST_TRUE_FATAL(daemonClone != nullptr);
-    APSARA_TEST_EQUAL((*daemonClone)[kBinary].to_string(), shBinary);
+    APSARA_TEST_EQUAL((*daemonClone).Get<kBinary>().to_string(), shBinary);
     APSARA_TEST_EQUAL(daemonClone->mRefCount, 0);
 
     auto daemonProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{daemonExecveEvent.process.pid, daemonExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(daemonProc != nullptr);
-    APSARA_TEST_EQUAL((*daemonProc)[kBinary].to_string(), daemonBinary);
+    APSARA_TEST_EQUAL((*daemonProc).Get<kBinary>().to_string(), daemonBinary);
     APSARA_TEST_EQUAL(daemonProc->mRefCount, 2);
 
     auto appClone = mProcessCacheManager->mProcessCache.Lookup(data_event_id{appCloneEvent.tgid, appCloneEvent.ktime});
     APSARA_TEST_TRUE_FATAL(appClone != nullptr);
-    APSARA_TEST_EQUAL((*appClone)[kBinary].to_string(), daemonBinary);
+    APSARA_TEST_EQUAL((*appClone).Get<kBinary>().to_string(), daemonBinary);
     APSARA_TEST_EQUAL(appClone->mRefCount, 0);
 
     auto appProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{appExecveEvent.process.pid, appExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(appProc != nullptr);
-    APSARA_TEST_EQUAL((*appProc)[kBinary].to_string(), appBinary);
+    APSARA_TEST_EQUAL((*appProc).Get<kBinary>().to_string(), appBinary);
     APSARA_TEST_EQUAL(appProc->mRefCount, 1);
 
     // check output events
@@ -902,30 +904,30 @@ void ProcessCacheManagerUnittest::TestRecordEventExecveExit() {
     auto shProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{shExecveEvent.process.pid, shExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(shProc != nullptr);
-    APSARA_TEST_EQUAL((*shProc)[kBinary].to_string(), shBinary);
+    APSARA_TEST_EQUAL((*shProc).Get<kBinary>().to_string(), shBinary);
     APSARA_TEST_EQUAL(shProc->mRefCount, 0);
 
     auto bashProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{bashExecveEvent.process.pid, bashExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(bashProc != nullptr);
-    APSARA_TEST_EQUAL((*bashProc)[kBinary].to_string(), bashBinary);
+    APSARA_TEST_EQUAL((*bashProc).Get<kBinary>().to_string(), bashBinary);
     APSARA_TEST_EQUAL(bashProc->mRefCount, 1);
 
     auto daemonProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{daemonExecveEvent.process.pid, daemonExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(daemonProc != nullptr);
-    APSARA_TEST_EQUAL((*daemonProc)[kBinary].to_string(), daemonBinary);
+    APSARA_TEST_EQUAL((*daemonProc).Get<kBinary>().to_string(), daemonBinary);
     APSARA_TEST_EQUAL(daemonProc->mRefCount, 2);
 
     auto appClone = mProcessCacheManager->mProcessCache.Lookup(data_event_id{appCloneEvent.tgid, appCloneEvent.ktime});
     APSARA_TEST_TRUE_FATAL(appClone != nullptr);
-    APSARA_TEST_EQUAL((*appClone)[kBinary].to_string(), daemonBinary);
+    APSARA_TEST_EQUAL((*appClone).Get<kBinary>().to_string(), daemonBinary);
     APSARA_TEST_EQUAL(appClone->mRefCount, 0);
 
     auto appProc = mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{appExecveEvent.process.pid, appExecveEvent.process.ktime});
     APSARA_TEST_TRUE_FATAL(appProc != nullptr);
-    APSARA_TEST_EQUAL((*appProc)[kBinary].to_string(), appBinary);
+    APSARA_TEST_EQUAL((*appProc).Get<kBinary>().to_string(), appBinary);
     APSARA_TEST_EQUAL(appProc->mRefCount, 1);
 
     // check output events
@@ -994,20 +996,20 @@ void ProcessCacheManagerUnittest::TestFinalizeProcessTags() {
     // 创建进程事件
     data_event_id key{1234, 5678};
     auto execveEvent = std::make_shared<ProcessCacheValue>();
-    execveEvent->SetContent(kProcessId, StringView("1234"));
-    execveEvent->SetContent(kKtime, StringView("5678"));
-    execveEvent->SetContent(kUid, StringView("1000"));
-    execveEvent->SetContent(kBinary, StringView("test_binary"));
+    execveEvent->SetContent<kProcessId>(StringView("1234"));
+    execveEvent->SetContent<kKtime>(StringView("5678"));
+    execveEvent->SetContent<kUid>(StringView("1000"));
+    execveEvent->SetContent<kBinary>(StringView("test_binary"));
     execveEvent->mPPid = 2345;
     execveEvent->mPKtime = 6789;
 
     // parent
     data_event_id pKey{2345, 6789};
     auto pExecveEvent = std::make_shared<ProcessCacheValue>();
-    pExecveEvent->SetContent(kProcessId, StringView("2345"));
-    pExecveEvent->SetContent(kKtime, StringView("6789"));
-    pExecveEvent->SetContent(kUid, StringView("1000"));
-    pExecveEvent->SetContent(kBinary, StringView("test_binary_parent"));
+    pExecveEvent->SetContent<kProcessId>(StringView("2345"));
+    pExecveEvent->SetContent<kKtime>(StringView("6789"));
+    pExecveEvent->SetContent<kUid>(StringView("1000"));
+    pExecveEvent->SetContent<kBinary>(StringView("test_binary_parent"));
 
     // 更新缓存
     mProcessCacheManager->mProcessCache.AddCache(key, std::move(execveEvent));

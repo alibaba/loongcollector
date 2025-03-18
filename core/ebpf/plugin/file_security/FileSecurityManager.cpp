@@ -149,10 +149,11 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-                auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                // set timestamp
-                logEvent->SetTimestamp(seconds.count(), ts);
+
+                auto ts = std::chrono::nanoseconds(innerEvent->mTimestamp + this->mTimeDiff.count());
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
+                auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
+                logEvent->SetTimestamp(seconds.count(), nanoseconds.count());
                 logEvent->SetContent(FileSecurityManager::sPathKey, group->mPath);
                 // set callnames
                 switch (innerEvent->mEventType) {

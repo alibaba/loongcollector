@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <coolbpf/security/bpf_process_event_type.h>
+
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -135,7 +137,7 @@ void ProcParserUnittest::TestGetPIDCWD() {
 
     auto [cwd, flags] = mParser->GetPIDCWD(testPid);
     APSARA_TEST_TRUE(cwd.find("/home/user") != std::string::npos);
-    APSARA_TEST_EQUAL(flags & static_cast<uint32_t>(ApiEventFlag::RootCWD), 0U);
+    APSARA_TEST_EQUAL(flags & static_cast<uint32_t>(EVENT_ROOT_CWD), 0U);
 }
 
 void ProcParserUnittest::TestGetPIDDockerId() {

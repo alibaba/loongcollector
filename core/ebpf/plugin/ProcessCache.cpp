@@ -22,80 +22,19 @@
 
 namespace logtail {
 
-ProcessCacheValue::ProcessCacheValue() : mSourceBuffer(std::make_shared<SourceBuffer>()) {
-}
-
 // avoid infinite execve to cause memory leak
 static long kMaxProcessCacheValueSourceBufferReuse = 100;
 ProcessCacheValue* ProcessCacheValue::CloneContents() {
     auto* newValue = new ProcessCacheValue();
-    if (mSourceBuffer.use_count() < kMaxProcessCacheValueSourceBufferReuse) {
-        newValue->mSourceBuffer = mSourceBuffer;
+    if (GetSourceBuffer().use_count() < kMaxProcessCacheValueSourceBufferReuse) {
         newValue->mContents = mContents;
     } else {
-        for (size_t i = 0; i < mContents.size(); ++i) {
-            StringBuffer cp = newValue->mSourceBuffer->CopyString(mContents[i]);
+        for (size_t i = 0; i < mContents.Size(); ++i) {
+            StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
             newValue->mContents[i] = {cp.data, cp.size};
         }
     }
     return newValue;
-}
-
-const StringView& ProcessCacheValue::operator[](const ebpf::DataElement& key) const {
-    return mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)];
-}
-
-void ProcessCacheValue::SetContentNoCopy(const ebpf::DataElement& key, const StringView& val) {
-    auto v = mSourceBuffer->CopyString(val);
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(v.data, v.size);
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, const StringView& val) {
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = val;
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, const std::string& val) {
-    auto v = mSourceBuffer->CopyString(val);
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(v.data, v.size);
-}
-
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, const char* data, size_t len) {
-    auto v = mSourceBuffer->CopyString(data, len);
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(v.data, v.size);
-}
-
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, int32_t val) {
-    auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
-    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
-    *end.out = '\0';
-    buf.size = end.size;
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, uint32_t val) {
-    auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt32Width);
-    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
-    *end.out = '\0';
-    buf.size = end.size;
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, int64_t val) {
-    auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
-    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
-    *end.out = '\0';
-    buf.size = end.size;
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, uint64_t val) {
-    auto buf = mSourceBuffer->AllocateStringBuffer(kMaxInt64Width);
-    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
-    *end.out = '\0';
-    buf.size = end.size;
-    mContents[ebpf::FindIndex(ebpf::kProcessCacheElements, key)] = StringView(buf.data, buf.size);
-}
-
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, long long val) {
-    SetContent(key, int64_t(val));
-}
-void ProcessCacheValue::SetContent(const ebpf::DataElement& key, unsigned long long val) {
-    SetContent(key, uint64_t(val));
 }
 
 ProcessCache::ProcessCache(size_t initCacheSize) {
@@ -127,7 +66,7 @@ void ProcessCache::removeCache(const data_event_id& key) {
 }
 
 void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCacheValue>&& value) {
-    ++value->mRefCount;
+    value->IncRef();
     std::lock_guard<std::mutex> lock(mCacheMutex);
     mCache.emplace(key, std::move(value));
 }
@@ -135,14 +74,14 @@ void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCac
 void ProcessCache::IncRef(const data_event_id& key) {
     auto v = Lookup(key);
     if (v) {
-        ++(v->mRefCount);
+        v->IncRef();
     }
 }
 
 void ProcessCache::DecRef(const data_event_id& key, time_t curktime) {
     auto v = Lookup(key);
     if (v) {
-        if (--(v->mRefCount) == 0) {
+        if (v->DecRef() == 0) {
             enqueueExpiredEntry(key, curktime);
         }
     }

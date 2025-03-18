@@ -20,14 +20,14 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kProcessCacheElements[] = {
+inline constexpr DataElement kProcessCacheElements[] = {
     kExecId, kProcessId, kUid, kUser, kBinary, kArguments, kCWD, kKtime, kCapInheritable, kCapPermitted, kCapEffective};
 
-static constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements);
+inline constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements);
 
-static constexpr auto kProcessCacheTable = DataTableSchema("process_cache_table", "", kProcessCacheElements);
+inline constexpr auto kProcessCacheTable = DataTableSchema("process_cache_table", "", kProcessCacheElements);
 
-static constexpr DataElement kProcessSecurityElements[] = {kExecId,
+inline constexpr DataElement kProcessSecurityElements[] = {kExecId,
                                                            kProcessId,
                                                            kUid,
                                                            kUser,
@@ -53,9 +53,9 @@ static constexpr DataElement kProcessSecurityElements[] = {kExecId,
                                                            kCallName,
                                                            kEventType};
 
-static constexpr size_t kProcessSecurityTableSize = std::size(kProcessSecurityElements);
+inline constexpr size_t kProcessSecurityTableSize = std::size(kProcessSecurityElements);
 
-static constexpr auto kProcessSecurityTable = DataTableSchema("process_security_table", "", kProcessSecurityElements);
+inline constexpr auto kProcessSecurityTable = DataTableSchema("process_security_table", "", kProcessSecurityElements);
 
 } // namespace ebpf
 } // namespace logtail

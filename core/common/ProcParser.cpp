@@ -14,6 +14,8 @@
 
 #include <charconv>
 #include <climits>
+#include <coolbpf/security/bpf_process_event_type.h>
+#include <cstdint>
 #include <cstring>
 
 #include <algorithm>
@@ -26,7 +28,6 @@
 #include <string_view>
 
 #include "common/TimeUtil.h"
-
 #if defined(__linux__)
 #include <pwd.h>
 #endif
@@ -103,19 +104,21 @@ bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
     proc.exe = GetPIDExePath(pid);
 
     std::tie(proc.cwd, proc.flags) = GetPIDCWD(pid);
-    proc.flags |= static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
+    proc.flags |= static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID);
 
     ProcStat stats;
     if (0 != GetProcStatStrings(pid, stats)) {
         LOG_WARNING(sLogger, ("GetProcStatStrings", "failed"));
         return false;
     }
+    if (stats.stats.size() < 4) {
+        LOG_WARNING(sLogger, ("GetProcStatStrings", "failed"));
+        return false;
+    }
     auto ppid = stats.stats[3];
 
     // get ppid
-    const auto* ppidLast = ppid.data() + ppid.size();
-    auto [ptr, ec] = std::from_chars(ppid.data(), ppidLast, proc.ppid);
-    if (ec != std::errc() || ptr != ppidLast) {
+    if (!StringTo(ppid, proc.ppid)) {
         LOG_WARNING(sLogger, ("Parse ppid", "failed"));
         return false;
     }
@@ -161,7 +164,7 @@ bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
         //     pnspid = 0;
         // }
         // proc.pnspid = pnspid;
-        // proc.pflags = static_cast<uint32_t>(ApiEventFlag::ProcFS | ApiEventFlag::NeedsCWD | ApiEventFlag::NeedsAUID);
+        // proc.pflags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID);
     }
     return true;
 }
@@ -255,7 +258,7 @@ std::string ProcParser::GetPIDExePath(uint32_t pid) const {
 }
 
 std::pair<std::string, uint32_t> ProcParser::GetPIDCWD(uint32_t pid) const {
-    ApiEventFlag flags = ApiEventFlag::Unknown;
+    uint32_t flags = EVENT_UNKNOWN;
     if (pid == 0) {
         return {"", static_cast<uint32_t>(flags)};
     }
@@ -263,11 +266,11 @@ std::pair<std::string, uint32_t> ProcParser::GetPIDCWD(uint32_t pid) const {
     try {
         std::string cwd = ReadPIDLink(pid, "cwd");
         if (cwd == "/") {
-            flags |= ApiEventFlag::RootCWD;
+            flags |= EVENT_ROOT_CWD;
         }
         return {cwd, static_cast<uint32_t>(flags)};
     } catch (const std::filesystem::filesystem_error&) { // possibly kernel thread
-        flags |= (ApiEventFlag::RootCWD | ApiEventFlag::ErrorCWD);
+        flags |= EVENT_ROOT_CWD | EVENT_ERROR_CWD;
         return {"", static_cast<uint32_t>(flags)};
     }
 }
@@ -374,9 +377,7 @@ int64_t ProcParser::GetStatsKtime(ProcStat& procStat) const {
     }
 
     int64_t ktime = 0L;
-    const auto* kTimeLast = procStat.stats[21].data() + procStat.stats[21].size();
-    auto [ptr, ec] = std::from_chars(procStat.stats[21].data(), kTimeLast, ktime);
-    if (ec != std::errc() || ptr != kTimeLast) {
+    if (!StringTo(procStat.stats[21], ktime)) {
         LOG_WARNING(sLogger, ("Parse ktime", "failed"));
         return -1;
     }
@@ -406,13 +407,8 @@ uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& nsStr) const
         return 0;
     }
     uint32_t inodeEntry = 0;
-    auto [ptr, errc] = std::from_chars(netStr.data() + openPos + 1, netStr.data() + closePos, inodeEntry);
-    if (errc == std::errc::invalid_argument) {
+    if (!StringTo(netStr.data() + openPos + 1, netStr.data() + closePos, inodeEntry)) {
         LOG_WARNING(sLogger, ("Invalid argument in line: ", netStr));
-        return 0;
-    }
-    if (errc == std::errc::result_out_of_range) {
-        LOG_WARNING(sLogger, ("Out of range in line: ", netStr));
         return 0;
     }
     return inodeEntry;

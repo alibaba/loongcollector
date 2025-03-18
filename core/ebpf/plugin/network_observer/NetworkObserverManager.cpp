@@ -40,6 +40,9 @@ namespace ebpf {
 
 class eBPFServer;
 
+inline constexpr int kNetObserverMaxBatchConsumeSize = 4096;
+inline constexpr int kNetObserverMaxWaitTimeMS = 0;
+
 static constexpr uint32_t APP_ID_INDEX = kConnTrackerTable.ColIndex(kAppId.Name());
 static constexpr uint32_t APP_NAME_INDEX = kConnTrackerTable.ColIndex(kAppName.Name());
 static constexpr uint32_t HOST_NAME_INDEX = kConnTrackerTable.ColIndex(kHostName.Name());
@@ -1572,7 +1575,8 @@ void NetworkObserverManager::PollBufferWrapper() {
         }
 
         // poll stats -> ctrl -> info
-        int ret = mSourceManager->PollPerfBuffers(PluginType::NETWORK_OBSERVE, 4096, &flag, 0);
+        int ret = mSourceManager->PollPerfBuffers(
+            PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, kNetObserverMaxWaitTimeMS);
         if (ret < 0) {
             LOG_WARNING(sLogger, ("poll event err, ret", ret));
         }

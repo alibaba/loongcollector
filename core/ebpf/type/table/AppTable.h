@@ -20,7 +20,7 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kConnTrackerElements[] = {
+inline constexpr DataElement kConnTrackerElements[] = {
     kHostName,
     kAppName,
     kAppId,
@@ -57,11 +57,11 @@ static constexpr DataElement kConnTrackerElements[] = {
     kStartTsNs,
 };
 
-static constexpr size_t kConnTrackerElementsTableSize = std::size(kConnTrackerElements);
+inline constexpr size_t kConnTrackerElementsTableSize = std::size(kConnTrackerElements);
 
 inline constexpr auto kConnTrackerTable = DataTableSchema("conn_tracker_table", "", kConnTrackerElements);
 
-static constexpr DataElement kAppMetricsElements[] = {
+inline constexpr DataElement kAppMetricsElements[] = {
     kHostName, // host
     kAppId, // pid
     kIp, // server ip
@@ -80,11 +80,11 @@ static constexpr DataElement kAppMetricsElements[] = {
     kEndpoint,
 };
 
-static constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
+inline constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
 inline constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
-static constexpr DataElement kAppTraceElements[] = {
+inline constexpr DataElement kAppTraceElements[] = {
     kNamespace,
     kWorkloadKind,
     kWorkloadName,
@@ -115,11 +115,11 @@ static constexpr DataElement kAppTraceElements[] = {
     kStartTsNs,
 };
 
-static constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
+inline constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 
 inline constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
-static constexpr DataElement kAppLogElements[] = {
+inline constexpr DataElement kAppLogElements[] = {
     kHostName, // host
     kAppId, // pid
     kIp, // server ip
@@ -139,7 +139,7 @@ static constexpr DataElement kAppLogElements[] = {
     kEndpoint,
 };
 
-static constexpr size_t kAppLogNum = std::size(kAppLogElements);
+inline constexpr size_t kAppLogNum = std::size(kAppLogElements);
 
 inline constexpr auto kAppLogTable = DataTableSchema("app_log", "app log table", kAppLogElements);
 

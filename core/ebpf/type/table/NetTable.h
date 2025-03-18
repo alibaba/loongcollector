@@ -20,7 +20,7 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kNetMetricsElements[] = {
+inline constexpr DataElement kNetMetricsElements[] = {
     kHostName, // host
     kAppId, // pid
     kIp, // server ip
@@ -37,11 +37,11 @@ static constexpr DataElement kNetMetricsElements[] = {
     kPeerWorkloadName,
 };
 
-static constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
+inline constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
 
 inline constexpr auto kNetMetricsTable = DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
 
-static constexpr DataElement kNetElements[] = {
+inline constexpr DataElement kNetElements[] = {
     kIp,
     kAppId,
 
@@ -50,7 +50,7 @@ static constexpr DataElement kNetElements[] = {
     kRemotePort,
 };
 
-static constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
+inline constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
 
 } // namespace ebpf
 } // namespace logtail

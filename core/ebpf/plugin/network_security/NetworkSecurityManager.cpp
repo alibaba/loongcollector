@@ -181,10 +181,10 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 logEvent->SetContentNoCopy(kDport.LogKey(), StringView(dportSb.data, dportSb.size));
                 logEvent->SetContentNoCopy(kNetNs.LogKey(), StringView(netnsSb.data, netnsSb.size));
 
-                auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                // set timestamp
-                logEvent->SetTimestamp(seconds.count(), ts);
+                auto ts = std::chrono::nanoseconds(innerEvent->mTimestamp + this->mTimeDiff.count());
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
+                auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
+                logEvent->SetTimestamp(seconds.count(), nanoseconds.count());
 
                 // set callnames
                 switch (innerEvent->mEventType) {

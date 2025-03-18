@@ -22,9 +22,6 @@
 
 namespace logtail {
 namespace ebpf {
-
-const std::string AbstractManager::sKprobeValue = "kprobe";
-
 AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCacheMgr,
                                  std::shared_ptr<SourceManager> sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,

@@ -22,16 +22,17 @@
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/type/ProcessEvent.h"
 
 namespace logtail {
 namespace ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
-    static const std::string kExitTidKey;
-    static const std::string kExitCodeKey;
-    static const std::string kExecveValue;
-    static const std::string kCloneValue;
-    static const std::string kExitValue;
+    inline static constexpr StringView kExitTidKey = "exit_tid";
+    inline static constexpr StringView kExitCodeKey = "exit_code";
+    inline static constexpr StringView kExecveValue = "value";
+    inline static constexpr StringView kCloneValue = "clone";
+    inline static constexpr StringView kExitValue = "exit";
 
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -47,15 +48,13 @@ public:
         return std::make_shared<ProcessSecurityManager>(mgr, sourceManager, queue, metricMgr);
     }
 
-    ~ProcessSecurityManager() {}
+    ~ProcessSecurityManager() = default;
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
-
-    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
@@ -72,6 +71,8 @@ public:
         LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0;
     }
+
+    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
 
 private:
     ReadWriteLock mLock;

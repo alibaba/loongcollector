@@ -33,12 +33,12 @@ void ProcessCacheValueUnittest::TestCloneContents() {
     v1.mPPid = 1;
     v1.mPKtime = 2;
     v1.mRefCount = 3;
-    v1.SetContent(ebpf::kArguments, StringView("arg1 arg2 arg3"));
+    v1.SetContent<ebpf::kArguments>(StringView("arg1 arg2 arg3"));
     std::unique_ptr<ProcessCacheValue> v2(v1.CloneContents());
     APSARA_TEST_EQUAL_FATAL(0U, v2->mPPid);
     APSARA_TEST_EQUAL_FATAL(0UL, v2->mPKtime);
     APSARA_TEST_EQUAL_FATAL(0, v2->mRefCount);
-    APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), (*v2)[ebpf::kArguments]);
+    APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), v2->Get<ebpf::kArguments>());
 }
 
 void ProcessCacheValueUnittest::TestCloneContentsExcessive() {
@@ -46,7 +46,7 @@ void ProcessCacheValueUnittest::TestCloneContentsExcessive() {
     v1.mPPid = 1;
     v1.mPKtime = 2;
     v1.mRefCount = 3;
-    v1.SetContent(ebpf::kArguments, StringView("arg1 arg2 arg3"));
+    v1.SetContent<ebpf::kArguments>(StringView("arg1 arg2 arg3"));
     std::array<std::unique_ptr<ProcessCacheValue>, 10000> clones;
     for (size_t i = 0; i < clones.size(); ++i) {
         auto& v2 = clones[i];
@@ -59,17 +59,17 @@ void ProcessCacheValueUnittest::TestCloneContentsExcessive() {
         APSARA_TEST_EQUAL_FATAL(0U, v2->mPPid);
         APSARA_TEST_EQUAL_FATAL(0UL, v2->mPKtime);
         APSARA_TEST_EQUAL_FATAL(0, v2->mRefCount);
-        APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), (*v2)[ebpf::kArguments]);
+        APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), v2->Get<ebpf::kArguments>());
     }
-    APSARA_TEST_NOT_EQUAL_FATAL(v1.mSourceBuffer.get(), clones.back()->mSourceBuffer.get());
+    APSARA_TEST_NOT_EQUAL_FATAL(v1.GetSourceBuffer().get(), clones.back()->GetSourceBuffer().get());
 }
 
 void ProcessCacheValueUnittest::TestSetContent() {
     ProcessCacheValue v;
-    v.SetContent(ebpf::kProcessId, uint32_t(1000U));
-    v.SetContent(ebpf::kKtime, uint64_t(1000000000UL));
-    APSARA_TEST_EQUAL_FATAL(StringView("1000"), v[ebpf::kProcessId]);
-    APSARA_TEST_EQUAL_FATAL(StringView("1000000000"), v[ebpf::kKtime]);
+    v.SetContent<ebpf::kProcessId>(uint32_t(1000U));
+    v.SetContent<ebpf::kKtime>(uint64_t(1000000000UL));
+    APSARA_TEST_EQUAL_FATAL(StringView("1000"), v.Get<ebpf::kProcessId>());
+    APSARA_TEST_EQUAL_FATAL(StringView("1000000000"), v.Get<ebpf::kKtime>());
 }
 
 UNIT_TEST_CASE(ProcessCacheValueUnittest, TestCloneContents);
@@ -92,10 +92,10 @@ void ProcessCacheUnittest::TestAddCache() {
     APSARA_TEST_TRUE(cacheValue == nullptr);
 
     cacheValue = std::make_shared<ProcessCacheValue>();
-    cacheValue->SetContent(kProcessId, StringView("1234"));
-    cacheValue->SetContent(kKtime, StringView("5678"));
-    cacheValue->SetContent(kUid, StringView("1000"));
-    cacheValue->SetContent(kBinary, StringView("test_binary"));
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    cacheValue->SetContent<kKtime>(StringView("5678"));
+    cacheValue->SetContent<kUid>(StringView("1000"));
+    cacheValue->SetContent<kBinary>(StringView("test_binary"));
 
     // 测试缓存更新
     mProcessCache.AddCache(key, std::move(cacheValue));
@@ -105,19 +105,19 @@ void ProcessCacheUnittest::TestAddCache() {
     // 测试缓存查找
     cacheValue = mProcessCache.Lookup(key);
     APSARA_TEST_TRUE(cacheValue != nullptr);
-    APSARA_TEST_EQUAL((*cacheValue)[kProcessId], StringView("1234"));
-    APSARA_TEST_EQUAL((*cacheValue)[kKtime], StringView("5678"));
-    APSARA_TEST_EQUAL((*cacheValue)[kUid], StringView("1000"));
-    APSARA_TEST_EQUAL((*cacheValue)[kBinary], StringView("test_binary"));
+    APSARA_TEST_EQUAL(cacheValue->Get<kProcessId>(), StringView("1234"));
+    APSARA_TEST_EQUAL(cacheValue->Get<kKtime>(), StringView("5678"));
+    APSARA_TEST_EQUAL(cacheValue->Get<kUid>(), StringView("1000"));
+    APSARA_TEST_EQUAL(cacheValue->Get<kBinary>(), StringView("test_binary"));
 }
 
 void ProcessCacheUnittest::TestRefCount() {
     data_event_id key{12345, 1234567890};
     auto cacheValue = std::make_shared<ProcessCacheValue>();
-    cacheValue->SetContent(kProcessId, StringView("1234"));
-    cacheValue->SetContent(kKtime, StringView("5678"));
-    cacheValue->SetContent(kUid, StringView("1000"));
-    cacheValue->SetContent(kBinary, StringView("test_binary"));
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    cacheValue->SetContent<kKtime>(StringView("5678"));
+    cacheValue->SetContent<kUid>(StringView("1000"));
+    cacheValue->SetContent<kBinary>(StringView("test_binary"));
     mProcessCache.AddCache(key, std::move(cacheValue));
     cacheValue = mProcessCache.Lookup(key);
     APSARA_TEST_TRUE(cacheValue != nullptr);
@@ -134,10 +134,10 @@ void ProcessCacheUnittest::TestRefCount() {
 void ProcessCacheUnittest::TestClearExpiredCache() {
     data_event_id key{12345, 1234567890};
     auto cacheValue = std::make_shared<ProcessCacheValue>();
-    cacheValue->SetContent(kProcessId, StringView("1234"));
-    cacheValue->SetContent(kKtime, StringView("5678"));
-    cacheValue->SetContent(kUid, StringView("1000"));
-    cacheValue->SetContent(kBinary, StringView("test_binary"));
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    cacheValue->SetContent<kKtime>(StringView("5678"));
+    cacheValue->SetContent<kUid>(StringView("1000"));
+    cacheValue->SetContent<kBinary>(StringView("test_binary"));
     mProcessCache.AddCache(key, std::move(cacheValue));
 
     mProcessCache.DecRef(key, 1234567890);

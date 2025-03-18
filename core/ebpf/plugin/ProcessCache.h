@@ -17,48 +17,83 @@
 #include <cstdint>
 #include <spdlog/fmt/bundled/format.h>
 
-#include <atomic>
 #include <deque>
 #include <mutex>
 
-#include "StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "ebpf/type/table/ProcessTable.h"
+#include "ebpf/type/table/StaticDataRow.h"
+#include "models/StringView.h"
 
 namespace logtail {
 
-static constexpr size_t kInitCacheSize = 65536UL;
-static constexpr auto kOneMinuteNanoseconds = std::chrono::minutes(1) / std::chrono::nanoseconds(1);
-static constexpr time_t kMaxCacheExpiredTimeout = kOneMinuteNanoseconds;
+constexpr size_t kInitCacheSize = 65536UL;
+constexpr auto kOneMinuteNanoseconds = std::chrono::minutes(1) / std::chrono::nanoseconds(1);
+constexpr time_t kMaxCacheExpiredTimeout = kOneMinuteNanoseconds;
 
-static constexpr size_t kMaxInt32Width = 11;
-static constexpr size_t kMaxInt64Width = 20;
 
-/* This class is optimized for generate process log event
-   Constent set copies only value in SourceBuffer as all keys are predefined StringViews
- */
 class ProcessCacheValue {
 public:
-    ProcessCacheValue();
-    const StringView& operator[](const ebpf::DataElement& key) const;
-
     ProcessCacheValue* CloneContents();
 
-    void SetContentNoCopy(const ebpf::DataElement& key, const StringView& val);
-    void SetContent(const ebpf::DataElement& key, const StringView& val);
-    void SetContent(const ebpf::DataElement& key, const std::string& val);
-    void SetContent(const ebpf::DataElement& key, const char* data, size_t len);
-    void SetContent(const ebpf::DataElement& key, int32_t val);
-    void SetContent(const ebpf::DataElement& key, uint32_t val);
-    void SetContent(const ebpf::DataElement& key, int64_t val);
-    void SetContent(const ebpf::DataElement& key, uint64_t val);
-    void SetContent(const ebpf::DataElement& key, long long val);
-    void SetContent(const ebpf::DataElement& key, unsigned long long val);
+    template <const ebpf::DataElement& key>
+    const StringView& Get() const {
+        return mContents.Get<key>();
+    }
 
-    std::array<StringView, ebpf::kProcessCacheTableSize> mContents;
-    std::shared_ptr<SourceBuffer> mSourceBuffer;
+    template <const ebpf::DataElement& key>
+    void SetContentNoCopy(const StringView& val) {
+        mContents.SetNoCopy<key>(StringView(val.data(), val.size()));
+    }
+    template <const ebpf::DataElement& key>
+    void SetContent(const StringView& val) {
+        mContents.Set<key>(val);
+    }
+    template <const ebpf::DataElement& key>
+    void SetContent(const std::string& val) {
+        mContents.Set<key>(val);
+    }
+
+    template <const ebpf::DataElement& key>
+    void SetContent(const char* data, size_t len) {
+        mContents.Set<key>(data, len);
+    }
+
+    template <const ebpf::DataElement& key>
+    void SetContent(int32_t val) {
+        mContents.Set<key>(val);
+    }
+    template <const ebpf::DataElement& key>
+    void SetContent(uint32_t val) {
+        mContents.Set<key>(val);
+    }
+    template <const ebpf::DataElement& key>
+    void SetContent(int64_t val) {
+        mContents.Set<key>(val);
+    }
+    template <const ebpf::DataElement& key>
+    void SetContent(uint64_t val) {
+        mContents.Set<key>(val);
+    }
+
+    template <const ebpf::DataElement& key>
+    void SetContent(long long val) {
+        mContents.Set<key>(int64_t(val));
+    }
+
+    template <const ebpf::DataElement& key>
+    void SetContent(unsigned long long val) {
+        mContents.Set<key>(uint64_t(val));
+    }
+
+    std::shared_ptr<SourceBuffer> GetSourceBuffer() { return mContents.GetSourceBuffer(); }
+    int IncRef() { return ++mRefCount; }
+    int DecRef() { return --mRefCount; }
     uint32_t mPPid = 0;
     uint64_t mPKtime = 0;
+
+private:
+    ebpf::StaticDataRow<&ebpf::kProcessCacheTable> mContents;
     int mRefCount = 0;
 };
 

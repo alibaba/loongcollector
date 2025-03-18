@@ -14,15 +14,6 @@
 
 #pragma once
 
-#include <chrono>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
 #include "models/ArrayView.h"
 #include "models/StringView.h"
 
@@ -118,11 +109,6 @@ private:
     const StringView mDesc;
     const ArrayView<DataElement> mElements;
 };
-
-template <std::size_t N>
-constexpr std::size_t FindIndex(const DataElement (&elements)[N], const DataElement& target, std::size_t idx = 0) {
-    return idx == N ? N : (elements[idx] == target ? idx : FindIndex(elements, target, idx + 1));
-}
 
 } // namespace ebpf
 } // namespace logtail

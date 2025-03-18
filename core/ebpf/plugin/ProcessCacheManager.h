@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <ctime>
 
@@ -23,12 +24,10 @@
 #include <unordered_map>
 
 #include "common/ProcParser.h"
-#include "common/memory/SourceBuffer.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/type/CommonDataEvent.h"
-#include "ebpf/type/ProcessEvent.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "util/FrequencyManager.h"
@@ -41,8 +40,6 @@ public:
     static constexpr size_t kInitDataMapSize = 1024UL;
     static constexpr size_t kMaxCacheSize = 4194304UL;
     static constexpr size_t kMaxDataMapSize = kInitDataMapSize * 4;
-    static constexpr int kMaxBatchConsumeSize = 1024;
-    static constexpr int kMaxWaitTimeMS = 200;
     ProcessCacheManager() = delete;
     ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                         const std::string& hostName,
@@ -54,13 +51,11 @@ public:
                         IntGaugePtr cacheSize);
     ~ProcessCacheManager() = default;
 
+    bool Init();
+    void Stop();
+
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);
-
-    std::vector<std::shared_ptr<Proc>> ListRunningProcs();
-    int WriteProcToBPFMap(const std::shared_ptr<Proc>& proc);
-    int SyncAllProc();
-    void PushExecveEvent(const Proc& proc);
 
     void RecordExecveEvent(msg_execve_event* eventPtr);
     void RecordExitEvent(msg_exit* eventPtr);
@@ -72,14 +67,15 @@ public:
 
     bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
 
-    bool Init();
-    void Stop();
-
 private:
-    std::shared_ptr<ProcessCacheValue> procToProcessCacheValue(const Proc& proc);
+    int syncAllProc();
+    std::vector<std::shared_ptr<Proc>> listRunningProcs();
+    int writeProcToBPFMap(const std::shared_ptr<Proc>& proc);
+    void pushProcEvent(const Proc& proc);
 
     void pollPerfBuffers();
 
+    std::shared_ptr<ProcessCacheValue> procToProcessCacheValue(const Proc& proc);
     std::shared_ptr<ProcessCacheValue> msgExecveEventToProcessCacheValue(const msg_execve_event& event);
     bool fillProcessDataFields(const msg_execve_event& event, ProcessCacheValue& cacheValue);
     std::shared_ptr<ProcessCacheValue> msgCloneEventToProcessCacheValue(const msg_clone_event& event);
@@ -117,7 +113,6 @@ private:
     FrequencyManager mFrequencyMgr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ManagerUnittest;
     friend class ProcessCacheManagerUnittest;
 #endif
 };

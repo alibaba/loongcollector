@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+
 #include "StringView.h"
 #include "common/StringTools.h"
 #include "unittest/Unittest.h"
@@ -393,6 +395,20 @@ TEST_F(StringToolsUnittest, TestStringViewSplitterMultiEmptyEmpty) {
         ++i;
     }
     APSARA_TEST_EQUAL(2, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringTo) {
+    int i = 0;
+    APSARA_TEST_TRUE(StringTo(std::string("666"), i));
+    APSARA_TEST_EQUAL(666, i);
+    long j = 0;
+    APSARA_TEST_TRUE(StringTo(std::string("-666666"), j));
+    APSARA_TEST_EQUAL(-666666, j);
+    uint32_t l = 0;
+    APSARA_TEST_TRUE(StringTo(std::string_view("777"), l));
+    APSARA_TEST_EQUAL(777U, l);
+    uint64_t k = 0;
+    APSARA_TEST_FALSE(StringTo(std::string_view("-888"), k));
 }
 
 UNIT_TEST_MAIN

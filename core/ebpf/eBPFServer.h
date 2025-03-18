@@ -60,6 +60,8 @@ public:
     eBPFServer(const eBPFServer&) = delete;
     eBPFServer& operator=(const eBPFServer&) = delete;
 
+    ~eBPFServer() = default;
+
     void Init() override;
 
     static eBPFServer* GetInstance() {
@@ -106,7 +108,6 @@ private:
                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                              PluginMetricManagerPtr mgr);
     eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
-    ~eBPFServer() = default;
 
     void
     UpdateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);

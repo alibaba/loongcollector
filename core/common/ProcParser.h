@@ -17,10 +17,7 @@
 #include <cstdint>
 
 #include <filesystem>
-#include <istream>
-#include <map>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -28,47 +25,6 @@ namespace logtail {
 
 // TODO use definations in bpf_process_event_type.h
 #define DOCKER_ID_LENGTH 128
-
-enum class ApiEventFlag : uint32_t {
-    Unknown = 0x00,
-    Execve = 0x01,
-    ExecveAt = 0x02,
-    ProcFS = 0x04,
-    TruncFilename = 0x08,
-    TruncArgs = 0x10,
-    TaskWalk = 0x20,
-    Miss = 0x40,
-    NeedsAUID = 0x80,
-    ErrorFilename = 0x100,
-    ErrorArgs = 0x200,
-    NeedsCWD = 0x400,
-    NoCWDSupport = 0x800,
-    RootCWD = 0x1000,
-    ErrorCWD = 0x2000,
-    Clone = 0x4000,
-    ErrorCgroupName = 0x010000,
-    ErrorCgroupKn = 0x020000,
-    ErrorCgroupSubsysCgrp = 0x040000,
-    ErrorCgroupSubsys = 0x080000,
-    ErrorCgroups = 0x100000,
-    ErrorCgroupId = 0x200000,
-    ErrorPathComponents = 0x400000,
-    DataFilename = 0x800000,
-    DataArgs = 0x1000000
-};
-
-inline ApiEventFlag operator|(ApiEventFlag lhs, ApiEventFlag rhs) {
-    return static_cast<ApiEventFlag>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
-}
-
-inline ApiEventFlag& operator|=(ApiEventFlag& lhs, ApiEventFlag rhs) {
-    lhs = lhs | rhs;
-    return lhs;
-}
-
-inline bool operator&(ApiEventFlag lhs, ApiEventFlag rhs) {
-    return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
-}
 
 struct Proc {
 public:

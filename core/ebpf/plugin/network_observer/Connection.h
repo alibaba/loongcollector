@@ -24,7 +24,6 @@
 #include "ebpf/plugin/network_observer/Type.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/type/table/AppTable.h"
-#include "ebpf/type/table/NetTable.h"
 #include "ebpf/type/table/StaticDataRow.h"
 #include "metadata/ContainerInfo.h"
 

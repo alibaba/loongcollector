@@ -36,15 +36,6 @@
 
 namespace logtail {
 namespace ebpf {
-
-class eBPFServer;
-
-const std::string ProcessSecurityManager::kExitTidKey = "exit_tid";
-const std::string ProcessSecurityManager::kExitCodeKey = "exit_code";
-const std::string ProcessSecurityManager::kExecveValue = "value";
-const std::string ProcessSecurityManager::kCloneValue = "clone";
-const std::string ProcessSecurityManager::kExitValue = "exit";
-
 ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -55,105 +46,9 @@ ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManag
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
+          [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) {
               return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
           }) {
-}
-
-bool ProcessSecurityManager::ConsumeAggregateTree(
-    [[maybe_unused]] const std::chrono::steady_clock::time_point& execTime) {
-    if (!mFlag || mSuspendFlag) {
-        return false;
-    }
-
-    WriteLock lk(mLock);
-    SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
-    lk.unlock();
-
-    // read aggregator
-    auto nodes = aggTree.GetNodesWithAggDepth(1);
-    LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
-    if (nodes.empty()) {
-        LOG_DEBUG(sLogger, ("empty nodes...", ""));
-        return true;
-    }
-
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup sharedEventGroup(sourceBuffer);
-    PipelineEventGroup eventGroup(sourceBuffer);
-    for (auto& node : nodes) {
-        LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
-        // convert to a item and push to process queue
-        aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
-            // represent a process ...
-            auto processCacheMgr = GetProcessCacheManager();
-            if (processCacheMgr == nullptr) {
-                LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
-                return;
-            }
-            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
-            if (!hit) {
-                LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
-                return;
-            }
-            for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
-                for (const auto& it : *sharedEvent) {
-                    logEvent->SetContentNoCopy(it.first, it.second);
-                }
-                auto ts = innerEvent->mTimestamp + this->mTimeDiff.count();
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                logEvent->SetTimestamp(seconds.count(), ts);
-                switch (innerEvent->mEventType) {
-                    case KernelEventType::PROCESS_EXECVE_EVENT: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(),
-                                                   StringView(ProcessSecurityManager::kExecveValue));
-                        // ? kprobe or execve
-                        logEvent->SetContentNoCopy(kEventType.LogKey(),
-                                                   StringView(ProcessSecurityManager::sKprobeValue));
-                        break;
-                    }
-                    case KernelEventType::PROCESS_EXIT_EVENT: {
-                        CommonEvent* ce = innerEvent.get();
-                        auto* exitEvent = static_cast<ProcessExitEvent*>(ce);
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kExitValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
-                        logEvent->SetContent(ProcessSecurityManager::kExitCodeKey,
-                                             std::to_string(exitEvent->mExitCode));
-                        logEvent->SetContent(ProcessSecurityManager::kExitTidKey, std::to_string(exitEvent->mExitTid));
-                        break;
-                    }
-                    case KernelEventType::PROCESS_CLONE_EVENT: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kCloneValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(),
-                                                   StringView(ProcessSecurityManager::sKprobeValue));
-                        break;
-                    }
-                    default:
-                        break;
-                }
-            }
-        });
-    }
-    {
-        std::lock_guard lk(mContextMutex);
-        if (this->mPipelineCtx == nullptr) {
-            return true;
-        }
-        LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
-        ADD_COUNTER(mPushLogGroupTotal, 1);
-        std::unique_ptr<ProcessQueueItem> item
-            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger,
-                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                            "[ProcessSecurityEvent] push queue failed!", ""));
-        }
-    }
-
-    return true;
 }
 
 int ProcessSecurityManager::Init(
@@ -177,7 +72,7 @@ int ProcessSecurityManager::Init(
     std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
         2,
         [managerPtr](const std::chrono::steady_clock::time_point& execTime) { // handler
-            ProcessSecurityManager* mgr = static_cast<ProcessSecurityManager*>(managerPtr.get());
+            auto* mgr = static_cast<ProcessSecurityManager*>(managerPtr.get());
             return mgr->ConsumeAggregateTree(execTime);
         },
         [managerPtr]() { // stop checker
@@ -243,5 +138,109 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     return 0;
 }
 
+StringBuffer ToStringBuffer(std::shared_ptr<SourceBuffer> sourceBuffer, int32_t val) {
+    auto buf = sourceBuffer->AllocateStringBuffer(kMaxInt32Width);
+    auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
+    *end.out = '\0';
+    buf.size = end.size;
+    return buf;
+}
+
+bool ProcessSecurityManager::ConsumeAggregateTree(
+    [[maybe_unused]] const std::chrono::steady_clock::time_point& execTime) {
+    if (!mFlag || mSuspendFlag) {
+        return false;
+    }
+
+    WriteLock lk(mLock);
+    SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
+    lk.unlock();
+
+    // read aggregator
+    auto nodes = aggTree.GetNodesWithAggDepth(1);
+    LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
+    if (nodes.empty()) {
+        LOG_DEBUG(sLogger, ("empty nodes...", ""));
+        return true;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup sharedEventGroup(sourceBuffer);
+    PipelineEventGroup eventGroup(sourceBuffer);
+    for (auto& node : nodes) {
+        LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
+        // convert to a item and push to process queue
+        aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
+            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            // represent a process ...
+            auto processCacheMgr = GetProcessCacheManager();
+            if (processCacheMgr == nullptr) {
+                LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
+                return;
+            }
+            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            if (!hit) {
+                LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
+                return;
+            }
+            for (const auto& innerEvent : group->mInnerEvents) {
+                auto* logEvent = eventGroup.AddLogEvent();
+                for (const auto& it : *sharedEvent) {
+                    logEvent->SetContentNoCopy(it.first, it.second);
+                }
+                auto ts = std::chrono::nanoseconds(innerEvent->mTimestamp + this->mTimeDiff.count());
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
+                auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
+                logEvent->SetTimestamp(seconds.count(), nanoseconds.count());
+                switch (innerEvent->mEventType) {
+                    case KernelEventType::PROCESS_EXECVE_EVENT: {
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), ProcessSecurityManager::kExecveValue);
+                        // ? kprobe or execve
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::sKprobeValue);
+                        break;
+                    }
+                    case KernelEventType::PROCESS_EXIT_EVENT: {
+                        CommonEvent* ce = innerEvent.get();
+                        auto* exitEvent = static_cast<ProcessExitEvent*>(ce);
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kExitValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        auto exitCode = ToStringBuffer(eventGroup.GetSourceBuffer(), exitEvent->mExitCode);
+                        auto exitTid = ToStringBuffer(eventGroup.GetSourceBuffer(), exitEvent->mExitTid);
+                        logEvent->SetContentNoCopy(ProcessSecurityManager::kExitCodeKey,
+                                                   StringView(exitCode.data, exitCode.size));
+                        logEvent->SetContentNoCopy(ProcessSecurityManager::kExitTidKey,
+                                                   StringView(exitTid.data, exitTid.size));
+                        break;
+                    }
+                    case KernelEventType::PROCESS_CLONE_EVENT: {
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), ProcessSecurityManager::kCloneValue);
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::sKprobeValue);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        });
+    }
+    {
+        std::lock_guard lk(mContextMutex);
+        if (this->mPipelineCtx == nullptr) {
+            return true;
+        }
+        LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
+        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        ADD_COUNTER(mPushLogGroupTotal, 1);
+        std::unique_ptr<ProcessQueueItem> item
+            = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[ProcessSecurityEvent] push queue failed!", ""));
+        }
+    }
+
+    return true;
+}
 } // namespace ebpf
 } // namespace logtail

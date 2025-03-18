@@ -15,12 +15,14 @@
  */
 
 #pragma once
+
 #include <algorithm>
-#include <iostream>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <boost/lexical_cast.hpp>
 #pragma GCC diagnostic pop
+#include <charconv>
+
 #include <boost/regex.hpp>
 #include <string>
 #include <vector>
@@ -267,5 +269,23 @@ private:
     StringView mDelimiter;
 };
 
+template <class T>
+bool StringTo(const char* first, const char* last, T& val, int base = 10) {
+    auto convresult = std::from_chars(first, last, val, base);
+    if (convresult.ec != std::errc() || convresult.ptr != last) {
+        return false;
+    }
+    return true;
+}
+
+template <class T>
+bool StringTo(const std::string& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+template <class T>
+bool StringTo(const std::string_view& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
 
 } // namespace logtail
