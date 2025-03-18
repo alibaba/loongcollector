@@ -25,8 +25,8 @@
 #include <string>
 #include <vector>
 
-#include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/plugin/instance/FlusherInstance.h"
+#include "collection_pipeline/plugin/interface/Flusher.h"
 
 namespace logtail {
 
