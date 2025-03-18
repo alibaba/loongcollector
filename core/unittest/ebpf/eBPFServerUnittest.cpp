@@ -34,8 +34,8 @@ namespace logtail {
 namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
 public:
-    eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
-    ~eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Stop(); }
+    eBPFServerUnittest() {}
+    ~eBPFServerUnittest() {}
 
     // for start and stop single
     void TestNetworkObserver();
@@ -96,9 +96,14 @@ protected:
         mConfig->mProfileProbeConfig.mProfileSampleRate = 10;
         mConfig->mProfileProbeConfig.mProfileUploadDuration = 10;
         mConfig->mProcessProbeConfig.mEnableOOMDetect = false;
+        ebpf::eBPFServer::GetInstance()->Init();
     }
 
-    void TearDown() override { mConfig.reset(); }
+    void TearDown() override {
+        mConfig.reset();
+        eBPFServer::GetInstance()->Stop();
+        Timer::GetInstance()->Stop();
+    }
 
     std::shared_ptr<eBPFAdminConfig> mConfig;
     //     CollectionPipeline p;
