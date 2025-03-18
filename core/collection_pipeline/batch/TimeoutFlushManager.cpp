@@ -31,17 +31,9 @@ void TimeoutFlushManager::UpdateRecord(
 }
 
 void TimeoutFlushManager::FlushTimeoutBatch() {
-    set<string> deletedConfigs;
-    {
-        lock_guard<mutex> lock(mDeletedConfigsMux);
-        deletedConfigs.swap(mDeletedConfigs);
-    }
     multimap<string, pair<Flusher*, size_t>> records;
     {
         lock_guard<mutex> lock(mTimeoutRecordsMux);
-        for (const auto& config : deletedConfigs) {
-            mTimeoutRecords.erase(config);
-        }
         for (auto& item : mTimeoutRecords) {
             for (auto it = item.second.begin(); it != item.second.end();) {
                 if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
@@ -55,10 +47,14 @@ void TimeoutFlushManager::FlushTimeoutBatch() {
             }
         }
     }
-    for (auto& item : records) {
-        if (deletedConfigs.find(item.first) == deletedConfigs.end()) {
-            item.second.first->Flush(item.second.second);
+    {
+        lock_guard<mutex> lock(mDeletedConfigsMux);
+        for (auto& item : records) {
+            if (mDeletedConfigs.find(item.first) == mDeletedConfigs.end()) {
+                item.second.first->Flush(item.second.second);
+            }
         }
+        mDeletedConfigs.clear();
     }
 }
 
