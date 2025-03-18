@@ -30,6 +30,7 @@
 #include "common/Flags.h"
 #include "common/timer/Timer.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
@@ -40,6 +41,8 @@ namespace logtail {
 
 HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<ProcessEntityCollector>();
+    RegisterCollector<CPUCollector>();
+
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
     if (INT32_FLAG(host_monitor_thread_pool_size) > 0) {
@@ -73,7 +76,18 @@ void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& new
     }
 }
 
-void HostMonitorInputRunner::RemoveCollector() {
+void HostMonitorInputRunner::RemoveCollector(const std::vector<std::string>& collectorNames) {
+    std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
+    for (const auto& name : collectorNames) {
+        auto iter = mRegisteredCollectorMap.find(name);
+        if (iter == mRegisteredCollectorMap.end()) {
+            continue;
+        }
+        iter->second.Disable();
+    }
+}
+
+void HostMonitorInputRunner::RemoveAllCollector() {
     std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMapMutex);
     for (auto& collector : mRegisteredCollectorMap) {
         collector.second.Disable();
@@ -95,7 +109,7 @@ void HostMonitorInputRunner::Stop() {
     if (!mIsStarted.exchange(false)) {
         return;
     }
-    RemoveCollector();
+    RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
     std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
     if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {

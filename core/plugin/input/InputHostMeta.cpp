@@ -14,6 +14,8 @@
 
 #include "plugin/input/InputHostMeta.h"
 
+#include <cstdint>
+
 #include "json/value.h"
 
 #include "common/ParamExtractor.h"
@@ -26,18 +28,21 @@ namespace logtail {
 
 const std::string InputHostMeta::sName = "input_host_meta";
 const uint32_t kMinInterval = 5; // seconds
+const uint32_t kDefaultInterval = 15; // seconds
 
 bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
+    mInterval = kDefaultInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
     }
     if (mInterval < kMinInterval) {
         LOG_WARNING(sLogger,
@@ -56,7 +61,7 @@ bool InputHostMeta::Start() {
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector();
+    HostMonitorInputRunner::GetInstance()->RemoveCollector({ProcessEntityCollector::sName});
     return true;
 }
 
