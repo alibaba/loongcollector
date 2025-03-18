@@ -65,7 +65,7 @@ void TimeoutFlushManager::UnregisterFlushers(const string& config, const vector<
     }
 }
 
-void TimeoutFlushManager::RegisterFlushers(const std::string& config, const vector<unique_ptr<FlusherInstance>>& flushers) {
+void TimeoutFlushManager::RegisterFlushers(const string& config, const vector<unique_ptr<FlusherInstance>>& flushers) {
     lock_guard<mutex> lock(mDeletedFlushersMux);
     for (const auto& flusher : flushers) {
         mDeletedFlushers.erase(make_pair(config, flusher->GetPlugin()));
