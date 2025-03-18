@@ -79,13 +79,14 @@ void TimeoutFlushManagerUnittest::TestFlushTimeoutBatch() {
 
 void TimeoutFlushManagerUnittest::TestClearRecords() {
     TimeoutFlushManager::GetInstance()->UpdateRecord("test_config", 0, 1, 3, sFlusher.get());
-    TimeoutFlushManager::GetInstance()->ClearRecords("test_config");
+    TimeoutFlushManager::GetInstance()->ClearRecords(
+        "test_config", vector<const Flusher*>{const_cast<const Flusher*>(static_cast<Flusher*>(sFlusher.get()))});
 
-    APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mDeletedConfigs.size());
+    APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mDeletedFlushers.size());
     APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
 
     TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
-    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mDeletedConfigs.empty());
+    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mDeletedFlushers.empty());
     APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mTimeoutRecords.empty());
 }
 

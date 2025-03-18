@@ -53,7 +53,7 @@ public:
 
     void UpdateRecord(const std::string& config, size_t index, size_t key, uint32_t timeoutSecs, Flusher* f);
     void FlushTimeoutBatch();
-    void ClearRecords(const std::string& config);
+    void ClearRecords(const std::string& config, const std::vector<const Flusher*>& flushers);
 
 private:
     TimeoutFlushManager() = default;
@@ -64,8 +64,8 @@ private:
     std::map<std::string, std::map<std::pair<size_t, size_t>, TimeoutRecord>> mTimeoutRecords;
 
     // visited by main thread and num 0 processor runner thread
-    mutable std::mutex mDeletedConfigsMux;
-    std::set<std::string> mDeletedConfigs;
+    mutable std::mutex mDeletedFlushersMux;
+    std::set<std::pair<std::string, const Flusher*>> mDeletedFlushers;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineUnittest;

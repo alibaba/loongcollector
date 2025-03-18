@@ -48,19 +48,21 @@ void TimeoutFlushManager::FlushTimeoutBatch() {
         }
     }
     {
-        lock_guard<mutex> lock(mDeletedConfigsMux);
+        lock_guard<mutex> lock(mDeletedFlushersMux);
         for (auto& item : records) {
-            if (mDeletedConfigs.find(item.first) == mDeletedConfigs.end()) {
+            if (mDeletedFlushers.find(make_pair(item.first, item.second.first)) == mDeletedFlushers.end()) {
                 item.second.first->Flush(item.second.second);
             }
         }
-        mDeletedConfigs.clear();
+        mDeletedFlushers.clear();
     }
 }
 
-void TimeoutFlushManager::ClearRecords(const string& config) {
-    lock_guard<mutex> lock(mDeletedConfigsMux);
-    mDeletedConfigs.insert(config);
+void TimeoutFlushManager::ClearRecords(const string& config, const vector<const Flusher*>& flushers) {
+    lock_guard<mutex> lock(mDeletedFlushersMux);
+    for (const auto& flusher : flushers) {
+        mDeletedFlushers.emplace(make_pair(config, flusher));
+    }
 }
 
 } // namespace logtail

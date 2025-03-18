@@ -439,7 +439,11 @@ bool CollectionPipeline::FlushBatch() {
     for (auto& flusher : mFlushers) {
         allSucceeded = flusher->FlushAll() && allSucceeded;
     }
-    TimeoutFlushManager::GetInstance()->ClearRecords(mName);
+    vector<const Flusher*> flushers;
+    for (const auto& flusher : mFlushers) {
+        flushers.push_back(flusher->GetPlugin());
+    }
+    TimeoutFlushManager::GetInstance()->ClearRecords(mName, flushers);
     return allSucceeded;
 }
 
