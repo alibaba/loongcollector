@@ -58,10 +58,17 @@ void TimeoutFlushManager::FlushTimeoutBatch() {
     }
 }
 
-void TimeoutFlushManager::ClearRecords(const string& config, const vector<const Flusher*>& flushers) {
+void TimeoutFlushManager::UnregisterFlushers(const string& config, const vector<unique_ptr<FlusherInstance>>& flushers) {
     lock_guard<mutex> lock(mDeletedFlushersMux);
     for (const auto& flusher : flushers) {
-        mDeletedFlushers.emplace(make_pair(config, flusher));
+        mDeletedFlushers.emplace(make_pair(config, flusher->GetPlugin()));
+    }
+}
+
+void TimeoutFlushManager::RegisterFlushers(const std::string& config, const vector<unique_ptr<FlusherInstance>>& flushers) {
+    lock_guard<mutex> lock(mDeletedFlushersMux);
+    for (const auto& flusher : flushers) {
+        mDeletedFlushers.erase(make_pair(config, flusher->GetPlugin()));
     }
 }
 

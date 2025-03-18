@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
+#include "collection_pipeline/plugin/instance/FlusherInstance.h"
 
 namespace logtail {
 
@@ -53,7 +54,8 @@ public:
 
     void UpdateRecord(const std::string& config, size_t index, size_t key, uint32_t timeoutSecs, Flusher* f);
     void FlushTimeoutBatch();
-    void ClearRecords(const std::string& config, const std::vector<const Flusher*>& flushers);
+    void UnregisterFlushers(const std::string& config, const std::vector<std::unique_ptr<FlusherInstance>>& flushers);
+    void RegisterFlushers(const std::string& config, const std::vector<std::unique_ptr<FlusherInstance>>& flushers);
 
 private:
     TimeoutFlushManager() = default;
