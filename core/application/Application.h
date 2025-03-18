@@ -73,6 +73,10 @@ private:
     JThread mUUIDThread;
     SpinLock mUUIDLock;
     std::string mUUID;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PollingPreservedDirDepthUnittest;
+#endif
 };
 
 } // namespace logtail

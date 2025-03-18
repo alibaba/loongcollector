@@ -17,6 +17,8 @@
 #include <sstream>
 #if defined(__linux__)
 #include <uuid/uuid.h>
+#elif defined(_MSC_VER)
+#include "UUIDUtil.h"
 #endif
 
 namespace logtail {
