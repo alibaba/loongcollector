@@ -20,6 +20,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
+#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
 #include "plugin/input/InputFileSecurity.h"
@@ -47,7 +48,10 @@ protected:
         ebpf::eBPFServer::GetInstance()->Init();
     }
 
-    void TearDown() override { ebpf::eBPFServer::GetInstance()->Stop(); }
+    void TearDown() override {
+        ebpf::eBPFServer::GetInstance()->Stop();
+        Timer::GetInstance()->Stop();
+    }
 
 private:
     CollectionPipeline p;
