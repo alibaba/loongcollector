@@ -39,7 +39,7 @@ void TimeoutFlushManager::FlushTimeoutBatch() {
     multimap<string, pair<Flusher*, size_t>> records;
     {
         lock_guard<mutex> lock(mTimeoutRecordsMux);
-        for (const auto& config: deletedConfigs) {
+        for (const auto& config : deletedConfigs) {
             mTimeoutRecords.erase(config);
         }
         for (auto& item : mTimeoutRecords) {
