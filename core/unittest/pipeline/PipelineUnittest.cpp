@@ -2917,7 +2917,7 @@ void PipelineUnittest::TestFlushBatch() const {
         TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 0, 1, 3, nullptr);
         TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 1, 1, 3, nullptr);
         APSARA_TEST_TRUE(pipeline.FlushBatch());
-        APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
+        APSARA_TEST_EQUAL(0U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
         APSARA_TEST_EQUAL(2U, TimeoutFlushManager::GetInstance()->mDeletedFlushers.size());
         TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
     }
@@ -2927,7 +2927,7 @@ void PipelineUnittest::TestFlushBatch() const {
         TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 0, 1, 3, nullptr);
         TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 1, 1, 3, nullptr);
         APSARA_TEST_FALSE(pipeline.FlushBatch());
-        APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
+        APSARA_TEST_EQUAL(0U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
         APSARA_TEST_EQUAL(2U, TimeoutFlushManager::GetInstance()->mDeletedFlushers.size());
         TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
     }
