@@ -1,6 +1,8 @@
 
 #include "prometheus/schedulers/ScrapeConfig.h"
 
+#include <chrono>
+#include <mutex>
 #include <string>
 
 #include "json/value.h"
@@ -232,6 +234,14 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     auto token = username + ":" + password;
     auto token64 = Base64Enconde(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
+
+    {
+        lock_guard<mutex> lock(mAuthMutex);
+        mAuthType = prometheus::BASIC_PREFIX;
+        mBasicNamePath = usernameFile;
+        mBasicPasswordPath = passwordFile;
+    }
+
     return true;
 }
 
@@ -261,11 +271,62 @@ bool ScrapeConfig::InitAuthorization(const Json::Value& authorization) {
     }
 
     if (!credentialsFile.empty() && !ReadFile(credentialsFile, credentials)) {
-        LOG_ERROR(sLogger, ("authorization read file error", ""));
+        LOG_ERROR(sLogger, ("authorization read file error", mBearerTokenPath));
         return false;
     }
 
+    {
+        lock_guard<mutex> lock(mAuthMutex);
+        mAuthType = type;
+        mBearerTokenPath = credentialsFile;
+    }
+
     mRequestHeaders[prometheus::A_UTHORIZATION] = type + " " + credentials;
+    return true;
+}
+
+// the return value is true if the authorization is updated
+bool ScrapeConfig::UpdateAuthorization() {
+    lock_guard<mutex> lock(mAuthMutex);
+    auto currTime = chrono::system_clock::now();
+    if (mAuthType.empty() || chrono::duration_cast<chrono::minutes>(currTime - mLastUpdateTime).count() < 5) {
+        return false;
+    }
+    mLastUpdateTime = currTime;
+    LOG_INFO(sLogger, (mJobName, "starte update authorization"));
+
+    string credentials;
+    if (mAuthType == prometheus::BASIC_PREFIX) {
+        if (mBasicNamePath.empty() || mBasicPasswordPath.empty()) {
+            return false;
+        }
+        string username;
+        string password;
+        if (!ReadFile(mBasicNamePath, username)) {
+            LOG_ERROR(sLogger, ("read username_file failed, username_file", mBasicNamePath));
+            return false;
+        }
+
+        if (!ReadFile(mBasicPasswordPath, password)) {
+            LOG_ERROR(sLogger, ("read password_file failed, password_file", mBasicPasswordPath));
+            return false;
+        }
+        credentials = prometheus::BASIC_PREFIX + Base64Enconde(username + ":" + password);
+    } else {
+        if (mBearerTokenPath.empty()) {
+            return false;
+        }
+        if (!ReadFile(mBearerTokenPath, credentials)) {
+            LOG_ERROR(sLogger, ("authorization read file error", mBearerTokenPath));
+            return false;
+        }
+        credentials = mAuthType + " " + credentials;
+    }
+    if (credentials.empty() || credentials == mRequestHeaders[prometheus::A_UTHORIZATION]) {
+        return false;
+    }
+    mRequestHeaders[prometheus::A_UTHORIZATION] = credentials;
+    LOG_INFO(sLogger, (mJobName, "authorization updated"));
     return true;
 }
 

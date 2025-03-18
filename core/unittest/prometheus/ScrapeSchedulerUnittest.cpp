@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+#include <unistd.h>
+
+#include <chrono>
 #include <memory>
 #include <string>
 
-#include "common/StringTools.h"
+#include "FileSystemUtil.h"
 #include "common/http/Curl.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
@@ -41,11 +44,13 @@ public:
     void TestReceiveMessage();
 
     void TestScheduler();
+    void TestTokenUpdate();
     void TestQueueIsFull();
     void TestExactlyScrape();
 
 protected:
     void SetUp() override {
+        OverwriteFile(mFilePath, mKey);
         mScrapeConfig = make_shared<ScrapeConfig>();
         mScrapeConfig->mJobName = "test_job";
         mScrapeConfig->mScheme = "http";
@@ -53,12 +58,20 @@ protected:
         mScrapeConfig->mScrapeTimeoutSeconds = 10;
         mScrapeConfig->mMetricsPath = "/metrics";
         mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
+        mScrapeConfig->mAuthType = "Bearer";
+        mScrapeConfig->mBearerTokenPath = "test_password.file";
     }
 
-    void TearDown() override { Timer::GetInstance()->Clear(); }
+    void TearDown() override {
+        Timer::GetInstance()->Clear();
+        remove(mFilePath.c_str());
+    }
 
 private:
     std::shared_ptr<ScrapeConfig> mScrapeConfig;
+
+    string mFilePath = "prom_password.file";
+    string mKey = "test_password.file";
 };
 
 void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
@@ -240,6 +253,46 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     APSARA_TEST_TRUE(event.mFuture->mState == PromFutureState::Done);
 }
 
+void ScrapeSchedulerUnittest::TestTokenUpdate() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    PromTargetInfo targetInfo;
+    targetInfo.mLabels = labels;
+    targetInfo.mHash = "test_hash";
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
+    EventPool eventPool{true};
+    event.SetComponent(&eventPool);
+    event.SetFirstExecTime(chrono::steady_clock::now(), chrono::system_clock::now());
+    event.ScheduleNext();
+
+    auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    httpResponse.SetStatusCode(401);
+    httpResponse.SetNetworkStatus(NetworkCode::Other, "");
+
+    // success update
+    event.mFuture->Process(httpResponse, 0);
+    auto curTime = chrono::system_clock::now();
+    APSARA_TEST_TRUE(chrono::duration_cast<chrono::seconds>(curTime - mScrapeConfig->mLastUpdateTime)
+                     <= chrono::seconds(1));
+
+    // fail update, no change
+    curTime = mScrapeConfig->mLastUpdateTime;
+    this_thread::sleep_for(chrono::milliseconds(10));
+    event.mFuture->Process(httpResponse, 0);
+    APSARA_TEST_EQUAL(curTime, mScrapeConfig->mLastUpdateTime);
+
+    // success update
+    mScrapeConfig->mLastUpdateTime = curTime - chrono::minutes(6);
+    curTime = chrono::system_clock::now();
+    this_thread::sleep_for(chrono::milliseconds(10));
+    event.mFuture->Process(httpResponse, 0);
+    APSARA_TEST_TRUE(chrono::duration_cast<chrono::seconds>(curTime - mScrapeConfig->mLastUpdateTime)
+                     <= chrono::seconds(1));
+}
+
 void ScrapeSchedulerUnittest::TestQueueIsFull() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
@@ -305,6 +358,7 @@ UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestStreamMetricWriteCallback)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestExactlyScrape)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestTokenUpdate)
 
 
 } // namespace logtail
