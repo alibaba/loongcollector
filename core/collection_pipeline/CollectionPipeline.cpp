@@ -32,6 +32,7 @@
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
+#include "config/OnetimeConfigManager.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
@@ -78,6 +79,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mSingletonInput = config.mSingletonInput;
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
+    mContext.SetIsFromCheckpoint(config.mIsFromCheckpoint);
     mContext.SetPipeline(*this);
     mContext.SetIsFirstProcessorJsonFlag(config.mIsFirstProcessorJson);
     mContext.SetHasNativeProcessorsFlag(config.mHasNativeProcessor);
@@ -102,8 +104,8 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     for (size_t i = 0; i < config.mInputs.size(); ++i) {
         const Json::Value& detail = *config.mInputs[i];
         string pluginType = detail["Type"].asString();
-        unique_ptr<InputInstance> input
-            = PluginRegistry::GetInstance()->CreateInput(pluginType, GenNextPluginMeta(false));
+        unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(
+            pluginType, config.mExpireTime.has_value(), GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
@@ -339,6 +341,11 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
+    if (config.mExpireTime.has_value()) {
+        OnetimeConfigManager::GetInstance()->UpdateConfig(
+            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
+    }
+
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
                                                          MetricCategory::METRIC_CATEGORY_PIPELINE,
                                                          {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
@@ -467,6 +474,13 @@ void CollectionPipeline::Stop(bool isRemoving) {
     for (const auto& flusher : mFlushers) {
         flusher->Stop(isRemoving);
     }
+
+    // only valid for onetime config
+    // for update, the old expire has been replaced by the new one on init, should not remove here
+    if (isRemoving) {
+        OnetimeConfigManager::GetInstance()->RemoveConfig(mName);
+    }
+
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
 }
 

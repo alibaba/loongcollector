@@ -55,7 +55,6 @@ std::string GetAgentGoLogConfDir();
 std::string GetAgentPrometheusAuthorizationPath();
 std::string GetAgentConfigFile();
 std::string GetAgentAppInfoFile();
-std::string GetAdhocCheckpointDirPath();
 std::string GetCheckPointFileName();
 std::string GetCrashStackFileName();
 std::string GetLocalEventDataFileName();
@@ -545,6 +544,7 @@ public:
     friend class FlusherRunnerUnittest;
     friend class PipelineUpdateUnittest;
     friend class ProcessorTagNativeUnittest;
+    friend class InputStaticFileUnittest;
 #endif
 };
 
