@@ -84,6 +84,19 @@ void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
     processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
     APSARA_TEST_TRUE(processor->mDiscardingNonUTF8);
+
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "DiscardingNonUTF8": "true"
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_TRUE(processor->Init(configJson));
+    APSARA_TEST_FALSE(processor->mDiscardingNonUTF8);
 }
 
 void ProcessorFilterNativeUnittest::OnFailedInit() {
@@ -92,6 +105,36 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     string configStr, errorMsg;
 
     // FilterKey + FilterRegex
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "FilterKey": true,
+            "FilterRegex": true
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_FALSE(processor->Init(configJson));
+
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "FilterKey": [
+                true
+            ],
+            "FilterRegex": [
+                "b"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_FALSE(processor->Init(configJson));
+
     configStr = R"(
         {
             "Type": "processor_filter_regex_native",
