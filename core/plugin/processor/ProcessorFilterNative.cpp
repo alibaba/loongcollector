@@ -122,50 +122,31 @@ bool ProcessorFilterNative::Init(const Json::Value& config) {
     if (mFilterMode == Mode::BYPASS_MODE) {
         const char* key = "ConditionExp";
         const Json::Value* itr = config.find(key, key + strlen(key));
-        if (itr == nullptr) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               "param ConditionExp is missing",
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
+        if (itr) {
+            if (!itr->isObject()) {
+                PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                   mContext->GetAlarm(),
+                                   "object param ConditionExp is not of type object",
+                                   sName,
+                                   mContext->GetConfigName(),
+                                   mContext->GetProjectName(),
+                                   mContext->GetLogstoreName(),
+                                   mContext->GetRegion());
+            }
+            BaseFilterNodePtr root = ParseExpressionFromJSON(*itr);
+            if (!root) {
+                PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                   mContext->GetAlarm(),
+                                   "object param ConditionExp is not valid",
+                                   sName,
+                                   mContext->GetConfigName(),
+                                   mContext->GetProjectName(),
+                                   mContext->GetLogstoreName(),
+                                   mContext->GetRegion());
+            }
+            mConditionExp.swap(root);
+            mFilterMode = Mode::EXPRESSION_MODE;
         }
-        if (!itr->isObject()) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               "object param ConditionExp is not of type object",
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
-        BaseFilterNodePtr root = ParseExpressionFromJSON(*itr);
-        if (!root) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               "object param ConditionExp is not valid",
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
-        mConditionExp.swap(root);
-        mFilterMode = Mode::EXPRESSION_MODE;
-    }
-
-    if (mFilterMode == Mode::BYPASS_MODE) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           "neither param Include nor param ConditionExp is valid",
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
     }
 
     // DiscardingNonUTF8
