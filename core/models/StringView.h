@@ -22,4 +22,6 @@ namespace logtail {
 // like string, in string_view, tailing \0 is not included in size
 using StringView = boost::string_view;
 
+inline constexpr StringView kEmptyStringView("");
+
 } // namespace logtail

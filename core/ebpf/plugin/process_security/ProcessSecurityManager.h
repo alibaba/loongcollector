@@ -30,7 +30,7 @@ class ProcessSecurityManager : public AbstractManager {
 public:
     inline static constexpr StringView kExitTidKey = "exit_tid";
     inline static constexpr StringView kExitCodeKey = "exit_code";
-    inline static constexpr StringView kExecveValue = "value";
+    inline static constexpr StringView kExecveValue = "execve";
     inline static constexpr StringView kCloneValue = "clone";
     inline static constexpr StringView kExitValue = "exit";
 

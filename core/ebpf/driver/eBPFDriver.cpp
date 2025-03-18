@@ -59,14 +59,9 @@ std::array<std::atomic_bool, size_t(logtail::ebpf::PluginType::MAX)> gPluginStat
 
 std::array<std::vector<std::string>, size_t(logtail::ebpf::PluginType::MAX)> gPluginCallNames;
 
-void UpdatePluginPbs(logtail::ebpf::PluginType type, std::vector<void*> pbs) {
+void UpdatePluginPerfBuffers(logtail::ebpf::PluginType type, std::vector<void*> pbs) {
     std::lock_guard lk(gPbMtx);
     gPluginPbs[int(type)] = pbs;
-}
-
-void CleanPluginPbs(logtail::ebpf::PluginType type) {
-    std::lock_guard lk(gPbMtx);
-    gPluginPbs[int(type)] = {};
 }
 
 std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> gWrapper = logtail::ebpf::BPFWrapper<security_bpf>::Create();
@@ -84,7 +79,7 @@ void set_networkobserver_config(int32_t opt, int32_t value) {
     SetCoolBpfConfig(opt, value);
 }
 
-int SetupPerfbuffers(logtail::ebpf::PluginConfig* arg) {
+int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
     std::vector<logtail::ebpf::PerfBufferSpec> specs;
     switch (arg->mPluginType) {
         case logtail::ebpf::PluginType::FILE_SECURITY: {
@@ -133,7 +128,7 @@ int SetupPerfbuffers(logtail::ebpf::PluginConfig* arg) {
             }
             pbs.push_back(pb);
         }
-        UpdatePluginPbs(arg->mPluginType, pbs);
+        UpdatePluginPerfBuffers(arg->mPluginType, pbs);
     }
     return 0;
 }
@@ -206,7 +201,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // setup pb
-            ret = SetupPerfbuffers(arg);
+            ret = SetupPerfBuffers(arg);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: setup perfbuffer fail ret:%d\n",
@@ -254,7 +249,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // setup pb
-            ret = SetupPerfbuffers(arg);
+            ret = SetupPerfBuffers(arg);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: setup perfbuffer fail ret:%d\n",
@@ -322,7 +317,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // setup pb
-            ret = SetupPerfbuffers(arg);
+            ret = SetupPerfBuffers(arg);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "process security: setup perfbuffer fail ret:%d\n",
@@ -503,9 +498,13 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
 }
 
 void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
-    std::lock_guard lk(gPbMtx);
-    // return;
-    auto pbs = gPluginPbs[static_cast<int>(pluginType)];
+    std::vector<void*> pbs;
+    {
+        std::lock_guard lk(gPbMtx);
+        // return;
+        pbs = gPluginPbs[static_cast<int>(pluginType)];
+        gPluginPbs[int(pluginType)] = {};
+    }
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
              "[BPFWrapper][stop_plugin] begin clean perfbuffer for pluginType: %d  \n",
              int(pluginType));
@@ -515,7 +514,6 @@ void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
             perf_buffer__free(perfbuffer);
         }
     }
-    CleanPluginPbs(pluginType);
 }
 
 int stop_plugin(logtail::ebpf::PluginType pluginType) {

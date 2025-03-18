@@ -584,8 +584,8 @@ bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, P
     static const StringView kENoMem = "enomem";
     thread_local std::string filename;
     thread_local std::string argsdata;
-    StringView args;
-    StringView cwd;
+    StringView args = kEmptyStringView;
+    StringView cwd = kEmptyStringView;
     // verifier size
     // SIZEOF_EVENT is the total size of all fixed fields, = offsetof(msg_process, args) = 56
     auto size = event.process.size - SIZEOF_EVENT; // remain size
@@ -662,8 +662,10 @@ bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, P
         }
         args = argsdata;
         // the remaining data is cwd
-        cwd = StringView(buffer + sizeof(data_event_desc), size - sizeof(data_event_desc));
-    } else {
+        if (size > sizeof(data_event_desc)) {
+            cwd = StringView(buffer + sizeof(data_event_desc), size - sizeof(data_event_desc));
+        }
+    } else if (size > 0) {
         bool hasCwd = false;
         if (((event.process.flags & EVENT_NO_CWD_SUPPORT) | (event.process.flags & EVENT_ERROR_CWD)
              | (event.process.flags & EVENT_ROOT_CWD))
@@ -671,7 +673,7 @@ bool ProcessCacheManager::fillProcessDataFields(const msg_execve_event& event, P
             hasCwd = true;
         }
         const char* nullPos = nullptr;
-        args = StringView(buffer, size - 1); // excluding tailing zero
+        args = StringView(buffer, size);
         if (hasCwd) {
             // find the last \0 to serapate args and cwd
             for (int i = size - 1; i >= 0; i--) {
