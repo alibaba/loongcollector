@@ -31,17 +31,17 @@ extern "C" {
 namespace logtail {
 namespace ebpf {
 
-const std::string EXTERNAL_STR = "external";
-const std::string LOCALHOST_STR = "localhost";
-const std::string HTTP_STR = "http";
-const std::string RPC_25_STR = "25";
-const std::string RPC_0_STR = "0";
-const std::string HTTP_CLIENT_STR = "http_client";
-const std::string UNKNOWN_STR = "unknown";
-const std::string IPV4_STR = "ipv4";
-const std::string IPV6_STR = "ipv6";
-const std::string ZERO_ADDR_STR = "0.0.0.0";
-const std::string LOOPBACK_STR = "127.0.0.1";
+static constexpr StringView EXTERNAL_STR = "external";
+static constexpr StringView LOCALHOST_STR = "localhost";
+static constexpr StringView HTTP_STR = "http";
+static constexpr StringView RPC_25_STR = "25";
+static constexpr StringView RPC_0_STR = "0";
+static constexpr StringView HTTP_CLIENT_STR = "http_client";
+static constexpr StringView UNKNOWN_STR = "unknown";
+static constexpr StringView IPV4_STR = "ipv4";
+static constexpr StringView IPV6_STR = "ipv6";
+static constexpr StringView ZERO_ADDR_STR = "0.0.0.0";
+static constexpr StringView LOOPBACK_STR = "127.0.0.1";
 
 std::regex Connection::mContainerIdRegex = std::regex("[a-f0-9]{64}");
 
@@ -166,14 +166,14 @@ void Connection::TrySafeUpdateProtocolAttr() {
         WriteLock lock(mAttrLock);
         mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
         if (mRole == support_role_e::IsClient) {
-            mTags.Set<kRpcType>(RPC_25_STR);
-            mTags.Set<kCallKind>(HTTP_CLIENT_STR);
-            mTags.Set<kCallType>(HTTP_CLIENT_STR);
+            mTags.SetNoCopy<kRpcType>(RPC_25_STR);
+            mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
+            mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
             mProtocolAttached = true;
         } else if (mRole == support_role_e::IsServer) {
-            mTags.Set<kRpcType>(RPC_0_STR);
-            mTags.Set<kCallKind>(HTTP_STR);
-            mTags.Set<kCallType>(HTTP_STR);
+            mTags.SetNoCopy<kRpcType>(RPC_0_STR);
+            mTags.SetNoCopy<kCallKind>(HTTP_STR);
+            mTags.SetNoCopy<kCallType>(HTTP_STR);
             mProtocolAttached = true;
         }
 
@@ -300,13 +300,13 @@ void Connection::UnsafeUpdatePeerPodMetaForExternal() {
     if (mK8sPeerMetaAttached) {
         return;
     }
-    mTags.Set<kPeerAppName>(EXTERNAL_STR);
-    mTags.Set<kPeerPodName>(EXTERNAL_STR);
-    mTags.Set<kPeerPodIp>(EXTERNAL_STR);
-    mTags.Set<kPeerWorkloadName>(EXTERNAL_STR);
-    mTags.Set<kPeerWorkloadKind>(EXTERNAL_STR);
-    mTags.Set<kPeerNamespace>(EXTERNAL_STR);
-    mTags.Set<kPeerServiceName>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerAppName>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerPodName>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerPodIp>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerWorkloadName>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerWorkloadKind>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerNamespace>(EXTERNAL_STR);
+    mTags.SetNoCopy<kPeerServiceName>(EXTERNAL_STR);
     if (mRole == IsClient) {
         auto daddr = mTags.Get<kRemoteAddr>();
         mTags.SetNoCopy<kDestId>(daddr);
@@ -320,14 +320,14 @@ void Connection::UpdatePeerPodMetaForLocalhost() {
         return;
     }
     WriteLock lock(mAttrLock);
-    mTags.Set<kPeerAppName>(LOCALHOST_STR);
-    mTags.Set<kPeerPodName>(LOCALHOST_STR);
-    mTags.Set<kPeerPodIp>(LOCALHOST_STR);
-    mTags.Set<kPeerWorkloadName>(LOCALHOST_STR);
-    mTags.Set<kPeerWorkloadKind>(LOCALHOST_STR);
+    mTags.SetNoCopy<kPeerAppName>(LOCALHOST_STR);
+    mTags.SetNoCopy<kPeerPodName>(LOCALHOST_STR);
+    mTags.SetNoCopy<kPeerPodIp>(LOCALHOST_STR);
+    mTags.SetNoCopy<kPeerWorkloadName>(LOCALHOST_STR);
+    mTags.SetNoCopy<kPeerWorkloadKind>(LOCALHOST_STR);
     if (mRole == IsClient) {
-        mTags.Set<kDestId>(LOCALHOST_STR);
-        mTags.Set<kEndpoint>(LOCALHOST_STR);
+        mTags.SetNoCopy<kDestId>(LOCALHOST_STR);
+        mTags.SetNoCopy<kEndpoint>(LOCALHOST_STR);
     }
     MarkPeerPodMetaAttached();
 }
@@ -337,14 +337,14 @@ void Connection::UpdateSelfPodMetaForUnknown() {
         return;
     }
     WriteLock lock(mAttrLock);
-    mTags.Set<kAppName>(UNKNOWN_STR);
+    mTags.SetNoCopy<kAppName>(UNKNOWN_STR);
     // mTags.Set<kAppName>(UNKNOWN_STR);
-    mTags.Set<kAppId>(UNKNOWN_STR);
-    mTags.Set<kPodIp>(UNKNOWN_STR);
-    mTags.Set<kWorkloadName>(UNKNOWN_STR);
-    mTags.Set<kWorkloadKind>(UNKNOWN_STR);
-    mTags.Set<kNamespace>(UNKNOWN_STR);
-    mTags.Set<kHostName>(UNKNOWN_STR);
+    mTags.SetNoCopy<kAppId>(UNKNOWN_STR);
+    mTags.SetNoCopy<kPodIp>(UNKNOWN_STR);
+    mTags.SetNoCopy<kWorkloadName>(UNKNOWN_STR);
+    mTags.SetNoCopy<kWorkloadKind>(UNKNOWN_STR);
+    mTags.SetNoCopy<kNamespace>(UNKNOWN_STR);
+    mTags.SetNoCopy<kHostName>(UNKNOWN_STR);
     MarkPodMetaAttached();
 }
 

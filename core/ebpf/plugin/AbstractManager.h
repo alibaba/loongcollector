@@ -114,19 +114,10 @@ public:
         mPluginIndex = index;
     }
 
-    // void UpdateProcessCacheManager(std::shared_ptr<ProcessCacheManager> other) {
-    //     WriteLock lk(mBaseMgrLock);
-    //     mProcessCacheManager = std::move(other);
-    // }
-
-    std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const {
-        // ReadLock lk(mBaseMgrLock);
-        return mProcessCacheManager;
-    }
+    std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
 
 private:
     mutable ReadWriteLock mMtx; // lock
-    // mutable ReadWriteLock mBaseMgrLock;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:

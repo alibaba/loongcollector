@@ -24,6 +24,7 @@ template <const DataTableSchema* schema>
 class StaticDataRow {
 public:
     StaticDataRow() : mSourceBuffer(std::make_shared<SourceBuffer>()) {}
+    StaticDataRow(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
 
     constexpr size_t Size() const { return schema->Size(); }
 

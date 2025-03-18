@@ -131,7 +131,7 @@ public:
     bool GetByLocalHostFromServer();
     bool GetByLocalHostFromServer(std::vector<std::string>& podIpVec);
     //
-    std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status);
+    std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status, bool force = false);
     // get info by container id from cache
     // std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
     std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const StringView& containerId);
@@ -142,7 +142,8 @@ public:
     bool SendRequestToOperator(const std::string& urlHost,
                                const std::string& request,
                                containerInfoType infoType,
-                               std::vector<std::string>& resKey);
+                               std::vector<std::string>& resKey,
+                               bool force = false);
 
     void AsyncQueryMetadata(containerInfoType type, const StringView& key);
     // CIDR 问题 gflag 支持配置

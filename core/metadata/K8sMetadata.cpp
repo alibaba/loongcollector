@@ -212,8 +212,9 @@ void K8sMetadata::UpdateStatus(bool status) {
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                                         const std::string& query,
                                         containerInfoType infoType,
-                                        std::vector<std::string>& resKey) {
-    if (!mIsValid) {
+                                        std::vector<std::string>& resKey,
+                                        bool force) {
+    if (!mIsValid && !force) {
         LOG_DEBUG(sLogger, ("remote status invalid", "skip query"));
         return false;
     }
@@ -352,7 +353,7 @@ void K8sMetadata::UpdateExternalIpCache(const std::vector<std::string>& queryIps
     }
 }
 
-std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string>& ips, bool& status) {
+std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string>& ips, bool& status, bool force) {
     Json::Value jsonObj;
     for (auto& str : ips) {
         jsonObj["keys"].append(str);
@@ -361,7 +362,7 @@ std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string
     Json::StreamWriterBuilder writer;
     std::string reqBody = Json::writeString(writer, jsonObj);
     LOG_DEBUG(sLogger, ("reqBody", reqBody));
-    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::IpInfo, res);
+    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::IpInfo, res, force);
     if (status) {
         UpdateExternalIpCache(ips, res);
     }
@@ -420,7 +421,7 @@ const static std::string LOCALHOST_IP = "127.0.0.1";
 void K8sMetadata::DetectMetadataServer() {
     std::vector<std::string> ips = {LOCALHOST_IP};
     bool status = false;
-    GetByIpsFromServer(ips, status);
+    GetByIpsFromServer(ips, status, true);
     LOG_DEBUG(sLogger, ("detect network, res", status));
     return;
 }

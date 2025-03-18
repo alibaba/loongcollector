@@ -79,8 +79,8 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
                  std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<AppMetricData> {
               auto* in = static_cast<AbstractAppRecord*>(i.get());
               auto spanName = sourceBuffer->CopyString(in->GetSpanName());
-              auto data
-                  = std::make_unique<AppMetricData>(in->GetConnection(), StringView(spanName.data, spanName.size));
+              auto data = std::make_unique<AppMetricData>(
+                  in->GetConnection(), sourceBuffer, StringView(spanName.data, spanName.size));
               auto connection = in->GetConnection();
               if (!connection) {
                   LOG_WARNING(sLogger, ("connection is null", ""));
@@ -88,17 +88,19 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               }
 
               auto& ctAttrs = connection->GetConnTrackerAttrs();
-              auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
-              data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
+              {
+                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
+                  data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
 
-              auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
-              data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
+                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
+                  data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
 
-              auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
-              data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
+                  auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
+                  data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
-              auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
-              data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
+                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
+                  data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
+              }
 
               auto workloadKind = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadKind>());
               data->mTags.SetNoCopy<kWorkloadKind>(StringView(workloadKind.data, workloadKind.size));
@@ -146,20 +148,22 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
           [this](const std::shared_ptr<AbstractRecord>& i, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               auto* in = static_cast<ConnStatsRecord*>(i.get());
               auto connection = in->GetConnection();
-              auto data = std::make_unique<NetMetricData>(in->GetConnection());
+              auto data = std::make_unique<NetMetricData>(in->GetConnection(), sourceBuffer);
               auto& ctAttrs = connection->GetConnTrackerAttrs();
 
-              auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
-              data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
+              {
+                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
+                  data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
 
-              auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
-              data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
+                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
+                  data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
 
-              auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
-              data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
+                  auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
+                  data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
-              auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
-              data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
+                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
+                  data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
+              }
 
               auto wk = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadKind>());
               data->mTags.SetNoCopy<kWorkloadKind>(StringView(wk.data, wk.size));

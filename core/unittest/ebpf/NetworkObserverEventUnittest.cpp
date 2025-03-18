@@ -163,7 +163,8 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
 
 void NetworkObserverEventUnittest::TestAppMetricData() {
     auto conn = CreateTestTracker();
-    AppMetricData data(conn, "test_span");
+    std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+    AppMetricData data(conn, sourceBuffer, "test_span");
 
     // 测试基本属性设置和获取
     data.mCount = 100;
@@ -187,7 +188,8 @@ void NetworkObserverEventUnittest::TestAppMetricData() {
 
 void NetworkObserverEventUnittest::TestNetMetricData() {
     auto conn = CreateTestTracker();
-    NetMetricData data(conn);
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    NetMetricData data(conn, sourceBuffer);
 
     // 测试基本属性设置和获取
     data.mDropCount = 10;

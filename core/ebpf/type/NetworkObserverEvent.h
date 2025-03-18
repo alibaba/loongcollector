@@ -232,7 +232,10 @@ public:
 
 class AppMetricData : public MetricData {
 public:
-    AppMetricData(std::shared_ptr<Connection> conn, const StringView& spanName) : MetricData(conn) {
+    AppMetricData(const std::shared_ptr<Connection>& conn,
+                  const std::shared_ptr<SourceBuffer>& sourceBuffer,
+                  const StringView& spanName)
+        : MetricData(conn), mTags(sourceBuffer) {
         mTags.SetNoCopy<kRpc>(spanName);
     }
     ~AppMetricData() {}
@@ -261,7 +264,8 @@ public:
 #define LC_TCP_MAX_STATES 13
 class NetMetricData : public MetricData {
 public:
-    NetMetricData(std::shared_ptr<Connection> conn) : MetricData(conn) {}
+    NetMetricData(const std::shared_ptr<Connection>& conn, const std::shared_ptr<SourceBuffer>& sourceBuffer)
+        : MetricData(conn), mTags(sourceBuffer) {}
     ~NetMetricData() {}
     std::string ToString() const {
         std::string res;
