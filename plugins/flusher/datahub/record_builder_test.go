@@ -290,7 +290,7 @@ func TestGenTupleRecordWithTypeMissMatch(t *testing.T) {
 func TestGenRecord(t *testing.T) {
 	builder := RecordBuilderImpl{
 		nextFreshTime: time.Now().Add(time.Hour),
-		hostIp:        "127.0.0.1",
+		hostIP:        "127.0.0.1",
 		hostname:      "hostname",
 	}
 
