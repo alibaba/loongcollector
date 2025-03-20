@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorLogToSlsMetric struct {
@@ -75,8 +76,8 @@ var (
 )
 
 var (
-	processorLogErrorAlarmType     = "PROCESSOR_LOG_ALARM"
-	processorInitErrorLogAlarmType = "PROCESSOR_INIT_ALARM"
+	processorLogErrorAlarmType     = util.ProcessorProcessAlarm
+	processorInitErrorLogAlarmType = util.ProcessorInitAlarm
 )
 
 func (p *ProcessorLogToSlsMetric) Init(context pipeline.Context) (err error) {

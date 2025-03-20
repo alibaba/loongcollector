@@ -179,7 +179,7 @@ func TestRelationOperatorFail(t *testing.T) {
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
-	assert.True(t, strings.Contains(memoryLog, "AlarmType:CONDITION_INIT_ALARM\tinit relationOpertor error"))
+	assert.True(t, strings.Contains(memoryLog, "AlarmType:PROCESSOR_INIT_ALARM\tprocessor_fields_with_condition init relationOpertor error"))
 	log1 := &protocol.Log{Time: 0}
 	value1 := "dummy"
 	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})

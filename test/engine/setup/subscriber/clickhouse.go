@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const clickHouseName = "clickhouse"
@@ -84,14 +85,14 @@ func (i *ClickHouseSubscriber) GetData(sql string, startTime int32) ([]*protocol
 		BlockBufferSize:  10,
 	})
 	if err != nil {
-		logger.Warningf(context.Background(), "CLICKHOUSE_SUBSCRIBER_ALARM", "failed to create clickhouse conn, host %, err: %s", host, err)
+		logger.Warningf(context.Background(), util.ClickhouseSubscriberAlarm, "failed to create clickhouse conn, host %, err: %s", host, err)
 		return nil, err
 	}
 	i.client = conn
 	i.lastTimestamp = int64(startTime)
 	logGroup, err := i.queryRecords()
 	if err != nil {
-		logger.Warning(context.Background(), "CLICKHOUSE_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), util.ClickhouseSubscriberAlarm, "err", err)
 		return nil, err
 	}
 	return []*protocol.LogGroup{logGroup}, nil
@@ -115,7 +116,7 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 	s := fmt.Sprintf(clickhouseQuerySQL, i.Database, i.Table, i.lastTimestamp)
 	rows, err := i.client.Query(context.Background(), s)
 	if err != nil {
-		logger.Warning(context.Background(), "CLICKHOUSE_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), util.ClickhouseSubscriberAlarm, "err", err)
 		return
 	}
 	logger.Debug(context.Background(), "sql", s)
@@ -140,13 +141,13 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 			l string
 		)
 		if err = rows.Scan(&t, &l); err != nil {
-			logger.Warning(context.Background(), "CLICKHOUSE_SUBSCRIBER_ALARM", "failed to read clickhouse data, err", err)
+			logger.Warning(context.Background(), util.ClickhouseSubscriberAlarm, "failed to read clickhouse data, err", err)
 			return
 		}
 		log := &protocol.Log{}
 		lc := logContent{}
 		if err = json.Unmarshal([]byte(l), &lc); err != nil {
-			logger.Warning(context.Background(), "CLICKHOUSE_SUBSCRIBER_ALARM", "failed to unmarshal data, err", err)
+			logger.Warning(context.Background(), util.ClickhouseSubscriberAlarm, "failed to unmarshal data, err", err)
 			return
 		}
 		log.Contents = append(log.Contents, &protocol.Log_Content{

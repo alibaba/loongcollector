@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type Instance struct {
@@ -102,14 +103,14 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	if m.JDKPath != "" {
 		abs, err := filepath.Abs(filepath.Clean(m.JDKPath))
 		if err != nil {
-			logger.Error(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk path illegal", m.JDKPath)
+			logger.Error(m.context.GetRuntimeContext(), util.JmxfetchAlarm, "the configured jdk path illegal", m.JDKPath)
 			return 0, err
 		}
 		javaCmd := abs + "/bin/java"
 		stat, err := os.Stat(javaCmd)
 		// 73: 000 001 001 001
 		if err != nil || stat.IsDir() || stat.Mode().Perm()&os.FileMode(73) == 0 {
-			logger.Error(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk cmd path illegal", javaCmd)
+			logger.Error(m.context.GetRuntimeContext(), util.JmxfetchAlarm, "the configured jdk cmd path illegal", javaCmd)
 			return 0, err
 		}
 	}
@@ -118,23 +119,23 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 		var err error
 		m.IncludeEnv, m.includeEnvRegex, err = helper.SplitRegexFromMap(m.IncludeEnv)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.InputInitAlarm, "init include env regex error", err)
 		}
 		m.ExcludeEnv, m.excludeEnvRegex, err = helper.SplitRegexFromMap(m.ExcludeEnv)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude env regex error", err)
 		}
 		m.IncludeContainerLabel, m.includeContainerLabelRegex, err = helper.SplitRegexFromMap(m.IncludeContainerLabel)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.InputInitAlarm, "init include label regex error", err)
 		}
 		m.ExcludeContainerLabel, m.excludeContainerLabelRegex, err = helper.SplitRegexFromMap(m.ExcludeContainerLabel)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude label regex error", err)
 		}
 		m.k8sFilter, err = helper.CreateK8SFilter(m.K8sNamespaceRegex, m.K8sPodRegex, m.K8sContainerRegex, m.IncludeK8sLabel, m.ExcludeK8sLabel)
 		if err != nil {
-			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init k8s filter error", err)
+			logger.Warning(m.context.GetRuntimeContext(), util.InputInitAlarm, "init k8s filter error", err)
 		}
 	}
 	return 0, nil
@@ -200,7 +201,7 @@ func (m *Jmx) UpdateContainerCfg() {
 		if val := detail.GetEnv("ILOGTAIL_JMX_PORT"); val != "" {
 			p, err := strconv.ParseInt(val, 10, 64)
 			if err != nil {
-				logger.Warning(m.context.GetRuntimeContext(), "ERROR_JMX_PORT", "the jmx port must be a number")
+				logger.Warning(m.context.GetRuntimeContext(), util.JmxfetchAlarm, "the jmx port must be a number")
 				continue
 			}
 			port = int32(p)
