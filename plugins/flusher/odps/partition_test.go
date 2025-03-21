@@ -123,8 +123,8 @@ func TestGenPartition(t *testing.T) {
 	timeStr := "20250321 15:17:23"
 
 	loc := time.Local
-	t, _ := time.ParseInLocation(layout, timeStr, loc)
-	timestamp := t.Unix()
+	curTime, _ := time.ParseInLocation(layout, timeStr, loc)
+	timestamp := curTime.Unix()
 
 	log := protocol.Log{
 		Time: uint32(timestamp),
