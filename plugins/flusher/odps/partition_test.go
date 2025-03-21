@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func TestPartitionHelperInit(t *testing.T) {

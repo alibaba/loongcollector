@@ -53,13 +53,13 @@ func TestFreshShardIds(t *testing.T) {
 		client:      newMockDataHubAPI(),
 	}
 
-	err := s.freshShardIds(true)
+	err := s.freshShardIDs(true)
 	assert.Nil(t, err)
-	assert.Equal(t, 3, len(s.shardInfo.shardIds))
+	assert.Equal(t, 3, len(s.shardInfo.shardIDs))
 
 	m := []string{"1", "2", "3"}
 	for idx, shardID := range m {
-		assert.Equal(t, shardID, s.shardInfo.shardIds[idx])
+		assert.Equal(t, shardID, s.shardInfo.shardIDs[idx])
 	}
 }
 

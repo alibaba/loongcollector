@@ -18,10 +18,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 )
 
 type TunnelSender interface {

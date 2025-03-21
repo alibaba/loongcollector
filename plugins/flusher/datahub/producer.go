@@ -42,7 +42,7 @@ func NewProducer(projectName string, topicName string, client datahub.DataHubApi
 }
 
 type ShardInfo struct {
-	shardIds      []string
+	shardIDs      []string
 	index         int
 	nextFreshTime time.Time
 }
@@ -56,10 +56,10 @@ type ProducerImpl struct {
 }
 
 func (pi *ProducerImpl) Init() error {
-	return pi.freshShardIds(true)
+	return pi.freshShardIDs(true)
 }
 
-func (pi *ProducerImpl) freshShardIds(force bool) error {
+func (pi *ProducerImpl) freshShardIDs(force bool) error {
 	if !force && pi.shardInfo != nil && time.Now().Before(pi.shardInfo.nextFreshTime) {
 		return nil
 	}
@@ -69,24 +69,24 @@ func (pi *ProducerImpl) freshShardIds(force bool) error {
 		return err
 	}
 
-	shardIds := make([]string, 0, len(ls.Shards))
+	shardIDs := make([]string, 0, len(ls.Shards))
 	for _, shard := range ls.Shards {
 		if shard.State == datahub.ACTIVE {
-			shardIds = append(shardIds, shard.ShardId)
+			shardIDs = append(shardIDs, shard.ShardId)
 		}
 	}
 
 	if pi.shardInfo != nil {
-		pi.shardInfo.shardIds = shardIds
+		pi.shardInfo.shardIDs = shardIDs
 	} else {
 		pi.shardInfo = &ShardInfo{
-			shardIds:      shardIds,
+			shardIDs:      shardIDs,
 			index:         int(time.Now().UnixNano()),
 			nextFreshTime: time.Now(),
 		}
 	}
 
-	if len(pi.shardInfo.shardIds) > 0 {
+	if len(pi.shardInfo.shardIDs) > 0 {
 		pi.shardInfo.nextFreshTime = time.Now().Add(shardFreshInterval)
 	} else {
 		pi.shardInfo.nextFreshTime = time.Now()
@@ -95,17 +95,17 @@ func (pi *ProducerImpl) freshShardIds(force bool) error {
 }
 
 func (pi *ProducerImpl) nextShardID() (string, error) {
-	err := pi.freshShardIds(false)
+	err := pi.freshShardIDs(false)
 	if err != nil {
 		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "fresh datahub %s/%s shard failed, error:%v, ingnore error", pi.projectName, pi.topicName, err)
 	}
 
-	if len(pi.shardInfo.shardIds) == 0 {
+	if len(pi.shardInfo.shardIDs) == 0 {
 		return "", fmt.Errorf("no active shard in datahub(%s/%s) now", pi.projectName, pi.topicName)
 	}
 
-	pi.shardInfo.index = (pi.shardInfo.index + 1) % len(pi.shardInfo.shardIds)
-	return pi.shardInfo.shardIds[pi.shardInfo.index], nil
+	pi.shardInfo.index = (pi.shardInfo.index + 1) % len(pi.shardInfo.shardIDs)
+	return pi.shardInfo.shardIDs[pi.shardInfo.index], nil
 }
 
 func (pi *ProducerImpl) DoSend(records []datahub.IRecord, isRecursive bool) (string, *datahub.PutRecordsByShardResult, error) {
@@ -126,7 +126,7 @@ func (pi *ProducerImpl) DoSend(records []datahub.IRecord, isRecursive bool) (str
 	if _, ok := err.(*datahub.ShardSealedError); ok {
 		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard (%s/%s/%s) sealed, try to fresh shard",
 			pi.projectName, pi.topicName, shardID)
-		err = pi.freshShardIds(true)
+		err = pi.freshShardIDs(true)
 		if err != nil {
 			logger.Errorf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard(%s/%s/%s) sealed, and fresh shard failed, error",
 				pi.projectName, pi.topicName, shardID, err)
@@ -145,9 +145,11 @@ func (pi *ProducerImpl) Send(records []datahub.IRecord) error {
 	}
 
 	var err error
+	var shardID string
+	var res *datahub.PutRecordsByShardResult
 	for retry := 0; retry < maxRetryCount; retry++ {
 		start := time.Now()
-		shardID, res, err := pi.DoSend(records, false)
+		shardID, res, err = pi.DoSend(records, false)
 		cost := time.Since(start)
 		if err == nil {
 			logger.Debugf(pi.context.GetRuntimeContext(), "Flush datahub(%s/%s/%s) success, rid:%s, records:%d, rawSize:%d, reqSize:%d, cost:%v",
