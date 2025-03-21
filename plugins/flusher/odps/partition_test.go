@@ -17,6 +17,7 @@ package odps
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -117,8 +118,16 @@ func TestGenPartition(t *testing.T) {
 	err := ph.Init(config, 15)
 	assert.Nil(t, err)
 
+	// 规避不同时区获取到的时间不同问题
+	layout := "20060102 15:04:05"
+	timeStr := "20250321 15:17:23"
+
+	loc := time.Local
+	t_, _ := time.ParseInLocation(layout, timeStr, loc)
+	timestamp := t_.Unix()
+
 	log := protocol.Log{
-		Time: 1742541463,
+		Time: uint32(timestamp),
 	}
 
 	log.Contents = make([]*protocol.Log_Content, 0)
