@@ -159,7 +159,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>
 LegacyCommonConfigProvider::SendHeartbeat(const ConfigServerAddress& configServerAddress) {
     configserver::proto::HeartBeatRequest heartBeatReq;
     configserver::proto::AgentAttributes attributes;
-    string requestID = Base64Enconde(string("heartbeat").append(to_string(time(NULL))));
+    string requestID = Base64Encode(string("heartbeat").append(to_string(time(NULL))));
     heartBeatReq.set_request_id(requestID);
     heartBeatReq.set_agent_id(Application::GetInstance()->GetInstanceId());
     heartBeatReq.set_agent_type("iLogtail");
@@ -223,7 +223,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> LegacyComm
     const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& requestConfigs) {
     configserver::proto::FetchPipelineConfigRequest fetchConfigReq;
     string requestID
-        = Base64Enconde(Application::GetInstance()->GetInstanceId().append("_").append(to_string(time(NULL))));
+        = Base64Encode(Application::GetInstance()->GetInstanceId().append("_").append(to_string(time(NULL))));
     fetchConfigReq.set_request_id(requestID);
     fetchConfigReq.set_agent_id(Application::GetInstance()->GetInstanceId());
 

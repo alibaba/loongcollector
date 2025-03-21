@@ -153,6 +153,6 @@ const string METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL = "other_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL = "shard_write_quota_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL = "project_quota_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL = "sequence_id_error_total";
-const string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL = "request_exprired_error_total";
+const string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPIRED_ERROR_TOTAL = "request_expired_error_total";
 
 } // namespace logtail

@@ -99,7 +99,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
 
     for (const auto& pipeline : builtInPipelines) {
         const string& pipelineName = pipeline.first;
-        const string& pipleineDetail = pipeline.second;
+        const string& pipelineDetail = pipeline.second;
         if (configSet.find(pipelineName) != configSet.end()) {
             LOG_WARNING(sLogger,
                         ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
@@ -111,9 +111,9 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
         string errorMsg;
         auto iter = mInnerConfigMap.find(pipelineName);
         if (iter == mInnerConfigMap.end()) {
-            mInnerConfigMap[pipelineName] = pipleineDetail;
+            mInnerConfigMap[pipelineName] = pipelineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipelineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
                                                                                                   pipelineName));
@@ -126,10 +126,10 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
             if (!CheckAddedConfig(pipelineName, std::move(detail), pDiff, tDiff, singletonCache)) {
                 continue;
             }
-        } else if (pipleineDetail != iter->second) {
-            mInnerConfigMap[pipelineName] = pipleineDetail;
+        } else if (pipelineDetail != iter->second) {
+            mInnerConfigMap[pipelineName] = pipelineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipelineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
                                                                                                   pipelineName));
