@@ -8,7 +8,7 @@
 * 2024-08 [iLogtail 开源两周年：感恩遇见，畅想未来](https://observability.cn/article/adeqhds7usxoyv3r)
 * 2024-02 [你好，iLogtail 2.0！](https://observability.cn/article/wkysbgfilo0oxln2)
 * 2023-02 [鲲鹏展翅凌云志：iLogtail社区2022年度开源报告](https://mp.weixin.qq.com/s/6luD7VUFd_0aaeyUBAShkw)
-* 2022-08 [iLogtail开源之路](https://mp.weixin.qq.com/s/5j5KJe9BmpZ1tdb-KCx_CQ)
+* 2022-08 [iLogtail开源之路](https://observability.cn/article/gwbxwx3gndgpbk31)
 * 2022-07 [千万级可观测数据采集器--iLogtail代码完整开源](https://mp.weixin.qq.com/s/Cam_OjPWhcEj77kqC0Q1SA)
   
 ## 技术分享
@@ -28,10 +28,10 @@
 * 2024-04 [破浪前行：iLogtail十年老架构如何浴火重生](https://observability.cn/article/dqmk581gzc7ci0k5)
 * 2024-04 [跟着iLogtail学习无锁化编程](https://observability.cn/article/ez2c05dvsunezgng)
 * 2023-08 [代码整洁之道 -- 告别码农，做一个有思想的程序员！](https://mp.weixin.qq.com/s/tK0ZyRxKBGpCqIw16SPSxg) 看iLogtail如何追求代码整洁
-* 2023-08 [跟着iLogtail学习设计模式](https://mp.weixin.qq.com/s/gfy9DfvcTuCiBiLJdZLTKQ)
-* 2022-12 [性能与可靠的超强碰撞：第三方测评开源日志采集器](https://mp.weixin.qq.com/s/8mCVk3gvXPOijTlcRjUR_w)
-* 2022-12 [阿里十年技术沉淀｜深度解析百PB级数据总线技术](https://mp.weixin.qq.com/s/NKoTCM5o-Rs_83Wakk9yCw)
-* 2022-09 [零信任策略下K8s安全监控最佳实践](https://mp.weixin.qq.com/s/wYUNsGaWEnQZ0BVxsQORbA)
+* 2023-08 [跟着iLogtail学习设计模式](https://observability.cn/article/di24pggyhnx1dp8x)
+* 2022-12 [性能与可靠的超强碰撞：第三方测评开源日志采集器](https://observability.cn/article/yhlb8gi9ic435o13)
+* 2022-12 [阿里十年技术沉淀｜深度解析百PB级数据总线技术](https://observability.cn/article/gh9mfxcxvl88ay4s)
+* 2022-09 [零信任策略下K8s安全监控最佳实践](https://observability.cn/article/gsrewlrzsydh568n)
 
 ## 其他
 
