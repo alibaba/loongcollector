@@ -118,7 +118,7 @@ func TestGenPartition(t *testing.T) {
 	assert.Nil(t, err)
 
 	log := protocol.Log{
-		Time: 1727255611,
+		Time: 1742541463,
 	}
 
 	log.Contents = make([]*protocol.Log_Content, 0)
@@ -136,5 +136,5 @@ func TestGenPartition(t *testing.T) {
 	})
 
 	str := ph.GenPartition(&log)
-	assert.Equal(t, "pt1=test1,pt2=value1,pt3=test_value2,pt4=20240925,pt5=test_1700aaa", str)
+	assert.Equal(t, "pt1=test1,pt2=value1,pt3=test_value2,pt4=20250321,pt5=test_1515aaa", str)
 }
