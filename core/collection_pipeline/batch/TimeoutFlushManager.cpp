@@ -20,7 +20,7 @@ namespace logtail {
 
 void TimeoutFlushManager::UpdateRecord(
     const string& config, size_t index, size_t key, uint32_t timeoutSecs, Flusher* f) {
-    lock_guard<recursive_mutex> lock(mMux);
+    lock_guard<mutex> lock(mTimeoutRecordsMux);
     auto& item = mTimeoutRecords[config];
     auto it = item.find({index, key});
     if (it == item.end()) {
@@ -31,27 +31,52 @@ void TimeoutFlushManager::UpdateRecord(
 }
 
 void TimeoutFlushManager::FlushTimeoutBatch() {
-    lock_guard<recursive_mutex> lock(mMux);
-    vector<pair<Flusher*, size_t>> records;
-    for (auto& item : mTimeoutRecords) {
-        for (auto it = item.second.begin(); it != item.second.end();) {
-            if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
-                // cannot flush here, since flush may also update record, which might invalidate map iterator
-                records.emplace_back(it->second.mFlusher, it->second.mKey);
-                it = item.second.erase(it);
-            } else {
-                ++it;
+    multimap<string, pair<Flusher*, size_t>> records;
+    {
+        lock_guard<mutex> lock(mTimeoutRecordsMux);
+        for (auto& item : mTimeoutRecords) {
+            for (auto it = item.second.begin(); it != item.second.end();) {
+                if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
+                    // cannot flush here, since flush may also update record, which might invalidate map iterator and
+                    // lead to deadlock
+                    records.emplace(item.first, make_pair(it->second.mFlusher, it->second.mKey));
+                    it = item.second.erase(it);
+                } else {
+                    ++it;
+                }
             }
         }
     }
-    for (auto& item : records) {
-        item.first->Flush(item.second);
+    {
+        lock_guard<mutex> lock(mDeletedFlushersMux);
+        for (auto& item : records) {
+            if (mDeletedFlushers.find(make_pair(item.first, item.second.first)) == mDeletedFlushers.end()) {
+                item.second.first->Flush(item.second.second);
+            }
+        }
+        mDeletedFlushers.clear();
     }
 }
 
-void TimeoutFlushManager::ClearRecords(const string& config) {
-    lock_guard<recursive_mutex> lock(mMux);
-    mTimeoutRecords.erase(config);
+void TimeoutFlushManager::UnregisterFlushers(const string& config,
+                                             const vector<unique_ptr<FlusherInstance>>& flushers) {
+    {
+        lock_guard<mutex> lock(mTimeoutRecordsMux);
+        mTimeoutRecords.erase(config);
+    }
+    {
+        lock_guard<mutex> lock(mDeletedFlushersMux);
+        for (const auto& flusher : flushers) {
+            mDeletedFlushers.emplace(make_pair(config, flusher->GetPlugin()));
+        }
+    }
+}
+
+void TimeoutFlushManager::RegisterFlushers(const string& config, const vector<unique_ptr<FlusherInstance>>& flushers) {
+    lock_guard<mutex> lock(mDeletedFlushersMux);
+    for (const auto& flusher : flushers) {
+        mDeletedFlushers.erase(make_pair(config, flusher->GetPlugin()));
+    }
 }
 
 } // namespace logtail

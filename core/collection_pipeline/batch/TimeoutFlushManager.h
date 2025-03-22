@@ -21,9 +21,11 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/plugin/instance/FlusherInstance.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
 
 namespace logtail {
@@ -52,14 +54,20 @@ public:
 
     void UpdateRecord(const std::string& config, size_t index, size_t key, uint32_t timeoutSecs, Flusher* f);
     void FlushTimeoutBatch();
-    void ClearRecords(const std::string& config);
+    void UnregisterFlushers(const std::string& config, const std::vector<std::unique_ptr<FlusherInstance>>& flushers);
+    void RegisterFlushers(const std::string& config, const std::vector<std::unique_ptr<FlusherInstance>>& flushers);
 
 private:
     TimeoutFlushManager() = default;
     ~TimeoutFlushManager() = default;
 
-    std::recursive_mutex mMux;
+    // visited by all processor runner threads
+    mutable std::mutex mTimeoutRecordsMux;
     std::map<std::string, std::map<std::pair<size_t, size_t>, TimeoutRecord>> mTimeoutRecords;
+
+    // visited by main thread and num 0 processor runner thread
+    mutable std::mutex mDeletedFlushersMux;
+    std::set<std::pair<std::string, const Flusher*>> mDeletedFlushers;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineUnittest;

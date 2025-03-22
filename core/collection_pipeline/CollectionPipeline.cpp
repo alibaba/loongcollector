@@ -359,7 +359,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
 }
 
 void CollectionPipeline::Start() {
-    // #ifndef APSARA_UNIT_TEST_MAIN
+    TimeoutFlushManager::GetInstance()->RegisterFlushers(mName, mFlushers);
     //  TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
     for (const auto& flusher : mFlushers) {
         flusher->Start();
@@ -381,7 +381,6 @@ void CollectionPipeline::Start() {
 
     SET_GAUGE(mStartTime,
               chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
-    // #endif
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
@@ -439,7 +438,7 @@ bool CollectionPipeline::FlushBatch() {
     for (auto& flusher : mFlushers) {
         allSucceeded = flusher->FlushAll() && allSucceeded;
     }
-    TimeoutFlushManager::GetInstance()->ClearRecords(mName);
+    TimeoutFlushManager::GetInstance()->UnregisterFlushers(mName, mFlushers);
     return allSucceeded;
 }
 

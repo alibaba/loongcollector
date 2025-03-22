@@ -24,7 +24,7 @@ class TimeoutFlushManagerUnittest : public ::testing::Test {
 public:
     void TestUpdateRecord();
     void TestFlushTimeoutBatch();
-    void TestClearRecords();
+    void TestUnregisterFlushers();
 
 protected:
     static void SetUpTestCase() {
@@ -77,16 +77,28 @@ void TimeoutFlushManagerUnittest::TestFlushTimeoutBatch() {
     APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
 }
 
-void TimeoutFlushManagerUnittest::TestClearRecords() {
-    TimeoutFlushManager::GetInstance()->UpdateRecord("test_config", 0, 1, 3, sFlusher.get());
-    TimeoutFlushManager::GetInstance()->ClearRecords("test_config");
+void TimeoutFlushManagerUnittest::TestUnregisterFlushers() {
+    auto flusher = new FlusherMock();
+    flusher->SetContext(sCtx);
+    flusher->SetMetricsRecordRef(FlusherMock::sName, "1");
+    auto instance = unique_ptr<FlusherInstance>(new FlusherInstance(flusher, PluginInstance::PluginMeta("1")));
+    vector<unique_ptr<FlusherInstance>> flushers;
+    flushers.push_back(std::move(instance));
 
+    TimeoutFlushManager::GetInstance()->UpdateRecord("test_config", 0, 1, 3, flusher);
+    TimeoutFlushManager::GetInstance()->UnregisterFlushers("test_config", flushers);
+
+    APSARA_TEST_EQUAL(1U, TimeoutFlushManager::GetInstance()->mDeletedFlushers.size());
     APSARA_TEST_EQUAL(0U, TimeoutFlushManager::GetInstance()->mTimeoutRecords.size());
+
+    TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
+    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mDeletedFlushers.empty());
+    APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mTimeoutRecords.empty());
 }
 
 UNIT_TEST_CASE(TimeoutFlushManagerUnittest, TestUpdateRecord)
 UNIT_TEST_CASE(TimeoutFlushManagerUnittest, TestFlushTimeoutBatch)
-UNIT_TEST_CASE(TimeoutFlushManagerUnittest, TestClearRecords)
+UNIT_TEST_CASE(TimeoutFlushManagerUnittest, TestUnregisterFlushers)
 
 } // namespace logtail
 
