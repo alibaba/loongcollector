@@ -14,6 +14,8 @@
 
 #include "collection_pipeline/batch/FlushStrategy.h"
 
+#include <cstdlib>
+
 using namespace std;
 
 namespace logtail {
@@ -21,6 +23,10 @@ namespace logtail {
 template <>
 bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
                                                               const PipelineEventPtr& e) {
+    if (e.Is<MetricEvent>()) {
+        return time(nullptr) - status.GetCreateTime() > mTimeoutSecs
+            || abs(status.GetCreateTime() - e->GetTimestamp()) > 300;
+    }
     return time(nullptr) - status.GetCreateTime() > mTimeoutSecs
         || status.GetCreateTimeMinute() != e->GetTimestamp() / 60;
 }
