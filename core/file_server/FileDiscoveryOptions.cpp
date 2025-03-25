@@ -746,15 +746,17 @@ bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, co
                    "skip this path")("params", paramsJSON.toStyledString())("errorMsg", errorMsg));
         return false;
     }
+    bool success = true;
     // if update all, clear and reset
     mContainerInfos->clear();
     for (auto& iter : allPathMap) {
         if (!mDeduceAndSetContainerBaseDirFunc(iter.second, ctx, this)) {
+            success = false;
             continue;
         }
         mContainerInfos->push_back(iter.second);
     }
-    return true;
+    return success;
 }
 
 bool FileDiscoveryOptions::DeleteContainerInfo(const Json::Value& paramsJSON) {
