@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -315,6 +316,12 @@ func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, allCmd 
 		}
 	}
 
+	sortMounts := func(mounts []types.MountPoint) {
+		sort.Slice(mounts, func(i, j int) bool {
+			return mounts[i].Source < mounts[j].Source
+		})
+	}
+	sortMounts(mounts)
 	// 判断mounts
 	if !changed {
 		if val, ok := idf.lastContainerInfoCache[id]; ok && !reflect.DeepEqual(val.Mounts, mounts) {
