@@ -46,7 +46,19 @@
 | Job2Pod | string, 无默认值（可选） | Job到Pod的关系名，不填则不生成关系。 |
 | Ingress2Service | string, 无默认值（可选） | Ingress到Service的关系名，不填则不生成关系。 |
 | Pod2PersistentVolumeClaim | string, 无默认值（可选） | Pod到PersistentVolumeClaim的关系名，不填则不生成关系。 |
-| Pod2Configmap | string, 无默认值（可选） | Pod到Configmap的关系名，不填则不生成关系。 |
+| Namespace2Pod | string, 无默认值（可选） | Namespace到Pod的关系名，不填则不生成关系。 |
+| Namespace2Node | string, 无默认值（可选） | Namespace到Node的关系名，不填则不生成关系。 |
+| Namespace2Service | string, 无默认值（可选） | Namespace到Service的关系名，不填则不生成关系。 |
+| Namespace2Deployment | string, 无默认值（可选） | Namespace到Deployment的关系名，不填则不生成关系。 |
+| Namespace2DaemonSet | string, 无默认值（可选） | Namespace到DaemonSet的关系名，不填则不生成关系。 |
+| Namespace2StatefulSet | string, 无默认值（可选） | Namespace到StatefulSet的关系名，不填则不生成关系。 |
+| Namespace2Configmap | string, 无默认值（可选） | Namespace到Configmap的关系名，不填则不生成关系。 |
+| Namespace2Job | string, 无默认值（可选） | Namespace到Job的关系名，不填则不生成关系。 |
+| Namespace2CronJob | string, 无默认值（可选） | Namespace到CronJob的关系名，不填则不生成关系。 |
+| Namespace2PersistentVolume | string, 无默认值（可选） | Namespace到PersistentVolume的关系名，不填则不生成关系。 |
+| Namespace2PersistentVolumeClaim | string, 无默认值（可选） | Namespace到PersistentVolumeClaim的关系名，不填则不生成关系。 |
+| Namespace2StorageClass | string, 无默认值（可选） | Namespace到StorageClass的关系名，不填则不生成关系。 |
+| Namespace2Ingress | string, 无默认值（可选） | Namespace到Ingress的关系名，不填则不生成关系。 |
 
 ## 环境变量
 

@@ -182,3 +182,39 @@ func (m *metaCollector) processPodDaemonSetLink(data *k8smeta.ObjectWrapper, met
 	}
 	return nil
 }
+
+func (m *metaCollector) processDeploymentNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.DeploymentNamespace); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.Deployment.Kind, obj.Deployment.Namespace, obj.Deployment.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Deployment)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}
+
+func (m *metaCollector) processDaemonSetNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.DaemonSetNamespace); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.DaemonSet.Kind, obj.DaemonSet.Namespace, obj.DaemonSet.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2DaemonSet)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}
+
+func (m *metaCollector) processStatefulNamespaceSetLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.StatefulSetNamespace); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.StatefulSet.Kind, obj.StatefulSet.Namespace, obj.StatefulSet.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2StatefulSet)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}

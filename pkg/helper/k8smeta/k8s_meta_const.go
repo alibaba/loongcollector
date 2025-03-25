@@ -5,6 +5,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -42,6 +43,21 @@ const (
 	POD_CONTAINER            = "pod->container"
 	INGRESS_SERVICE          = "ingress->service"
 	//revive:enable:var-naming
+
+	//add namespace link
+	POD_NAMESPACE                   = "pod->namesapce"
+	NODE_NAMESPACE                  = "mode->namesapce"
+	SERVICE_NAMESPACE               = "service->namesapce"
+	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
+	DAEMONSET_NAMESPACE             = "daemonset->namesapce"
+	STATEFULSET_NAMESPACE           = "statefulset->namesapce"
+	CONFIGMAP_NAMESPACE             = "configmap->namesapce"
+	JOB_NAMESPACE                   = "job->namesapce"
+	CRONJOB_NAMESPACE               = "cronjob->namesapce"
+	PERSISTENTVOLUME_NAMESPACE      = "persistentvolume->namesapce"
+	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
+	STORAGECLASS_NAMESPACE          = "storageclass->namesapce"
+	INGRESS_NAMESPACE               = "ingress->namesapce"
 )
 
 var AllResources = []string{
@@ -125,6 +141,71 @@ type IngressService struct {
 type PodContainer struct {
 	Pod       *v1.Pod
 	Container *v1.Container
+}
+
+type PodNamespace struct {
+	Pod       *v1.Pod
+	Namespace *v1.Namespace
+}
+
+type NodeNamespace struct {
+	Node       *v1.Node
+	Namespace  *v1.Namespace
+}
+
+type ServiceNamespace struct {
+	Service       *v1.Service
+	Namespace     *v1.Namespace
+}
+
+type DeploymentNamespace struct {
+	Deployment     *app.Deployment
+	Namespace      *v1.Namespace
+}
+
+type DaemonSetNamespace struct {
+	DaemonSet     *app.DaemonSet
+	Namespace      *v1.Namespace
+}
+
+type StatefulSetNamespace struct {
+	StatefulSet    *app.StatefulSet
+	Namespace      *v1.Namespace
+}
+
+type ConfigMapNamespace struct {
+	ConfigMap      *v1.ConfigMap
+	Namespace      *v1.Namespace
+}
+
+type JobNamespace struct {
+	Job            *batch.Job
+	Namespace      *v1.Namespace
+}
+
+type CronJobNamespace struct {
+	CronJob        *batch.CronJob
+	Namespace      *v1.Namespace
+}
+
+type PersistentVolumeNamespace struct {
+	PersistentVolume        *v1.PersistentVolume
+	Namespace               *v1.Namespace
+}
+
+type PersistentVolumeClaimNamespace struct {
+	PersistentVolumeClaim   *v1.PersistentVolumeClaim
+	Namespace               *v1.Namespace
+}
+
+type StorageClassNamespace struct {
+	StorageClass            *storage.StorageClass
+	Namespace               *v1.Namespace
+}
+
+type IngressNamespace struct {
+	Ingress            *networking.Ingress
+	Namespace          *v1.Namespace
 }
 
 const (

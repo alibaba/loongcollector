@@ -5,8 +5,9 @@ import (
 
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	storage "k8s.io/api/storage/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -56,6 +57,32 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getReplicaSetDeploymentLink(events)
 	case INGRESS_SERVICE:
 		return g.getIngressServiceLink(events)
+	case POD_NAMESPACE:
+		return g.getPodNamespaceLink(events)
+	case NODE_NAMESPACE:
+		return g.getNodeNamespaceLink(events)
+	case SERVICE_NAMESPACE:
+		return g.getServiceNamespaceLink(events)
+	case DEPLOYMENT_NAMESPACE:
+		return g.getDeploymentNamespaceLink(events)
+	case DAEMONSET_NAMESPACE:
+		return g.getDaemonsetNamespaceLink(events)
+	case STATEFULSET_NAMESPACE:
+		return g.getStatefulsetNamespaceLink(events)
+	case CONFIGMAP_NAMESPACE:
+		return g.getConfigMapNamesapceLink(events)
+	case JOB_NAMESPACE:
+		return g.getJobNamesapceLink(events)
+	case CRONJOB_NAMESPACE:
+		return g.getCronJobNamesapceLink(events)
+	case PERSISTENTVOLUME_NAMESPACE:
+		return g.getPVNamesapceLink(events)
+	case PERSISTENTVOLUMECLAIM_NAMESPACE:
+		return g.getPVCNamesapceLink(events)
+	case STORAGECLASS_NAMESPACE:
+		return g.getStorageClassNamesapceLink(events)
+	case INGRESS_NAMESPACE:
+		return g.getIngressNamesapceLink(events)
 	default:
 		return nil
 	}
@@ -467,6 +494,366 @@ func (g *LinkGenerator) getIngressServiceLink(ingressList []*K8sMetaEvent) []*K8
 						Raw: &IngressService{
 							Ingress: ingress,
 							Service: s.Raw.(*v1.Service),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+
+func (g *LinkGenerator) getPodNamespaceLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range podList {
+		pod, ok := data.Object.Raw.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{pod.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: POD_NAMESPACE,
+						Raw: &PodNamespace{
+							Pod:       pod,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+
+func (g *LinkGenerator) getNodeNamespaceLink(nodeList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range nodeList {
+		node, ok := data.Object.Raw.(*v1.Node)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{node.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: NODE_NAMESPACE,
+						Raw: &NodeNamespace{
+							Node:       node,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+
+func (g *LinkGenerator) getServiceNamespaceLink(serviceList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range serviceList {
+		service, ok := data.Object.Raw.(*v1.Service)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{service.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: SERVICE_NAMESPACE,
+						Raw: &ServiceNamespace{
+							Service:       service,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) getDeploymentNamespaceLink(deploymentList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range deploymentList {
+		deployment, ok := data.Object.Raw.(*app.Deployment)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{deployment.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: DEPLOYMENT_NAMESPACE,
+						Raw: &DeploymentNamespace{
+							Deployment:       deployment,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getDaemonsetNamespaceLink(daemonsetList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range daemonsetList {
+		daemonset, ok := data.Object.Raw.(*app.DaemonSet)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{daemonset.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: DAEMONSET_NAMESPACE,
+						Raw: &DaemonSetNamespace{
+							DaemonSet:       daemonset,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getStatefulsetNamespaceLink(statefulsetList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range statefulsetList {
+		statefulset, ok := data.Object.Raw.(*app.StatefulSet)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{statefulset.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: STATEFULSET_NAMESPACE,
+						Raw: &StatefulSetNamespace{
+							StatefulSet:       statefulset,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getConfigMapNamesapceLink(configMapList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range configMapList {
+		configmap, ok := data.Object.Raw.(*v1.ConfigMap)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{configmap.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: CONFIGMAP_NAMESPACE,
+						Raw: &ConfigMapNamespace{
+							ConfigMap:       configmap,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getJobNamesapceLink(jobList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range jobList {
+		job, ok := data.Object.Raw.(*batch.Job)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{job.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: JOB_NAMESPACE,
+						Raw: &JobNamespace{
+							Job:       job,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getCronJobNamesapceLink(jobList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range jobList {
+		job, ok := data.Object.Raw.(*batch.CronJob)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{job.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: CRONJOB_NAMESPACE,
+						Raw: &CronJobNamespace{
+							CronJob:       job,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) getPVNamesapceLink(pvList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range pvList {
+		pv, ok := data.Object.Raw.(*v1.PersistentVolume)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{pv.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: PERSISTENTVOLUME_NAMESPACE,
+						Raw: &PersistentVolumeNamespace{
+							PersistentVolume:       pv,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getPVCNamesapceLink(pvcList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range pvcList {
+		pvc, ok := data.Object.Raw.(*v1.PersistentVolumeClaim)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{pvc.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: PERSISTENTVOLUMECLAIM_NAMESPACE,
+						Raw: &PersistentVolumeClaimNamespace{
+							PersistentVolumeClaim:       pvc,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) getStorageClassNamesapceLink(scList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range scList {
+		sc, ok := data.Object.Raw.(*storage.StorageClass)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{sc.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: STORAGECLASS_NAMESPACE,
+						Raw: &StorageClassNamespace{
+							StorageClass:       sc,
+							Namespace: n.Raw.(*v1.Namespace),
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+func (g *LinkGenerator) getIngressNamesapceLink(ingressList []*K8sMetaEvent) []*K8sMetaEvent {
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range ingressList {
+		ingress, ok := data.Object.Raw.(*networking.Ingress)
+		if !ok {
+			continue
+		}
+		nsList := g.metaCache[NAMESPACE].Get([]string{ingress.Namespace})
+		for _, ns := range nsList{
+			for _, n := range ns{
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: INGRESS_NAMESPACE,
+						Raw: &IngressNamespace{
+							Ingress:       ingress,
+							Namespace: n.Raw.(*v1.Namespace),
 						},
 						FirstObservedTime: data.Object.FirstObservedTime,
 						LastObservedTime:  data.Object.LastObservedTime,
