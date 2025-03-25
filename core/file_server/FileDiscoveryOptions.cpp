@@ -748,11 +748,11 @@ bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, co
     }
     // if update all, clear and reset
     mContainerInfos->clear();
-    for (unordered_map<string, ContainerInfo>::iterator iter = allPathMap.begin(); iter != allPathMap.end(); ++iter) {
-        if (!mDeduceAndSetContainerBaseDirFunc(iter->second, ctx, this)) {
-            return false;
+    for (auto& iter : allPathMap) {
+        if (!mDeduceAndSetContainerBaseDirFunc(iter.second, ctx, this)) {
+            continue;
         }
-        mContainerInfos->push_back(iter->second);
+        mContainerInfos->push_back(iter.second);
     }
     return true;
 }
