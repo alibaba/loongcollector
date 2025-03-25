@@ -46,7 +46,6 @@ const (
 
 	//add namespace link
 	POD_NAMESPACE                   = "pod->namesapce"
-	NODE_NAMESPACE                  = "mode->namesapce"
 	SERVICE_NAMESPACE               = "service->namesapce"
 	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
 	DAEMONSET_NAMESPACE             = "daemonset->namesapce"
@@ -146,11 +145,6 @@ type PodContainer struct {
 type PodNamespace struct {
 	Pod       *v1.Pod
 	Namespace *v1.Namespace
-}
-
-type NodeNamespace struct {
-	Node       *v1.Node
-	Namespace  *v1.Namespace
 }
 
 type ServiceNamespace struct {

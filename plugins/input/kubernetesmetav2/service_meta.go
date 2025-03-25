@@ -48,7 +48,6 @@ type ServiceK8sMeta struct {
 
 	// add link for namesapce
 	Namespace2Pod                   string
-	Namespace2Node                  string
 	Namespace2Service               string
 	Namespace2Deployment            string
 	Namespace2DaemonSet             string

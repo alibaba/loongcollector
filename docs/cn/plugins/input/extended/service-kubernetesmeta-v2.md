@@ -47,7 +47,6 @@
 | Ingress2Service | string, 无默认值（可选） | Ingress到Service的关系名，不填则不生成关系。 |
 | Pod2PersistentVolumeClaim | string, 无默认值（可选） | Pod到PersistentVolumeClaim的关系名，不填则不生成关系。 |
 | Namespace2Pod | string, 无默认值（可选） | Namespace到Pod的关系名，不填则不生成关系。 |
-| Namespace2Node | string, 无默认值（可选） | Namespace到Node的关系名，不填则不生成关系。 |
 | Namespace2Service | string, 无默认值（可选） | Namespace到Service的关系名，不填则不生成关系。 |
 | Namespace2Deployment | string, 无默认值（可选） | Namespace到Deployment的关系名，不填则不生成关系。 |
 | Namespace2DaemonSet | string, 无默认值（可选） | Namespace到DaemonSet的关系名，不填则不生成关系。 |

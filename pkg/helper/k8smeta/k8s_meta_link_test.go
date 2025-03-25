@@ -1008,6 +1008,267 @@ func TestGetIngressServiceLink(t *testing.T) {
 	assert.Equal(t, "service2", results[1].Object.Raw.(*IngressService).Service.Name)
 }
 
+func TestGetPodNamespaceLink(t *testing.T) {
+	podCache := newK8sMetaCache(make(chan struct{}), POD)
+	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("default"),
+	})
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("kube-system"),
+	})
+	pod1 := generateMockPod("1")
+	pod1.Raw.(*corev1.Pod).Namespace = "default"
+	pod2 := generateMockPod("2")
+	pod2.Raw.(*corev1.Pod).Namespace = "kube-system"
+	pod3 := generateMockPod("3")
+	pod3.Raw.(*corev1.Pod).Namespace = "kube-system"
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    pod1,
+	})
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    pod2,
+	})
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    pod3,
+	})
+	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		POD:  podCache,
+		NAMESPACE: namespaceCache,
+	})
+	podList := []*K8sMetaEvent{
+		{
+			EventType: "update",
+			Object:    podCache.metaStore.Items["default/pod1"],
+		},
+		{
+			EventType: "update",
+			Object:    podCache.metaStore.Items["kube-system/pod2"],
+		},
+		{
+			EventType: "update",
+			Object:    podCache.metaStore.Items["kube-system/pod3"],
+		},
+	}
+	results := linkGenerator.getPodNamespaceLink(podList)
+	assert.Equal(t, 3, len(results))
+	assert.Equal(t, "default", results[0].Object.Raw.(*PodNamespace).Namespace.Name)
+	assert.Equal(t, "pod1", results[0].Object.Raw.(*PodNamespace).Pod.Name)
+	assert.Equal(t, "kube-system", results[1].Object.Raw.(*PodNamespace).Namespace.Name)
+	assert.Equal(t, "pod2", results[1].Object.Raw.(*PodNamespace).Pod.Name)
+	assert.Equal(t, "kube-system", results[2].Object.Raw.(*PodNamespace).Namespace.Name)
+	assert.Equal(t, "pod3", results[2].Object.Raw.(*PodNamespace).Pod.Name)
+	assert.Equal(t, POD_NAMESPACE, results[0].Object.ResourceType)
+}
+
+func TestGetServiceNamespaceLink(t *testing.T) {
+	serviceCache := newK8sMetaCache(make(chan struct{}), SERVICE)
+	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("default"),
+	})
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("kube-system"),
+	})
+	service1:= &ObjectWrapper{
+		Raw: &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service1",
+				Namespace: "default",
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					"app": "test",
+				},
+			},
+		},
+	}
+	service2:= &ObjectWrapper{
+		Raw: &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service2",
+				Namespace: "kube-system",
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					"app": "test",
+				},
+			},
+		},
+	}
+	serviceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    service1,
+	})
+	serviceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    service2,
+	})
+
+	serviceList := []*K8sMetaEvent{
+		{
+			EventType: "update",
+			Object:    service1,
+		},
+		{
+			EventType: "update",
+			Object:    service2,
+		},
+	}
+	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		SERVICE:  serviceCache,
+		NAMESPACE: namespaceCache,
+	})
+
+	results := linkGenerator.getServiceNamespaceLink(serviceList)
+	assert.Equal(t, 2, len(results))
+	assert.Equal(t, "default", results[0].Object.Raw.(*ServiceNamespace).Namespace.Name)
+	assert.Equal(t, "service1", results[0].Object.Raw.(*ServiceNamespace).Service.Name)
+	assert.Equal(t, "kube-system", results[1].Object.Raw.(*ServiceNamespace).Namespace.Name)
+	assert.Equal(t, "service2", results[1].Object.Raw.(*ServiceNamespace).Service.Name)
+	assert.Equal(t, SERVICE_NAMESPACE, results[0].Object.ResourceType)
+
+}
+
+func TestGetDeploymentNamespaceLink(t *testing.T) {
+	deploymentCache := newK8sMetaCache(make(chan struct{}), DEPLOYMENT)
+	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("default"),
+	})
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("kube-system"),
+	})
+	deployment1:= &ObjectWrapper{
+		Raw: &app.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "deployment1",
+				Namespace: "default",
+			},
+		},
+	}
+	deployment2:= &ObjectWrapper{
+		Raw: &app.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "deployment2",
+				Namespace: "kube-system",
+			},
+		},
+	}
+	deploymentCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    deployment1,
+	})
+	deploymentCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    deployment2,
+	})
+
+	deploymentList := []*K8sMetaEvent{
+		{
+			EventType: "update",
+			Object:    deployment1,
+		},
+		{
+			EventType: "update",
+			Object:    deployment2,
+		},
+	}
+	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		DEPLOYMENT:  deploymentCache,
+		NAMESPACE: namespaceCache,
+	})
+
+	results := linkGenerator.getDeploymentNamespaceLink(deploymentList)
+	assert.Equal(t, 2, len(results))
+	assert.Equal(t, "default", results[0].Object.Raw.(*DeploymentNamespace).Namespace.Name)
+	assert.Equal(t, "deployment1", results[0].Object.Raw.(*DeploymentNamespace).Deployment.Name)
+	assert.Equal(t, "kube-system", results[1].Object.Raw.(*DeploymentNamespace).Namespace.Name)
+	assert.Equal(t, "deployment2", results[1].Object.Raw.(*DeploymentNamespace).Deployment.Name)
+	assert.Equal(t, DEPLOYMENT_NAMESPACE, results[0].Object.ResourceType)
+
+}
+
+func TestGetDaemonSetNamespaceLink(t *testing.T) {
+	daemonSetCache := newK8sMetaCache(make(chan struct{}), DEPLOYMENT)
+	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("default"),
+	})
+	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object: generateMockNamespace("kube-system"),
+	})
+	daemonset1:= &ObjectWrapper{
+		Raw: &app.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "daemonset1",
+				Namespace: "default",
+			},
+		},
+	}
+	daemonset2:= &ObjectWrapper{
+		Raw: &app.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "daemonset2",
+				Namespace: "kube-system",
+			},
+		},
+	}
+	daemonSetCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    daemonset1,
+	})
+	daemonSetCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: "add",
+		Object:    daemonset2,
+	})
+
+	daemonsetList := []*K8sMetaEvent{
+		{
+			EventType: "update",
+			Object:    daemonset1,
+		},
+		{
+			EventType: "update",
+			Object:    daemonset2,
+		},
+	}
+	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		DAEMONSET:  daemonSetCache,
+		NAMESPACE:  namespaceCache,
+	})
+
+	results := linkGenerator.getDaemonSetNamespaceLink(daemonsetList)
+	assert.Equal(t, 2, len(results))
+	assert.Equal(t, "default", results[0].Object.Raw.(*DaemonSetNamespace).Namespace.Name)
+	assert.Equal(t, "daemonset1", results[0].Object.Raw.(*DaemonSetNamespace).DaemonSet.Name)
+	assert.Equal(t, "kube-system", results[1].Object.Raw.(*DaemonSetNamespace).Namespace.Name)
+	assert.Equal(t, "daemonset2", results[1].Object.Raw.(*DaemonSetNamespace).DaemonSet.Name)
+	assert.Equal(t, DAEMONSET_NAMESPACE, results[0].Object.ResourceType)
+}
+
+func generateMockNamespace(namespaceName string) *ObjectWrapper {
+	return &ObjectWrapper{
+		Raw: &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespaceName,
+				Namespace: namespaceName,// Namespace: "namespace1",
+			},
+		},
+	}
+}
+
 func generateMockPod(index string) *ObjectWrapper {
 	return &ObjectWrapper{
 		Raw: &corev1.Pod{

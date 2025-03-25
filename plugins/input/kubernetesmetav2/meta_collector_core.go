@@ -310,17 +310,7 @@ func (m *metaCollector) processPodNamespaceLink(data *k8smeta.ObjectWrapper, met
 	}
 	return nil
 }
-func (m *metaCollector) processNodeNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*k8smeta.NodeNamespace); ok {
-		log := &models.Log{}
-		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.Node.Kind, obj.Node.Namespace, obj.Node.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Node)
-		log.Timestamp = uint64(time.Now().Unix())
-		return []models.PipelineEvent{log}
-	}
-	return nil
-}
+
 func (m *metaCollector) processServiceNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	if obj, ok := data.Raw.(*k8smeta.ServiceNamespace); ok {
 		log := &models.Log{}

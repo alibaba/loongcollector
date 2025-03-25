@@ -64,19 +64,18 @@ func (m *metaCollector) Start() error {
 		k8smeta.INGRESS_SERVICE:          m.processIngressServiceLink,
 		
 		//add namesapce to xx link processor
-		k8smeta.NAMESPACE_POD:                   m.processPodNamespaceLink,
-		k8smeta.NAMESPACE_NODE:                  m.processNodeNamespaceLink,
-		k8smeta.NAMESPACE_SERVICE:               m.processServiceNamespaceLink,
-		k8smeta.NAMESPACE_DEPLOYMENT:            m.processDeploymentNamespaceLink,
-		k8smeta.NAMESPACE_DAEMONSET:             m.processDaemonSetNamespaceLink,
-		k8smeta.NAMESPACE_STATEFULSET:           m.processStatefulNamespaceSetLink,
-		k8smeta.NAMESPACE_CONFIGMAP:             m.processConfigMapNamespaceLink,
-		k8smeta.NAMESPACE_JOB:                   m.processJobNamespaceLink,
-		k8smeta.NAMESPACE_CRONJOB:               m.processCronJobNamespaceLink,
-		k8smeta.NAMESPACE_PERSISTENTVOLUME:      m.processPVNamespaceLink,
-		k8smeta.NAMESPACE_PERSISTENTVOLUMECLAIM: m.processPVCNamespaceLink,
-		k8smeta.NAMESPACE_STORAGECLASS:          m.processStorageClassNamespaceLink,
-		k8smeta.NAMESPACE_INGRESS:               m.processIngressNamespaceLink,
+		k8smeta.POD_NAMESPACE:                   m.processPodNamespaceLink,
+		k8smeta.SERVICE_NAMESPACE:               m.processServiceNamespaceLink,
+		k8smeta.DEPLOYMENT_NAMESPACE:            m.processDeploymentNamespaceLink,
+		k8smeta.DAEMONSET_NAMESPACE:             m.processDaemonSetNamespaceLink,
+		k8smeta.STATEFULSET_NAMESPACE:           m.processStatefulNamespaceSetLink,
+		k8smeta.CONFIGMAP_NAMESPACE:             m.processConfigMapNamespaceLink,
+		k8smeta.JOB_NAMESPACE:                   m.processJobNamespaceLink,
+		k8smeta.CRONJOB_NAMESPACE:               m.processCronJobNamespaceLink,
+		k8smeta.PERSISTENTVOLUME_NAMESPACE:      m.processPVNamespaceLink,
+		k8smeta.PERSISTENTVOLUMECLAIM_NAMESPACE: m.processPVCNamespaceLink,
+		k8smeta.STORAGECLASS_NAMESPACE:          m.processStorageClassNamespaceLink,
+		k8smeta.INGRESS_NAMESPACE:               m.processIngressNamespaceLink,
 	}
 
 	if m.serviceK8sMeta.Pod {
@@ -165,43 +164,40 @@ func (m *metaCollector) Start() error {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Namespace2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_POD, m.handleEvent, m.serviceK8sMeta.Interval)
-	}
-	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Node && m.serviceK8sMeta.Namespace2Node != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_NODE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Service && m.serviceK8sMeta.Namespace2Service != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Deployment && m.serviceK8sMeta.Namespace2Deployment != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.DaemonSet && m.serviceK8sMeta.Namespace2DaemonSet != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.StatefulSet && m.serviceK8sMeta.Namespace2StatefulSet != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Configmap && m.serviceK8sMeta.Namespace2ConfigMap != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Job && m.serviceK8sMeta.Namespace2Job != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_JOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.CronJob && m.serviceK8sMeta.Namespace2CronJob != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.PersistentVolume && m.serviceK8sMeta.Namespace2PersistentVolume != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_PERSISTENTVOLUME, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUME_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.PersistentVolumeClaim && m.serviceK8sMeta.Namespace2PersistentVolumeClaim != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_PERSISTENTVOLUMECLAIM, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.StorageClass && m.serviceK8sMeta.Namespace2StorageClass != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_STORAGECLASS, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STORAGECLASS_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Ingress && m.serviceK8sMeta.Namespace2Ingress != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE_INGRESS, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
 
 	go m.sendInBackground()
