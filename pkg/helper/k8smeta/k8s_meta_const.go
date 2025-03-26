@@ -5,7 +5,6 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
-	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -180,20 +179,11 @@ type CronJobNamespace struct {
 	Namespace      *v1.Namespace
 }
 
-type PersistentVolumeNamespace struct {
-	PersistentVolume        *v1.PersistentVolume
-	Namespace               *v1.Namespace
-}
-
 type PersistentVolumeClaimNamespace struct {
 	PersistentVolumeClaim   *v1.PersistentVolumeClaim
 	Namespace               *v1.Namespace
 }
 
-type StorageClassNamespace struct {
-	StorageClass            *storage.StorageClass
-	Namespace               *v1.Namespace
-}
 
 type IngressNamespace struct {
 	Ingress            *networking.Ingress

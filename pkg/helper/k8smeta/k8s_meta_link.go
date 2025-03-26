@@ -6,7 +6,6 @@ import (
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	networking "k8s.io/api/networking/v1"
-	storage "k8s.io/api/storage/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

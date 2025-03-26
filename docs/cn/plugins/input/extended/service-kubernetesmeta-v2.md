@@ -54,9 +54,7 @@
 | Namespace2Configmap | string, 无默认值（可选） | Namespace到Configmap的关系名，不填则不生成关系。 |
 | Namespace2Job | string, 无默认值（可选） | Namespace到Job的关系名，不填则不生成关系。 |
 | Namespace2CronJob | string, 无默认值（可选） | Namespace到CronJob的关系名，不填则不生成关系。 |
-| Namespace2PersistentVolume | string, 无默认值（可选） | Namespace到PersistentVolume的关系名，不填则不生成关系。 |
 | Namespace2PersistentVolumeClaim | string, 无默认值（可选） | Namespace到PersistentVolumeClaim的关系名，不填则不生成关系。 |
-| Namespace2StorageClass | string, 无默认值（可选） | Namespace到StorageClass的关系名，不填则不生成关系。 |
 | Namespace2Ingress | string, 无默认值（可选） | Namespace到Ingress的关系名，不填则不生成关系。 |
 
 ## 环境变量
