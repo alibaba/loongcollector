@@ -223,7 +223,5 @@
 
 ## Awesome iLogtail <a href="#awesome-ilogtail" id="awesome-ilogtail"></a>
 
-* [走近iLogtail社区版](awesome-ilogtail/awesome-ilogtail.md)
-* [iLogtail社区版使用入门](awesome-ilogtail/awesome-ilogtail-getting-started.md)
-* [iLogtail社区版开发者指南](awesome-ilogtail/awesome-ilogtail-developer-guide.md)
-* [iLogtail社区版使用案例](awesome-ilogtail/awesome-ilogtail-use-cases.md)
+* [走近LoongCollector社区版](awesome-ilogtail/awesome-ilogtail.md)
+* [LoongCollector社区版开发使用经验](awesome-ilogtail/awesome-ilogtail-getting-started.md)
