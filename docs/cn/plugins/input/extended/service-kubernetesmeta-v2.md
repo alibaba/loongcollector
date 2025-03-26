@@ -46,6 +46,7 @@
 | Job2Pod | string, 无默认值（可选） | Job到Pod的关系名，不填则不生成关系。 |
 | Ingress2Service | string, 无默认值（可选） | Ingress到Service的关系名，不填则不生成关系。 |
 | Pod2PersistentVolumeClaim | string, 无默认值（可选） | Pod到PersistentVolumeClaim的关系名，不填则不生成关系。 |
+| Pod2Configmap | string, 无默认值（可选） | Pod到Configmap的关系名，不填则不生成关系。 |
 | Namespace2Pod | string, 无默认值（可选） | Namespace到Pod的关系名，不填则不生成关系。 |
 | Namespace2Service | string, 无默认值（可选） | Namespace到Service的关系名，不填则不生成关系。 |
 | Namespace2Deployment | string, 无默认值（可选） | Namespace到Deployment的关系名，不填则不生成关系。 |
