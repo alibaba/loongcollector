@@ -113,7 +113,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 				line, err := buf.ReadString('\n')
 				if err != nil {
 					if err != io.EOF && err != io.ErrClosedPipe {
-						logger.Warning(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "stdoutSyner done, id", ss.info.IDPrefix(),
+						logger.Warning(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "stdoutSyner done, id", ss.info.IDPrefix(),
 							"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status(), "source", source, "error", err)
 					}
 					logger.Debug(ss.context.GetRuntimeContext(), "docker source stop", source, "id", ss.info.IDPrefix(),
@@ -149,7 +149,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 				}
 				if err != nil {
 					if err != io.EOF && err != io.ErrClosedPipe {
-						logger.Warning(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "stdoutSyner done, id", ss.info.IDPrefix(),
+						logger.Warning(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "stdoutSyner done, id", ss.info.IDPrefix(),
 							"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status(), "source", source, "error", err)
 					}
 					logger.Debug(ss.context.GetRuntimeContext(), "docker source stop", source, "name", ss.info.ContainerInfo.Name, "error", err)
@@ -190,7 +190,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					values[2] += logLine
 					// check very big line
 					if len(values[2]) >= ss.maxLogSize {
-						logger.Warning(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "log line is too long, force flush out", len(values[2]), "log prefix", util.CutString(values[2], 4096))
+						logger.Warning(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "log line is too long, force flush out", len(values[2]), "log prefix", util.CutString(values[2], 4096))
 						c.AddDataArray(tags, keys, values)
 						values[2] = ""
 					}
@@ -225,7 +225,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 		if len(ss.startCheckPoint) > 0 {
 			var err error
 			if cpTime, err = time.Parse(helper.DockerTimeFormat, ss.startCheckPoint); err != nil {
-				logger.Warning(ss.context.GetRuntimeContext(), "CHECKPOINT_ALARM", "docker stdout raw parse start time error", ss.startCheckPoint,
+				logger.Warning(ss.context.GetRuntimeContext(), util.CheckpointAlarm, "docker stdout raw parse start time error", ss.startCheckPoint,
 					"id", ss.info.IDPrefix(),
 					"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status())
 			} else {
@@ -269,7 +269,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 		// loop to copy logs to parser
 		logReader, err := ss.client.ContainerLogs(ss.runtimeContext, ss.info.ContainerInfo.ID, options)
 		if err != nil {
-			logger.Errorf(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "open container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
+			logger.Errorf(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "open container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 				err.Error(), ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 			break
 		}
@@ -279,7 +279,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 			logger.Debugf(ss.context.GetRuntimeContext(), "read container log bytes=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 				written, ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 			if err != nil && err != context.Canceled {
-				logger.Errorf(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "read container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
+				logger.Errorf(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "read container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 					err.Error(), ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 			}
 		} else {
@@ -287,13 +287,13 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 			logger.Debugf(ss.context.GetRuntimeContext(), "read container log bytes=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 				written, ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 			if err != nil && err != context.Canceled {
-				logger.Errorf(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "read container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
+				logger.Errorf(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "read container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 					err.Error(), ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 			}
 		}
 		// loop broken if container exits
 		if closeErr := logReader.Close(); closeErr != nil {
-			logger.Warningf(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "close container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
+			logger.Warningf(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "close container log error=%v, id:%v\tname:%v\tcreated:%v\tstatus:%v",
 				closeErr, ss.info.IDPrefix(), ss.info.ContainerInfo.Name, ss.info.ContainerInfo.Created, ss.info.Status())
 		}
 		_ = outrd.CloseWithError(io.EOF)
@@ -311,7 +311,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 			return
 		default:
 			// after sleep, we need recheck if runtime context is done
-			logger.Warning(ss.context.GetRuntimeContext(), "DOCKER_STDOUT_STOP_ALARM", "stdoutSyner stop, retry after 10 seconds, id", ss.info.IDPrefix(),
+			logger.Warning(ss.context.GetRuntimeContext(), util.DockerStdoutStopAlarm, "stdoutSyner stop, retry after 10 seconds, id", ss.info.IDPrefix(),
 				"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status(), "error", err)
 			if util.RandomSleep(time.Second*time.Duration(10), 0.1, ss.runtimeContext.Done()) {
 				logger.Info(ss.context.GetRuntimeContext(), "docker stdout raw", "stop", "id", ss.info.IDPrefix(),
@@ -377,11 +377,11 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	var err error
 	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), util.InputInitAlarm, "init include env regex error", err)
 	}
 	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeEnv)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude env regex error", err)
 	}
 	if sds.IncludeLabel != nil {
 		for k, v := range sds.IncludeContainerLabel {
@@ -399,11 +399,11 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	}
 	sds.IncludeLabel, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeLabel)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), util.InputInitAlarm, "init include label regex error", err)
 	}
 	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude label regex error", err)
 	}
 	sds.K8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
 
@@ -438,7 +438,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 			var reg *regexp.Regexp
 			if len(sds.BeginLineRegex) > 0 {
 				if reg, err = regexp.Compile(sds.BeginLineRegex); err != nil {
-					logger.Warning(sds.context.GetRuntimeContext(), "REGEX_COMPILE_ALARM", "compile begin line regex error, regex", sds.BeginLineRegex, "error", err)
+					logger.Warning(sds.context.GetRuntimeContext(), util.DockerRegexCompileAlarm, "compile begin line regex error, regex", sds.BeginLineRegex, "error", err)
 				}
 			}
 			syner = &stdoutSyner{
@@ -512,7 +512,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 
 	var err error
 	if sds.client, err = helper.CreateDockerClient(); err != nil {
-		logger.Error(sds.context.GetRuntimeContext(), "DOCKER_CLIENT_ALARM", "create docker client error", err)
+		logger.Error(sds.context.GetRuntimeContext(), util.DockerCenterAlarm, "create docker client error", err)
 		return err
 	}
 	var cancelFun context.CancelFunc

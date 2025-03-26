@@ -282,7 +282,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 							}
 							// wait until shutdown is active
 							if tryCount%100 == 0 {
-								logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), "AGGREGATOR_ADD_ALARM", "error", err)
+								logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorAddAlarm, "error", err)
 							}
 							time.Sleep(time.Millisecond * 10)
 						}
@@ -352,7 +352,7 @@ func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 						err := flusher.Flush(p.LogstoreConfig.ProjectName,
 							p.LogstoreConfig.LogstoreName, p.LogstoreConfig.ConfigName, logGroups)
 						if err != nil {
-							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error",
+							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.SendDataFailAlarm, "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)
 						}
 					}
@@ -405,7 +405,7 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	}
 	for idx, flusher := range p.FlusherPlugins {
 		if err := flusher.Flusher.Stop(); err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_FLUSHER_ALARM",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.FlusherStopAlarm,
 				"Failed to stop %vth flusher (description: %v): %v",
 				idx, flusher.Flusher.Description(), err)
 		}
@@ -415,7 +415,7 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	for _, extension := range p.ExtensionPlugins {
 		err := extension.Stop()
 		if err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_EXTENSION_ALARM",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.ExtensionAlarm,
 				"failed to stop extension (description: %v): %v", extension.Description(), err)
 		}
 	}

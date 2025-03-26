@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorStringReplace struct {
@@ -66,7 +67,7 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 	case MethodRegex:
 		p.re, err = regexp2.Compile(p.Match, regexp2.RE2)
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Match)
+			logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "init regex error", err, "regex", p.Match)
 			return err
 		}
 	case MethodUnquote:
@@ -111,7 +112,7 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 				newContVal = cont.Value
 			}
 			if err != nil {
-				logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "process log error", err)
+				logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "process log error", err)
 				newContVal = cont.Value
 			}
 			if len(p.DestKey) > 0 {

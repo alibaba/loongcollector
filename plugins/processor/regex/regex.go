@@ -56,7 +56,7 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 	// `(?s)` change the meaning of `.` in Golang to match the every character, and the default meaning is not match a newline.
 	p.re, err = regexp.Compile("(?s)" + p.Regex)
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Regex)
+		logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "init regex error", err, "regex", p.Regex)
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (p *ProcessorRegex) ProcessLog(log *protocol.Log) {
 		}
 	}
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "REGEX_FIND_ALARM", "anchor cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), util.RegexFindAlarm, "anchor cannot find key", p.SourceKey)
 	}
 	p.logPairMetric.Add(int64(len(log.Contents) - beginLen + 1))
 }
@@ -106,7 +106,7 @@ func (p *ProcessorRegex) processRegex(log *protocol.Log, val *string) bool {
 	indexArray := p.re.FindStringSubmatchIndex(*val)
 	if len(indexArray) < 2 || (p.FullMatch && (indexArray[0] != 0 || indexArray[1] != len(*val))) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), "REGEX_UNMATCHED_ALARM", "unmatch this log content", util.CutString(*val, 512))
+			logger.Warning(p.context.GetRuntimeContext(), util.RegexUnmatchedAlarm, "unmatch this log content", util.CutString(*val, 512))
 		}
 		return false
 	}
@@ -114,7 +114,7 @@ func (p *ProcessorRegex) processRegex(log *protocol.Log, val *string) bool {
 	// Use bitwise operations to ignore first two values in indexArray.
 	if (len(indexArray)>>1 - 1) < len(p.Keys) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), "REGEX_UNMATCHED_ALARM", "match result count less than key count, result count", len(indexArray)>>1-1, "key count", len(p.Keys))
+			logger.Warning(p.context.GetRuntimeContext(), util.RegexUnmatchedAlarm, "match result count less than key count, result count", len(indexArray)>>1-1, "key count", len(p.Keys))
 		}
 		return false
 	}
