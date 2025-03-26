@@ -21,6 +21,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,6 +144,12 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 			Driver:      mount.Driver,
 		})
 	}
+	sortMounts := func(mounts []types.MountPoint) {
+		sort.Slice(mounts, func(i, j int) bool {
+			return mounts[i].Source < mounts[j].Source
+		})
+	}
+	sortMounts(dockerContainer.Mounts)
 	return dockerContainer
 }
 
