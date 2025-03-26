@@ -8,6 +8,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v2.0.4 及以上
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
@@ -20,14 +24,14 @@
 
 采集文件`/home/test-log/reg.log`，通过正则表达式解析日志内容并提取字段，然后只采集method为POST或PUT且状态码为200的日志，并将结果输出到stdout。
 
-- 输入
+* 输入
 
 ```plain
 127.0.0.1 - - [07/Jul/2022:10:43:30 +0800] "POST /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"
 127.0.0.1 - - [07/Jul/2022:10:44:30 +0800] "Get /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"
 ```
 
-- 采集配置
+* 采集配置
 
 ```yaml
 enable: true
@@ -62,7 +66,7 @@ flushers:
     OnlyStdout: true
 ```
 
-- 输出
+* 输出
 
 ```json
 {

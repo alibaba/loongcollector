@@ -10,6 +10,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.0.27 及以上
+
 ## 配置参数
 
 ### `processor_split_char`配置

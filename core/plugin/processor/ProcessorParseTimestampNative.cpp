@@ -127,19 +127,19 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
                                                  LogtailTime& logTime,
                                                  StringView& timeStrCache) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
-        mOutKeyNotFoundEventsTotal->Add(1);
+        ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         return true;
     }
     const StringView& timeStr = sourceEvent.GetContent(mSourceKey);
     uint64_t preciseTimestamp = 0;
     bool parseSuccess = ParseLogTime(timeStr, logPath, logTime, preciseTimestamp, timeStrCache);
     if (!parseSuccess) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     if (logTime.tv_sec <= 0
@@ -157,12 +157,13 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
             }
             AlarmManager::GetInstance()->SendAlarm(OUTDATED_LOG_ALARM,
                                                    std::string("logTime: ") + ToString(logTime.tv_sec),
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
-        mHistoryFailureTotal->Add(1);
-        mDiscardedEventsTotal->Add(1);
+        ADD_COUNTER(mHistoryFailureTotal, 1);
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
         return false;
     }
     sourceEvent.SetTimestamp(logTime.tv_sec, logTime.tv_nsec);
@@ -171,7 +172,7 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
     //     sb.size = std::min(20, snprintf(sb.data, sb.capacity, "%lu", preciseTimestamp));
     //     sourceEvent.SetContentNoCopy(mLegacyPreciseTimestampConfig.key, StringView(sb.data, sb.size));
     // }
-    mOutSuccessfulEventsTotal->Add(1);
+    ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     return true;
 }
 
@@ -213,9 +214,10 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
             }
             AlarmManager::GetInstance()->SendAlarm(PARSE_TIME_FAIL_ALARM,
                                                    curTimeStr.to_string() + " " + mSourceFormat,
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
         }
         return false;
     }

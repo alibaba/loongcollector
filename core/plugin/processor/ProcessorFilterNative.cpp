@@ -30,108 +30,11 @@ const std::string ProcessorFilterNative::sName = "processor_filter_regex_native"
 bool ProcessorFilterNative::Init(const Json::Value& config) {
     std::string errorMsg;
 
-    // FilterKey + FilterRegex
-    std::vector<std::string> filterKeys, filterRegs;
-    if (!GetOptionalListParam(config, "FilterKey", filterKeys, errorMsg)
-        || !GetOptionalListParam(config, "FilterRegex", filterRegs, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    } else if (filterKeys.size() != filterRegs.size()) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             "param FilterKey and FilterRegex does not have the same size",
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    } else if (!filterKeys.empty()) {
-        bool hasError = false;
-        std::vector<boost::regex> regs;
-        for (const auto& reg : filterRegs) {
-            if (!IsRegexValid(reg)) {
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "value in list param FilterRegex is not a valid regex",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
-                hasError = true;
-                break;
-            }
-            regs.emplace_back(reg);
-        }
-        if (!hasError) {
-            mFilterRule = std::make_shared<LogFilterRule>();
-            mFilterRule->FilterKeys = filterKeys;
-            mFilterRule->FilterRegs = regs;
-            mFilterMode = Mode::RULE_MODE;
-        }
-    }
-
-    // TODO: deprecated, remove in the future
-    // Include
-    if (mFilterMode == Mode::BYPASS_MODE) {
-        if (!GetOptionalMapParam(config, "Include", mInclude, errorMsg)) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
-        } else if (!mInclude.empty()) {
-            std::vector<std::string> keys;
-            std::vector<boost::regex> regs;
-            bool hasError = false;
-            for (auto& include : mInclude) {
-                if (!IsRegexValid(include.second)) {
-                    PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                         mContext->GetAlarm(),
-                                         "value in map param Include is not a valid regex",
-                                         sName,
-                                         mContext->GetConfigName(),
-                                         mContext->GetProjectName(),
-                                         mContext->GetLogstoreName(),
-                                         mContext->GetRegion());
-                    hasError = true;
-                    break;
-                }
-                keys.emplace_back(include.first);
-                regs.emplace_back(boost::regex(include.second));
-            }
-            if (!hasError) {
-                mFilterRule = std::make_shared<LogFilterRule>();
-                mFilterRule->FilterKeys = keys;
-                mFilterRule->FilterRegs = regs;
-                mFilterMode = Mode::RULE_MODE;
-            }
-        }
-    }
-
+    // for backward compatibility, ConditionExp prioritize over FilterKey and FilterRegex
     // ConditionExp
-    if (mFilterMode == Mode::BYPASS_MODE) {
-        const char* key = "ConditionExp";
-        const Json::Value* itr = config.find(key, key + strlen(key));
-        if (itr == nullptr) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               "param ConditionExp is missing",
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
+    const char* key = "ConditionExp";
+    const Json::Value* itr = config.find(key, key + strlen(key));
+    if (itr) {
         if (!itr->isObject()) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
                                mContext->GetAlarm(),
@@ -158,14 +61,83 @@ bool ProcessorFilterNative::Init(const Json::Value& config) {
     }
 
     if (mFilterMode == Mode::BYPASS_MODE) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           "neither param Include nor param ConditionExp is valid",
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+        // FilterKey + FilterRegex
+        std::vector<std::string> filterKeys, filterRegs;
+        if (!GetOptionalListParam(config, "FilterKey", filterKeys, errorMsg)
+            || !GetOptionalListParam(config, "FilterRegex", filterRegs, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        } else if (filterKeys.size() != filterRegs.size()) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "param FilterKey and FilterRegex does not have the same size",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        } else if (!filterKeys.empty()) {
+            std::vector<boost::regex> regs;
+            for (const auto& reg : filterRegs) {
+                if (!IsRegexValid(reg)) {
+                    PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                       mContext->GetAlarm(),
+                                       "value in list param FilterRegex is not a valid regex",
+                                       sName,
+                                       mContext->GetConfigName(),
+                                       mContext->GetProjectName(),
+                                       mContext->GetLogstoreName(),
+                                       mContext->GetRegion());
+                }
+                regs.emplace_back(reg);
+            }
+            mFilterRule = std::make_shared<LogFilterRule>();
+            mFilterRule->FilterKeys = filterKeys;
+            mFilterRule->FilterRegs = regs;
+            mFilterMode = Mode::RULE_MODE;
+        }
+    }
+
+    if (mFilterMode == Mode::BYPASS_MODE) {
+        // TODO: deprecated, remove in the future
+        // Include
+        if (!GetOptionalMapParam(config, "Include", mInclude, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        } else if (!mInclude.empty()) {
+            std::vector<std::string> keys;
+            std::vector<boost::regex> regs;
+            for (auto& include : mInclude) {
+                if (!IsRegexValid(include.second)) {
+                    PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                       mContext->GetAlarm(),
+                                       "value in map param Include is not a valid regex",
+                                       sName,
+                                       mContext->GetConfigName(),
+                                       mContext->GetProjectName(),
+                                       mContext->GetLogstoreName(),
+                                       mContext->GetRegion());
+                }
+                keys.emplace_back(include.first);
+                regs.emplace_back(boost::regex(include.second));
+            }
+            mFilterRule = std::make_shared<LogFilterRule>();
+            mFilterRule->FilterKeys = keys;
+            mFilterRule->FilterRegs = regs;
+            mFilterMode = Mode::RULE_MODE;
+        }
     }
 
     // DiscardingNonUTF8
@@ -298,9 +270,10 @@ bool ProcessorFilterNative::IsMatched(const LogEvent& contents, const LogFilterR
                 if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
                     GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                                       "regex_match in Filter fail:" + exception,
+                                                      GetContext().GetRegion(),
                                                       GetContext().GetProjectName(),
-                                                      GetContext().GetLogstoreName(),
-                                                      GetContext().GetRegion());
+                                                      GetContext().GetConfigName(),
+                                                      GetContext().GetLogstoreName());
                 }
             }
             return false;
@@ -496,9 +469,10 @@ bool RegexFilterValueNode::Match(const LogEvent& contents, const CollectionPipel
         if (mContext.GetAlarm().IsLowLevelAlarmValid()) {
             mContext.GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                           "regex_match in Filter fail:" + exception,
+                                          mContext.GetRegion(),
                                           mContext.GetProjectName(),
-                                          mContext.GetLogstoreName(),
-                                          mContext.GetRegion());
+                                          mContext.GetConfigName(),
+                                          mContext.GetLogstoreName());
         }
     }
     return result;

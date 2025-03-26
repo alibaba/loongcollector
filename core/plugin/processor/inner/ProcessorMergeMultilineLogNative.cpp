@@ -103,9 +103,10 @@ bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& 
     mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
                                    "unexpected error: some events are not supported.\tprocessor: " + sName
                                        + "\tconfig: " + mContext->GetConfigName(),
+                                   mContext->GetRegion(),
                                    mContext->GetProjectName(),
-                                   mContext->GetLogstoreName(),
-                                   mContext->GetRegion());
+                                   mContext->GetConfigName(),
+                                   mContext->GetLogstoreName());
     return false;
 }
 
@@ -207,9 +208,10 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                                            "unexpected error: some events do not have the sourceKey.\tSourceKey: "
                                                + mSourceKey + "\tprocessor: " + sName
                                                + "\tconfig: " + mContext->GetConfigName(),
+                                           mContext->GetRegion(),
                                            mContext->GetProjectName(),
-                                           mContext->GetLogstoreName(),
-                                           mContext->GetRegion());
+                                           mContext->GetConfigName(),
+                                           mContext->GetLogstoreName());
             return;
         }
         StringView sourceVal = sourceEvent->GetContent(mSourceKey);
@@ -232,7 +234,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                 // case: continue + end
                 // current line is matched against the end pattern rather than the continue pattern
                 begin = cur;
-                mMergedEventsTotal->Add(1);
+                ADD_COUNTER(mMergedEventsTotal, 1);
                 sourceEvents[newSize++] = std::move(sourceEvents[begin]);
             } else {
                 HandleUnmatchLogs(sourceEvents, newSize, cur, cur, logPath);
@@ -325,7 +327,7 @@ void ProcessorMergeMultilineLogNative::MergeEvents(std::vector<LogEvent*>& logEv
     if (logEvents.size() == 0) {
         return;
     }
-    mMergedEventsTotal->Add(logEvents.size());
+    ADD_COUNTER(mMergedEventsTotal, logEvents.size());
     if (logEvents.size() == 1) {
         logEvents.clear();
         return;
@@ -350,7 +352,7 @@ void ProcessorMergeMultilineLogNative::MergeEvents(std::vector<LogEvent*>& logEv
 
 void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
     std::vector<PipelineEventPtr>& logEvents, size_t& newSize, size_t begin, size_t end, StringView logPath) {
-    mUnmatchedEventsTotal->Add(end - begin + 1);
+    ADD_COUNTER(mUnmatchedEventsTotal, end - begin + 1);
     if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::DISCARD
         && mMultiline.mIgnoringUnmatchWarning) {
         return;
@@ -369,9 +371,10 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
                 "unmatched log line, first 1KB:" + sourceVal.substr(0, 1024).to_string() + "\taction: "
                     + UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment) + "\tfilepath: "
                     + logPath.to_string() + "\tprocessor: " + sName + "\tconfig: " + GetContext().GetConfigName(),
+                GetContext().GetRegion(),
                 GetContext().GetProjectName(),
-                GetContext().GetLogstoreName(),
-                GetContext().GetRegion());
+                GetContext().GetConfigName(),
+                GetContext().GetLogstoreName());
         }
         if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
             logEvents[newSize++] = std::move(logEvents[i]);

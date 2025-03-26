@@ -8,6 +8,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v2.0.0 及以上
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
@@ -24,13 +28,13 @@
 
 采集文件`/home/test-log/sen.log`，将日志内容中的密码替换成******，并将结果输出到stdout。
 
-- 输入
+* 输入
 
 ```json
 {"account":"1812213231432969","password":"04a23f38"}
 ```
 
-- 采集配置
+* 采集配置
 
 ```yaml
 enable: true
@@ -50,7 +54,7 @@ flushers:
     OnlyStdout: true
 ```
 
-- 输出
+* 输出
 
 ```json
 {

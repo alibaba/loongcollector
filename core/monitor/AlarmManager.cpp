@@ -57,7 +57,7 @@ AlarmManager::AlarmManager() {
     mMessageType[ENCRYPT_DECRYPT_FAIL_ALARM] = "ENCRYPT_DECRYPT_FAIL_ALARM";
     mMessageType[LOG_GROUP_PARSE_FAIL_ALARM] = "LOG_GROUP_PARSE_FAIL_ALARM";
     mMessageType[METRIC_GROUP_PARSE_FAIL_ALARM] = "METRIC_GROUP_PARSE_FAIL_ALARM";
-    mMessageType[LOGDIR_PERMINSSION_ALARM] = "LOGDIR_PERMINSSION_ALARM";
+    mMessageType[LOGDIR_PERMISSION_ALARM] = "LOGDIR_PERMISSION_ALARM";
     mMessageType[REGEX_MATCH_ALARM] = "REGEX_MATCH_ALARM";
     mMessageType[DISCARD_SECONDARY_ALARM] = "DISCARD_SECONDARY_ALARM";
     mMessageType[BINARY_UPDATE_ALARM] = "BINARY_UPDATE_ALARM";
@@ -179,6 +179,9 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             if (!messagePtr->mCategory.empty()) {
                 logEvent->SetContent("category", messagePtr->mCategory);
             }
+            if (!messagePtr->mConfig.empty()) {
+                logEvent->SetContent("config", messagePtr->mConfig);
+            }
         }
         lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
         alarmMap.clear();
@@ -214,9 +217,10 @@ AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(cons
 
 void AlarmManager::SendAlarm(const AlarmType alarmType,
                              const std::string& message,
+                             const std::string& region,
                              const std::string& projectName,
-                             const std::string& category,
-                             const std::string& region) {
+                             const std::string& config,
+                             const std::string& category) {
     if (alarmType < 0 || alarmType >= ALL_LOGTAIL_ALARM_NUM) {
         return;
     }
@@ -228,10 +232,10 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",
     // mMessageType[alarmType])("msg", message));
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
-    string key = projectName + "_" + category;
+    string key = projectName + "_" + category + "_" + config;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();

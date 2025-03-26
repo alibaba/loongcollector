@@ -35,7 +35,7 @@
 #include "unittest/pipeline/LogtailPluginMock.h"
 #endif
 
-DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
+DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", true);
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 DECLARE_FLAG_INT32(file_tags_update_interval);
 DECLARE_FLAG_STRING(agent_host_id);
@@ -58,9 +58,6 @@ LogtailPlugin::LogtailPlugin() {
     mPluginAlarmConfig.mLogstore = "logtail_alarm";
     mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
-    mPluginProfileConfig.mLogstore = "shennong_log_profile";
-    mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginProfileConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -236,7 +233,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             const char* shardHash,
                             int shardHashSize) {
     static FlusherSLS* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
-    static FlusherSLS* profileConfig = &(LogtailPlugin::GetInstance()->mPluginProfileConfig);
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
@@ -250,13 +246,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     FlusherSLS* pConfig = NULL;
     if (configNameStr == alarmConfig->mLogstore) {
         pConfig = alarmConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == profileConfig->mLogstore) {
-        pConfig = profileConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {

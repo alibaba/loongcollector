@@ -115,7 +115,7 @@ public:
     void TestStopAllDir() {
         LOG_INFO(sLogger, ("TestStopAllDir() begin", time(NULL)));
         std::string baseDir = "/basepath0";
-        EventDispatcher::GetInstance()->StopAllDir(baseDir);
+        EventDispatcher::GetInstance()->StopAllDir(baseDir, "");
         for (size_t i = 0; i < 10; ++i) {
             if (i < 4) {
                 APSARA_TEST_EQUAL_FATAL(mHandlers[i].handle_count, 1);

@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -67,16 +66,6 @@ func checkMixProcessMode(pluginCfg map[string]interface{}) mixProcessMode {
 	}
 }
 
-type LogstoreStatistics struct {
-	CollecLatencytMetric pipeline.LatencyMetric
-	RawLogMetric         pipeline.CounterMetric
-	SplitLogMetric       pipeline.CounterMetric
-	FlushLogMetric       pipeline.CounterMetric
-	FlushLogGroupMetric  pipeline.CounterMetric
-	FlushReadyMetric     pipeline.CounterMetric
-	FlushLatencyMetric   pipeline.LatencyMetric
-}
-
 type ConfigVersion string
 
 var (
@@ -98,7 +87,6 @@ type LogstoreConfig struct {
 
 	Version      ConfigVersion
 	Context      pipeline.Context
-	Statistics   LogstoreStatistics
 	PluginRunner PluginRunner
 	// private fields
 	configDetailHash string
@@ -108,18 +96,6 @@ type LogstoreConfig struct {
 	EnvSet                   map[string]struct{}
 	CollectingContainersMeta bool
 	pluginID                 int32
-}
-
-func (p *LogstoreStatistics) Init(context pipeline.Context) {
-	labels := helper.GetPluginCommonLabels(context, &pipeline.PluginMeta{})
-	metricsRecord := context.RegisterLogstoreConfigMetricRecord(labels)
-	p.CollecLatencytMetric = helper.NewLatencyMetricAndRegister(metricsRecord, "collect_latency")
-	p.RawLogMetric = helper.NewCounterMetricAndRegister(metricsRecord, "raw_log")
-	p.SplitLogMetric = helper.NewCounterMetricAndRegister(metricsRecord, "processed_log")
-	p.FlushLogMetric = helper.NewCounterMetricAndRegister(metricsRecord, "flush_log")
-	p.FlushLogGroupMetric = helper.NewCounterMetricAndRegister(metricsRecord, "flush_loggroup")
-	p.FlushReadyMetric = helper.NewAverageMetricAndRegister(metricsRecord, "flush_ready")
-	p.FlushLatencyMetric = helper.NewLatencyMetricAndRegister(metricsRecord, "flush_latency")
 }
 
 // Start initializes plugin instances in config and starts them.
@@ -351,6 +327,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if logstoreC.PluginRunner, err = initPluginRunner(logstoreC); err != nil {
 		return nil, err
 	}
+	if lastConfigRunner, hasLastConfig := LastUnsendBuffer[configName]; hasLastConfig {
+		// Move unsent LogGroups from last config to new config.
+		logstoreC.PluginRunner.Merge(lastConfigRunner)
+	}
 
 	logstoreC.ContainerLabelSet = make(map[string]struct{})
 	logstoreC.EnvSet = make(map[string]struct{})
@@ -467,8 +447,6 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if err = logstoreC.PluginRunner.Init(logQueueSize, logGroupSize); err != nil {
 		return nil, err
 	}
-
-	logstoreC.Statistics.Init(logstoreC.Context)
 
 	// extensions should be initialized first
 	pluginConfig, ok := plugins["extensions"]
@@ -652,9 +630,7 @@ func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {
 func LoadLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) error {
 	if len(jsonStr) == 0 {
 		logger.Info(context.Background(), "delete config", configName, "logstore", logstore)
-		LogtailConfigLock.Lock()
-		delete(LogtailConfig, configName)
-		LogtailConfigLock.Unlock()
+		DeleteLogstoreConfigFromLogtailConfig(configName, true)
 		return nil
 	}
 	logger.Info(context.Background(), "load config", configName, "logstore", logstore)

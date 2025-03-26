@@ -207,19 +207,19 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
                                                  PipelineEventPtr& e,
                                                  const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
-        mOutKeyNotFoundEventsTotal->Add(1);
+        ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         return true;
     }
     StringView buffer = sourceEvent.GetContent(mSourceKey);
 
     int32_t endIdx = buffer.size();
     if (endIdx == 0) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
 
@@ -237,7 +237,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
             break;
     }
     if (begIdx >= endIdx) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
 
@@ -293,26 +293,29 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
                                                   std::string("keys count unmatch columns count :")
                                                       + ToString(parsedColCount) + ", required:"
                                                       + ToString(mKeys.size()) + ", logs:" + buffer.to_string(),
+                                                  GetContext().GetRegion(),
                                                   GetContext().GetProjectName(),
-                                                  GetContext().GetLogstoreName(),
-                                                  GetContext().GetRegion());
+                                                  GetContext().GetConfigName(),
+                                                  GetContext().GetLogstoreName());
                 parseSuccess = false;
             }
         } else {
             AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse delimiter log fail")
                                                        + ", logs:" + buffer.to_string(),
+                                                   GetContext().GetRegion(),
                                                    GetContext().GetProjectName(),
-                                                   GetContext().GetLogstoreName(),
-                                                   GetContext().GetRegion());
+                                                   GetContext().GetConfigName(),
+                                                   GetContext().GetLogstoreName());
             parseSuccess = false;
         }
     } else {
         AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                "no column keys defined",
+                                               GetContext().GetRegion(),
                                                GetContext().GetProjectName(),
-                                               GetContext().GetLogstoreName(),
-                                               GetContext().GetRegion());
+                                               GetContext().GetConfigName(),
+                                               GetContext().GetLogstoreName());
         LOG_WARNING(sLogger,
                     ("parse delimiter log fail", "no column keys defined")("project", GetContext().GetProjectName())(
                         "logstore", GetContext().GetLogstoreName())("file", logPath));
@@ -339,9 +342,9 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
                        sourceEvent);
             }
         }
-        mOutSuccessfulEventsTotal->Add(1);
+        ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     } else {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
     }
 
     if (!parseSuccess || !mSourceKeyOverwritten) {
@@ -354,7 +357,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
     }
     if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
-        mDiscardedEventsTotal->Add(1);
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
         return false;
     }
     return true;

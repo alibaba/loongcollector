@@ -36,21 +36,21 @@ void Compressor::SetMetricRecordRef(MetricLabels&& labels, DynamicMetricLabels&&
 
 bool Compressor::DoCompress(const string& input, string& output, string& errorMsg) {
     if (mMetricsRecordRef != nullptr) {
-        mInItemsTotal->Add(1);
-        mInItemSizeBytes->Add(input.size());
+        ADD_COUNTER(mInItemsTotal, 1);
+        ADD_COUNTER(mInItemSizeBytes, input.size());
     }
 
     auto before = chrono::system_clock::now();
     auto res = Compress(input, output, errorMsg);
 
     if (mMetricsRecordRef != nullptr) {
-        mTotalProcessMs->Add(chrono::system_clock::now() - before);
+        ADD_COUNTER(mTotalProcessMs, chrono::system_clock::now() - before);
         if (res) {
-            mOutItemsTotal->Add(1);
-            mOutItemSizeBytes->Add(output.size());
+            ADD_COUNTER(mOutItemsTotal, 1);
+            ADD_COUNTER(mOutItemSizeBytes, output.size());
         } else {
-            mDiscardedItemsTotal->Add(1);
-            mDiscardedItemSizeBytes->Add(input.size());
+            ADD_COUNTER(mDiscardedItemsTotal, 1);
+            ADD_COUNTER(mDiscardedItemSizeBytes, input.size());
         }
     }
     return res;

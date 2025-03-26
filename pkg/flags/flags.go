@@ -249,12 +249,13 @@ func LoadEnvToFlags() {
 		if !found {
 			continue
 		}
-
-		if !strings.HasPrefix(name, LoongcollectorEnvPrefix) {
-			continue
+		var flagName string
+		if strings.HasPrefix(name, LoongcollectorEnvPrefix) {
+			flagName = strings.ToLower(strings.TrimPrefix(name, LoongcollectorEnvPrefix))
+		} else {
+			flagName = name
 		}
 
-		flagName := strings.ToLower(strings.TrimPrefix(name, LoongcollectorEnvPrefix))
 		f := flag.Lookup(flagName)
 		if f == nil {
 			continue

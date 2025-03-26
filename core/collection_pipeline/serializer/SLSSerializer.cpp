@@ -64,19 +64,19 @@ bool Serializer<vector<CompressedLogGroup>>::DoSerialize(vector<CompressedLogGro
     for (auto& item : p) {
         inputSize += item.mData.size();
     }
-    mInItemsTotal->Add(1);
-    mInItemSizeBytes->Add(inputSize);
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemSizeBytes, inputSize);
 
     auto before = std::chrono::system_clock::now();
     auto res = Serialize(std::move(p), output, errorMsg);
-    mTotalProcessMs->Add(std::chrono::system_clock::now() - before);
+    ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
 
     if (res) {
-        mOutItemsTotal->Add(1);
-        mOutItemSizeBytes->Add(output.size());
+        ADD_COUNTER(mOutItemsTotal, 1);
+        ADD_COUNTER(mOutItemSizeBytes, output.size());
     } else {
-        mDiscardedItemsTotal->Add(1);
-        mDiscardedItemSizeBytes->Add(inputSize);
+        ADD_COUNTER(mDiscardedItemsTotal, 1);
+        ADD_COUNTER(mDiscardedItemSizeBytes, inputSize);
     }
     return res;
 }
@@ -244,12 +244,13 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
         case PipelineEvent::Type::METRIC:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& e = group.mEvents[i].Cast<MetricEvent>();
+                auto& e = group.mEvents[i].Cast<MetricEvent>();
                 if (!e.Is<UntypedSingleValue>() || e.GetTimestamp() < 1e9) {
                     continue;
                 }
                 serializer.StartToAddLog(logSZ[i]);
                 serializer.AddLogTime(e.GetTimestamp());
+                e.SortTags();
                 serializer.AddLogContentMetricLabel(e, metricEventContentCache[i].second);
                 serializer.AddLogContentMetricTimeNano(e);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);

@@ -8,6 +8,10 @@
 
 [Alpha](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.4.0 及以上
+
 ## 配置参数
 
 | 参数                           | 类型                 | 是否必选 | 说明                                                                                                                                                                                         |
@@ -36,11 +40,11 @@
 | MaxIdleConnsPerHost          | Int                | 否    | 每个host上的最大空闲的HTTP连接数，默认`0`，表示不限制<p>当其值大于http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost时（当前是`0`），会采用该值                                                                         |
 | IdleConnTimeout              | String             | 否    | HTTP连接在关闭前保持闲置状态的最长时间，默认`90s`<p>当其值大于http.DefaultTransport.(*http.Transport).IdleConnTimeout时（当前是`90s`），会采用该值                                                                              |
 | WriteBufferSize              | Int                | 否    | 写缓冲区的大小，不填不会给http.DefaultTransport.(*http.Transport).WriteBufferSize赋值，此时采用默认的`4KB`<p>当其值大于0时，会采用该值                                                                                        |
-| QueueCapacity                | Int                | 否    | 内部channel的缓存大小，默认为1024                                                                                                                                                                     
+| QueueCapacity                | Int                | 否    | 内部channel的缓存大小，默认为1024 |
 | Authenticator                | Struct             | 否    | 鉴权扩展插件配置                                                                                                                                                                                   |
 | Authenticator.Type           | String             | 否    | 鉴权扩展插件类型                                                                                                                                                                                   |
 | Authenticator.Options        | Map<String,Struct> | 否    | 鉴权扩展插件配置内容                                                                                                                                                                                 |
-| AsyncIntercept               | Boolean            | 否    | 异步过滤数据，默认为否                                                                                                                                                                                
+| AsyncIntercept               | Boolean            | 否    | 异步过滤数据，默认为否 |
 | DropEventWhenQueueFull       | Boolean            | 否    | 当队列满时是否丢弃数据，否则需要等待，默认为不丢弃                                                                                                                                                                  |
 | Compression                  | string             | 否    | 压缩策略，目前支持gzip和snappy，默认不开启                                                                                                                                                                 |
 
@@ -94,6 +98,7 @@ flushers:
 
 采集Prometheus指标，并将指标以Prometheus协议发送到`PROMETHEUS_REMOTEWRITE_ADDRESS`。
 这里用到了`ext_default_encoder`插件，该插件可以配置使用Prometheus Encoder，从而支持将采集到的数据转换为Prometheus协议。
+
 ```yaml
 enable: true
 global:

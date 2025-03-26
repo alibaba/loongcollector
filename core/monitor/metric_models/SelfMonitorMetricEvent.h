@@ -15,8 +15,10 @@
  */
 
 #pragma once
-#include "MetricRecord.h"
-#include "models/PipelineEventGroup.h"
+#include <map>
+
+#include "models/MetricEvent.h"
+#include "monitor/metric_models/MetricRecord.h"
 
 namespace logtail {
 
@@ -37,16 +39,23 @@ struct SelfMonitorMetricRules {
 using SelfMonitorMetricEventKey = int64_t;
 class SelfMonitorMetricEvent {
 public:
-    SelfMonitorMetricEvent();
+    SelfMonitorMetricEvent() = default;
+    SelfMonitorMetricEvent(const SelfMonitorMetricEvent& event) = default;
+
     SelfMonitorMetricEvent(MetricsRecord* metricRecord);
     SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
 
     void SetInterval(size_t interval);
-    void Merge(SelfMonitorMetricEvent& event);
+    void Merge(const SelfMonitorMetricEvent& event);
 
     bool ShouldSend();
     bool ShouldDelete();
     void ReadAsMetricEvent(MetricEvent* metricEventPtr);
+
+    // 调用的对象应是不再修改的只读对象，不用加锁
+    std::string GetLabel(const std::string& labelKey);
+    uint64_t GetCounter(const std::string& counterName);
+    double GetGauge(const std::string& gaugeName);
 
     SelfMonitorMetricEventKey mKey; // labels + category
     std::string mCategory; // category
@@ -57,7 +66,7 @@ private:
     std::unordered_map<std::string, uint64_t> mCounters;
     std::unordered_map<std::string, double> mGauges;
     int32_t mSendInterval;
-    int32_t mLastSendInterval;
+    int32_t mIntervalsSinceLastSend;
     bool mUpdatedFlag;
 
 #ifdef APSARA_UNIT_TEST_MAIN

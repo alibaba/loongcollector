@@ -151,7 +151,7 @@ void FlusherRunner::Run() {
     LOG_INFO(sLogger, ("flusher runner", "started"));
     while (true) {
         auto curTime = chrono::system_clock::now();
-        mLastRunTime->Set(chrono::duration_cast<chrono::seconds>(curTime.time_since_epoch()).count());
+        SET_GAUGE(mLastRunTime, chrono::duration_cast<chrono::seconds>(curTime.time_since_epoch()).count());
 
         vector<SenderQueueItem*> items;
         int32_t limit = Application::GetInstance()->IsExiting()
@@ -163,11 +163,11 @@ void FlusherRunner::Run() {
         } else {
             LOG_DEBUG(sLogger, ("got items from sender queue, cnt", items.size()));
             for (auto itr = items.begin(); itr != items.end(); ++itr) {
-                mInItemDataSizeBytes->Add((*itr)->mData.size());
-                mInItemRawDataSizeBytes->Add((*itr)->mRawSize);
+                ADD_COUNTER(mInItemDataSizeBytes, (*itr)->mData.size());
+                ADD_COUNTER(mInItemRawDataSizeBytes, (*itr)->mRawSize);
             }
-            mInItemsTotal->Add(items.size());
-            mWaitingItemsTotal->Add(items.size());
+            ADD_COUNTER(mInItemsTotal, items.size());
+            ADD_GAUGE(mWaitingItemsTotal, items.size());
         }
 
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
@@ -185,9 +185,9 @@ void FlusherRunner::Run() {
             }
 
             Dispatch(*itr);
-            mWaitingItemsTotal->Sub(1);
-            mOutItemsTotal->Add(1);
-            mTotalDelayMs->Add(chrono::system_clock::now() - curTime);
+            SUB_GAUGE(mWaitingItemsTotal, 1);
+            ADD_COUNTER(mOutItemsTotal, 1);
+            ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - curTime);
         }
 
         if (mIsFlush && SenderQueueManager::GetInstance()->IsAllQueueEmpty()) {

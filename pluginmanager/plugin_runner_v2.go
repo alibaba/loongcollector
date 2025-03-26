@@ -67,10 +67,10 @@ func (p *pluginv2Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.AggregatorPlugins = make([]*AggregatorWrapperV2, 0)
 	p.FlusherPlugins = make([]*FlusherWrapperV2, 0)
 	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
-	p.InputPipeContext = helper.NewObservePipelineConext(inputQueueSize)
-	p.ProcessPipeContext = helper.NewGroupedPipelineConext()
-	p.AggregatePipeContext = helper.NewObservePipelineConext(flushQueueSize)
-	p.FlushPipeContext = helper.NewNoopPipelineConext()
+	p.InputPipeContext = helper.NewObservePipelineContext(inputQueueSize)
+	p.ProcessPipeContext = helper.NewGroupedPipelineContext()
+	p.AggregatePipeContext = helper.NewObservePipelineContext(flushQueueSize)
+	p.FlushPipeContext = helper.NewNoopPipelineContext()
 	p.FlushOutStore.Write(p.AggregatePipeContext.Collector().Observe())
 	return nil
 }
@@ -160,7 +160,6 @@ func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 		interval:        wrapper.Interval,
 		state:           input,
 		context:         p.LogstoreConfig.Context,
-		latencyMetric:   p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
 	return err
 }
@@ -197,7 +196,6 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 		initialMaxDelay: wrapper.Interval,
 		interval:        wrapper.Interval,
 		context:         p.LogstoreConfig.Context,
-		latencyMetric:   p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
 	return nil
 }
@@ -271,7 +269,6 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 			if processorTag != nil {
 				processorTag.ProcessV2(group)
 			}
-			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(group.Events)))
 			pipeEvents := []*models.PipelineGroupEvents{group}
 			for _, processor := range p.ProcessorPlugins {
 				for _, in := range pipeEvents {
@@ -290,7 +287,6 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 					if len(pipeEvent.Events) == 0 {
 						continue
 					}
-					p.LogstoreConfig.Statistics.SplitLogMetric.Add(int64(len(pipeEvent.Events)))
 					for tryCount := 1; true; tryCount++ {
 						err := aggregator.Record(pipeEvent, p.AggregatePipeContext)
 						if err == nil {
@@ -349,14 +345,6 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 			for i := 1; i < dataSize; i++ {
 				data[i] = <-pipeChan
 			}
-			p.LogstoreConfig.Statistics.FlushLogGroupMetric.Add(int64(len(data)))
-
-			for _, item := range data {
-				if len(item.Events) == 0 {
-					continue
-				}
-				p.LogstoreConfig.Statistics.FlushLogMetric.Add(int64(len(item.Events)))
-			}
 
 			// Flush LogGroups to all flushers.
 			// Note: multiple flushers is unrecommended, because all flushers will
@@ -372,10 +360,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 				}
 				if allReady {
 					for _, flusher := range p.FlusherPlugins {
-						p.LogstoreConfig.Statistics.FlushReadyMetric.Add(1)
-						begin := time.Now()
 						err := flusher.Export(data, p.FlushPipeContext)
-						p.LogstoreConfig.Statistics.FlushLatencyMetric.Observe(float64(time.Since(begin)))
 						if err != nil {
 							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)

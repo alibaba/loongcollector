@@ -46,6 +46,7 @@ public:
     int32_t mLastUpdateTime = 0;
     bool mFileOpenFlag = false;
     bool mContainerStopped = false;
+    std::string mContainerID;
     bool mLastForceRead = false;
     std::string mCache;
     std::string mConfigName;
@@ -64,6 +65,7 @@ public:
                const std::string& realFileName,
                bool fileOpenFlag,
                bool containerStopped,
+               std::string containerID,
                bool lastForceRead)
         : mDevInode(devInode),
           mOffset(offset),
@@ -72,6 +74,7 @@ public:
           mLastUpdateTime(0),
           mFileOpenFlag(fileOpenFlag),
           mContainerStopped(containerStopped),
+          mContainerID(containerID),
           mLastForceRead(lastForceRead),
           mConfigName(configName),
           mFileName(filename),

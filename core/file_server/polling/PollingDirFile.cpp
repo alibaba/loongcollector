@@ -121,9 +121,10 @@ void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
     AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
                                            msgBase + ", current count: " + ToString(diffCount) + " total count:"
                                                + ToString(mStatCount) + " path: " + config.first->GetBasePath(),
+                                           config.second->GetRegion(),
                                            config.second->GetProjectName(),
-                                           config.second->GetLogstoreName(),
-                                           config.second->GetRegion());
+                                           config.second->GetConfigName(),
+                                           config.second->GetLogstoreName());
 }
 
 void PollingDirFile::Polling() {
@@ -142,7 +143,7 @@ void PollingDirFile::Polling() {
 
 void PollingDirFile::PollingIteration() {
     LOG_DEBUG(sLogger, ("start dir file polling, mCurrentRound", mCurrentRound));
-    PTScopedLock thradLock(mPollingThreadLock);
+    PTScopedLock threadLock(mPollingThreadLock);
     mStatCount = 0;
     mNewFileVec.clear();
     ++mCurrentRound;
@@ -163,8 +164,8 @@ void PollingDirFile::PollingIteration() {
     LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(nameConfigMap.size());
     {
         ScopedSpinLock lock(mCacheLock);
-        mPollingDirCacheSize->Set(mDirCacheMap.size());
-        mPollingFileCacheSize->Set(mFileCacheMap.size());
+        SET_GAUGE(mPollingDirCacheSize, mDirCacheMap.size());
+        SET_GAUGE(mPollingFileCacheSize, mFileCacheMap.size());
     }
 
     // Iterate all normal configs, make sure stat count will not exceed limit.
@@ -256,8 +257,8 @@ void PollingDirFile::PollingIteration() {
 }
 
 // Last Modified Time (LMD) of directory changes when a file or a subdirectory is added,
-// removed or renamed. Howerver, modifying the content of a file within it will not update
-// LMD, and add/remove/rename file/directory in its subdirectory will also not upadte LMD.
+// removed or renamed. However, modifying the content of a file within it will not update
+// LMD, and add/remove/rename file/directory in its subdirectory will also not update LMD.
 // NOTE: So, we can not find changes in subdirectories of the directory according to LMD.
 bool PollingDirFile::CheckAndUpdateDirMatchCache(const string& dirPath,
                                                  const fsutil::PathStat& statBuf,
@@ -393,10 +394,12 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_DEBUG(sLogger, ("Open dir error, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetConfigName(),
                                                    pConfig.second->GetLogstoreName());
             LOG_ERROR(sLogger, ("Open dir error", dirPath.c_str())("error", ErrnoToString(err)));
         }
@@ -419,8 +422,12 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             AlarmManager::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
-                    + " total count:" + ToString(mStatCount) + " path: " + dirPath + " project:"
-                    + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName());
+                    + " total count:" + ToString(mStatCount) + " path: " + dirPath
+                    + " project:" + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName(),
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -433,7 +440,10 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
                 string("this dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
                     + " total count:" + ToString(mStatCount) + " path: " + dirPath
                     + " project:" + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName(),
-                pConfig.second->GetRegion());
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -558,10 +568,12 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_DEBUG(sLogger, ("Open dir fail, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetConfigName(),
                                                    pConfig.second->GetLogstoreName());
             LOG_WARNING(sLogger, ("Open dir fail", dirPath.c_str())("errno", err));
         }
@@ -581,9 +593,10 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
                                                    string("too many sub directoried for path:" + dirPath
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + pConfig.first->GetBasePath()),
+                                                   pConfig.second->GetRegion(),
                                                    pConfig.second->GetProjectName(),
-                                                   pConfig.second->GetLogstoreName(),
-                                                   pConfig.second->GetRegion());
+                                                   pConfig.second->GetConfigName(),
+                                                   pConfig.second->GetLogstoreName());
             break;
         }
 
@@ -598,7 +611,11 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, total count:" + ToString(mStatCount)
                        + " path: " + dirPath + " project:" + pConfig.second->GetProjectName()
-                       + " logstore:" + pConfig.second->GetLogstoreName()));
+                       + " logstore:" + pConfig.second->GetLogstoreName()),
+                pConfig.second->GetRegion(),
+                pConfig.second->GetProjectName(),
+                pConfig.second->GetConfigName(),
+                pConfig.second->GetLogstoreName());
             break;
         }
 

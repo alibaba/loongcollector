@@ -94,7 +94,7 @@ private:
     volatile bool mHoldOnFlag;
     ThreadPtr mThreadPtr;
 
-    // Cache the files addded or removed by PollingDirFile, they will be loaded and cleared
+    // Cache the files added or removed by PollingDirFile, they will be loaded and cleared
     // at the beginning of each polling round.
     std::mutex mFileLock;
     std::deque<SplitedFilePath> mNewFileNameQueue;

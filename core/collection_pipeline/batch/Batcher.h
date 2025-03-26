@@ -132,9 +132,9 @@ public:
         std::lock_guard<std::mutex> lock(mMux);
         size_t key = g.GetTagsHash();
         EventBatchItem<T>& item = mEventQueueMap[key];
-        mInEventsTotal->Add(g.GetEvents().size());
-        mInGroupDataSizeBytes->Add(g.DataSize());
-        mEventBatchItemsTotal->Set(mEventQueueMap.size());
+        ADD_COUNTER(mInEventsTotal, g.GetEvents().size());
+        ADD_COUNTER(mInGroupDataSizeBytes, g.DataSize());
+        SET_GAUGE(mEventBatchItemsTotal, mEventQueueMap.size());
 
         if (g.DataSize() > mEventFlushStrategy.GetMinSizeBytes()) {
             // for group size larger than min batch size, separate group only if size is larger than max batch size
@@ -145,7 +145,7 @@ public:
             for (auto& e : g.MutableEvents()) {
                 // should consider time condition here because sls require this
                 if (!item.IsEmpty() && mEventFlushStrategy.NeedFlushByTime(item.GetStatus(), e)) {
-                    mOutEventsTotal->Add(item.EventSize());
+                    ADD_COUNTER(mOutEventsTotal, item.EventSize());
                     item.Flush(res);
                 }
                 if (item.IsEmpty()) {
@@ -156,11 +156,11 @@ public:
                 }
                 item.Add(std::move(e));
                 if (mEventFlushStrategy.SizeReachingUpperLimit(item.GetStatus())) {
-                    mOutEventsTotal->Add(item.EventSize());
+                    ADD_COUNTER(mOutEventsTotal, item.EventSize());
                     item.Flush(res);
                 }
             }
-            mOutEventsTotal->Add(item.EventSize());
+            ADD_COUNTER(mOutEventsTotal, item.EventSize());
             item.Flush(res);
         } else {
             size_t eventsSize = g.GetEvents().size();
@@ -199,13 +199,13 @@ public:
                                                                      key,
                                                                      mEventFlushStrategy.GetTimeoutSecs(),
                                                                      mFlusher);
-                    mBufferedGroupsTotal->Add(1);
-                    mBufferedDataSizeByte->Add(item.DataSize());
+                    ADD_GAUGE(mBufferedGroupsTotal, 1);
+                    ADD_GAUGE(mBufferedDataSizeByte, item.DataSize());
                 } else if (i == 0) {
                     item.AddSourceBuffer(g.GetSourceBuffer());
                 }
-                mBufferedEventsTotal->Add(1);
-                mBufferedDataSizeByte->Add(e->DataSize());
+                ADD_GAUGE(mBufferedEventsTotal, 1);
+                ADD_GAUGE(mBufferedDataSizeByte, e->DataSize());
                 item.Add(std::move(e));
                 if (mEventFlushStrategy.NeedFlushBySize(item.GetStatus())
                     || mEventFlushStrategy.NeedFlushByCnt(item.GetStatus())) {
@@ -214,7 +214,7 @@ public:
                 }
             }
         }
-        mTotalAddTimeMs->Add(std::chrono::system_clock::now() - before);
+        ADD_COUNTER(mTotalAddTimeMs, std::chrono::system_clock::now() - before);
     }
 
     // key != 0: event level queue
@@ -238,7 +238,7 @@ public:
             UpdateMetricsOnFlushingEventQueue(iter->second);
             iter->second.Flush(res);
             mEventQueueMap.erase(iter);
-            mEventBatchItemsTotal->Set(mEventQueueMap.size());
+            SET_GAUGE(mEventBatchItemsTotal, mEventQueueMap.size());
             return;
         }
 
@@ -255,7 +255,7 @@ public:
         }
         iter->second.Flush(mGroupQueue.value());
         mEventQueueMap.erase(iter);
-        mEventBatchItemsTotal->Set(mEventQueueMap.size());
+        SET_GAUGE(mEventBatchItemsTotal, mEventQueueMap.size());
         if (mGroupFlushStrategy->NeedFlushBySize(mGroupQueue->GetStatus())) {
             UpdateMetricsOnFlushingGroupQueue();
             mGroupQueue->Flush(res);
@@ -284,7 +284,7 @@ public:
             UpdateMetricsOnFlushingGroupQueue();
             mGroupQueue->Flush(res);
         }
-        mEventBatchItemsTotal->Set(0);
+        SET_GAUGE(mEventBatchItemsTotal, 0);
         mEventQueueMap.clear();
     }
 
@@ -295,29 +295,29 @@ public:
 
 private:
     void UpdateMetricsOnFlushingEventQueue(const EventBatchItem<T>& item) {
-        mOutEventsTotal->Add(item.EventSize());
-        // mTotalDelayMs->Add(
-        //     item.EventSize()
-        //         * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
-        //               .time_since_epoch()
-        //               .count()
-        //     - item.TotalEnqueTimeMs());
-        mBufferedGroupsTotal->Sub(1);
-        mBufferedEventsTotal->Sub(item.EventSize());
-        mBufferedDataSizeByte->Sub(item.DataSize());
+        ADD_COUNTER(mOutEventsTotal, item.EventSize());
+        // ADD_COUNTER(mTotalDelayMs,
+        //             item.EventSize()
+        //                     * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        //                           .time_since_epoch()
+        //                           .count()
+        //                 - item.TotalEnqueTimeMs());
+        SUB_GAUGE(mBufferedGroupsTotal, 1);
+        SUB_GAUGE(mBufferedEventsTotal, item.EventSize());
+        SUB_GAUGE(mBufferedDataSizeByte, item.DataSize());
     }
 
     void UpdateMetricsOnFlushingGroupQueue() {
-        mOutEventsTotal->Add(mGroupQueue->EventSize());
-        // mTotalDelayMs->Add(
-        //     mGroupQueue->EventSize()
-        //         * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
-        //               .time_since_epoch()
-        //               .count()
-        //     - mGroupQueue->TotalEnqueTimeMs());
-        mBufferedGroupsTotal->Sub(mGroupQueue->GroupSize());
-        mBufferedEventsTotal->Sub(mGroupQueue->EventSize());
-        mBufferedDataSizeByte->Sub(mGroupQueue->DataSize());
+        ADD_COUNTER(mOutEventsTotal, mGroupQueue->EventSize());
+        // ADD_COUNTER(mTotalDelayMs,
+        //             mGroupQueue->EventSize()
+        //                     * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        //                           .time_since_epoch()
+        //                           .count()
+        //                 - mGroupQueue->TotalEnqueTimeMs());
+        SUB_GAUGE(mBufferedGroupsTotal, mGroupQueue->GroupSize());
+        SUB_GAUGE(mBufferedEventsTotal, mGroupQueue->EventSize());
+        SUB_GAUGE(mBufferedDataSizeByte, mGroupQueue->DataSize());
     }
 
     std::mutex mMux;

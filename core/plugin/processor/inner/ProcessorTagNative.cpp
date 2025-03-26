@@ -95,19 +95,15 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
 // should keep same with Go addAllConfigurableTags
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     AddTag(logGroup, TagKey::HOST_NAME_TAG_KEY, LoongCollectorMonitor::GetInstance()->mHostname);
+#ifdef __ENTERPRISE__
     auto entity = InstanceIdentity::Instance()->GetEntity();
     if (entity != nullptr) {
         AddTag(logGroup, TagKey::HOST_ID_TAG_KEY, entity->GetHostID());
-#ifdef __ENTERPRISE__
         ECSMeta meta = entity->GetECSMeta();
         const string cloudProvider
             = meta.GetInstanceID().empty() ? DEFAULT_VALUE_DOMAIN_INFRA : DEFAULT_VALUE_DOMAIN_ACS;
-#else
-        const string cloudProvider = DEFAULT_VALUE_DOMAIN_INFRA;
-#endif
         AddTag(logGroup, TagKey::CLOUD_PROVIDER_TAG_KEY, cloudProvider);
     }
-#ifdef __ENTERPRISE__
     AddTag(logGroup, TagKey::AGENT_TAG_TAG_KEY, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
 #else
     AddTag(logGroup, TagKey::HOST_IP_TAG_KEY, LoongCollectorMonitor::GetInstance()->mIpAddr);
@@ -145,6 +141,7 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     // When flushing through Go pipeline, it will skip serializer, add a new unexpected tag
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
 }
 
 bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
@@ -154,7 +151,7 @@ bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
 void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, const string& value) const {
     auto it = mPipelineMetaTagKey.find(tagKey);
     if (it != mPipelineMetaTagKey.end()) {
-        if (!it->second.empty()) {
+        if (!value.empty() && !it->second.empty()) {
             auto sb = logGroup.GetSourceBuffer()->CopyString(value);
             logGroup.SetTagNoCopy(it->second, StringView(sb.data, sb.size));
         }
@@ -166,7 +163,7 @@ void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, con
 void ProcessorTagNative::AddTag(PipelineEventGroup& logGroup, TagKey tagKey, StringView value) const {
     auto it = mPipelineMetaTagKey.find(tagKey);
     if (it != mPipelineMetaTagKey.end()) {
-        if (!it->second.empty()) {
+        if (!value.empty() && !it->second.empty()) {
             logGroup.SetTagNoCopy(it->second, value);
         }
         // empty value means delete

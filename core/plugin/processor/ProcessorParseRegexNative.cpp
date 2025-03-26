@@ -128,12 +128,12 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
                                              PipelineEventPtr& e,
                                              const GroupMetadata& metadata) {
     if (!IsSupportedEvent(e)) {
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
-        mOutKeyNotFoundEventsTotal->Add(1);
+        ADD_COUNTER(mOutKeyNotFoundEventsTotal, 1);
         return true;
     }
     auto rawContent = sourceEvent.GetContent(mSourceKey);
@@ -155,10 +155,10 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, rawContent, sourceEvent, false);
     }
     if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent, metadata)) {
-        mDiscardedEventsTotal->Add(1);
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
         return false;
     }
-    mOutSuccessfulEventsTotal->Add(1);
+    ADD_COUNTER(mOutSuccessfulEventsTotal, 1);
     return true;
 }
 
@@ -197,9 +197,10 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                 }
                 GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                                   "errorlog:" + buffer.to_string() + " | exception:" + exception,
+                                                  GetContext().GetRegion(),
                                                   GetContext().GetProjectName(),
-                                                  GetContext().GetLogstoreName(),
-                                                  GetContext().GetRegion());
+                                                  GetContext().GetConfigName(),
+                                                  GetContext().GetLogstoreName());
             }
         } else {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -210,12 +211,13 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                 }
                 GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                                   std::string("errorlog:") + buffer.to_string(),
+                                                  GetContext().GetRegion(),
                                                   GetContext().GetProjectName(),
-                                                  GetContext().GetLogstoreName(),
-                                                  GetContext().GetRegion());
+                                                  GetContext().GetConfigName(),
+                                                  GetContext().GetLogstoreName());
             }
         }
-        mOutFailedEventsTotal->Add(1);
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;
     } else if (what.size() <= keys.size()) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -228,9 +230,10 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
             GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
                                               "parse key count not match" + ToString(what.size())
                                                   + "errorlog:" + buffer.to_string(),
+                                              GetContext().GetRegion(),
                                               GetContext().GetProjectName(),
-                                              GetContext().GetLogstoreName(),
-                                              GetContext().GetRegion());
+                                              GetContext().GetConfigName(),
+                                              GetContext().GetLogstoreName());
         }
         parseSuccess = false;
     }
