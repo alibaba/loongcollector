@@ -73,12 +73,8 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getJobNamesapceLink(events)
 	case CRONJOB_NAMESPACE:
 		return g.getCronJobNamesapceLink(events)
-	case PERSISTENTVOLUME_NAMESPACE:
-		return g.getPVNamesapceLink(events)
 	case PERSISTENTVOLUMECLAIM_NAMESPACE:
 		return g.getPVCNamesapceLink(events)
-	case STORAGECLASS_NAMESPACE:
-		return g.getStorageClassNamesapceLink(events)
 	case INGRESS_NAMESPACE:
 		return g.getIngressNamesapceLink(events)
 	default:
@@ -723,33 +719,6 @@ func (g *LinkGenerator) getCronJobNamesapceLink(jobList []*K8sMetaEvent) []*K8sM
 	return result
 }
 
-func (g *LinkGenerator) getPVNamesapceLink(pvList []*K8sMetaEvent) []*K8sMetaEvent {
-	result := make([]*K8sMetaEvent, 0)
-	for _, data := range pvList {
-		pv, ok := data.Object.Raw.(*v1.PersistentVolume)
-		if !ok {
-			continue
-		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(pv.Namespace, pv.Namespace)})
-		for _, ns := range nsList{
-			for _, n := range ns{
-				result = append(result, &K8sMetaEvent{
-					EventType: data.EventType,
-					Object: &ObjectWrapper{
-						ResourceType: PERSISTENTVOLUME_NAMESPACE,
-						Raw: &PersistentVolumeNamespace{
-							PersistentVolume:       pv,
-							Namespace: n.Raw.(*v1.Namespace),
-						},
-						FirstObservedTime: data.Object.FirstObservedTime,
-						LastObservedTime:  data.Object.LastObservedTime,
-					},
-				})
-			}
-		}
-	}
-	return result
-}
 func (g *LinkGenerator) getPVCNamesapceLink(pvcList []*K8sMetaEvent) []*K8sMetaEvent {
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range pvcList {
@@ -778,33 +747,6 @@ func (g *LinkGenerator) getPVCNamesapceLink(pvcList []*K8sMetaEvent) []*K8sMetaE
 	return result
 }
 
-func (g *LinkGenerator) getStorageClassNamesapceLink(scList []*K8sMetaEvent) []*K8sMetaEvent {
-	result := make([]*K8sMetaEvent, 0)
-	for _, data := range scList {
-		sc, ok := data.Object.Raw.(*storage.StorageClass)
-		if !ok {
-			continue
-		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(sc.Namespace, sc.Namespace)})
-		for _, ns := range nsList{
-			for _, n := range ns{
-				result = append(result, &K8sMetaEvent{
-					EventType: data.EventType,
-					Object: &ObjectWrapper{
-						ResourceType: STORAGECLASS_NAMESPACE,
-						Raw: &StorageClassNamespace{
-							StorageClass:       sc,
-							Namespace: n.Raw.(*v1.Namespace),
-						},
-						FirstObservedTime: data.Object.FirstObservedTime,
-						LastObservedTime:  data.Object.LastObservedTime,
-					},
-				})
-			}
-		}
-	}
-	return result
-}
 func (g *LinkGenerator) getIngressNamesapceLink(ingressList []*K8sMetaEvent) []*K8sMetaEvent {
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range ingressList {

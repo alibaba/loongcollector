@@ -53,9 +53,7 @@ const (
 	CONFIGMAP_NAMESPACE             = "configmap->namesapce"
 	JOB_NAMESPACE                   = "job->namesapce"
 	CRONJOB_NAMESPACE               = "cronjob->namesapce"
-	PERSISTENTVOLUME_NAMESPACE      = "persistentvolume->namesapce"
 	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
-	STORAGECLASS_NAMESPACE          = "storageclass->namesapce"
 	INGRESS_NAMESPACE               = "ingress->namesapce"
 )
 

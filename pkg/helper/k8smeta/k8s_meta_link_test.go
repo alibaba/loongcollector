@@ -1498,66 +1498,6 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 	assert.Equal(t, CRONJOB_NAMESPACE, results[0].Object.ResourceType)
 }
 
-func TestGetPVNamespaceLink(t *testing.T) {
-	pvCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUME)
-	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
-	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
-		EventType: "add",
-		Object: generateMockNamespace("default"),
-	})
-	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
-		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
-	})
-	pv1:= &ObjectWrapper{
-		Raw: &corev1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pv1",
-				Namespace: "default",
-			},
-		},
-	}
-	pv2:= &ObjectWrapper{
-		Raw: &corev1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pv2",
-				Namespace: "kube-system",
-			},
-		},
-	}
-	pvCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
-		EventType: "add",
-		Object:    pv1,
-	})
-	pvCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
-		EventType: "add",
-		Object:    pv2,
-	})
-
-	jobList := []*K8sMetaEvent{
-		{
-			EventType: "update",
-			Object:    pv1,
-		},
-		{
-			EventType: "update",
-			Object:    pv2,
-		},
-	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		PERSISTENTVOLUME:  pvCache,
-		NAMESPACE:  namespaceCache,
-	})
-
-	results := linkGenerator.getPVNamesapceLink(jobList)
-	assert.Equal(t, 2, len(results))
-	assert.Equal(t, "default", results[0].Object.Raw.(*PersistentVolumeNamespace).Namespace.Name)
-	assert.Equal(t, "pv1", results[0].Object.Raw.(*PersistentVolumeNamespace).PersistentVolume.Name)
-	assert.Equal(t, "kube-system", results[1].Object.Raw.(*PersistentVolumeNamespace).Namespace.Name)
-	assert.Equal(t, "pv2", results[1].Object.Raw.(*PersistentVolumeNamespace).PersistentVolume.Name)
-	assert.Equal(t, PERSISTENTVOLUME_NAMESPACE, results[0].Object.ResourceType)
-}
-
 func TestGetPVCNamespaceLink(t *testing.T) {
 	pvcCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUME)
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)

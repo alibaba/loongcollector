@@ -335,18 +335,6 @@ func (m *metaCollector) processConfigMapNamespaceLink(data *k8smeta.ObjectWrappe
 	return nil
 }
 
-func (m *metaCollector) processPVNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
-	if obj, ok := data.Raw.(*k8smeta.PersistentVolumeNamespace); ok {
-		log := &models.Log{}
-		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.PersistentVolume.Kind, obj.PersistentVolume.Namespace, obj.PersistentVolume.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2PersistentVolume)
-		log.Timestamp = uint64(time.Now().Unix())
-		return []models.PipelineEvent{log}
-	}
-	return nil
-}
-
 func (m *metaCollector) processPVCNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	if obj, ok := data.Raw.(*k8smeta.PersistentVolumeClaimNamespace); ok {
 		log := &models.Log{}
