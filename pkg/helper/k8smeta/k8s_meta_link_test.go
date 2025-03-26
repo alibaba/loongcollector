@@ -1624,7 +1624,7 @@ func generateMockNamespace(namespaceName string) *ObjectWrapper {
 		Raw: &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespaceName,
-				Namespace: namespaceName,// Namespace: "namespace1",
+				Namespace: "", // namesapce itself without namesapce
 			},
 		},
 	}
