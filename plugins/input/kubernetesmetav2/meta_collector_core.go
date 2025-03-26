@@ -328,7 +328,7 @@ func (m *metaCollector) processConfigMapNamespaceLink(data *k8smeta.ObjectWrappe
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.ConfigMap.Kind, obj.ConfigMap.Namespace, obj.ConfigMap.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2ConfigMap)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Configmap)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}

@@ -52,7 +52,7 @@ type ServiceK8sMeta struct {
 	Namespace2Deployment            string
 	Namespace2DaemonSet             string
 	Namespace2StatefulSet           string
-	Namespace2ConfigMap             string
+	Namespace2Configmap             string
 	Namespace2Job                   string
 	Namespace2CronJob               string
 	Namespace2PersistentVolume      string

@@ -506,7 +506,7 @@ func (g *LinkGenerator) getPodNamespaceLink(podList []*K8sMetaEvent) []*K8sMetaE
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(pod.Namespace, pod.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", pod.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -534,7 +534,7 @@ func (g *LinkGenerator) getServiceNamespaceLink(serviceList []*K8sMetaEvent) []*
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(service.Namespace, service.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", service.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -562,7 +562,7 @@ func (g *LinkGenerator) getDeploymentNamespaceLink(deploymentList []*K8sMetaEven
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(deployment.Namespace, deployment.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", deployment.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -589,7 +589,7 @@ func (g *LinkGenerator) getDaemonSetNamespaceLink(daemonsetList []*K8sMetaEvent)
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(daemonset.Namespace,daemonset.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("",daemonset.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -616,7 +616,7 @@ func (g *LinkGenerator) getStatefulsetNamespaceLink(statefulsetList []*K8sMetaEv
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(statefulset.Namespace, statefulset.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", statefulset.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -643,7 +643,7 @@ func (g *LinkGenerator) getConfigMapNamesapceLink(configMapList []*K8sMetaEvent)
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(configmap.Namespace,configmap.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("",configmap.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -670,7 +670,7 @@ func (g *LinkGenerator) getJobNamesapceLink(jobList []*K8sMetaEvent) []*K8sMetaE
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(job.Namespace, job.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", job.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -697,7 +697,7 @@ func (g *LinkGenerator) getCronJobNamesapceLink(jobList []*K8sMetaEvent) []*K8sM
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(job.Namespace,job.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("",job.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -725,7 +725,7 @@ func (g *LinkGenerator) getPVCNamesapceLink(pvcList []*K8sMetaEvent) []*K8sMetaE
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(pvc.Namespace,pvc.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("",pvc.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
@@ -753,7 +753,7 @@ func (g *LinkGenerator) getIngressNamesapceLink(ingressList []*K8sMetaEvent) []*
 		if !ok {
 			continue
 		}
-		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey(ingress.Namespace, ingress.Namespace)})
+		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", ingress.Namespace)})
 		for _, ns := range nsList{
 			for _, n := range ns{
 				result = append(result, &K8sMetaEvent{
