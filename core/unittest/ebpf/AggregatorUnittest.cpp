@@ -22,9 +22,9 @@
 
 #include "common/timer/Timer.h"
 #include "common/timer/TimerEvent.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
-#include "ebpf/type/PeriodicalEvent.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "logger/Logger.h"

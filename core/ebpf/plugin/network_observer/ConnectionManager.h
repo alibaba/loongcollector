@@ -37,8 +37,8 @@ namespace ebpf {
 // hold by one thread
 class ConnectionManager {
 public:
-    static std::unique_ptr<ConnectionManager> Create(int64_t it_interval_ms = 200, int64_t report_interval_sec = 15) {
-        return std::unique_ptr<ConnectionManager>(new ConnectionManager(it_interval_ms, report_interval_sec));
+    static std::unique_ptr<ConnectionManager> Create(int maxConnections = 5000, bool enableMetadata = true) {
+        return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections, enableMetadata));
     }
 
     using ConnStatsHandler = std::function<void(const std::shared_ptr<AbstractRecord>& record)>;
@@ -55,16 +55,23 @@ public:
 
     void RegisterConnStatsFunc(ConnStatsHandler fn) { mConnStatsHandler = fn; }
 
-private:
-    ConnectionManager(int64_t itIntervalMs, int64_t reportIntervalSec)
-        : mItIntervalMs(itIntervalMs), mReportIntervalSec(reportIntervalSec), mConnectionTotal(0) {}
+    int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
+    void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
+    void SetMetadataEnableStatus(bool enable) { mEnableMetadata = enable; }
 
-    const std::shared_ptr<Connection> GetOrCreateConnection(const ConnId&);
+private:
+    ConnectionManager(int maxConnections, bool enableMetadata)
+        : mMaxConnections(maxConnections), mEnableMetadata(enableMetadata), mConnectionTotal(0) {}
+
+    std::shared_ptr<Connection> GetOrCreateConnection(const ConnId&);
     void DeleteConnection(const ConnId&);
-    const std::shared_ptr<Connection> GetConnection(const ConnId&);
+    std::shared_ptr<Connection> GetConnection(const ConnId&);
 
     int mItIntervalMs;
     int mReportIntervalSec;
+
+    std::atomic_int mMaxConnections;
+    std::atomic_bool mEnableMetadata;
 
     std::atomic_bool mEnableConnStats = false;
     ConnStatsHandler mConnStatsHandler = nullptr;
@@ -76,6 +83,7 @@ private:
     std::unordered_map<ConnId, std::shared_ptr<Connection>> mConnections;
 
     int64_t mLastReportTs = -1;
+    friend class NetworkObserverManager;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;

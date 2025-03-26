@@ -48,8 +48,9 @@ public:
     uint64_t GetEndTimeStamp() { return mEndTs; }
     double GetLatencyNs() const { return mEndTs - mStartTs; }
     double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
-    void SetStartTs(uint64_t startTsNs) { mStartTs = startTsNs; }
-    void SetEndTs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
+    double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
+    void SetStartTsNs(uint64_t startTsNs) { mStartTs = startTsNs; }
+    void SetEndTsNs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
     int RollbackCount() const { return mRollbackCount; }
     int Rollback() { return mRollbackCount++; }
     bool ShouldSample() const { return mIsSample; }
@@ -246,6 +247,9 @@ public:
             res += std::string(mTags[i]);
             res += ",";
         }
+        res += std::to_string(mCount);
+        res += ",";
+        res += std::to_string(mSum);
         return res;
     }
 

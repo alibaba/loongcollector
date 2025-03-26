@@ -22,7 +22,7 @@
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/eBPFServer.h"
-#include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"

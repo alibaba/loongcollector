@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "common/timer/Timer.h"
-#include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

@@ -73,8 +73,8 @@ public:
         if (mIsClose && this->mEpoch < 0) {
             return true;
         }
-        auto now_ts = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-        return now_ts > mLastActiveTs && (now_ts - mLastActiveTs) > 120000; // 120s
+        auto nowTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+        return nowTs > mLastActiveTs && (nowTs - mLastActiveTs) > 10000; // 10s
     }
 
     bool IsClose() const { return mIsClose; }
@@ -96,12 +96,21 @@ public:
             res += std::string(mTags[i]);
             res += ",";
         }
+        res += std::to_string(mIsClose);
+        res += ",";
+        res += std::to_string(mK8sMetaAttached);
+        res += ",";
+        res += std::to_string(mK8sPeerMetaAttached);
+        res += ",";
+        res += std::to_string(mNetMetaAttached);
+        res += ",";
+        res += std::to_string(mProtocolAttached);
 
         return res;
     }
 
     void RecordActive() {
-        this->mEpoch = 10;
+        this->mEpoch = 4;
         auto now = std::chrono::steady_clock::now();
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
@@ -127,8 +136,8 @@ public:
 
     bool IsLocalhost() const;
 
-    void TryAttachSelfMeta();
-    void TryAttachPeerMeta();
+    void TryAttachSelfMeta(bool enable = true);
+    void TryAttachPeerMeta(bool enable = true);
 
     std::atomic_bool mNetMetaAttached = false;
     std::atomic_bool mK8sMetaAttached = false;
@@ -188,7 +197,7 @@ private:
     // accessed by multiple threads ...
     StaticDataRow<&kConnTrackerTable> mTags;
 
-    std::atomic_int mEpoch = 10;
+    std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;
     std::chrono::time_point<std::chrono::steady_clock> mMarkCloseTime;
     int64_t mLastUpdateTs = 0;

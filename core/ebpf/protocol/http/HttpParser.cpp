@@ -17,6 +17,7 @@
 #include <atomic>
 #include <map>
 
+#include "common/StringTools.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
@@ -31,11 +32,9 @@ inline constexpr char kUpgrade[] = "Upgrade";
 std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
                                                                        const std::shared_ptr<Connection>& conn,
                                                                        const std::shared_ptr<Sampler>& sampler) {
-    std::vector<std::shared_ptr<AbstractRecord>> records;
-    records.reserve(1);
     auto record = std::make_shared<HttpRecord>(conn);
-    record->SetEndTs(dataEvent->end_ts);
-    record->SetStartTs(dataEvent->start_ts);
+    record->SetEndTsNs(dataEvent->end_ts);
+    record->SetStartTsNs(dataEvent->start_ts);
     auto spanId = GenerateSpanID();
     // slow request
     if (record->GetLatencyMs() > 500) {
@@ -50,6 +49,7 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         ParseState state = http::ParseResponse(&buf, record, true, false);
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
+            return {};
         }
     }
 
@@ -58,6 +58,7 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         ParseState state = http::ParseRequest(&buf, record, false);
         if (state != ParseState::kSuccess) {
             LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
+            return {};
         }
     }
 
@@ -70,8 +71,7 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         LOG_DEBUG(sLogger, ("sampler", "reject"));
     }
 
-    records.emplace_back(std::move(record));
-    return records;
+    return {record};
 }
 
 namespace http {
@@ -108,18 +108,18 @@ ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& resu
     if (retval >= 0) {
         buf->remove_prefix(retval);
 
-        if (req.path_len == 0) {
+        auto orginPath = std::string(req.path, req.path_len);
+        auto trimPath = TrimString(orginPath);
+        std::size_t pos = trimPath.find(QUESTION_MARK);
+
+        if (trimPath.empty() || (pos != std::string::npos && pos == 0)) {
             result->SetPath(ROOT_PATH);
             result->SetRealPath(ROOT_PATH);
+        } else if (pos != std::string::npos) {
+            result->SetPath(trimPath.substr(0, pos));
         } else {
-            auto path = std::string(req.path, req.path_len);
-            result->SetRealPath(path);
-            std::size_t pos = result->GetRealPath().find(QUESTION_MARK);
-            if (pos != std::string::npos) {
-                result->SetPath(path.substr(0, pos));
-            } else {
-                result->SetPath(path);
-            }
+            result->SetPath(trimPath);
+            result->SetRealPath(trimPath);
         }
 
         if (result->ShouldSample() || forceSample) {

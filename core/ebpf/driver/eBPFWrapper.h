@@ -59,6 +59,10 @@ template <typename T>
 class BPFWrapper : public BPFWrapperBase {
 public:
     static std::shared_ptr<BPFWrapper<T>> Create() { return std::make_shared<BPFWrapper<T>>(); }
+    ~BPFWrapper() {
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO, "[BPFWrapper] begin destruct \n");
+        Destroy();
+    }
 
     /**
      * Init will open and load bpf object, and fill caches for maps and progs
@@ -393,6 +397,7 @@ public:
         if (!mInited) {
             return;
         }
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO, "[BPFWrapper] begin destroy \n");
         //     LOG(INFO) << "begin to destroy bpf wrapper";
         // clear all links first
         for (auto& it : mLinks) {

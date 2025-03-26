@@ -46,7 +46,7 @@ static constexpr StringView LOOPBACK_STR = "127.0.0.1";
 std::regex Connection::mContainerIdRegex = std::regex("[a-f0-9]{64}");
 
 bool Connection::MetaAttachReadyForApp() {
-    return mNetMetaAttached && mK8sMetaAttached && mK8sPeerMetaAttached && mProtocolAttached;
+    return MetaAttachReadyForNet() && mProtocolAttached;
 }
 
 bool Connection::MetaAttachReadyForNet() {
@@ -54,7 +54,7 @@ bool Connection::MetaAttachReadyForNet() {
 }
 
 bool Connection::IsLocalhost() const {
-    auto& remoteIp = GetRemoteIp();
+    const auto& remoteIp = GetRemoteIp();
     return (remoteIp == LOOPBACK_STR || remoteIp == LOCALHOST_STR || remoteIp == ZERO_ADDR_STR);
 }
 
@@ -136,14 +136,16 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
 
 bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in) {
     ConnStatsRecord* record = static_cast<ConnStatsRecord*>(in.get());
-    if (!record)
+    if (!record) {
         return false;
-    record->mDropCount = mCurrStats.mDropCount - mLastStats.mDropCount;
-    record->mRetransCount = mCurrStats.mRetransCount - mLastStats.mRetransCount;
-    record->mRecvPackets = mCurrStats.mRecvPackets - mLastStats.mRecvPackets;
-    record->mSendPackets = mCurrStats.mSendPackets - mLastStats.mSendPackets;
-    record->mRecvBytes = mCurrStats.mRecvBytes - mLastStats.mRecvBytes;
-    record->mSendBytes = mCurrStats.mSendBytes - mLastStats.mSendBytes;
+    }
+
+    record->mDropCount = (mLastStats.mDropCount == 0) ? 0 : mCurrStats.mDropCount - mLastStats.mDropCount;
+    record->mRetransCount = (mLastStats.mRetransCount == 0) ? 0 : mCurrStats.mRetransCount - mLastStats.mRetransCount;
+    record->mRecvPackets = (mLastStats.mRecvPackets == 0) ? 0 : mCurrStats.mRecvPackets - mLastStats.mRecvPackets;
+    record->mSendPackets = (mLastStats.mSendPackets == 0) ? 0 : mCurrStats.mSendPackets - mLastStats.mSendPackets;
+    record->mRecvBytes = (mLastStats.mRecvBytes == 0) ? 0 : mCurrStats.mRecvBytes - mLastStats.mRecvBytes;
+    record->mSendBytes = (mLastStats.mSendBytes == 0) ? 0 : mCurrStats.mSendBytes - mLastStats.mSendBytes;
     record->mRtt = mCurrStats.mRtt;
     LOG_DEBUG(
         sLogger,
@@ -390,19 +392,20 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod)
     MarkPeerPodMetaAttached();
 }
 
-void Connection::TryAttachSelfMeta() {
+void Connection::TryAttachSelfMeta(bool enable) {
     if (mK8sMetaAttached) {
         return;
     }
-    if (!K8sMetadata::GetInstance().Enable()) {
-        MarkPeerPodMetaAttached();
+    if (!enable || !K8sMetadata::GetInstance().Enable()) {
+        // set self metadata ...
+        MarkPodMetaAttached();
         return;
     }
 
     switch (mSelfMetadataAttachStatus) {
         case MetadataAttachStatus::KERNEL_EVENT_RECEIVED: {
             // query cache ...
-            auto& cid = GetContainerId();
+            const auto& cid = GetContainerId();
             auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
             if (info) {
                 UpdateSelfPodMeta(info);
@@ -415,7 +418,7 @@ void Connection::TryAttachSelfMeta() {
         }
         case MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER: {
             // query cache ...
-            auto& cid = GetContainerId();
+            const auto& cid = GetContainerId();
             auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
             if (info) {
                 UpdateSelfPodMeta(info);
@@ -428,12 +431,11 @@ void Connection::TryAttachSelfMeta() {
     }
 }
 
-void Connection::TryAttachPeerMeta() {
+void Connection::TryAttachPeerMeta(bool enable) {
     if (mK8sPeerMetaAttached) {
         return;
     }
-
-    if (!K8sMetadata::GetInstance().Enable()) {
+    if (!enable || !K8sMetadata::GetInstance().Enable()) {
         MarkPeerPodMetaAttached();
         return;
     }
@@ -441,7 +443,7 @@ void Connection::TryAttachPeerMeta() {
     switch (mPeerMetadataAttachStatus) {
         case MetadataAttachStatus::KERNEL_EVENT_RECEIVED: {
             // query cache ...
-            auto& dip = GetRemoteIp();
+            const auto& dip = GetRemoteIp();
             if (dip.empty()) {
                 LOG_DEBUG(sLogger, ("dip is empty, conn", DumpConnection()));
                 break;

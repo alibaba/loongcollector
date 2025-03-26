@@ -67,7 +67,6 @@ public:
 
     void PollBufferWrapper();
     void ConsumeRecords();
-    void HandleRollbackRecords(const std::chrono::steady_clock::time_point&);
 
     std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
     std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
@@ -173,6 +172,10 @@ private:
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
     std::string mClusterId;
+    std::string mAppId;
+    std::string mAppName;
+    std::string mHostName;
+    std::string mHostIp;
 
     template <typename T, typename Func>
     void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

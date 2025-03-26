@@ -31,7 +31,7 @@
 #include "ebpf/eBPFServer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/PeriodicalEvent.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail {

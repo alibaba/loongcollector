@@ -255,8 +255,8 @@ void NetworkObserverEventUnittest::TestHttpRecordTimestamps() {
     auto conn = CreateTestTracker();
     HttpRecord record(conn);
 
-    record.SetStartTs(1000000);
-    record.SetEndTs(2000000);
+    record.SetStartTsNs(1000000);
+    record.SetEndTsNs(2000000);
 
     APSARA_TEST_EQUAL(record.GetStartTimeStamp(), 1000000UL);
     APSARA_TEST_EQUAL(record.GetEndTimeStamp(), 2000000UL);
@@ -277,8 +277,8 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
     APSARA_TEST_TRUE(record.IsError());
 
     // 测试慢请求判断
-    record.SetStartTs(0);
-    record.SetEndTs(600000000); // 600ms
+    record.SetStartTsNs(0);
+    record.SetEndTsNs(600000000); // 600ms
     APSARA_TEST_TRUE(record.IsSlow());
 
     HeadersMap reqHeaders;

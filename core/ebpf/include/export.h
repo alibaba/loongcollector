@@ -28,7 +28,12 @@ struct ObserverNetworkOption {
     bool mEnableMetric = false;
     bool mEnableLog = false;
     double mSampleRate = 0.01;
+    int mMaxConnections = 5000;
     bool mDisableMetadata = false;
+    std::string mAppId; // optional
+    std::string mAppName; // optional
+    std::string mHostName; // optional
+    std::string mHostIp; // optional
     std::vector<std::string> mEnableCids;
     std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;

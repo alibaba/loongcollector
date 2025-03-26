@@ -38,10 +38,10 @@ constexpr uint64_t AlwaysSampleThreasHold = 0;
 constexpr uint64_t NeverSampleThreasHold = MaxAdjustedCount;
 
 uint64_t ProbabilityToThreshold(double fraction) {
-    if (fraction < MinSamplingProbability) {
-        return AlwaysSampleThreasHold;
+    if (fraction <= MinSamplingProbability) {
+        return NeverSampleThreasHold;
     }
-    if (fraction > 1) {
+    if (fraction >= 1) {
         return AlwaysSampleThreasHold;
     }
     uint64_t scaled = uint64_t((double)MaxAdjustedCount * fraction);
