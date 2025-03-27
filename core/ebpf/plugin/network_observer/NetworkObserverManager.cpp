@@ -43,62 +43,62 @@ class eBPFServer;
 inline constexpr int kNetObserverMaxBatchConsumeSize = 4096;
 inline constexpr int kNetObserverMaxWaitTimeMS = 0;
 
-static constexpr uint32_t APP_ID_INDEX = kConnTrackerTable.ColIndex(kAppId.Name());
-static constexpr uint32_t APP_NAME_INDEX = kConnTrackerTable.ColIndex(kAppName.Name());
-static constexpr uint32_t HOST_NAME_INDEX = kConnTrackerTable.ColIndex(kHostName.Name());
-static constexpr uint32_t HOST_IP_INDEX = kConnTrackerTable.ColIndex(kIp.Name());
+static constexpr uint32_t kAppIdIndex = kConnTrackerTable.ColIndex(kAppId.Name());
+static constexpr uint32_t kAppNameIndex = kConnTrackerTable.ColIndex(kAppName.Name());
+static constexpr uint32_t kHostNameIndex = kConnTrackerTable.ColIndex(kHostName.Name());
+static constexpr uint32_t kHostIpIndex = kConnTrackerTable.ColIndex(kIp.Name());
 
-static constexpr uint32_t WORKLOAD_KIND_INDEX = kConnTrackerTable.ColIndex(kWorkloadKind.Name());
-static constexpr uint32_t WORKLOAD_NAME_INDEX = kConnTrackerTable.ColIndex(kWorkloadName.Name());
-static constexpr uint32_t NAMESPACE_INDEX = kConnTrackerTable.ColIndex(kNamespace.Name());
+static constexpr uint32_t kWorkloadKindIndex = kConnTrackerTable.ColIndex(kWorkloadKind.Name());
+static constexpr uint32_t kWorkloadNameIndex = kConnTrackerTable.ColIndex(kWorkloadName.Name());
+static constexpr uint32_t kNamespaceIndex = kConnTrackerTable.ColIndex(kNamespace.Name());
 
-static constexpr uint32_t PEER_WORKLOAD_KIND_INDEX = kConnTrackerTable.ColIndex(kPeerWorkloadKind.Name());
-static constexpr uint32_t PEER_WORKLOAD_NAME_INDEX = kConnTrackerTable.ColIndex(kPeerWorkloadName.Name());
-static constexpr uint32_t PEER_NAMESPACE_INDEX = kConnTrackerTable.ColIndex(kPeerNamespace.Name());
+static constexpr uint32_t kPeerWorkloadKindIndex = kConnTrackerTable.ColIndex(kPeerWorkloadKind.Name());
+static constexpr uint32_t kPeerWorkloadNameIndex = kConnTrackerTable.ColIndex(kPeerWorkloadName.Name());
+static constexpr uint32_t kPeerNamespaceIndex = kConnTrackerTable.ColIndex(kPeerNamespace.Name());
 
 // apm
-const static std::string METRIC_NAME_TAG = "arms_tag_entity";
-const static std::string METRIC_NAME_REQ_TOTAL = "arms_rpc_requests_count";
-const static std::string METRIC_NAME_REQ_DURATION_SUM = "arms_rpc_requests_seconds";
-const static std::string METRIC_NAME_REQ_ERR_TOTAL = "arms_rpc_requests_error_count";
-const static std::string METRIC_NAME_REQ_SLOW_TOTAL = "arms_rpc_requests_slow_count";
-const static std::string METRIC_NAME_REQ_BY_STATUS_TOTAL = "arms_rpc_requests_by_status_count";
+const static std::string kMetricNameTag = "arms_tag_entity";
+const static std::string kMetricNameRequestTotal = "arms_rpc_requests_count";
+const static std::string kMetricNameRequestDurationSum = "arms_rpc_requests_seconds";
+const static std::string kMetricNameRequestErrorTotal = "arms_rpc_requests_error_count";
+const static std::string kMetricNameRequestSlowTotal = "arms_rpc_requests_slow_count";
+const static std::string kMetricNameRequestByStatusTotal = "arms_rpc_requests_by_status_count";
 
-static const StringView status_2xx_key = "2xx";
-static const StringView status_3xx_key = "3xx";
-static const StringView status_4xx_key = "4xx";
-static const StringView status_5xx_key = "5xx";
+static const StringView kStatus2xxKey = "2xx";
+static const StringView kStatus3xxKey = "3xx";
+static const StringView kStatus4xxKey = "4xx";
+static const StringView kStatus5xxKey = "5xx";
 
 // npm
-const static std::string METRIC_NAME_TCP_DROP_TOTAL = "arms_npm_tcp_drop_count";
-const static std::string METRIC_NAME_TCP_RETRANS_TOTAL = "arms_npm_tcp_retrans_total";
-const static std::string METRIC_NAME_TCP_RTT_AVG = "arms_npm_tcp_rtt_avg";
-const static std::string METRIC_NAME_TCP_CONN_TOTAL = "arms_npm_tcp_count_by_state";
-const static std::string METRIC_NAME_TCP_RECV_PKTS_TOTAL = "arms_npm_recv_packets_total";
-const static std::string METRIC_NAME_TCP_RECV_BYTES_TOTAL = "arms_npm_recv_bytes_total";
-const static std::string METRIC_NAME_TCP_SENT_PKTS_TOTAL = "arms_npm_sent_packets_total";
-const static std::string METRIC_NAME_TCP_SENT_BTES_TOTAL = "arms_npm_sent_bytes_total";
+const static std::string kMetricNameTcpDropTotal = "arms_npm_tcp_drop_count";
+const static std::string kMetricNameTcpRetransTotal = "arms_npm_tcp_retrans_total";
+const static std::string kMetricNameTcpRttAvg = "arms_npm_tcp_rtt_avg";
+const static std::string kMetricNameTcpConnTotal = "arms_npm_tcp_count_by_state";
+const static std::string kMetricNameTcpRecvPktsTotal = "arms_npm_recv_packets_total";
+const static std::string kMetricNameTcpRecvBytesTotal = "arms_npm_recv_bytes_total";
+const static std::string kMetricNameTcpSentPktsTotal = "arms_npm_sent_packets_total";
+const static std::string kMetricNameTcpSentBytesTotal = "arms_npm_sent_bytes_total";
 
-const static StringView EBPF_VALUE = "ebpf";
-const static StringView METRIC_VALUE = "metric";
-const static StringView TRACE_VALUE = "trace";
-const static StringView LOG_VALUE = "log";
+const static StringView kEBPFValue = "ebpf";
+const static StringView kMetricValue = "metric";
+const static StringView kTraceValue = "trace";
+const static StringView kLogValue = "log";
 
-const static StringView SPAN_TAG_KEY_APP = "app";
+const static StringView kSpanTagKeyApp = "app";
 
-const static StringView TAG_AGENT_VERSION_KEY = "agentVersion";
-const static StringView TAG_APP_KEY = "app";
-const static StringView TAG_V1_VALUE = "v1";
-const static StringView TAG_RESOURCE_ID_KEY = "resourceid";
-const static StringView TAG_VERSION_KEY = "version";
-const static StringView TAG_CLUSTER_ID_KEY = "clusterId";
-const static StringView TAG_WORKLOAD_NAME_KEY = "workloadName";
-const static StringView TAG_WORKLOAD_KIND_KEY = "workloadKind";
-const static StringView TAG_NAMESPACE_KEY = "namespace";
-const static StringView TAG_HOST_KEY = "host";
-const static StringView TAG_HOSTNAME_KEY = "hostname";
-const static StringView TAG_APPLICATION_VALUE = "APPLICATION";
-const static StringView TAG_RESOURCE_TYPE_KEY = "resourcetype";
+const static StringView kTagAgentVersionKey = "agentVersion";
+const static StringView kTagAppKey = "app";
+const static StringView kTagV1Value = "v1";
+const static StringView kTagResourceIdKey = "resourceid";
+const static StringView kTagVersionKey = "version";
+const static StringView kTagClusterIdKey = "clusterId";
+const static StringView kTagWorkloadNameKey = "workloadName";
+const static StringView kTagWorkloadKindKey = "workloadKind";
+const static StringView kTagNamespaceKey = "namespace";
+const static StringView kTagHostKey = "host";
+const static StringView kTagHostnameKey = "hostname";
+const static StringView kTagApplicationValue = "APPLICATION";
+const static StringView kTagResourceTypeKey = "resourcetype";
 
 enum {
     TCP_ESTABLISHED = 1,
@@ -149,13 +149,13 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
 
               auto& ctAttrs = connection->GetConnTrackerAttrs();
               {
-                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
+                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<kAppIdIndex>());
                   data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
 
-                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
+                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<kAppNameIndex>());
                   data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
 
-                  auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
+                  auto host = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
                   data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
                   auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
@@ -212,13 +212,13 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
               auto& ctAttrs = connection->GetConnTrackerAttrs();
 
               {
-                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
+                  auto appId = sourceBuffer->CopyString(ctAttrs.Get<kAppIdIndex>());
                   data->mTags.SetNoCopy<kAppId>(StringView(appId.data, appId.size));
 
-                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
+                  auto appName = sourceBuffer->CopyString(ctAttrs.Get<kAppNameIndex>());
                   data->mTags.SetNoCopy<kAppName>(StringView(appName.data, appName.size));
 
-                  auto host = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
+                  auto host = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
                   data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
                   auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
@@ -286,13 +286,13 @@ NetworkObserverManager::GenerateAggKeyForNetMetric(const std::shared_ptr<Abstrac
     // level0: hostname hostip appId appName, if it's not arms app, we need set default appname ...
     // kConnTrackerTable.ColIndex();
     // level1: namespace workloadkind workloadname peerNamespace peerWorkloadKind peerWorkloadName
-    static constexpr auto idxes0 = {APP_ID_INDEX, APP_NAME_INDEX, HOST_NAME_INDEX, HOST_IP_INDEX};
-    static constexpr auto idxes1 = {WORKLOAD_KIND_INDEX,
-                                    WORKLOAD_NAME_INDEX,
-                                    NAMESPACE_INDEX,
-                                    PEER_WORKLOAD_KIND_INDEX,
-                                    PEER_WORKLOAD_NAME_INDEX,
-                                    PEER_NAMESPACE_INDEX};
+    static constexpr auto idxes0 = {kAppIdIndex, kAppNameIndex, kHostNameIndex, kHostIpIndex};
+    static constexpr auto idxes1 = {kWorkloadKindIndex,
+                                    kWorkloadNameIndex,
+                                    kNamespaceIndex,
+                                    kPeerWorkloadKindIndex,
+                                    kPeerWorkloadNameIndex,
+                                    kPeerNamespaceIndex};
 
     for (auto& x : idxes0) {
         std::string_view attr(connTrackerAttrs[x].data(), connTrackerAttrs[x].size());
@@ -318,9 +318,9 @@ NetworkObserverManager::GenerateAggKeyForAppMetric(const std::shared_ptr<Abstrac
         return {};
     }
 
-    static constexpr std::array<uint32_t, 4> idxes0 = {APP_ID_INDEX, APP_NAME_INDEX, HOST_NAME_INDEX, HOST_IP_INDEX};
-    static constexpr std::array<uint32_t, 9> idxes1 = {WORKLOAD_KIND_INDEX,
-                                                       WORKLOAD_NAME_INDEX,
+    static constexpr std::array<uint32_t, 4> idxes0 = {kAppIdIndex, kAppNameIndex, kHostNameIndex, kHostIpIndex};
+    static constexpr std::array<uint32_t, 9> idxes1 = {kWorkloadKindIndex,
+                                                       kWorkloadNameIndex,
                                                        kConnTrackerTable.ColIndex(kProtocol.Name()),
                                                        kConnTrackerTable.ColIndex(kDestId.Name()),
                                                        kConnTrackerTable.ColIndex(kEndpoint.Name()),
@@ -357,7 +357,7 @@ NetworkObserverManager::GenerateAggKeyForSpan(const std::shared_ptr<AbstractReco
         return {};
     }
     auto& ctAttrs = connection->GetConnTrackerAttrs();
-    static constexpr auto idxes = {APP_ID_INDEX, APP_NAME_INDEX, HOST_NAME_INDEX, HOST_IP_INDEX};
+    static constexpr auto idxes = {kAppIdIndex, kAppNameIndex, kHostNameIndex, kHostIpIndex};
     for (auto& x : idxes) {
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
@@ -429,7 +429,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
         // convert to a item and push to process queue
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTagNoCopy(kDataType.LogKey(), LOG_VALUE);
+        eventGroup.SetTagNoCopy(kDataType.LogKey(), kLogValue);
         bool init = false;
         bool needPush = false;
         aggTree.ForEach(node, [&](const AppLogGroup* group) {
@@ -571,9 +571,9 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
         std::shared_ptr<SourceBuffer> sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTagNoCopy(kAppType.MetricKey(), EBPF_VALUE);
-        eventGroup.SetTagNoCopy(kDataType.MetricKey(), METRIC_VALUE);
-        eventGroup.SetTag(TAG_CLUSTER_ID_KEY, mClusterId);
+        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
+        eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
+        eventGroup.SetTag(kTagClusterIdKey, mClusterId);
 
         bool init = false;
         aggTree.ForEach(node, [&](const NetMetricData* group) {
@@ -590,49 +590,49 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
             std::vector<MetricEvent*> metrics;
             if (group->mDropCount > 0) {
                 auto* tcpDropMetric = eventGroup.AddMetricEvent();
-                tcpDropMetric->SetName(METRIC_NAME_TCP_DROP_TOTAL);
+                tcpDropMetric->SetName(kMetricNameTcpDropTotal);
                 tcpDropMetric->SetValue(UntypedSingleValue{double(group->mDropCount)});
                 metrics.push_back(tcpDropMetric);
             }
 
             if (group->mRetransCount > 0) {
                 auto* tcpRetxMetric = eventGroup.AddMetricEvent();
-                tcpRetxMetric->SetName(METRIC_NAME_TCP_RETRANS_TOTAL);
+                tcpRetxMetric->SetName(kMetricNameTcpRetransTotal);
                 tcpRetxMetric->SetValue(UntypedSingleValue{double(group->mRetransCount)});
                 metrics.push_back(tcpRetxMetric);
             }
 
             if (group->mRttCount > 0) {
                 auto* tcpRttAvg = eventGroup.AddMetricEvent();
-                tcpRttAvg->SetName(METRIC_NAME_TCP_RTT_AVG);
+                tcpRttAvg->SetName(kMetricNameTcpRttAvg);
                 tcpRttAvg->SetValue(UntypedSingleValue{(group->mRtt * 1.0) / group->mRttCount});
                 metrics.push_back(tcpRttAvg);
             }
 
             if (group->mRecvBytes > 0) {
                 auto* tcpRxBytes = eventGroup.AddMetricEvent();
-                tcpRxBytes->SetName(METRIC_NAME_TCP_RECV_BYTES_TOTAL);
+                tcpRxBytes->SetName(kMetricNameTcpRecvBytesTotal);
                 tcpRxBytes->SetValue(UntypedSingleValue{double(group->mRecvBytes)});
                 metrics.push_back(tcpRxBytes);
             }
 
             if (group->mRecvPkts > 0) {
                 auto* tcpRxPkts = eventGroup.AddMetricEvent();
-                tcpRxPkts->SetName(METRIC_NAME_TCP_RECV_PKTS_TOTAL);
+                tcpRxPkts->SetName(kMetricNameTcpRecvPktsTotal);
                 tcpRxPkts->SetValue(UntypedSingleValue{double(group->mRecvPkts)});
                 metrics.push_back(tcpRxPkts);
             }
 
             if (group->mSendBytes > 0) {
                 auto* tcpTxBytes = eventGroup.AddMetricEvent();
-                tcpTxBytes->SetName(METRIC_NAME_TCP_SENT_BTES_TOTAL);
+                tcpTxBytes->SetName(kMetricNameTcpSentBytesTotal);
                 tcpTxBytes->SetValue(UntypedSingleValue{double(group->mSendBytes)});
                 metrics.push_back(tcpTxBytes);
             }
 
             if (group->mSendPkts > 0) {
                 auto* tcpTxPkts = eventGroup.AddMetricEvent();
-                tcpTxPkts->SetName(METRIC_NAME_TCP_SENT_PKTS_TOTAL);
+                tcpTxPkts->SetName(kMetricNameTcpSentPktsTotal);
                 tcpTxPkts->SetValue(UntypedSingleValue{double(group->mSendPkts)});
                 metrics.push_back(tcpTxPkts);
             }
@@ -640,7 +640,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
             for (size_t zz = 0; zz < LC_TCP_MAX_STATES; zz++) {
                 if (group->mStateCounts[zz] > 0) {
                     auto* tcpCount = eventGroup.AddMetricEvent();
-                    tcpCount->SetName(METRIC_NAME_TCP_CONN_TOTAL);
+                    tcpCount->SetName(kMetricNameTcpConnTotal);
                     tcpCount->SetValue(UntypedSingleValue{double(group->mStateCounts[zz])});
                     tcpCount->SetTagNoCopy(kState.MetricKey(), sNetStateStrings[zz]);
                     metrics.push_back(tcpCount);
@@ -726,8 +726,8 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
         std::shared_ptr<SourceBuffer> sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTagNoCopy(kAppType.MetricKey(), EBPF_VALUE);
-        eventGroup.SetTagNoCopy(kDataType.MetricKey(), METRIC_VALUE);
+        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
+        eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
 
         bool needPush = false;
 
@@ -760,21 +760,21 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
                 }
 
                 auto* tagMetric = eventGroup.AddMetricEvent();
-                tagMetric->SetName(METRIC_NAME_TAG);
+                tagMetric->SetName(kMetricNameTag);
                 tagMetric->SetValue(UntypedSingleValue{1.0});
                 tagMetric->SetTimestamp(seconds, 0);
-                tagMetric->SetTagNoCopy(TAG_AGENT_VERSION_KEY, TAG_V1_VALUE);
-                tagMetric->SetTagNoCopy(TAG_APP_KEY, group->mTags.Get<kAppName>()); // app ===> appname
-                tagMetric->SetTagNoCopy(TAG_RESOURCE_ID_KEY, group->mTags.Get<kAppId>()); // resourceid -==> pid
-                tagMetric->SetTagNoCopy(TAG_RESOURCE_TYPE_KEY, TAG_APPLICATION_VALUE); // resourcetype ===> APPLICATION
-                tagMetric->SetTagNoCopy(TAG_VERSION_KEY, TAG_V1_VALUE); // version ===> v1
-                tagMetric->SetTagNoCopy(TAG_CLUSTER_ID_KEY,
+                tagMetric->SetTagNoCopy(kTagAgentVersionKey, kTagV1Value);
+                tagMetric->SetTagNoCopy(kTagAppKey, group->mTags.Get<kAppName>()); // app ===> appname
+                tagMetric->SetTagNoCopy(kTagResourceIdKey, group->mTags.Get<kAppId>()); // resourceid -==> pid
+                tagMetric->SetTagNoCopy(kTagResourceTypeKey, kTagApplicationValue); // resourcetype ===> APPLICATION
+                tagMetric->SetTagNoCopy(kTagVersionKey, kTagV1Value); // version ===> v1
+                tagMetric->SetTagNoCopy(kTagClusterIdKey,
                                         mClusterId); // clusterId ===> TODO read from env _cluster_id_
-                tagMetric->SetTagNoCopy(TAG_HOST_KEY, group->mTags.Get<kIp>()); // host ===>
-                tagMetric->SetTagNoCopy(TAG_HOSTNAME_KEY, group->mTags.Get<kHostName>()); // hostName ===>
-                tagMetric->SetTagNoCopy(TAG_NAMESPACE_KEY, group->mTags.Get<kNamespace>()); // namespace ===>
-                tagMetric->SetTagNoCopy(TAG_WORKLOAD_KIND_KEY, group->mTags.Get<kWorkloadKind>()); // workloadKind ===>
-                tagMetric->SetTagNoCopy(TAG_WORKLOAD_NAME_KEY, group->mTags.Get<kWorkloadName>()); // workloadName ===>
+                tagMetric->SetTagNoCopy(kTagHostKey, group->mTags.Get<kIp>()); // host ===>
+                tagMetric->SetTagNoCopy(kTagHostnameKey, group->mTags.Get<kHostName>()); // hostName ===>
+                tagMetric->SetTagNoCopy(kTagNamespaceKey, group->mTags.Get<kNamespace>()); // namespace ===>
+                tagMetric->SetTagNoCopy(kTagWorkloadKindKey, group->mTags.Get<kWorkloadKind>()); // workloadKind ===>
+                tagMetric->SetTagNoCopy(kTagWorkloadNameKey, group->mTags.Get<kWorkloadName>()); // workloadName ===>
                 init = true;
             }
 
@@ -791,24 +791,24 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             std::vector<MetricEvent*> metrics;
             if (group->mCount) {
                 auto* requestsMetric = eventGroup.AddMetricEvent();
-                requestsMetric->SetName(METRIC_NAME_REQ_TOTAL);
+                requestsMetric->SetName(kMetricNameRequestTotal);
                 requestsMetric->SetValue(UntypedSingleValue{double(group->mCount)});
                 metrics.push_back(requestsMetric);
 
                 auto* latencyMetric = eventGroup.AddMetricEvent();
-                latencyMetric->SetName(METRIC_NAME_REQ_DURATION_SUM);
+                latencyMetric->SetName(kMetricNameRequestDurationSum);
                 latencyMetric->SetValue(UntypedSingleValue{double(group->mSum)});
                 metrics.push_back(latencyMetric);
             }
             if (group->mErrCount) {
                 auto* errorMetric = eventGroup.AddMetricEvent();
-                errorMetric->SetName(METRIC_NAME_REQ_ERR_TOTAL);
+                errorMetric->SetName(kMetricNameRequestErrorTotal);
                 errorMetric->SetValue(UntypedSingleValue{double(group->mErrCount)});
                 metrics.push_back(errorMetric);
             }
             if (group->mSlowCount) {
                 auto* slowMetric = eventGroup.AddMetricEvent();
-                slowMetric->SetName(METRIC_NAME_REQ_SLOW_TOTAL);
+                slowMetric->SetName(kMetricNameRequestSlowTotal);
                 slowMetric->SetValue(UntypedSingleValue{double(group->mSlowCount)});
                 metrics.push_back(slowMetric);
             }
@@ -816,29 +816,29 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
             if (group->m2xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m2xxCount)});
-                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
-                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), status_2xx_key);
+                statusMetric->SetName(kMetricNameRequestByStatusTotal);
+                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), kStatus2xxKey);
                 metrics.push_back(statusMetric);
             }
             if (group->m3xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m3xxCount)});
-                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
-                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), status_3xx_key);
+                statusMetric->SetName(kMetricNameRequestByStatusTotal);
+                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), kStatus3xxKey);
                 metrics.push_back(statusMetric);
             }
             if (group->m4xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m4xxCount)});
-                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
-                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), status_4xx_key);
+                statusMetric->SetName(kMetricNameRequestByStatusTotal);
+                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), kStatus4xxKey);
                 metrics.push_back(statusMetric);
             }
             if (group->m5xxCount) {
                 auto* statusMetric = eventGroup.AddMetricEvent();
                 statusMetric->SetValue(UntypedSingleValue{double(group->m5xxCount)});
-                statusMetric->SetName(METRIC_NAME_REQ_BY_STATUS_TOTAL);
-                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), status_5xx_key);
+                statusMetric->SetName(kMetricNameRequestByStatusTotal);
+                statusMetric->SetTagNoCopy(kStatusCode.MetricKey(), kStatus5xxKey);
                 metrics.push_back(statusMetric);
             }
 
@@ -929,19 +929,19 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 const auto& ct = record->GetConnection();
                 auto& ctAttrs = ct->GetConnTrackerAttrs();
 
-                if ((mAppName.empty() && ctAttrs.Get<APP_NAME_INDEX>().empty()) || !ct) {
+                if ((mAppName.empty() && ctAttrs.Get<kAppNameIndex>().empty()) || !ct) {
                     LOG_DEBUG(sLogger,
                               ("no app name or ct null, skip, spanname ", record->GetSpanName())(
-                                  "appname", ctAttrs.Get<APP_NAME_INDEX>())("ct null", ct == nullptr));
+                                  "appname", ctAttrs.Get<kAppNameIndex>())("ct null", ct == nullptr));
                     continue;
                 }
 
                 if (!init) {
-                    if (ctAttrs.Get<APP_NAME_INDEX>().size()) {
+                    if (ctAttrs.Get<kAppNameIndex>().size()) {
                         // set app attrs ...
-                        auto appName = sourceBuffer->CopyString(ctAttrs.Get<APP_NAME_INDEX>());
+                        auto appName = sourceBuffer->CopyString(ctAttrs.Get<kAppNameIndex>());
                         eventGroup.SetTagNoCopy(kAppName.SpanKey(), StringView(appName.data, appName.size)); // app name
-                        auto appId = sourceBuffer->CopyString(ctAttrs.Get<APP_ID_INDEX>());
+                        auto appId = sourceBuffer->CopyString(ctAttrs.Get<kAppIdIndex>());
                         eventGroup.SetTagNoCopy(kAppId.SpanKey(), StringView(appId.data, appId.size)); // app id
                         auto podIp = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
                         eventGroup.SetTagNoCopy(kHostIp.SpanKey(), StringView(podIp.data, podIp.size)); // pod ip
@@ -958,8 +958,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                             eventGroup.SetTag(kHostName.SpanKey(), mHostIp); // pod name
                         }
                     }
-                    eventGroup.SetTagNoCopy(kAppType.SpanKey(), EBPF_VALUE);
-                    eventGroup.SetTagNoCopy(kDataType.SpanKey(), TRACE_VALUE);
+                    eventGroup.SetTagNoCopy(kAppType.SpanKey(), kEBPFValue);
+                    eventGroup.SetTagNoCopy(kDataType.SpanKey(), kTraceValue);
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
                         LOG_DEBUG(sLogger, ("record span tags", "")(std::string(tag->first), std::string(tag->second)));
                     }
@@ -968,8 +968,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 auto* spanEvent = eventGroup.AddSpanEvent();
                 auto workloadName = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadName>());
                 // TODO @qianlu.kk
-                spanEvent->SetTagNoCopy(SPAN_TAG_KEY_APP, StringView(workloadName.data, workloadName.size));
-                auto hostName = sourceBuffer->CopyString(ctAttrs.Get<HOST_NAME_INDEX>());
+                spanEvent->SetTagNoCopy(kSpanTagKeyApp, StringView(workloadName.data, workloadName.size));
+                auto hostName = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
                 spanEvent->SetTag(kHostName.Name(), StringView(hostName.data, hostName.size));
 
                 for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
