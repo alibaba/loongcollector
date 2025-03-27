@@ -49,12 +49,6 @@ public:
     uint64_t mSendBytes = 0;
 };
 
-enum class MetadataAttachStatus {
-    WAIT_FOR_KERNEL_EVENT, // need receive kernel event to trigger attach process
-    KERNEL_EVENT_RECEIVED, // need to try to attach metadata from cache ...
-    WAIT_QUERY_REMOTE_SERVER, // cache miss, need query metadata server
-};
-
 class Connection {
 public:
     ~Connection() {}
@@ -142,10 +136,6 @@ public:
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
 
-    // MetadataAttachStatus GetSelfMetadataAttachStatus() const { return mSelfMetadataAttachStatus; }
-
-    // MetadataAttachStatus GetPeerMetadataAttachStatus() const { return mPeerMetadataAttachStatus; }
-
     const StringView& GetContainerId() const {
         ReadLock lock(mAttrLock);
         return mTags.Get<kContainerId>();
@@ -166,11 +156,6 @@ public:
     void TryAttachSelfMeta(bool enable = true);
     void TryAttachPeerMeta(bool enable = true);
 
-    // std::atomic_bool mNetMetaAttached = false;
-    // std::atomic_bool mK8sMetaAttached = false;
-    // std::atomic_bool mK8sPeerMetaAttached = false;
-    // std::atomic_bool mProtocolAttached = false;
-
     void UpdateRole(enum support_role_e role);
 
     void UpdateProtocol(support_proto_e protocol);
@@ -185,9 +170,6 @@ public:
     unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
 
     void MarkConnStatsEventReceived() { mMetaFlags.fetch_or(sFlagConnStatsEventReceived, std::memory_order_release); }
-    // void MarkDataEventReceived() {
-    //     mMetaFlags.fetch_or(sFlagDataEventReceived, std::memory_order_release);
-    // }
 
 private:
     void UpdateNetMetaAttr(struct conn_stats_event_t* event);
@@ -240,9 +222,6 @@ private:
     support_role_e mRole = support_role_e::IsUnknown;
 
     std::atomic<Flag> mMetaFlags = 0;
-
-    // MetadataAttachStatus mSelfMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
-    // MetadataAttachStatus mPeerMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
 
     mutable ReadWriteLock mAttrLock;
     // accessed by multiple threads ...

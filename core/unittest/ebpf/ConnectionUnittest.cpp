@@ -201,10 +201,6 @@ void ConnectionUnittest::TestMetadataManagement() {
 
     APSARA_TEST_EQUAL(tracker->GetRemoteIp(), "192.168.1.1");
 
-    // APSARA_TEST_EQUAL(tracker->GetSelfMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
-    // APSARA_TEST_EQUAL(tracker->GetPeerMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
-
-
     LOG_INFO(sLogger, ("step", "0"));
 
     // add k8s metadata cache

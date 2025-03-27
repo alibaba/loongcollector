@@ -197,13 +197,6 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
 
     MarkConnStatsEventReceived();
 
-    // if (mSelfMetadataAttachStatus == MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT) {
-    //     mSelfMetadataAttachStatus = MetadataAttachStatus::KERNEL_EVENT_RECEIVED;
-    // }
-    // if (mPeerMetadataAttachStatus == MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT) {
-    //     mPeerMetadataAttachStatus = MetadataAttachStatus::KERNEL_EVENT_RECEIVED;
-    // }
-
     // handle container id ...
     std::string cidTrim;
     if (strlen(event->docker_id) > 0) {
