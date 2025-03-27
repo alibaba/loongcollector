@@ -197,14 +197,13 @@ void Connection::SafeUpdateNetMetaAttr(struct conn_stats_event_t* event) {
     }
 
     // handle container id ...
-    std::string cid = event->docker_id;
     std::string cidTrim;
-    if (!cid.empty()) {
-        std::smatch match;
-        if (std::regex_search(cid, match, mContainerIdRegex)) {
+    if (strlen(event->docker_id) > 0) {
+        std::cmatch match;
+        if (std::regex_search(event->docker_id, match, mContainerIdRegex)) {
             cidTrim = match.str(0);
         }
-        LOG_DEBUG(sLogger, ("origin container_id", cid)("trim", cidTrim)("match pos", match.position()));
+        LOG_DEBUG(sLogger, ("origin container_id", event->docker_id)("trim", cidTrim)("match pos", match.position()));
         TryAttachSelfMeta();
     } else {
         LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));

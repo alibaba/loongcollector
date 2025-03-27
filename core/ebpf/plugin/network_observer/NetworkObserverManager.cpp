@@ -1459,6 +1459,29 @@ void NetworkObserverManager::ProcessRecordAsMetric(const std::shared_ptr<Abstrac
 std::atomic_int HttpRecord::sConstructCount = 0;
 std::atomic_int HttpRecord::sDestructCount = 0;
 
+void NetworkObserverManager::HandleRollback(const std::shared_ptr<AbstractRecord>& record) {
+    int times = record->Rollback();
+#ifdef APSARA_UNIT_TEST_MAIN
+    if (times == 1) {
+        mRollbackRecordTotal++;
+    }
+#endif
+    if (times > 5) {
+#ifdef APSARA_UNIT_TEST_MAIN
+        mDropRecordTotal++;
+#endif
+        LOG_WARNING(sLogger,
+                    ("meta not ready, drop record, times", times)("record type",
+                                                                  magic_enum::enum_name(record->GetRecordType())));
+    } else {
+        LOG_WARNING(sLogger,
+                    ("meta not ready, rollback record, times", times)("record type",
+                                                                      magic_enum::enum_name(record->GetRecordType())));
+        mRollbackQueue.try_enqueue(std::move(record));
+    }
+    return;
+}
+
 void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>& record) {
     switch (record->GetRecordType()) {
         case RecordType::APP_RECORD: {
@@ -1467,36 +1490,16 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                 // should not happen
                 return;
             }
+            // try attach again, for sake of connection is released in connection manager ...
             appRecord->GetConnection()->TryAttachPeerMeta();
             appRecord->GetConnection()->TryAttachSelfMeta();
             if (!appRecord->GetConnection()->MetaAttachReadyForApp()) {
                 // rollback
-                auto times = record->Rollback();
-#ifdef APSARA_UNIT_TEST_MAIN
-                if (times == 1) {
-                    mRollbackRecordTotal++;
-                }
-#endif
-                if (times > 5) {
-#ifdef APSARA_UNIT_TEST_MAIN
-                    mDropRecordTotal++;
-#endif
-                    LOG_WARNING(sLogger, ("app meta not ready, drop app record, times", times)
-                                // ("connection", appRecord->GetConnection()->DumpConnection())
-                    );
-                } else {
-                    LOG_WARNING(sLogger,
-                                ("app meta not ready, rollback app record, times",
-                                 times)("connection", appRecord->GetConnection()->DumpConnection()));
-                    mRollbackQueue.try_enqueue(std::move(record));
-                }
+                HandleRollback(record);
                 return;
-            } else {
-                LOG_DEBUG(sLogger,
-                          ("app meta ready, times",
-                           record->RollbackCount())("connection", appRecord->GetConnection()->DumpConnection()));
             }
 
+            // handle record
             if (mEnableLog && record->ShouldSample()) {
                 ProcessRecordAsLog(record);
             }
@@ -1518,19 +1521,11 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             }
             if (!connStatsRecord->GetConnection()->MetaAttachReadyForNet()) {
                 // rollback
-                auto times = record->Rollback();
-                if (times > 5) {
-                    LOG_WARNING(sLogger, ("net meta not ready, drop net record, times", times)
-                                // ("connection", connStatsRecord->GetConnection()->DumpConnection())
-                    );
-                } else {
-                    LOG_WARNING(sLogger,
-                                ("net meta not ready, rollback net record, times",
-                                 times)("connection", connStatsRecord->GetConnection()->DumpConnection()));
-                    mRollbackQueue.enqueue(record);
-                }
+                HandleRollback(record);
                 return;
             }
+
+            // handle record
             // do aggregate
             {
                 WriteLock lk(mNetAggLock);

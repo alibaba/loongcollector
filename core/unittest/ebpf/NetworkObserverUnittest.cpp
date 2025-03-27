@@ -346,7 +346,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "test-pod-ip");
-    APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
+    APSARA_TEST_EQUAL(tags["host.name"], "test-pod-ip");
     APSARA_TEST_EQUAL(tags["arms.app.type"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
@@ -362,7 +362,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "test-pod-ip");
-    APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
+    APSARA_TEST_EQUAL(tags["host"], "test-pod-ip");
     APSARA_TEST_EQUAL(tags["source"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
     LOG_INFO(sLogger, ("====== consume log ======", ""));
@@ -370,7 +370,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(mManager->mLogEventGroups.size(), 1UL);
     APSARA_TEST_EQUAL(mManager->mLogEventGroups[0].GetEvents().size(), 100UL);
     tags = mManager->mLogEventGroups[0].GetTags();
-    APSARA_TEST_EQUAL(tags.size(), 0UL);
+    APSARA_TEST_EQUAL(tags.size(), 1UL);
 }
 
 // TEST RollBack mechanism

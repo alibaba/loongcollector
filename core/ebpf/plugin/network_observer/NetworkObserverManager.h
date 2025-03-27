@@ -105,6 +105,8 @@ private:
     void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
     void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
 
+    void HandleRollback(const std::shared_ptr<AbstractRecord>& record);
+
     void RunInThread();
 
     bool UpdateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);

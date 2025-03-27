@@ -131,10 +131,9 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
     auto conn = CreateTestTracker();
     HttpRecord record(conn);
 
-    // 测试基本属性
     record.SetPath("/api/v1/test");
     record.SetMethod("GET");
-    record.SetStatusCode("200");
+    record.SetStatusCode(200);
     record.SetProtocolVersion("HTTP/1.1");
 
     APSARA_TEST_EQUAL(record.GetPath(), "/api/v1/test");
@@ -143,8 +142,7 @@ void NetworkObserverEventUnittest::TestHttpRecord() {
     APSARA_TEST_EQUAL(record.GetProtocolVersion(), "HTTP/1.1");
     APSARA_TEST_FALSE(record.IsError());
 
-    // 测试错误状态码
-    record.SetStatusCode("404");
+    record.SetStatusCode(404);
     APSARA_TEST_TRUE(record.IsError());
     APSARA_TEST_EQUAL(record.GetStatusCode(), 404);
 
@@ -268,15 +266,12 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
     auto conn = CreateTestTracker();
     HttpRecord record(conn);
 
-    // 测试正常状态码
-    record.SetStatusCode("200");
+    record.SetStatusCode(200);
     APSARA_TEST_FALSE(record.IsError());
 
-    // 测试错误状态码
-    record.SetStatusCode("500");
+    record.SetStatusCode(500);
     APSARA_TEST_TRUE(record.IsError());
 
-    // 测试慢请求判断
     record.SetStartTsNs(0);
     record.SetEndTsNs(600000000); // 600ms
     APSARA_TEST_TRUE(record.IsSlow());

@@ -135,13 +135,6 @@ public:
     mutable std::string mSpanId;
 };
 
-const static std::string STATUS_CODE_1XX = "1xx";
-const static std::string STATUS_CODE_2XX = "2xx";
-const static std::string STATUS_CODE_3XX = "3xx";
-const static std::string STATUS_CODE_4XX = "4xx";
-const static std::string STATUS_CODE_5XX = "5xx";
-
-
 class HttpRecord : public AbstractAppRecord {
 public:
     static std::atomic_int sConstructCount;
@@ -163,25 +156,7 @@ public:
 
     void SetProtocolVersion(const std::string& version) { mProtocolVersion = version; }
 
-    void SetStatusCode(const std::string& code) {
-        mCode = std::stoi(code);
-        mStatusCode = code;
-    }
-
-    void SetStatusCode(int code) {
-        mCode = code;
-        if (code < 200) {
-            mStatusCode = STATUS_CODE_1XX;
-        } else if (code < 300) {
-            mStatusCode = STATUS_CODE_2XX;
-        } else if (code < 400) {
-            mStatusCode = STATUS_CODE_3XX;
-        } else if (code < 500) {
-            mStatusCode = STATUS_CODE_4XX;
-        } else {
-            mStatusCode = STATUS_CODE_5XX;
-        }
-    }
+    void SetStatusCode(int code) { mCode = code; }
 
     void SetReqHeaderMap(HeadersMap&& headerMap) { mReqHeaderMap = std::move(headerMap); }
 
@@ -210,7 +185,6 @@ public:
     int mCode = 0;
     size_t mReqBodySize = 0;
     size_t mRespBodySize = 0;
-    std::string mStatusCode;
     std::string mPath;
     std::string mRealPath;
     std::string mConvPath;
