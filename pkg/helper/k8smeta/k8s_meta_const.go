@@ -42,6 +42,20 @@ const (
 	POD_CONTAINER            = "pod->container"
 	INGRESS_SERVICE          = "ingress->service"
 	//revive:enable:var-naming
+
+	// add namespace link
+	//revive:disable:var-naming
+	POD_NAMESPACE                   = "pod->namesapce"
+	SERVICE_NAMESPACE               = "service->namesapce"
+	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
+	DAEMONSET_NAMESPACE             = "daemonset->namesapce"
+	STATEFULSET_NAMESPACE           = "statefulset->namesapce"
+	CONFIGMAP_NAMESPACE             = "configmap->namesapce"
+	JOB_NAMESPACE                   = "job->namesapce"
+	CRONJOB_NAMESPACE               = "cronjob->namesapce"
+	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
+	INGRESS_NAMESPACE               = "ingress->namesapce"
+	//revive:disable:var-naming
 )
 
 var AllResources = []string{
@@ -125,6 +139,56 @@ type IngressService struct {
 type PodContainer struct {
 	Pod       *v1.Pod
 	Container *v1.Container
+}
+
+type PodNamespace struct {
+	Pod       *v1.Pod
+	Namespace *v1.Namespace
+}
+
+type ServiceNamespace struct {
+	Service   *v1.Service
+	Namespace *v1.Namespace
+}
+
+type DeploymentNamespace struct {
+	Deployment *app.Deployment
+	Namespace  *v1.Namespace
+}
+
+type DaemonSetNamespace struct {
+	DaemonSet *app.DaemonSet
+	Namespace *v1.Namespace
+}
+
+type StatefulSetNamespace struct {
+	StatefulSet *app.StatefulSet
+	Namespace   *v1.Namespace
+}
+
+type ConfigMapNamespace struct {
+	ConfigMap *v1.ConfigMap
+	Namespace *v1.Namespace
+}
+
+type JobNamespace struct {
+	Job       *batch.Job
+	Namespace *v1.Namespace
+}
+
+type CronJobNamespace struct {
+	CronJob   *batch.CronJob
+	Namespace *v1.Namespace
+}
+
+type PersistentVolumeClaimNamespace struct {
+	PersistentVolumeClaim *v1.PersistentVolumeClaim
+	Namespace             *v1.Namespace
+}
+
+type IngressNamespace struct {
+	Ingress   *networking.Ingress
+	Namespace *v1.Namespace
 }
 
 const (
