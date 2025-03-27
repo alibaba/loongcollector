@@ -457,7 +457,7 @@ TEST_F(FileSystemUtilUnittest, TestPathJoin) {
     std::string filePath;
 #if defined(_MSC_VER)
     filePath = PathJoin("D:\\", "dataA");
-    EXPECT_EQ(filePath, "D\\dataA");
+    EXPECT_EQ(filePath, "D:\\dataA");
 
     filePath = PathJoin("D:\\xx", "dataA");
     EXPECT_EQ(filePath, "D:\\xx\\dataA");
