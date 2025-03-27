@@ -342,10 +342,10 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     while ((ent = dir.ReadNext())) {
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
             LOG_WARNING(sLogger,
-                        ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
+                        ("too many sub directories for path", path)("dirCount", dirCount)("basePath",
                                                                                           config.first->GetBasePath()));
             AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("too many sub directoried for path:" + path
+                                                   string("too many sub directories for path:" + path
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + config.first->GetBasePath()),
                                                    config.second->GetRegion(),
@@ -777,7 +777,7 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
                 multiConfigs.push_back(config);
             }
             if (!config.first->mAllowingIncludedByMultiConfigs) {
-                // if not ForceMultiConfig, find best match in normal cofigs
+                // if not ForceMultiConfig, find best match in normal configs
                 // note: best config is the one which length is longest and create time is nearest
                 curLen = config.first->GetBasePath().size();
                 if (prevLen < curLen) {
