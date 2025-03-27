@@ -647,12 +647,6 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
                 }
             }
 
-            // auto workloadKind = sourceBuffer->CopyString(group->mWorkloadKind);
-            // auto workloadName = sourceBuffer->CopyString(group->mWorkloadName);
-            // auto k8sNamespace = sourceBuffer->CopyString(group->mNamespace);
-            // auto peerWorkloadKind = sourceBuffer->CopyString(group->mPeerWorkloadKind);
-            // auto peerWorkloadName = sourceBuffer->CopyString(group->mPeerWorkloadName);
-            // auto peerNamepace = sourceBuffer->CopyString(group->mPeerNamespace);
             for (auto* metricsEvent : metrics) {
                 // set tags
                 metricsEvent->SetTimestamp(seconds, 0);
