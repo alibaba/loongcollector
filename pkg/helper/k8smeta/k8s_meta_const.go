@@ -43,7 +43,7 @@ const (
 	INGRESS_SERVICE          = "ingress->service"
 	//revive:enable:var-naming
 
-	//add namespace link
+	// add namespace link
 	POD_NAMESPACE                   = "pod->namesapce"
 	SERVICE_NAMESPACE               = "service->namesapce"
 	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
