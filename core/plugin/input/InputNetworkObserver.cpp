@@ -28,11 +28,11 @@ const std::string InputNetworkObserver::sName = "input_network_observer";
 
 bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE)) {
+    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -44,6 +44,8 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNTRACKER_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
@@ -58,16 +60,22 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputNetworkObserver::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::NETWORK_OBSERVE,
+                                                         mContext,
+                                                         &mNetworkOption,
+                                                         mPluginMgr);
 }
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_OBSERVE);
+        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::NETWORK_OBSERVE);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_OBSERVE);
+    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+                                                          logtail::ebpf::PluginType::NETWORK_OBSERVE);
 }
 
 } // namespace logtail
