@@ -44,6 +44,7 @@ const (
 	//revive:enable:var-naming
 
 	// add namespace link
+	//revive:disable:var-naming
 	POD_NAMESPACE                   = "pod->namesapce"
 	SERVICE_NAMESPACE               = "service->namesapce"
 	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
@@ -54,6 +55,7 @@ const (
 	CRONJOB_NAMESPACE               = "cronjob->namesapce"
 	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
 	INGRESS_NAMESPACE               = "ingress->namesapce"
+	//revive:disable:var-naming
 )
 
 var AllResources = []string{
