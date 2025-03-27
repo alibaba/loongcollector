@@ -78,8 +78,8 @@ const std::shared_ptr<Connection> ConnectionManager::AcceptNetDataEvent(struct c
         return nullptr;
     }
 
-    conn->SafeUpdateRole(event->role);
-    conn->SafeUpdateProtocol(event->protocol);
+    conn->UpdateRole(event->role);
+    conn->UpdateProtocol(event->protocol);
     conn->RecordActive();
     return conn;
 }
@@ -134,7 +134,7 @@ void ConnectionManager::Iterations(int count) {
             continue;
         }
 
-        if (mEnableConnStats && it.second->MetaAttachReadyForNet() && (needGenRecord || forceGenRecord)) {
+        if (mEnableConnStats && it.second->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
             std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(it.second);
             LOG_DEBUG(sLogger,
                       ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",

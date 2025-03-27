@@ -223,7 +223,7 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     APSARA_TEST_TRUE(mManager->mConnectionManager->GetConnection(conn->GetConnId()) != nullptr);
 
     // destroy connection
-    conn->UnsafeMarkClose();
+    conn->MarkClose();
     for (size_t i = 0; i < 12; i++) {
         mManager->mConnectionManager->Iterations(i);
     }
@@ -317,12 +317,12 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     mManager->AcceptNetStatsEvent(&statsEvent);
     auto cnn = mManager->mConnectionManager->GetConnection({0, 2, 1});
     APSARA_TEST_TRUE(cnn != nullptr);
-    APSARA_TEST_TRUE(cnn->mProtocolAttached);
-    APSARA_TEST_TRUE(cnn->mK8sPeerMetaAttached);
-    APSARA_TEST_TRUE(cnn->mK8sMetaAttached);
-    APSARA_TEST_TRUE(cnn->mNetMetaAttached);
+    APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsSelfMetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsL4MetaAttachReady());
 
-    APSARA_TEST_TRUE(cnn->MetaAttachReadyForApp());
+    APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
 
     // Generate 10 records
     for (size_t i = 0; i < 100; i++) {
@@ -413,7 +413,7 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
             free(dataEvent);
         }
         auto cnn = mManager->mConnectionManager->GetConnection({0, 2, 1});
-        APSARA_TEST_FALSE(cnn->MetaAttachReadyForApp());
+        APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
@@ -421,12 +421,12 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         auto statsEvent = CreateConnStatsEvent();
         mManager->AcceptNetStatsEvent(&statsEvent);
         APSARA_TEST_TRUE(cnn != nullptr);
-        APSARA_TEST_TRUE(cnn->mProtocolAttached);
-        APSARA_TEST_TRUE(cnn->mK8sPeerMetaAttached);
-        APSARA_TEST_TRUE(cnn->mK8sMetaAttached);
-        APSARA_TEST_TRUE(cnn->mNetMetaAttached);
+        APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
+        APSARA_TEST_TRUE(cnn->IsPeerMetaAttachReady());
+        APSARA_TEST_TRUE(cnn->IsSelfMetaAttachReady());
+        APSARA_TEST_TRUE(cnn->IsL4MetaAttachReady());
 
-        APSARA_TEST_TRUE(cnn->MetaAttachReadyForApp());
+        APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
         APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
         APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
 

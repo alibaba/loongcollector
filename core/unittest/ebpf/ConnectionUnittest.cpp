@@ -92,7 +92,7 @@ void ConnectionUnittest::TestStateTransitions() {
     auto futureTime = std::chrono::steady_clock::now() + std::chrono::seconds(121);
     APSARA_TEST_TRUE(tracker->ReadyToDestroy(futureTime));
 
-    tracker->UnsafeMarkClose();
+    tracker->MarkClose();
     tracker->RecordActive();
     futureTime = std::chrono::steady_clock::now() + std::chrono::seconds(10);
     APSARA_TEST_FALSE(tracker->ReadyToDestroy(futureTime));
@@ -119,7 +119,7 @@ void ConnectionUnittest::TestProtocolHandling() {
 
     // will update protocol but will not update role
     tracker->UpdateConnStats(&statsEvent);
-    APSARA_TEST_FALSE(tracker->mProtocolAttached);
+    APSARA_TEST_FALSE(tracker->IsL7MetaAttachReady());
     support_proto_e pt = tracker->GetProtocol();
     const StaticDataRow<&kConnTrackerTable>& attrs = tracker->GetConnTrackerAttrs();
     APSARA_TEST_EQUAL(pt, support_proto_e::ProtoHTTP);
@@ -133,9 +133,9 @@ void ConnectionUnittest::TestProtocolHandling() {
     LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // mock receive a data event
-    tracker->SafeUpdateRole(support_role_e::IsClient);
-    tracker->SafeUpdateProtocol(support_proto_e::ProtoHTTP);
-    APSARA_TEST_TRUE(tracker->mProtocolAttached);
+    tracker->UpdateRole(support_role_e::IsClient);
+    tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
+    APSARA_TEST_TRUE(tracker->IsL7MetaAttachReady());
     APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
     APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
     APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
@@ -146,7 +146,7 @@ void ConnectionUnittest::TestProtocolHandling() {
     LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // role chage ...
-    tracker->SafeUpdateRole(support_role_e::IsServer);
+    tracker->UpdateRole(support_role_e::IsServer);
     APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
     APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
     APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
@@ -157,7 +157,7 @@ void ConnectionUnittest::TestProtocolHandling() {
     LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // protocol change ...
-    tracker->SafeUpdateProtocol(support_proto_e::ProtoMySQL);
+    tracker->UpdateProtocol(support_proto_e::ProtoMySQL);
     APSARA_TEST_EQUAL(std::string(attrs.Get<kRpcType>()), "25");
     APSARA_TEST_EQUAL(std::string(attrs.Get<kCallKind>()), "http_client");
     APSARA_TEST_EQUAL(std::string(attrs.Get<kCallType>()), "http_client");
@@ -186,20 +186,25 @@ void ConnectionUnittest::TestMetadataManagement() {
         = "/machine.slice/libpod-80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106.scope";
     memcpy(statsEvent.docker_id, testCid.c_str(), testCid.size());
 
+    LOG_DEBUG(sLogger, ("flags", tracker->GetMetaFlags()));
+
     // attach net metadata
     tracker->UpdateConnStats(&statsEvent);
     APSARA_TEST_EQUAL(tracker->GetContainerId(), "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106");
-    APSARA_TEST_FALSE(tracker->MetaAttachReadyForApp());
+
+    APSARA_TEST_FALSE(tracker->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsL4MetaAttachReady());
+    APSARA_TEST_FALSE(tracker->IsL7MetaAttachReady());
+    APSARA_TEST_FALSE(tracker->IsSelfMetaAttachReady());
+    LOG_DEBUG(sLogger, ("flags", tracker->GetMetaFlags()));
+    APSARA_TEST_FALSE(tracker->IsMetaAttachReadyForAppRecord());
 
     APSARA_TEST_EQUAL(tracker->GetRemoteIp(), "192.168.1.1");
 
-    APSARA_TEST_EQUAL(tracker->GetSelfMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
-    APSARA_TEST_EQUAL(tracker->GetPeerMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
+    // APSARA_TEST_EQUAL(tracker->GetSelfMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
+    // APSARA_TEST_EQUAL(tracker->GetPeerMetadataAttachStatus(), MetadataAttachStatus::WAIT_QUERY_REMOTE_SERVER);
 
-    APSARA_TEST_FALSE(tracker->mK8sMetaAttached);
-    APSARA_TEST_FALSE(tracker->mK8sPeerMetaAttached);
-    APSARA_TEST_TRUE(tracker->mNetMetaAttached);
-    APSARA_TEST_FALSE(tracker->mProtocolAttached);
+
     LOG_INFO(sLogger, ("step", "0"));
 
     // add k8s metadata cache
@@ -218,10 +223,10 @@ void ConnectionUnittest::TestMetadataManagement() {
     LOG_INFO(sLogger, ("step", "0-2"));
     tracker->TryAttachPeerMeta();
     LOG_INFO(sLogger, ("step", "0-3"));
-    APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
-    APSARA_TEST_FALSE(tracker->mK8sPeerMetaAttached);
-    APSARA_TEST_TRUE(tracker->mNetMetaAttached);
-    APSARA_TEST_FALSE(tracker->mProtocolAttached);
+    APSARA_TEST_TRUE(tracker->IsSelfMetaAttachReady());
+    APSARA_TEST_FALSE(tracker->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsL4MetaAttachReady());
+    APSARA_TEST_FALSE(tracker->IsL7MetaAttachReady());
 
     LOG_INFO(sLogger, ("step", "1"));
 
@@ -238,28 +243,28 @@ void ConnectionUnittest::TestMetadataManagement() {
     tracker->TryAttachPeerMeta();
     K8sMetadata::GetInstance().mIpCache.remove(std::string(tracker->GetRemoteIp()));
     K8sMetadata::GetInstance().mContainerCache.remove(std::string(tracker->GetContainerId()));
-    APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
-    APSARA_TEST_TRUE(tracker->mK8sPeerMetaAttached);
-    APSARA_TEST_TRUE(tracker->mNetMetaAttached);
-    APSARA_TEST_FALSE(tracker->mProtocolAttached);
+    tracker->IsL4MetaAttachReady();
+    APSARA_TEST_TRUE(tracker->IsSelfMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsL4MetaAttachReady());
+    APSARA_TEST_FALSE(tracker->IsL7MetaAttachReady());
     LOG_INFO(sLogger, ("step", "3"));
 
     // mock receive data event ...
-    tracker->SafeUpdateRole(support_role_e::IsClient);
-    tracker->SafeUpdateProtocol(support_proto_e::ProtoHTTP);
+    tracker->UpdateRole(support_role_e::IsClient);
+    tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
     tracker->RecordActive();
-    APSARA_TEST_TRUE(tracker->mK8sMetaAttached);
-    APSARA_TEST_TRUE(tracker->mK8sPeerMetaAttached);
-    APSARA_TEST_TRUE(tracker->mNetMetaAttached);
-    APSARA_TEST_TRUE(tracker->mProtocolAttached);
+    APSARA_TEST_TRUE(tracker->IsSelfMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsL4MetaAttachReady());
+    APSARA_TEST_TRUE(tracker->IsL7MetaAttachReady());
     LOG_INFO(sLogger, ("step", "4"));
 
-    APSARA_TEST_TRUE(tracker->MetaAttachReadyForApp());
+    APSARA_TEST_TRUE(tracker->IsMetaAttachReadyForAppRecord());
 }
 
 UNIT_TEST_CASE(ConnectionUnittest, TestBasicOperations);
 UNIT_TEST_CASE(ConnectionUnittest, TestProtocolHandling);
-
 UNIT_TEST_CASE(ConnectionUnittest, TestMetadataManagement);
 UNIT_TEST_CASE(ConnectionUnittest, TestStateTransitions);
 

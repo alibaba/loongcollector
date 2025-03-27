@@ -86,8 +86,41 @@ public:
     uint64_t GetLastUpdateTs() const { return mLastUpdateTs; }
     uint64_t GetLastActiveTs() const { return mLastActiveTs; }
 
-    bool MetaAttachReadyForApp();
-    bool MetaAttachReadyForNet();
+    inline bool IsMetaAttachReadyForAppRecord() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return (flags & sFlagAppRecordAttachReady) == sFlagAppRecordAttachReady;
+        // return IsMetaAttachReadyForNetRecord() && mProtocolAttached;
+    }
+    inline bool IsMetaAttachReadyForNetRecord() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return (flags & sFlagNetRecordAttachReady) == sFlagNetRecordAttachReady;
+        // return mNetMetaAttached && mK8sMetaAttached && mK8sPeerMetaAttached;
+    }
+
+    inline bool IsL7MetaAttachReady() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagL7MetaAttached;
+    }
+
+    inline bool IsL4MetaAttachReady() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagL4MetaAttached;
+    }
+
+    inline bool IsSelfMetaAttachReady() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagSelfMetaAttached;
+    }
+
+    inline bool IsPeerMetaAttachReady() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagPeerMetaAttached;
+    }
+
+    inline bool IsConnStatsEventReceived() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagConnStatsEventReceived;
+    }
 
     std::string DumpConnection() {
         std::string res;
@@ -98,13 +131,7 @@ public:
         }
         res += std::to_string(mIsClose);
         res += ",";
-        res += std::to_string(mK8sMetaAttached);
-        res += ",";
-        res += std::to_string(mK8sPeerMetaAttached);
-        res += ",";
-        res += std::to_string(mNetMetaAttached);
-        res += ",";
-        res += std::to_string(mProtocolAttached);
+        res += std::to_string(mMetaFlags.load(std::memory_order_acquire));
 
         return res;
     }
@@ -115,9 +142,9 @@ public:
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
 
-    MetadataAttachStatus GetSelfMetadataAttachStatus() const { return mSelfMetadataAttachStatus; }
+    // MetadataAttachStatus GetSelfMetadataAttachStatus() const { return mSelfMetadataAttachStatus; }
 
-    MetadataAttachStatus GetPeerMetadataAttachStatus() const { return mPeerMetadataAttachStatus; }
+    // MetadataAttachStatus GetPeerMetadataAttachStatus() const { return mPeerMetadataAttachStatus; }
 
     const StringView& GetContainerId() const {
         ReadLock lock(mAttrLock);
@@ -139,15 +166,14 @@ public:
     void TryAttachSelfMeta(bool enable = true);
     void TryAttachPeerMeta(bool enable = true);
 
-    std::atomic_bool mNetMetaAttached = false;
-    std::atomic_bool mK8sMetaAttached = false;
-    std::atomic_bool mK8sPeerMetaAttached = false;
-    std::atomic_bool mProtocolAttached = false;
+    // std::atomic_bool mNetMetaAttached = false;
+    // std::atomic_bool mK8sMetaAttached = false;
+    // std::atomic_bool mK8sPeerMetaAttached = false;
+    // std::atomic_bool mProtocolAttached = false;
 
+    void UpdateRole(enum support_role_e role);
 
-    void SafeUpdateRole(enum support_role_e role);
-
-    void SafeUpdateProtocol(support_proto_e protocol);
+    void UpdateProtocol(support_proto_e protocol);
 
     bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& record);
 
@@ -156,12 +182,19 @@ public:
         return mRole;
     }
 
+    unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
+
+    void MarkConnStatsEventReceived() { mMetaFlags.fetch_or(sFlagConnStatsEventReceived, std::memory_order_release); }
+    // void MarkDataEventReceived() {
+    //     mMetaFlags.fetch_or(sFlagDataEventReceived, std::memory_order_release);
+    // }
+
 private:
-    void SafeUpdateNetMetaAttr(struct conn_stats_event_t* event);
-    void TrySafeUpdateProtocolAttr();
+    void UpdateNetMetaAttr(struct conn_stats_event_t* event);
+    void TryUpdateProtocolAttr();
     // peer pod meta
-    void SafeUpdatePeerPodMetaForExternal();
-    void UnsafeUpdatePeerPodMetaForExternal();
+    void UpdatePeerPodMetaForExternal();
+    void UpdatePeerPodMetaForExternalInner();
     void UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
     void UpdatePeerPodMetaForLocalhost();
 
@@ -169,20 +202,36 @@ private:
     void UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
     void UpdateSelfPodMetaForUnknown();
 
-    void MarkPodMetaAttached() { mK8sMetaAttached = true; }
-    void MarkPeerPodMetaAttached() { mK8sPeerMetaAttached = true; }
+    using Flag = unsigned int;
+
+
+    static constexpr Flag sFlagL4MetaAttached = 0b0001; // Flags[0]
+    static constexpr Flag sFlagSelfMetaAttached = 0b0010; // Flags[1]
+    static constexpr Flag sFlagPeerMetaAttached = 0b0100; // Flags[2]
+    static constexpr Flag sFlagL7MetaAttached = 0b1000; // Flags[3]
+    static constexpr Flag sFlagConnStatsEventReceived = 0b10000; // Flags[4]
+    // static constexpr Flag sFlagDataEventReceived = 0b100000; // Flags[5]
+
+    static constexpr Flag sFlagNetRecordAttachReady
+        = (sFlagL4MetaAttached | sFlagSelfMetaAttached | sFlagPeerMetaAttached);
+    static constexpr Flag sFlagAppRecordAttachReady = (sFlagNetRecordAttachReady | sFlagL7MetaAttached);
+
+    void MarkSelfMetaAttached() { mMetaFlags.fetch_or(sFlagSelfMetaAttached, std::memory_order_release); }
+    void MarkPeerMetaAttached() { mMetaFlags.fetch_or(sFlagPeerMetaAttached, std::memory_order_release); }
+    void MarkL4MetaAttached() { mMetaFlags.fetch_or(sFlagL4MetaAttached, std::memory_order_release); }
+    void MarkL7MetaAttached() { mMetaFlags.fetch_or(sFlagL7MetaAttached, std::memory_order_release); }
 
     support_proto_e GetProtocol() const {
         ReadLock lock(mProtocolAndRoleLock);
         return mProtocol;
     }
 
-    void UnsafeMarkClose() {
+    void MarkClose() {
         this->mIsClose = true;
         this->mMarkCloseTime = std::chrono::steady_clock::now();
     }
 
-    void UnsafeRecordLastUpdateTs(uint64_t ts) { mLastUpdateTs = ts; }
+    void RecordLastUpdateTs(uint64_t ts) { mLastUpdateTs = ts; }
 
     ConnId mConnId;
     mutable ReadWriteLock mProtocolAndRoleLock;
@@ -190,8 +239,10 @@ private:
     // accessed by at least 2 threads ...
     support_role_e mRole = support_role_e::IsUnknown;
 
-    MetadataAttachStatus mSelfMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
-    MetadataAttachStatus mPeerMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
+    std::atomic<Flag> mMetaFlags = 0;
+
+    // MetadataAttachStatus mSelfMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
+    // MetadataAttachStatus mPeerMetadataAttachStatus = MetadataAttachStatus::WAIT_FOR_KERNEL_EVENT;
 
     mutable ReadWriteLock mAttrLock;
     // accessed by multiple threads ...

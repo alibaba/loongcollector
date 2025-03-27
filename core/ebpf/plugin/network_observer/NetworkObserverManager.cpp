@@ -579,25 +579,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
         aggTree.ForEach(node, [&](const NetMetricData* group) {
             LOG_DEBUG(sLogger,
                       ("dump group attrs", group->ToString())("ct attrs", group->mConnection->DumpConnection()));
-            // auto appId = DEFAULT_NET_APP_ID;
-            // if (group->mAppId.size()) {
-            //     auto sb = sourceBuffer->CopyString(group->mAppId);
-            //     appId = StringView(sb.data, sb.size);
-            // }
-            // auto appName = DEFAULT_NET_APP_NAME;
-            // if (group->mAppName.size()) {
-            //     auto sb = sourceBuffer->CopyString(group->mAppName);
-            //     appName = StringView(sb.data, sb.size);
-            // }
-            // auto hostName = sourceBuffer->CopyString(group->mHost);
-            // auto ip = sourceBuffer->CopyString(group->mIp);
             if (!init) {
-                // set app attrs ...
-                // eventGroup.SetTagNoCopy(kAppId.MetricKey(), appId);
-                // eventGroup.SetTagNoCopy(kAppName.MetricKey(), appName);
-                // eventGroup.SetTagNoCopy(kIp.MetricKey(), StringView(ip.data, ip.size)); // pod ip
-                // eventGroup.SetTagNoCopy(kHostName.MetricKey(), StringView(hostName.data, hostName.size)); // pod name
-
                 eventGroup.SetTagNoCopy(kAppId.MetricKey(), group->mTags.Get<kAppId>());
                 eventGroup.SetTagNoCopy(kAppName.MetricKey(), group->mTags.Get<kAppName>());
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
@@ -683,18 +665,6 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
                 metricsEvent->SetTagNoCopy(kPeerNamespace.MetricKey(), group->mTags.Get<kPeerNamespace>());
                 metricsEvent->SetTagNoCopy(kPeerWorkloadKind.MetricKey(), group->mTags.Get<kPeerWorkloadKind>());
                 metricsEvent->SetTagNoCopy(kPeerWorkloadName.MetricKey(), group->mTags.Get<kPeerWorkloadName>());
-
-                // metricsEvent->SetTagNoCopy(kPodIp.MetricKey(), StringView(ip.data, ip.size));
-                // metricsEvent->SetTagNoCopy(kWorkloadName.MetricKey(), StringView(workloadName.data,
-                // workloadName.size)); metricsEvent->SetTagNoCopy(kWorkloadKind.MetricKey(),
-                // StringView(workloadKind.data, workloadKind.size)); metricsEvent->SetTagNoCopy(kNamespace.MetricKey(),
-                // StringView(k8sNamespace.data, k8sNamespace.size));
-                // metricsEvent->SetTagNoCopy(kPeerWorkloadName.MetricKey(),
-                //                            StringView(peerWorkloadName.data, peerWorkloadName.size));
-                // metricsEvent->SetTagNoCopy(kPeerWorkloadKind.MetricKey(),
-                //                            StringView(peerWorkloadKind.data, peerWorkloadKind.size));
-                // metricsEvent->SetTagNoCopy(kPeerNamespace.MetricKey(),
-                //                            StringView(peerNamepace.data, peerNamepace.size));
             }
         });
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -1493,7 +1463,7 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             // try attach again, for sake of connection is released in connection manager ...
             appRecord->GetConnection()->TryAttachPeerMeta();
             appRecord->GetConnection()->TryAttachSelfMeta();
-            if (!appRecord->GetConnection()->MetaAttachReadyForApp()) {
+            if (!appRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
                 // rollback
                 HandleRollback(record);
                 return;
@@ -1519,7 +1489,7 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                 // should not happen
                 return;
             }
-            if (!connStatsRecord->GetConnection()->MetaAttachReadyForNet()) {
+            if (!connStatsRecord->GetConnection()->IsMetaAttachReadyForNetRecord()) {
                 // rollback
                 HandleRollback(record);
                 return;
