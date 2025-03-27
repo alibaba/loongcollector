@@ -1356,19 +1356,18 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
             5,
             [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-                std::async(std::launch::async, [managerPtr]() {
+                std::thread([managerPtr] {
                     NetworkObserverManager* networkObserverManager
                         = static_cast<NetworkObserverManager*>(managerPtr.get());
-
                     std::vector<std::string> podIpVec;
                     bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
 
                     if (res) {
-                        networkObserverManager->HandleHostMetadataUpdate(podIpVec); // 需要结果
+                        networkObserverManager->HandleHostMetadataUpdate(podIpVec);
                     } else {
                         LOG_DEBUG(sLogger, ("failed to request host metadata", ""));
                     }
-                });
+                }).detach();
 
                 return true;
             },
