@@ -1125,7 +1125,7 @@ void ConfigManager::ClearFilePipelineMatchCache() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-void ConfigManager::CleanEnviroments() {
+void ConfigManager::CleanEnvironments() {
     for (std::unordered_map<std::string, EventHandler*>::iterator iter = mDirEventHandlerMap.begin();
          iter != mDirEventHandlerMap.end();
          ++iter) {

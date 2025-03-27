@@ -46,7 +46,7 @@ public:
     void PushEventQueue(Event* ev);
     void TryReadEvents(bool forceRead);
     void FlowControl();
-    bool IsInterupt() { return mInteruptFlag; }
+    bool IsInterrupt() { return mInterruptFlag; }
 
     /**
      * @brief read local event data
@@ -76,14 +76,14 @@ private:
     int32_t mCheckBaseDirInterval;
     int32_t mCheckSymbolicLinkInterval;
     int64_t mLastReadEventMicroSeconds;
-    volatile bool mInteruptFlag;
+    volatile bool mInterruptFlag;
     volatile bool mForceClearFlag;
     volatile bool mIdleFlag;
     int32_t mEventProcessCount;
     int32_t mLastUpdateMetricTime;
 
     IntGaugePtr mLastRunTime;
-    IntGaugePtr mRegisterdHandlersTotal;
+    IntGaugePtr mRegisteredHandlersTotal;
     IntGaugePtr mActiveReadersTotal;
     IntGaugePtr mEnableFileIncludedByMultiConfigs;
 
@@ -105,7 +105,7 @@ private:
     friend class FuseFileUnittest;
     friend class PipelineUpdateUnittest;
 
-    void CleanEnviroments();
+    void CleanEnvironments();
 #endif
 };
 

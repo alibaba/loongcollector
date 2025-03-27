@@ -573,7 +573,7 @@ private:
     // class DoubleBuffer<std::vector<sls_logs::LogTag>> mFileTags;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void CleanEnviroments();
+    void CleanEnvironments();
 
     friend class EventDispatcherTest;
     friend class SenderUnittest;
