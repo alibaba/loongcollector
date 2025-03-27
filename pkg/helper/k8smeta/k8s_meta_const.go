@@ -145,49 +145,48 @@ type PodNamespace struct {
 }
 
 type ServiceNamespace struct {
-	Service       *v1.Service
-	Namespace     *v1.Namespace
+	Service   *v1.Service
+	Namespace *v1.Namespace
 }
 
 type DeploymentNamespace struct {
-	Deployment     *app.Deployment
-	Namespace      *v1.Namespace
+	Deployment *app.Deployment
+	Namespace  *v1.Namespace
 }
 
 type DaemonSetNamespace struct {
-	DaemonSet     *app.DaemonSet
-	Namespace      *v1.Namespace
+	DaemonSet *app.DaemonSet
+	Namespace *v1.Namespace
 }
 
 type StatefulSetNamespace struct {
-	StatefulSet    *app.StatefulSet
-	Namespace      *v1.Namespace
+	StatefulSet *app.StatefulSet
+	Namespace   *v1.Namespace
 }
 
 type ConfigMapNamespace struct {
-	ConfigMap      *v1.ConfigMap
-	Namespace      *v1.Namespace
+	ConfigMap *v1.ConfigMap
+	Namespace *v1.Namespace
 }
 
 type JobNamespace struct {
-	Job            *batch.Job
-	Namespace      *v1.Namespace
+	Job       *batch.Job
+	Namespace *v1.Namespace
 }
 
 type CronJobNamespace struct {
-	CronJob        *batch.CronJob
-	Namespace      *v1.Namespace
+	CronJob   *batch.CronJob
+	Namespace *v1.Namespace
 }
 
 type PersistentVolumeClaimNamespace struct {
-	PersistentVolumeClaim   *v1.PersistentVolumeClaim
-	Namespace               *v1.Namespace
+	PersistentVolumeClaim *v1.PersistentVolumeClaim
+	Namespace             *v1.Namespace
 }
 
-
 type IngressNamespace struct {
-	Ingress            *networking.Ingress
-	Namespace          *v1.Namespace
+	Ingress   *networking.Ingress
+	Namespace *v1.Namespace
 }
 
 const (

@@ -1013,11 +1013,11 @@ func TestGetPodNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
 	pod1 := generateMockPod("1")
 	pod1.Raw.(*corev1.Pod).Namespace = "default"
@@ -1038,7 +1038,7 @@ func TestGetPodNamespaceLink(t *testing.T) {
 		Object:    pod3,
 	})
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		POD:  podCache,
+		POD:       podCache,
 		NAMESPACE: namespaceCache,
 	})
 	podList := []*K8sMetaEvent{
@@ -1071,13 +1071,13 @@ func TestGetServiceNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	service1:= &ObjectWrapper{
+	service1 := &ObjectWrapper{
 		Raw: &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "service1",
@@ -1090,7 +1090,7 @@ func TestGetServiceNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	service2:= &ObjectWrapper{
+	service2 := &ObjectWrapper{
 		Raw: &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "service2",
@@ -1123,7 +1123,7 @@ func TestGetServiceNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		SERVICE:  serviceCache,
+		SERVICE:   serviceCache,
 		NAMESPACE: namespaceCache,
 	})
 
@@ -1142,13 +1142,13 @@ func TestGetDeploymentNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	deployment1:= &ObjectWrapper{
+	deployment1 := &ObjectWrapper{
 		Raw: &app.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "deployment1",
@@ -1156,7 +1156,7 @@ func TestGetDeploymentNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	deployment2:= &ObjectWrapper{
+	deployment2 := &ObjectWrapper{
 		Raw: &app.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "deployment2",
@@ -1184,8 +1184,8 @@ func TestGetDeploymentNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		DEPLOYMENT:  deploymentCache,
-		NAMESPACE: namespaceCache,
+		DEPLOYMENT: deploymentCache,
+		NAMESPACE:  namespaceCache,
 	})
 
 	results := linkGenerator.getDeploymentNamespaceLink(deploymentList)
@@ -1203,13 +1203,13 @@ func TestGetDaemonSetNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	daemonset1:= &ObjectWrapper{
+	daemonset1 := &ObjectWrapper{
 		Raw: &app.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "daemonset1",
@@ -1217,7 +1217,7 @@ func TestGetDaemonSetNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	daemonset2:= &ObjectWrapper{
+	daemonset2 := &ObjectWrapper{
 		Raw: &app.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "daemonset2",
@@ -1245,8 +1245,8 @@ func TestGetDaemonSetNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		DAEMONSET:  daemonSetCache,
-		NAMESPACE:  namespaceCache,
+		DAEMONSET: daemonSetCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getDaemonSetNamespaceLink(daemonsetList)
@@ -1263,13 +1263,13 @@ func TestGetStatefulSetNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	statefulSet1:= &ObjectWrapper{
+	statefulSet1 := &ObjectWrapper{
 		Raw: &app.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "statefulSet1",
@@ -1277,7 +1277,7 @@ func TestGetStatefulSetNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	statefulSet2:= &ObjectWrapper{
+	statefulSet2 := &ObjectWrapper{
 		Raw: &app.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "statefulSet2",
@@ -1305,8 +1305,8 @@ func TestGetStatefulSetNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		DAEMONSET:  statefulSetCache,
-		NAMESPACE:  namespaceCache,
+		DAEMONSET: statefulSetCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getStatefulsetNamespaceLink(statefulSetList)
@@ -1323,13 +1323,13 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	configmap1:= &ObjectWrapper{
+	configmap1 := &ObjectWrapper{
 		Raw: &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "configmap1",
@@ -1337,7 +1337,7 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	configmap2:= &ObjectWrapper{
+	configmap2 := &ObjectWrapper{
 		Raw: &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "configmap2",
@@ -1365,8 +1365,8 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		CONFIGMAP:  configmapCache,
-		NAMESPACE:  namespaceCache,
+		CONFIGMAP: configmapCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getConfigMapNamesapceLink(configmapList)
@@ -1383,13 +1383,13 @@ func TestGetJobNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	job1:= &ObjectWrapper{
+	job1 := &ObjectWrapper{
 		Raw: &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "job1",
@@ -1397,7 +1397,7 @@ func TestGetJobNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	job2:= &ObjectWrapper{
+	job2 := &ObjectWrapper{
 		Raw: &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "job2",
@@ -1425,8 +1425,8 @@ func TestGetJobNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		JOB:  jobCache,
-		NAMESPACE:  namespaceCache,
+		JOB:       jobCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getJobNamesapceLink(jobList)
@@ -1443,13 +1443,13 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	cronjob1:= &ObjectWrapper{
+	cronjob1 := &ObjectWrapper{
 		Raw: &batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cronjob1",
@@ -1457,7 +1457,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	cronjob2:= &ObjectWrapper{
+	cronjob2 := &ObjectWrapper{
 		Raw: &batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cronjob2",
@@ -1485,8 +1485,8 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		CRONJOB:  cronjobCache,
-		NAMESPACE:  namespaceCache,
+		CRONJOB:   cronjobCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getCronJobNamesapceLink(jobList)
@@ -1503,13 +1503,13 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	pvc1:= &ObjectWrapper{
+	pvc1 := &ObjectWrapper{
 		Raw: &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pvc1",
@@ -1517,7 +1517,7 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	pvc2:= &ObjectWrapper{
+	pvc2 := &ObjectWrapper{
 		Raw: &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pvc2",
@@ -1545,8 +1545,8 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		PERSISTENTVOLUMECLAIM:  pvcCache,
-		NAMESPACE:  namespaceCache,
+		PERSISTENTVOLUMECLAIM: pvcCache,
+		NAMESPACE:             namespaceCache,
 	})
 
 	results := linkGenerator.getPVCNamesapceLink(jobList)
@@ -1558,19 +1558,18 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 	assert.Equal(t, PERSISTENTVOLUMECLAIM_NAMESPACE, results[0].Object.ResourceType)
 }
 
-
 func TestGetIngressNamespaceLink(t *testing.T) {
 	ingressCache := newK8sMetaCache(make(chan struct{}), INGRESS)
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("default"),
+		Object:    generateMockNamespace("default"),
 	})
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
-		Object: generateMockNamespace("kube-system"),
+		Object:    generateMockNamespace("kube-system"),
 	})
-	ingress1:= &ObjectWrapper{
+	ingress1 := &ObjectWrapper{
 		Raw: &networking.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "ingress1",
@@ -1578,7 +1577,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 			},
 		},
 	}
-	ingress2:= &ObjectWrapper{
+	ingress2 := &ObjectWrapper{
 		Raw: &networking.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "ingress2",
@@ -1606,8 +1605,8 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		},
 	}
 	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
-		INGRESS:  ingressCache,
-		NAMESPACE:  namespaceCache,
+		INGRESS:   ingressCache,
+		NAMESPACE: namespaceCache,
 	})
 
 	results := linkGenerator.getIngressNamesapceLink(jobList)
@@ -1623,7 +1622,7 @@ func generateMockNamespace(namespaceName string) *ObjectWrapper {
 	return &ObjectWrapper{
 		Raw: &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: namespaceName,
+				Name:      namespaceName,
 				Namespace: "", // namesapce itself without namesapce
 			},
 		},

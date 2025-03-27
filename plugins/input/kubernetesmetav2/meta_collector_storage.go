@@ -26,4 +26,3 @@ func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, m
 	}
 	return nil
 }
-

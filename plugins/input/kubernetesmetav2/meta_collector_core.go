@@ -298,7 +298,6 @@ func (m *metaCollector) processPodContainerLink(data *k8smeta.ObjectWrapper, met
 	return nil
 }
 
-
 func (m *metaCollector) processPodNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	if obj, ok := data.Raw.(*k8smeta.PodNamespace); ok {
 		log := &models.Log{}
@@ -346,4 +345,3 @@ func (m *metaCollector) processPVCNamespaceLink(data *k8smeta.ObjectWrapper, met
 	}
 	return nil
 }
-
