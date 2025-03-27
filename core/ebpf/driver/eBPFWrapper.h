@@ -60,7 +60,6 @@ class BPFWrapper : public BPFWrapperBase {
 public:
     static std::shared_ptr<BPFWrapper<T>> Create() { return std::make_shared<BPFWrapper<T>>(); }
     ~BPFWrapper() {
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO, "[BPFWrapper] begin destruct \n");
         Destroy();
     }
 
