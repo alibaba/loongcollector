@@ -115,7 +115,6 @@ void Application::Init() {
     LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
-    EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
         AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
     }

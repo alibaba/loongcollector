@@ -23,9 +23,7 @@ DEFINE_FLAG_BOOL(enable_full_drain_mode, "", false);
 DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);
 DEFINE_FLAG_DOUBLE(cpu_usage_up_limit, "cpu usage upper limit, cores", 2.0);
-DEFINE_FLAG_DOUBLE(pub_cpu_usage_up_limit, "cpu usage upper limit, cores", 0.4);
 DEFINE_FLAG_INT64(memory_usage_up_limit, "memory usage upper limit, MB", 2 * 1024);
-DEFINE_FLAG_INT64(pub_memory_usage_up_limit, "memory usage upper limit, MB", 200);
 
 // epoll
 DEFINE_FLAG_INT32(ilogtail_epoll_time_out, "default time out is 1s", 1);
