@@ -483,8 +483,8 @@ bool LogtailPlugin::LoadPluginBase() {
         if (BOOL_FLAG(ilogtail_disable_core)) {
             ResetCrashBackTrace();
         }
-    }
 #endif
+    }
     return mPluginValid;
 }
 
