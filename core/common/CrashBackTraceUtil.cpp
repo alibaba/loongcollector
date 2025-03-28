@@ -165,8 +165,6 @@ void ResetCrashBackTrace() {
 }
 
 
-
-
 std::string GetCrashBackTrace() {
     auto stackFilePath = GetCrashStackFileName();
     FILE* pStackFile = fopen(stackFilePath.c_str(), "rb");
