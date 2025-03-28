@@ -479,11 +479,12 @@ bool LogtailPlugin::LoadPluginBase() {
     } else {
         LOG_INFO(sLogger, ("Go plugin system init", "succeeded"));
         mPluginValid = true;
-
+#ifdef __ENTERPRISE__
         if (BOOL_FLAG(ilogtail_disable_core)) {
             ResetCrashBackTrace();
         }
     }
+#endif
     return mPluginValid;
 }
 
