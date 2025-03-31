@@ -146,7 +146,7 @@ void eBPFServerUnittest::TestNetworkObserver() {
     EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
     EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMgr);
+        "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMetricPtr);
     EXPECT_TRUE(res);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));

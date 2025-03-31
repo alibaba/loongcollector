@@ -48,7 +48,7 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(
+    mPluginMetricPtr = std::make_shared<PluginMetricManager>(
         GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return mSecurityOptions.Init(ebpf::SecurityProbeType::FILE, config, mContext, sName);
 }
@@ -59,7 +59,7 @@ bool InputFileSecurity::Start() {
                                                          logtail::ebpf::PluginType::FILE_SECURITY,
                                                          mContext,
                                                          &mSecurityOptions,
-                                                         mPluginMgr);
+                                                         mPluginMetricPtr);
 }
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {

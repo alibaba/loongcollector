@@ -50,7 +50,7 @@ bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optional
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(
+    mPluginMetricPtr = std::make_shared<PluginMetricManager>(
         GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
 
     return mSecurityOptions.Init(ebpf::SecurityProbeType::NETWORK, config, mContext, sName);
@@ -62,7 +62,7 @@ bool InputNetworkSecurity::Start() {
                                                          logtail::ebpf::PluginType::NETWORK_SECURITY,
                                                          mContext,
                                                          &mSecurityOptions,
-                                                         mPluginMgr);
+                                                         mPluginMetricPtr);
 }
 
 bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {

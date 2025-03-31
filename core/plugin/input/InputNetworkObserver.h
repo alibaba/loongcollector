@@ -36,7 +36,7 @@ public:
     bool SupportAck() const override { return false; }
 
     logtail::ebpf::ObserverNetworkOption mNetworkOption;
-    PluginMetricManagerPtr mPluginMgr;
+    PluginMetricManagerPtr mPluginMetricPtr;
 };
 
 } // namespace logtail
