@@ -22,16 +22,34 @@
 #include <random>
 #include <sstream>
 
+#include "spdlog/spdlog.h"
+
 namespace logtail {
 namespace ebpf {
 
 std::string BytesToHexString(const uint8_t* bytes, size_t length) {
-    std::ostringstream oss;
-    oss << std::hex << std::setfill('0');
+    std::string result;
+    result.reserve(length * 2);
     for (size_t i = 0; i < length; ++i) {
-        oss << std::setw(2) << static_cast<int>(bytes[i]);
+        fmt::format_to(std::back_inserter(result), "{:02x}", bytes[i]);
     }
-    return oss.str();
+    return result;
+}
+
+char randHexChar() {
+    thread_local static std::random_device rd;
+    thread_local static std::mt19937 generator(rd());
+    thread_local static std::uniform_int_distribution<int> distribution(0, 15);
+    static const char hexChars[] = "0123456789abcdef";
+    return hexChars[distribution(generator)];
+}
+
+std::string RandHexStr(int len) {
+    std::string res(len, '0'); // Initialize string with '0' of length 'len'
+    for (int i = 0; i < len; ++i) { // Corrected loop condition
+        res[i] = randHexChar();
+    }
+    return res;
 }
 
 std::array<uint8_t, 32> GenerateTraceID() {

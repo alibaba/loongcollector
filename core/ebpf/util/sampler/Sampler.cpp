@@ -34,15 +34,15 @@ uint64_t TraceIDToRandomness(const std::array<uint8_t, 16>& traceID) {
 
 
 constexpr double MinSamplingProbability = (double)1.0 / double(MaxAdjustedCount);
-constexpr uint64_t AlwaysSampleThreasHold = 0;
-constexpr uint64_t NeverSampleThreasHold = MaxAdjustedCount;
+constexpr uint64_t AlwaysSampleThresHold = 0;
+constexpr uint64_t NeverSampleThresHold = MaxAdjustedCount;
 
 uint64_t ProbabilityToThreshold(double fraction) {
     if (fraction <= MinSamplingProbability) {
-        return NeverSampleThreasHold;
+        return NeverSampleThresHold;
     }
     if (fraction >= 1) {
-        return AlwaysSampleThreasHold;
+        return AlwaysSampleThresHold;
     }
     uint64_t scaled = uint64_t((double)MaxAdjustedCount * fraction);
     return MaxAdjustedCount - scaled;

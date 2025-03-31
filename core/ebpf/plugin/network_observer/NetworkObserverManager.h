@@ -194,6 +194,9 @@ private:
 
     int mRollbackRecordTotal = 0;
     int mDropRecordTotal = 0;
+
+    std::vector<std::string> mEnableCids;
+    std::vector<std::string> mDisableCids;
 #endif
 };
 

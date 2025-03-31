@@ -7,14 +7,13 @@
 
 namespace logtail {
 
-struct k8sContainerInfo {
+struct K8sPodInfo {
     std::unordered_map<std::string, std::string> images;
     std::unordered_map<std::string, std::string> labels;
     std::string k8sNamespace;
     std::string serviceName;
     std::string workloadKind;
     std::string workloadName;
-    // ???
     std::time_t timestamp;
     std::string appId;
     std::string appName;

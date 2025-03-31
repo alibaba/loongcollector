@@ -48,7 +48,6 @@ protected:
     void SetUp() override {}
     void TearDown() override {}
 
-    // 辅助函数：检查十六进制字符串格式
     bool IsValidHexString(const std::string& str) {
         std::regex hexRegex("^[0-9a-f]+$");
         return std::regex_match(str, hexRegex);
@@ -56,11 +55,9 @@ protected:
 };
 
 void CommonUtilUnittest::TestTraceIDGeneration() {
-    // 测试生成的 TraceID 数组大小
     auto traceId = GenerateTraceID();
     APSARA_TEST_EQUAL(traceId.size(), 32UL);
 
-    // 测试生成的数组不全为0
     bool allZero = true;
     for (const auto& byte : traceId) {
         if (byte != 0) {
@@ -75,15 +72,14 @@ void CommonUtilUnittest::TestTraceIDFormat() {
     auto traceId = GenerateTraceID();
     std::string hexString = FromTraceId(traceId);
 
-    // 验证转换后的字符串长度（32字节 = 64个十六进制字符）
+    LOG_INFO(sLogger, ("traceId", hexString));
+
     APSARA_TEST_EQUAL(hexString.length(), 64UL);
 
-    // 验证是否为有效的十六进制字符串
     APSARA_TEST_TRUE(IsValidHexString(hexString));
 }
 
 void CommonUtilUnittest::TestTraceIDUniqueness() {
-    // 生成多个 TraceID 并验证唯一性
     std::set<std::string> traceIds;
     const int numIds = 1000;
 
@@ -93,16 +89,13 @@ void CommonUtilUnittest::TestTraceIDUniqueness() {
         traceIds.insert(hexString);
     }
 
-    // 验证没有重复的 TraceID
     APSARA_TEST_EQUAL(traceIds.size(), size_t(numIds));
 }
 
 void CommonUtilUnittest::TestSpanIDGeneration() {
-    // 测试生成的 SpanID 数组大小
     auto spanId = GenerateSpanID();
     APSARA_TEST_EQUAL(spanId.size(), 16UL);
 
-    // 测试生成的数组不全为0
     bool allZero = true;
     for (const auto& byte : spanId) {
         if (byte != 0) {
@@ -117,10 +110,10 @@ void CommonUtilUnittest::TestSpanIDFormat() {
     auto spanId = GenerateSpanID();
     std::string hexString = FromSpanId(spanId);
 
-    // 验证转换后的字符串长度（16字节 = 32个十六进制字符）
+    LOG_INFO(sLogger, ("spanId", hexString));
+
     APSARA_TEST_EQUAL(hexString.length(), 32UL);
 
-    // 验证是否为有效的十六进制字符串
     APSARA_TEST_TRUE(IsValidHexString(hexString));
 }
 

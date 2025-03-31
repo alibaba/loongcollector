@@ -124,12 +124,12 @@ public:
         auto res = reader->parse(jsonData.c_str(), jsonData.c_str() + jsonData.size(), &root, &errors);
         APSARA_TEST_TRUE(res);
         std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-        res = K8sMetadata::GetInstance().FromContainerJson(root, data, containerInfoType::ContainerIdInfo);
+        res = K8sMetadata::GetInstance().FromContainerJson(root, data, PodInfoType::ContainerIdInfo);
         APSARA_TEST_TRUE(res);
         APSARA_TEST_TRUE(data != nullptr);
         std::vector<std::string> resKey;
         // update cache
-        K8sMetadata::GetInstance().HandleMetadataResponse(containerInfoType::ContainerIdInfo, data, resKey);
+        K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::ContainerIdInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(
             "286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144");
         APSARA_TEST_TRUE(container != nullptr);
@@ -151,12 +151,12 @@ public:
         auto res = reader->parse(jsonData.c_str(), jsonData.c_str() + jsonData.size(), &root, &errors);
         APSARA_TEST_TRUE(res);
         std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-        res = K8sMetadata::GetInstance().FromContainerJson(root, data, containerInfoType::IpInfo);
+        res = K8sMetadata::GetInstance().FromContainerJson(root, data, PodInfoType::IpInfo);
         APSARA_TEST_TRUE(res);
         APSARA_TEST_TRUE(data != nullptr);
         std::vector<std::string> resKey;
         // update cache
-        K8sMetadata::GetInstance().HandleMetadataResponse(containerInfoType::IpInfo, data, resKey);
+        K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::IpInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache("192.16..10.1");
         APSARA_TEST_TRUE(container != nullptr);
         APSARA_TEST_EQUAL(container->k8sNamespace, "default");
@@ -240,12 +240,12 @@ public:
         auto res = reader->parse(jsonData.c_str(), jsonData.c_str() + jsonData.size(), &root, &errors);
         APSARA_TEST_TRUE(res);
         std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-        res = K8sMetadata::GetInstance().FromContainerJson(root, data, containerInfoType::IpInfo);
+        res = K8sMetadata::GetInstance().FromContainerJson(root, data, PodInfoType::IpInfo);
         APSARA_TEST_TRUE(res);
         APSARA_TEST_TRUE(data != nullptr);
         std::vector<std::string> resKey;
         // update cache
-        K8sMetadata::GetInstance().HandleMetadataResponse(containerInfoType::IpInfo, data, resKey);
+        K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::IpInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByIpFromCache("172.16.20.108");
         APSARA_TEST_TRUE(container != nullptr);
 
@@ -363,12 +363,12 @@ public:
         auto res = reader->parse(jsonData.c_str(), jsonData.c_str() + jsonData.size(), &root, &errors);
         APSARA_TEST_TRUE(res);
         std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-        res = K8sMetadata::GetInstance().FromContainerJson(root, data, containerInfoType::IpInfo);
+        res = K8sMetadata::GetInstance().FromContainerJson(root, data, PodInfoType::IpInfo);
         APSARA_TEST_TRUE(res);
         APSARA_TEST_TRUE(data != nullptr);
         std::vector<std::string> resKey;
         // update cache
-        K8sMetadata::GetInstance().HandleMetadataResponse(containerInfoType::IpInfo, data, resKey);
+        K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::IpInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByIpFromCache("172.16.20.108");
         APSARA_TEST_TRUE(container != nullptr);
 
@@ -1101,12 +1101,12 @@ public:
         auto res = reader->parse(jsonData.c_str(), jsonData.c_str() + jsonData.size(), &root, &errors);
         APSARA_TEST_TRUE(res);
         std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-        res = K8sMetadata::GetInstance().FromContainerJson(root, data, containerInfoType::HostInfo);
+        res = K8sMetadata::GetInstance().FromContainerJson(root, data, PodInfoType::HostInfo);
         APSARA_TEST_TRUE(res);
         APSARA_TEST_TRUE(data != nullptr);
         std::vector<std::string> resKey;
         // update cache
-        K8sMetadata::GetInstance().HandleMetadataResponse(containerInfoType::HostInfo, data, resKey);
+        K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::HostInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByIpFromCache("10.208.196.155");
         APSARA_TEST_TRUE(container != nullptr);
 
@@ -1158,15 +1158,57 @@ public:
         APSARA_TEST_TRUE(k8sMetadata.mEnable);
         for (int i = 0; i < 10; i++) {
             // fail request
-            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i));
-            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i + 1));
-            k8sMetadata.AsyncQueryMetadata(containerInfoType::IpInfo, "192.168.0." + std::to_string(i + 2));
+            k8sMetadata.AsyncQueryMetadata(PodInfoType::IpInfo, "192.168.0." + std::to_string(i));
+            k8sMetadata.AsyncQueryMetadata(PodInfoType::IpInfo, "192.168.0." + std::to_string(i + 1));
+            k8sMetadata.AsyncQueryMetadata(PodInfoType::IpInfo, "192.168.0." + std::to_string(i + 2));
             // shoule query for 10 times ...
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
 
         APSARA_TEST_GT(k8sMetadata.mFailCount, 5);
         APSARA_TEST_FALSE(k8sMetadata.mIsValid);
+    }
+
+    void TestBuildAsyncQuery() {
+        std::vector<std::string> keys = {"1", "2", "3"};
+        auto req = K8sMetadata::GetInstance().BuildAsyncRequest(
+            keys,
+            PodInfoType::ContainerIdInfo,
+            []() { return true; },
+            [](const std::vector<std::string>& podIpVec) { LOG_INFO(sLogger, ("size", podIpVec.size())); });
+        APSARA_TEST_TRUE(req != nullptr);
+        LOG_INFO(sLogger,
+                 ("host", req->mHost)("url", req->mUrl)("query string",
+                                                        req->mQueryString)("body", req->mBody)("method", req->mMethod));
+        APSARA_TEST_EQUAL(req->mHost, K8sMetadata::GetInstance().mServiceHost);
+        APSARA_TEST_EQUAL(req->mMethod, "GET");
+        APSARA_TEST_EQUAL(req->mUrl, "/metadata/containerid");
+
+        req = K8sMetadata::GetInstance().BuildAsyncRequest(
+            keys,
+            PodInfoType::IpInfo,
+            []() { return true; },
+            [](const std::vector<std::string>& podIpVec) { LOG_INFO(sLogger, ("size", podIpVec.size())); });
+        APSARA_TEST_TRUE(req != nullptr);
+        LOG_INFO(sLogger,
+                 ("host", req->mHost)("url", req->mUrl)("query string",
+                                                        req->mQueryString)("body", req->mBody)("method", req->mMethod));
+        APSARA_TEST_EQUAL(req->mHost, K8sMetadata::GetInstance().mServiceHost);
+        APSARA_TEST_EQUAL(req->mMethod, "GET");
+        APSARA_TEST_EQUAL(req->mUrl, "/metadata/ipport");
+
+        req = K8sMetadata::GetInstance().BuildAsyncRequest(
+            keys,
+            PodInfoType::HostInfo,
+            []() { return true; },
+            [](const std::vector<std::string>& podIpVec) { LOG_INFO(sLogger, ("size", podIpVec.size())); });
+        APSARA_TEST_TRUE(req != nullptr);
+        LOG_INFO(sLogger,
+                 ("host", req->mHost)("url", req->mUrl)("query string",
+                                                        req->mQueryString)("body", req->mBody)("method", req->mMethod));
+        APSARA_TEST_EQUAL(req->mHost, K8sMetadata::GetInstance().mServiceHost);
+        APSARA_TEST_EQUAL(req->mMethod, "GET");
+        APSARA_TEST_EQUAL(req->mUrl, "/metadata/host");
     }
 };
 
@@ -1177,6 +1219,7 @@ APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToSpan, 3);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestExternalIpOperations, 4);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAsyncQueryMetadata, 5);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestNetworkCheck, 6);
+APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestBuildAsyncQuery, 7);
 
 } // end of namespace logtail
 

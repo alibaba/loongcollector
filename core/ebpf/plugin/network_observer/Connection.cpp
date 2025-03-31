@@ -176,13 +176,11 @@ void Connection::TryUpdateProtocolAttr() {
             mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
             mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
             MarkL7MetaAttached();
-            // mProtocolAttached = true;
         } else if (mRole == support_role_e::IsServer) {
             mTags.SetNoCopy<kRpcType>(RPC_0_STR);
             mTags.SetNoCopy<kCallKind>(HTTP_STR);
             mTags.SetNoCopy<kCallType>(HTTP_STR);
             MarkL7MetaAttached();
-            // mProtocolAttached = true;
         }
 
         return;
@@ -204,12 +202,13 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
         if (std::regex_search(event->docker_id, match, mContainerIdRegex)) {
             cidTrim = match.str(0);
         }
-        LOG_DEBUG(sLogger, ("origin container_id", event->docker_id)("trim", cidTrim)("match pos", match.position()));
-        TryAttachSelfMeta();
-    } else {
-        LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));
-        UpdateSelfPodMetaForUnknown();
+        // LOG_DEBUG(sLogger, ("origin container_id", event->docker_id)("trim", cidTrim)("match pos",
+        // match.position())); TryAttachSelfMeta();
     }
+    // else {
+    //     LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));
+    //     UpdateSelfPodMetaForUnknown();
+    // }
 
     // handle socket info ...
     struct socket_info& si = event->si;
@@ -240,14 +239,21 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
         mTags.Set<kRemoteIp>(dip);
     }
 
+    // for peer meta
     if (IsLocalhost()) {
         LOG_DEBUG(sLogger, ("remote ip is localhost", "attach localhost for peer pod meta"));
         UpdatePeerPodMetaForLocalhost();
     } else {
-        LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
-        TryAttachPeerMeta();
+        // not cluster ip
+        if (si.family == AF_INET && !K8sMetadata::GetInstance().IsClusterIpForIPv4(si.ap.daddr)) {
+            UpdatePeerPodMetaForExternal();
+        } else {
+            LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
+            TryAttachPeerMeta();
+        }
     }
 
+    // for self meta
     if (cidTrim.empty()) {
         LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));
         UpdateSelfPodMetaForUnknown();
@@ -257,11 +263,9 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
     }
 
     MarkL4MetaAttached();
-    // mNetMetaAttached = true;
 }
 
-
-void Connection::UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod) {
+void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     if (IsSelfMetaAttachReady()) {
         return;
     }
@@ -351,7 +355,7 @@ void Connection::UpdateSelfPodMetaForUnknown() {
     MarkSelfMetaAttached();
 }
 
-void Connection::UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod) {
+void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     if (IsPeerMetaAttachReady()) {
         return;
     }
@@ -413,7 +417,7 @@ void Connection::TryAttachSelfMeta(bool enable) {
             return;
         }
         // async query
-        K8sMetadata::GetInstance().AsyncQueryMetadata(containerInfoType::ContainerIdInfo, cid);
+        K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::ContainerIdInfo, cid);
     }
 }
 
@@ -448,7 +452,7 @@ void Connection::TryAttachPeerMeta(bool enable) {
 
         // neither in cache nor external ip
         // start an async task
-        K8sMetadata::GetInstance().AsyncQueryMetadata(containerInfoType::IpInfo, dip);
+        K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::IpInfo, dip);
     }
 }
 

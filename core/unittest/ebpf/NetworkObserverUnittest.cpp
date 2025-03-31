@@ -42,6 +42,7 @@ public:
     void TestConfigUpdate();
     void TestErrorHandling();
     void TestPluginLifecycle();
+    void TestHandleHostMetadataUpdate();
 
 protected:
     void SetUp() override {
@@ -292,7 +293,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     options.mSampleRate = 1;
     mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    auto podInfo = std::make_shared<k8sContainerInfo>();
+    auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->containerIds = {"1", "2"};
     podInfo->appName = "test-app-name";
     podInfo->appId = "test-app-id";
@@ -306,7 +307,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     K8sMetadata::GetInstance().mContainerCache.insert(
         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
 
-    auto peerPodInfo = std::make_shared<k8sContainerInfo>();
+    auto peerPodInfo = std::make_shared<K8sPodInfo>();
     peerPodInfo->containerIds = {"3", "4"};
     peerPodInfo->podIp = "peer-pod-ip";
     peerPodInfo->podName = "peer-pod-name";
@@ -345,8 +346,8 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags.size(), 6UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
-    APSARA_TEST_EQUAL(tags["host.ip"], "test-pod-ip");
-    APSARA_TEST_EQUAL(tags["host.name"], "test-pod-ip");
+    APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host.name"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["arms.app.type"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
@@ -361,8 +362,8 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags.size(), 6UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
-    APSARA_TEST_EQUAL(tags["serverIp"], "test-pod-ip");
-    APSARA_TEST_EQUAL(tags["host"], "test-pod-ip");
+    APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["source"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
     LOG_INFO(sLogger, ("====== consume log ======", ""));
@@ -385,7 +386,7 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         options.mEnableSpan = true;
         mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-        auto podInfo = std::make_shared<k8sContainerInfo>();
+        auto podInfo = std::make_shared<K8sPodInfo>();
         podInfo->containerIds = {"1", "2"};
         podInfo->appName = "test-app-name";
         podInfo->appId = "test-app-id";
@@ -399,7 +400,7 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         K8sMetadata::GetInstance().mContainerCache.insert(
             "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
 
-        auto peerPodInfo = std::make_shared<k8sContainerInfo>();
+        auto peerPodInfo = std::make_shared<K8sPodInfo>();
         peerPodInfo->containerIds = {"3", "4"};
         peerPodInfo->podIp = "peer-pod-ip";
         peerPodInfo->podName = "peer-pod-name";
@@ -585,6 +586,36 @@ void NetworkObserverManagerUnittest::TestPluginLifecycle() {
     EXPECT_EQ(result, 0);
 }
 
+std::shared_ptr<K8sPodInfo> CreatePodInfo(const std::string& cid) {
+    auto podInfo = std::make_shared<K8sPodInfo>();
+    podInfo->containerIds = {cid};
+    podInfo->podIp = "test-pod-ip";
+    podInfo->podName = "test-pod-name";
+    podInfo->k8sNamespace = "test-namespace";
+    podInfo->appId = cid + "-test-app-id";
+    podInfo->appName = cid + "-test-app-name";
+    return podInfo;
+}
+
+void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
+    std::vector<std::string> cidLists0 = {"1", "2", "3", "4", "5"};
+    for (auto cid : cidLists0) {
+        K8sMetadata::GetInstance().mContainerCache.insert(cid, CreatePodInfo(cid));
+    }
+    mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 0);
+
+    mManager->HandleHostMetadataUpdate({"2", "3", "4", "5"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 1); // only add "5"
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 1); // delete "1"
+
+    mManager->HandleHostMetadataUpdate({"4", "5", "6"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 0);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
+}
+
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestDataEventProcessing);
@@ -594,6 +625,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 
 } // namespace ebpf
 } // namespace logtail

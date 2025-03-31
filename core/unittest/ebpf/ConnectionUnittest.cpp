@@ -205,7 +205,7 @@ void ConnectionUnittest::TestMetadataManagement() {
 
     // add k8s metadata cache
     // attach self pod metadata
-    auto podInfo = std::make_shared<k8sContainerInfo>();
+    auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->containerIds = {"1", "2"};
     podInfo->podIp = "test-pod-ip";
     podInfo->podName = "test-pod-name";
@@ -227,7 +227,7 @@ void ConnectionUnittest::TestMetadataManagement() {
     LOG_INFO(sLogger, ("step", "1"));
 
     // attach peer pod metadata
-    auto peerPodInfo = std::make_shared<k8sContainerInfo>();
+    auto peerPodInfo = std::make_shared<K8sPodInfo>();
     peerPodInfo->containerIds = {"3", "4"};
     peerPodInfo->podIp = "peer-pod-ip";
     peerPodInfo->podName = "peer-pod-name";

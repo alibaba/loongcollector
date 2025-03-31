@@ -59,7 +59,6 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
         ProcessEvent(events[i], containerVec, remoteIpVec);
     }
-    return;
 }
 
 bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e,
@@ -89,7 +88,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
-        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerIdView);
+        std::shared_ptr<K8sPodInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerIdView);
         if (containerInfo == nullptr) {
             containerVec.push_back(containerId);
             res = false;
@@ -104,7 +103,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
-        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIpView);
+        std::shared_ptr<K8sPodInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIpView);
         if (ipInfo == nullptr) {
             remoteIpVec.push_back(remoteIp);
             res = false;

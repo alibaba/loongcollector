@@ -68,6 +68,17 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
+#ifdef APSARA_UNIT_TEST_MAIN
+DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
+DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
+DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
+DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", true);
+#else
+DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
+#endif
 
 using namespace std;
 
@@ -140,10 +151,18 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    if (BOOL_FLAG(enable_ebpf_network_observer)) {
+        RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_process_secure)) {
+        RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_file_secure)) {
+        RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_network_secure)) {
+        RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    }
     RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
 #endif
 

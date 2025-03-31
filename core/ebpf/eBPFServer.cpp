@@ -309,11 +309,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                 pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             }
-            // else {
-            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
-            // }
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
@@ -322,15 +317,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                 pluginMgr = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             }
-            // else {
-            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
-            // }
-            NetworkObserveConfig nconfig;
-            // TODO @qianlu.kk register k8s metadata callback for metric ??
-
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-
-            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
@@ -339,12 +325,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                 pluginMgr = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             }
-            // else {
-            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
-            // }
-
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (pluginMgr->Init(options) == 0);
             break;
         }
 
@@ -353,17 +333,15 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                 pluginMgr = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
                 UpdatePluginManager(type, pluginMgr);
             }
-            // else {
-            //     pluginMgr->UpdateProcessCacheManager(mProcessCacheManager);
-            // }
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = (pluginMgr->Init(options) == 0);
             break;
         }
         default:
             LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
             return false;
     }
+
+    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+    ret = (pluginMgr->Init(options) == 0);
 
     if (ret) {
         ADD_COUNTER(mStartPluginTotal, 1);

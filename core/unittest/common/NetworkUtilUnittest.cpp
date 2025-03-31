@@ -27,6 +27,8 @@ public:
     void TestGetFamilyString();
     void TestGetProtocolString();
     void TestGetStateString();
+
+    void TestCIDROptions();
 };
 
 void NetworkUtilUnittest::TestGetAddrString() {
@@ -76,10 +78,26 @@ void NetworkUtilUnittest::TestGetStateString() {
     APSARA_TEST_STREQ_DESC(GetStateString(999).c_str(), "INVALID_STATE", "Invalid state should return 'INVALID_STATE'");
 }
 
+void NetworkUtilUnittest::TestCIDROptions() {
+    CIDR cidr;
+    bool status = ParseCIDR("192.168.0.1/27", &cidr);
+    LOG_DEBUG(sLogger, ("cidr addr", std::get<uint32_t>(cidr.mAddr.mIp)));
+    APSARA_TEST_TRUE(status);
+    // 3232235521 ===> 192.168.0.1
+    // 3232235786 ===> 192.168.1.10
+    bool contains = CIDRContainsForIPV4(16820416, 24, 167880896);
+    APSARA_TEST_FALSE(contains);
+    // test 192.168.1.10
+    contains = CIDRContainsForIPV4(16820416, 16, 167880896);
+    APSARA_TEST_TRUE(contains);
+}
+
 UNIT_TEST_CASE(NetworkUtilUnittest, TestGetAddrString);
 UNIT_TEST_CASE(NetworkUtilUnittest, TestGetFamilyString);
 UNIT_TEST_CASE(NetworkUtilUnittest, TestGetProtocolString);
 UNIT_TEST_CASE(NetworkUtilUnittest, TestGetStateString);
+UNIT_TEST_CASE(NetworkUtilUnittest, TestCIDROptions);
+
 
 } // namespace logtail
 

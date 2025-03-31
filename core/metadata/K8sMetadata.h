@@ -25,6 +25,7 @@
 #include "common/Flags.h"
 #include "common/LRUCache.h"
 #include "common/Lock.h"
+#include "common/NetworkUtil.h"
 #include "common/http/HttpRequest.h"
 #include "models/StringView.h"
 #include "monitor/metric_models/MetricRecord.h"
@@ -35,25 +36,11 @@ DECLARE_FLAG_INT32(singleton_port);
 
 namespace logtail {
 
-const static std::string appIdKey = "armseBPFAppId";
-const static std::string appNameKey = "armseBPFCreateAppName";
-const static std::string imageKey = "images";
-const static std::string labelsKey = "labels";
-const static std::string namespaceKey = "namespace";
-const static std::string workloadKindKey = "workloadKind";
-const static std::string workloadNameKey = "workloadName";
-const static std::string serviceNameKey = "serviceName";
-const static std::string podNameKey = "podName";
-const static std::string podIpKey = "podIP";
-const static std::string envKey = "envs";
-const static std::string containerIdKey = "containerIDs";
-const static std::string startTimeKey = "startTime";
-
 struct ContainerData {
-    std::unordered_map<std::string, k8sContainerInfo> containers;
+    std::unordered_map<std::string, K8sPodInfo> containers;
 };
 
-enum class containerInfoType {
+enum class PodInfoType {
     ContainerIdInfo,
     IpInfo,
     HostInfo,
@@ -61,10 +48,12 @@ enum class containerInfoType {
 
 using HostMetadataPostHandler = std::function<bool(uint32_t pluginIndex, std::vector<std::string>& containerIds)>;
 
+struct K8sMetadataHttpRequest;
+
 class K8sMetadata {
 private:
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mIpCache;
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> mContainerCache;
+    lru11::Cache<std::string, std::shared_ptr<K8sPodInfo>, std::mutex> mIpCache;
+    lru11::Cache<std::string, std::shared_ptr<K8sPodInfo>, std::mutex> mContainerCache;
     lru11::Cache<std::string, uint8_t, std::mutex> mExternalIpCache;
 
     std::string mServiceHost;
@@ -96,6 +85,8 @@ private:
     mutable std::condition_variable mNetDetectorCv;
     std::thread mNetDetector;
 
+    std::vector<CIDR> mClusterCIDRs;
+
     K8sMetadata(size_t ipCacheSize = 1024, size_t cidCacheSize = 1024, size_t externalIpCacheSize = 1024);
     K8sMetadata(const K8sMetadata&) = delete;
     K8sMetadata& operator=(const K8sMetadata&) = delete;
@@ -106,15 +97,16 @@ private:
     std::unique_ptr<HttpRequest>
     BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
     void DetectNetwork();
-    void SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
-    void SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info);
+    void SetIpCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info);
+    void SetContainerCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info);
     void SetExternalIpCache(const std::string&);
     void UpdateExternalIpCache(const std::vector<std::string>& queryIps, const std::vector<std::string>& retIps);
-    bool FromInfoJson(const Json::Value& json, k8sContainerInfo& info);
-    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, containerInfoType infoType);
-    void HandleMetadataResponse(containerInfoType infoType,
+    bool FromInfoJson(const Json::Value& json, K8sPodInfo& info);
+    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, PodInfoType infoType);
+    void HandleMetadataResponse(PodInfoType infoType,
                                 const std::shared_ptr<ContainerData>& data,
                                 std::vector<std::string>& resKey);
+    bool HandleResponse(HttpResponse& res, PodInfoType infoType, std::vector<std::string>& resKey);
 
 public:
     static K8sMetadata& GetInstance() {
@@ -125,34 +117,88 @@ public:
 
     bool Enable();
 
+    const std::string& GetHostIp() const;
+
     // if cache not have,get from server
     std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string>& containerIds, bool& status);
     // get pod metadatas for local host
     bool GetByLocalHostFromServer();
     bool GetByLocalHostFromServer(std::vector<std::string>& podIpVec);
-    //
+
     std::vector<std::string> GetByIpsFromServer(std::vector<std::string>& ips, bool& status, bool force = false);
     // get info by container id from cache
-    // std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
-    std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const StringView& containerId);
+    std::shared_ptr<K8sPodInfo> GetInfoByContainerIdFromCache(const StringView& containerId);
     // get info by ip from cache
-    // std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
-    std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const StringView& ip);
+    std::shared_ptr<K8sPodInfo> GetInfoByIpFromCache(const StringView& ip);
     bool IsExternalIp(const StringView& ip) const;
+    bool IsClusterIpForIPv4(uint32_t ip) const;
     bool SendRequestToOperator(const std::string& urlHost,
                                const std::string& request,
-                               containerInfoType infoType,
+                               PodInfoType infoType,
                                std::vector<std::string>& resKey,
                                bool force = false);
 
-    void AsyncQueryMetadata(containerInfoType type, const StringView& key);
-    // CIDR 问题 gflag 支持配置
+    void AsyncQueryMetadata(PodInfoType type, const StringView& key);
 
+    std::unique_ptr<K8sMetadataHttpRequest>
+    BuildAsyncRequest(std::vector<std::string>& keys,
+                      PodInfoType infoType,
+                      std::function<bool()> validator,
+                      std::function<void(const std::vector<std::string>&)> postProcessor = nullptr,
+                      uint32_t timeoutSeconds = 1,
+                      uint32_t retryTimes = 3);
+
+    friend class K8sMetadataHttpRequest;
 #ifdef APSARA_UNIT_TEST_MAIN
     HttpRequest* mRequest;
     friend class k8sMetadataUnittest;
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
+    friend class NetworkObserverManagerUnittest;
 #endif
 };
+
+struct K8sMetadataHttpRequest : public AsynHttpRequest {
+    K8sMetadataHttpRequest(const std::string& method,
+                           bool httpsFlag,
+                           const std::string& host,
+                           int32_t port,
+                           const std::string& url,
+                           const std::string& query,
+                           const std::map<std::string, std::string>& header,
+                           const std::string& body,
+                           uint32_t timeout,
+                           uint32_t maxTryCnt,
+                           PodInfoType infoType,
+                           std::function<bool()> validator,
+                           std::function<void(const std::vector<std::string>&)> postProcessor = nullptr)
+        : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body, HttpResponse(), timeout, maxTryCnt),
+          mInfoType(infoType),
+          mValidator(validator),
+          mPostProcessor(postProcessor) {}
+
+    bool IsContextValid() const override {
+        if (mValidator == nullptr) {
+            return true;
+        }
+        return mValidator();
+    };
+
+    void OnSendDone(HttpResponse& response) {
+        std::vector<std::string> podIps;
+        bool status = K8sMetadata::GetInstance().HandleResponse(response, mInfoType, podIps);
+        if (!status) {
+            return;
+        }
+        // post process ...
+        if (mPostProcessor != nullptr) {
+            mPostProcessor(podIps);
+        }
+    };
+
+    PodInfoType mInfoType;
+    std::function<bool()> mValidator = nullptr;
+    std::function<void(const std::vector<std::string>&)> mPostProcessor = nullptr;
+};
+
 } // namespace logtail

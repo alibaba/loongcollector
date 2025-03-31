@@ -177,11 +177,11 @@ private:
     // peer pod meta
     void UpdatePeerPodMetaForExternal();
     void UpdatePeerPodMetaForExternalInner();
-    void UpdatePeerPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
+    void UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void UpdatePeerPodMetaForLocalhost();
 
     // self pod meta
-    void UpdateSelfPodMeta(const std::shared_ptr<k8sContainerInfo>& pod);
+    void UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void UpdateSelfPodMetaForUnknown();
 
     using Flag = unsigned int;

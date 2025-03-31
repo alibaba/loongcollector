@@ -19,9 +19,15 @@
 #include <cstdint>
 
 #include <array>
+#include <variant>
+
+#include "common/StringTools.h"
+#include "logger/Logger.h"
 
 #if defined(__linux__)
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/un.h>
 #endif
 
 namespace logtail {
@@ -53,10 +59,10 @@ const std::string& GetStateString(uint16_t state) {
 std::string GetAddrString(uint32_t ad) {
 #if defined(__linux__)
     auto addr = ntohl(ad);
-    struct in_addr ip_addr;
-    ip_addr.s_addr = htonl(addr);
+    struct in_addr ipAddr;
+    ipAddr.s_addr = htonl(addr);
     char ip_str[INET_ADDRSTRLEN];
-    if (inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN)) {
+    if (inet_ntop(AF_INET, &ipAddr, ip_str, INET_ADDRSTRLEN)) {
         return ip_str;
     }
 #endif
@@ -111,6 +117,76 @@ const std::string& GetProtocolString(uint16_t protocol) {
         default:
             return PROTOCOL_UNKNOWN;
     }
+}
+
+constexpr int kIPv4BitLen = 32;
+constexpr int kIPv6BitLen = 128;
+
+bool CIDRContainsForIPV4(uint32_t cidrIp, size_t prefixLen, uint32_t ip) {
+    LOG_DEBUG(sLogger, ("cidr ip", cidrIp)("ip", ip));
+    return ntohl(cidrIp) >> (kIPv4BitLen - prefixLen) == ntohl(ip) >> (kIPv4BitLen - prefixLen);
+}
+
+// The IPv4 IP is located in the last 32-bit word of IPv6 address.
+constexpr int kIPv4Offset = 3;
+
+bool ParseIPv4Addr(const std::string& addrStr, struct in_addr* inAddr) {
+    if (!inet_pton(AF_INET, addrStr.c_str(), inAddr)) {
+        return false;
+    }
+    return true;
+}
+
+bool ParseIPv6Addr(const std::string& addrStr, struct in6_addr* in6Addr) {
+    if (!inet_pton(AF_INET6, addrStr.c_str(), in6Addr)) {
+        return false;
+    }
+    return true;
+}
+
+bool ParseIPAddr(const std::string& addrStr, InetAddr* ipAddr) {
+    struct in_addr v4Addr = {};
+    struct in6_addr v6Addr = {};
+    v6Addr.s6_addr;
+
+    if (ParseIPv4Addr(addrStr, &v4Addr)) {
+        ipAddr->mFamily = InetAddrFamily::kIPv4;
+        ipAddr->mIp = v4Addr.s_addr;
+    } else if (ParseIPv6Addr(addrStr, &v6Addr)) {
+        ipAddr->mFamily = InetAddrFamily::kIPv6;
+        ipAddr->mIp = std::array<uint8_t, 16>();
+        std::copy(std::begin(v6Addr.s6_addr),
+                  std::end(v6Addr.s6_addr),
+                  std::get<std::array<uint8_t, 16>>(ipAddr->mIp).begin());
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+bool ParseCIDR(const std::string& cidrStr, CIDR* cidr) {
+    auto items = StringSpliter(cidrStr, "/");
+    if (items.size() != 2) {
+        return false;
+    }
+    int prefixLen = StringTo<int>(items[1]);
+    if (prefixLen < 0) {
+        return false;
+    }
+    InetAddr addr;
+    ParseIPAddr(items[0], &addr);
+
+    if (addr.mFamily == InetAddrFamily::kIPv4 && prefixLen > kIPv4BitLen) {
+        return false;
+    }
+    if (addr.mFamily == InetAddrFamily::kIPv6 && prefixLen > kIPv6BitLen) {
+        return false;
+    }
+
+    cidr->mAddr = std::move(addr);
+    cidr->mPrefixLength = prefixLen;
+    return true;
 }
 
 } // namespace logtail

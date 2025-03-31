@@ -21,6 +21,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/MachineInfoUtil.h"
+#include "common/NetworkUtil.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "common/http/HttpRequest.h"
@@ -31,16 +32,27 @@
 
 using namespace std;
 
+DEFINE_FLAG_STRING(ipv4_cluster_cidrs, "cluster cidr", "");
+
 namespace logtail {
 
 const std::string CONTAINER_ID_METADATA_PATH = "/metadata/containerid";
 const std::string HOST_METADATAPATH = "/metadata/host";
 const std::string IP_METADATA_PATH = "/metadata/ipport";
 
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    ((std::string*)userp)->append((char*)contents, size * nmemb);
-    return size * nmemb;
-}
+static const std::string kAppIdKey = "armseBPFAppId";
+static const std::string kAppNameKey = "armseBPFCreateAppName";
+static const std::string kImagesKey = "images";
+static const std::string kLabelsKey = "labels";
+static const std::string kNamespaceKey = "namespace";
+static const std::string kWorkloadKindKey = "workloadKind";
+static const std::string kWorkloadNameKey = "workloadName";
+static const std::string kServiceNameKey = "serviceName";
+static const std::string kPodNameKey = "podName";
+static const std::string kPodIpKey = "podIP";
+static const std::string kEnvKey = "envs";
+static const std::string kContainerIdKey = "containerIDs";
+static const std::string kStartTimeKey = "startTime";
 
 bool K8sMetadata::Enable() {
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -77,6 +89,17 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     } else {
         mHostIp = GetHostIp();
     }
+    // parse CIDR blocks
+    if (STRING_FLAG(ipv4_cluster_cidrs).size()) {
+        auto cidrs = StringSpliter(STRING_FLAG(ipv4_cluster_cidrs), ",");
+        for (auto& cidrStr : cidrs) {
+            CIDR cidr;
+            if (ParseCIDR(cidrStr, &cidr)) {
+                mClusterCIDRs.push_back(cidr);
+            }
+        }
+    }
+
 #ifdef APSARA_UNIT_TEST_MAIN
     mServiceHost = "47.95.70.43";
     mServicePort = 8899;
@@ -100,7 +123,6 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_IP_CACHE_SIZE);
     mExternalIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE);
     mRequestMetaServerTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL);
-    ;
     mRequestMetaServerFailedTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL);
 
     // batch query metadata ...
@@ -111,49 +133,49 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     }
 }
 
-bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) {
-    if (!json.isMember(imageKey) || !json.isMember(labelsKey) || !json.isMember(namespaceKey)
-        || !json.isMember(workloadKindKey) || !json.isMember(workloadNameKey)) {
+bool K8sMetadata::FromInfoJson(const Json::Value& json, K8sPodInfo& info) {
+    if (!json.isMember(kImagesKey) || !json.isMember(kLabelsKey) || !json.isMember(kNamespaceKey)
+        || !json.isMember(kWorkloadKindKey) || !json.isMember(kWorkloadNameKey)) {
         return false;
     }
 
-    for (const auto& key : json[imageKey].getMemberNames()) {
-        if (json[imageKey].isMember(key)) {
-            info.images[key] = json[imageKey][key].asString();
+    for (const auto& key : json[kImagesKey].getMemberNames()) {
+        if (json[kImagesKey].isMember(key)) {
+            info.images[key] = json[kImagesKey][key].asString();
         }
     }
-    for (const auto& key : json[labelsKey].getMemberNames()) {
-        if (json[labelsKey].isMember(key)) {
-            info.labels[key] = json[labelsKey][key].asString();
+    for (const auto& key : json[kLabelsKey].getMemberNames()) {
+        if (json[kLabelsKey].isMember(key)) {
+            info.labels[key] = json[kLabelsKey][key].asString();
 
-            if (key == appIdKey) {
-                info.appId = json[labelsKey][key].asString();
-            } else if (key == appNameKey) {
-                info.appName = json[labelsKey][key].asString();
+            if (key == kAppIdKey) {
+                info.appId = json[kLabelsKey][key].asString();
+            } else if (key == kAppNameKey) {
+                info.appName = json[kLabelsKey][key].asString();
             }
         }
     }
 
-    info.k8sNamespace = json[namespaceKey].asString();
-    if (json.isMember(serviceNameKey)) {
-        info.serviceName = json[serviceNameKey].asString();
+    info.k8sNamespace = json[kNamespaceKey].asString();
+    if (json.isMember(kServiceNameKey)) {
+        info.serviceName = json[kServiceNameKey].asString();
     }
-    if (json.isMember(containerIdKey)) {
-        for (const auto& member : json[containerIdKey]) {
+    if (json.isMember(kContainerIdKey)) {
+        for (const auto& member : json[kContainerIdKey]) {
             info.containerIds.push_back(member.asString());
         }
     }
-    info.workloadKind = json[workloadKindKey].asString();
-    info.workloadName = json[workloadNameKey].asString();
-    info.podIp = json[podIpKey].asString();
-    info.podName = json[podNameKey].asString();
-    info.serviceName = json[serviceNameKey].asString();
-    info.startTime = json[startTimeKey].asInt64();
+    info.workloadKind = json[kWorkloadKindKey].asString();
+    info.workloadName = json[kWorkloadNameKey].asString();
+    info.podIp = json[kPodIpKey].asString();
+    info.podName = json[kPodNameKey].asString();
+    info.serviceName = json[kServiceNameKey].asString();
+    info.startTime = json[kStartTimeKey].asInt64();
     info.timestamp = std::time(0);
     return true;
 }
 
-bool ContainerInfoIsExpired(std::shared_ptr<k8sContainerInfo> info) {
+bool ContainerInfoIsExpired(const std::shared_ptr<K8sPodInfo>& info) {
     if (info == nullptr) {
         return false;
     }
@@ -170,12 +192,12 @@ bool ContainerInfoIsExpired(std::shared_ptr<k8sContainerInfo> info) {
 
 bool K8sMetadata::FromContainerJson(const Json::Value& json,
                                     std::shared_ptr<ContainerData> data,
-                                    containerInfoType infoType) {
+                                    PodInfoType infoType) {
     if (!json.isObject()) {
         return false;
     }
     for (const auto& key : json.getMemberNames()) {
-        k8sContainerInfo info;
+        K8sPodInfo info;
         bool fromJsonIsOk = FromInfoJson(json[key], info);
         if (!fromJsonIsOk) {
             continue;
@@ -209,9 +231,95 @@ void K8sMetadata::UpdateStatus(bool status) {
     }
 }
 
+bool K8sMetadata::HandleResponse(HttpResponse& res, PodInfoType infoType, std::vector<std::string>& resKey) {
+    if (res.GetStatusCode() != 200) {
+        UpdateStatus(false);
+        ADD_COUNTER(mRequestMetaServerFailedTotal, 1);
+        LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail, code is ", res.GetStatusCode()));
+        return false;
+    }
+    UpdateStatus(true);
+    Json::CharReaderBuilder readerBuilder;
+    std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
+    Json::Value root;
+    std::string errors;
+
+    auto& responseBody = *res.GetBody<std::string>();
+    if (reader->parse(responseBody.c_str(), responseBody.c_str() + responseBody.size(), &root, &errors)) {
+        std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
+        if (data == nullptr) {
+            return false;
+        }
+        if (!FromContainerJson(root, data, infoType)) {
+            LOG_WARNING(sLogger, ("from container json error:", "SetIpCache"));
+        } else {
+            HandleMetadataResponse(infoType, data, resKey);
+        }
+    } else {
+        LOG_WARNING(sLogger, ("JSON parse error:", errors));
+        return false;
+    }
+    return true;
+}
+
+const std::string& K8sMetadata::GetHostIp() const {
+    return mHostIp;
+}
+
+const std::string kKeysString = "keys";
+std::string KeysToReqBody(const std::vector<std::string>& keys) {
+    if (keys.size()) {
+        Json::Value jsonObj;
+        for (auto& str : keys) {
+            jsonObj[kKeysString].append(str);
+        }
+        std::vector<std::string> res;
+        Json::StreamWriterBuilder writer;
+        return Json::writeString(writer, jsonObj);
+    } else {
+        return "";
+    }
+}
+
+std::unique_ptr<K8sMetadataHttpRequest>
+K8sMetadata::BuildAsyncRequest(std::vector<std::string>& keys,
+                               PodInfoType infoType,
+                               std::function<bool()> validator,
+                               std::function<void(const std::vector<std::string>&)> postProcessor,
+                               uint32_t timeoutSeconds,
+                               uint32_t retryTimes) {
+    std::string reqBody;
+    std::string path = CONTAINER_ID_METADATA_PATH;
+    if (infoType == PodInfoType::IpInfo) {
+        path = IP_METADATA_PATH;
+        reqBody = KeysToReqBody(keys);
+    } else if (infoType == PodInfoType::ContainerIdInfo) {
+        path = CONTAINER_ID_METADATA_PATH;
+        reqBody = KeysToReqBody(keys);
+    } else {
+        path = HOST_METADATAPATH;
+        reqBody = KeysToReqBody({K8sMetadata::GetInstance().mHostIp});
+    }
+
+    return std::make_unique<K8sMetadataHttpRequest>(
+        "GET",
+        false,
+        mServiceHost,
+        mServicePort,
+        path,
+        "",
+        map<std::string, std::string>({{"Content-Type", "application/json"}}),
+        reqBody,
+        timeoutSeconds,
+        retryTimes,
+        infoType,
+        validator,
+        postProcessor);
+}
+
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                                         const std::string& query,
-                                        containerInfoType infoType,
+                                        PodInfoType infoType,
                                         std::vector<std::string>& resKey,
                                         bool force) {
     if (!mIsValid && !force) {
@@ -220,9 +328,9 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
     HttpResponse res;
     std::string path = CONTAINER_ID_METADATA_PATH;
-    if (infoType == containerInfoType::IpInfo) {
+    if (infoType == PodInfoType::IpInfo) {
         path = IP_METADATA_PATH;
-    } else if (infoType == containerInfoType::HostInfo) {
+    } else if (infoType == PodInfoType::HostInfo) {
         path = HOST_METADATAPATH;
     }
     auto request = BuildRequest(path, query);
@@ -236,35 +344,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
 #endif
     LOG_DEBUG(sLogger, ("res body", *res.GetBody<std::string>()));
     if (success) {
-        if (res.GetStatusCode() != 200) {
-            UpdateStatus(false);
-            ADD_COUNTER(mRequestMetaServerFailedTotal, 1);
-            LOG_WARNING(sLogger, ("fetch k8s meta from one operator fail, code is ", res.GetStatusCode()));
-            return false;
-        }
-        UpdateStatus(true);
-        Json::CharReaderBuilder readerBuilder;
-        std::unique_ptr<Json::CharReader> reader(readerBuilder.newCharReader());
-        Json::Value root;
-        std::string errors;
-
-        auto& responseBody = *res.GetBody<std::string>();
-        if (reader->parse(responseBody.c_str(), responseBody.c_str() + responseBody.size(), &root, &errors)) {
-            std::shared_ptr<ContainerData> data = std::make_shared<ContainerData>();
-            if (data == nullptr) {
-                return false;
-            }
-            if (!FromContainerJson(root, data, infoType)) {
-                LOG_WARNING(sLogger, ("from container json error:", "SetIpCache"));
-            } else {
-                HandleMetadataResponse(infoType, data, resKey);
-            }
-        } else {
-            LOG_WARNING(sLogger, ("JSON parse error:", errors));
-            return false;
-        }
-
-        return true;
+        return HandleResponse(res, infoType, resKey);
     } else {
         UpdateStatus(false);
         ADD_COUNTER(mRequestMetaServerFailedTotal, 1);
@@ -273,17 +353,17 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
 }
 
-void K8sMetadata::HandleMetadataResponse(containerInfoType infoType,
+void K8sMetadata::HandleMetadataResponse(PodInfoType infoType,
                                          const std::shared_ptr<ContainerData>& data,
                                          std::vector<std::string>& resKey) {
     for (const auto& pair : data->containers) {
         // update cache
-        auto info = std::make_shared<k8sContainerInfo>(pair.second);
-        if (infoType == containerInfoType::ContainerIdInfo) {
+        auto info = std::make_shared<K8sPodInfo>(pair.second);
+        if (infoType == PodInfoType::ContainerIdInfo) {
             // record result
             resKey.push_back(pair.first);
             SetContainerCache(pair.first, info);
-        } else if (infoType == containerInfoType::IpInfo) {
+        } else if (infoType == PodInfoType::IpInfo) {
             // record result
             resKey.push_back(pair.first);
             SetIpCache(pair.first, info);
@@ -302,23 +382,15 @@ void K8sMetadata::HandleMetadataResponse(containerInfoType infoType,
 
 std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string>& containerIds,
                                                                   bool& status) {
-    Json::Value jsonObj;
-    for (auto& str : containerIds) {
-        jsonObj["keys"].append(str);
-    }
     std::vector<std::string> res;
-    Json::StreamWriterBuilder writer;
-    std::string reqBody = Json::writeString(writer, jsonObj);
-    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::ContainerIdInfo, res);
+    std::string reqBody = KeysToReqBody(containerIds);
+    status = SendRequestToOperator(mServiceHost, reqBody, PodInfoType::ContainerIdInfo, res);
     return res;
 }
 
 bool K8sMetadata::GetByLocalHostFromServer(std::vector<std::string>& podIpVec) {
-    Json::Value jsonObj;
-    jsonObj["keys"].append(mHostIp);
-    Json::StreamWriterBuilder writer;
-    std::string reqBody = Json::writeString(writer, jsonObj);
-    return SendRequestToOperator(mServiceHost, reqBody, containerInfoType::HostInfo, podIpVec);
+    std::string reqBody = KeysToReqBody({mHostIp});
+    return SendRequestToOperator(mServiceHost, reqBody, PodInfoType::HostInfo, podIpVec);
 }
 
 bool K8sMetadata::GetByLocalHostFromServer() {
@@ -326,11 +398,11 @@ bool K8sMetadata::GetByLocalHostFromServer() {
     return GetByLocalHostFromServer(podIpVec);
 }
 
-void K8sMetadata::SetContainerCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info) {
+void K8sMetadata::SetContainerCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info) {
     mContainerCache.insert(key, info);
 }
 
-void K8sMetadata::SetIpCache(const std::string& key, const std::shared_ptr<k8sContainerInfo>& info) {
+void K8sMetadata::SetIpCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info) {
     mIpCache.insert(key, info);
 }
 
@@ -354,22 +426,16 @@ void K8sMetadata::UpdateExternalIpCache(const std::vector<std::string>& queryIps
 }
 
 std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string>& ips, bool& status, bool force) {
-    Json::Value jsonObj;
-    for (auto& str : ips) {
-        jsonObj["keys"].append(str);
-    }
     std::vector<std::string> res;
-    Json::StreamWriterBuilder writer;
-    std::string reqBody = Json::writeString(writer, jsonObj);
-    LOG_DEBUG(sLogger, ("reqBody", reqBody));
-    status = SendRequestToOperator(mServiceHost, reqBody, containerInfoType::IpInfo, res, force);
+    std::string reqBody = KeysToReqBody(ips);
+    status = SendRequestToOperator(mServiceHost, reqBody, PodInfoType::IpInfo, res, force);
     if (status) {
         UpdateExternalIpCache(ips, res);
     }
     return res;
 }
 
-std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(const StringView& containerId) {
+std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByContainerIdFromCache(const StringView& containerId) {
     if (containerId.empty()) {
         return nullptr;
     }
@@ -381,7 +447,7 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByContainerIdFromCache(con
     }
 }
 
-std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& ipv) {
+std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& ipv) {
     if (ipv.empty()) {
         return nullptr;
     }
@@ -397,7 +463,23 @@ bool K8sMetadata::IsExternalIp(const StringView& ip) const {
     return mExternalIpCache.contains(std::string(ip));
 }
 
-void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const StringView& str) {
+bool K8sMetadata::IsClusterIpForIPv4(uint32_t ip) const {
+    if (mClusterCIDRs.empty()) {
+        return true;
+    }
+
+    for (auto& cidr : mClusterCIDRs) {
+        if (cidr.mAddr.mFamily == InetAddrFamily::kIPv4) {
+            if (!CIDRContainsForIPV4(std::get<uint32_t>(cidr.mAddr.mIp), cidr.mPrefixLength, ip)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void K8sMetadata::AsyncQueryMetadata(PodInfoType type, const StringView& str) {
     if (str.empty()) {
         LOG_DEBUG(sLogger, ("empty key", ""));
         return;
@@ -409,9 +491,9 @@ void K8sMetadata::AsyncQueryMetadata(containerInfoType type, const StringView& s
         return;
     }
     mPendingKeys.insert(key);
-    if (type == containerInfoType::IpInfo) {
+    if (type == PodInfoType::IpInfo) {
         mBatchKeys.push_back(key);
-    } else if (type == containerInfoType::ContainerIdInfo) {
+    } else if (type == PodInfoType::ContainerIdInfo) {
         mBatchCids.push_back(key);
     }
 }
@@ -423,7 +505,6 @@ void K8sMetadata::DetectMetadataServer() {
     bool status = false;
     GetByIpsFromServer(ips, status, true);
     LOG_DEBUG(sLogger, ("detect network, res", status));
-    return;
 }
 
 void K8sMetadata::DetectNetwork() {

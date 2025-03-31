@@ -20,6 +20,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
+#include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
@@ -158,7 +159,7 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
                   auto host = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
                   data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
-                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
+                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
                   data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
               }
 
@@ -221,7 +222,7 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
                   auto host = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
                   data->mTags.SetNoCopy<kHostName>(StringView(host.data, host.size));
 
-                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
+                  auto ip = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
                   data->mTags.SetNoCopy<kIp>(StringView(ip.data, ip.size));
               }
 
@@ -583,7 +584,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(
                 eventGroup.SetTagNoCopy(kAppId.MetricKey(), group->mTags.Get<kAppId>());
                 eventGroup.SetTagNoCopy(kAppName.MetricKey(), group->mTags.Get<kAppName>());
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
-                eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod name
+                eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod name
                 init = true;
             }
 
@@ -895,6 +896,8 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
     return true;
 }
 
+static constexpr StringView kSpanHostAttrKey = "host";
+
 bool NetworkObserverManager::ConsumeSpanAggregateTree(
     const std::chrono::steady_clock::time_point& execTime) { // handler
     if (!this->mFlag || this->mSuspendFlag) {
@@ -943,7 +946,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                         eventGroup.SetTagNoCopy(kAppName.SpanKey(), StringView(appName.data, appName.size)); // app name
                         auto appId = sourceBuffer->CopyString(ctAttrs.Get<kAppIdIndex>());
                         eventGroup.SetTagNoCopy(kAppId.SpanKey(), StringView(appId.data, appId.size)); // app id
-                        auto podIp = sourceBuffer->CopyString(ctAttrs.Get<kPodIp>());
+                        auto podIp = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
                         eventGroup.SetTagNoCopy(kHostIp.SpanKey(), StringView(podIp.data, podIp.size)); // pod ip
                         eventGroup.SetTagNoCopy(kHostName.SpanKey(), StringView(podIp.data, podIp.size)); // pod name
                     } else {
@@ -969,8 +972,10 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 auto workloadName = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadName>());
                 // TODO @qianlu.kk
                 spanEvent->SetTagNoCopy(kSpanTagKeyApp, StringView(workloadName.data, workloadName.size));
-                auto hostName = sourceBuffer->CopyString(ctAttrs.Get<kHostNameIndex>());
-                spanEvent->SetTag(kHostName.Name(), StringView(hostName.data, hostName.size));
+
+                // attr.host, adjust to old logic ...
+                auto host = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
+                spanEvent->SetTag(kSpanHostAttrKey, StringView(host.data, host.size));
 
                 for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
                     auto sb = sourceBuffer->CopyString(ctAttrs[i]);
@@ -1320,19 +1325,19 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
             5,
             [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-                std::thread([managerPtr] {
-                    NetworkObserverManager* networkObserverManager
-                        = static_cast<NetworkObserverManager*>(managerPtr.get());
-                    std::vector<std::string> podIpVec;
-                    bool res = K8sMetadata::GetInstance().GetByLocalHostFromServer(podIpVec);
-
-                    if (res) {
-                        networkObserverManager->HandleHostMetadataUpdate(podIpVec);
-                    } else {
-                        LOG_DEBUG(sLogger, ("failed to request host metadata", ""));
-                    }
-                }).detach();
-
+                std::vector<std::string> keys;
+                auto request = K8sMetadata::GetInstance().BuildAsyncRequest(
+                    keys,
+                    PodInfoType::HostInfo,
+                    [managerPtr]() { return managerPtr->IsExists(); },
+                    [managerPtr](const std::vector<std::string>& podIpVec) {
+                        NetworkObserverManager* networkObserverManager
+                            = static_cast<NetworkObserverManager*>(managerPtr.get());
+                        if (networkObserverManager) {
+                            networkObserverManager->HandleHostMetadataUpdate(podIpVec);
+                        }
+                    });
+                AsynCurlRunner::GetInstance()->AddRequest(std::move(request));
                 return true;
             },
             [managerPtr]() { // stop checker
@@ -1699,6 +1704,11 @@ int NetworkObserverManager::Destroy() {
 
 void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableCids,
                                               std::vector<std::string>&& disableCids) {
+#ifdef APSARA_UNIT_TEST_MAIN
+    mEnableCids = enableCids;
+    mDisableCids = disableCids;
+    return;
+#endif
     for (auto& cid : enableCids) {
         LOG_INFO(sLogger, ("UpdateWhitelists cid", cid));
         mSourceManager->SetNetworkObserverCidFilter(cid, true);
