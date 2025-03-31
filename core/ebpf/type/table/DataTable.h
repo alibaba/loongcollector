@@ -14,7 +14,8 @@
 
 #pragma once
 
-#include "models/ArrayView.h"
+#include "boost/core/span.hpp"
+
 #include "models/StringView.h"
 
 namespace logtail {
@@ -76,7 +77,7 @@ public:
 
     constexpr StringView Name() const { return mName; }
     constexpr StringView Desc() const { return mDesc; }
-    constexpr ArrayView<DataElement> Elements() const { return mElements; }
+    constexpr boost::span<const DataElement> Elements() const { return mElements; }
     constexpr size_t Size() const { return mElements.size(); }
 
     constexpr uint32_t ColIndex(StringView key) const {
@@ -107,7 +108,7 @@ public:
 private:
     const StringView mName;
     const StringView mDesc;
-    const ArrayView<DataElement> mElements;
+    const boost::span<const DataElement> mElements;
 };
 
 } // namespace ebpf

@@ -42,8 +42,6 @@ target_link_libraries(pipeline_event_group_unittest ${UT_BASE_TARGET})
 add_executable(event_pool_unittest EventPoolUnittest.cpp)
 target_link_libraries(event_pool_unittest ${UT_BASE_TARGET})
 
-add_executable(array_view_unittest ArrayViewUnittest.cpp)
-target_link_libraries(array_view_unittest ${UT_BASE_TARGET})
 add_executable(sized_container_unittest SizedContainerUnittest.cpp)
 target_link_libraries(sized_container_unittest ${UT_BASE_TARGET})
 
@@ -57,7 +55,6 @@ gtest_discover_tests(raw_event_unittest)
 gtest_discover_tests(pipeline_event_ptr_unittest)
 gtest_discover_tests(pipeline_event_group_unittest)
 gtest_discover_tests(event_pool_unittest)
-gtest_discover_tests(array_view_unittest)
 gtest_discover_tests(sized_container_unittest)
 
 add_executable(event_group_benchmark EventGroupBenchmark.cpp)
