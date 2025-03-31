@@ -133,11 +133,11 @@ public:
         auto container = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(
             "286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144");
         APSARA_TEST_TRUE(container != nullptr);
-        APSARA_TEST_EQUAL(container->k8sNamespace, "default");
-        APSARA_TEST_EQUAL(container->workloadName, "oneagent-demo-658648895b");
-        APSARA_TEST_EQUAL(container->workloadKind, "replicaset");
-        APSARA_TEST_EQUAL(container->appId, "");
-        APSARA_TEST_EQUAL(container->appName, "");
+        APSARA_TEST_EQUAL(container->mNamespace, "default");
+        APSARA_TEST_EQUAL(container->mWorkloadName, "oneagent-demo-658648895b");
+        APSARA_TEST_EQUAL(container->mWorkloadKind, "replicaset");
+        APSARA_TEST_EQUAL(container->mAppId, "");
+        APSARA_TEST_EQUAL(container->mAppName, "");
     }
 
     void TestGetByIps() {
@@ -159,11 +159,11 @@ public:
         K8sMetadata::GetInstance().HandleMetadataResponse(PodInfoType::IpInfo, data, resKey);
         auto container = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache("192.16..10.1");
         APSARA_TEST_TRUE(container != nullptr);
-        APSARA_TEST_EQUAL(container->k8sNamespace, "default");
-        APSARA_TEST_EQUAL(container->workloadName, "oneagent-demo-658648895b");
-        APSARA_TEST_EQUAL(container->workloadKind, "replicaset");
-        APSARA_TEST_EQUAL(container->appId, "");
-        APSARA_TEST_EQUAL(container->appName, "");
+        APSARA_TEST_EQUAL(container->mNamespace, "default");
+        APSARA_TEST_EQUAL(container->mWorkloadName, "oneagent-demo-658648895b");
+        APSARA_TEST_EQUAL(container->mWorkloadKind, "replicaset");
+        APSARA_TEST_EQUAL(container->mAppId, "");
+        APSARA_TEST_EQUAL(container->mAppName, "");
     }
 
     void TestGetByLocalHost() {

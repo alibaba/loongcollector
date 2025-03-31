@@ -95,7 +95,7 @@ private:
     void DetectMetadataServer();
 
     std::unique_ptr<HttpRequest>
-    BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
+    BuildRequest(const std::string* path, const std::string& reqBody, uint32_t timeout = 1, uint32_t maxTryCnt = 3);
     void DetectNetwork();
     void SetIpCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info);
     void SetContainerCache(const std::string& key, const std::shared_ptr<K8sPodInfo>& info);

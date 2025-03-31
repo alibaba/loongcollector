@@ -141,37 +141,37 @@ bool K8sMetadata::FromInfoJson(const Json::Value& json, K8sPodInfo& info) {
 
     for (const auto& key : json[kImagesKey].getMemberNames()) {
         if (json[kImagesKey].isMember(key)) {
-            info.images[key] = json[kImagesKey][key].asString();
+            info.mImages[key] = json[kImagesKey][key].asString();
         }
     }
     for (const auto& key : json[kLabelsKey].getMemberNames()) {
         if (json[kLabelsKey].isMember(key)) {
-            info.labels[key] = json[kLabelsKey][key].asString();
+            info.mLabels[key] = json[kLabelsKey][key].asString();
 
             if (key == kAppIdKey) {
-                info.appId = json[kLabelsKey][key].asString();
+                info.mAppId = json[kLabelsKey][key].asString();
             } else if (key == kAppNameKey) {
-                info.appName = json[kLabelsKey][key].asString();
+                info.mAppName = json[kLabelsKey][key].asString();
             }
         }
     }
 
-    info.k8sNamespace = json[kNamespaceKey].asString();
+    info.mNamespace = json[kNamespaceKey].asString();
     if (json.isMember(kServiceNameKey)) {
-        info.serviceName = json[kServiceNameKey].asString();
+        info.mServiceName = json[kServiceNameKey].asString();
     }
     if (json.isMember(kContainerIdKey)) {
         for (const auto& member : json[kContainerIdKey]) {
-            info.containerIds.push_back(member.asString());
+            info.mContainerIds.push_back(member.asString());
         }
     }
-    info.workloadKind = json[kWorkloadKindKey].asString();
-    info.workloadName = json[kWorkloadNameKey].asString();
-    info.podIp = json[kPodIpKey].asString();
-    info.podName = json[kPodNameKey].asString();
-    info.serviceName = json[kServiceNameKey].asString();
-    info.startTime = json[kStartTimeKey].asInt64();
-    info.timestamp = std::time(0);
+    info.mWorkloadKind = json[kWorkloadKindKey].asString();
+    info.mWorkloadName = json[kWorkloadNameKey].asString();
+    info.mPodIp = json[kPodIpKey].asString();
+    info.mPodName = json[kPodNameKey].asString();
+    info.mServiceName = json[kServiceNameKey].asString();
+    info.mServiceName = json[kStartTimeKey].asInt64();
+    info.mTimestamp = std::time(0);
     return true;
 }
 
@@ -180,7 +180,7 @@ bool ContainerInfoIsExpired(const std::shared_ptr<K8sPodInfo>& info) {
         return false;
     }
     std::time_t now = std::time(0);
-    std::chrono::system_clock::time_point th1 = std::chrono::system_clock::from_time_t(info->timestamp);
+    std::chrono::system_clock::time_point th1 = std::chrono::system_clock::from_time_t(info->mTimestamp);
     std::chrono::system_clock::time_point th2 = std::chrono::system_clock::from_time_t(now);
     std::chrono::duration<double> diff = th2 - th1;
     double seconds_diff = diff.count();
@@ -208,12 +208,12 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json,
 }
 
 std::unique_ptr<HttpRequest>
-K8sMetadata::BuildRequest(const std::string& path, const std::string& reqBody, uint32_t timeout, uint32_t maxTryCnt) {
+K8sMetadata::BuildRequest(const std::string* path, const std::string& reqBody, uint32_t timeout, uint32_t maxTryCnt) {
     return std::make_unique<HttpRequest>("GET",
                                          false,
                                          mServiceHost,
                                          mServicePort,
-                                         path,
+                                         *path,
                                          "",
                                          map<std::string, std::string>({{"Content-Type", "application/json"}}),
                                          reqBody,
@@ -289,15 +289,15 @@ K8sMetadata::BuildAsyncRequest(std::vector<std::string>& keys,
                                uint32_t timeoutSeconds,
                                uint32_t retryTimes) {
     std::string reqBody;
-    std::string path = CONTAINER_ID_METADATA_PATH;
+    const std::string* path = &CONTAINER_ID_METADATA_PATH;
     if (infoType == PodInfoType::IpInfo) {
-        path = IP_METADATA_PATH;
+        path = &IP_METADATA_PATH;
         reqBody = KeysToReqBody(keys);
     } else if (infoType == PodInfoType::ContainerIdInfo) {
-        path = CONTAINER_ID_METADATA_PATH;
+        path = &CONTAINER_ID_METADATA_PATH;
         reqBody = KeysToReqBody(keys);
     } else {
-        path = HOST_METADATAPATH;
+        path = &HOST_METADATAPATH;
         reqBody = KeysToReqBody({K8sMetadata::GetInstance().mHostIp});
     }
 
@@ -306,7 +306,7 @@ K8sMetadata::BuildAsyncRequest(std::vector<std::string>& keys,
         false,
         mServiceHost,
         mServicePort,
-        path,
+        *path,
         "",
         map<std::string, std::string>({{"Content-Type", "application/json"}}),
         reqBody,
@@ -327,11 +327,11 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
         return false;
     }
     HttpResponse res;
-    std::string path = CONTAINER_ID_METADATA_PATH;
+    const std::string* path = &CONTAINER_ID_METADATA_PATH;
     if (infoType == PodInfoType::IpInfo) {
-        path = IP_METADATA_PATH;
+        path = &IP_METADATA_PATH;
     } else if (infoType == PodInfoType::HostInfo) {
-        path = HOST_METADATAPATH;
+        path = &HOST_METADATAPATH;
     }
     auto request = BuildRequest(path, query);
     LOG_DEBUG(sLogger, ("host", mServiceHost)("port", mServicePort)("path", path)("query", query));
@@ -369,9 +369,9 @@ void K8sMetadata::HandleMetadataResponse(PodInfoType infoType,
             SetIpCache(pair.first, info);
         } else {
             // set ip cache
-            SetIpCache(info->podIp, info);
+            SetIpCache(info->mPodIp, info);
             // set containerid cache
-            for (const auto& cid : info->containerIds) {
+            for (const auto& cid : info->mContainerIds) {
                 // record result
                 resKey.push_back(cid);
                 SetContainerCache(cid, info);

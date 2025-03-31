@@ -276,21 +276,21 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         return;
     }
 
-    std::string workloadKind = pod->workloadKind;
+    std::string workloadKind = pod->mWorkloadKind;
     if (workloadKind.size()) {
         workloadKind[0] = std::toupper(workloadKind[0]); // upper case
     }
 
     {
         WriteLock lock(mAttrLock);
-        mTags.Set<kAppId>(pod->appId);
-        mTags.Set<kAppName>(pod->appName);
-        mTags.Set<kPodName>(pod->podName);
-        mTags.Set<kPodIp>(pod->podIp);
-        mTags.Set<kWorkloadName>(pod->workloadName);
-        mTags.Set<kWorkloadKind>(workloadKind);
-        mTags.Set<kNamespace>(pod->k8sNamespace);
-        mTags.Set<kHostName>(pod->podName);
+        mTags.Set<kAppId>(pod->mAppId);
+        mTags.Set<kAppName>(pod->mAppName);
+        mTags.Set<kPodName>(pod->mPodName);
+        mTags.Set<kPodIp>(pod->mPodIp);
+        mTags.Set<kWorkloadName>(pod->mWorkloadName);
+        mTags.Set<kWorkloadKind>(pod->mWorkloadKind);
+        mTags.Set<kNamespace>(pod->mNamespace);
+        mTags.Set<kHostName>(pod->mPodName);
         MarkSelfMetaAttached();
     }
 }
@@ -366,27 +366,27 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         return;
     }
 
-    auto peerWorkloadKind = pod->workloadKind;
+    auto peerWorkloadKind = pod->mWorkloadKind;
     if (peerWorkloadKind.size()) {
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mTags.Set<kPeerAppName>(pod->appName.size() ? pod->appName : UNKNOWN_STR);
-    mTags.Set<kPeerPodName>(pod->podName.size() ? pod->podName : UNKNOWN_STR);
-    mTags.Set<kPeerPodIp>(pod->podIp.size() ? pod->podIp : UNKNOWN_STR);
-    mTags.Set<kPeerWorkloadName>(pod->workloadName.size() ? pod->workloadName : UNKNOWN_STR);
+    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : UNKNOWN_STR);
+    mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : UNKNOWN_STR);
+    mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : UNKNOWN_STR);
+    mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : UNKNOWN_STR);
     mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : UNKNOWN_STR);
-    mTags.Set<kPeerNamespace>(pod->k8sNamespace.size() ? pod->k8sNamespace : UNKNOWN_STR);
-    mTags.Set<kPeerServiceName>(pod->serviceName.size() ? pod->serviceName : UNKNOWN_STR);
+    mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : UNKNOWN_STR);
+    mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : UNKNOWN_STR);
 
     // set destId and endpoint ...
     if (mRole == IsClient) {
-        if (pod->appName.size()) {
-            mTags.Set<kDestId>(pod->appName);
-        } else if (pod->workloadName.size()) {
-            mTags.Set<kDestId>(pod->workloadName);
-        } else if (pod->serviceName.size()) {
-            mTags.Set<kDestId>(pod->serviceName);
+        if (pod->mAppName.size()) {
+            mTags.Set<kDestId>(pod->mAppName);
+        } else if (pod->mWorkloadName.size()) {
+            mTags.Set<kDestId>(pod->mWorkloadName);
+        } else if (pod->mServiceName.size()) {
+            mTags.Set<kDestId>(pod->mServiceName);
         } else {
             // TODO set to rpc value...
             mTags.Set<kDestId>(UNKNOWN_STR);

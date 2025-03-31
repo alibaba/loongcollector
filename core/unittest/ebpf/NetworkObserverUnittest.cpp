@@ -294,24 +294,24 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
     auto podInfo = std::make_shared<K8sPodInfo>();
-    podInfo->containerIds = {"1", "2"};
-    podInfo->appName = "test-app-name";
-    podInfo->appId = "test-app-id";
-    podInfo->podIp = "test-pod-ip";
-    podInfo->podName = "test-pod-name";
-    podInfo->k8sNamespace = "test-namespace";
-    podInfo->workloadKind = "Deployment";
-    podInfo->workloadName = "test-workloadname";
+    podInfo->mContainerIds = {"1", "2"};
+    podInfo->mAppName = "test-app-name";
+    podInfo->mAppId = "test-app-id";
+    podInfo->mPodIp = "test-pod-ip";
+    podInfo->mPodName = "test-pod-name";
+    podInfo->mNamespace = "test-namespace";
+    podInfo->mWorkloadKind = "Deployment";
+    podInfo->mWorkloadName = "test-workloadname";
 
     LOG_INFO(sLogger, ("step", "0-0"));
     K8sMetadata::GetInstance().mContainerCache.insert(
         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
 
     auto peerPodInfo = std::make_shared<K8sPodInfo>();
-    peerPodInfo->containerIds = {"3", "4"};
-    peerPodInfo->podIp = "peer-pod-ip";
-    peerPodInfo->podName = "peer-pod-name";
-    peerPodInfo->k8sNamespace = "peer-namespace";
+    peerPodInfo->mContainerIds = {"3", "4"};
+    peerPodInfo->mPodIp = "peer-pod-ip";
+    peerPodInfo->mPodName = "peer-pod-name";
+    peerPodInfo->mNamespace = "peer-namespace";
     K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
 
     auto statsEvent = CreateConnStatsEvent();
@@ -387,24 +387,24 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
         auto podInfo = std::make_shared<K8sPodInfo>();
-        podInfo->containerIds = {"1", "2"};
-        podInfo->appName = "test-app-name";
-        podInfo->appId = "test-app-id";
-        podInfo->podIp = "test-pod-ip";
-        podInfo->podName = "test-pod-name";
-        podInfo->k8sNamespace = "test-namespace";
-        podInfo->workloadKind = "Deployment";
-        podInfo->workloadName = "test-workloadname";
+        podInfo->mContainerIds = {"1", "2"};
+        podInfo->mAppName = "test-app-name";
+        podInfo->mAppId = "test-app-id";
+        podInfo->mPodIp = "test-pod-ip";
+        podInfo->mPodName = "test-pod-name";
+        podInfo->mNamespace = "test-namespace";
+        podInfo->mWorkloadKind = "Deployment";
+        podInfo->mWorkloadName = "test-workloadname";
 
         LOG_INFO(sLogger, ("step", "0-0"));
         K8sMetadata::GetInstance().mContainerCache.insert(
             "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
 
         auto peerPodInfo = std::make_shared<K8sPodInfo>();
-        peerPodInfo->containerIds = {"3", "4"};
-        peerPodInfo->podIp = "peer-pod-ip";
-        peerPodInfo->podName = "peer-pod-name";
-        peerPodInfo->k8sNamespace = "peer-namespace";
+        peerPodInfo->mContainerIds = {"3", "4"};
+        peerPodInfo->mPodIp = "peer-pod-ip";
+        peerPodInfo->mPodName = "peer-pod-name";
+        peerPodInfo->mNamespace = "peer-namespace";
         K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
 
         // Generate 10 records
@@ -588,12 +588,12 @@ void NetworkObserverManagerUnittest::TestPluginLifecycle() {
 
 std::shared_ptr<K8sPodInfo> CreatePodInfo(const std::string& cid) {
     auto podInfo = std::make_shared<K8sPodInfo>();
-    podInfo->containerIds = {cid};
-    podInfo->podIp = "test-pod-ip";
-    podInfo->podName = "test-pod-name";
-    podInfo->k8sNamespace = "test-namespace";
-    podInfo->appId = cid + "-test-app-id";
-    podInfo->appName = cid + "-test-app-name";
+    podInfo->mContainerIds = {cid};
+    podInfo->mPodIp = "test-pod-ip";
+    podInfo->mPodName = "test-pod-name";
+    podInfo->mNamespace = "test-namespace";
+    podInfo->mAppId = cid + "-test-app-id";
+    podInfo->mAppName = cid + "-test-app-name";
     return podInfo;
 }
 

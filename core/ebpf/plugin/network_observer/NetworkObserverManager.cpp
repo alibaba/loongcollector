@@ -1371,7 +1371,7 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
 
     for (const auto& cid : podCidVec) {
         auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
-        if (!podInfo || podInfo->appId == "") {
+        if (!podInfo || podInfo->mAppId == "") {
             // filter appid ...
             LOG_DEBUG(sLogger, (cid, "cannot fetch pod metadata or doesn't have arms label"));
             continue;
@@ -1383,8 +1383,8 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
             newContainerIds.push_back(cid);
         }
         LOG_DEBUG(sLogger,
-                  ("appId", podInfo->appId)("appName", podInfo->appName)("podIp", podInfo->podIp)(
-                      "podName", podInfo->podName)("containerId", cid));
+                  ("appId", podInfo->mAppId)("appName", podInfo->mAppName)("podIp", podInfo->mPodIp)(
+                      "podName", podInfo->mPodName)("containerId", cid));
     }
 
     for (const auto& cid : mEnabledCids) {

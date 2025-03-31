@@ -93,10 +93,10 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
             containerVec.push_back(containerId);
             res = false;
         } else {
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME, containerInfo->workloadName);
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND, containerInfo->workloadKind);
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_NAMESPACE, containerInfo->k8sNamespace);
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_SERVICE_NAME, containerInfo->serviceName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME, containerInfo->mWorkloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND, containerInfo->mWorkloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_NAMESPACE, containerInfo->mNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_SERVICE_NAME, containerInfo->mServiceName);
         }
     }
     StringView ipView(remoteIpKeyFromTag);
@@ -108,9 +108,9 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
             remoteIpVec.push_back(remoteIp);
             res = false;
         } else {
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME, ipInfo->workloadName);
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND, ipInfo->workloadKind);
-            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE, ipInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME, ipInfo->mWorkloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND, ipInfo->mWorkloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE, ipInfo->mNamespace);
         }
     }
     return res;
