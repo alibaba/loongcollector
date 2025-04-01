@@ -171,12 +171,12 @@ void eBPFServer::Init() {
         mHostPathPrefix = "/";
     }
 #endif
-    LOG_INFO(sLogger, ("begin to init timer", ""));
+    LOG_DEBUG(sLogger, ("begin to init timer", ""));
     Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
-    LOG_INFO(sLogger, ("begin to start poller", ""));
+    LOG_DEBUG(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
-    LOG_INFO(sLogger, ("begin to start handler", ""));
+    LOG_DEBUG(sLogger, ("begin to start handler", ""));
     mHandler = async(std::launch::async, &eBPFServer::HandlerEvents, this);
     // check env
 
@@ -235,7 +235,7 @@ void eBPFServer::Stop() {
     std::future_status s2 = mHandler.wait_for(std::chrono::seconds(1));
     if (mPoller.valid()) {
         if (s1 == std::future_status::ready) {
-            LOG_INFO(sLogger, ("poller thread", "stopped successfully"));
+            LOG_DEBUG(sLogger, ("poller thread", "stopped successfully"));
         } else {
             LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
         }
@@ -243,7 +243,7 @@ void eBPFServer::Stop() {
 
     if (mHandler.valid()) {
         if (s2 == std::future_status::ready) {
-            LOG_INFO(sLogger, ("handler thread", "stopped successfully"));
+            LOG_DEBUG(sLogger, ("handler thread", "stopped successfully"));
         } else {
             LOG_WARNING(sLogger, ("handler thread", "forced to stopped"));
         }
