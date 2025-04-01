@@ -125,7 +125,7 @@ void Application::Init() {
         AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
     if (BOOL_FLAG(ilogtail_disable_core)) {
-        InitCrashBackTrace();
+        ResetCrashBackTrace();
     }
 #endif
     // override process related params if designated by user explicitly

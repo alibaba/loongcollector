@@ -19,6 +19,7 @@
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/CrashBackTraceUtil.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
@@ -39,6 +40,7 @@ DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS met
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 DECLARE_FLAG_INT32(file_tags_update_interval);
 DECLARE_FLAG_STRING(agent_host_id);
+DECLARE_FLAG_BOOL(ilogtail_disable_core);
 
 using namespace std;
 using namespace logtail;
@@ -477,6 +479,11 @@ bool LogtailPlugin::LoadPluginBase() {
     } else {
         LOG_INFO(sLogger, ("Go plugin system init", "succeeded"));
         mPluginValid = true;
+#ifdef __ENTERPRISE__
+        if (BOOL_FLAG(ilogtail_disable_core)) {
+            ResetCrashBackTrace();
+        }
+#endif
     }
     return mPluginValid;
 }
