@@ -67,4 +67,4 @@ flushers:
 }
 ```
 
-更多样例可参考：[一文教会你如何使用iLogtail SPL处理日志](https://open.observability.cn/article/gpgqx50m2ry4h2mx/)
+更多样例可参考：[一文教会你如何使用iLogtail SPL处理日志](https://observability.cn/article/gpgqx50m2ry4h2mx/)

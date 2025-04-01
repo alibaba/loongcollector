@@ -57,7 +57,7 @@ LoongCollector 是一款集卓越性能、超强稳定性和灵活可编程性�
 
     针对 Loongcollector 的自监控指标，进行了全面的优化改进，使得自身运行状态的展示更加完整和清晰。用户可以直观地了解到各项指标的实时变化，快速定位潜在问题。此外，通过合理的数据分类和分级展示，用户可以更方便地进行系统调优和资源管理，从而提高整体运行效率。我们将自监控指标改造为了内置 Pipeline，可以将自监控指标自定义发送到不同的位置。
 
-7. [全新的官网](https://open.observability.cn/project/loongcollector/about/#_top) （已发布）
+7. [全新的官网](https://observability.cn/project/loongcollector/readme) （已发布）
 
     鉴于 gitbook 网络不稳定，将官网移植到“可观测中文社区”，以便享受更便捷的文档服务。
 
