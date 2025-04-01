@@ -25,6 +25,7 @@
 #include "common/Lock.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
@@ -172,6 +173,7 @@ void eBPFServer::Init() {
 #endif
     LOG_INFO(sLogger, ("begin to init timer", ""));
     Timer::GetInstance()->Init();
+    AsynCurlRunner::GetInstance()->Init();
     LOG_INFO(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
     LOG_INFO(sLogger, ("begin to start handler", ""));
