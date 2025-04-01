@@ -169,8 +169,7 @@ bool K8sMetadata::FromInfoJson(const Json::Value& json, K8sPodInfo& info) {
     info.mWorkloadName = json[kWorkloadNameKey].asString();
     info.mPodIp = json[kPodIpKey].asString();
     info.mPodName = json[kPodNameKey].asString();
-    info.mServiceName = json[kServiceNameKey].asString();
-    info.mServiceName = json[kStartTimeKey].asInt64();
+    info.mStartTime = json[kStartTimeKey].asInt64();
     info.mTimestamp = std::time(0);
     return true;
 }

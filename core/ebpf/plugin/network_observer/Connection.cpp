@@ -288,7 +288,7 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         mTags.Set<kPodName>(pod->mPodName);
         mTags.Set<kPodIp>(pod->mPodIp);
         mTags.Set<kWorkloadName>(pod->mWorkloadName);
-        mTags.Set<kWorkloadKind>(pod->mWorkloadKind);
+        mTags.Set<kWorkloadKind>(workloadKind);
         mTags.Set<kNamespace>(pod->mNamespace);
         mTags.Set<kHostName>(pod->mPodName);
         MarkSelfMetaAttached();
