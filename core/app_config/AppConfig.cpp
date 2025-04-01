@@ -51,19 +51,13 @@ DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", true);
 DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", false);
 #endif
 DEFINE_FLAG_INT32(max_buffer_num, "max size", 40);
-DEFINE_FLAG_INT32(pub_max_buffer_num, "max size", 8);
-DEFINE_FLAG_INT32(pub_max_send_byte_per_sec, "the max send speed per sec, realtime thread", 20 * 1024 * 1024);
 DEFINE_FLAG_INT32(default_send_byte_per_sec, "the max send speed per sec, replay buffer thread", 2 * 1024 * 1024);
-DEFINE_FLAG_INT32(pub_send_byte_per_sec, "the max send speed per sec, replay buffer thread", 1 * 1024 * 1024);
 DEFINE_FLAG_INT32(default_buffer_file_num, "how many buffer files in default", 50);
-DEFINE_FLAG_INT32(pub_buffer_file_num, "how many buffer files in default", 25);
 DEFINE_FLAG_INT32(default_local_file_size, "default size of one buffer file", 20 * 1024 * 1024);
-DEFINE_FLAG_INT32(pub_local_file_size, "default size of one buffer file", 20 * 1024 * 1024);
 DEFINE_FLAG_INT32(process_thread_count, "", 1);
 DEFINE_FLAG_INT32(send_request_concurrency, "max count keep in mem when async send", 15);
 DEFINE_FLAG_STRING(default_buffer_file_path, "set current execution dir in default", "");
 DEFINE_FLAG_STRING(buffer_file_path, "set buffer dir", "");
-// DEFINE_FLAG_STRING(default_mapping_config_path, "", "mapping_config.json");
 DEFINE_FLAG_DOUBLE(default_machine_cpu_usage_threshold, "machine level", 0.4);
 DEFINE_FLAG_BOOL(default_resource_auto_scale, "", false);
 DEFINE_FLAG_BOOL(default_input_flow_control, "", false);
@@ -76,41 +70,12 @@ DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-
 #elif defined(_MSC_VER)
 DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-id, aliuid", "C:\\LogtailData\\");
 #endif
-// const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE = "user_local_config.json";
-// DEFINE_FLAG_STRING(ilogtail_local_config, "local ilogtail config file", DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE);
-// const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE = "user_config.d";
-// DEFINE_FLAG_STRING(ilogtail_local_config_dir,
-//                    "local ilogtail config file dir",
-//                    DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE);
-// const char* DEFAULT_ILOGTAIL_LOCAL_YAML_CONFIG_DIR_FLAG_VALUE = "user_yaml_config.d";
-// DEFINE_FLAG_STRING(ilogtail_local_yaml_config_dir,
-//                    "local ilogtail yaml config file dir",
-//                    DEFAULT_ILOGTAIL_LOCAL_YAML_CONFIG_DIR_FLAG_VALUE);
-// const char* DEFAULT_ILOGTAIL_REMOTE_YAML_CONFIG_DIR_FLAG_VALUE = "remote_yaml_config.d";
-// DEFINE_FLAG_STRING(ilogtail_remote_yaml_config_dir,
-//                    "remote ilogtail yaml config file dir",
-//                    DEFAULT_ILOGTAIL_REMOTE_YAML_CONFIG_DIR_FLAG_VALUE);
-
-// DEFINE_FLAG_BOOL(default_global_fuse_mode, "default global fuse mode", false);
-// DEFINE_FLAG_BOOL(default_global_mark_offset_flag, "default global mark offset flag", false);
-
-// DEFINE_FLAG_STRING(default_container_mount_path, "", "container_mount.json");
 DEFINE_FLAG_STRING(default_include_config_path, "", "config.d");
 
 DEFINE_FLAG_INT32(default_oas_connect_timeout, "default (minimum) connect timeout for OSARequest", 5);
 DEFINE_FLAG_INT32(default_oas_request_timeout, "default (minimum) request timeout for OSARequest", 10);
-// DEFINE_FLAG_BOOL(rapid_retry_update_config, "", false);
 DEFINE_FLAG_BOOL(check_profile_region, "", false);
-// DEFINE_FLAG_BOOL(enable_collection_mark,
-//                  "enable collection mark function to override check_ulogfs_env in user config",
-//                  false);
-// DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration",
-// false);
 DEFINE_FLAG_INT32(data_server_port, "", 80);
-
-// DEFINE_FLAG_STRING(alipay_app_zone, "", "ALIPAY_APP_ZONE");
-// DEFINE_FLAG_STRING(alipay_zone, "", "ALIPAY_ZONE");
-// DEFINE_FLAG_STRING(alipay_zone_env_name, "", "");
 
 DECLARE_FLAG_INT32(polling_max_stat_count);
 DECLARE_FLAG_INT32(polling_max_stat_count_per_dir);
@@ -154,9 +119,6 @@ DECLARE_FLAG_INT32(ignore_file_modify_timeout);
 DEFINE_FLAG_STRING(host_path_blacklist, "host path matches substring in blacklist will be ignored", "");
 DEFINE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS, "default env file key to load tags", "");
 DEFINE_FLAG_INT32(max_holded_data_size,
-                  "for every id and metric name, the max data size can be holded in memory (default 512KB)",
-                  512 * 1024);
-DEFINE_FLAG_INT32(pub_max_holded_data_size,
                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
 DEFINE_FLAG_STRING(metrics_report_method,
@@ -911,55 +873,31 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
 
     if (confJson.isMember("max_bytes_per_sec") && confJson["max_bytes_per_sec"].isInt())
         mMaxBytePerSec = confJson["max_bytes_per_sec"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mMaxBytePerSec = INT32_FLAG(pub_max_send_byte_per_sec);
-#endif
     else
         mMaxBytePerSec = kDefaultMaxSendBytePerSec;
 
     if (confJson.isMember("bytes_per_sec") && confJson["bytes_per_sec"].isInt())
         mBytePerSec = confJson["bytes_per_sec"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mBytePerSec = INT32_FLAG(pub_send_byte_per_sec);
-#endif
     else
         mBytePerSec = INT32_FLAG(default_send_byte_per_sec);
 
     if (confJson.isMember("buffer_file_num") && confJson["buffer_file_num"].isInt())
         mNumOfBufferFile = confJson["buffer_file_num"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mNumOfBufferFile = INT32_FLAG(pub_buffer_file_num);
-#endif
     else
         mNumOfBufferFile = INT32_FLAG(default_buffer_file_num);
 
     if (confJson.isMember("buffer_file_size") && confJson["buffer_file_size"].isInt())
         mLocalFileSize = confJson["buffer_file_size"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mLocalFileSize = INT32_FLAG(pub_local_file_size);
-#endif
     else
         mLocalFileSize = INT32_FLAG(default_local_file_size);
 
     if (confJson.isMember("buffer_map_size") && confJson["buffer_map_size"].isInt())
         mMaxHoldedDataSize = confJson["buffer_map_size"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mMaxHoldedDataSize = INT32_FLAG(pub_max_holded_data_size);
-#endif
     else
         mMaxHoldedDataSize = INT32_FLAG(max_holded_data_size);
 
     if (confJson.isMember("buffer_map_num") && confJson["buffer_map_num"].isInt())
         mMaxBufferNum = confJson["buffer_map_num"].asInt();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mMaxBufferNum = INT32_FLAG(pub_max_buffer_num);
-#endif
     else
         mMaxBufferNum = INT32_FLAG(max_buffer_num);
 
@@ -1004,32 +942,15 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mCpuUsageUpLimit = confJson["cpu_usage_limit"].asDouble();
         else if (confJson["cpu_usage_limit"].isIntegral())
             mCpuUsageUpLimit = double(confJson["cpu_usage_limit"].asInt64());
-#ifdef __ENTERPRISE__
-        else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-            mCpuUsageUpLimit = DOUBLE_FLAG(pub_cpu_usage_up_limit);
-#endif
         else
             mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
-#ifdef __ENTERPRISE__
-    } else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion()) {
-        mCpuUsageUpLimit = DOUBLE_FLAG(pub_cpu_usage_up_limit);
-#endif
     } else
         mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
 
     if (confJson.isMember("mem_usage_limit") && confJson["mem_usage_limit"].isIntegral())
         mMemUsageUpLimit = confJson["mem_usage_limit"].asInt64();
-#ifdef __ENTERPRISE__
-    else if (EnterpriseConfigProvider::GetInstance()->IsOldPubRegion())
-        mMemUsageUpLimit = INT64_FLAG(pub_memory_usage_up_limit);
-#endif
     else
         mMemUsageUpLimit = INT64_FLAG(memory_usage_up_limit);
-
-    if ((mMemUsageUpLimit == 80 || mMemUsageUpLimit == 100)
-        && mMemUsageUpLimit < INT64_FLAG(pub_memory_usage_up_limit)) {
-        mMemUsageUpLimit = INT64_FLAG(pub_memory_usage_up_limit);
-    }
 
     if (confJson.isMember("resource_auto_scale") && confJson["resource_auto_scale"].isBool())
         mResourceAutoScale = confJson["resource_auto_scale"].asBool();
