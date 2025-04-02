@@ -1,6 +1,7 @@
 
 #include <cstdio>
 
+#include <chrono>
 #include <string>
 
 #include "JsonUtil.h"
@@ -22,6 +23,7 @@ public:
     void TestScrapeProtocols();
     void TestEnableCompression();
     void TestTLS();
+    void TestTokenUpdate();
 
 private:
     void SetUp() override;
@@ -238,6 +240,30 @@ void ScrapeConfigUnittest::TestBasicAuth() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     APSARA_TEST_FALSE(scrapeConfig.Init(config));
+
+    scrapeConfig.mRequestHeaders.clear();
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "basic_auth": {
+                "username_file": "prom_password.file",
+                "password_file": "prom_password.file"
+            }
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"],
+                      "Basic dGVzdF9wYXNzd29yZC5maWxlOnRlc3RfcGFzc3dvcmQuZmlsZQ==");
+
+    OverwriteFile(mFilePath, "new key");
+    scrapeConfig.mRequestHeaders.clear();
+    // update true
+    APSARA_TEST_TRUE(scrapeConfig.UpdateAuthorization());
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Basic bmV3IGtleTpuZXcga2V5");
 }
 
 void ScrapeConfigUnittest::TestAuthorization() {
@@ -281,6 +307,14 @@ void ScrapeConfigUnittest::TestAuthorization() {
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
     APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer " + mKey);
+
+    // update false
+    APSARA_TEST_FALSE(scrapeConfig.UpdateAuthorization());
+    OverwriteFile(mFilePath, "new key");
+    // update true
+    scrapeConfig.mLastUpdateTime = chrono::system_clock::now() - chrono::seconds(301);
+    APSARA_TEST_TRUE(scrapeConfig.UpdateAuthorization());
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer new key");
 }
 
 void ScrapeConfigUnittest::TestScrapeProtocols() {

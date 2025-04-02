@@ -115,7 +115,7 @@ Json::Value UntypedMultiDoubleValues::ToJson() const {
 void UntypedMultiDoubleValues::FromJson(const Json::Value& value) {
     mValues.clear();
     for (Json::Value::const_iterator itr = value.begin(); itr != value.end(); ++itr) {
-        UntypedValueMetricType type;
+        UntypedValueMetricType type = UntypedValueMetricType::MetricTypeCounter;
         if (itr->get("type", "unknown").asString() == "counter")
             type = UntypedValueMetricType::MetricTypeCounter;
         else if (itr->get("type", "unknown").asString() == "gauge")

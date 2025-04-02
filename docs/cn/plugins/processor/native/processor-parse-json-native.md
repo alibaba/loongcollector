@@ -8,6 +8,10 @@
 
 [Stable](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：LoongCollector v3.0.5 及以上
+
 ## 配置参数
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
@@ -22,13 +26,13 @@
 
 采集Json格式文件`/home/test-log/json.log`，解析日志内容并提取字段，并将结果输出到stdout。
 
-- 输入
+* 输入
 
 ```json
 {"url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1", "ip": "10.200.98.220", "user-agent": "aliyun-sdk-java", "request": {"status": "200", "latency": "18204"}, "time": "07/Jul/2022:10:30:28"}
 ```
 
-- 采集配置
+* 采集配置
 
 ```yaml
 enable: true
@@ -44,7 +48,7 @@ flushers:
     OnlyStdout: true
 ```
 
-- 输出
+* 输出
 
 ```json
 {

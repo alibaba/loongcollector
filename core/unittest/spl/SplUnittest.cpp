@@ -410,7 +410,7 @@ void SplUnittest::TestRegexCSV() {
 
 void SplUnittest::TestRegexKV() {
     // make config
-    Json::Value config = GetCastConfig(R"(* | parse-kv -delims='&?' content)");
+    Json::Value config = GetCastConfig(R"(* | parse-kv -regexp content, '(\w+)=(\w+)')");
 
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -485,7 +485,7 @@ void SplUnittest::TestRegexKV() {
 
 void SplUnittest::TestTag() {
     // make config
-    Json::Value config = GetCastConfig(R"(* | parse-json content | project-rename __tag__:taiye2=a1)");
+    Json::Value config = GetCastConfig(R"(* | parse-json content | project-rename "__tag__:taiye2"=a1)");
 
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();

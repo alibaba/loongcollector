@@ -63,8 +63,8 @@ func (m *metaCollector) processJobCronJobLink(data *k8smeta.ObjectWrapper, metho
 	if obj, ok := data.Raw.(*k8smeta.JobCronJob); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, obj.CronJob.Kind, obj.CronJob.Namespace, obj.CronJob.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		m.processEntityLinkCommonPart(log.Contents, obj.CronJob.Kind, obj.CronJob.Namespace, obj.CronJob.Name, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.CronJob2Job)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -75,8 +75,32 @@ func (m *metaCollector) processPodJobLink(data *k8smeta.ObjectWrapper, method st
 	if obj, ok := data.Raw.(*k8smeta.PodJob); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		m.processEntityLinkCommonPart(log.Contents, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Job2Pod)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}
+
+func (m *metaCollector) processJobNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.JobNamespace); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.Job.Kind, obj.Job.Namespace, obj.Job.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Job)
+		log.Timestamp = uint64(time.Now().Unix())
+		return []models.PipelineEvent{log}
+	}
+	return nil
+}
+
+func (m *metaCollector) processCronJobNamespaceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	if obj, ok := data.Raw.(*k8smeta.CronJobNamespace); ok {
+		log := &models.Log{}
+		log.Contents = models.NewLogContents()
+		m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name, obj.CronJob.Kind, obj.CronJob.Namespace, obj.CronJob.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2CronJob)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}

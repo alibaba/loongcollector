@@ -24,8 +24,8 @@ using namespace std;
 
 namespace logtail {
 
-const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__metric__";
-const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__alarm__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
@@ -114,7 +114,6 @@ void SelfMonitorServer::SendMetrics() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, INTERNAL_DATA_TYPE_METRIC); // todo: delete this tag
     pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 

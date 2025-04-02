@@ -1,4 +1,4 @@
-# Alibaba LoongCollector - Fast and Lightweight Observability Data Collector | 中文用户手册（[GitBook](https://ilogtail.gitbook.io/ilogtail-docs/) | [可观测中文社区](https://open.observability.cn/project/loongcollector/about/)）
+# Alibaba LoongCollector - Fast and Lightweight Observability Data Collector | 中文用户手册（[GitBook](https://ilogtail.gitbook.io/ilogtail-docs/) | [可观测中文社区](https://observability.cn/project/loongcollector/readme)）
 
 <img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/logo/jpg/black-blue.jpg" alt="loongcollector logo" height="100px" align="center" />
 

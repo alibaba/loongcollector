@@ -453,4 +453,27 @@ TEST_F(FileSystemUtilUnittest, TestGetFdPath) {
     fclose(file);
 }
 
+TEST_F(FileSystemUtilUnittest, TestPathJoin) {
+    std::string filePath;
+#if defined(_MSC_VER)
+    filePath = PathJoin("D:\\", "dataA");
+    EXPECT_EQ(filePath, "D:\\dataA");
+
+    filePath = PathJoin("D:\\xx", "dataA");
+    EXPECT_EQ(filePath, "D:\\xx\\dataA");
+
+    filePath = PathJoin("D:\\xx\\", "dataA");
+    EXPECT_EQ(filePath, "D:\\xx\\dataA");
+#else
+    filePath = PathJoin("/", "dataA");
+    EXPECT_EQ(filePath, "/dataA");
+
+    filePath = PathJoin("/xx", "dataA");
+    EXPECT_EQ(filePath, "/xx/dataA");
+
+    filePath = PathJoin("/xx/", "dataA");
+    EXPECT_EQ(filePath, "/xx/dataA");
+#endif
+}
+
 } // namespace logtail

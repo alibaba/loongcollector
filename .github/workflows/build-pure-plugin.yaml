@@ -17,13 +17,13 @@ name: Build Pure Plugin
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'docker/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
   push:
     branches:
       - main
@@ -34,17 +34,34 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [ 1.19 ]
+        go-version: [1.19]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ arc-runner-set-ilogtail ]
+        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
-
       # prepare ubuntu environment
       - name: prepare ubuntu environment
         if: matrix.runner == 'arc-runner-set-ilogtail'
-        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-        
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
         if: matrix.runner == 'arc-runner-set-ilogtail'
@@ -84,7 +101,7 @@ jobs:
   result:
     runs-on: arc-runner-set-ilogtail
     timeout-minutes: 60
-    needs: [ CI ]
+    needs: [CI]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"

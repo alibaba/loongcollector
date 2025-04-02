@@ -31,6 +31,35 @@ type ServiceK8sMeta struct {
 	StorageClass          bool
 	Ingress               bool
 	Container             bool
+	// link switch
+	Node2Pod                  string
+	Deployment2Pod            string
+	ReplicaSet2Pod            string
+	Deployment2ReplicaSet     string
+	StatefulSet2Pod           string
+	DaemonSet2Pod             string
+	Service2Pod               string
+	Pod2Container             string
+	CronJob2Job               string
+	Job2Pod                   string
+	Ingress2Service           string
+	Pod2PersistentVolumeClaim string
+	Pod2ConfigMap             string
+
+	// add link for namesapce
+	Namespace2Pod                   string
+	Namespace2Service               string
+	Namespace2Deployment            string
+	Namespace2DaemonSet             string
+	Namespace2StatefulSet           string
+	Namespace2Configmap             string
+	Namespace2Job                   string
+	Namespace2CronJob               string
+	Namespace2PersistentVolume      string
+	Namespace2PersistentVolumeClaim string
+	Namespace2StorageClass          string
+	Namespace2Ingress               string
+
 	// other
 	context       pipeline.Context
 	metaManager   *k8smeta.MetaManager

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "boost/filesystem/operations.hpp"
 
 #include "SystemInformationTools.h"
@@ -24,7 +26,7 @@ namespace logtail {
 
 class SystemInformationToolsUnittest : public testing::Test {
 public:
-    void TestGetSystemBootSeconds() const;
+    void TestGetHostSystemStat() const;
 
 protected:
     void SetUp() override {
@@ -34,12 +36,13 @@ protected:
     }
 };
 
-void SystemInformationToolsUnittest::TestGetSystemBootSeconds() const {
-    PROCESS_DIR = ".";
-    APSARA_TEST_EQUAL(1731142542, GetHostSystemBootTime());
+void SystemInformationToolsUnittest::TestGetHostSystemStat() const {
+    auto lines = vector<string>();
+    std::string errorMessage;
+    APSARA_TEST_TRUE(GetHostSystemStat(lines, errorMessage));
+    APSARA_TEST_EQUAL(1, lines.size());
+    APSARA_TEST_EQUAL("btime 1731142542", lines[0]);
 }
-
-UNIT_TEST_CASE(SystemInformationToolsUnittest, TestGetSystemBootSeconds);
 
 } // namespace logtail
 

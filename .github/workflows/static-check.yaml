@@ -17,13 +17,13 @@ name: Static Check
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'docker/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
   push:
     branches:
       - main
@@ -37,14 +37,32 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [ 1.19 ]
-        runner: [ ubuntu ]
+        go-version: [1.19]
+        runner: [ubuntu]
       fail-fast: true
     steps:
       # prepare ubuntu environment
       - name: prepare ubuntu environment
         if: matrix.runner == 'ubuntu'
-        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
@@ -86,8 +104,8 @@ jobs:
       - name: C++ Core Lint
         uses: jidicula/clang-format-action@v4.14.0
         with:
-          clang-format-version: '18'
-          check-path: 'core'
+          clang-format-version: "18"
+          check-path: "core"
           exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp'
           include-regex: '.*\.(cpp|h)$'
 
@@ -100,11 +118,10 @@ jobs:
       - name: UnitTest PluginManager
         run: sudo make unittest_pluginmanager
 
-
   result:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [ CI ]
+    needs: [CI]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"

@@ -4,6 +4,7 @@ import (
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1"
 )
 
 const (
@@ -24,12 +25,13 @@ const (
 	STORAGECLASS          = "storageclass"
 	INGRESS               = "ingress"
 	CONTAINER             = "container"
-	// entity link type
+	// entity link type, the direction is from resource which will be trigger to linked resource
 	//revive:disable:var-naming
 	LINK_SPLIT_CHARACTER     = "->"
 	POD_NODE                 = "pod->node"
-	REPLICASET_DEPLOYMENT    = "replicaset->deployment"
+	POD_DEPLOYMENT           = "pod->deployment"
 	POD_REPLICASET           = "pod->replicaset"
+	REPLICASET_DEPLOYMENT    = "replicaset->deployment"
 	POD_STATEFULSET          = "pod->statefulset"
 	POD_DAEMONSET            = "pod->daemonset"
 	JOB_CRONJOB              = "job->cronjob"
@@ -38,8 +40,22 @@ const (
 	POD_CONFIGMAP            = "pod->configmap"
 	POD_SERVICE              = "pod->service"
 	POD_CONTAINER            = "pod->container"
-	POD_PROCESS              = "pod->process"
+	INGRESS_SERVICE          = "ingress->service"
 	//revive:enable:var-naming
+
+	// add namespace link
+	//revive:disable:var-naming
+	POD_NAMESPACE                   = "pod->namesapce"
+	SERVICE_NAMESPACE               = "service->namesapce"
+	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
+	DAEMONSET_NAMESPACE             = "daemonset->namesapce"
+	STATEFULSET_NAMESPACE           = "statefulset->namesapce"
+	CONFIGMAP_NAMESPACE             = "configmap->namesapce"
+	JOB_NAMESPACE                   = "job->namesapce"
+	CRONJOB_NAMESPACE               = "cronjob->namesapce"
+	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
+	INGRESS_NAMESPACE               = "ingress->namesapce"
+	//revive:disable:var-naming
 )
 
 var AllResources = []string{
@@ -60,9 +76,14 @@ var AllResources = []string{
 	INGRESS,
 }
 
-type NodePod struct {
-	Node *v1.Node
+type PodNode struct {
 	Pod  *v1.Pod
+	Node *v1.Node
+}
+
+type PodDeployment struct {
+	Pod        *v1.Pod
+	Deployment *app.Deployment
 }
 
 type ReplicaSetDeployment struct {
@@ -110,9 +131,64 @@ type PodService struct {
 	Pod     *v1.Pod
 }
 
+type IngressService struct {
+	Ingress *networking.Ingress
+	Service *v1.Service
+}
+
 type PodContainer struct {
 	Pod       *v1.Pod
 	Container *v1.Container
+}
+
+type PodNamespace struct {
+	Pod       *v1.Pod
+	Namespace *v1.Namespace
+}
+
+type ServiceNamespace struct {
+	Service   *v1.Service
+	Namespace *v1.Namespace
+}
+
+type DeploymentNamespace struct {
+	Deployment *app.Deployment
+	Namespace  *v1.Namespace
+}
+
+type DaemonSetNamespace struct {
+	DaemonSet *app.DaemonSet
+	Namespace *v1.Namespace
+}
+
+type StatefulSetNamespace struct {
+	StatefulSet *app.StatefulSet
+	Namespace   *v1.Namespace
+}
+
+type ConfigMapNamespace struct {
+	ConfigMap *v1.ConfigMap
+	Namespace *v1.Namespace
+}
+
+type JobNamespace struct {
+	Job       *batch.Job
+	Namespace *v1.Namespace
+}
+
+type CronJobNamespace struct {
+	CronJob   *batch.CronJob
+	Namespace *v1.Namespace
+}
+
+type PersistentVolumeClaimNamespace struct {
+	PersistentVolumeClaim *v1.PersistentVolumeClaim
+	Namespace             *v1.Namespace
+}
+
+type IngressNamespace struct {
+	Ingress   *networking.Ingress
+	Namespace *v1.Namespace
 }
 
 const (

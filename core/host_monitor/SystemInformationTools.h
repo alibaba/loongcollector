@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace logtail {
 
-int64_t GetHostSystemBootTime();
+bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
 
 } // namespace logtail

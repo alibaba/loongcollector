@@ -8,6 +8,10 @@
 
 [Beta](../../stability-level.md)
 
+## 版本说明
+
+* 推荐版本：iLogtail v1.6.0 及以上
+
 ## 配置参数
 
 | 参数                                    | 类型       | 是否必选 | 说明                                                                                                         |
@@ -61,7 +65,7 @@
 | HashOnce                              | Boolean  | 否    |                                                                                                            |
 | ClientID                              | String   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                                                                    |
 
-- `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~3.3.1`。
+* `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~3.3.1`。
   请根据自己的`kafka`版本号参照下面的`kafka protocol version`规则进行配置。**建议根据自己的`kafka`
   版本指定对应`protocol version`**,
   `kafka protocol version`支持版本号如下：
@@ -76,7 +80,7 @@
 3.0.0,3.0.1,3.0.2,3.1.0,3.1.1,3.1.2,3.2.0,3.2.1,3.2.2,3.2.3,3.3.0,3.3.1,3.3.2,3.4.0,3.4.1,3.5.0,3.5.1,3.6.0
 ```
 
-- `Brokers`是个数组，多个`Broker`地址不能使用`;`或者`,`来隔开放在一行里，`yaml`配置文件中正确的多个`Broker`地址配置参考如下：
+* `Brokers`是个数组，多个`Broker`地址不能使用`;`或者`,`来隔开放在一行里，`yaml`配置文件中正确的多个`Broker`地址配置参考如下：
 
 ```yaml
 enable: true
@@ -122,12 +126,12 @@ flushers:
 
 以上面这行日志为例 , 我们通`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段：
 
-- time
-- loglevel
-- appname
-- thread
-- class
-- message
+* time
+* loglevel
+* appname
+* thread
+* class
+* message
 
 最后推送到`kafka`的数据样例如下：
 
@@ -163,17 +167,17 @@ Topic: test_%{content.application}
 最后`ilogtail`就自动将日志推送到`test_springboot-docker`这个`topic`中。
 `topic`动态表达式规则：
 
-- `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
-- `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
-- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。
-- 其它方式暂不支持
+* `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
+* `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
+* `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。
+* 其它方式暂不支持
 
 #### 动态topic中使用系统变量
 
 动态`topic`绑定系统变量的两种场景：
 
-- 将系统变量采集添加到日志的`tag`中，然后使用`%{tag.fieldname}`规则完成绑定。
-- 对系统变量无采集存储需求，只是想根据设定的系统变量将日志推送到指定的`topic`中，直接采用`${env_name}`
+* 将系统变量采集添加到日志的`tag`中，然后使用`%{tag.fieldname}`规则完成绑定。
+* 对系统变量无采集存储需求，只是想根据设定的系统变量将日志推送到指定的`topic`中，直接采用`${env_name}`
   规则完成绑定，此方式需要`1.5.0`才支持。
 
 由于上面提到的两种系统变量的采集绑定都需要做一些特殊配置，因此下面将分别介绍下相关的配置操作。
@@ -183,7 +187,7 @@ Topic: test_%{content.application}
 将系统变量采集添加到日志中有两种方式，一种是在`ilogtail`容器`env`添加，另一种是通过`processor_add_fields` 插件添加，
 两种方式不同的配置参考下面的介绍
 
-- 在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
+* 在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
 
 ```yaml
 env:
@@ -196,7 +200,7 @@ env:
 自定义的变量`_app_name_`被添加到`ALIYUN_LOG_ENV_TAGS`中，日志的`tags`中会看到自定义的变量， 此时动态 `topic`
 采用`%{tag.fieldname}`规则配置即可。
 
-- 使用`processor_add_fields` 插件系统变量添加到日志中，配置参考如下：
+* 使用`processor_add_fields` 插件系统变量添加到日志中，配置参考如下：
 
 ```yaml
 processors:
@@ -237,7 +241,7 @@ flushers:
     Topic: ilogtail_${app_name}
 ```
 
-- `${app_name}`就是我们上面添加的系统变量。
+* `${app_name}`就是我们上面添加的系统变量。
 
 ### TagFieldsRename
 
@@ -292,9 +296,9 @@ flushers:
 
 `ilogtail`一共支持三种分区分发方式：
 
-- `random`随机分发, 默认。
-- `roundrobin`轮询分发。
-- `hash`分发。
+* `random`随机分发, 默认。
+* `roundrobin`轮询分发。
+* `hash`分发。
 
 `random`和`roundrobin`分发只需要配置`PartitionerType`指定对应的分区分发方式即可。
 `hash`分发相对比较特殊，可以指定`HashKeys`，`HashKeys`的中配置的字段名只能是`contents`中的字段属性。
@@ -319,7 +323,7 @@ flushers:
     Topic: KafkaTestTopic
 ```
 
-- `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
+* `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
   例如重名为`messege`，则应该配置为`messege.application`
 
 ### 配置Headers
@@ -413,10 +417,10 @@ flushers:
 
 `flusher_kafka_v2`支持多种安全认证连接`kafka`服务端。
 
-- `PlainText`认证，`ilogtail v1.3.0`开始支持;
-- `SASL`认证，`ilogtail v1.3.0`开始支持;
-- `TLS`认证，`ilogtail v1.4.0`开始支持;
-- `Kerberos`认证(待测试验证)，`ilogtail v1.4.0`开始支持;
+* `PlainText`认证，`ilogtail v1.3.0`开始支持;
+* `SASL`认证，`ilogtail v1.3.0`开始支持;
+* `TLS`认证，`ilogtail v1.4.0`开始支持;
+* `Kerberos`认证(待测试验证)，`ilogtail v1.4.0`开始支持;
 
 前面两种配置比较简单，下面主要介绍下`TLS`和`Kerberos`两种认证的配置。
 

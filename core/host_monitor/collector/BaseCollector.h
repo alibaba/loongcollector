@@ -31,7 +31,7 @@ public:
     virtual const std::string& Name() const = 0;
 
 protected:
-    bool mValidState = false;
+    bool mValidState = true;
 };
 
 } // namespace logtail
