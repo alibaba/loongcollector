@@ -24,13 +24,57 @@
       .chart-container {
         width: 60%;
         height: auto; /* 设置图表高度为400像素 */
+        max-width: 1000px;
         margin: 0 auto; /* 居中对齐 */
+      }
+      a {
+        color: #3273dc;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      a:hover {
+        color: #000;
+      }
+      button {
+        color: #fff;
+        background-color: #3298dc;
+        border-color: transparent;
+        cursor: pointer;
+        text-align: center;
+      }
+      button:hover {
+        background-color: #2793da;
+        flex: none;
+      }
+      footer {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+      }
+      .spacer {
+        flex: auto;
+      }
+      .small {
+        font-size: 0.75rem;
       }
     </style>
   </head>
   <body>
     <h1>Multi Collection Agent Benchmark Records</h1>
     <div id="charts-container"></div>
+    <footer>
+      <button id="dl-button">Download data as JSON</button>
+      <div class="spacer"></div>
+      <div class="small">
+        Powered by
+        <a
+          rel="noopener"
+          href="https://github.com/marketplace/actions/continuous-benchmark"
+          >github-action-benchmark</a
+        >
+      </div>
+    </footer>
+
     <script src="records_all.js"></script>
     <script>
       const container = document.getElementById("charts-container");
@@ -50,6 +94,20 @@
         benchmarkdotnet: "#178600",
         _: "#333333",
       };
+
+      function init() {
+        const data = groupByLongestPrefix(window.BENCHMARK_RECORDS);
+
+        document.getElementById("dl-button").onclick = () => {
+          const dataUrl = "data:," + JSON.stringify(data, null, 2);
+          const a = document.createElement("a");
+          a.href = dataUrl;
+          a.download = "multi_agent_benchmark_data.json";
+          a.click();
+        };
+
+        return data;
+      }
 
       // Function to group benchmarks by longest name prefix
       function groupByLongestPrefix(records) {
@@ -78,8 +136,7 @@
         return groups;
       }
 
-      const groupedRecords = groupByLongestPrefix(window.BENCHMARK_RECORDS);
-      console.log(groupedRecords);
+      const groupedRecords = init();
 
       Object.keys(groupedRecords).forEach((prefix, index) => {
         const chartContainer = document.createElement("div");
