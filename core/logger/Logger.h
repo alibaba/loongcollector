@@ -48,7 +48,7 @@ private:
     Logger();
     ~Logger();
 
-    // Use it to log something during intiliazing logger, it will
+    // Use it to log something during initializing logger, it will
     // be closed if logger has already been initialized successfully.
     std::ofstream mInnerLogger;
     void LogMsg(const std::string& msg);

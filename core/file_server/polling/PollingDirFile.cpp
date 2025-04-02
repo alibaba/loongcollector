@@ -587,10 +587,10 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
 
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
             LOG_WARNING(sLogger,
-                        ("too many sub directoried for path",
+                        ("too many sub directories for path",
                          dirPath)("dirCount", dirCount)("basePath", pConfig.first->GetBasePath()));
             AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("too many sub directoried for path:" + dirPath
+                                                   string("too many sub directories for path:" + dirPath
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + pConfig.first->GetBasePath()),
                                                    pConfig.second->GetRegion(),
@@ -739,7 +739,7 @@ void PollingDirFile::ClearTimeoutFileAndDir() {
 }
 
 void PollingDirFile::ClearUnavailableFileAndDir() {
-    // Collected genereated events.
+    // Collected generated events.
     // For directory, if its cache item becomes unavailable, a TIMEOUT event will be
     // generated to notify that related directories should be unregistered to release
     // resources (LogInput::ProcessEvent -> EventDispatcher::UnregisterAllDir).

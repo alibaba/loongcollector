@@ -37,10 +37,10 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     EventsContainer& events = logGroup.MutableEvents();
     std::vector<std::string> containerVec;
     std::vector<std::string> remoteIpVec;
-    std::vector<size_t> cotainerNotTag;
+    std::vector<size_t> containerNotTag;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
         if (!ProcessEvent(events[rIdx], containerVec, remoteIpVec)) {
-            cotainerNotTag.push_back(rIdx);
+            containerNotTag.push_back(rIdx);
         }
     }
     auto& k8sMetadata = K8sMetadata::GetInstance();
@@ -50,7 +50,7 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
     if (remoteIpVec.empty() || (!k8sMetadata.GetByIpsFromServer(remoteIpVec))) {
         return;
     }
-    for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
+    for (size_t i = 0; i < containerNotTag.size(); ++i) {
         ProcessEvent(events[i], containerVec, remoteIpVec);
     }
     return;

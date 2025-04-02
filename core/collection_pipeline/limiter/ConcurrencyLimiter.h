@@ -37,7 +37,7 @@ public:
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
-          mCurrenctConcurrency(maxConcurrency),
+          mCurrentConcurrency(maxConcurrency),
           mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
           mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
 
@@ -79,7 +79,7 @@ private:
     uint32_t mMinConcurrency = 0;
 
     mutable std::mutex mLimiterMux;
-    uint32_t mCurrenctConcurrency = 0;
+    uint32_t mCurrentConcurrency = 0;
 
     double mConcurrencyFastFallBackRatio = 0.0;
     double mConcurrencySlowFallBackRatio = 0.0;
