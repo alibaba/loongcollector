@@ -124,7 +124,7 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
             item->mStatus = SendingStatus::IDLE;
-            LOG_DEBUG(sLogger,
+            LOG_TRACE(sLogger,
                       ("failed to build request", "retry later")("item address", item)(
                           "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
@@ -139,7 +139,7 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     }
 
     req->mEnqueTime = item->mLastSendTime = chrono::system_clock::now();
-    LOG_DEBUG(sLogger,
+    LOG_TRACE(sLogger,
               ("send item to http sink, item address", item)("config-flusher-dst",
                                                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
                   "sending cnt", ToString(mHttpSendingCnt.load() + 1)));
@@ -161,7 +161,7 @@ void FlusherRunner::Run() {
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);
         } else {
-            LOG_DEBUG(sLogger, ("got items from sender queue, cnt", items.size()));
+            LOG_TRACE(sLogger, ("got items from sender queue, cnt", items.size()));
             for (auto itr = items.begin(); itr != items.end(); ++itr) {
                 ADD_COUNTER(mInItemDataSizeBytes, (*itr)->mData.size());
                 ADD_COUNTER(mInItemRawDataSizeBytes, (*itr)->mRawSize);
@@ -171,7 +171,7 @@ void FlusherRunner::Run() {
         }
 
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
-            LOG_DEBUG(
+            LOG_TRACE(
                 sLogger,
                 ("got item from sender queue, item address",
                  *itr)("config-flusher-dst", QueueKeyManager::GetInstance()->GetName((*itr)->mQueueKey))(
