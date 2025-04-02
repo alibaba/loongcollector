@@ -2,10 +2,15 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes" />
+    <meta
+      name="viewport"
+      content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes"
+    />
     <style>
       html {
-        font-family: BlinkMacSystemFont,-apple-system,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+        font-family: BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue",
+          Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
         background-color: #fff;
         font-size: 16px;
@@ -83,7 +88,7 @@
         max-width: 1000px;
       }
     </style>
-    <title>Benchmarks</title>
+    <title>LoongCollector Benchmarks</title>
   </head>
 
   <body>
@@ -101,41 +106,42 @@
     <footer>
       <button id="dl-button">Download data as JSON</button>
       <div class="spacer"></div>
-      <div class="small">Powered by <a rel="noopener" href="https://github.com/marketplace/actions/continuous-benchmark">github-action-benchmark</a></div>
+      <div class="small">
+        Powered by
+        <a
+          rel="noopener"
+          href="https://github.com/marketplace/actions/continuous-benchmark"
+          >github-action-benchmark</a
+        >
+      </div>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
     <script src="data.js"></script>
     <script id="main-script">
-      'use strict';
-      (function() {
-        // Colors from https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
-        const toolColors = {
-          cargo: '#dea584',
-          go: '#00add8',
-          benchmarkjs: '#f1e05a',
-          benchmarkluau: '#000080',
-          pytest: '#3572a5',
-          googlecpp: '#f34b7d',
-          catch2: '#f34b7d',
-          julia: '#a270ba',
-          jmh: '#b07219',
-          benchmarkdotnet: '#178600',
-          customBiggerIsBetter: '#38ff38',
-          customSmallerIsBetter: '#ff3838',
-          _: '#333333'
-        };
-
+      "use strict";
+      (function () {
         function init() {
           function collectBenchesPerTestCase(entries) {
             const map = new Map();
             for (const entry of entries) {
-              const {commit, date, tool, benches} = entry;
+              const { commit, date, tool, benches } = entry;
               for (const bench of benches) {
+                // 分离前缀和后缀
+                const [prefix, suffix] = bench.name.split(" - ");
+                const parts = prefix.split("_");
+                const metricType = parts.slice(0, -1).join("_"); // 拼接前两部分，如 "CPU_Usage"
+                const metricSubtype = parts[parts.length - 1]; // 最后一部分，如 "Max"
+
+                // 构造新的键名，例如 "CPU_Usage - performance_file_to_blackhole_ilogtail"
+                const key = `${metricType} - ${suffix}`;
+                // 修改 bench.name 为 metricSubtype
+                bench.name = metricSubtype;
+
                 const result = { commit, date, tool, bench };
-                const arr = map.get(bench.name);
+                const arr = map.get(key);
                 if (arr === undefined) {
-                  map.set(bench.name, [result]);
+                  map.set(key, [result]);
                 } else {
                   arr.push(result);
                 }
@@ -147,129 +153,165 @@
           const data = window.BENCHMARK_DATA;
 
           // Render header
-          document.getElementById('last-update').textContent = new Date(data.lastUpdate).toString();
-          const repoLink = document.getElementById('repository-link');
+          document.getElementById("last-update").textContent = new Date(
+            data.lastUpdate
+          ).toString();
+          const repoLink = document.getElementById("repository-link");
           repoLink.href = data.repoUrl;
           repoLink.textContent = data.repoUrl;
 
           // Render footer
-          document.getElementById('dl-button').onclick = () => {
-            const dataUrl = 'data:,' + JSON.stringify(data, null, 2);
-            const a = document.createElement('a');
+          document.getElementById("dl-button").onclick = () => {
+            const dataUrl = "data:," + JSON.stringify(data, null, 2);
+            const a = document.createElement("a");
             a.href = dataUrl;
-            a.download = 'benchmark_data.json';
+            a.download = "benchmark_data.json";
             a.click();
           };
 
           // Prepare data points for charts
-          return Object.keys(data.entries).map(name => ({
+          return Object.keys(data.entries).map((name) => ({
             name,
             dataSet: collectBenchesPerTestCase(data.entries[name]),
           }));
         }
 
         function renderAllChars(dataSets) {
-
           function renderGraph(parent, name, dataset) {
-            const canvas = document.createElement('canvas');
-            canvas.className = 'benchmark-chart';
+            const canvas = document.createElement("canvas");
+            canvas.className = "benchmark-chart";
             parent.appendChild(canvas);
 
-            const color = toolColors[dataset.length > 0 ? dataset[0].tool : '_'];
+            // 过滤出 Max 和 Avg 数据
+            const maxData = dataset.filter((d) => d.bench.name.includes("Max"));
+            const avgData = dataset.filter((d) => d.bench.name.includes("Avg"));
+
+            // 确保 Max 和 Avg 数据长度一致
+            if (maxData.length !== avgData.length) {
+              console.warn(`Mismatched data lengths for ${name}`);
+              return;
+            }
+
             const data = {
-              labels: dataset.map(d => d.commit.id.slice(0, 7)),
+              labels: maxData.map((d) => d.commit.id.slice(0, 7)), // 使用 commit ID 作为标签
               datasets: [
                 {
-                  label: name,
-                  data: dataset.map(d => d.bench.value),
-                  borderColor: color,
-                  backgroundColor: color + '60', // Add alpha for #rrggbbaa
-                }
+                  label: "Max",
+                  data: maxData.map((d) => d.bench.value),
+                  borderColor: "#ff3838",
+                  backgroundColor: "#ff383860",
+                  fill: false,
+                },
+                {
+                  label: "Avg",
+                  data: avgData.map((d) => d.bench.value),
+                  borderColor: "#38ff38",
+                  backgroundColor: "#38ff3860",
+                  fill: false,
+                },
               ],
             };
+
             const options = {
+              responsive: true,
+              title: {
+                display: true,
+                text: name,
+                fontSize: 20,
+              },
               scales: {
                 xAxes: [
                   {
                     scaleLabel: {
                       display: true,
-                      labelString: 'commit',
+                      labelString: "commit",
                     },
-                  }
+                  },
                 ],
                 yAxes: [
                   {
                     scaleLabel: {
                       display: true,
-                      labelString: dataset.length > 0 ? dataset[0].bench.unit : '',
+                      labelString:
+                        maxData.length > 0 ? maxData[0].bench.unit : "",
                     },
                     ticks: {
                       beginAtZero: true,
-                    }
-                  }
+                    },
+                  },
                 ],
               },
               tooltips: {
                 callbacks: {
-                  afterTitle: items => {
-                    const {index} = items[0];
-                    const data = dataset[index];
-                    return '\n' + data.commit.message + '\n\n' + data.commit.timestamp + ' committed by @' + data.commit.committer.username + '\n';
+                  afterTitle: (items) => {
+                    let item = items[0];
+                    const data = dataset[item.index * 2 + item.datasetIndex];
+                    return (
+                      "\n" +
+                      data.commit.message +
+                      "\n\n" +
+                      data.commit.timestamp +
+                      " committed by @" +
+                      data.commit.committer.username +
+                      "\n"
+                    );
                   },
-                  label: item => {
+                  label: (item) => {
                     let label = item.value;
-                    const { range, unit } = dataset[item.index].bench;
-                    label += ' ' + unit;
+                    const { range, unit } =
+                      dataset[item.index * 2 + item.datasetIndex].bench;
+                    label += " " + unit;
                     if (range) {
-                      label += ' (' + range + ')';
+                      label += " (" + range + ")";
                     }
                     return label;
                   },
-                  afterLabel: item => {
-                    const { extra } = dataset[item.index].bench;
-                    return extra ? '\n' + extra : '';
-                  }
-                }
+                  afterLabel: (item) => {
+                    const { extra } =
+                      dataset[item.index * 2 + item.datasetIndex].bench;
+                    return extra ? "\n" + extra : "";
+                  },
+                },
               },
               onClick: (_mouseEvent, activeElems) => {
                 if (activeElems.length === 0) {
                   return;
                 }
-                // XXX: Undocumented. How can we know the index?
-                const index = activeElems[0]._index;
+                const index =
+                  activeElems[0]._index * 2 + activeElems[0]._datasetIndex;
                 const url = dataset[index].commit.url;
-                window.open(url, '_blank');
+                window.open(url, "_blank");
               },
             };
 
             new Chart(canvas, {
-              type: 'line',
+              type: "line",
               data,
               options,
             });
           }
 
           function renderBenchSet(name, benchSet, main) {
-            const setElem = document.createElement('div');
-            setElem.className = 'benchmark-set';
+            const setElem = document.createElement("div");
+            setElem.className = "benchmark-set";
             main.appendChild(setElem);
 
-            const nameElem = document.createElement('h1');
-            nameElem.className = 'benchmark-title';
-            nameElem.textContent = name;
+            const nameElem = document.createElement("h1");
+            nameElem.className = "benchmark-title";
+            nameElem.textContent = "LoongCollector Benchmarks";
             setElem.appendChild(nameElem);
 
-            const graphsElem = document.createElement('div');
-            graphsElem.className = 'benchmark-graphs';
+            const graphsElem = document.createElement("div");
+            graphsElem.className = "benchmark-graphs";
             setElem.appendChild(graphsElem);
 
             for (const [benchName, benches] of benchSet.entries()) {
-              renderGraph(graphsElem, benchName, benches)
+              renderGraph(graphsElem, benchName, benches);
             }
           }
 
-          const main = document.getElementById('main');
-          for (const {name, dataSet} of dataSets) {
+          const main = document.getElementById("main");
+          for (const { name, dataSet } of dataSets) {
             renderBenchSet(name, dataSet, main);
           }
         }

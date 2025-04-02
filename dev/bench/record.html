@@ -1,137 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benchmark Records</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi Collection Agent Benchmark Records</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            color: #4a4a4a;
-            margin: 8px;
-            font-size: 1em;
-            font-weight: bold; /* 设置所有字体加粗 */
-            text-align: center; /* 设置文本居中 */
-        }
-        header {
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center; /* 居中对齐 */
-        }
-        .chart-container {
-            width: 70%; /* 设置图表宽度为页面宽度的50% */
-            height: 400px; /* 设置图表高度为400像素 */
-            margin: 0 auto; /* 居中对齐 */
-        }
+      html {
+        font-family: BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue",
+          Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        background-color: #fff;
+        font-size: 16px;
+      }
+      body {
+        color: #4a4a4a;
+        margin: 8px;
+        font-size: 1em;
+        font-weight: bold; /* 设置所有字体加粗 */
+        text-align: center; /* 设置文本居中 */
+      }
+      .chart-container {
+        width: 60%;
+        height: auto; /* 设置图表高度为400像素 */
+        margin: 0 auto; /* 居中对齐 */
+      }
     </style>
-</head>
-<body>
-    <h1>Benchmark Records</h1>
+  </head>
+  <body>
+    <h1>Multi Collection Agent Benchmark Records</h1>
     <div id="charts-container"></div>
     <script src="records_all.js"></script>
     <script>
-        const container = document.getElementById('charts-container');
+      const container = document.getElementById("charts-container");
 
-        const toolColors = {
-            customSmallerIsBetter: '#ff3838',
-            customBiggerIsBetter: '#38ff38',
-            cargo: '#dea584',
-            go: '#00add8',
-            benchmarkjs: '#f1e05a',
-            benchmarkluau: '#000080',
-            pytest: '#3572a5',
-            googlecpp: '#f34b7d',
-            catch2: '#f34b7d',
-            julia: '#a270ba',
-            jmh: '#b07219',
-            benchmarkdotnet: '#178600',
-            _: '#333333'
-        };
+      const toolColors = {
+        customSmallerIsBetter: "#ff3838",
+        customBiggerIsBetter: "#38ff38",
+        cargo: "#dea584",
+        go: "#00add8",
+        benchmarkjs: "#f1e05a",
+        benchmarkluau: "#000080",
+        pytest: "#3572a5",
+        googlecpp: "#f34b7d",
+        catch2: "#f34b7d",
+        julia: "#a270ba",
+        jmh: "#b07219",
+        benchmarkdotnet: "#178600",
+        _: "#333333",
+      };
 
-        // Function to group benchmarks by longest name prefix
-        function groupByLongestPrefix(records) {
-            const groups = {};
-            records.forEach(record => {
-                const parts = record.name.split('_');
-                let prefix = parts[0];
-                for (let i = 1; i < parts.length - 1; i++) {
-                    prefix += `_${parts[i]}`;
-                }
-                if (!groups[prefix]) {
-                    groups[prefix] = [];
-                }
-                groups[prefix].push(record);
-            });
-            Object.keys(groups).forEach(prefix => {
-                const maxLength = Math.max(...groups[prefix].map(record => record.records.length));
-                groups[prefix].forEach(record => {
-                    while (record.records.length < maxLength) {
-                        record.records.push(record.records[record.records.length - 1]); // Use null to fill the array
-                    }
-                });
-            });
-            return groups;
-        }
-
-        const groupedRecords = groupByLongestPrefix(window.BENCHMARK_RECORDS);
-
-        Object.keys(groupedRecords).forEach((prefix, index) => {
-            const chartContainer = document.createElement('div');
-            chartContainer.className = 'chart-container';
-            const canvas = document.createElement('canvas');
-            canvas.id = `chart-${index}`;
-            chartContainer.appendChild(canvas);
-            container.appendChild(chartContainer);
-
-            const datasets = groupedRecords[prefix].map((benchmark, i) => {
-                const colorKeys = Object.keys(toolColors);
-                const colorKey = colorKeys[i % colorKeys.length];
-                const suffix = benchmark.name.split('_').pop();
-                return {
-                    label: suffix,
-                    data: benchmark.records,
-                    borderColor: toolColors[colorKey] || toolColors._,
-                    borderWidth: 1,
-                    fill: false
-                };
-            });
-
-            new Chart(canvas, {
-                type: 'line',
-                data: {
-                    labels: groupedRecords[prefix][0].records.map((_, i) => i + 1),
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: prefix,
-                            font: {
-                                size: 20, // 设置标题字体大小
-                                weight: 'bold' // 设置标题字体加粗
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'time (s)'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: groupedRecords[prefix][0].unit
-                            }
-                        }
-                    }
-                }
-            });
+      // Function to group benchmarks by longest name prefix
+      function groupByLongestPrefix(records) {
+        const groups = {};
+        records.forEach((record) => {
+          const parts = record.name.split("_");
+          let prefix = parts[0];
+          for (let i = 1; i < parts.length - 1; i++) {
+            prefix += `_${parts[i]}`;
+          }
+          if (!groups[prefix]) {
+            groups[prefix] = [];
+          }
+          groups[prefix].push(record);
         });
+        Object.keys(groups).forEach((prefix) => {
+          const maxLength = Math.max(
+            ...groups[prefix].map((record) => record.records.length)
+          );
+          groups[prefix].forEach((record) => {
+            while (record.records.length < maxLength) {
+              record.records.push(record.records[record.records.length - 1]); // Use null to fill the array
+            }
+          });
+        });
+        return groups;
+      }
+
+      const groupedRecords = groupByLongestPrefix(window.BENCHMARK_RECORDS);
+      console.log(groupedRecords);
+
+      Object.keys(groupedRecords).forEach((prefix, index) => {
+        const chartContainer = document.createElement("div");
+        chartContainer.className = "chart-container";
+        const canvas = document.createElement("canvas");
+        canvas.id = `chart-${index}`;
+        chartContainer.appendChild(canvas);
+        container.appendChild(chartContainer);
+
+        const datasets = groupedRecords[prefix].map((benchmark, i) => {
+          const colorKeys = Object.keys(toolColors);
+          const colorKey = colorKeys[i % colorKeys.length];
+          const suffix = benchmark.name.split("_").pop();
+          return {
+            label: suffix,
+            data: benchmark.records,
+            borderColor: toolColors[colorKey] || toolColors._,
+            borderWidth: 1,
+            fill: false,
+          };
+        });
+
+        new Chart(canvas, {
+          type: "line",
+          data: {
+            labels: groupedRecords[prefix][0].records.map((_, i) => i + 1),
+            datasets: datasets,
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: prefix,
+                font: {
+                  size: 20, // 设置标题字体大小
+                  weight: "bold", // 设置标题字体加粗
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "time (s)",
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: groupedRecords[prefix][0].unit,
+                },
+              },
+            },
+          },
+        });
+      });
     </script>
-</body>
+  </body>
 </html>
