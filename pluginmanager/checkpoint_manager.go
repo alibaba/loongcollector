@@ -55,7 +55,7 @@ func (p *checkPointManager) SaveCheckpoint(configName, key string, value []byte)
 	}
 	err := p.db.Put([]byte(configName+"^"+key), value, nil)
 	if err != nil {
-		logger.Error(context.Background(), "CHECKPOINT_SAVE_ALARM", "save checkpoint error, key", key, "error", err)
+		logger.Error(context.Background(), util.CheckpointAlarm, "save checkpoint error, key", key, "error", err)
 	}
 	return err
 }
@@ -66,7 +66,7 @@ func (p *checkPointManager) GetCheckpoint(configName, key string) ([]byte, error
 	}
 	val, err := p.db.Get([]byte(configName+"^"+key), nil)
 	if err != nil && err != leveldb.ErrNotFound {
-		logger.Error(context.Background(), "CHECKPOINT_GET_ALARM", "get checkpoint error, key", key, "error", err)
+		logger.Error(context.Background(), util.CheckpointAlarm, "get checkpoint error, key", key, "error", err)
 	}
 	return val, err
 }
@@ -96,18 +96,18 @@ func (p *checkPointManager) Init() error {
 		}
 	} else {
 		// c++程序如果这个目录创建失败会直接exit，所以这里一般应该不会走进来
-		logger.Error(context.Background(), "CHECKPOINT_ALARM", "logtailDataDir not exist", logtailDataDir, "err", err)
+		logger.Error(context.Background(), util.CheckpointAlarm, "logtailDataDir not exist", logtailDataDir, "err", err)
 		return err
 	}
 
 	p.db, err = leveldb.OpenFile(dbPath, nil)
 	if err != nil {
-		logger.Warning(context.Background(), "CHECKPOINT_ALARM", "open checkpoint error", err, "try recover db file", dbPath)
+		logger.Warning(context.Background(), util.CheckpointAlarm, "open checkpoint error", err, "try recover db file", dbPath)
 		p.db, err = leveldb.RecoverFile(dbPath, nil)
 	}
 
 	if err != nil {
-		logger.Error(context.Background(), "CHECKPOINT_ALARM", "recover db file error", err)
+		logger.Error(context.Background(), util.CheckpointAlarm, "recover db file error", err)
 		return err
 	}
 	p.initFlag = true
@@ -148,7 +148,7 @@ func (p *checkPointManager) keyMatch(key []byte) bool {
 	keyStr := string(key)
 	index := strings.IndexByte(keyStr, '^')
 	if index <= 0 {
-		logger.Error(context.Background(), "CHECKPOINT_ALARM", "key format not match, key", keyStr)
+		logger.Error(context.Background(), util.CheckpointAlarm, "key format not match, key", keyStr)
 		return false
 	}
 	configName := keyStr[0:index]
@@ -182,7 +182,7 @@ func (p *checkPointManager) check() {
 	iter.Release()
 	err := iter.Error()
 	if err != nil {
-		logger.Warning(context.Background(), "CHECKPOINT_ALARM", "iterate checkpoint error", err)
+		logger.Warning(context.Background(), util.CheckpointAlarm, "iterate checkpoint error", err)
 	}
 	for _, key := range cleanItems {
 		p.configCounter[key]++

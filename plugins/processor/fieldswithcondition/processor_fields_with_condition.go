@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -93,7 +94,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 		case RelationOperatorStartwith:
 		default:
 			if len(relationOpertor) > 0 {
-				logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init relationOpertor error, relationOpertor", relationOpertor)
+				logger.Warning(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_fields_with_condition init relationOpertor error, relationOpertor", relationOpertor)
 			}
 			relationOpertor = RelationOperatorEquals
 			p.Switch[i].Case.RelationOperator = relationOpertor
@@ -104,7 +105,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 		case LogicalOperatorOr:
 		default:
 			if len(logicalOperator) > 0 {
-				logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init logicalOperator error, logicalOperator", logicalOperator)
+				logger.Warning(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_fields_with_condition init logicalOperator error, logicalOperator", logicalOperator)
 			}
 			p.Switch[i].Case.LogicalOperator = LogicalOperatorAnd
 		}
@@ -116,7 +117,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 				case RelationOperatorRegexp:
 					reg, err := regexp.Compile(val)
 					if err != nil {
-						logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition regex error, key", key, "regex", val, "error", err)
+						logger.Warning(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_fields_with_condition init condition regex error, key", key, "regex", val, "error", err)
 						return err
 					}
 					p.Switch[i].Case.fieldConditionFields[key] = Field{
@@ -193,7 +194,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 							}
 						}
 					default:
-						logger.Error(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition action type error, type", typeName)
+						logger.Error(p.context.GetRuntimeContext(), util.ProcessorInitAlarm, "processor_fields_with_condition init condition action type error, type", typeName)
 						return fmt.Errorf("init condition action type error,type is %v", typeName)
 					}
 				}

@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const elasticSearchName = "elasticsearch"
@@ -67,7 +68,7 @@ func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*proto
 	}
 	es, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		logger.Warningf(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "failed to create elasticsearch client, host %, err: %s", host, err)
+		logger.Warningf(context.Background(), util.ElasticsearchSubscriberAlarm, "failed to create elasticsearch client, host %, err: %s", host, err)
 		return nil, err
 	}
 	i.client = es
@@ -97,7 +98,7 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 		i.client.Search.WithBody(strings.NewReader(`{"query" : { "match_all" : { } }}`)),
 	)
 	if err != nil {
-		logger.Warning(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), util.ElasticsearchSubscriberAlarm, "err", err)
 		return
 	}
 	if err = json.NewDecoder(res.Body).Decode(&r); err != nil {
@@ -126,7 +127,7 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 		lc := logContent{}
 		err = json.Unmarshal(tmpJSON, &lc)
 		if err != nil {
-			logger.Warning(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "err", err)
+			logger.Warning(context.Background(), util.ElasticsearchSubscriberAlarm, "err", err)
 		}
 
 		log := &protocol.Log{
