@@ -53,7 +53,7 @@
 #include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
-#include "file_server/reader/GloablFileDescriptorManager.h"
+#include "file_server/reader/GlobalFileDescriptorManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -1051,10 +1051,10 @@ bool LogFileReader::UpdateFilePtr() {
         if (INT32_FLAG(force_release_deleted_file_fd_timeout) < 0) {
             SetFileDeleted(false);
         }
-        if (GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize() > INT32_FLAG(max_reader_open_files)) {
+        if (GlobalFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize() > INT32_FLAG(max_reader_open_files)) {
             LOG_ERROR(sLogger,
                       ("open file failed, opened fd exceed limit, too many open files",
-                       GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize())(
+                       GlobalFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize())(
                           "limit", INT32_FLAG(max_reader_open_files))("project", GetProject())(
                           "logstore", GetLogstore())("config", GetConfigName())("log reader queue name", mHostLogPath)(
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
@@ -1085,7 +1085,7 @@ bool LogFileReader::UpdateFilePtr() {
             if (mLogFileOp.IsOpen() == false) {
                 OnOpenFileError();
             } else if (CheckDevInode()) {
-                GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+                GlobalFileDescriptorManager::GetInstance()->OnFileOpen(this);
                 LOG_INFO(sLogger,
                          ("open file succeeded, project", GetProject())("logstore", GetLogstore())(
                              "config", GetConfigName())("log reader queue name", mHostLogPath)(
@@ -1123,7 +1123,7 @@ bool LogFileReader::UpdateFilePtr() {
         } else if (CheckDevInode()) {
             // the mHostLogPath's dev inode equal to mDevInode, so real log path is mHostLogPath
             mRealLogPath = mHostLogPath;
-            GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+            GlobalFileDescriptorManager::GetInstance()->OnFileOpen(this);
             LOG_INFO(
                 sLogger,
                 ("open file succeeded, project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
@@ -1223,7 +1223,7 @@ void LogFileReader::CloseFilePtr() {
                     "file size", mLastFileSize)("last file position", mLastFilePos)("reader id", long(this)));
         }
         // always call OnFileClose
-        GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
+        GlobalFileDescriptorManager::GetInstance()->OnFileClose(this);
     }
 }
 
@@ -1260,7 +1260,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
                          "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                          "file size", mLastFileSize)("last file position", mLastFilePos));
         }
-        GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
+        GlobalFileDescriptorManager::GetInstance()->OnFileClose(this);
         bool reopenFlag = UpdateFilePtr();
         endSize = mLogFileOp.GetFileSize();
         LOG_WARNING(

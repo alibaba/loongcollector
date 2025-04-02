@@ -120,8 +120,8 @@ public:
             p.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        // EventDispatcher::GetInstance()->CleanEnviroments();
-        // ConfigManager::GetInstance()->CleanEnviroments();
+        // EventDispatcher::GetInstance()->CleanEnvironments();
+        // ConfigManager::GetInstance()->CleanEnvironments();
         PollingDirFile::GetInstance()->ClearCache();
         PollingModify::GetInstance()->ClearCache();
         CheckPointManager::Instance()->RemoveAllCheckPoint();

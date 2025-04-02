@@ -1022,10 +1022,10 @@ public:
     }
 
     void CaseCleanUp() {
-        LogInput::GetInstance()->CleanEnviroments();
+        LogInput::GetInstance()->CleanEnvironments();
         sleep(1);
-        EventDispatcher::GetInstance()->CleanEnviroments();
-        ProcessorRunner::GetInstance()->CleanEnviroments();
+        EventDispatcher::GetInstance()->CleanEnvironments();
+        ProcessorRunner::GetInstance()->CleanEnvironments();
         Sender::Instance()->RemoveSender();
         if (gRealIpSendThread) {
             Sender::Instance()->mStopRealIpThread = true;
@@ -1044,7 +1044,7 @@ public:
         gRecvLogGroupLock.lock();
         gRcvLogGroup.Clear();
         gRecvLogGroupLock.unlock();
-        ConfigManager::GetInstance()->CleanEnviroments();
+        ConfigManager::GetInstance()->CleanEnvironments();
         delete ConfigManager::GetInstance()->mSharedHandler;
         ConfigManager::GetInstance()->mSharedHandler = NULL;
         LogIntegrity::GetInstance()->ClearForTest();

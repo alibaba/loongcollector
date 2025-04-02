@@ -35,7 +35,7 @@
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingEventQueue.h"
 #include "file_server/polling/PollingModify.h"
-#include "file_server/reader/GloablFileDescriptorManager.h"
+#include "file_server/reader/GlobalFileDescriptorManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -62,7 +62,7 @@ namespace logtail {
 LogInput::LogInput() : mAccessMainThreadRWL(ReadWriteLock::PREFER_WRITER) {
     mCheckBaseDirInterval = INT32_FLAG(check_base_dir_interval);
     mCheckSymbolicLinkInterval = INT32_FLAG(check_symbolic_link_interval);
-    mInteruptFlag = false;
+    mInterruptFlag = false;
     mForceClearFlag = false;
     mIdleFlag = false;
     mEventProcessCount = 0;
@@ -81,10 +81,10 @@ void LogInput::Start() {
     else
         initialized = true;
 
-    mInteruptFlag = false;
+    mInterruptFlag = false;
 
     mLastRunTime = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mRegisterdHandlersTotal
+    mRegisteredHandlersTotal
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
     mActiveReadersTotal
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
@@ -96,7 +96,7 @@ void LogInput::Start() {
 
 void LogInput::Resume() {
     LOG_INFO(sLogger, ("event handle daemon resume", "starts"));
-    mInteruptFlag = false;
+    mInterruptFlag = false;
     mAccessMainThreadRWL.unlock();
     LOG_INFO(sLogger, ("event handle daemon resume", "succeeded"));
 }
@@ -112,14 +112,14 @@ void LogInput::HoldOn() {
         LOG_INFO(sLogger, ("input event handle daemon", "stopped successfully"));
     } else {
         LOG_INFO(sLogger, ("input event handle daemon pause", "starts"));
-        mInteruptFlag = true;
+        mInterruptFlag = true;
         mAccessMainThreadRWL.lock();
         LOG_INFO(sLogger, ("input event handle daemon pause", "succeeded"));
     }
 }
 
 void LogInput::TryReadEvents(bool forceRead) {
-    if (mInteruptFlag)
+    if (mInterruptFlag)
         return;
 
     int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
@@ -160,7 +160,7 @@ void LogInput::FlowControl() {
     static int32_t lastCheckTime = 0;
     int32_t i = 0;
     while (i < sleepCount) {
-        if (mInteruptFlag)
+        if (mInterruptFlag)
             return;
         usleep(FLOW_CONTROL_SLEEP_MICROSECONDS);
         ++i;
@@ -168,7 +168,7 @@ void LogInput::FlowControl() {
             TryReadEvents(true);
     }
 
-    if (mInteruptFlag)
+    if (mInterruptFlag)
         return;
     int32_t curTime = time(NULL);
     if (curTime - lastCheckTime >= 1) {
@@ -231,7 +231,7 @@ bool LogInput::ReadLocalEvents() {
             continue;
         }
 
-        // remove last '/' to makesure source not end with '/'
+        // remove last '/' to make sure source not end with '/'
         if (source[source.size() - 1] == PATH_SEPARATOR[0]) {
             source.resize(source.size() - 1);
         }
@@ -347,8 +347,8 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
     SET_GAUGE(mLastRunTime, mLastReadEventTime.load());
     LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(
-        GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
-    SET_GAUGE(mRegisterdHandlersTotal, EventDispatcher::GetInstance()->GetHandlerCount());
+        GlobalFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+    SET_GAUGE(mRegisteredHandlersTotal, EventDispatcher::GetInstance()->GetHandlerCount());
     SET_GAUGE(mActiveReadersTotal, CheckPointManager::Instance()->GetReaderCount());
     mEventProcessCount = 0;
 }
@@ -460,7 +460,7 @@ void LogInput::ProcessLoop() {
         }
     }
 
-    mInteruptFlag = true;
+    mInterruptFlag = true;
 }
 
 void LogInput::PushEventQueue(std::vector<Event*>& eventVec) {
@@ -524,9 +524,9 @@ Event* LogInput::PopEventQueue() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-void LogInput::CleanEnviroments() {
+void LogInput::CleanEnvironments() {
     mIdleFlag = true;
-    mInteruptFlag = true;
+    mInterruptFlag = true;
     usleep(100 * 1000);
     while (true) {
         Event* ev = PopEventQueue();
