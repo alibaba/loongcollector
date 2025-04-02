@@ -1,0 +1,13 @@
+# 忽略所有文件和目录
+*
+
+# 保留 README 文件
+!/README
+
+# 保留 .gitignore 文件
+!/.gitignore
+
+# 保留 dev 目录及其内容
+!/dev/
+!/dev/**/*
+dev/.DS_Store
