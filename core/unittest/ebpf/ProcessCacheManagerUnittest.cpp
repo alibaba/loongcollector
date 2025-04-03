@@ -495,7 +495,7 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongFilen
     APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
     APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), "/");
     APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), "/" + filename);
-    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\"");
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\" ");
 
     APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
     APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),
