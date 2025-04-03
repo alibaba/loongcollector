@@ -31,14 +31,6 @@
 
 namespace logtail {
 
-struct ConfigInfo {
-    std::string name;
-    int64_t version;
-    ConfigFeedbackStatus status;
-    std::string message;
-    std::string detail;
-};
-
 class CommonConfigProvider : public ConfigProvider, ConfigFeedbackable {
 public:
     std::string sName;
@@ -57,9 +49,7 @@ public:
 
     void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
-    void FeedbackOnetimePipelineConfigStatus(const std::string& type,
-                                             const std::string& name,
-                                             ConfigFeedbackStatus status) override;
+    void FeedbackOnetimePipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
     CommonConfigProvider() = default;
     ~CommonConfigProvider() = default;
 

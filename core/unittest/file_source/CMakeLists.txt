@@ -24,7 +24,11 @@ target_link_libraries(multiline_options_unittest ${UT_BASE_TARGET})
 add_executable(file_tag_options_unittest FileTagOptionsUnittest.cpp)
 target_link_libraries(file_tag_options_unittest ${UT_BASE_TARGET})
 
+add_executable(static_file_server_unittest StaticFileServerUnittest.cpp)
+target_link_libraries(static_file_server_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(file_discovery_options_unittest)
 gtest_discover_tests(multiline_options_unittest)
 gtest_discover_tests(file_tag_options_unittest)
+gtest_discover_tests(static_file_server_unittest)
