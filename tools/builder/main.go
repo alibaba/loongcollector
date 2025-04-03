@@ -255,7 +255,8 @@ func getGoModules(ctx *buildContext) error {
 		return fmt.Errorf("failed to download go modules, err: %w, output: %s", err, out)
 	}
 
-	mods, err := os.ReadFile(ctx.ModFile)
+	path := getAbsPath(ctx.ModFile, ctx.ProjectRoot)
+	mods, err := os.ReadFile(path) // nolint
 	if err != nil {
 		return fmt.Errorf("failed to read file content, err: %v", err)
 	}

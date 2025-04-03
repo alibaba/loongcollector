@@ -15,12 +15,17 @@
  */
 
 #pragma once
+
 #include <algorithm>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#include <boost/lexical_cast.hpp>
+#pragma GCC diagnostic pop
+#include <charconv>
+
+#include <boost/regex.hpp>
 #include <string>
 #include <vector>
-
-#include "boost/lexical_cast.hpp"
-#include "boost/regex.hpp"
 
 #include "models/StringView.h"
 
@@ -158,5 +163,129 @@ inline bool IsInt(const std::string& str) {
 #define FNM_PATHNAME 0
 int fnmatch(const char* pattern, const char* dirPath, int flag);
 #endif
+
+// trim from start (returns a new string_view)
+static inline StringView Ltrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_prefix(std::min(s.find_first_not_of(blank), s.size()));
+    return s;
+}
+
+// trim from end (returns a new string_view)
+static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_suffix(std::min(s.size() - s.find_last_not_of(blank) - 1, s.size()));
+    return s;
+}
+
+// trim from both ends (returns a new string_view)
+static inline StringView Trim(StringView s) {
+    return Ltrim(Rtrim(s));
+}
+
+static constexpr StringView kNullSv("\0", 1);
+
+class StringViewSplitterIterator {
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = StringView;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+    StringViewSplitterIterator() = default;
+
+    StringViewSplitterIterator(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter), mPos(0) {
+        findNext();
+    }
+
+    value_type operator*() { return mField; }
+
+    pointer operator->() { return &mField; }
+
+    StringViewSplitterIterator& operator++() {
+        findNext();
+        return *this;
+    }
+
+    StringViewSplitterIterator operator++(int) {
+        StringViewSplitterIterator tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+
+    friend bool operator==(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return a.mPos == b.mPos;
+    }
+
+    friend bool operator!=(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return !(a == b);
+    }
+
+private:
+    void findNext() {
+        if (mPos == StringView::npos) {
+            mField = {};
+            return;
+        }
+
+        size_t end = 0;
+        if (mDelimiter.empty()) {
+            end = mPos + 1;
+        } else {
+            end = mStr.find(mDelimiter, mPos);
+        }
+        if (end == StringView::npos) {
+            if (mPos <= mStr.size()) { // last field
+                mField = mStr.substr(mPos);
+                mPos = mStr.size() + 1;
+            } else { // equivalent to end
+                mField = {};
+                mPos = StringView::npos;
+            }
+        } else {
+            mField = mStr.substr(mPos, end - mPos);
+            mPos = end + mDelimiter.size();
+        }
+    }
+
+    StringView mStr;
+    StringView mDelimiter;
+    StringView mField;
+    size_t mPos = StringView::npos;
+};
+
+class StringViewSplitter {
+public:
+    using value_type = StringView;
+    using iterator = StringViewSplitterIterator;
+
+    StringViewSplitter(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter) {}
+
+    iterator begin() const { return iterator(mStr, mDelimiter); }
+
+    iterator end() const { return iterator(); }
+
+private:
+    StringView mStr;
+    StringView mDelimiter;
+};
+
+template <class T>
+bool StringTo(const char* first, const char* last, T& val, int base = 10) {
+    auto convresult = std::from_chars(first, last, val, base);
+    if (convresult.ec != std::errc() || convresult.ptr != last) {
+        return false;
+    }
+    return true;
+}
+
+template <class T>
+bool StringTo(const std::string& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+template <class T>
+bool StringTo(const std::string_view& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
 
 } // namespace logtail

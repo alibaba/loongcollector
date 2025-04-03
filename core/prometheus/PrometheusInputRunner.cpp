@@ -201,11 +201,6 @@ void PrometheusInputRunner::Stop() {
         mThreadRes.wait_for(chrono::seconds(1));
     }
 
-#ifndef APSARA_UNIT_TEST_MAIN
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
-    AsynCurlRunner::GetInstance()->Stop();
-#endif
-
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();
     {

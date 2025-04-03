@@ -22,74 +22,94 @@
 #include <chrono>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
-#include <thread>
-#include <vector>
 
 #include "common/DynamicLibHelper.h"
-#include "ebpf/include/SysAkApi.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {
 namespace ebpf {
 
-enum class eBPFPluginType {
-    SOCKETTRACE = 0,
-    PROCESS = 1,
-    MAX = 2,
-};
+inline constexpr int kDefaultMaxBatchConsumeSize = 1024;
+inline constexpr int kDefaultMaxWaitTimeMS = 200;
 
 class SourceManager {
 public:
-    const std::string m_lib_name_ = "network_observer";
+    const std::string mDriverLibName = "eBPFDriver";
 
     SourceManager(const SourceManager&) = delete;
     SourceManager& operator=(const SourceManager&) = delete;
 
     void Init();
 
-    bool StartPlugin(nami::PluginType plugin_type, std::unique_ptr<nami::eBPFConfig> conf);
+    bool StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
 
-    bool StopPlugin(nami::PluginType plugin_type);
+    bool StopPlugin(PluginType plugin_type);
 
-    bool SuspendPlugin(nami::PluginType plugin_type);
+    // detach bpf progs ...
+    bool SuspendPlugin(PluginType plugin_type);
 
-    bool CheckPluginRunning(nami::PluginType plugin_type);
+    // just update configs ...
+    bool UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+
+    // re-attach bpf progs ...
+    bool ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+
+    bool CheckPluginRunning(PluginType plugin_type);
+
+    int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
+
+    bool SetNetworkObserverConfig(int32_t key, int32_t value);
+    bool SetNetworkObserverCidFilter(const std::string&, bool update);
+
+    // for bpf object operations ...
+    bool BPFMapUpdateElem(PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag);
 
     SourceManager();
     ~SourceManager();
 
 private:
-    void FillCommonConf(std::unique_ptr<nami::eBPFConfig>& conf);
     bool LoadDynamicLib(const std::string& lib_name);
+    bool LoadCoolBPF();
     bool DynamicLibSuccess();
-    bool UpdatePlugin(nami::PluginType plugin_type, std::unique_ptr<nami::eBPFConfig> conf);
+
+    enum class network_observer_uprobe_funcs {
+        EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG,
+        EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR,
+        EBPF_NETWORK_OBSERVER_DISABLE_PROCESS,
+        EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE,
+        EBPF_NETWORK_OBSERVER_MAX,
+    };
 
     enum class ebpf_func {
-        EBPF_INIT,
-        EBPF_UPDATE,
-        EBPF_SUSPEND,
-        EBPF_DEINIT,
-        EBPF_REMOVE,
-        EBPF_SOCKET_TRACE_CLEAN_UP_DOG,
-        EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR,
-        EBPF_SOCKET_TRACE_DISABLE_PROCESS,
-        EBPF_SOCKET_TRACE_UPDATE_CONN_ROLE,
-        EBPF_MAX,
+        EBPF_SET_LOGGER,
+        EBPF_START_PLUGIN,
+        EBPF_UPDATE_PLUGIN,
+        EBPF_STOP_PLUGIN,
+        EBPF_SUSPEND_PLUGIN,
+        EBPF_RESUME_PLUGIN,
+        EBPF_POLL_PLUGIN_PBS,
+        EBPF_SET_NETWORKOBSERVER_CONFIG,
+        EBPF_SET_NETWORKOBSERVER_CID_FILTER,
+
+        // operations
+        EBPF_MAP_UPDATE_ELEM,
+        EBPF_FUNC_MAX,
     };
 
     std::shared_ptr<DynamicLibLoader> mLib;
-    std::array<void*, (int)ebpf_func::EBPF_MAX> mFuncs = {};
-    std::array<long, (int)ebpf_func::EBPF_MAX> mOffsets = {};
-    std::array<std::atomic_bool, (int)nami::PluginType::MAX> mRunning = {};
-    std::string mHostIp;
-    std::string mHostName;
-    std::string mHostPathPrefix;
+    std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
+    std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
+    std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
+    std::array<std::atomic_bool, (int)PluginType::MAX> mRunning = {};
     std::string mBinaryPath;
     std::string mFullLibName;
 
+    eBPFLogHandler mLogPrinter;
+
 #ifdef APSARA_UNIT_TEST_MAIN
-    std::unique_ptr<nami::eBPFConfig> mConfig;
+    std::unique_ptr<PluginConfig> mConfig;
     friend class eBPFServerUnittest;
 #endif
 };

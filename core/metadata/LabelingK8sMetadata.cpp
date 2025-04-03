@@ -16,11 +16,13 @@
 
 #include "LabelingK8sMetadata.h"
 
+#include <boost/utility/string_view.hpp>
 #include <string>
 #include <vector>
 
 #include "K8sMetadata.h"
 #include "common/ParamExtractor.h"
+#include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/SpanEvent.h"
@@ -43,17 +45,20 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
             cotainerNotTag.push_back(rIdx);
         }
     }
+    bool remoteStatus;
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (!k8sMetadata.GetByContainerIdsFromServer(containerVec))) {
+    if (containerVec.empty()
+        || (k8sMetadata.GetByContainerIdsFromServer(containerVec, remoteStatus).size() != containerVec.size())) {
         return;
     }
-    if (remoteIpVec.empty() || (!k8sMetadata.GetByIpsFromServer(remoteIpVec))) {
+
+    if (remoteIpVec.empty()
+        || (k8sMetadata.GetByIpsFromServer(remoteIpVec, remoteStatus).size() != remoteIpVec.size())) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
         ProcessEvent(events[i], containerVec, remoteIpVec);
     }
-    return;
 }
 
 bool LabelingK8sMetadata::ProcessEvent(PipelineEventPtr& e,
@@ -79,34 +84,33 @@ bool LabelingK8sMetadata::AddLabels(Event& e,
     bool res = true;
 
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    StringView containerIdViewKey(containerIdKey);
+    StringView containerIdViewKey(containerIdKeyFromTags);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
-        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerId);
+        std::shared_ptr<K8sPodInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerIdView);
         if (containerInfo == nullptr) {
             containerVec.push_back(containerId);
             res = false;
         } else {
-            e.SetTag(workloadNameKey, containerInfo->workloadName);
-            e.SetTag(workloadKindKey, containerInfo->workloadKind);
-            e.SetTag(namespaceKey, containerInfo->k8sNamespace);
-            e.SetTag(serviceNameKey, containerInfo->serviceName);
-            e.SetTag(pidKey, containerInfo->appId);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME, containerInfo->mWorkloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND, containerInfo->mWorkloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_NAMESPACE, containerInfo->mNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_SERVICE_NAME, containerInfo->mServiceName);
         }
     }
-    StringView ipView(remoteIpKey);
+    StringView ipView(remoteIpKeyFromTag);
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
-        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIp);
+        std::shared_ptr<K8sPodInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIpView);
         if (ipInfo == nullptr) {
             remoteIpVec.push_back(remoteIp);
             res = false;
         } else {
-            e.SetTag(peerWorkloadNameKey, ipInfo->workloadName);
-            e.SetTag(peerWorkloadKindKey, ipInfo->workloadKind);
-            e.SetTag(peerNamespaceKey, ipInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME, ipInfo->mWorkloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND, ipInfo->mWorkloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE, ipInfo->mNamespace);
         }
     }
     return res;

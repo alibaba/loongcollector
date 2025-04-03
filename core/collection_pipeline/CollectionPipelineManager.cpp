@@ -21,6 +21,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
+#include "common/http/AsynCurlRunner.h"
 #include "common/timer/Timer.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
@@ -176,6 +177,7 @@ void CollectionPipelineManager::StopAllPipelines() {
     LogtailPlugin::GetInstance()->StopAllPipelines(true);
 
     Timer::GetInstance()->Stop();
+    AsynCurlRunner::GetInstance()->Stop();
     ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();
