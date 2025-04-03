@@ -115,7 +115,6 @@ void Application::Init() {
     LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
-    EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
         AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
     }
@@ -126,7 +125,7 @@ void Application::Init() {
         AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
     if (BOOL_FLAG(ilogtail_disable_core)) {
-        InitCrashBackTrace();
+        ResetCrashBackTrace();
     }
 #endif
     // override process related params if designated by user explicitly

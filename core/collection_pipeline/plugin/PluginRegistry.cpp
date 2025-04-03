@@ -31,6 +31,7 @@
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputHostMeta.h"
+#include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
@@ -163,7 +164,8 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
-    RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
+    RegisterInputCreator(new StaticInputCreator<InputHostMeta>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());

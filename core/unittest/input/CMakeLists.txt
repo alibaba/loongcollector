@@ -55,6 +55,9 @@ add_custom_command(TARGET input_ebpf_process_security_unittest POST_BUILD
     ${COOLBPF_DIR}/libcoolbpf.so.1.0.0 $<TARGET_FILE_DIR:input_ebpf_process_security_unittest>
 )
 
+add_executable(input_host_monitor_unittest InputHostMonitorUnittest.cpp)
+target_link_libraries(input_host_monitor_unittest unittest_base)
+
 include(GoogleTest)
 gtest_discover_tests(input_file_unittest)
 gtest_discover_tests(input_container_stdio_unittest)
@@ -66,3 +69,4 @@ gtest_discover_tests(input_ebpf_network_observer_unittest)
 gtest_discover_tests(input_internal_alarms_unittest)
 gtest_discover_tests(input_internal_metrics_unittest)
 gtest_discover_tests(input_host_meta_unittest)
+gtest_discover_tests(input_host_monitor_unittest)

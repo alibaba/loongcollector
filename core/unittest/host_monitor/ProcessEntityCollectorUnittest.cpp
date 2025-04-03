@@ -25,6 +25,7 @@ public:
     void TestGetNewProcessStat() const;
     void TestSortProcessByCpu() const;
     void TestGetProcessEntityID() const;
+    void TestGetSystemBootSeconds() const;
 
 protected:
     void SetUp() override {
@@ -69,9 +70,16 @@ void ProcessEntityCollectorUnittest::TestGetProcessEntityID() const {
     APSARA_TEST_EQUAL(collect.GetProcessEntityID("123", "123", "123"), "f5bb0c8de146c67b44babbf4e6584cc0");
 }
 
+void ProcessEntityCollectorUnittest::TestGetSystemBootSeconds() const {
+    PROCESS_DIR = ".";
+    ProcessEntityCollector collect;
+    APSARA_TEST_EQUAL(1731142542, collect.GetHostSystemBootTime());
+}
+
 UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetNewProcessStat);
 UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestSortProcessByCpu);
 UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetProcessEntityID);
+UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetSystemBootSeconds);
 
 } // namespace logtail
 

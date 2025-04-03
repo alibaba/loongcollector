@@ -221,9 +221,7 @@
     * [iLogtail 数据吞吐性能优化](events/summer-ospp-2024/projects/summer-ospp-2024-projects-ilogtail-io.md)
     * [ConfigServer 能力升级 + 体验优化（全栈）](events/summer-ospp-2024/projects/summer-ospp-2024-projects-config-server.md)
 
-## Awesome iLogtail <a href="#awesome-ilogtail" id="awesome-ilogtail"></a>
+## Awesome LoongCollector <a href="#awesome-loongcollector" id="awesome-loongcollector"></a>
 
-* [走近iLogtail社区版](awesome-ilogtail/awesome-ilogtail.md)
-* [iLogtail社区版使用入门](awesome-ilogtail/awesome-ilogtail-getting-started.md)
-* [iLogtail社区版开发者指南](awesome-ilogtail/awesome-ilogtail-developer-guide.md)
-* [iLogtail社区版使用案例](awesome-ilogtail/awesome-ilogtail-use-cases.md)
+* [走近LoongCollector社区版](awesome-loongcollector/awesome-loongcollector.md)
+* [LoongCollector社区版开发使用经验](awesome-loongcollector/awesome-loongcollector-getting-started.md)

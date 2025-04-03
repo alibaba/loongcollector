@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -623,6 +624,12 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 		info.Mounts[i].Source = filepath.Clean(info.Mounts[i].Source)
 		info.Mounts[i].Destination = filepath.Clean(info.Mounts[i].Destination)
 	}
+	sortMounts := func(mounts []types.MountPoint) {
+		sort.Slice(mounts, func(i, j int) bool {
+			return mounts[i].Source < mounts[j].Source
+		})
+	}
+	sortMounts(info.Mounts)
 	did := &DockerInfoDetail{
 		StdoutPath:       info.LogPath,
 		ContainerInfo:    info,

@@ -618,6 +618,12 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                         if (sendResult) {
                             break;
                         }
+                        {
+                            lock_guard<mutex> lock(mBufferSenderThreadRunningMux);
+                            if (!mIsSendBufferThreadRunning) {
+                                break;
+                            }
+                        }
                     }
                 }
             }

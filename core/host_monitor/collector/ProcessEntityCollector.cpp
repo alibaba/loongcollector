@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-#include "ProcessEntityCollector.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <sched.h>
 #include <unistd.h>
 
-#include <chrono>
-#include <exception>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -50,28 +48,19 @@ const size_t ProcessTopN = 20;
 
 const std::string ProcessEntityCollector::sName = "process_entity";
 
-const int64_t kSystemHertz = sysconf(_SC_CLK_TCK);
-
-ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {
-    // try to read process dir
-    if (access(PROCESS_DIR.c_str(), R_OK) != 0) {
-        LOG_ERROR(sLogger,
-                  ("process collector init failed", "process dir not exist or no permission")("dir", PROCESS_DIR));
-        mValidState = false;
-    } else {
-        mValidState = true;
-    }
-};
+// clang-format off
+ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {};
+// clang-format on
 
 bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
                                      PipelineEventGroup* group) {
-    if (!mValidState || group == nullptr) {
+    if (group == nullptr) {
         return false;
     }
     std::vector<ProcessStatPtr> processes;
     GetSortedProcess(processes, ProcessTopN);
     for (auto process : processes) {
-        auto event = group->AddLogEvent();
+        auto* event = group->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
 
@@ -133,6 +122,7 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& proce
         queue(compare);
 
     int readCount = 0;
+    std::unordered_map<pid_t, ProcessStatPtr> newProcessStat;
     WalkAllProcess(PROCESS_DIR, [&](const std::string& dirName) {
         if (++readCount > mProcessSilentCount) {
             readCount = 0;
@@ -142,6 +132,7 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& proce
         if (pid != 0) {
             bool isFirstCollect = false;
             auto ptr = GetProcessStat(pid, isFirstCollect);
+            newProcessStat[pid] = ptr;
             if (ptr && !isFirstCollect) {
                 queue.emplace(ptr, ptr->cpuInfo.percent);
             }
@@ -164,8 +155,8 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& proce
     }
     LOG_DEBUG(sLogger, ("collect Process Cpu info, top", processStats.size()));
 
+    mPrevProcessStat = std::move(newProcessStat);
     mProcessSortTime = now;
-    mSortProcessStats = processStats;
 }
 
 ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect) {
@@ -192,8 +183,8 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
     {
         ptr->lastTime = now;
         constexpr const uint64_t MILLISECOND = 1000;
-        ptr->cpuInfo.user = (ptr->utime.count() + ptr->cutime.count()) * MILLISECOND / kSystemHertz;
-        ptr->cpuInfo.sys = (ptr->stime.count() + ptr->cstime.count()) * MILLISECOND / kSystemHertz;
+        ptr->cpuInfo.user = (ptr->utime.count() + ptr->cutime.count()) * MILLISECOND / SYSTEM_HERTZ;
+        ptr->cpuInfo.sys = (ptr->stime.count() + ptr->cstime.count()) * MILLISECOND / SYSTEM_HERTZ;
         ptr->cpuInfo.total = ptr->cpuInfo.user + ptr->cpuInfo.sys;
         if (isFirstCollect || ptr->cpuInfo.total <= prev->second->cpuInfo.total) {
             // first time called
@@ -207,8 +198,6 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
             ptr->cpuInfo.percent = totalDiff / timeDiff;
         }
     }
-
-    mPrevProcessStat[pid] = ptr;
     return ptr;
 }
 
@@ -278,9 +267,14 @@ ProcessStatPtr ProcessEntityCollector::ParseProcessStat(pid_t pid, std::string& 
 bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
                                             const std::function<void(const std::string&)>& callback) {
     if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        LOG_ERROR(sLogger, ("ProcessEntityCollector", "root path is not a directory or not exist")("root", root));
+        if (mValidState) {
+            LOG_ERROR(sLogger,
+                      ("root path is not a directory or not exist", "invalid ProcessEntity collector")("root", root));
+            mValidState = false;
+        }
         return false;
     }
+    mValidState = true;
 
     for (const auto& dirEntry :
          std::filesystem::directory_iterator{root, std::filesystem::directory_options::skip_permission_denied}) {
@@ -318,6 +312,32 @@ void ProcessEntityCollector::FetchDomainInfo(std::string& domain,
         entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_ECS_PROCESS;
         hostEntityID = entity->GetHostID();
     }
+}
+
+int64_t ProcessEntityCollector::GetHostSystemBootTime() {
+    static int64_t systemBootSeconds = 0;
+    if (systemBootSeconds != 0) {
+        return systemBootSeconds;
+    }
+    int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    std::vector<std::string> lines = {};
+    std::string errorMessage;
+    if (!GetHostSystemStat(lines, errorMessage)) {
+        LOG_WARNING(sLogger, ("failed to get system boot time", "use current time instead")("error msg", errorMessage));
+        return currentSeconds;
+    }
+    for (auto const& line : lines) {
+        auto cpuMetric = SplitString(line);
+        // example: btime 1719922762
+        if (cpuMetric.size() >= 2 && cpuMetric[0] == "btime") {
+            systemBootSeconds = StringTo<int64_t>(cpuMetric[1]);
+            return systemBootSeconds;
+        }
+    }
+
+    LOG_WARNING(sLogger,
+                ("failed to get system boot time", "use current time instead")("error msg", "btime not found in stat"));
+    return currentSeconds;
 }
 
 } // namespace logtail

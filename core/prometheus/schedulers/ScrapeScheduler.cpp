@@ -18,6 +18,7 @@
 
 #include <cstddef>
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
@@ -126,6 +127,15 @@ void ScrapeScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     auto isContextValidFuture = std::make_shared<PromFuture<>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
+        if (response.GetStatusCode() == 401) {
+            auto duration
+                = chrono::duration_cast<chrono::seconds>(mLatestScrapeTime - mScrapeConfigPtr->mLastUpdateTime).count();
+            if ((duration <= mInterval && duration > 0) || mScrapeConfigPtr->UpdateAuthorization()) {
+                LOG_WARNING(sLogger, ("retry", GetId()));
+                this->ScheduleNext();
+                return true;
+            }
+        }
         this->OnMetricResult(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();

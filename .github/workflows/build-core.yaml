@@ -41,7 +41,25 @@ jobs:
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
-        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
         run: |

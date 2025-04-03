@@ -19,8 +19,7 @@
 
 namespace logtail {
 
-void InitCrashBackTrace();
-
+void ResetCrashBackTrace();
 std::string GetCrashBackTrace();
 
 } // namespace logtail

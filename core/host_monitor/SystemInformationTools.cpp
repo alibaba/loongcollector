@@ -16,11 +16,11 @@
 
 #include "host_monitor/SystemInformationTools.h"
 
+#include <iostream>
 #include <string>
 #include <vector>
 
 #include "common/FileSystemUtil.h"
-#include "common/StringTools.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
@@ -30,42 +30,18 @@ using namespace std::chrono;
 
 namespace logtail {
 
-int64_t GetHostSystemBootTime() {
-    static int64_t systemBootSeconds = 0;
-    if (systemBootSeconds != 0) {
-        return systemBootSeconds;
-    }
-    int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+bool GetHostSystemStat(vector<string>& lines, string& errorMessage) {
+    errorMessage.clear();
     if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
-        LOG_WARNING(sLogger,
-                    ("failed to get system boot time", "use process start time instead")(
-                        "error msg", "file not exists")("process start time", currentSeconds));
-        return currentSeconds;
+        errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_STAT).string();
+        return false;
     }
 
-    vector<string> cpuLines = {};
-    string errorMessage;
-    int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, cpuLines, true, &errorMessage);
-    if (ret != 0 || cpuLines.empty()) {
-        LOG_WARNING(sLogger,
-                    ("failed to get system boot time", "use process start time instead")("error msg", errorMessage)(
-                        "process start time", currentSeconds));
-        return currentSeconds;
+    int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, lines, true, &errorMessage);
+    if (ret != 0 || lines.empty()) {
+        return false;
     }
-
-    for (auto const& cpuLine : cpuLines) {
-        auto cpuMetric = SplitString(cpuLine);
-        // example: btime 1719922762
-        if (cpuMetric.size() >= 2 && cpuMetric[0] == "btime") {
-            systemBootSeconds = StringTo<int64_t>(cpuMetric[1]);
-            return systemBootSeconds;
-        }
-    }
-
-    LOG_WARNING(sLogger,
-                ("failed to get system boot time", "use process start time instead")(
-                    "error msg", "btime not found in stat")("process start time", currentSeconds));
-    return currentSeconds;
+    return true;
 }
 
 } // namespace logtail

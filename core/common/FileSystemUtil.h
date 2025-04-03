@@ -41,15 +41,10 @@ extern const std::string PATH_SEPARATOR;
 // PathJoin concats base and sub (by adding necessary path separator).
 // NOTE: the implementation is not elegant for better performance (backward).
 inline std::string PathJoin(const std::string& base, const std::string& sub) {
-    // Only Windows can collect root path, so linux do as old way.
-#if defined(__linux__)
-    return base + PATH_SEPARATOR + sub;
-#elif defined(_MSC_VER)
-    if (!BOOL_FLAG(enable_root_path_collection) || base.back() != PATH_SEPARATOR[0]) {
+    if (!base.empty() && base.back() != PATH_SEPARATOR[0]) {
         return base + PATH_SEPARATOR + sub;
     }
     return base + sub;
-#endif
 }
 
 std::string ParentPath(const std::string& path);

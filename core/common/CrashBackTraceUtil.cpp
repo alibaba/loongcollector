@@ -124,13 +124,14 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
 }
 #endif
 
-void InitCrashBackTrace() {
-#if defined(__ANDROID__)
-#elif defined(__linux__)
-    g_crashBackTraceFilePtr = fopen((GetCrashStackFileName()).c_str(), "w");
+void ResetCrashBackTrace() {
+#if defined(__linux__)
     if (g_crashBackTraceFilePtr == NULL) {
-        APSARA_LOG_ERROR(sLogger, ("unable to open stack back trace file", strerror(errno)));
-        return;
+        g_crashBackTraceFilePtr = fopen((GetCrashStackFileName()).c_str(), "w");
+        if (g_crashBackTraceFilePtr == NULL) {
+            APSARA_LOG_ERROR(sLogger, ("unable to open stack back trace file", strerror(errno)));
+            return;
+        }
     }
     signal(SIGSEGV, CrashBackTrace); // SIGSEGV    11       Core Invalid memory reference
     signal(SIGABRT, CrashBackTrace); // SIGABRT     6       Core Abort signal from
@@ -140,8 +141,10 @@ void InitCrashBackTrace() {
     _mkdir("dumps");
     g_handler.reset(new google_breakpad::ExceptionHandler(
         L"dumps\\", FilterCallbackFunc, MinidumpCallbackFunc, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL));
+#elif defined(__ANDROID__)
 #endif
 }
+
 
 std::string GetCrashBackTrace() {
     auto stackFilePath = GetCrashStackFileName();

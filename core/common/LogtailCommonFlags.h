@@ -24,9 +24,7 @@ DECLARE_FLAG_BOOL(enable_full_drain_mode);
 DECLARE_FLAG_INT32(cpu_limit_num);
 DECLARE_FLAG_INT32(mem_limit_num);
 DECLARE_FLAG_DOUBLE(cpu_usage_up_limit);
-DECLARE_FLAG_DOUBLE(pub_cpu_usage_up_limit);
 DECLARE_FLAG_INT64(memory_usage_up_limit);
-DECLARE_FLAG_INT64(pub_memory_usage_up_limit);
 
 // epoll
 DECLARE_FLAG_INT32(ilogtail_epoll_time_out);

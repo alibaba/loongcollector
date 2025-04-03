@@ -72,7 +72,8 @@ public:
                          const std::vector<uint32_t>& newCollectorIntervals,
                          QueueKey processQueueKey,
                          size_t inputIndex);
-    void RemoveCollector();
+    void RemoveCollector(const std::vector<std::string>& collectorNames);
+    void RemoveAllCollector();
 
     void Init() override;
     void Stop() override;
