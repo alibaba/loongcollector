@@ -17,6 +17,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/http/AsynCurlRunner.h"
 #include "ebpf/Config.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/eBPFServer.h"
@@ -103,6 +104,7 @@ protected:
         mConfig.reset();
         eBPFServer::GetInstance()->Stop();
         Timer::GetInstance()->Stop();
+        AsynCurlRunner::GetInstance()->Stop();
     }
 
     std::shared_ptr<eBPFAdminConfig> mConfig;

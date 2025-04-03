@@ -18,6 +18,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
+#include "common/http/AsynCurlRunner.h"
 #include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
@@ -48,6 +49,7 @@ protected:
     void TearDown() override {
         ebpf::eBPFServer::GetInstance()->Stop();
         Timer::GetInstance()->Stop();
+        AsynCurlRunner::GetInstance()->Stop();
     }
 
 private:

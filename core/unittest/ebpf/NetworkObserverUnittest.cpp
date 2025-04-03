@@ -17,6 +17,7 @@
 #include <thread>
 
 #include "common/TimeUtil.h"
+#include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/eBPFServer.h"
@@ -47,6 +48,7 @@ public:
 protected:
     void SetUp() override {
         Timer::GetInstance()->Init();
+        AsynCurlRunner::GetInstance()->Stop();
         mSourceManager = std::make_shared<SourceManager>();
         mSourceManager->Init();
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
@@ -58,6 +60,7 @@ protected:
 
     void TearDown() override {
         Timer::GetInstance()->Stop();
+        AsynCurlRunner::GetInstance()->Stop();
         mManager->Destroy();
         eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
     }
