@@ -23,29 +23,40 @@
 
 namespace logtail {
 
-std::string GenerateOnetimePipelineConfigFeedBackKey(const std::string& type, const std::string& name);
-
 class ConfigFeedbackReceiver {
 public:
-    static ConfigFeedbackReceiver& GetInstance();
+    ConfigFeedbackReceiver(const ConfigFeedbackReceiver&) = delete;
+    ConfigFeedbackReceiver& operator=(const ConfigFeedbackReceiver&) = delete;
+
+    static ConfigFeedbackReceiver& GetInstance() {
+        static ConfigFeedbackReceiver instance;
+        return instance;
+    }
+
     void RegisterContinuousPipelineConfig(const std::string& name, ConfigFeedbackable* feedbackable);
+    void RegisterOnetimePipelineConfig(const std::string& name, ConfigFeedbackable* feedbackable);
     void RegisterInstanceConfig(const std::string& name, ConfigFeedbackable* feedbackable);
-    void
-    RegisterOnetimePipelineConfig(const std::string& type, const std::string& name, ConfigFeedbackable* feedbackable);
+
     void UnregisterContinuousPipelineConfig(const std::string& name);
+    void UnregisterOnetimePipelineConfig(const std::string& name);
     void UnregisterInstanceConfig(const std::string& name);
-    void UnregisterOnetimePipelineConfig(const std::string& type, const std::string& name);
+
+    void FeedbackOnetimePipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
     void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status);
-    void
-    FeedbackOnetimePipelineConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status);
 
 private:
-    ConfigFeedbackReceiver() {}
+    ConfigFeedbackReceiver() = default;
+    ~ConfigFeedbackReceiver() = default;
+
     std::mutex mMutex;
     std::unordered_map<std::string, ConfigFeedbackable*> mContinuousPipelineConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mInstanceConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mOnetimePipelineConfigFeedbackableMap;
+    
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class ConfigFeedbackReceiverUnittest;
+#endif
 };
 
 } // namespace logtail

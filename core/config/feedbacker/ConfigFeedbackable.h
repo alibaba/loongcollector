@@ -19,21 +19,33 @@
 #include <cstdint>
 
 #include <string>
+#include <string_view>
 
 namespace logtail {
 
 enum class ConfigFeedbackStatus { UNSET = 0, APPLYING = 1, APPLIED = 2, FAILED = 3, DELETED = 4 };
 
+struct ConfigInfo {
+    std::string name;
+    int64_t version;
+    ConfigFeedbackStatus status;
+    std::string message;
+};
+
 std::string_view ToStringView(ConfigFeedbackStatus status);
 
 class ConfigFeedbackable {
 public:
-    virtual ~ConfigFeedbackable() = default; // LCOV_EXCL_LINE
+    ConfigFeedbackable(const ConfigFeedbackable&) = delete;
+    ConfigFeedbackable& operator=(const ConfigFeedbackable&) = delete;
+
     virtual void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
+    virtual void FeedbackOnetimePipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
     virtual void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
-    virtual void
-    FeedbackOnetimePipelineConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status)
-        = 0;
+
+protected:
+    ConfigFeedbackable() = default;
+    virtual ~ConfigFeedbackable() = default;
 };
 
 } // namespace logtail
