@@ -136,7 +136,6 @@ protected:
 
     // static ...
     std::chrono::nanoseconds mTimeDiff;
-    // std::atomic_int mStartUid = 0;
 
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
@@ -146,8 +145,6 @@ protected:
     CounterPtr mPushSpanGroupTotal;
     CounterPtr mPushMetricsTotal;
     CounterPtr mPushMetricGroupTotal;
-    CounterPtr mMetaAttachSuccessTotal;
-    CounterPtr mMetaAttachFailedTotal;
 
     std::vector<MetricLabels> mRefAndLabels;
 };

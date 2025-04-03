@@ -89,31 +89,6 @@
             "env": {
                 "LD_LIBRARY_PATH": "${workspaceFolder}/pkg/logtail"
             }
-        },
-        {
-            "name": "Launch UT",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "/workspaces/loongcollector-qianlu/build/unittest/ebpf/process_cache_unittest",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "/workspaces/loongcollector-qianlu/build/unittest/ebpf",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": "/opt/rh/devtoolset-9/root/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
         }
     ]
 }
