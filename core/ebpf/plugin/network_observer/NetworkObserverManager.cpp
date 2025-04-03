@@ -267,6 +267,25 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
           [this](const std::shared_ptr<AbstractRecord>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               return std::make_unique<AppLogGroup>();
           }) {
+    if (mMetricMgr) {
+        // init metrics
+        MetricLabels connectionNumLabels = {{METRIC_LABEL_KEY_EVENT_SOURCE, METRIC_LABEL_VALUE_EVENT_SOURCE_EBPF}};
+        auto ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(connectionNumLabels);
+        mRefAndLabels.emplace_back(connectionNumLabels);
+        mConnectionNum = ref->GetIntGauge(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNECTION_NUM);
+
+        MetricLabels appLabels = {{METRIC_LABEL_KEY_RECORD_TYPE, METRIC_LABEL_VALUE_RECORD_TYPE_APP}};
+        ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(appLabels);
+        mRefAndLabels.emplace_back(appLabels);
+        mAppMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
+        mAppMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
+
+        MetricLabels netLabels = {{METRIC_LABEL_KEY_RECORD_TYPE, METRIC_LABEL_VALUE_RECORD_TYPE_NET}};
+        ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(netLabels);
+        mRefAndLabels.emplace_back(netLabels);
+        mNetMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
+        mNetMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
+    }
 }
 
 std::array<size_t, 2>
@@ -1464,9 +1483,11 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             appRecord->GetConnection()->TryAttachSelfMeta();
             if (!appRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
                 // rollback
+                ADD_COUNTER(mAppMetaAttachFailedTotal, 1);
                 HandleRollback(record);
                 return;
             }
+            ADD_COUNTER(mAppMetaAttachSuccessTotal, 1);
 
             // handle record
             if (mEnableLog && record->ShouldSample()) {
@@ -1490,9 +1511,11 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             }
             if (!connStatsRecord->GetConnection()->IsMetaAttachReadyForNetRecord()) {
                 // rollback
+                ADD_COUNTER(mNetMetaAttachFailedTotal, 1);
                 HandleRollback(record);
                 return;
             }
+            ADD_COUNTER(mNetMetaAttachSuccessTotal, 1);
 
             // handle record
             // do aggregate
@@ -1562,6 +1585,7 @@ void NetworkObserverManager::PollBufferWrapper() {
         }
 
         mConnectionManager->Iterations(cnt++);
+        SET_GAUGE(mConnectionNum, mConnectionManager->ConnectionTotal());
 
         LOG_DEBUG(
             sLogger,

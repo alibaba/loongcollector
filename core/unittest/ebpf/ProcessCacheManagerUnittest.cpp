@@ -478,7 +478,7 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongFilen
     desc->id.pid = event.process.pid;
     desc->id.time = event.process.ktime;
     // fill arguments and cwd
-    constexpr char args[] = "-l\0/root/one more thing\0";
+    constexpr char args[] = "-l\0/root/one more thing";
     constexpr uint32_t argsSize = sizeof(args) - 1;
     memcpy(event.buffer + SIZEOF_EVENT + sizeof(data_event_desc), args, argsSize);
     event.process.size = argsSize + sizeof(data_event_desc) + SIZEOF_EVENT;
@@ -495,7 +495,7 @@ void ProcessCacheManagerUnittest::TestMsgExecveEventToProcessCacheValueLongFilen
     APSARA_TEST_EQUAL(cacheValue.Get<kKtime>().to_string(), std::to_string(event.process.ktime));
     APSARA_TEST_EQUAL(cacheValue.Get<kCWD>().to_string(), "/");
     APSARA_TEST_EQUAL(cacheValue.Get<kBinary>().to_string(), "/" + filename);
-    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\" ");
+    APSARA_TEST_EQUAL(cacheValue.Get<kArguments>().to_string(), "-l \"/root/one more thing\"");
 
     APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string("CAP_CHOWN CAP_FSETID"));
     APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(),

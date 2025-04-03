@@ -123,17 +123,14 @@ private:
     mutable std::atomic_int64_t mLostCtrlEventsTotal = 0;
     mutable std::atomic_int64_t mLostDataEventsTotal = 0;
 
-    // recv kernel events metric
-    // CounterPtr mRecvConnStatsEventsTotal;
-    // CounterPtr mRecvCtrlEventsTotal;
-    // CounterPtr mRecvHTTPDataEventsTotal;
-
     // cache relative metric
-    // IntGaugePtr mConnTrackerNum;
+    IntGaugePtr mConnectionNum;
 
     // metadata relative metric
-    // CounterPtr mSelfMetadataMatchTotal;
-    // CounterPtr mPeerMetadataMatchTotal;
+    CounterPtr mNetMetaAttachSuccessTotal;
+    CounterPtr mNetMetaAttachFailedTotal;
+    CounterPtr mAppMetaAttachSuccessTotal;
+    CounterPtr mAppMetaAttachFailedTotal;
 
     mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;

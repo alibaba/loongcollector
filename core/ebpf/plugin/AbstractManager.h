@@ -146,6 +146,8 @@ protected:
     CounterPtr mPushSpanGroupTotal;
     CounterPtr mPushMetricsTotal;
     CounterPtr mPushMetricGroupTotal;
+    CounterPtr mMetaAttachSuccessTotal;
+    CounterPtr mMetaAttachFailedTotal;
 
     std::vector<MetricLabels> mRefAndLabels;
 };
