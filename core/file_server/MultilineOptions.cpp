@@ -183,11 +183,18 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
 }
 
 bool MultilineOptions::ParseRegex(const string& pattern, shared_ptr<boost::regex>& reg) {
-    if (pattern.empty() || pattern == ".*") {
+    string regexPattern = pattern;
+    if (!regexPattern.empty() && EndWith(regexPattern, "$")) {
+        regexPattern = regexPattern.substr(0, regexPattern.size() - 1);
+    }
+    while (!regexPattern.empty() && EndWith(regexPattern, ".*")) {
+        regexPattern = regexPattern.substr(0, regexPattern.size() - 2);
+    }
+    if (regexPattern.empty()) {
         return true;
     }
     try {
-        reg.reset(new boost::regex(pattern));
+        reg.reset(new boost::regex(regexPattern));
     } catch (...) {
         return false;
     }

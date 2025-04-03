@@ -116,6 +116,7 @@ std::vector<std::string> StringSpliter(const std::string& str, const std::string
 void ReplaceString(std::string& raw, const std::string& src, const std::string& dst);
 
 // Boost regex utility.
+bool BoostRegexSearch(const char* buffer, size_t size, const boost::regex& reg, std::string& exception);
 bool BoostRegexSearch(const char* buffer,
                       const boost::regex& reg,
                       std::string& exception,

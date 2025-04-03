@@ -56,6 +56,7 @@
 #else
 #include "config/provider/CommonConfigProvider.h"
 #endif
+#include "gperftools/profiler.h"
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
@@ -248,6 +249,7 @@ void Application::Start() {
 
     time_t curTime = 0, lastProfilingCheckTime = 0, lastTcmallocReleaseMemTime = 0, lastConfigCheckTime = 0,
            lastUpdateMetricTime = 0, lastCheckTagsTime = 0;
+    ProfilerStart("logtail_2.0.prof");
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -315,6 +317,7 @@ bool Application::TryGetUUID() {
 }
 
 void Application::Exit() {
+    ProfilerStop();
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Stop();

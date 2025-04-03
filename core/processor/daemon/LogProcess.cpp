@@ -66,7 +66,15 @@ DEFINE_FLAG_STRING(raw_log_tag, "", "__raw__");
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
 DEFINE_FLAG_BOOL(enable_new_pipeline, "use C++ pipline with refactoried plugins", true);
 
+DEFINE_FLAG_INT32(low_size, "", 10);
+DEFINE_FLAG_INT32(high_size, "", 15);
+
 namespace logtail {
+
+thread_local std::chrono::nanoseconds LogProcess::sWaitTime;
+thread_local std::chrono::nanoseconds LogProcess::sProcessTime;
+thread_local std::chrono::nanoseconds LogProcess::sAggTime;
+thread_local std::chrono::nanoseconds LogProcess::sTotalTime;
 
 LogProcess::LogProcess() : mAccessProcessThreadRWL(ReadWriteLock::PREFER_WRITER) {
     size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
@@ -76,7 +84,7 @@ LogProcess::LogProcess() : mAccessProcessThreadRWL(ReadWriteLock::PREFER_WRITER)
     if (concurrencyCount > 50) {
         concurrencyCount = 50;
     }
-    mLogFeedbackQueue.SetParam(concurrencyCount, (size_t)(concurrencyCount * 1.5), 100);
+    mLogFeedbackQueue.SetParam(INT32_FLAG(low_size), INT32_FLAG(high_size), 100);
     mThreadCount = 0;
     mInitialized = false;
 }
@@ -218,24 +226,42 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
     uint64_t waitTime = 0;
     uint64_t waitCount = 0;
 #endif
+    int32_t lastAATime = time(NULL);
+    int32_t processCnt = 0;
+    int32_t processBytes = 0;
+    std::chrono::system_clock::time_point cur;
     while (true) {
         std::shared_ptr<LogBuffer> logBuffer;
         mThreadFlags[threadNo] = false;
 
         int32_t curTime = time(NULL);
+        if (curTime - lastAATime >= 5) {
+            LOG_WARNING(sLogger,
+                        ("thread", threadNo)("cnt", processCnt)("bytes", processBytes)("wait time", sWaitTime.count())(
+                            "process time", sProcessTime.count())("agg time", sAggTime.count())("total Time",
+                                                                                                sTotalTime.count()));
+            lastAATime = curTime;
+            sTotalTime = sWaitTime = sProcessTime = sAggTime = std::chrono::nanoseconds::zero();
+            processCnt = processBytes = 0;
+        }
+
         if (threadNo == 0 && curTime - lastMergeTime >= INT32_FLAG(default_flush_merged_buffer_interval)) {
             lastMergeTime = curTime;
             static Aggregator* aggregator = Aggregator::GetInstance();
             aggregator->FlushReadyBuffer();
         }
 
-        if (threadNo == 0 && curTime - lastUpdateMetricTime >= 40) {
+        if (threadNo == 0 && curTime - lastUpdateMetricTime >= 5) {
             static auto sMonitor = LogtailMonitor::GetInstance();
 
             // atomic counter will be negative if process speed is too fast.
             sMonitor->UpdateMetric("process_tps", 1.0 * s_processCount / (curTime - lastUpdateMetricTime));
             sMonitor->UpdateMetric("process_bytes_ps", 1.0 * s_processBytes / (curTime - lastUpdateMetricTime));
             sMonitor->UpdateMetric("process_lines_ps", 1.0 * s_processLines / (curTime - lastUpdateMetricTime));
+            LOG_WARNING(sLogger,
+                        ("process tps", 1.0 * s_processCount / (curTime - lastUpdateMetricTime))(
+                            "process bytes ps", 1.0 * s_processBytes / (curTime - lastUpdateMetricTime))(
+                            "process lines ps", 1.0 * s_processLines / (curTime - lastUpdateMetricTime)));
             lastUpdateMetricTime = curTime;
             s_processCount = 0;
             s_processBytes = 0;
@@ -262,14 +288,18 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             DoFuseHandling();
         }
 
+        auto begin = cur = std::chrono::system_clock::now();
         // if have no data, wait 100 ms for new data or timeout, then continue to check again
         LogBuffer* tmpLogBuffer = NULL;
         if (!mLogFeedbackQueue.CheckAndPopNextItem(
                 logstoreKey, tmpLogBuffer, Sender::Instance()->GetSenderFeedBackInterface(), threadNo, mThreadCount)) {
             mLogFeedbackQueue.Wait(100);
+            sWaitTime += std::chrono::system_clock::now() - cur;
+            sTotalTime += std::chrono::system_clock::now() - begin;
             continue;
         }
         logBuffer.reset(tmpLogBuffer);
+        sWaitTime += std::chrono::system_clock::now() - cur;
 
 #ifdef LOGTAIL_DEBUG_FLAG
         ++processCount;
@@ -289,6 +319,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             s_processCount++;
             uint64_t readBytes = logBuffer->rawBuffer.size() + 1; // may not be accurate if input is not utf8
             s_processBytes += readBytes;
+            processCnt++;
+            processBytes += readBytes;
             LogFileReaderPtr logFileReader = logBuffer->logFileReader;
             auto convertedPath = logFileReader->GetConvertedPath();
             auto hostLogPath = logFileReader->GetHostLogPath();
@@ -374,6 +406,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 }
                 sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
 
+                auto cur = std::chrono::system_clock::now();
                 for (auto& pLogGroup : logGroupList) {
                     LogGroupContext context(flusherSLS->mRegion,
                                             projectName,
@@ -407,34 +440,35 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                       "project", projectName)("logstore", category)("filename", convertedPath));
                     }
                 }
+                sAggTime += std::chrono::system_clock::now() - cur;
             }
 
             // 统计信息需要放在最外面，确保Pipeline在各种条件下，都能统计到
             LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
-                                                                 pipeline->GetContext().GetRegion(),
-                                                                 projectName,
-                                                                 category,
-                                                                 convertedPath,
-                                                                 hostLogPath,
-                                                                 logFileReader->GetExtraTags(),
-                                                                 readBytes,
-                                                                 profile.skipBytes,
-                                                                 profile.splitLines,
-                                                                 profile.parseFailures,
-                                                                 profile.regexMatchFailures,
-                                                                 profile.parseTimeFailures,
-                                                                 profile.historyFailures,
-                                                                 0,
-                                                                 ""); // TODO: I don't think errorLine is useful
+                                                             pipeline->GetContext().GetRegion(),
+                                                             projectName,
+                                                             category,
+                                                             convertedPath,
+                                                             hostLogPath,
+                                                             logFileReader->GetExtraTags(),
+                                                             readBytes,
+                                                             profile.skipBytes,
+                                                             profile.splitLines,
+                                                             profile.parseFailures,
+                                                             profile.regexMatchFailures,
+                                                             profile.parseTimeFailures,
+                                                             profile.historyFailures,
+                                                             0,
+                                                             ""); // TODO: I don't think errorLine is useful
             LOG_DEBUG(
                 sLogger,
                 ("project", projectName)("logstore", category)("filename", convertedPath)("read_bytes", readBytes)(
                     "split_lines", profile.splitLines)("parse_failures", profile.parseFailures)(
                     "parse_time_failures", profile.parseTimeFailures)(
-                    "regex_match_failures", profile.regexMatchFailures)("history_failures",
-                                                                        profile.historyFailures));
+                    "regex_match_failures", profile.regexMatchFailures)("history_failures", profile.historyFailures));
             logGroupList.clear();
         }
+        sTotalTime += std::chrono::system_clock::now() - begin;
     }
     LOG_WARNING(sLogger, ("LogProcessThread", "Exit")("threadNo", threadNo));
     return NULL;
@@ -453,7 +487,7 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
                      "logstore", logFileReader->GetLogstore()));
         return -1;
     }
-
+    auto cur = std::chrono::system_clock::now();
     std::vector<PipelineEventGroup> eventGroupList;
     {
         // construct a logGroup, it should be moved into input later
@@ -474,12 +508,14 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
         // process logGroup
         pipeline->Process(eventGroupList);
     }
+    sProcessTime += std::chrono::system_clock::now() - cur;
 
     // record profile
     auto& processProfile = pipeline->GetContext().GetProcessProfile();
     profile = processProfile;
     processProfile.Reset();
 
+    cur = std::chrono::system_clock::now();
     for (auto& eventGroup : eventGroupList) {
         // fill protobuf
         resultGroupList.emplace_back(new sls_logs::LogGroup());
@@ -499,6 +535,7 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
             logBuffer->exactlyOnceCheckpoint->positions.assign(eventGroup.GetEvents().size(), pos);
         }
     }
+    sAggTime += std::chrono::system_clock::now() - cur;
     return 0;
 }
 

@@ -684,7 +684,7 @@ void LogFileReader::FixLastFilePos(LogFileOperator& op, int64_t endOffset) {
     if (mMultilineConfig.first->GetStartPatternReg()) {
         for (size_t i = 0; i < readSizeReal - 1; ++i) {
             if (readBuf[i] == '\0'
-                && BoostRegexMatch(
+                && BoostRegexSearch(
                     readBuf + i + 1, readSize - i - 1, *mMultilineConfig.first->GetStartPatternReg(), exception)) {
                 mLastFilePos += i + 1;
                 mCache.clear();
@@ -1956,7 +1956,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
             StringView content = GetLastLine(StringView(buffer, size), endPs);
             if (mMultilineConfig.first->GetEndPatternReg()) {
                 // start + end, continue + end, end
-                if (BoostRegexMatch(
+                if (BoostRegexSearch(
                         content.data(), content.size(), *mMultilineConfig.first->GetEndPatternReg(), exception)) {
                     // Ensure the end line is complete
                     if (buffer[endPs] == '\n') {
@@ -1964,7 +1964,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
                     }
                 }
             } else if (mMultilineConfig.first->GetStartPatternReg()
-                       && BoostRegexMatch(
+                       && BoostRegexSearch(
                            content.data(), content.size(), *mMultilineConfig.first->GetStartPatternReg(), exception)) {
                 // start + continue, start
                 ++rollbackLineFeedCount;

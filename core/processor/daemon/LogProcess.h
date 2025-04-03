@@ -122,6 +122,11 @@ private:
     // int32_t mBufferCountLimit;
     ReadWriteLock mAccessProcessThreadRWL;
 
+    thread_local static std::chrono::nanoseconds sWaitTime;
+    thread_local static std::chrono::nanoseconds sProcessTime;
+    thread_local static std::chrono::nanoseconds sAggTime;
+    thread_local static std::chrono::nanoseconds sTotalTime;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
     friend class EventDispatcherTest;
