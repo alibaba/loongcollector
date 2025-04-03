@@ -100,13 +100,6 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
     for (const auto& pipeline : builtInPipelines) {
         const string& pipelineName = pipeline.first;
         const string& pipleineDetail = pipeline.second;
-        if (configSet.find(pipelineName) != configSet.end()) {
-            LOG_WARNING(sLogger,
-                        ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
-                                                                                                  pipelineName));
-            continue;
-        }
-        configSet.insert(pipelineName);
 
         string errorMsg;
         auto iter = mInnerConfigMap.find(pipelineName);
@@ -123,7 +116,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
                 LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipelineName));
                 continue;
             }
-            if (!CheckAddedConfig(pipelineName, std::move(detail), pDiff, tDiff, singletonCache)) {
+            if (!CheckAddedConfig(pipelineName, filesystem::path(), std::move(detail), pDiff, tDiff, singletonCache)) {
                 continue;
             }
         } else if (pipleineDetail != iter->second) {
@@ -164,7 +157,8 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
                 }
                 continue;
             }
-            if (!CheckModifiedConfig(pipelineName, std::move(detail), pDiff, tDiff, singletonCache)) {
+            if (!CheckModifiedConfig(
+                    pipelineName, filesystem::path(), std::move(detail), pDiff, tDiff, singletonCache)) {
                 continue;
             }
         } else {
