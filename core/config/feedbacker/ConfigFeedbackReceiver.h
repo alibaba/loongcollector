@@ -53,7 +53,7 @@ private:
     std::unordered_map<std::string, ConfigFeedbackable*> mContinuousPipelineConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mInstanceConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mOnetimePipelineConfigFeedbackableMap;
-    
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConfigFeedbackReceiverUnittest;
 #endif
