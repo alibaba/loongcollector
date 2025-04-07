@@ -127,7 +127,7 @@ func (o *FlusherOdps) Stop() error {
 }
 
 func init() {
-	pipeline.Flushers["flusher_odps"] = func() pipeline.Flusher {
+	pipeline.Flushers["flusher_aliyun_odps"] = func() pipeline.Flusher {
 		f := NewFlusherOdps()
 		return f
 	}

@@ -127,7 +127,7 @@ func (d *FlusherDatahub) Stop() error {
 }
 
 func init() {
-	pipeline.Flushers["flusher_datahub"] = func() pipeline.Flusher {
+	pipeline.Flushers["flusher_aliyun_datahub"] = func() pipeline.Flusher {
 		f := NewFlusherDatahub()
 		return f
 	}

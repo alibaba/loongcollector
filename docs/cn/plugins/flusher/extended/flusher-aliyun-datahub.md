@@ -2,7 +2,7 @@
 
 ## 简介
 
-`flusher_datahub` `flusher`插件可以实现将采集到的数据，经过处理后，发送到阿里云数据总线[Datahub](https://www.aliyun.com/product/bigdata/datahub)。
+`flusher_aliyun_datahub` `flusher`插件可以实现将采集到的数据，经过处理后，发送到阿里云数据总线[Datahub](https://www.aliyun.com/product/bigdata/datahub)。
 
 ## 版本
 
@@ -16,7 +16,7 @@
 
 | 参数                                | 类型       | 是否必选 | 说明                                                                                 |
 |-------------------------------------|----------|------|------------------------------------------------------------------------------------|
-| Type                                | String    | 是    | 插件类型，固定为`flusher_datahub`
+| Type                                | String    | 是    | 插件类型，固定为`flusher_aliyun_datahub`
 | Endpoint                            | String    | 是    | 数据总线 Datahub 的域名 |
 | AccessKeyID                         | String    | 是    | 阿里云账号下的 AccessKeyID |
 | AccessKeySecret                     | String    | 是    | 阿里云账号下的 AccessKeySecret，与上述 AccessKeyID 配合使用 |
@@ -39,7 +39,7 @@ inputs:
         - /home/test-log/*.log
       Type: input_file
 flushers:
-    - Type: flusher_datahub
+    - Type: flusher_aliyun_datahub
       AccessKeyID: xxxxx
       AccessKeySecret: xxxxx
       Endpoint: http://dh-cn-hangzhou.aliyun-inc.com

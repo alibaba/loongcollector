@@ -2,7 +2,7 @@
 
 ## 简介
 
-`flusher_odps` `flusher`插件可以实现将采集到的数据，经过处理后，发送到阿里云大数据计算服务[Maxcompute(又名Odps)](https://www.aliyun.com/product/maxcompute)。
+`flusher_aliyun_odps` `flusher`插件可以实现将采集到的数据，经过处理后，发送到阿里云大数据计算服务[Maxcompute(又名Odps)](https://www.aliyun.com/product/maxcompute)。
 
 ## 版本
 
@@ -16,7 +16,7 @@
 
 | 参数                                | 类型       | 是否必选 | 说明                                                                                 |
 |-------------------------------------|----------|------|------------------------------------------------------------------------------------|
-| Type                                | String    | 是    | 插件类型，固定为`flusher_odps`
+| Type                                | String    | 是    | 插件类型，固定为`flusher_aliyun_odps`
 | Endpoint                            | String    | 是    | 待访问 Odps 的域名 |
 | AccessKeyID                         | String    | 是    | 阿里云账号下的 AccessKeyID |
 | AccessKeySecret                     | String    | 是    | 阿里云账号下的 AccessKeySecret，与上述 AccessKeyID 配合使用 |
@@ -43,7 +43,7 @@ inputs:
         - /home/test-log/*.log
       Type: input_file
 flushers:
-    - Type: flusher_odps
+    - Type: flusher_aliyun_odps
       AccessKeyID: xxxxx
       AccessKeySecret: xxxxx
       Endpoint: https://service.cn-hangzhou-vpc.maxcompute.aliyun-inc.com/api
