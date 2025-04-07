@@ -45,18 +45,6 @@ static constexpr StringView LOOPBACK_STR = "127.0.0.1";
 
 std::regex Connection::mContainerIdRegex = std::regex("[a-f0-9]{64}");
 
-// bool Connection::IsMetaAttachReadyForAppRecord() {
-//     Flag flags = mMetaFlags.load(std::memory_order_acquire);
-//     return flags & sFlagAppRecordAttachReady;
-//     // return IsMetaAttachReadyForNetRecord() && mProtocolAttached;
-// }
-
-// bool Connection::IsMetaAttachReadyForNetRecord() {
-//     Flag flags = mMetaFlags.load(std::memory_order_acquire);
-//     return flags & sFlagNetRecordAttachReady;
-//     // return mNetMetaAttached && mK8sMetaAttached && mK8sPeerMetaAttached;
-// }
-
 bool Connection::IsLocalhost() const {
     const auto& remoteIp = GetRemoteIp();
     return (remoteIp == LOOPBACK_STR || remoteIp == LOCALHOST_STR || remoteIp == ZERO_ADDR_STR);
@@ -202,13 +190,7 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
         if (std::regex_search(event->docker_id, match, mContainerIdRegex)) {
             cidTrim = match.str(0);
         }
-        // LOG_DEBUG(sLogger, ("origin container_id", event->docker_id)("trim", cidTrim)("match pos",
-        // match.position())); TryAttachSelfMeta();
     }
-    // else {
-    //     LOG_DEBUG(sLogger, ("no containerid", "attach unknown for self pod meta"));
-    //     UpdateSelfPodMetaForUnknown();
-    // }
 
     // handle socket info ...
     struct socket_info& si = event->si;
