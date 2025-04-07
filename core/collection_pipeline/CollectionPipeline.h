@@ -62,6 +62,7 @@ public:
     }
 
     const std::string& Name() const { return mName; }
+    bool IsOnetime() const { return mIsOnetime; }
     CollectionPipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
     const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
@@ -92,6 +93,7 @@ private:
     void WaitAllItemsInProcessFinished();
 
     std::string mName;
+    bool mIsOnetime = false;
     std::vector<std::unique_ptr<InputInstance>> mInputs;
     std::vector<std::unique_ptr<ProcessorInstance>> mPipelineInnerProcessorLine;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;

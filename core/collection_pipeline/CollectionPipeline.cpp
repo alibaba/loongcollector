@@ -77,6 +77,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
     mSingletonInput = config.mSingletonInput;
+    mIsOnetime = config.mExpireTime.has_value();
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
     mContext.SetIsFromCheckpoint(config.mIsFromCheckpoint);
@@ -104,8 +105,8 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     for (size_t i = 0; i < config.mInputs.size(); ++i) {
         const Json::Value& detail = *config.mInputs[i];
         string pluginType = detail["Type"].asString();
-        unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(
-            pluginType, config.mExpireTime.has_value(), GenNextPluginMeta(false));
+        unique_ptr<InputInstance> input
+            = PluginRegistry::GetInstance()->CreateInput(pluginType, mIsOnetime, GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
@@ -341,7 +342,9 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
-    if (config.mExpireTime.has_value()) {
+    // for symetry consideration, the following should be done on pipeline start. However, since it relies much on
+    // config, it is more reasonable to do it here. 
+    if (mIsOnetime) {
         OnetimeConfigManager::GetInstance()->UpdateConfig(
             mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
     }

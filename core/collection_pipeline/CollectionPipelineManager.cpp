@@ -86,7 +86,9 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+        // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one should
+        // be considered as deleted
+        iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = p;
