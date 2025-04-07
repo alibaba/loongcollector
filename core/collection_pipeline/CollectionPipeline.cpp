@@ -343,7 +343,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     }
 
     // for symetry consideration, the following should be done on pipeline start. However, since it relies much on
-    // config, it is more reasonable to do it here. 
+    // config, it is more reasonable to do it here.
     if (mIsOnetime) {
         OnetimeConfigManager::GetInstance()->UpdateConfig(
             mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
