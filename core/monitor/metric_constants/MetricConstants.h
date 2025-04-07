@@ -158,6 +158,7 @@ extern const std::string METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM;
 extern const std::string METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL;
+extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL;
 
 /**********************************************************
  *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）

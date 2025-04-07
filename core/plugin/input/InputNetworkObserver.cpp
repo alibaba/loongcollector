@@ -54,6 +54,7 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
         {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
     mPluginMetricPtr = std::make_shared<PluginMetricManager>(

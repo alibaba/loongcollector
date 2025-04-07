@@ -279,12 +279,14 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
         mRefAndLabels.emplace_back(appLabels);
         mAppMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
         mAppMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
+        mAppMetaAttachRollbackTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL);
 
         MetricLabels netLabels = {{METRIC_LABEL_KEY_RECORD_TYPE, METRIC_LABEL_VALUE_RECORD_TYPE_NET}};
         ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(netLabels);
         mRefAndLabels.emplace_back(netLabels);
         mNetMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
         mNetMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
+        mNetMetaAttachRollbackTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL);
     }
 }
 
@@ -1447,7 +1449,7 @@ void NetworkObserverManager::ProcessRecordAsMetric(const std::shared_ptr<Abstrac
 std::atomic_int HttpRecord::sConstructCount = 0;
 std::atomic_int HttpRecord::sDestructCount = 0;
 
-void NetworkObserverManager::HandleRollback(const std::shared_ptr<AbstractRecord>& record) {
+void NetworkObserverManager::HandleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop) {
     int times = record->Rollback();
 #ifdef APSARA_UNIT_TEST_MAIN
     if (times == 1) {
@@ -1458,19 +1460,22 @@ void NetworkObserverManager::HandleRollback(const std::shared_ptr<AbstractRecord
 #ifdef APSARA_UNIT_TEST_MAIN
         mDropRecordTotal++;
 #endif
+        drop = true;
         LOG_WARNING(sLogger,
                     ("meta not ready, drop record, times", times)("record type",
                                                                   magic_enum::enum_name(record->GetRecordType())));
     } else {
-        LOG_WARNING(sLogger,
-                    ("meta not ready, rollback record, times", times)("record type",
-                                                                      magic_enum::enum_name(record->GetRecordType())));
+        LOG_DEBUG(sLogger,
+                  ("meta not ready, rollback record, times", times)("record type",
+                                                                    magic_enum::enum_name(record->GetRecordType())));
         mRollbackQueue.try_enqueue(std::move(record));
+        drop = false;
     }
     return;
 }
 
 void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>& record) {
+    bool isDrop;
     switch (record->GetRecordType()) {
         case RecordType::APP_RECORD: {
             auto* appRecord = static_cast<AbstractAppRecord*>(record.get());
@@ -1483,8 +1488,12 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             appRecord->GetConnection()->TryAttachSelfMeta();
             if (!appRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
                 // rollback
-                ADD_COUNTER(mAppMetaAttachFailedTotal, 1);
-                HandleRollback(record);
+                HandleRollback(record, isDrop);
+                if (isDrop) {
+                    ADD_COUNTER(mAppMetaAttachFailedTotal, 1);
+                } else {
+                    ADD_COUNTER(mAppMetaAttachRollbackTotal, 1);
+                }
                 return;
             }
             ADD_COUNTER(mAppMetaAttachSuccessTotal, 1);
@@ -1511,8 +1520,12 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
             }
             if (!connStatsRecord->GetConnection()->IsMetaAttachReadyForNetRecord()) {
                 // rollback
-                ADD_COUNTER(mNetMetaAttachFailedTotal, 1);
-                HandleRollback(record);
+                HandleRollback(record, isDrop);
+                if (isDrop) {
+                    ADD_COUNTER(mNetMetaAttachFailedTotal, 1);
+                } else {
+                    ADD_COUNTER(mNetMetaAttachRollbackTotal, 1);
+                }
                 return;
             }
             ADD_COUNTER(mNetMetaAttachSuccessTotal, 1);

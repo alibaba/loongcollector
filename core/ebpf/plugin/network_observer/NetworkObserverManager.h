@@ -105,7 +105,7 @@ private:
     void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
     void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
 
-    void HandleRollback(const std::shared_ptr<AbstractRecord>& record);
+    void HandleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
 
     void RunInThread();
 
@@ -129,8 +129,10 @@ private:
     // metadata relative metric
     CounterPtr mNetMetaAttachSuccessTotal;
     CounterPtr mNetMetaAttachFailedTotal;
+    CounterPtr mNetMetaAttachRollbackTotal;
     CounterPtr mAppMetaAttachSuccessTotal;
     CounterPtr mAppMetaAttachFailedTotal;
+    CounterPtr mAppMetaAttachRollbackTotal;
 
     mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;

@@ -110,6 +110,7 @@ const string METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM = "process_cache_entri
 const string METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL = "process_cache_miss_total";
 const string METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL = "meta_attach_success_total";
 const string METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL = "meta_attach_failed_total";
+const string METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL = "meta_attach_rollback_total";
 
 /**********************************************************
  *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
