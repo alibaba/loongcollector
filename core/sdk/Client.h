@@ -98,7 +98,17 @@ namespace sdk {
                                                   sls_logs::SlsCompressType compressType,
                                                   const std::string& compressedLogGroup,
                                                   uint32_t rawSize,
-                                                  const std::string& hashKey = "");
+                                                  const std::string& hashKey = "",
+                                                  bool isTimeSeries = false);
+
+        PostLogStoreLogsResponse PostMetricStoreLogs(const std::string& project,
+                                                     const std::string& logstore,
+                                                     sls_logs::SlsCompressType compressType,
+                                                     const std::string& compressedLogGroup,
+                                                     uint32_t rawSize) {
+            return PostLogStoreLogs(project, logstore, compressType, compressedLogGroup, rawSize, "", true);
+        }
+
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
          * @param logstore The logstore name
@@ -125,7 +135,18 @@ namespace sdk {
                               uint32_t rawSize,
                               PostLogStoreLogsClosure* callBack,
                               const std::string& hashKey = "",
-                              int64_t hashKeySeqID = kInvalidHashKeySeqID);
+                              int64_t hashKeySeqID = kInvalidHashKeySeqID,
+                              bool isTimeSeries = false);
+
+        void PostMetricStoreLogs(const std::string& project,
+                                 const std::string& logstore,
+                                 sls_logs::SlsCompressType compressType,
+                                 const std::string& compressedLogGroup,
+                                 uint32_t rawSize,
+                                 PostLogStoreLogsClosure* callBack) {
+            PostLogStoreLogs(project, logstore, compressType, compressedLogGroup, rawSize, callBack, "", kInvalidHashKeySeqID, true);
+        }
+
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
          * @param logstore The logstore name
@@ -168,6 +189,12 @@ namespace sdk {
                                   const std::string& hashKey,
                                   int64_t hashKeySeqID);
 
+        void AsynPostMetricStoreLogs(const std::string& project,
+                                  const std::string& logstore,
+                                  const std::string& body,
+                                  std::map<std::string, std::string>& httpHeader,
+                                  PostLogStoreLogsClosure* callBack);
+
         // PingSLSServer sends a trivial data packet to SLS for some inner purposes.
         PostLogStoreLogsResponse
         PingSLSServer(const std::string& project, const std::string& logstore, std::string* realIpPtr = NULL);
@@ -178,6 +205,13 @@ namespace sdk {
                                                      std::map<std::string, std::string>& httpHeader,
                                                      const std::string& hashKey,
                                                      std::string* realIpPtr = NULL);
+
+        PostLogStoreLogsResponse SynPostMetricStoreLogs(const std::string& project,
+                                                        const std::string& logstore,
+                                                        const std::string& body,
+                                                        std::map<std::string, std::string>& httpHeader,
+                                                        std::string* realIpPtr = NULL);
+
 
         void SetCommonHeader(std::map<std::string, std::string>& httpHeader,
                              int32_t contentLength,

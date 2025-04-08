@@ -26,13 +26,13 @@
 #include <json/json.h>
 
 #include "common/LogstoreFeedbackKey.h"
+#include "log_pb/sls_logs.pb.h"
 
 namespace logtail {
 
 class FlusherSLS : public Flusher {
 public:
     enum class CompressType { NONE, LZ4, ZSTD };
-    enum class TelemetryType { LOG, METRIC };
 
     struct Batch {
         enum class MergeType { TOPIC, LOGSTORE };
@@ -60,7 +60,7 @@ public:
     std::string mEndpoint;
     std::string mAliuid;
     CompressType mCompressType = CompressType::LZ4;
-    TelemetryType mTelemetryType = TelemetryType::LOG;
+    sls_logs::SlsTelemetryType mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
     uint32_t mFlowControlExpireTime = 0;
     int32_t mMaxSendRate = -1;
     Batch mBatch;

@@ -383,6 +383,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                             projectName,
                                             flusherSLS->mLogstore,
                                             compressType,
+                                            flusherSLS->mTelemetryType,
                                             logBuffer->fileInfo,
                                             integrityConfigPtr,
                                             lineCountConfigPtr,

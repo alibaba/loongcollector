@@ -28,6 +28,7 @@ struct LogGroupContext {
                     const std::string& project = "",
                     const std::string& logStore = "",
                     sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_LZ4,
+                    sls_logs::SlsTelemetryType telemetryType = sls_logs::SLS_TELEMETRY_TYPE_LOGS,
                     const FileInfoPtr& infoPtr = FileInfoPtr(),
                     const IntegrityConfigPtr& integrityConfigPtr = IntegrityConfigPtr(),
                     const LineCountConfigPtr& lineCountConfigPtr = LineCountConfigPtr(),
@@ -39,6 +40,7 @@ struct LogGroupContext {
           mProjectName(project),
           mLogStore(logStore),
           mCompressType(compressType),
+          mTelemetryType(telemetryType),
           mFileInfoPtr(infoPtr),
           mIntegrityConfigPtr(integrityConfigPtr),
           mLineCountConfigPtr(lineCountConfigPtr),
@@ -55,6 +57,7 @@ struct LogGroupContext {
     std::string mProjectName;
     std::string mLogStore;
     sls_logs::SlsCompressType mCompressType;
+    sls_logs::SlsTelemetryType mTelemetryType;
 
     FileInfoPtr mFileInfoPtr;
 

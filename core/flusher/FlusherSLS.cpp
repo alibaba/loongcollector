@@ -26,6 +26,7 @@
 using namespace std;
 
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
+DEFINE_FLAG_BOOL(enable_metricstore_channel, "only works for metrics data for enhance metrics query performance", true);
 
 namespace logtail {
 
@@ -183,7 +184,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     } else if (telemetryType == "metrics") {
-        mTelemetryType = TelemetryType::METRIC;
+        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
+                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     } else if (!telemetryType.empty() && telemetryType != "logs") {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),

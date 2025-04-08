@@ -1054,6 +1054,9 @@ bool Sender::ReadNextEncryption(int32_t& pos,
     if (!bufferMeta.has_compresstype()) {
         bufferMeta.set_compresstype(SlsCompressType::SLS_CMP_LZ4);
     }
+    if (!bufferMeta.has_telemetrytype()) {
+        bufferMeta.set_telemetrytype(sls_logs::SLS_TELEMETRY_TYPE_LOGS);
+    }
 
     buffer = new char[meta.mEncryptionSize + 1];
     nbytes = fread(buffer, sizeof(char), meta.mEncryptionSize, fin);
@@ -1674,6 +1677,8 @@ bool Sender::SendToBufferFile(LoggroupTimeValue* dataPtr) {
     bufferMeta.set_rawsize(dataPtr->mRawSize);
     bufferMeta.set_shardhashkey(dataPtr->mShardHashKey);
     bufferMeta.set_compresstype(dataPtr->mLogGroupContext.mCompressType);
+    bufferMeta.set_telemetrytype(dataPtr->mLogGroupContext.mTelemetryType);
+
     string encodedInfo;
     bufferMeta.SerializeToString(&encodedInfo);
 
@@ -1751,7 +1756,7 @@ bool Sender::SendPb(const FlusherSLS* pConfig,
         compressStr = "lz4";
     }
     sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
-    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProject, pConfig->mLogstore, compressType);
+    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProject, pConfig->mLogstore, compressType, pConfig->mTelemetryType);
     LoggroupTimeValue* pData = new LoggroupTimeValue(pConfig->mProject,
                                                      logstore.empty() ? pConfig->mLogstore : logstore,
                                                      pConfig->HasContext() ? pConfig->GetContext().GetConfigName() : "",
@@ -2014,7 +2019,14 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                 else
                     LOG_ERROR(sLogger, ("MockSyncSend", "uninitialized"));
             } else if (bufferMeta.datatype() == LOGGROUP_COMPRESSED) {
-                if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
+                if (bufferMeta.has_telemetrytype()
+                    && bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+                    sendClient->PostMetricStoreLogs(bufferMeta.project(),
+                                                    bufferMeta.logstore(),
+                                                    bufferMeta.compresstype(),
+                                                    logData,
+                                                    bufferMeta.rawsize());
+                } else if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogs(bufferMeta.project(),
                                                  bufferMeta.logstore(),
                                                  bufferMeta.compresstype(),
@@ -2147,24 +2159,33 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
             delete sendClosure;
         }
     } else if (dataPtr->mDataType == LOGGROUP_COMPRESSED) {
-        const auto& hashKey = exactlyOnceCpt ? exactlyOnceCpt->data.hash_key() : dataPtr->mShardHashKey;
-        if (hashKey.empty()) {
-            sendClient->PostLogStoreLogs(dataPtr->mProjectName,
+        if (dataPtr->mLogGroupContext.mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+            sendClient->PostMetricStoreLogs(dataPtr->mProjectName,
                                          dataPtr->mLogstore,
                                          dataPtr->mLogGroupContext.mCompressType,
                                          dataPtr->mLogData,
                                          dataPtr->mRawSize,
                                          sendClosure);
         } else {
-            int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
-            sendClient->PostLogStoreLogs(dataPtr->mProjectName,
-                                         dataPtr->mLogstore,
-                                         dataPtr->mLogGroupContext.mCompressType,
-                                         dataPtr->mLogData,
-                                         dataPtr->mRawSize,
-                                         sendClosure,
-                                         hashKey,
-                                         hashKeySeqID);
+            const auto& hashKey = exactlyOnceCpt ? exactlyOnceCpt->data.hash_key() : dataPtr->mShardHashKey;
+            if (hashKey.empty()) {
+                sendClient->PostLogStoreLogs(dataPtr->mProjectName,
+                                            dataPtr->mLogstore,
+                                            dataPtr->mLogGroupContext.mCompressType,
+                                            dataPtr->mLogData,
+                                            dataPtr->mRawSize,
+                                            sendClosure);
+            } else {
+                int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
+                sendClient->PostLogStoreLogs(dataPtr->mProjectName,
+                                            dataPtr->mLogstore,
+                                            dataPtr->mLogGroupContext.mCompressType,
+                                            dataPtr->mLogData,
+                                            dataPtr->mRawSize,
+                                            sendClosure,
+                                            hashKey,
+                                            hashKeySeqID);
+            }
         }
     } else {
         if (dataPtr->mShardHashKey.empty())
