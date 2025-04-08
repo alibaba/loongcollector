@@ -36,6 +36,8 @@ public:
     void TestSpanIDUniqueness();
     void TestTraceIDConversion();
     void TestSpanIDConversion();
+    void TraceIDBenchmark();
+    void FromTraceIDBenchmark();
 
     void TestInitialState();
     void TestPeriodSetting();
@@ -56,7 +58,7 @@ protected:
 
 void CommonUtilUnittest::TestTraceIDGeneration() {
     auto traceId = GenerateTraceID();
-    APSARA_TEST_EQUAL(traceId.size(), 32UL);
+    APSARA_TEST_EQUAL(traceId.size(), 4UL);
 
     bool allZero = true;
     for (const auto& byte : traceId) {
@@ -70,7 +72,7 @@ void CommonUtilUnittest::TestTraceIDGeneration() {
 
 void CommonUtilUnittest::TestTraceIDFormat() {
     auto traceId = GenerateTraceID();
-    std::string hexString = FromTraceId(traceId);
+    std::string hexString = FromRandom64ID<4>(traceId);
 
     LOG_INFO(sLogger, ("traceId", hexString));
 
@@ -85,7 +87,7 @@ void CommonUtilUnittest::TestTraceIDUniqueness() {
 
     for (int i = 0; i < numIds; ++i) {
         auto traceId = GenerateTraceID();
-        std::string hexString = FromTraceId(traceId);
+        std::string hexString = FromRandom64ID<4>(traceId);
         traceIds.insert(hexString);
     }
 
@@ -94,7 +96,7 @@ void CommonUtilUnittest::TestTraceIDUniqueness() {
 
 void CommonUtilUnittest::TestSpanIDGeneration() {
     auto spanId = GenerateSpanID();
-    APSARA_TEST_EQUAL(spanId.size(), 16UL);
+    APSARA_TEST_EQUAL(spanId.size(), 2UL);
 
     bool allZero = true;
     for (const auto& byte : spanId) {
@@ -108,7 +110,7 @@ void CommonUtilUnittest::TestSpanIDGeneration() {
 
 void CommonUtilUnittest::TestSpanIDFormat() {
     auto spanId = GenerateSpanID();
-    std::string hexString = FromSpanId(spanId);
+    std::string hexString = FromRandom64ID<2>(spanId);
 
     LOG_INFO(sLogger, ("spanId", hexString));
 
@@ -124,7 +126,7 @@ void CommonUtilUnittest::TestSpanIDUniqueness() {
 
     for (int i = 0; i < numIds; ++i) {
         auto spanId = GenerateSpanID();
-        std::string hexString = FromSpanId(spanId);
+        std::string hexString = FromRandom64ID<2>(spanId);
         spanIds.insert(hexString);
     }
 
@@ -134,19 +136,19 @@ void CommonUtilUnittest::TestSpanIDUniqueness() {
 
 void CommonUtilUnittest::TestTraceIDConversion() {
     // 创建一个已知的 TraceID 数组
-    std::array<uint8_t, 32> traceId = {};
+    std::array<uint64_t, 4> traceId = {};
     for (size_t i = 0; i < traceId.size(); ++i) {
-        traceId[i] = static_cast<uint8_t>(i);
+        traceId[i] = static_cast<uint64_t>(i);
     }
 
     // 转换为字符串
-    std::string hexString = FromTraceId(traceId);
+    std::string hexString = FromRandom64ID<4>(traceId);
 
     // 验证转换结果
     std::string expected;
     for (size_t i = 0; i < traceId.size(); ++i) {
-        char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", traceId[i]);
+        char buf[17];
+        snprintf(buf, sizeof(buf), "%016x", traceId[i]);
         expected += buf;
     }
     APSARA_TEST_EQUAL(hexString, expected);
@@ -154,19 +156,19 @@ void CommonUtilUnittest::TestTraceIDConversion() {
 
 void CommonUtilUnittest::TestSpanIDConversion() {
     // 创建一个已知的 SpanID 数组
-    std::array<uint8_t, 16> spanId = {};
+    std::array<uint64_t, 2> spanId = {};
     for (size_t i = 0; i < spanId.size(); ++i) {
-        spanId[i] = static_cast<uint8_t>(i);
+        spanId[i] = static_cast<uint64_t>(i);
     }
 
     // 转换为字符串
-    std::string hexString = FromSpanId(spanId);
+    std::string hexString = FromRandom64ID<2>(spanId);
 
     // 验证转换结果
     std::string expected;
     for (size_t i = 0; i < spanId.size(); ++i) {
-        char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", spanId[i]);
+        char buf[17];
+        snprintf(buf, sizeof(buf), "%016x", spanId[i]);
         expected += buf;
     }
     APSARA_TEST_EQUAL(hexString, expected);
@@ -287,6 +289,37 @@ void CommonUtilUnittest::TestMultipleCycles() {
     }
 }
 
+void CommonUtilUnittest::TraceIDBenchmark() {
+    auto tid = GenerateTraceID();
+    auto str = FromRandom64ID<4>(tid);
+    LOG_INFO(sLogger, ("origin traceID", str));
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000; i++) {
+        GenerateTraceID();
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[GenerateTraceID] elapsed: " << elapsed.count() << " seconds" << std::endl;
+}
+
+void CommonUtilUnittest::FromTraceIDBenchmark() {
+    auto tid = GenerateTraceID();
+    auto str = FromRandom64ID<4>(tid);
+    std::vector<std::array<uint64_t, 4>> traceIDs;
+    for (int i = 0; i < 1000000; i++) {
+        traceIDs.push_back(GenerateTraceID());
+    }
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000; i++) {
+        FromRandom64ID(traceIDs[i]);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "[FromTraceID] elapsed: " << elapsed.count() << " seconds" << std::endl;
+}
+
 // for trace id util
 UNIT_TEST_CASE(CommonUtilUnittest, TestTraceIDGeneration);
 UNIT_TEST_CASE(CommonUtilUnittest, TestTraceIDFormat);
@@ -296,6 +329,9 @@ UNIT_TEST_CASE(CommonUtilUnittest, TestSpanIDFormat);
 UNIT_TEST_CASE(CommonUtilUnittest, TestSpanIDUniqueness);
 UNIT_TEST_CASE(CommonUtilUnittest, TestTraceIDConversion);
 UNIT_TEST_CASE(CommonUtilUnittest, TestSpanIDConversion);
+
+UNIT_TEST_CASE(CommonUtilUnittest, TraceIDBenchmark);
+UNIT_TEST_CASE(CommonUtilUnittest, FromTraceIDBenchmark);
 
 // for freq manager
 UNIT_TEST_CASE(CommonUtilUnittest, TestInitialState);

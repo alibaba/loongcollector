@@ -35,43 +35,25 @@ public:
     void TestRandFromSpanID();
     void TestSampleAll();
 
+    void TestRandFromSpanID64();
+    void TestSampleAll64();
+
 
 protected:
     void SetUp() override {}
     void TearDown() override {}
 
 private:
-    std::unique_ptr<HashRatioSampler> sampler_;
+    std::unique_ptr<HashRatioSampler> mSampler;
 };
 
-
-std::array<uint8_t, 16> GenerateSpanID() {
-    std::random_device rd;
-    std::mt19937_64 generator(rd());
-    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
-
-    auto result = std::array<uint8_t, 16>();
-    auto buf_size = result.size();
-
-    for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
-        uint64_t value = distribution(generator);
-
-        if (i + sizeof(uint64_t) <= buf_size) {
-            memcpy(&result[i], &value, sizeof(uint64_t));
-        } else {
-            memcpy(&result[i], &value, buf_size - i);
-        }
-    }
-    return result;
-}
-
 void SamplerUnittest::TestRandFromSpanID() {
-    sampler_ = std::make_unique<HashRatioSampler>(0.01);
+    mSampler = std::make_unique<HashRatioSampler>(0.01);
     int totalCount = 0;
     int sampledCount = 0;
     for (int i = 0; i < 1000000; i++) {
         auto id = GenerateSpanID();
-        bool result = sampler_->ShouldSample(id);
+        bool result = mSampler->ShouldSample(id);
         totalCount++;
         if (result) {
             sampledCount++;
@@ -84,16 +66,43 @@ void SamplerUnittest::TestRandFromSpanID() {
     APSARA_TEST_LE(realPortion, 0.011);
 }
 void SamplerUnittest::TestSampleAll() {
-    sampler_ = std::make_unique<HashRatioSampler>(1);
+    mSampler = std::make_unique<HashRatioSampler>(1);
     for (int i = 0; i < 1000000; i++) {
         auto id = GenerateSpanID();
-        APSARA_TEST_TRUE(sampler_->ShouldSample(id));
+        APSARA_TEST_TRUE(mSampler->ShouldSample(id));
     }
 }
 
+// void SamplerUnittest::TestRandFromSpanID64() {
+//     mSampler = std::make_unique<HashRatioSampler>(0.01);
+//     int totalCount = 0;
+//     int sampledCount = 0;
+//     for (int i = 0; i < 1000000; i++) {
+//         auto id = GenerateSpanID64();
+//         bool result = mSampler->ShouldSample64(id);
+//         totalCount++;
+//         if (result) {
+//             sampledCount++;
+//         }
+//     }
+//     double realPortion = double(sampledCount) / double(totalCount);
+//     ASSERT_GE(realPortion, 0.009);
+//     ASSERT_LE(realPortion, 0.011);
+//     APSARA_TEST_GE(realPortion, 0.009);
+//     APSARA_TEST_LE(realPortion, 0.011);
+// }
+// void SamplerUnittest::TestSampleAll64() {
+//     mSampler = std::make_unique<HashRatioSampler>(1);
+//     for (int i = 0; i < 1000000; i++) {
+//         auto id = GenerateSpanID64();
+//         APSARA_TEST_TRUE(mSampler->ShouldSample64(id));
+//     }
+// }
+
 UNIT_TEST_CASE(SamplerUnittest, TestRandFromSpanID);
 UNIT_TEST_CASE(SamplerUnittest, TestSampleAll);
-
+// UNIT_TEST_CASE(SamplerUnittest, TestRandFromSpanID64);
+// UNIT_TEST_CASE(SamplerUnittest, TestSampleAll64);
 
 } // namespace ebpf
 } // namespace logtail

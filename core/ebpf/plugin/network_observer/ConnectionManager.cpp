@@ -130,6 +130,7 @@ void ConnectionManager::Iterations(int count) {
             forceGenRecord = true;
             // push conn stats ...
             deleteQueue.push_back(it.first);
+            it.second->MarkConnDeleted();
             n++;
             continue;
         }

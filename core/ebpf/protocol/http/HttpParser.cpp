@@ -48,7 +48,7 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         std::string_view buf(dataEvent->msg + dataEvent->request_len, dataEvent->response_len);
         ParseState state = http::ParseResponse(&buf, record, true, false);
         if (state != ParseState::kSuccess) {
-            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
+            LOG_DEBUG(sLogger, ("[HTTPProtocolParser]: Parse HTTP response failed", int(state)));
             return {};
         }
     }
@@ -57,18 +57,15 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         std::string_view buf(dataEvent->msg, dataEvent->request_len);
         ParseState state = http::ParseRequest(&buf, record, false);
         if (state != ParseState::kSuccess) {
-            LOG_WARNING(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
+            LOG_DEBUG(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
             return {};
         }
     }
 
     if (record->ShouldSample()) {
         auto traceId = GenerateTraceID();
-        LOG_DEBUG(sLogger, ("spanId", FromSpanId(spanId))("traceId", FromTraceId(traceId)));
-        record->SetSpanId(FromSpanId(spanId));
-        record->SetTraceId(FromTraceId(traceId));
-    } else {
-        LOG_DEBUG(sLogger, ("sampler", "reject"));
+        record->SetSpanId(FromRandom64ID<2>(spanId));
+        record->SetTraceId(FromRandom64ID<4>(traceId));
     }
 
     return {record};

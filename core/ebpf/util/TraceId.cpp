@@ -16,87 +16,32 @@
 
 #include <cstring>
 
-#include <array>
 #include <iomanip>
-#include <memory>
 #include <random>
-#include <sstream>
-
-#include "spdlog/spdlog.h"
 
 namespace logtail {
 namespace ebpf {
 
-std::string BytesToHexString(const uint8_t* bytes, size_t length) {
-    std::string result;
-    result.reserve(length * 2);
-    for (size_t i = 0; i < length; ++i) {
-        fmt::format_to(std::back_inserter(result), "{:02x}", bytes[i]);
-    }
-    return result;
-}
-
-char randHexChar() {
+template <size_t N>
+void GenerateRand64(std::array<uint64_t, N>& result) {
     thread_local static std::random_device rd;
-    thread_local static std::mt19937 generator(rd());
-    thread_local static std::uniform_int_distribution<int> distribution(0, 15);
-    static const char hexChars[] = "0123456789abcdef";
-    return hexChars[distribution(generator)];
+    thread_local static std::mt19937_64 generator(rd());
+    thread_local static std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
+
+    for (size_t i = 0; i < N; i++) {
+        result[i] = distribution(generator);
+    }
 }
 
-std::string RandHexStr(int len) {
-    std::string res(len, '0'); // Initialize string with '0' of length 'len'
-    for (int i = 0; i < len; ++i) { // Corrected loop condition
-        res[i] = randHexChar();
-    }
-    return res;
-}
-
-std::array<uint8_t, 32> GenerateTraceID() {
-    std::random_device rd;
-    std::mt19937_64 generator(rd());
-    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
-
-    auto result = std::array<uint8_t, 32>();
-    auto buf_size = result.size();
-
-    for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
-        uint64_t value = distribution(generator);
-
-        if (i + sizeof(uint64_t) <= buf_size) {
-            memcpy(&result[i], &value, sizeof(uint64_t));
-        } else {
-            memcpy(&result[i], &value, buf_size - i);
-        }
-    }
+std::array<uint64_t, 4> GenerateTraceID() {
+    std::array<uint64_t, 4> result;
+    GenerateRand64<4>(result);
     return result;
 }
 
-std::string FromSpanId(const std::array<uint8_t, 16>& spanId) {
-    return BytesToHexString(spanId.data(), spanId.size());
-}
-
-std::string FromTraceId(const std::array<uint8_t, 32>& traceId) {
-    return BytesToHexString(traceId.data(), traceId.size());
-}
-
-std::array<uint8_t, 16> GenerateSpanID() {
-    std::random_device rd;
-    std::mt19937_64 generator(rd());
-    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
-
-    auto result = std::array<uint8_t, 16>();
-    auto buf_size = result.size();
-
-    for (size_t i = 0; i < buf_size; i += sizeof(uint64_t)) {
-        uint64_t value = distribution(generator);
-
-        if (i + sizeof(uint64_t) <= buf_size) {
-            memcpy(&result[i], &value, sizeof(uint64_t));
-        } else {
-            memcpy(&result[i], &value, buf_size - i);
-        }
-    }
+std::array<uint64_t, 2> GenerateSpanID() {
+    std::array<uint64_t, 2> result;
+    GenerateRand64<2>(result);
     return result;
 }
 

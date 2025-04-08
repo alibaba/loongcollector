@@ -16,17 +16,24 @@
 
 #include <array>
 #include <memory>
-#include <random>
+
+#include "spdlog/spdlog.h"
 
 namespace logtail {
 namespace ebpf {
 
-std::array<uint8_t, 32> GenerateTraceID();
-std::string FromTraceId(const std::array<uint8_t, 32>&);
+template <size_t N>
+std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
+    std::string result;
+    result.reserve(N << 4);
+    for (size_t i = 0; i < N; i++) {
+        fmt::format_to(std::back_inserter(result), "{:016x}", id[i]);
+    }
+    return result;
+}
 
-std::array<uint8_t, 16> GenerateSpanID();
-std::string FromSpanId(const std::array<uint8_t, 16>&);
-
+std::array<uint64_t, 4> GenerateTraceID();
+std::array<uint64_t, 2> GenerateSpanID();
 
 } // namespace ebpf
 } // namespace logtail

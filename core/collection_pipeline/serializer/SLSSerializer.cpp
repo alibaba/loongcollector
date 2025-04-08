@@ -120,19 +120,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<MetricEvent>();
-                if (SHOULD_LOG_DEBUG(sLogger)) {
-                    for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                        LOG_DEBUG(
-                            sLogger,
-                            ("event tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
-                    }
-                    for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
-                        LOG_DEBUG(
-                            sLogger,
-                            ("group tags for metricname", e.GetName().data())(tag->first.data(), tag->second.data()));
-                    }
-                }
-
                 if (e.GetTimestamp() < 1e9) {
                     LOG_WARNING(sLogger,
                                 ("metric event timestamp is less than 1e9", "discard event")(

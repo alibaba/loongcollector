@@ -26,7 +26,8 @@ namespace ebpf {
 
 class Sampler {
 public:
-    [[nodiscard]] virtual bool ShouldSample(const std::array<uint8_t, 16>&) const = 0;
+    [[nodiscard]] virtual bool ShouldSample(const std::array<uint64_t, 2>& traceID) const = 0;
+    // [[nodiscard]] virtual bool ShouldSample64(const std::array<uint64_t, 2>& traceID) const = 0;
 
     virtual ~Sampler() = default;
 };
@@ -36,7 +37,8 @@ protected:
     RatioSampler(double fraction, uint64_t thresHold);
 
 public:
-    [[nodiscard]] bool ShouldSample(const std::array<uint8_t, 16>& traceID) const override;
+    [[nodiscard]] bool ShouldSample(const std::array<uint64_t, 2>& traceID) const override;
+    // [[nodiscard]] virtual bool ShouldSample64(const std::array<uint64_t, 2>& traceID) const override;
 
 private:
     double mFraction;

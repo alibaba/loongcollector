@@ -1293,6 +1293,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     NetworkObserveConfig config;
     config.mCustomCtx = (void*)this;
     config.mStatsHandler = [](void* custom_data, struct conn_stats_event_t* event) {
+        if (!event) {
+            LOG_ERROR(sLogger, ("event is null", ""));
+            return;
+        }
         auto mgr = static_cast<NetworkObserverManager*>(custom_data);
         if (mgr) {
             mgr->mRecvConnStatEventsTotal.fetch_add(1);
@@ -1301,6 +1305,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     };
 
     config.mDataHandler = [](void* custom_data, struct conn_data_event_t* event) {
+        if (!event) {
+            LOG_ERROR(sLogger, ("event is null", ""));
+            return;
+        }
         auto mgr = static_cast<NetworkObserverManager*>(custom_data);
         if (mgr == nullptr) {
             LOG_ERROR(sLogger, ("assert network observer handler failed", ""));
@@ -1318,6 +1326,10 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     };
 
     config.mCtrlHandler = [](void* custom_data, struct conn_ctrl_event_t* event) {
+        if (!event) {
+            LOG_ERROR(sLogger, ("event is null", ""));
+            return;
+        }
         auto mgr = static_cast<NetworkObserverManager*>(custom_data);
         if (!mgr) {
             LOG_ERROR(sLogger, ("assert network observer handler failed", ""));
@@ -1475,6 +1487,9 @@ void NetworkObserverManager::HandleRollback(const std::shared_ptr<AbstractRecord
 }
 
 void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>& record) {
+    if (!record) {
+        return;
+    }
     bool isDrop;
     switch (record->GetRecordType()) {
         case RecordType::APP_RECORD: {
@@ -1483,10 +1498,13 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                 // should not happen
                 return;
             }
-            // try attach again, for sake of connection is released in connection manager ...
-            appRecord->GetConnection()->TryAttachPeerMeta();
-            appRecord->GetConnection()->TryAttachSelfMeta();
+
             if (!appRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
+                if (appRecord->GetConnection()->IsConnDeleted()) {
+                    // try attach again, for sake of connection is released in connection manager ...
+                    appRecord->GetConnection()->TryAttachPeerMeta();
+                    appRecord->GetConnection()->TryAttachSelfMeta();
+                }
                 // rollback
                 HandleRollback(record, isDrop);
                 if (isDrop) {
@@ -1496,6 +1514,7 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                 }
                 return;
             }
+
             ADD_COUNTER(mAppMetaAttachSuccessTotal, 1);
 
             // handle record

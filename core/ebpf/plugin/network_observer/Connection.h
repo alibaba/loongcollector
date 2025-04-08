@@ -56,10 +56,7 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
-    const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() {
-        ReadLock lock(mAttrLock);
-        return mTags;
-    }
+    const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
     const ConnId GetConnId() const { return mConnId; };
 
@@ -83,12 +80,10 @@ public:
     inline bool IsMetaAttachReadyForAppRecord() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
         return (flags & sFlagAppRecordAttachReady) == sFlagAppRecordAttachReady;
-        // return IsMetaAttachReadyForNetRecord() && mProtocolAttached;
     }
     inline bool IsMetaAttachReadyForNetRecord() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
         return (flags & sFlagNetRecordAttachReady) == sFlagNetRecordAttachReady;
-        // return mNetMetaAttached && mK8sMetaAttached && mK8sPeerMetaAttached;
     }
 
     inline bool IsL7MetaAttachReady() {
@@ -116,9 +111,13 @@ public:
         return flags & sFlagConnStatsEventReceived;
     }
 
+    inline bool IsConnDeleted() {
+        Flag flags = mMetaFlags.load(std::memory_order_acquire);
+        return flags & sFlagConnDeleted;
+    }
+
     std::string DumpConnection() {
         std::string res;
-        ReadLock lock(mAttrLock);
         for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
             res += std::string(mTags[i]);
             res += ",";
@@ -136,25 +135,16 @@ public:
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
 
-    const StringView& GetContainerId() const {
-        ReadLock lock(mAttrLock);
-        return mTags.Get<kContainerId>();
-    }
+    const StringView& GetContainerId() const { return mTags.Get<kContainerId>(); }
 
-    const StringView& GetRemoteIp() const {
-        ReadLock lock(mAttrLock);
-        return mTags.Get<kRemoteIp>();
-    }
+    const StringView& GetRemoteIp() const { return mTags.Get<kRemoteIp>(); }
 
-    const StringView& GetSourceIp() const {
-        ReadLock lock(mAttrLock);
-        return mTags.Get<kIp>();
-    }
+    const StringView& GetSourceIp() const { return mTags.Get<kIp>(); }
 
     bool IsLocalhost() const;
 
     void TryAttachSelfMeta(bool enable = true);
-    void TryAttachPeerMeta(bool enable = true);
+    void TryAttachPeerMeta(bool enable = true, int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
     void UpdateRole(enum support_role_e role);
 
@@ -162,21 +152,19 @@ public:
 
     bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& record);
 
-    support_role_e GetRole() const {
-        ReadLock lock(mProtocolAndRoleLock);
-        return mRole;
-    }
+    support_role_e GetRole() const { return mRole; }
 
     unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
 
     void MarkConnStatsEventReceived() { mMetaFlags.fetch_or(sFlagConnStatsEventReceived, std::memory_order_release); }
+
+    void MarkConnDeleted() { mMetaFlags.fetch_or(sFlagConnDeleted, std::memory_order_release); }
 
 private:
     void UpdateNetMetaAttr(struct conn_stats_event_t* event);
     void TryUpdateProtocolAttr();
     // peer pod meta
     void UpdatePeerPodMetaForExternal();
-    void UpdatePeerPodMetaForExternalInner();
     void UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void UpdatePeerPodMetaForLocalhost();
 
@@ -192,7 +180,7 @@ private:
     static constexpr Flag sFlagPeerMetaAttached = 0b0100; // Flags[2]
     static constexpr Flag sFlagL7MetaAttached = 0b1000; // Flags[3]
     static constexpr Flag sFlagConnStatsEventReceived = 0b10000; // Flags[4]
-    // static constexpr Flag sFlagDataEventReceived = 0b100000; // Flags[5]
+    static constexpr Flag sFlagConnDeleted = 0b100000; // Flags[5]
 
     static constexpr Flag sFlagNetRecordAttachReady
         = (sFlagL4MetaAttached | sFlagSelfMetaAttached | sFlagPeerMetaAttached);
@@ -203,10 +191,7 @@ private:
     void MarkL4MetaAttached() { mMetaFlags.fetch_or(sFlagL4MetaAttached, std::memory_order_release); }
     void MarkL7MetaAttached() { mMetaFlags.fetch_or(sFlagL7MetaAttached, std::memory_order_release); }
 
-    support_proto_e GetProtocol() const {
-        ReadLock lock(mProtocolAndRoleLock);
-        return mProtocol;
-    }
+    support_proto_e GetProtocol() const { return mProtocol; }
 
     void MarkClose() {
         this->mIsClose = true;
@@ -216,15 +201,12 @@ private:
     void RecordLastUpdateTs(uint64_t ts) { mLastUpdateTs = ts; }
 
     ConnId mConnId;
-    mutable ReadWriteLock mProtocolAndRoleLock;
+
     support_proto_e mProtocol = support_proto_e::ProtoUnknown;
-    // accessed by at least 2 threads ...
     support_role_e mRole = support_role_e::IsUnknown;
 
     std::atomic<Flag> mMetaFlags = 0;
 
-    mutable ReadWriteLock mAttrLock;
-    // accessed by multiple threads ...
     StaticDataRow<&kConnTrackerTable> mTags;
 
     std::atomic_int mEpoch = 4;
