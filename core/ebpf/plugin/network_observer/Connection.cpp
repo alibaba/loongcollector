@@ -215,6 +215,8 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
     mTags.Set<kIp>(sip);
     mTags.Set<kRemoteIp>(dip);
 
+    MarkL4MetaAttached();
+
 
     // for peer meta
     LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
@@ -223,8 +225,6 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
     // for self meta
     LOG_DEBUG(sLogger, ("try attach self meta", GetContainerId()));
     TryAttachSelfMeta();
-
-    MarkL4MetaAttached();
 }
 
 void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {

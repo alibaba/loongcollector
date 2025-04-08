@@ -79,34 +79,4 @@ const string LOG_RESERVED_KEY_TOPIC = "__topic__";
 const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
 const string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
 
-////////////////////////// METRIC ////////////////////////
-const string DEFAULT_METRIC_TAG_NAMESPACE = ebpf::kNamespace.MetricKey().to_string();
-const string DEFAULT_METRIC_TAG_POD_NAME = ebpf::kPodName.MetricKey().to_string();
-const string DEFAULT_METRIC_TAG_POD_UID = ebpf::kPodUid.MetricKey().to_string();
-const string DEFAULT_METRIC_TAG_CONTAINER_NAME = ebpf::kContainerName.MetricKey().to_string();
-const string DEFAULT_METRIC_TAG_CONTAINER_IP = ebpf::kContainerIp.MetricKey().to_string();
-const string DEFAULT_METRIC_TAG_IMAGE_NAME = ebpf::kImageName.MetricKey().to_string();
-
-////////////////////////// TRACE ////////////////////////
-const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE = ebpf::kNamespace.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE = ebpf::kPeerNamespace.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME = ebpf::kPodName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME = ebpf::kPeerPodName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_POD_UID = ebpf::kPodUid.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_POD_IP = ebpf::kPodIp.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_IP = ebpf::kPeerPodIp.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND = ebpf::kWorkloadKind.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND = ebpf::kPeerWorkloadKind.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME = ebpf::kWorkloadName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME = ebpf::kPeerWorkloadName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_SERVICE_NAME = ebpf::kServiceName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_K8S_PEER_SERVICE_NAME = ebpf::kPeerServiceName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_HOST_NAME = ebpf::kHostName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_HOST_IP = ebpf::kHostIp.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_PROCESS_PID = ebpf::kProcessId.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_CONTAINER_NAME = ebpf::kContainerName.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_CONTAINER_ID = ebpf::kContainerId.SpanKey().to_string();
-const std::string DEFAULT_TRACE_TAG_IMAGE_NAME = ebpf::kImageName.SpanKey().to_string();
-
-
 } // namespace logtail

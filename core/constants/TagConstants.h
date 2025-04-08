@@ -68,34 +68,4 @@ extern const std::string LOG_RESERVED_KEY_TOPIC;
 extern const std::string LOG_RESERVED_KEY_MACHINE_UUID;
 extern const std::string LOG_RESERVED_KEY_PACKAGE_ID;
 
-////////////////////////// METRIC ////////////////////////
-extern const std::string DEFAULT_METRIC_TAG_NAMESPACE;
-extern const std::string DEFAULT_METRIC_TAG_POD_NAME;
-extern const std::string DEFAULT_METRIC_TAG_POD_UID;
-extern const std::string DEFAULT_METRIC_TAG_CONTAINER_NAME;
-extern const std::string DEFAULT_METRIC_TAG_CONTAINER_IP;
-extern const std::string DEFAULT_METRIC_TAG_IMAGE_NAME;
-
-////////////////////////// TRACE ////////////////////////
-extern const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE;
-extern const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME;
-extern const std::string DEFAULT_TRACE_TAG_K8S_POD_UID;
-extern const std::string DEFAULT_TRACE_TAG_K8S_POD_IP;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_IP;
-extern const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND;
-extern const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME;
-extern const std::string DEFAULT_TRACE_TAG_K8S_SERVICE_NAME;
-extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_SERVICE_NAME;
-extern const std::string DEFAULT_TRACE_TAG_HOST_NAME;
-extern const std::string DEFAULT_TRACE_TAG_HOST_IP;
-extern const std::string DEFAULT_TRACE_TAG_PROCESS_PID;
-extern const std::string DEFAULT_TRACE_TAG_CONTAINER_NAME;
-extern const std::string DEFAULT_TRACE_TAG_CONTAINER_ID;
-extern const std::string DEFAULT_TRACE_TAG_IMAGE_NAME;
-
-
 } // namespace logtail
