@@ -17,6 +17,7 @@
 # There are 3 kinds of test, which are e2e, core and performance.
 TYPE=$1
 TEST_SCOPE=$2
+AGENT=$3
 
 ROOT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 TESTDIR=$ROOT_DIR/test
@@ -25,7 +26,12 @@ cd "$TESTDIR"
 if [ "$TEST_SCOPE" = "core" ]; then
   go test -v -timeout 30m -run ^TestE2EOnDockerComposeCore$ github.com/alibaba/ilogtail/test/$TYPE
 elif [ "$TEST_SCOPE" = "performance" ]; then
-  go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+  if [ -n "$AGENT" ]; then
+    export AGENT="$AGENT"
+    go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+  else
+    go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+  fi
 else
   go test -v -timeout 30m -run ^TestE2EOnDockerCompose$ github.com/alibaba/ilogtail/test/$TYPE
 fi

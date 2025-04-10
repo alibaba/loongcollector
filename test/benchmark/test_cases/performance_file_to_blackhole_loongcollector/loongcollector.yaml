@@ -2,11 +2,11 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths: 
-      - /home/ilogtail/*.log
+      - /home/loongcollector/*.log
 processors:
   - Type: processor_parse_regex_native
     SourceKey: content
-    Regex: (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) (.*) (.*) \[(\d{2}\/\w{3}\/\d{4}:\d{2}:\d{2}:\d{2} \+\d{4})\] \"(\w+) (.*?) HTTP\/(\d+\.\d+)\" (\d{3}) (\d+) \"(.*?)\" \"(.*?)\"
+    Regex: ^([^ ]*) ([^ ]*) ([^ ]*) \[([^\]]*)\] "(\S+) ([^\"]*) (\S*)" ([^ ]*) ([^ ]*) "([^\"]*)" "([^\"]*)"
     Keys:
       - ip
       - ident
@@ -25,8 +25,4 @@ processors:
     FilterRegex:
       - ^no-agent$
 flushers:
-  - Type: flusher_sls
-    Region: cn-hangzhou
-    Endpoint: cn-hangzhou.log.aliyuncs.com
-    Project: test_project
-    Logstore: test_logstore
+  - Type: flusher_blackhole

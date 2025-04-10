@@ -16,7 +16,9 @@ package dockercompose
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	dockertypes "github.com/docker/docker/api/types"
@@ -31,9 +33,9 @@ import (
 
 const (
 	benchmarkIdentifier = "benchmark"
-	cadvisorTemplate    = `version: '3.8'
+	cadvisorTemplate    = `
 services:
-  cadvisor:
+  cadvisor-%s:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     volumes:
       - /:/rootfs:ro
@@ -106,7 +108,7 @@ func (c *ComposeBenchmarkBooter) Stop() error {
 	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
 	if execError.Error != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
+			"err", execError.Error.Error())
 		return execError.Error
 	}
 	_ = os.Remove(config.CaseHome + finalFileName)
@@ -155,7 +157,7 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 			return err
 		}
 	}
-	cfg := c.getAdvisorConfig()
+	cfg := c.getAdvisorConfig(filepath.Base(filepath.Dir(config.CaseHome)))
 	services := cfg["services"].(map[string]interface{})
 	// merge docker compose file.
 	if len(bytes) > 0 {
@@ -176,11 +178,11 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 }
 
 // getLogtailpluginConfig find the docker compose configuration of the ilogtail.
-func (c *ComposeBenchmarkBooter) getAdvisorConfig() map[string]interface{} {
+func (c *ComposeBenchmarkBooter) getAdvisorConfig(name string) map[string]interface{} {
 	cfg := make(map[string]interface{})
 	f, _ := os.Create(config.CoverageFile)
 	_ = f.Close()
-	if err := yaml.Unmarshal([]byte(cadvisorTemplate), &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(fmt.Sprintf(cadvisorTemplate, name)), &cfg); err != nil {
 		panic(err)
 	}
 	bytes, _ := yaml.Marshal(cfg)
