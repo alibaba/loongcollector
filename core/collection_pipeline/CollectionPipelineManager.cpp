@@ -24,6 +24,7 @@
 #include "common/timer/Timer.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
+#include "file_server/StaticFileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -85,7 +86,9 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+        // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one should
+        // be considered as deleted
+        iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = p;
@@ -164,6 +167,12 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
         res.push_back(item.first);
     }
     return res;
+}
+
+void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
+    for (auto& item : mInputRunners) {
+        item->ClearUnusedCheckpoints();
+    }
 }
 
 void CollectionPipelineManager::StopAllPipelines() {

@@ -32,7 +32,6 @@
 #include "config/CollectionConfig.h"
 #include "config/ConfigUtil.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
-#include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 
@@ -145,7 +144,6 @@ void CommonConfigProvider::LoadConfigFile() {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
             }
             info.status = ConfigFeedbackStatus::APPLYING;
-            info.detail = detail.toStyledString();
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mContinuousPipelineConfigInfoMap[info.name] = info;
@@ -163,7 +161,6 @@ void CommonConfigProvider::LoadConfigFile() {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
             }
             info.status = ConfigFeedbackStatus::APPLYING;
-            info.detail = detail.toStyledString();
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mInstanceConfigInfoMap[info.name] = info;
@@ -428,18 +425,14 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::FAILED,
-                                                                             .detail = config.detail()};
+                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{
+                    .name = config.name(), .version = config.version(), .status = ConfigFeedbackStatus::FAILED};
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::APPLYING,
-                                                                             .detail = config.detail()};
+                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{
+                    .name = config.name(), .version = config.version(), .status = ConfigFeedbackStatus::APPLYING};
             }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
@@ -472,18 +465,14 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::FAILED,
-                                                                   .detail = config.detail()};
+                mInstanceConfigInfoMap[config.name()] = ConfigInfo{
+                    .name = config.name(), .version = config.version(), .status = ConfigFeedbackStatus::FAILED};
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::APPLYING,
-                                                                   .detail = config.detail()};
+                mInstanceConfigInfoMap[config.name()] = ConfigInfo{
+                    .name = config.name(), .version = config.version(), .status = ConfigFeedbackStatus::APPLYING};
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
@@ -564,17 +553,15 @@ void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name,
     LOG_DEBUG(sLogger,
               ("CommonConfigProvider", "FeedbackInstanceConfigStatus")("name", name)("status", ToStringView(status)));
 }
-void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& type,
-                                                               const std::string& name,
-                                                               ConfigFeedbackStatus status) {
+void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
     lock_guard<mutex> lockInfoMap(mInfoMapMux);
-    auto info = mOnetimePipelineConfigInfoMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
+    auto info = mOnetimePipelineConfigInfoMap.find(name);
     if (info != mOnetimePipelineConfigInfoMap.end()) {
         info->second.status = status;
     }
-    LOG_DEBUG(sLogger,
-              ("CommonConfigProvider",
-               "FeedbackOnetimePipelineConfigStatus")("type", type)("name", name)("status", ToStringView(status)));
+    LOG_DEBUG(
+        sLogger,
+        ("CommonConfigProvider", "FeedbackOnetimePipelineConfigStatus")("name", name)("status", ToStringView(status)));
 }
 
 } // namespace logtail
