@@ -87,7 +87,7 @@ func (m *Statistic) UpdateStatistic(stat *v1.ContainerStats) {
 	m.cpu.Add(cpuUsageRateTotal)
 	m.mem.Add(float64(stat.Memory.Usage) / 1024 / 1024)
 	m.lastStat = stat
-	logger.Info(context.Background(), "CPU Usage Rate(%):", cpuUsageRateTotal, "Memory Usage(MB):", float64(stat.Memory.Usage)/1024/1024)
+	logger.Info(context.Background(), "CPU Usage Rate(%)", cpuUsageRateTotal, "Memory Usage(MB)", float64(stat.Memory.Usage)/1024/1024)
 }
 
 func (m *Statistic) ClearStatistic() {

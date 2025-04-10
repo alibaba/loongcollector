@@ -83,7 +83,7 @@ jobs:
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          make benchmark DOCKER_REPOSITORY=ghcr.io/$REPO_OWNER/loongcollector DOCKER_PUSH=true VERSION=main-latest
+          make benchmark DOCKER_REPOSITORY=ghcr.io/$REPO_OWNER/loongcollector DOCKER_PUSH=true VERSION=edge
 
   Benchmark:
     if: github.event.pull_request.merged == true
@@ -146,8 +146,8 @@ jobs:
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker pull ghcr.io/$REPO_OWNER/loongcollector:main-latest
-          docker tag ghcr.io/$REPO_OWNER/loongcollector:main-latest aliyun/loongcollector:0.0.1
+          docker pull ghcr.io/$REPO_OWNER/loongcollector:edge
+          docker tag ghcr.io/$REPO_OWNER/loongcollector:edge aliyun/loongcollector:0.0.1
 
       - name: Run benchmark for agent ${{ matrix.test-agent }}
         run: |
