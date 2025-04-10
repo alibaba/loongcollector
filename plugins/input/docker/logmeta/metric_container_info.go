@@ -173,11 +173,11 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	var err error
 	idf.IncludeEnv, idf.IncludeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)
 	if err != nil {
-		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), util.InputInitAlarm, "init include env regex error", err)
 	}
 	idf.ExcludeEnv, idf.ExcludeEnvRegex, err = helper.SplitRegexFromMap(idf.ExcludeEnv)
 	if err != nil {
-		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude env regex error", err)
 	}
 	if idf.IncludeLabel != nil {
 		for k, v := range idf.IncludeContainerLabel {
@@ -195,11 +195,11 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	}
 	idf.IncludeLabel, idf.IncludeLabelRegex, err = helper.SplitRegexFromMap(idf.IncludeLabel)
 	if err != nil {
-		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), util.InputInitAlarm, "init include label regex error", err)
 	}
 	idf.ExcludeLabel, idf.ExcludeLabelRegex, err = helper.SplitRegexFromMap(idf.ExcludeLabel)
 	if err != nil {
-		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), util.InputInitAlarm, "init exclude label regex error", err)
 	}
 	idf.K8sFilter, err = helper.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
 
@@ -245,7 +245,7 @@ func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, c
 		return
 	}
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFile, "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), util.DockerFileMappingAlarm, "cmdType", PluginDockerUpdateFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -257,7 +257,7 @@ func (idf *InputDockerFile) deleteMappingFromLogtail(id string) {
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerDeleteFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerDeleteFile, "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), util.DockerFileMappingAlarm, "cmdType", PluginDockerDeleteFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -269,7 +269,7 @@ func (idf *InputDockerFile) notifyStopToLogtail(id string) {
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerStopFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerStopFile, "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), util.DockerFileMappingAlarm, "cmdType", PluginDockerStopFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -279,7 +279,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 	cmdBuf, _ := json.Marshal(allCmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFileAll, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFileAll, "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), util.DockerFileMappingAlarm, "cmdType", PluginDockerUpdateFileAll, "cmd", cmdBuf, "error", err)
 	}
 }
 

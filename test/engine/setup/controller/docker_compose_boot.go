@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
@@ -47,7 +48,7 @@ func (c *BootController) Start(ctx context.Context) error {
 func (c *BootController) Clean() {
 	logger.Info(context.Background(), "boot controller is cleaning....")
 	if err := dockercompose.ShutDown(); err != nil {
-		logger.Error(context.Background(), "BOOT_STOP_ALARM", "err", err)
+		logger.Error(context.Background(), util.BootStopAlarm, "err", err)
 	}
 	_ = os.RemoveAll(config.FlusherFile)
 	_ = os.RemoveAll(config.ConfigDir)

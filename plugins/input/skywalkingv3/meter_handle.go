@@ -22,6 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
@@ -43,7 +44,7 @@ func (m *MeterHandler) Collect(srv agent.MeterReportService_CollectServer) error
 			if err == io.EOF {
 				return srv.SendAndClose(&v3.Commands{})
 			}
-			logger.Error(m.context.GetRuntimeContext(), "SKYWALKING_METER_GRPC_ERROR", "error", err)
+			logger.Error(m.context.GetRuntimeContext(), util.InputCollectAlarm, "skywalking meter grpc error", err)
 			return err
 		}
 		// logger.Info("service", service, "serviceInstance", serviceInstance, "meter", meterData.String())

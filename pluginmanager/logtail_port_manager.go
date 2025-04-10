@@ -26,6 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 func getExcludePorts() []int {
@@ -86,7 +87,7 @@ func getListenPortsFromFile(pid int, protocol string) ([]int, error) {
 		// local_address is ip:port
 		port, err := strconv.ParseUint((strings.Split(fields[1], ":")[1]), 16, 32)
 		if err != nil {
-			logger.Error(context.Background(), "parse port fail", err.Error())
+			logger.Error(context.Background(), util.PortManagerAlarm, "parse port fail", err.Error())
 			continue
 		}
 		ports = append(ports, int(port))
@@ -103,7 +104,7 @@ func getLogtailLitsenPorts() ([]int, []int) {
 	// get tcp ports
 	tcpPorts, err := getListenPortsFromFile(pid, "tcp")
 	if err != nil {
-		logger.Error(context.Background(), "get tcp port fail", err.Error())
+		logger.Error(context.Background(), util.PortManagerAlarm, "get tcp port fail", err.Error())
 	}
 	for _, port := range tcpPorts {
 		portsTCPMap[port]++
@@ -111,7 +112,7 @@ func getLogtailLitsenPorts() ([]int, []int) {
 	// get tcp6 ports
 	tcp6Ports, err := getListenPortsFromFile(pid, "tcp6")
 	if err != nil {
-		logger.Error(context.Background(), "get tcp6 port fail", err.Error())
+		logger.Error(context.Background(), util.PortManagerAlarm, "get tcp6 port fail", err.Error())
 	}
 	for _, port := range tcp6Ports {
 		portsTCPMap[port]++
@@ -119,7 +120,7 @@ func getLogtailLitsenPorts() ([]int, []int) {
 	// get udp ports
 	udpPorts, err := getListenPortsFromFile(pid, "udp")
 	if err != nil {
-		logger.Error(context.Background(), "get udp port fail", err.Error())
+		logger.Error(context.Background(), util.PortManagerAlarm, "get udp port fail", err.Error())
 	}
 	for _, port := range udpPorts {
 		portsUDPMap[port]++
@@ -127,7 +128,7 @@ func getLogtailLitsenPorts() ([]int, []int) {
 	// get udp6 ports
 	udp6Ports, err := getListenPortsFromFile(pid, "udp6")
 	if err != nil {
-		logger.Error(context.Background(), "get udp6 port fail", err.Error())
+		logger.Error(context.Background(), util.PortManagerAlarm, "get udp6 port fail", err.Error())
 	}
 	for _, port := range udp6Ports {
 		portsUDPMap[port]++
@@ -162,13 +163,13 @@ func FindPort(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusInternalServerError)
 		_, WriteErr := res.Write([]byte(err.Error()))
 		if WriteErr != nil {
-			logger.Error(context.Background(), "write response err", WriteErr.Error())
+			logger.Error(context.Background(), util.PortManagerAlarm, "write response err", WriteErr.Error())
 		}
 		return
 	}
 	res.WriteHeader(http.StatusOK)
 	_, WriteErr := res.Write(jsonBytes)
 	if WriteErr != nil {
-		logger.Error(context.Background(), "write response err", WriteErr.Error())
+		logger.Error(context.Background(), util.PortManagerAlarm, "write response err", WriteErr.Error())
 	}
 }
