@@ -87,7 +87,7 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 }
 
 func (*FlusherStdout) Description() string {
-	return "stdout flusher for logtail"
+	return "stdout flusher for loongcollector"
 }
 
 // Flush the logGroup list to stdout or files.
@@ -229,8 +229,11 @@ func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *model
 			}
 			i++
 		}
+
 		if metric.GetTypedValue().Len() > 0 {
-			_, _ = writer.Write([]byte{','})
+			if values.Len() > 0 {
+				_, _ = writer.Write([]byte{','})
+			}
 			i = 0
 			for k, v := range metric.GetTypedValue().Iterator() {
 				writer.WriteObjectField(k)
@@ -239,6 +242,16 @@ func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *model
 					writer.WriteString(v.Value.(string))
 				case models.ValueTypeBoolean:
 					writer.WriteBool(v.Value.(bool))
+				case models.ValueTypeInteger:
+					if !p.handleIntegerTypeAssertion(writer, v.Value, false) {
+						continue
+					}
+				case models.ValueTypeUnsigned:
+					if !p.handleIntegerTypeAssertion(writer, v.Value, true) {
+						continue
+					}
+				default:
+					writer.WriteVal(v.Value)
 				}
 				if i < metric.GetTypedValue().Len()-1 {
 					_, _ = writer.Write([]byte{','})
@@ -307,4 +320,44 @@ func init() {
 			KeyValuePairs: true,
 		}
 	}
+}
+
+func (p *FlusherStdout) handleIntegerTypeAssertion(writer *jsoniter.Stream, value interface{}, unsigned bool) bool {
+	integerValue, ok := getInteger(value)
+	if !ok {
+		logger.Error(p.context.GetRuntimeContext(), "FLUSHER_TYPE_ASSERT_ALARM", "unsigned", unsigned, "value", value)
+		return false
+	}
+	if unsigned {
+		writer.WriteUint64(uint64(integerValue))
+	} else {
+		writer.WriteInt64(integerValue)
+	}
+	return true
+}
+
+func getInteger(v any) (int64, bool) {
+	switch v := v.(type) {
+	case int:
+		return int64(v), true
+	case int8:
+		return int64(v), true
+	case int16:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case uint:
+		return int64(v), true
+	case uint8:
+		return int64(v), true
+	case uint16:
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case uint64:
+		return int64(v), true
+	}
+	return 0, false
 }
