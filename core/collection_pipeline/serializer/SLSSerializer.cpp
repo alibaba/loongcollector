@@ -18,6 +18,7 @@
 
 #include "json/json.h"
 
+#include "Logger.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"

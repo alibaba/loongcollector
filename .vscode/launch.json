@@ -40,7 +40,7 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerPath": "/opt/rh/devtoolset-9/root/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -66,7 +66,7 @@
             "externalConsole": false,
             "coreDumpPath": "${workspaceFolder}/build",
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerPath": "/opt/rh/devtoolset-9/root/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

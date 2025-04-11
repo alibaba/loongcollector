@@ -15,6 +15,7 @@
 #include "ebpf/eBPFServer.h"
 
 #include <algorithm>
+#include <future>
 #include <map>
 #include <string>
 #include <vector>
@@ -24,10 +25,17 @@
 #include "common/Lock.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/http/AsynCurlRunner.h"
+#include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
+#include "metadata/K8sMetadata.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/network_observer/NetworkObserverManager.h"
+#include "plugin/network_security/NetworkSecurityManager.h"
+#include "plugin/process_security/ProcessSecurityManager.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -40,19 +48,19 @@ static const uint16_t KERNEL_VERSION_310 = 3010; // for centos7
 static const std::string KERNEL_NAME_CENTOS = "CentOS";
 static const uint16_t KERNEL_CENTOS_MIN_VERSION = 7006;
 
-bool EnvManager::IsSupportedEnv(nami::PluginType type) {
+bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
         LOG_ERROR(sLogger, ("env manager not inited ...", ""));
         return false;
     }
     bool status = false;
     switch (type) {
-        case nami::PluginType::NETWORK_OBSERVE:
+        case PluginType::NETWORK_OBSERVE:
             status = mArchSupport && (mBTFSupport || m310Support);
             break;
-        case nami::PluginType::FILE_SECURITY:
-        case nami::PluginType::NETWORK_SECURITY:
-        case nami::PluginType::PROCESS_SECURITY: {
+        case PluginType::FILE_SECURITY:
+        case PluginType::NETWORK_SECURITY:
+        case PluginType::PROCESS_SECURITY: {
             status = mArchSupport && mBTFSupport;
             break;
         }
@@ -132,7 +140,7 @@ void EnvManager::InitEnvInfo() {
     m310Support = false;
 }
 
-bool eBPFServer::IsSupportedEnv(nami::PluginType type) {
+bool eBPFServer::IsSupportedEnv(PluginType type) {
     return mEnvMgr.IsSupportedEnv(type);
 }
 
@@ -145,9 +153,34 @@ void eBPFServer::Init() {
         return;
     }
     mInited = true;
+    mRunning = true;
+
+    mHostIp = GetHostIp();
+    mHostName = GetHostName();
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    mHostPathPrefix = "/logtail_host";
+    LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+#else
+    // read host path prefix
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        mHostPathPrefix = STRING_FLAG(default_container_host_path);
+        LOG_INFO(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+    } else {
+        LOG_INFO(sLogger, ("running in host mode", "would not set host path prefix ..."));
+        mHostPathPrefix = "/";
+    }
+#endif
+    LOG_DEBUG(sLogger, ("begin to init timer", ""));
+    Timer::GetInstance()->Init();
+    AsynCurlRunner::GetInstance()->Init();
+    LOG_DEBUG(sLogger, ("begin to start poller", ""));
+    mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
+    LOG_DEBUG(sLogger, ("begin to start handler", ""));
+    mHandler = async(std::launch::async, &eBPFServer::HandlerEvents, this);
     // check env
 
-    mMonitorMgr = std::make_unique<eBPFSelfMonitorMgr>();
+    // mMonitorMgr = std::make_unique<eBPFSelfMonitorMgr>();
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
@@ -159,158 +192,158 @@ void eBPFServer::Init() {
     mStartPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL);
     mStopPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL);
     mSuspendPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL);
+    mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+    mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+    mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+    mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
 
-    mSourceManager = std::make_unique<SourceManager>();
     mSourceManager->Init();
+
+    mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager,
+                                                                 mHostName,
+                                                                 mHostPathPrefix,
+                                                                 mDataEventQueue,
+                                                                 mPollProcessEventsTotal,
+                                                                 mLossProcessEventsTotal,
+                                                                 mProcessCacheMissTotal,
+                                                                 mProcessCacheSize);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
-    mEventCB = std::make_unique<EventHandler>(nullptr, -1, 0);
-#ifdef __ENTERPRISE__
-    mMeterCB = std::make_unique<ArmsMeterHandler>(nullptr, -1, 0);
-    mSpanCB = std::make_unique<ArmsSpanHandler>(nullptr, -1, 0);
-#else
-    mMeterCB = std::make_unique<OtelMeterHandler>(nullptr, -1, 0);
-    mSpanCB = std::make_unique<OtelSpanHandler>(nullptr, -1, 0);
-#endif
-
-    mNetworkSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
-    mProcessSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
-    mFileSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
 }
 
 void eBPFServer::Stop() {
-    if (!mInited)
+    if (!mInited) {
         return;
+    }
     mInited = false;
+
+    mRunning = false;
+
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
-    // destroy source manager
-    mSourceManager.reset();
-    for (int i = 0; i < int(nami::PluginType::MAX); i++) {
-        UpdatePipelineName(static_cast<nami::PluginType>(i), "", "");
+    for (int i = 0; i < int(PluginType::MAX); i++) {
+        auto pipelineName = mLoadedPipeline[i];
+        if (pipelineName.size()) {
+            bool ret = DisablePlugin(pipelineName, static_cast<PluginType>(i));
+            LOG_INFO(sLogger,
+                     ("force stop plugin",
+                      magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", pipelineName)("ret", ret));
+        }
     }
 
-    // UpdateContext must after than StopPlugin
-    if (mEventCB)
-        mEventCB->UpdateContext(nullptr, -1, -1);
-    if (mMeterCB)
-        mMeterCB->UpdateContext(nullptr, -1, -1);
-    if (mSpanCB)
-        mSpanCB->UpdateContext(nullptr, -1, -1);
-    if (mNetworkSecureCB)
-        mNetworkSecureCB->UpdateContext(nullptr, -1, -1);
-    if (mProcessSecureCB)
-        mProcessSecureCB->UpdateContext(nullptr, -1, -1);
-    if (mFileSecureCB)
-        mFileSecureCB->UpdateContext(nullptr, -1, -1);
+    std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
+    std::future_status s2 = mHandler.wait_for(std::chrono::seconds(1));
+    if (mPoller.valid()) {
+        if (s1 == std::future_status::ready) {
+            LOG_DEBUG(sLogger, ("poller thread", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
+        }
+    }
+
+    if (mHandler.valid()) {
+        if (s2 == std::future_status::ready) {
+            LOG_DEBUG(sLogger, ("handler thread", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("handler thread", "forced to stopped"));
+        }
+    }
 }
 
+// maybe update or create
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
                                      uint32_t plugin_index,
-                                     nami::PluginType type,
+                                     PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
-                                     const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                                     const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                                      PluginMetricManagerPtr mgr) {
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
                     ("pipeline already loaded, plugin type",
-                     int(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+                     magic_enum::enum_name(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
+    }
+
+    if (prev_pipeline_name.size() && prev_pipeline_name == pipeline_name) {
+        LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
+        auto pluginMgr = GetPluginManager(type);
+        if (pluginMgr) {
+            int res = pluginMgr->Update(options);
+            LOG_WARNING(sLogger, ("update plugin for type", magic_enum::enum_name(type))("res", res));
+            if (res) {
+                return false;
+            }
+            res = pluginMgr->Resume(options);
+            if (res) {
+                return false;
+            }
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type))("res", res));
+            return true;
+        } else {
+            LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
+            return false;
+        }
     }
 
     UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
 
+    if (type != PluginType::NETWORK_OBSERVE) {
+        LOG_INFO(sLogger, ("hostname", mHostName)("mHostPathPrefix", mHostPathPrefix));
+        auto res = mProcessCacheManager->Init();
+        LOG_INFO(sLogger, ("ProcessCacheManager init ", res));
+    }
+
     // init self monitor
-    mMonitorMgr->Init(type, mgr, pipeline_name, ctx->GetProjectName());
+    // mMonitorMgr->Init(type, mgr, pipeline_name, ctx->GetProjectName());
 
     // step1: convert options to export type
     bool ret = false;
-    auto eBPFConfig = std::make_unique<nami::eBPFConfig>();
-    eBPFConfig->plugin_type_ = type;
-    eBPFConfig->stats_handler_ = [this](auto& stats) { return mMonitorMgr->HandleStatistic(stats); };
+    auto eBPFConfig = std::make_unique<PluginConfig>();
+    eBPFConfig->mPluginType = type;
     // call update function
     // step2: call init function
+    auto pluginMgr = GetPluginManager(type);
     switch (type) {
-        case nami::PluginType::PROCESS_SECURITY: {
-            nami::ProcessConfig pconfig;
-            pconfig.process_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-                return mProcessSecureCB->handle(events);
-            };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            pconfig.options_ = opts->mOptionList;
-            // UpdateContext must ahead of StartPlugin
-            mProcessSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            eBPFConfig->config_ = std::move(pconfig);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+        case PluginType::PROCESS_SECURITY: {
+            if (!pluginMgr) {
+                pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                UpdatePluginManager(type, pluginMgr);
+            }
             break;
         }
 
-        case nami::PluginType::NETWORK_OBSERVE: {
-            nami::NetworkObserveConfig nconfig;
-            nconfig.enable_cid_filter = false;
-            nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
-            if (opts->mEnableMetric) {
-                nconfig.enable_metric_ = true;
-                nconfig.measure_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchMeasure>>& events, auto ts) {
-                    return mMeterCB->handle(events, ts);
-                };
-                nconfig.enable_metric_ = true;
-                mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+        case PluginType::NETWORK_OBSERVE: {
+            if (!pluginMgr) {
+                pluginMgr = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                UpdatePluginManager(type, pluginMgr);
             }
-            if (opts->mEnableSpan) {
-                nconfig.enable_span_ = true;
-                nconfig.span_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchSpan>>& events) {
-                    return mSpanCB->handle(events);
-                };
-                nconfig.enable_span_ = true;
-                mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            }
-            if (opts->mEnableLog) {
-                nconfig.enable_event_ = true;
-                nconfig.event_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
-                    return mEventCB->handle(events);
-                };
-                nconfig.enable_event_ = true;
-                mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            }
-
-            eBPFConfig->config_ = std::move(nconfig);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
             break;
         }
 
-        case nami::PluginType::NETWORK_SECURITY: {
-            nami::NetworkSecurityConfig nconfig;
-            nconfig.network_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-                return mNetworkSecureCB->handle(events);
-            };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            nconfig.options_ = opts->mOptionList;
-            eBPFConfig->config_ = std::move(nconfig);
-            // UpdateContext must ahead of StartPlugin
-            mNetworkSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+        case PluginType::NETWORK_SECURITY: {
+            if (!pluginMgr) {
+                pluginMgr = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                UpdatePluginManager(type, pluginMgr);
+            }
             break;
         }
 
-        case nami::PluginType::FILE_SECURITY: {
-            nami::FileSecurityConfig fconfig;
-            fconfig.file_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
-                return mFileSecureCB->handle(events);
-            };
-            SecurityOptions* opts = std::get<SecurityOptions*>(options);
-            fconfig.options_ = opts->mOptionList;
-            eBPFConfig->config_ = std::move(fconfig);
-            // UpdateContext must ahead of StartPlugin
-            mFileSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+        case PluginType::FILE_SECURITY: {
+            if (!pluginMgr) {
+                pluginMgr = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                UpdatePluginManager(type, pluginMgr);
+            }
             break;
         }
         default:
             LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
             return false;
     }
+
+    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+    ret = (pluginMgr->Init(options) == 0);
 
     if (ret) {
         ADD_COUNTER(mStartPluginTotal, 1);
@@ -330,9 +363,9 @@ bool eBPFServer::HasRegisteredPlugins() const {
 
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
                               uint32_t plugin_index,
-                              nami::PluginType type,
+                              PluginType type,
                               const CollectionPipelineContext* ctx,
-                              const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                               PluginMetricManagerPtr mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
@@ -340,7 +373,20 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options, mgr);
 }
 
-bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginType type) {
+bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
+    std::lock_guard<std::mutex> lk(mMtx);
+    auto nsMgr = mPlugins[static_cast<int>(PluginType::NETWORK_SECURITY)];
+    auto psMgr = mPlugins[static_cast<int>(PluginType::PROCESS_SECURITY)];
+    auto fsMgr = mPlugins[static_cast<int>(PluginType::FILE_SECURITY)];
+    if ((nsMgr && nsMgr->IsExists()) || (psMgr && psMgr->IsExists()) || (fsMgr && fsMgr->IsExists())) {
+        return false;
+    } else {
+        LOG_INFO(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
+        return true;
+    }
+}
+
+bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
     }
@@ -348,19 +394,41 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginTyp
     if (prev_pipeline == pipeline_name) {
         UpdatePipelineName(type, "", "");
     } else {
-        LOG_WARNING(sLogger, ("prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
+        LOG_WARNING(
+            sLogger,
+            ("the specified config is not running, prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
     }
-    bool ret = mSourceManager->StopPlugin(type);
-    // UpdateContext must after than StopPlugin
-    if (ret) {
-        UpdateCBContext(type, nullptr, -1, -1);
-        ADD_COUNTER(mStopPluginTotal, 1);
+
+    LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipeline_name));
+    auto pluginManager = GetPluginManager(type);
+    if (pluginManager && pluginManager->IsExists()) {
+        pluginManager->UpdateContext(nullptr, -1, -1);
+        int ret = pluginManager->Destroy();
+        if (ret == 0) {
+            ADD_COUNTER(mStopPluginTotal, 1);
+            UpdatePluginManager(type, nullptr);
+            // pluginManager->UpdateProcessCacheManager(nullptr); // deprecated ... TODO @qianlu.kk
+            LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
+            if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
+                || type == PluginType::FILE_SECURITY) {
+                // check if we need stop ProcessCacheManager
+                if (CheckIfNeedStopProcessCacheManager()) {
+                    mProcessCacheManager->Stop();
+                }
+            }
+        } else {
+            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("no plugin registered or not running, plugin type", magic_enum::enum_name(type))("pipeline",
+                                                                                                      pipeline_name));
     }
-    return ret;
+    return true;
 }
 
-std::string eBPFServer::CheckLoadedPipelineName(nami::PluginType type) {
+std::string eBPFServer::CheckLoadedPipelineName(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
     return mLoadedPipeline[int(type)];
 }
@@ -368,7 +436,7 @@ std::string eBPFServer::CheckLoadedPipelineName(nami::PluginType type) {
 std::string eBPFServer::GetAllProjects() {
     std::lock_guard<std::mutex> lk(mMtx);
     std::string res;
-    for (int i = 0; i < int(nami::PluginType::MAX); i++) {
+    for (int i = 0; i < int(PluginType::MAX); i++) {
         if (mPluginProject[i] != "") {
             res += mPluginProject[i];
             res += " ";
@@ -377,57 +445,100 @@ std::string eBPFServer::GetAllProjects() {
     return res;
 }
 
-void eBPFServer::UpdatePipelineName(nami::PluginType type, const std::string& name, const std::string& project) {
+void eBPFServer::UpdatePipelineName(PluginType type, const std::string& name, const std::string& project) {
     std::lock_guard<std::mutex> lk(mMtx);
     mLoadedPipeline[int(type)] = name;
     mPluginProject[int(type)] = project;
-    return;
 }
 
-bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, nami::PluginType type) {
+bool eBPFServer::SuspendPlugin(const std::string&, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return false;
     }
-    // mark plugin status is update
-    bool ret = mSourceManager->SuspendPlugin(type);
-    if (ret) {
-        UpdateCBContext(type, nullptr, -1, -1);
-        ADD_COUNTER(mSuspendPluginTotal, 1);
+
+    auto mgr = GetPluginManager(type);
+    if (!mgr || !mgr->IsRunning()) {
+        LOG_DEBUG(sLogger, ("plugin not registered or stopped", ""));
+        return true;
     }
-    return ret;
+
+    mgr->UpdateContext(nullptr, -1, -1);
+
+    int ret = mgr->Suspend();
+    if (ret) {
+        LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(type)));
+        return false;
+    }
+    ADD_COUNTER(mSuspendPluginTotal, 1);
+    return true;
 }
 
-void eBPFServer::UpdateCBContext(nami::PluginType type,
-                                 const logtail::CollectionPipelineContext* ctx,
-                                 logtail::QueueKey key,
-                                 int idx) {
-    switch (type) {
-        case nami::PluginType::PROCESS_SECURITY: {
-            if (mProcessSecureCB)
-                mProcessSecureCB->UpdateContext(ctx, key, idx);
-            return;
+void eBPFServer::PollPerfBuffers() {
+    mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
+    while (mRunning) {
+        auto now = std::chrono::steady_clock::now();
+        auto nextWindow = mFrequencyMgr.Next();
+        if (!mFrequencyMgr.Expired(now)) {
+            std::this_thread::sleep_until(nextWindow);
+            mFrequencyMgr.Reset(nextWindow);
+        } else {
+            mFrequencyMgr.Reset(now);
         }
-        case nami::PluginType::NETWORK_OBSERVE: {
-            if (mMeterCB)
-                mMeterCB->UpdateContext(ctx, key, idx);
-            if (mSpanCB)
-                mSpanCB->UpdateContext(ctx, key, idx);
-            if (mEventCB)
-                mEventCB->UpdateContext(ctx, key, idx);
-            return;
+        for (int i = 0; i < int(PluginType::MAX); i++) {
+            auto plugin = GetPluginManager(PluginType(i));
+            if (!plugin || !plugin->IsRunning()) {
+                continue;
+            }
+            int cnt = plugin->PollPerfBuffer();
+            LOG_DEBUG(sLogger,
+                      ("poll buffer for ", magic_enum::enum_name(PluginType(i)))("cnt", cnt)("running status",
+                                                                                             plugin->IsRunning()));
         }
-        case nami::PluginType::NETWORK_SECURITY: {
-            if (mNetworkSecureCB)
-                mNetworkSecureCB->UpdateContext(ctx, key, idx);
-            return;
+    }
+}
+
+std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
+    std::lock_guard<std::mutex> lk(mMtx);
+    if (type == PluginType::MAX) {
+        return nullptr;
+    } else {
+        return mPlugins[static_cast<int>(type)];
+    }
+}
+
+void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
+    std::lock_guard<std::mutex> lk(mMtx);
+    if (type == PluginType::MAX) {
+        return;
+    } else {
+        mPlugins[static_cast<int>(type)] = mgr;
+    }
+}
+
+void eBPFServer::HandlerEvents() {
+    std::vector<std::shared_ptr<CommonEvent>> items(1024);
+    while (mRunning) {
+        // consume queue
+        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
+        LOG_DEBUG(sLogger, ("get data events, number", count));
+        // handle ....
+        if (count == 0) {
+            continue;
         }
-        case nami::PluginType::FILE_SECURITY: {
-            if (mFileSecureCB)
-                mFileSecureCB->UpdateContext(ctx, key, idx);
-            return;
+
+        for (size_t i = 0; i < count; i++) {
+            auto event = items[i];
+            auto pluginType = event->GetPluginType();
+            auto plugin = GetPluginManager(pluginType);
+            if (plugin) {
+                // handle event and put into aggregator ...
+                plugin->HandleEvent(event);
+            }
         }
-        default:
-            return;
+
+        // handle
+        items.clear();
+        items.resize(1024);
     }
 }
 
