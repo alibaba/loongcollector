@@ -161,12 +161,13 @@ void Connection::TryUpdateProtocolAttr() {
         mTags.SetNoCopy<kRpcType>(RPC_25_STR);
         mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
         mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
+        MarkL7MetaAttached();
     } else if (mRole == support_role_e::IsServer) {
         mTags.SetNoCopy<kRpcType>(RPC_0_STR);
         mTags.SetNoCopy<kCallKind>(HTTP_STR);
         mTags.SetNoCopy<kCallType>(HTTP_STR);
+        MarkL7MetaAttached();
     }
-    MarkL7MetaAttached();
 }
 
 void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
