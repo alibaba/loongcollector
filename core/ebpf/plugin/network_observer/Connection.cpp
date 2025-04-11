@@ -161,15 +161,12 @@ void Connection::TryUpdateProtocolAttr() {
         mTags.SetNoCopy<kRpcType>(RPC_25_STR);
         mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
         mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
-        MarkL7MetaAttached();
     } else if (mRole == support_role_e::IsServer) {
         mTags.SetNoCopy<kRpcType>(RPC_0_STR);
         mTags.SetNoCopy<kCallKind>(HTTP_STR);
         mTags.SetNoCopy<kCallType>(HTTP_STR);
-        MarkL7MetaAttached();
     }
-
-    return;
+    MarkL7MetaAttached();
 }
 
 void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
@@ -228,10 +225,6 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
 }
 
 void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
-    if (IsSelfMetaAttachReady()) {
-        return;
-    }
-
     if (!pod) {
         // no meta info ...
         LOG_WARNING(sLogger, ("no pod info ... cid:", mTags.Get<kContainerId>()));
@@ -269,10 +262,6 @@ void Connection::UpdatePeerPodMetaForExternal() {
 }
 
 void Connection::UpdatePeerPodMetaForLocalhost() {
-    if (IsPeerMetaAttachReady()) {
-        return;
-    }
-
     mTags.SetNoCopy<kPeerAppName>(LOCALHOST_STR);
     mTags.SetNoCopy<kPeerPodName>(LOCALHOST_STR);
     mTags.SetNoCopy<kPeerPodIp>(LOCALHOST_STR);
@@ -285,10 +274,6 @@ void Connection::UpdatePeerPodMetaForLocalhost() {
 }
 
 void Connection::UpdateSelfPodMetaForUnknown() {
-    if (IsSelfMetaAttachReady()) {
-        return;
-    }
-
     mTags.SetNoCopy<kAppName>(UNKNOWN_STR);
     mTags.SetNoCopy<kAppId>(UNKNOWN_STR);
     mTags.SetNoCopy<kPodIp>(UNKNOWN_STR);
@@ -299,12 +284,8 @@ void Connection::UpdateSelfPodMetaForUnknown() {
 }
 
 void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
-    if (IsPeerMetaAttachReady()) {
-        return;
-    }
     if (!pod) {
         // no meta info ...
-
         return;
     }
 
@@ -376,7 +357,6 @@ void Connection::TryAttachPeerMeta(bool enable, int family, uint32_t ip) {
     }
 
     if (IsLocalhost()) {
-        LOG_DEBUG(sLogger, ("remote ip is localhost", "attach localhost for peer pod meta"));
         UpdatePeerPodMetaForLocalhost();
         MarkPeerMetaAttached();
         return;

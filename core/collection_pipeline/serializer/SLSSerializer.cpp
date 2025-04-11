@@ -128,8 +128,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 }
                 if (e.Is<UntypedSingleValue>()) {
                     metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
-                    // should not happen
-                    LOG_DEBUG(sLogger, ("config", mFlusher->GetContext().GetConfigName())("metricname", e.GetName()));
                 } else {
                     // untyped multi value is not supported
                     LOG_WARNING(sLogger,
@@ -153,18 +151,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::SPAN:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<SpanEvent>();
-                if (SHOULD_LOG_DEBUG(sLogger)) {
-                    for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                        LOG_DEBUG(sLogger,
-                                  ("event tags for spanname", std::string(e.GetName()))(std::string(tag->first),
-                                                                                        std::string(tag->second)));
-                    }
-                    for (auto tag = group.mTags.mInner.begin(); tag != group.mTags.mInner.end(); tag++) {
-                        LOG_DEBUG(sLogger,
-                                  ("group tags for spanname", std::string(e.GetName()))(std::string(tag->first),
-                                                                                        std::string(tag->second)));
-                    }
-                }
                 size_t contentSZ = 0;
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_TRACE_ID.size(), e.GetTraceId().size());
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_SPAN_ID.size(), e.GetSpanId().size());
