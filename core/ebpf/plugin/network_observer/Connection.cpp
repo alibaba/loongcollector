@@ -324,8 +324,8 @@ void Connection::TryAttachSelfMeta(bool enable) {
     }
     if (!enable || !K8sMetadata::GetInstance().Enable()) {
         // set self metadata ...
-        LOG_DEBUG(sLogger, ("not enable", ""));
         MarkSelfMetaAttached();
+        return;
     } else if (IsConnStatsEventReceived()) {
         const auto& cid = GetContainerId();
         if (cid.empty()) {
