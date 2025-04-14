@@ -41,16 +41,5 @@ inline constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
 
 inline constexpr auto kNetMetricsTable = DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
 
-// inline constexpr DataElement kNetElements[] = {
-//     kIp,
-//     kAppId,
-
-//     kLocalAddr,
-//     kRemoteAddr,
-//     kRemotePort,
-// };
-
-// inline constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
-
 } // namespace ebpf
 } // namespace logtail

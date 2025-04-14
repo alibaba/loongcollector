@@ -100,22 +100,5 @@ constexpr DataElement kHTTPRespHeader = {
     "http resp.header",
 };
 
-// static constexpr DataElement kHTTPElements[] = {kIp, // agg key
-//                                                 kAppId, // agg key
-//                                                 kProtocol, // agg key
-//                                                 kRpc, // agg key
-//                                                 kDestId, // agg key
-//                                                 kContainerId, // agg key
-//                                                 kRpcType,
-//                                                 kCallType,
-//                                                 kCallKind,
-//                                                 kEndpoint,
-//                                                 kStatusCode,
-//                                                 kStartTsNs,
-//                                                 kEndTsNs};
-
-// static constexpr auto kHTTPTable = DataTableSchema("http_record", "HTTP request-response pair events",
-// kHTTPElements);
-
 } // namespace ebpf
 } // namespace logtail

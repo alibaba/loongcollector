@@ -59,14 +59,6 @@ inline constexpr DataElement kPodName = {
     "",
 };
 
-inline constexpr DataElement kPodUid = {
-    "pod_uid",
-    "pod_uid", // metric
-    "k8s.pod.uid", // span
-    "k8s.pod.uid", // log, inside pod
-    "pod uid",
-};
-
 inline constexpr DataElement kPodIp = {
     "pod_ip",
     "podIp", // metric
@@ -179,14 +171,6 @@ inline constexpr DataElement kLocalAddr = {
     "IP address of the local endpoint.",
 };
 
-inline constexpr DataElement kLocalPort = {
-    "local_port",
-    "local_addr", // metric
-    "local.port", // span
-    "local.port", // log
-    "Port of the local endpoint.",
-};
-
 inline constexpr DataElement kTraceRole = {
     "trace_role",
     "trace_role", // metric
@@ -209,22 +193,6 @@ inline constexpr DataElement kStartTsNs = {
     "startTsNs", // span
     "start_time_nsec", // log
     "Request-response latency.",
-};
-
-inline constexpr DataElement kEndTsNs = {
-    "endTsNs",
-    "", // metric
-    "endTsNs", // span
-    "end_time_nsec", // log
-    "Request-response latency.",
-};
-
-inline constexpr DataElement kRegionId = {
-    "region_id",
-    "regionId", // metric
-    "regionId", // span
-    "region.id", // log
-    "region id",
 };
 
 inline constexpr DataElement kIp = {
@@ -354,30 +322,6 @@ inline constexpr DataElement kContainerId = {
     "local container id",
 };
 
-inline constexpr DataElement kContainerName = {
-    "container_name",
-    "container_name", // metric
-    "container.name", // span
-    "container.name", // log
-    "local container name",
-};
-
-inline constexpr DataElement kContainerIp = {
-    "container_ip",
-    "container_ip", // metric
-    "container.ip", // span
-    "container.ip", // log
-    "container ip",
-};
-
-inline constexpr DataElement kImageName = {
-    "image_name",
-    "conatainer_image_name", // metric
-    "conatainer.image.name", // span
-    "conatainer.image.name", // log
-    "container image name",
-};
-
 // for processes
 inline constexpr DataElement kProcessId = {
     "process_pid",
@@ -480,14 +424,6 @@ inline constexpr DataElement kEventType = {
     "event_type",
     "event_type",
     "event_type",
-    "",
-};
-
-inline constexpr DataElement kEventTime = {
-    "event_time",
-    "event_time",
-    "event_time",
-    "event_time",
     "",
 };
 

@@ -27,36 +27,5 @@ inline constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements
 
 inline constexpr auto kProcessCacheTable = DataTableSchema("process_cache_table", "", kProcessCacheElements);
 
-// inline constexpr DataElement kProcessSecurityElements[] = {kExecId,
-//                                                            kProcessId,
-//                                                            kUid,
-//                                                            kUser,
-//                                                            kBinary,
-//                                                            kArguments,
-//                                                            kCWD,
-//                                                            kKtime,
-//                                                            kCapInheritable,
-//                                                            kCapPermitted,
-//                                                            kCapEffective,
-//                                                            kParentProcessId,
-//                                                            kParentUid,
-//                                                            kParentUser,
-//                                                            kParentBinary,
-//                                                            kParentArguments,
-//                                                            kParentCWD,
-//                                                            kParentKtime,
-//                                                            kParentCapInheritable,
-//                                                            kParentCapPermitted,
-//                                                            kParentCapEffective,
-//                                                            kContainerId,
-//                                                            kEventTime,
-//                                                            kCallName,
-//                                                            kEventType};
-
-// inline constexpr size_t kProcessSecurityTableSize = std::size(kProcessSecurityElements);
-
-// inline constexpr auto kProcessSecurityTable = DataTableSchema("process_security_table", "",
-// kProcessSecurityElements);
-
 } // namespace ebpf
 } // namespace logtail

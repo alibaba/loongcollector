@@ -83,39 +83,5 @@ inline constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
 inline constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
-// inline constexpr DataElement kAppTraceElements[] = {
-//     kNamespace,
-//     kWorkloadKind,
-//     kWorkloadName,
-//     kPeerAppName,
-//     kPeerPodName,
-//     kPeerPodIp,
-//     kPeerNamespace,
-//     kPeerWorkloadKind,
-//     kPeerWorkloadName,
-//     kPeerServiceName,
-//     kProtocol,
-//     kLocalAddr,
-//     kRemoteAddr,
-//     kRemotePort,
-//     kRpcType,
-//     kCallKind,
-//     kCallType,
-//     kDestId,
-//     kEndpoint,
-//     kFd,
-//     kProcessId,
-//     kContainerId,
-//     kTraceRole,
-//     kIp,
-//     kNetNs,
-//     kFamily,
-//     kStartTsNs,
-// };
-
-// inline constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
-
-// inline constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
-
 } // namespace ebpf
 } // namespace logtail

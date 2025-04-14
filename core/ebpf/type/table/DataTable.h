@@ -23,11 +23,7 @@ namespace ebpf {
 class DataElement {
 public:
     constexpr DataElement() = delete;
-    constexpr DataElement(StringView name,
-                          StringView metricKey,
-                          StringView spanKey,
-                          StringView logKey,
-                          StringView desc)
+    constexpr DataElement(StringView name, StringView metricKey, StringView spanKey, StringView logKey, StringView desc)
         : mName(name), mMetricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc) {}
 
     constexpr bool operator==(const DataElement& rhs) const { return mName == rhs.mName; }
