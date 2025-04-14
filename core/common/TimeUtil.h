@@ -101,4 +101,6 @@ long GetTicksPerSecond();
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic();
 
+struct timespec KernelNanoTimeToUTC(uint64_t nano);
+
 } // namespace logtail

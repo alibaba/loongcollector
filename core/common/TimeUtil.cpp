@@ -411,6 +411,7 @@ long GetTicksPerSecond() {
 }
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
+    LOG_INFO(sLogger, ("enter", "aaa"));
 #if defined(__linux__)
     struct timespec t;
     int ret = clock_gettime(CLOCK_MONOTONIC, &t);
@@ -422,9 +423,20 @@ std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
     auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
     auto boot_ns = t.tv_sec * 1000000000ULL + t.tv_nsec;
     return std::chrono::nanoseconds(now_ns - boot_ns);
-#elif defined(__APPLE__)
+#else
     return std::chrono::nanoseconds(0);
 #endif
+}
+
+struct timespec KernelNanoTimeToUTC(uint64_t nano) {
+    static std::chrono::nanoseconds diff = GetTimeDiffFromMonotonic();
+    auto ts = std::chrono::nanoseconds(nano + diff.count());
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
+    auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
+    struct timespec res;
+    res.tv_sec = seconds.count();
+    res.tv_nsec = nanoseconds.count();
+    return res;
 }
 
 } // namespace logtail

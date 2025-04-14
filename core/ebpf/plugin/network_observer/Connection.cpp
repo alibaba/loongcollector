@@ -59,33 +59,33 @@ void Connection::UpdateConnState(struct conn_ctrl_event_t* event) {
     }
 }
 
-void Connection::UpdateRole(enum support_role_e role) {
-    if (!IsL7MetaAttachReady()) {
-        // WriteLock lock(mProtocolAndRoleLock);
-        if (mRole != IsUnknown && mRole != role) {
-            LOG_WARNING(
-                sLogger,
-                ("role change!! last role", magic_enum::enum_name(mRole))("new role", magic_enum::enum_name(role)));
-        } else {
-            mRole = role;
-            TryUpdateProtocolAttr();
-        }
-    }
-}
+// void Connection::UpdateRole(enum support_role_e role) {
+//     if (!IsL7MetaAttachReady()) {
+//         // WriteLock lock(mProtocolAndRoleLock);
+//         if (mRole != IsUnknown && mRole != role) {
+//             LOG_WARNING(
+//                 sLogger,
+//                 ("role change!! last role", magic_enum::enum_name(mRole))("new role", magic_enum::enum_name(role)));
+//         } else {
+//             mRole = role;
+//             TryAttachL7Meta();
+//         }
+//     }
+// }
 
-void Connection::UpdateProtocol(support_proto_e protocol) {
-    if (!IsL7MetaAttachReady()) {
-        // WriteLock lock(mProtocolAndRoleLock);
-        if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
-            LOG_WARNING(sLogger,
-                        ("protocol change!! last protocol",
-                         magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
-        } else {
-            mProtocol = protocol;
-            TryUpdateProtocolAttr();
-        }
-    }
-}
+// void Connection::UpdateProtocol(support_proto_e protocol) {
+//     if (!IsL7MetaAttachReady()) {
+//         // WriteLock lock(mProtocolAndRoleLock);
+//         if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
+//             LOG_WARNING(sLogger,
+//                         ("protocol change!! last protocol",
+//                          magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
+//         } else {
+//             mProtocol = protocol;
+//             TryAttachL7Meta();
+//         }
+//     }
+// }
 
 // only called by poller thread ...
 void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
@@ -101,12 +101,26 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     }
 
     this->mLastUpdateTs = eventTs;
+    // if (IsL4MetaAttachReady()) {
+    //     LOG_DEBUG(sLogger, ("netMeta already attached", ""));
+    //     UpdateL4Meta(event);
+    // MarkXXX();
+    // TryAttachSelf();
+    // }
+    if (!IsL4MetaAttachReady()) {
+        LOG_DEBUG(sLogger, ("netMeta already attached", ""));
+        UpdateL4Meta(event);
+        MarkL4MetaAttached();
+        TryAttachPeerMeta(true, event->si.family, event->si.ap.daddr);
+        TryAttachSelfMeta();
+    }
 
-    UpdateRole(event->role);
+    TryAttachL7Meta(event->role, event->protocol);
 
-    UpdateProtocol(event->protocol);
+    // 合并成 L7 meta
+    // UpdateRole(event->role);
 
-    UpdateNetMetaAttr(event);
+    // UpdateProtocol(event->protocol);
 
     mCurrStats.mSendBytes = event->wr_bytes;
     mCurrStats.mRecvBytes = event->rd_bytes;
@@ -117,6 +131,7 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     mLastStats.mRecvBytes = event->last_output_rd_bytes;
     mLastStats.mSendPackets = event->last_output_wr_pkts;
     mLastStats.mRecvPackets = event->last_output_rd_pkts;
+
     LOG_DEBUG(sLogger,
               ("stage", "updateConnStates")("mSendBytes", event->wr_bytes)("mRecvBytes", event->rd_bytes)(
                   "mSendPackets", event->wr_pkts)("mRecvPackets", event->rd_pkts)("last", "")(
@@ -151,31 +166,86 @@ bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& 
     return true;
 }
 
-void Connection::TryUpdateProtocolAttr() {
-    if (mProtocol == support_proto_e::ProtoUnknown || IsL7MetaAttachReady()) {
+// void Connection::TryAttachL7Meta() {
+//     if (mProtocol == support_proto_e::ProtoUnknown || IsL7MetaAttachReady()) {
+//         return;
+//     }
+
+//     mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
+//     if (mRole == support_role_e::IsClient) {
+//         mTags.SetNoCopy<kRpcType>(RPC_25_STR);
+//         mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
+//         mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
+//         MarkL7MetaAttached();
+//     } else if (mRole == support_role_e::IsServer) {
+//         mTags.SetNoCopy<kRpcType>(RPC_0_STR);
+//         mTags.SetNoCopy<kCallKind>(HTTP_STR);
+//         mTags.SetNoCopy<kCallType>(HTTP_STR);
+//         MarkL7MetaAttached();
+//     }
+// }
+
+void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) {
+    if (IsL7MetaAttachReady()) {
         return;
     }
 
-    mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
-    if (mRole == support_role_e::IsClient) {
-        mTags.SetNoCopy<kRpcType>(RPC_25_STR);
-        mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
-        mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
-        MarkL7MetaAttached();
-    } else if (mRole == support_role_e::IsServer) {
-        mTags.SetNoCopy<kRpcType>(RPC_0_STR);
-        mTags.SetNoCopy<kCallKind>(HTTP_STR);
-        mTags.SetNoCopy<kCallType>(HTTP_STR);
-        MarkL7MetaAttached();
+    // update role
+    if (mRole == IsUnknown && role != IsUnknown) {
+        mRole = role;
     }
+
+    if (mProtocol == support_proto_e::ProtoUnknown && protocol != support_proto_e::ProtoUnknown) {
+        mProtocol = protocol;
+        mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
+    }
+
+    LOG_INFO(sLogger,
+             ("protocol", magic_enum::enum_name(protocol))("role", magic_enum::enum_name(role))(
+                 "mprotocol", magic_enum::enum_name(mProtocol))("mrole", magic_enum::enum_name(mRole)));
+
+    if (mProtocol == support_proto_e::ProtoHTTP) {
+        if (mRole == support_role_e::IsClient) {
+            mTags.SetNoCopy<kRpcType>(RPC_25_STR);
+            mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
+            mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
+            MarkL7MetaAttached();
+        } else if (mRole == support_role_e::IsServer) {
+            mTags.SetNoCopy<kRpcType>(RPC_0_STR);
+            mTags.SetNoCopy<kCallKind>(HTTP_STR);
+            mTags.SetNoCopy<kCallType>(HTTP_STR);
+            MarkL7MetaAttached();
+        }
+    }
+
+    // MarkL7MetaAttached();
+
+    // if (!IsL7MetaAttachReady()) {
+    //     // WriteLock lock(mProtocolAndRoleLock);
+    //     if (mRole != IsUnknown && mRole != role) {
+    //         LOG_WARNING(
+    //             sLogger,
+    //             ("role change!! last role", magic_enum::enum_name(mRole))("new role", magic_enum::enum_name(role)));
+    //     } else {
+    //         mRole = role;
+    //         TryAttachL7Meta();
+    //     }
+    // }
+
+    // if (!IsL7MetaAttachReady()) {
+    //     // WriteLock lock(mProtocolAndRoleLock);
+    //     if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
+    //         LOG_WARNING(sLogger,
+    //                     ("protocol change!! last protocol",
+    //                      magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
+    //     } else {
+    //         mProtocol = protocol;
+    //         TryAttachL7Meta();
+    //     }
+    // }
 }
 
-void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
-    if (IsL4MetaAttachReady()) {
-        LOG_DEBUG(sLogger, ("netMeta already attached", ""));
-        return;
-    }
-
+void Connection::UpdateL4Meta(struct conn_stats_event_t* event) {
     MarkConnStatsEventReceived();
 
     // handle container id ...
@@ -213,16 +283,15 @@ void Connection::UpdateNetMetaAttr(struct conn_stats_event_t* event) {
     mTags.Set<kIp>(sip);
     mTags.Set<kRemoteIp>(dip);
 
-    MarkL4MetaAttached();
-
+    // MarkL4MetaAttached();
 
     // for peer meta
-    LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
-    TryAttachPeerMeta(true, si.family, si.ap.daddr);
+    // LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
+    // TryAttachPeerMeta(true, si.family, si.ap.daddr);
 
-    // for self meta
-    LOG_DEBUG(sLogger, ("try attach self meta", GetContainerId()));
-    TryAttachSelfMeta();
+    // // for self meta
+    // LOG_DEBUG(sLogger, ("try attach self meta", GetContainerId()));
+    // TryAttachSelfMeta();
 }
 
 void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {

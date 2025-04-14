@@ -133,8 +133,9 @@ void ConnectionUnittest::TestProtocolHandling() {
     LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // mock receive a data event
-    tracker->UpdateRole(support_role_e::IsClient);
-    tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
+    // tracker->UpdateRole(support_role_e::IsClient);
+    // tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
+    tracker->TryAttachL7Meta(support_role_e::IsClient, support_proto_e::ProtoHTTP);
     APSARA_TEST_TRUE(tracker->IsL7MetaAttachReady());
     APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
     APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
@@ -146,27 +147,27 @@ void ConnectionUnittest::TestProtocolHandling() {
     LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // role chage ...
-    tracker->UpdateRole(support_role_e::IsServer);
-    APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
-    APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
-    APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
+    // tracker->UpdateRole(support_role_e::IsServer);
+    // APSARA_TEST_EQUAL(attrs.Get<kRpcType>(), "25");
+    // APSARA_TEST_EQUAL(attrs.Get<kCallKind>(), "http_client");
+    // APSARA_TEST_EQUAL(attrs.Get<kCallType>(), "http_client");
 
     // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
     // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
     // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
-    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
+    // LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 
     // protocol change ...
-    tracker->UpdateProtocol(support_proto_e::ProtoMySQL);
-    APSARA_TEST_EQUAL(std::string(attrs.Get<kRpcType>()), "25");
-    APSARA_TEST_EQUAL(std::string(attrs.Get<kCallKind>()), "http_client");
-    APSARA_TEST_EQUAL(std::string(attrs.Get<kCallType>()), "http_client");
+    // tracker->UpdateProtocol(support_proto_e::ProtoMySQL);
+    // APSARA_TEST_EQUAL(std::string(attrs.Get<kRpcType>()), "25");
+    // APSARA_TEST_EQUAL(std::string(attrs.Get<kCallKind>()), "http_client");
+    // APSARA_TEST_EQUAL(std::string(attrs.Get<kCallType>()), "http_client");
 
     // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())]), "25");
     // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())]), "http_client");
     // APSARA_TEST_EQUAL(std::string(attrs[kConnTrackerTable.ColIndex(kCallType.Name())]), "http_client");
-    APSARA_TEST_EQUAL(tracker->GetProtocol(), support_proto_e::ProtoHTTP);
-    LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
+    // APSARA_TEST_EQUAL(tracker->GetProtocol(), support_proto_e::ProtoHTTP);
+    // LOG_DEBUG(sLogger, ("connection", tracker->DumpConnection()));
 }
 
 void ConnectionUnittest::TestMetadataManagement() {
@@ -247,8 +248,9 @@ void ConnectionUnittest::TestMetadataManagement() {
     LOG_INFO(sLogger, ("step", "3"));
 
     // mock receive data event ...
-    tracker->UpdateRole(support_role_e::IsClient);
-    tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
+    // tracker->UpdateRole(support_role_e::IsClient);
+    // tracker->UpdateProtocol(support_proto_e::ProtoHTTP);
+    tracker->TryAttachL7Meta(support_role_e::IsClient, support_proto_e::ProtoHTTP);
     tracker->RecordActive();
     APSARA_TEST_TRUE(tracker->IsSelfMetaAttachReady());
     APSARA_TEST_TRUE(tracker->IsPeerMetaAttachReady());

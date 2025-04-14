@@ -34,6 +34,7 @@ public:
     void TestStrptimeNanosecond();
     void TestGetPreciseTimestampFromLogtailTime();
     void TestBootTimeDiff();
+    void TestKernelTimeToUTC();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
@@ -42,11 +43,17 @@ APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestBootTimeDiff, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestKernelTimeToUTC, 0);
 
 void TimeUtilUnittest::TestBootTimeDiff() {
     auto diff = GetTimeDiffFromMonotonic();
     uint64_t num = static_cast<uint64_t>(diff.count());
     APSARA_TEST_GE(num, (uint64_t)0);
+}
+
+void TimeUtilUnittest::TestKernelTimeToUTC() {
+    auto ts = KernelNanoTimeToUTC(1000);
+    APSARA_TEST_GE(ts.tv_nsec, 1000);
 }
 
 void TimeUtilUnittest::TestDeduceYear() {

@@ -91,22 +91,22 @@ enum class ParseState {
 
 namespace http {
 
-ParseState ParseRequest(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool forceSample = false);
+ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool forceSample = false);
 
-ParseState ParseRequestBody(std::string_view* buf, std::shared_ptr<HttpRecord>& result);
+ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result);
 
 HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t num_headers);
 
-ParseState ParseContent(std::string_view content_len_str,
-                        std::string_view* data,
+ParseState ParseContent(std::string_view& content_len_str,
+                        std::string_view& data,
                         size_t body_size_limit_bytes,
-                        std::string* result,
-                        size_t* body_size);
+                        std::string& result,
+                        size_t& body_size);
 
 ParseState
-ParseResponse(std::string_view* buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample = false);
+ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample = false);
 
-int ParseHttpRequest(std::string_view buf, HTTPRequest* result);
+int ParseHttpRequest(std::string_view& buf, HTTPRequest& result);
 } // namespace http
 
 

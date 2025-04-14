@@ -338,7 +338,6 @@ int CreateNetworkFilterForCallname(
              newConfig.index(),
              std::holds_alternative<SecurityFileFilter>(newConfig));
 
-    std::vector<AttachProgOps> attachOps = {AttachProgOps("kprobe_" + callName, true)};
     int ret = 0;
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx < 0) {
@@ -394,9 +393,7 @@ int CreateNetworkFilterForCallname(
 }
 
 int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper, const std::string& callName) {
-    std::vector<AttachProgOps> attachOps = {AttachProgOps("kprobe_" + callName, true)};
     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "DisableCallName %s\n", callName.c_str());
-
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx < 0) {
         return 1;

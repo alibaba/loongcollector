@@ -78,8 +78,10 @@ const std::shared_ptr<Connection> ConnectionManager::AcceptNetDataEvent(struct c
         return nullptr;
     }
 
-    conn->UpdateRole(event->role);
-    conn->UpdateProtocol(event->protocol);
+    // TryAttachL7
+    // conn->UpdateRole(event->role);
+    // conn->UpdateProtocol(event->protocol);
+    conn->TryAttachL7Meta(event->role, event->protocol);
     conn->RecordActive();
     return conn;
 }

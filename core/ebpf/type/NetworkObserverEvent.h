@@ -108,8 +108,8 @@ public:
     explicit AbstractAppRecord(std::shared_ptr<Connection> connection) : AbstractNetRecord(connection) {}
     ~AbstractAppRecord() override {}
 
-    void SetTraceId(const std::string& traceId) { mTraceId = traceId; }
-    void SetSpanId(const std::string& spanId) { mSpanId = spanId; }
+    void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = std::move(traceId); }
+    void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = std::move(spanId); }
 
     RecordType GetRecordType() override { return RecordType::APP_RECORD; }
 
@@ -123,8 +123,8 @@ public:
     virtual std::string GetProtocolVersion() const = 0;
     virtual std::string GetPath() const = 0;
 
-    mutable std::string mTraceId;
-    mutable std::string mSpanId;
+    mutable std::array<uint64_t, 4> mTraceId;
+    mutable std::array<uint64_t, 2> mSpanId;
 };
 
 class HttpRecord : public AbstractAppRecord {

@@ -20,6 +20,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
@@ -495,9 +496,10 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 }
                 // set time stamp
                 HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
-                auto ts = httpRecord->GetStartTimeStamp() + mTimeDiff.count();
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
-                logEvent->SetTimestamp(seconds.count(), ts);
+                auto timeSpec = KernelNanoTimeToUTC(httpRecord->GetStartTimeStamp());
+                // auto ts = httpRecord->GetStartTimeStamp() + mTimeDiff.count();
+                // auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
                 logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
                 logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
                 logEvent->SetContent(kHTTPPath.LogKey(),
@@ -507,7 +509,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 logEvent->SetContent(kStatusCode.LogKey(), std::to_string(httpRecord->GetStatusCode()));
                 logEvent->SetContent(kHTTPReqBody.LogKey(), httpRecord->GetReqBody());
                 logEvent->SetContent(kHTTPRespBody.LogKey(), httpRecord->GetRespBody());
-                LOG_DEBUG(sLogger, ("add one log, log timestamp", ts));
+                LOG_DEBUG(sLogger, ("add one log, log timestamp", timeSpec.tv_sec)("nano", timeSpec.tv_nsec));
                 needPush = true;
             }
         });
@@ -1009,8 +1011,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                     LOG_DEBUG(sLogger, ("record span tags", "")(std::string(kConnTrackerTable.ColSpanKey(i)), sb.data));
                 }
 
-                spanEvent->SetTraceId(record->mTraceId);
-                spanEvent->SetSpanId(record->mSpanId);
+                spanEvent->SetTraceId(FromRandom64ID(record->mTraceId));
+                spanEvent->SetSpanId(FromRandom64ID(record->mSpanId));
                 spanEvent->SetStatus(record->IsError() ? SpanEvent::StatusCode::Error : SpanEvent::StatusCode::Ok);
                 auto role = ct->GetRole();
                 if (role == support_role_e::IsClient) {
@@ -1504,12 +1506,13 @@ void NetworkObserverManager::ProcessRecord(const std::shared_ptr<AbstractRecord>
                 return;
             }
 
+            if (appRecord->GetConnection()->IsConnDeleted()) {
+                // try attach again, for sake of connection is released in connection manager ...
+                appRecord->GetConnection()->TryAttachPeerMeta();
+                appRecord->GetConnection()->TryAttachSelfMeta();
+            }
+
             if (!appRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
-                if (appRecord->GetConnection()->IsConnDeleted()) {
-                    // try attach again, for sake of connection is released in connection manager ...
-                    appRecord->GetConnection()->TryAttachPeerMeta();
-                    appRecord->GetConnection()->TryAttachSelfMeta();
-                }
                 // rollback
                 HandleRollback(record, isDrop);
                 if (isDrop) {
@@ -1668,6 +1671,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
     LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
 
     ReadLock lk(mSamplerLock);
+    // atomic shared_ptr
     std::vector<std::shared_ptr<AbstractRecord>> records
         = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, mSampler);
     lk.unlock();

@@ -143,12 +143,13 @@ public:
 
     bool IsLocalhost() const;
 
+    void TryAttachL7Meta(support_role_e role, support_proto_e protocol);
     void TryAttachSelfMeta(bool enable = true);
     void TryAttachPeerMeta(bool enable = true, int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
-    void UpdateRole(enum support_role_e role);
+    // void UpdateRole(enum support_role_e role);
 
-    void UpdateProtocol(support_proto_e protocol);
+    // void UpdateProtocol(support_proto_e protocol);
 
     bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& record);
 
@@ -161,8 +162,7 @@ public:
     void MarkConnDeleted() { mMetaFlags.fetch_or(sFlagConnDeleted, std::memory_order_release); }
 
 private:
-    void UpdateNetMetaAttr(struct conn_stats_event_t* event);
-    void TryUpdateProtocolAttr();
+    void UpdateL4Meta(struct conn_stats_event_t* event);
     // peer pod meta
     void UpdatePeerPodMetaForExternal();
     void UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
