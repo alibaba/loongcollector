@@ -101,9 +101,6 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    mServiceHost = "47.95.70.43";
-    mServicePort = 8899;
-    mHostIp = "172.16.57.207";
     mEnable = true;
 #else
     mEnable = getenv("KUBERNETES_SERVICE_HOST") && AppConfig::GetInstance()->IsPurageContainerMode()

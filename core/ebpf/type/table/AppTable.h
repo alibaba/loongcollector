@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -83,63 +83,39 @@ inline constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
 inline constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
-inline constexpr DataElement kAppTraceElements[] = {
-    kNamespace,
-    kWorkloadKind,
-    kWorkloadName,
-    kPeerAppName,
-    kPeerPodName,
-    kPeerPodIp,
-    kPeerNamespace,
-    kPeerWorkloadKind,
-    kPeerWorkloadName,
-    kPeerServiceName,
-    kProtocol,
-    kLocalAddr,
-    kRemoteAddr,
-    kRemotePort,
-    kRpcType,
-    kCallKind,
-    kCallType,
-    kDestId,
-    kEndpoint,
-    kFd,
-    kProcessId,
-    kContainerId,
-    kTraceRole,
-    kIp,
-    kNetNs,
-    kFamily,
-    kStartTsNs,
-};
+// inline constexpr DataElement kAppTraceElements[] = {
+//     kNamespace,
+//     kWorkloadKind,
+//     kWorkloadName,
+//     kPeerAppName,
+//     kPeerPodName,
+//     kPeerPodIp,
+//     kPeerNamespace,
+//     kPeerWorkloadKind,
+//     kPeerWorkloadName,
+//     kPeerServiceName,
+//     kProtocol,
+//     kLocalAddr,
+//     kRemoteAddr,
+//     kRemotePort,
+//     kRpcType,
+//     kCallKind,
+//     kCallType,
+//     kDestId,
+//     kEndpoint,
+//     kFd,
+//     kProcessId,
+//     kContainerId,
+//     kTraceRole,
+//     kIp,
+//     kNetNs,
+//     kFamily,
+//     kStartTsNs,
+// };
 
-inline constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
+// inline constexpr size_t kAppTraceNum = std::size(kAppTraceElements);
 
-inline constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
-
-inline constexpr DataElement kAppLogElements[] = {
-    kHostName, // host
-    kAppId, // pid
-    kIp, // server ip
-    kAppName, // service
-    kWorkloadKind,
-    kWorkloadName,
-
-    kProtocol,
-    kRpc,
-    kDestId,
-    // kContainerId,
-    /* non-aggregate keys */
-
-    kRpcType,
-    kCallType,
-    kCallKind,
-    kEndpoint,
-};
-
-inline constexpr size_t kAppLogNum = std::size(kAppLogElements);
-
-inline constexpr auto kAppLogTable = DataTableSchema("app_log", "app log table", kAppLogElements);
+// inline constexpr auto kAppTraceTable = DataTableSchema("app_trace", "app metrics table", kAppTraceElements);
 
 } // namespace ebpf
 } // namespace logtail

@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -127,10 +127,15 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
           [this](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractRecord>& o) {
               auto* other = static_cast<AbstractAppRecord*>(o.get());
               int statusCode = other->GetStatusCode();
-              base->m2xxCount += statusCode / 100 == 2;
-              base->m3xxCount += statusCode / 100 == 3;
-              base->m4xxCount += statusCode / 100 == 4;
-              base->m5xxCount += statusCode / 100 == 5;
+              if (statusCode >= 500) {
+                  base->m5xxCount += 1;
+              } else if (statusCode >= 400) {
+                  base->m4xxCount += 1;
+              } else if (statusCode >= 300) {
+                  base->m3xxCount += 1;
+              } else {
+                  base->m2xxCount += 1;
+              }
               base->mCount++;
               base->mErrCount += other->IsError();
               base->mSlowCount += other->IsSlow();

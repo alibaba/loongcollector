@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,22 +20,6 @@
 namespace logtail {
 namespace ebpf {
 
-/* AggregationType defination
-NoAggregate means that this field doesn't engage in aggregate. level means the level of aggregation map this field will
-exist in. Note that currently we use Level0 to represent the fixed fields of exporter struct ApplicationBatchMeasure.
-they are expected to be aggregated first.
-*/
-enum class AggregationType {
-    NoAggregate,
-    Level0,
-    Level1,
-    AggregationTypeBoundry, // notice: DO NOT use AggregationTypeBoundry when assigning AggregationType.
-};
-
-constexpr int kMinAggregationLevel = static_cast<int>(AggregationType::NoAggregate) + 1;
-constexpr int kMaxAggregationLevel = static_cast<int>(AggregationType::AggregationTypeBoundry) - 1;
-
-
 class DataElement {
 public:
     constexpr DataElement() = delete;
@@ -43,9 +27,8 @@ public:
                           StringView metricKey,
                           StringView spanKey,
                           StringView logKey,
-                          StringView desc,
-                          AggregationType aggType = AggregationType::NoAggregate)
-        : mName(name), mMetricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc), mAggType(aggType) {}
+                          StringView desc)
+        : mName(name), mMetricKey(metricKey), mSpanKey(spanKey), mLogKey(logKey), mDesc(desc) {}
 
     constexpr bool operator==(const DataElement& rhs) const { return mName == rhs.mName; }
 
@@ -57,15 +40,12 @@ public:
     constexpr StringView LogKey() const { return mLogKey; }
     constexpr StringView Desc() const { return mDesc; }
 
-    constexpr AggregationType AggType() const { return mAggType; }
-
 protected:
     const StringView mName;
     const StringView mMetricKey;
     const StringView mSpanKey;
     const StringView mLogKey;
     const StringView mDesc;
-    const AggregationType mAggType = AggregationType::NoAggregate;
 };
 
 class DataTableSchema {

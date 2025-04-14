@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ namespace ebpf {
 class Sampler {
 public:
     [[nodiscard]] virtual bool ShouldSample(const std::array<uint64_t, 2>& traceID) const = 0;
-    // [[nodiscard]] virtual bool ShouldSample64(const std::array<uint64_t, 2>& traceID) const = 0;
 
     virtual ~Sampler() = default;
 };
@@ -38,7 +37,6 @@ protected:
 
 public:
     [[nodiscard]] bool ShouldSample(const std::array<uint64_t, 2>& traceID) const override;
-    // [[nodiscard]] virtual bool ShouldSample64(const std::array<uint64_t, 2>& traceID) const override;
 
 private:
     double mFraction;

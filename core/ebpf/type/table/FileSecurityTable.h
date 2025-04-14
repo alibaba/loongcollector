@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,40 +20,40 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kFileSecurityElements[] = {
-    kExecId,
-    kProcessId,
-    kUid,
-    kUser,
-    kBinary,
-    kArguments,
-    kCWD,
-    kKtime,
-    kCapInheritable,
-    kCapPermitted,
-    kCapEffective,
-    kParentProcessId,
-    kParentUid,
-    kParentUser,
-    kParentBinary,
-    kParentArguments,
-    kParentCWD,
-    kParentKtime,
-    kParentCapInheritable,
-    kParentCapPermitted,
-    kParentCapEffective,
-    kContainerId, // ?
-    kEventTime,
-    kCallName,
-    kEventType,
+// static constexpr DataElement kFileSecurityElements[] = {
+//     kExecId,
+//     kProcessId,
+//     kUid,
+//     kUser,
+//     kBinary,
+//     kArguments,
+//     kCWD,
+//     kKtime,
+//     kCapInheritable,
+//     kCapPermitted,
+//     kCapEffective,
+//     kParentProcessId,
+//     kParentUid,
+//     kParentUser,
+//     kParentBinary,
+//     kParentArguments,
+//     kParentCWD,
+//     kParentKtime,
+//     kParentCapInheritable,
+//     kParentCapPermitted,
+//     kParentCapEffective,
+//     kContainerId, // ?
+//     kEventTime,
+//     kCallName,
+//     kEventType,
 
-    // for file
-    kFilePath,
-};
+//     // for file
+//     kFilePath,
+// };
 
-static constexpr size_t kFileSecurityTableSize = std::size(kFileSecurityElements);
+// static constexpr size_t kFileSecurityTableSize = std::size(kFileSecurityElements);
 
-static constexpr auto kFileSecurityTable = DataTableSchema("file_security_table", "", kFileSecurityElements);
+// static constexpr auto kFileSecurityTable = DataTableSchema("file_security_table", "", kFileSecurityElements);
 
 } // namespace ebpf
 } // namespace logtail

@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,9 +37,7 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
     record->SetStartTsNs(dataEvent->start_ts);
     auto spanId = GenerateSpanID();
     // slow request
-    if (record->GetLatencyMs() > 500) {
-        record->MarkSample();
-    } else if (sampler->ShouldSample(spanId)) {
+    if (record->GetLatencyMs() > 500 || sampler->ShouldSample(spanId)) {
         record->MarkSample();
     }
 

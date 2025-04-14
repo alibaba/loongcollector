@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -100,23 +100,22 @@ constexpr DataElement kHTTPRespHeader = {
     "http resp.header",
 };
 
-static constexpr DataElement kHTTPElements[] = {kIp, // agg key
-                                                kAppId, // agg key
-                                                kProtocol, // agg key
-                                                kRpc, // agg key
-                                                kDestId, // agg key
-                                                kContainerId, // agg key
-                                                kRpcType,
-                                                kCallType,
-                                                kCallKind,
-                                                kEndpoint,
-                                                kStatusCode,
-                                                kStartTsNs,
-                                                kEndTsNs};
+// static constexpr DataElement kHTTPElements[] = {kIp, // agg key
+//                                                 kAppId, // agg key
+//                                                 kProtocol, // agg key
+//                                                 kRpc, // agg key
+//                                                 kDestId, // agg key
+//                                                 kContainerId, // agg key
+//                                                 kRpcType,
+//                                                 kCallType,
+//                                                 kCallKind,
+//                                                 kEndpoint,
+//                                                 kStatusCode,
+//                                                 kStartTsNs,
+//                                                 kEndTsNs};
 
-static constexpr auto kHTTPTable = DataTableSchema("http_record", "HTTP request-response pair events", kHTTPElements);
-
-static constexpr int kHTTPPathIdx = kHTTPTable.ColIndex("path");
+// static constexpr auto kHTTPTable = DataTableSchema("http_record", "HTTP request-response pair events",
+// kHTTPElements);
 
 } // namespace ebpf
 } // namespace logtail

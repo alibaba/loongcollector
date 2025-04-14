@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,45 +20,46 @@
 namespace logtail {
 namespace ebpf {
 
-static constexpr DataElement kNetworkSecurityElements[] = {
-    kExecId,
-    kProcessId,
-    kUid,
-    kUser,
-    kBinary,
-    kArguments,
-    kCWD,
-    kKtime,
-    kCapInheritable,
-    kCapPermitted,
-    kCapEffective,
-    kParentProcessId,
-    kParentUid,
-    kParentUser,
-    kParentBinary,
-    kParentArguments,
-    kParentCWD,
-    kParentKtime,
-    kParentCapInheritable,
-    kParentCapPermitted,
-    kParentCapEffective,
-    kContainerId, // ?
-    kEventTime,
-    kCallName,
-    kEventType,
+// static constexpr DataElement kNetworkSecurityElements[] = {
+//     kExecId,
+//     kProcessId,
+//     kUid,
+//     kUser,
+//     kBinary,
+//     kArguments,
+//     kCWD,
+//     kKtime,
+//     kCapInheritable,
+//     kCapPermitted,
+//     kCapEffective,
+//     kParentProcessId,
+//     kParentUid,
+//     kParentUser,
+//     kParentBinary,
+//     kParentArguments,
+//     kParentCWD,
+//     kParentKtime,
+//     kParentCapInheritable,
+//     kParentCapPermitted,
+//     kParentCapEffective,
+//     kContainerId, // ?
+//     kEventTime,
+//     kCallName,
+//     kEventType,
 
-    // for network
-    kSaddr,
-    kSport,
-    kDaddr,
-    kDport,
-    kState,
-    kL4Protocol,
-};
+//     // for network
+//     kSaddr,
+//     kSport,
+//     kDaddr,
+//     kDport,
+//     kState,
+//     kL4Protocol,
+// };
 
-static constexpr size_t kNetworkSecurityTableSize = std::size(kNetworkSecurityElements);
+// static constexpr size_t kNetworkSecurityTableSize = std::size(kNetworkSecurityElements);
 
-static constexpr auto kNetworkSecurityTable = DataTableSchema("network_security_table", "", kNetworkSecurityElements);
+// static constexpr auto kNetworkSecurityTable = DataTableSchema("network_security_table", "",
+// kNetworkSecurityElements);
 
 } // namespace ebpf
 } // namespace logtail

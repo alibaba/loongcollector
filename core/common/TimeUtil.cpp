@@ -422,7 +422,6 @@ std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
     auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
     auto boot_ns = t.tv_sec * 1000000000ULL + t.tv_nsec;
     return std::chrono::nanoseconds(now_ns - boot_ns);
-// linux windows
 #elif defined(__APPLE__)
     return std::chrono::nanoseconds(0);
 #endif

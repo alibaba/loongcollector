@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,33 +19,37 @@
 namespace logtail {
 namespace ebpf {
 
-inline constexpr DataElement kHostIp = {"host_ip",
-                                        "host_ip", // metric
-                                        "host.ip", // span
-                                        "host.ip", // log
-                                        "host ip",
-                                        AggregationType::Level0};
+inline constexpr DataElement kHostIp = {
+    "host_ip",
+    "host_ip", // metric
+    "host.ip", // span
+    "host.ip", // log
+    "host ip",
+};
 
-inline constexpr DataElement kHostName = {"host_name",
-                                          "host", // metric, DO NOT USE host_name for compatibility
-                                          "host.name", // span
-                                          "host.name", // log
-                                          "host name",
-                                          AggregationType::Level0};
+inline constexpr DataElement kHostName = {
+    "host_name",
+    "host", // metric, DO NOT USE host_name for compatibility
+    "host.name", // span
+    "host.name", // log
+    "host name",
+};
 
-inline constexpr DataElement kAppType = {"app_type",
-                                         "source", // metric
-                                         "arms.app.type", // span
-                                         "app_type", // log
-                                         "app type",
-                                         AggregationType::Level0};
+inline constexpr DataElement kAppType = {
+    "app_type",
+    "source", // metric
+    "arms.app.type", // span
+    "app_type", // log
+    "app type",
+};
 
-inline constexpr DataElement kDataType = {"data_type",
-                                          "data_type", // metric
-                                          "data_type", // span
-                                          "data_type", // log
-                                          "data_type",
-                                          AggregationType::Level0};
+inline constexpr DataElement kDataType = {
+    "data_type",
+    "data_type", // metric
+    "data_type", // span
+    "data_type", // log
+    "data_type",
+};
 
 inline constexpr DataElement kPodName = {
     "pod_name",
@@ -53,7 +57,6 @@ inline constexpr DataElement kPodName = {
     "k8s.pod.name", // span
     "k8s.pod.name", // log, inside pod
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPodUid = {
@@ -62,7 +65,6 @@ inline constexpr DataElement kPodUid = {
     "k8s.pod.uid", // span
     "k8s.pod.uid", // log, inside pod
     "pod uid",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPodIp = {
@@ -71,7 +73,6 @@ inline constexpr DataElement kPodIp = {
     "k8s.pod.ip", // span
     "k8s.pod.ip", // log, inside pod
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kWorkloadKind = {
@@ -80,7 +81,6 @@ inline constexpr DataElement kWorkloadKind = {
     "k8s.workload.kind", // span
     "k8s.workload.kind", // log, inside pod.workload
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kWorkloadName = {
@@ -89,7 +89,6 @@ inline constexpr DataElement kWorkloadName = {
     "k8s.workload.name", // span
     "k8s.workload.name", // log, inside pod.workload
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kNamespace = {
@@ -98,7 +97,6 @@ inline constexpr DataElement kNamespace = {
     "k8s.namespace", // span
     "k8s.namespace", // log, inside pod
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kServiceName = {
@@ -107,7 +105,6 @@ inline constexpr DataElement kServiceName = {
     "k8s.peer.service.name", // span
     "k8s.peer.service.name", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerPodName = {
@@ -116,7 +113,6 @@ inline constexpr DataElement kPeerPodName = {
     "k8s.peer.pod.name", // span
     "k8s.peer.pod.name", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerPodIp = {
@@ -125,7 +121,6 @@ inline constexpr DataElement kPeerPodIp = {
     "k8s.peer.pod.ip", // span
     "k8s.peer.pod.ip", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerWorkloadKind = {
@@ -134,7 +129,6 @@ inline constexpr DataElement kPeerWorkloadKind = {
     "k8s.peer.workload.kind", // span
     "k8s.peer.workload.kind", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerWorkloadName = {
@@ -143,7 +137,6 @@ inline constexpr DataElement kPeerWorkloadName = {
     "peerWorkloadName", // span
     "k8s.peer.workload.name", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerServiceName = {
@@ -152,7 +145,6 @@ inline constexpr DataElement kPeerServiceName = {
     "k8s.peer.service.name", // span
     "k8s.peer.service.name", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kPeerNamespace = {
@@ -161,7 +153,6 @@ inline constexpr DataElement kPeerNamespace = {
     "k8s.peer.namespace", // span
     "k8s.peer.namespace", // log
     "",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kRemoteAddr = {
@@ -170,7 +161,6 @@ inline constexpr DataElement kRemoteAddr = {
     "remote.addr", // span
     "remote.addr", // log
     "IP address of the remote endpoint.",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kRemotePort = {
@@ -179,7 +169,6 @@ inline constexpr DataElement kRemotePort = {
     "remote.port", // span
     "remote.port", // log
     "Port of the remote endpoint.",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kLocalAddr = {
@@ -188,66 +177,79 @@ inline constexpr DataElement kLocalAddr = {
     "local.addr", // span
     "local.addr", // log
     "IP address of the local endpoint.",
-    AggregationType::Level1,
 };
 
-inline constexpr DataElement kLocalPort = {"local_port",
-                                           "local_addr", // metric
-                                           "local.port", // span
-                                           "local.port", // log
-                                           "Port of the local endpoint."};
+inline constexpr DataElement kLocalPort = {
+    "local_port",
+    "local_addr", // metric
+    "local.port", // span
+    "local.port", // log
+    "Port of the local endpoint.",
+};
 
-inline constexpr DataElement kTraceRole = {"trace_role",
-                                           "trace_role", // metric
-                                           "trace.role", // span
-                                           "trace.role", // log
-                                           "The role (client-or-server) of the process that owns the connections."};
+inline constexpr DataElement kTraceRole = {
+    "trace_role",
+    "trace_role", // metric
+    "trace.role", // span
+    "trace.role", // log
+    "The role (client-or-server) of the process that owns the connections.",
+};
 
-inline constexpr DataElement kLatencyNS = {"latency",
-                                           "latency", // metric
-                                           "latency", // span
-                                           "latency", // log
-                                           "Request-response latency."};
+inline constexpr DataElement kLatencyNS = {
+    "latency",
+    "latency", // metric
+    "latency", // span
+    "latency", // log
+    "Request-response latency.",
+};
 
-inline constexpr DataElement kStartTsNs = {"startTsNs",
-                                           "startTsNs", // metric
-                                           "startTsNs", // span
-                                           "start_time_nsec", // log
-                                           "Request-response latency."};
+inline constexpr DataElement kStartTsNs = {
+    "startTsNs",
+    "startTsNs", // metric
+    "startTsNs", // span
+    "start_time_nsec", // log
+    "Request-response latency.",
+};
 
-inline constexpr DataElement kEndTsNs = {"endTsNs",
-                                         "", // metric
-                                         "endTsNs", // span
-                                         "end_time_nsec", // log
-                                         "Request-response latency."};
+inline constexpr DataElement kEndTsNs = {
+    "endTsNs",
+    "", // metric
+    "endTsNs", // span
+    "end_time_nsec", // log
+    "Request-response latency.",
+};
 
-inline constexpr DataElement kRegionId = {"region_id",
-                                          "regionId", // metric
-                                          "regionId", // span
-                                          "region.id", // log
-                                          "region id",
-                                          AggregationType::Level0};
+inline constexpr DataElement kRegionId = {
+    "region_id",
+    "regionId", // metric
+    "regionId", // span
+    "region.id", // log
+    "region id",
+};
 
-inline constexpr DataElement kIp = {"ip",
-                                    "serverIp", // metric
-                                    "ip", // span
-                                    "ip", // log
-                                    "local ip.",
-                                    AggregationType::Level0};
+inline constexpr DataElement kIp = {
+    "ip",
+    "serverIp", // metric
+    "ip", // span
+    "ip", // log
+    "local ip.",
+};
 
-inline constexpr DataElement kRemoteIp = {"remote_ip",
-                                          "", // metric
-                                          "remote.ip", // span
-                                          "remote.ip", // log
-                                          "remote ip.",
-                                          AggregationType::NoAggregate};
+inline constexpr DataElement kRemoteIp = {
+    "remote_ip",
+    "", // metric
+    "remote.ip", // span
+    "remote.ip", // log
+    "remote ip.",
+};
 
-inline constexpr DataElement kAppId = {"app_id",
-                                       "pid", // metric
-                                       "arms.appId", // span
-                                       "arms.app.id", // log
-                                       "arms app id",
-                                       AggregationType::Level0};
+inline constexpr DataElement kAppId = {
+    "app_id",
+    "pid", // metric
+    "arms.appId", // span
+    "arms.app.id", // log
+    "arms app id",
+};
 
 inline constexpr DataElement kNetNs = {
     "net_ns",
@@ -264,19 +266,21 @@ inline constexpr DataElement kFamily = {
     "",
 };
 
-inline constexpr DataElement kAppName = {"app",
-                                         "service", // metric
-                                         "service.name", // span
-                                         "arms.app.name", // log
-                                         "arms app name",
-                                         AggregationType::Level0};
+inline constexpr DataElement kAppName = {
+    "app",
+    "service", // metric
+    "service.name", // span
+    "arms.app.name", // log
+    "arms app name",
+};
 
-inline constexpr DataElement kPeerAppName = {"peer_app",
-                                             "arms_peer_app_name", // metric
-                                             "arms.peer.app.name", // span
-                                             "arms.app.name", // log
-                                             "arms app name",
-                                             AggregationType::Level0};
+inline constexpr DataElement kPeerAppName = {
+    "peer_app",
+    "arms_peer_app_name", // metric
+    "arms.peer.app.name", // span
+    "arms.app.name", // log
+    "arms app name",
+};
 
 inline constexpr DataElement kDestId = {
     "dest_id",
@@ -284,7 +288,6 @@ inline constexpr DataElement kDestId = {
     "destId", // span
     "dest.id", // log
     "peer addr (ip:port)",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kFd = {
@@ -295,12 +298,13 @@ inline constexpr DataElement kFd = {
     "fd",
 };
 
-inline constexpr DataElement kEndpoint = {"endpoint",
-                                          "endpoint", // metric
-                                          "endpoint", // span
-                                          "endpoint", // log
-                                          "reqeust path",
-                                          AggregationType::Level1};
+inline constexpr DataElement kEndpoint = {
+    "endpoint",
+    "endpoint", // metric
+    "endpoint", // span
+    "endpoint", // log
+    "reqeust path",
+};
 
 inline constexpr DataElement kProtocol = {
     "protocol",
@@ -308,7 +312,6 @@ inline constexpr DataElement kProtocol = {
     "protocol", // span
     "protocol", // log
     "request protocol",
-    AggregationType::NoAggregate,
 };
 
 inline constexpr DataElement kRpcType = {
@@ -317,7 +320,6 @@ inline constexpr DataElement kRpcType = {
     "rpcType", // span
     "rpc_type", // log
     "arms rpc type",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kCallType = {
@@ -326,7 +328,6 @@ inline constexpr DataElement kCallType = {
     "callType", // span
     "arms.call.type", // log
     "arms call type",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kCallKind = {
@@ -335,7 +336,6 @@ inline constexpr DataElement kCallKind = {
     "callKind", // span
     "arms.call.kind", // log
     "arms call kind",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kRpc = {
@@ -344,7 +344,6 @@ inline constexpr DataElement kRpc = {
     "rpc", // span
     "rpc", // log
     "span name",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kContainerId = {
@@ -353,7 +352,6 @@ inline constexpr DataElement kContainerId = {
     "container.id", // span
     "container.id", // log
     "local container id",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kContainerName = {
@@ -362,7 +360,6 @@ inline constexpr DataElement kContainerName = {
     "container.name", // span
     "container.name", // log
     "local container name",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kContainerIp = {
@@ -371,7 +368,6 @@ inline constexpr DataElement kContainerIp = {
     "container.ip", // span
     "container.ip", // log
     "container ip",
-    AggregationType::Level1,
 };
 
 inline constexpr DataElement kImageName = {
@@ -380,88 +376,266 @@ inline constexpr DataElement kImageName = {
     "conatainer.image.name", // span
     "conatainer.image.name", // log
     "container image name",
-    AggregationType::Level1,
 };
 
 // for processes
-inline constexpr DataElement kProcessId
-    = {"process_pid", "process_pid", "process.pid", "pid", "process pid", AggregationType::Level0};
+inline constexpr DataElement kProcessId = {
+    "process_pid",
+    "process_pid",
+    "process.pid",
+    "pid",
+    "process pid",
+};
 
-inline constexpr DataElement kKtime = {"ktime", "", "", "ktime", "", AggregationType::Level0};
+inline constexpr DataElement kKtime = {
+    "ktime",
+    "",
+    "",
+    "ktime",
+    "",
+};
 
-inline constexpr DataElement kExecId = {"exec_id", "", "", "exec_id", "", AggregationType::NoAggregate};
+inline constexpr DataElement kExecId = {
+    "exec_id",
+    "",
+    "",
+    "exec_id",
+    "",
+};
 
-inline constexpr DataElement kUser = {"user", "", "", "user", "", AggregationType::NoAggregate};
+inline constexpr DataElement kUser = {
+    "user",
+    "",
+    "",
+    "user",
+    "",
+};
 
-inline constexpr DataElement kUid = {"uid", "", "", "uid", "", AggregationType::NoAggregate};
+inline constexpr DataElement kUid = {
+    "uid",
+    "",
+    "",
+    "uid",
+    "",
+};
 
-inline constexpr DataElement kBinary = {"binary", "", "", "binary", "", AggregationType::NoAggregate};
+inline constexpr DataElement kBinary = {
+    "binary",
+    "",
+    "",
+    "binary",
+    "",
+};
 
-inline constexpr DataElement kCWD = {"cwd", "", "", "cwd", "", AggregationType::NoAggregate};
+inline constexpr DataElement kCWD = {
+    "cwd",
+    "",
+    "",
+    "cwd",
+    "",
+};
 
-inline constexpr DataElement kArguments = {"arguments", "", "", "arguments", "", AggregationType::NoAggregate};
+inline constexpr DataElement kArguments = {
+    "arguments",
+    "",
+    "",
+    "arguments",
+    "",
+};
 
-inline constexpr DataElement kCapPermitted
-    = {"cap_permitted", "", "", "cap.permitted", "", AggregationType::NoAggregate};
+inline constexpr DataElement kCapPermitted = {
+    "cap_permitted",
+    "",
+    "",
+    "cap.permitted",
+    "",
+};
 
-inline constexpr DataElement kCapInheritable
-    = {"cap_inheritable", "", "", "cap.inheritable", "", AggregationType::NoAggregate};
+inline constexpr DataElement kCapInheritable = {
+    "cap_inheritable",
+    "",
+    "",
+    "cap.inheritable",
+    "",
+};
 
-inline constexpr DataElement kCapEffective
-    = {"cap_effective", "", "", "cap.effective", "", AggregationType::NoAggregate};
+inline constexpr DataElement kCapEffective = {
+    "cap_effective",
+    "",
+    "",
+    "cap.effective",
+    "",
+};
 
-inline constexpr DataElement kCallName = {"call_name", "", "", "call_name", "", AggregationType::NoAggregate};
+inline constexpr DataElement kCallName = {
+    "call_name",
+    "",
+    "",
+    "call_name",
+    "",
+};
 
-inline constexpr DataElement kEventType
-    = {"event_type", "event_type", "event_type", "event_type", "", AggregationType::NoAggregate};
+inline constexpr DataElement kEventType = {
+    "event_type",
+    "event_type",
+    "event_type",
+    "event_type",
+    "",
+};
 
-inline constexpr DataElement kEventTime
-    = {"event_time", "event_time", "event_time", "event_time", "", AggregationType::NoAggregate};
+inline constexpr DataElement kEventTime = {
+    "event_time",
+    "event_time",
+    "event_time",
+    "event_time",
+    "",
+};
 
-inline constexpr DataElement kParentProcessId
-    = {"parent_process_pid", "", "", "parent.pid", "parent process pid", AggregationType::Level0};
+inline constexpr DataElement kParentProcessId = {
+    "parent_process_pid",
+    "",
+    "",
+    "parent.pid",
+    "parent process pid",
+};
 
-inline constexpr DataElement kParentKtime = {"parent_ktime", "", "", "parent.ktime", "", AggregationType::Level0};
+inline constexpr DataElement kParentKtime = {
+    "parent_ktime",
+    "",
+    "",
+    "parent.ktime",
+    "",
+};
 
-inline constexpr DataElement kParentExecId
-    = {"parent_exec_id", "", "", "parent.exec_id", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentExecId = {
+    "parent_exec_id",
+    "",
+    "",
+    "parent.exec_id",
+    "",
+};
 
-inline constexpr DataElement kParentUser = {"parent_user", "", "", "parent.user", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentUser = {
+    "parent_user",
+    "",
+    "",
+    "parent.user",
+    "",
+};
 
-inline constexpr DataElement kParentUid = {"parent_uid", "", "", "parent.uid", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentUid = {
+    "parent_uid",
+    "",
+    "",
+    "parent.uid",
+    "",
+};
 
-inline constexpr DataElement kParentBinary
-    = {"parent_binary", "", "", "parent.binary", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentBinary = {
+    "parent_binary",
+    "",
+    "",
+    "parent.binary",
+    "",
+};
 
-inline constexpr DataElement kParentCWD = {"parent_cwd", "", "", "parent.cwd", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentCWD = {
+    "parent_cwd",
+    "",
+    "",
+    "parent.cwd",
+    "",
+};
 
-inline constexpr DataElement kParentArguments
-    = {"parent_arguments", "", "", "parent.arguments", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentArguments = {
+    "parent_arguments",
+    "",
+    "",
+    "parent.arguments",
+    "",
+};
 
-inline constexpr DataElement kParentCapPermitted
-    = {"parent_cap_permitted", "", "", "parent.cap.permitted", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentCapPermitted = {
+    "parent_cap_permitted",
+    "",
+    "",
+    "parent.cap.permitted",
+    "",
+};
 
-inline constexpr DataElement kParentCapInheritable
-    = {"parent_cap_inheritable", "", "", "parent.cap.inheritable", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentCapInheritable = {
+    "parent_cap_inheritable",
+    "",
+    "",
+    "parent.cap.inheritable",
+    "",
+};
 
-inline constexpr DataElement kParentCapEffective
-    = {"parent_cap_effective", "", "", "parent.cap.effective", "", AggregationType::NoAggregate};
+inline constexpr DataElement kParentCapEffective = {
+    "parent_cap_effective",
+    "",
+    "",
+    "parent.cap.effective",
+    "",
+};
 
 // for network
-inline constexpr DataElement kSaddr
-    = {"source.addr", "saddr", "saddr", "network.saddr", "source address", AggregationType::NoAggregate};
-inline constexpr DataElement kDaddr
-    = {"dest.addr", "", "", "network.daddr", "dest address", AggregationType::NoAggregate};
-inline constexpr DataElement kSport
-    = {"source.port", "", "", "network.sport", "source port", AggregationType::NoAggregate};
-inline constexpr DataElement kState
-    = {"state", "state", "", "network.state", "connection state", AggregationType::NoAggregate};
-inline constexpr DataElement kDport = {"dest.port", "", "", "network.dport", "dest port", AggregationType::NoAggregate};
+inline constexpr DataElement kSaddr = {
+    "source.addr",
+    "saddr",
+    "saddr",
+    "network.saddr",
+    "source address",
+};
 
-inline constexpr DataElement kL4Protocol
-    = {"protocol", "", "", "network.protocol", "L4 protocol", AggregationType::NoAggregate};
+inline constexpr DataElement kDaddr = {
+    "dest.addr",
+    "",
+    "",
+    "network.daddr",
+    "dest address",
+};
+
+inline constexpr DataElement kSport = {
+    "source.port",
+    "",
+    "",
+    "network.sport",
+    "source port",
+};
+
+inline constexpr DataElement kState = {
+    "state",
+    "state",
+    "",
+    "network.state",
+    "connection state",
+};
+
+inline constexpr DataElement kDport = {
+    "dest.port",
+    "",
+    "",
+    "network.dport",
+    "dest port",
+};
+
+inline constexpr DataElement kL4Protocol = {
+    "protocol",
+    "",
+    "",
+    "network.protocol",
+    "L4 protocol",
+};
 
 // for file
-inline constexpr DataElement kFilePath = {"path", "", "", "file.path", "file path", AggregationType::NoAggregate};
+inline constexpr DataElement kFilePath = {
+    "path",
+    "",
+    "",
+    "file.path",
+    "file path",
+};
+
 } // namespace ebpf
 } // namespace logtail

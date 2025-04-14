@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,16 +41,16 @@ inline constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
 
 inline constexpr auto kNetMetricsTable = DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
 
-inline constexpr DataElement kNetElements[] = {
-    kIp,
-    kAppId,
+// inline constexpr DataElement kNetElements[] = {
+//     kIp,
+//     kAppId,
 
-    kLocalAddr,
-    kRemoteAddr,
-    kRemotePort,
-};
+//     kLocalAddr,
+//     kRemoteAddr,
+//     kRemotePort,
+// };
 
-inline constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
+// inline constexpr auto kNetTable = DataTableSchema("net_record", "net events", kNetElements);
 
 } // namespace ebpf
 } // namespace logtail

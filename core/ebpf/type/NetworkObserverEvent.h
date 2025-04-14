@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,10 +60,6 @@ public:
     virtual bool IsSlow() const = 0;
     virtual int GetStatusCode() const = 0;
 
-    virtual DataTableSchema GetMetricsTableSchema() const = 0;
-
-    virtual DataTableSchema GetTableSchema() const = 0;
-
 protected:
     uint64_t mStartTs;
     uint64_t mEndTs;
@@ -94,8 +90,6 @@ public:
     int GetStatusCode() const override { return 0; }
 
     std::string GetSpanName() override { return "CONN_STATS"; }
-    DataTableSchema GetMetricsTableSchema() const override { return kNetMetricsTable; }
-    DataTableSchema GetTableSchema() const override { return kNetTable; }
     int mState;
     uint64_t mDropCount = 0;
     uint64_t mRttVar = 0;
@@ -129,8 +123,6 @@ public:
     virtual std::string GetProtocolVersion() const = 0;
     virtual std::string GetPath() const = 0;
 
-    DataTableSchema GetMetricsTableSchema() const override { return kAppMetricsTable; }
-
     mutable std::string mTraceId;
     mutable std::string mSpanId;
 };
@@ -141,8 +133,6 @@ public:
     static std::atomic_int sDestructCount;
     ~HttpRecord() override { sDestructCount++; }
     HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) { sConstructCount++; }
-
-    DataTableSchema GetTableSchema() const override { return kHTTPTable; }
 
     void SetPath(const std::string& path) { mPath = path; }
 

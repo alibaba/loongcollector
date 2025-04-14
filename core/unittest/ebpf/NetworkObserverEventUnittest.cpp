@@ -121,10 +121,6 @@ void NetworkObserverEventUnittest::TestConnStatsRecord() {
     APSARA_TEST_FALSE(record.IsError());
     APSARA_TEST_FALSE(record.IsSlow());
     APSARA_TEST_EQUAL(record.GetStatusCode(), 0);
-
-    // 测试表模式
-    APSARA_TEST_EQUAL(record.GetMetricsTableSchema().Name(), "net_metrics");
-    APSARA_TEST_EQUAL(record.GetTableSchema().Name(), "net_record");
 }
 
 void NetworkObserverEventUnittest::TestHttpRecord() {
@@ -291,10 +287,6 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
 void NetworkObserverEventUnittest::TestAbstractNetRecord() {
     auto conn = CreateTestTracker();
     ConnStatsRecord record(conn);
-
-    // 测试表模式
-    APSARA_TEST_TRUE(record.GetMetricsTableSchema().Name() == "net_metrics");
-    APSARA_TEST_TRUE(record.GetTableSchema().Name() == "net_record");
 }
 
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestConnId);

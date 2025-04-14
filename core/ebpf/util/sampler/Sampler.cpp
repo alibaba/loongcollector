@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,17 +20,6 @@ namespace ebpf {
 // we only use the least 56 bit of spanID
 constexpr uint64_t kMaxAdjustedCount = ((uint64_t)1 << 56);
 constexpr uint64_t kLeastHalfTraceIDThreasholdMask = (kMaxAdjustedCount - 1);
-constexpr int kNumHexDigits = 56 / 4;
-constexpr int kNumSampledBytes = 56 / 8;
-
-// uint64_t TraceIDToRandomness(const std::array<uint8_t, 16>& traceID) {
-//     uint64_t half = (static_cast<uint64_t>(traceID[15])) | (static_cast<uint64_t>(traceID[14]) << 8)
-//         | (static_cast<uint64_t>(traceID[13]) << 16) | (static_cast<uint64_t>(traceID[12]) << 24)
-//         | (static_cast<uint64_t>(traceID[11]) << 32) | (static_cast<uint64_t>(traceID[10]) << 40)
-//         | (static_cast<uint64_t>(traceID[9]) << 48) | (static_cast<uint64_t>(traceID[8]) << 56);
-
-//     return half & kLeastHalfTraceIDThreasholdMask;
-// }
 
 uint64_t TraceID64ToRandomness(const std::array<uint64_t, 2>& traceID) {
     return traceID[1] & kLeastHalfTraceIDThreasholdMask;
@@ -59,11 +48,6 @@ double ThresholdToProbability(uint64_t threshold) {
 RatioSampler::RatioSampler(const double fraction, const uint64_t thresHold)
     : mFraction(fraction), mThresHold(thresHold) {
 }
-
-// bool RatioSampler::ShouldSample(const std::array<uint8_t, 16>& traceID) const {
-//     auto rand = TraceIDToRandomness(traceID);
-//     return rand >= mThresHold;
-// }
 
 bool RatioSampler::ShouldSample(const std::array<uint64_t, 2>& traceID) const {
     auto rand = TraceID64ToRandomness(traceID);
