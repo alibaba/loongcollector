@@ -20,15 +20,16 @@
 
 #include "boost/regex.hpp"
 
-#include "PipelineEventGroup.h"
-#include "TagConstants.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
 #include "constants/Constants.h"
+#include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "runner/ProcessorRunner.h"
 
 namespace logtail {
 
@@ -65,6 +66,18 @@ bool ProcessorSplitMultilineLogStringNative::Init(const Json::Value& config) {
                               mContext->GetProjectName(),
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
+    }
+
+    for (int i = 0; i < AppConfig::GetInstance()->GetProcessThreadCount(); ++i) {
+        if (!mMultiline.mStartPattern.empty()) {
+            mStartPatternReg.emplace_back(mMultiline.mStartPattern);
+        }
+        if (!mMultiline.mContinuePattern.empty()) {
+            mContinuePatternReg.emplace_back(mMultiline.mContinuePattern);
+        }
+        if (!mMultiline.mEndPattern.empty()) {
+            mEndPatternReg.emplace_back(mMultiline.mEndPattern);
+        }
     }
 
     mMatchedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MATCHED_EVENTS_TOTAL);
@@ -150,8 +163,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
     std::string exception;
     const char* multiStartIndex = nullptr;
     bool isPartialLog = false;
-    if (mMultiline.GetStartPatternReg() == nullptr && mMultiline.GetContinuePatternReg() == nullptr
-        && mMultiline.GetEndPatternReg() != nullptr) {
+    if (!HasStartPattern() && !HasContinuePattern() && HasEndPattern()) {
         // if only end pattern is given, then it will stick to this state
         isPartialLog = true;
         multiStartIndex = sourceVal.data();
@@ -165,17 +177,16 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
         if (!isPartialLog) {
             // it is impossible to enter this state if only end pattern is given
             boost::regex regex;
-            if (mMultiline.GetStartPatternReg() != nullptr) {
-                regex = *mMultiline.GetStartPatternReg();
+            if (HasStartPattern()) {
+                regex = GetStartPatternReg();
             } else {
-                regex = *mMultiline.GetContinuePatternReg();
+                regex = GetContinuePatternReg();
             }
             if (BoostRegexSearch(content.data(), content.size(), regex, exception)) {
                 multiStartIndex = content.data();
                 isPartialLog = true;
-            } else if (mMultiline.GetEndPatternReg() != nullptr && mMultiline.GetStartPatternReg() == nullptr
-                       && mMultiline.GetContinuePatternReg() != nullptr
-                       && BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
+            } else if (HasEndPattern() && !HasStartPattern() && HasContinuePattern()
+                       && BoostRegexSearch(content.data(), content.size(), GetEndPatternReg(), exception)) {
                 // case: continue + end
                 CreateNewEvent(content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents);
                 multiStartIndex = content.data() + content.size() + 1;
@@ -186,17 +197,17 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
             }
         } else {
             // case: start + continue or continue + end
-            if (mMultiline.GetContinuePatternReg() != nullptr
-                && BoostRegexSearch(content.data(), content.size(), *mMultiline.GetContinuePatternReg(), exception)) {
+            if (HasContinuePattern()
+                && BoostRegexSearch(content.data(), content.size(), GetContinuePatternReg(), exception)) {
                 begin += content.size() + 1;
                 continue;
             }
-            if (mMultiline.GetEndPatternReg() != nullptr) {
+            if (HasEndPattern()) {
                 // case: start + end or continue + end or end
-                if (mMultiline.GetContinuePatternReg() != nullptr) {
+                if (HasContinuePattern()) {
                     // current line is not matched against the continue pattern, so the end pattern will decide
                     // if the current log is a match or not
-                    if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
+                    if (BoostRegexSearch(content.data(), content.size(), GetEndPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
                                        isLastLog,
                                        sourceKey,
@@ -218,14 +229,14 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     isPartialLog = false;
                 } else {
                     // case: start + end or end
-                    if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
+                    if (BoostRegexSearch(content.data(), content.size(), GetEndPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
                                        isLastLog,
                                        sourceKey,
                                        sourceEvent,
                                        logGroup,
                                        newEvents);
-                        if (mMultiline.GetStartPatternReg() != nullptr) {
+                        if (HasStartPattern()) {
                             isPartialLog = false;
                         } else {
                             multiStartIndex = content.data() + content.size() + 1;
@@ -237,9 +248,9 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     // so wait for the next line
                 }
             } else {
-                if (mMultiline.GetContinuePatternReg() == nullptr) {
+                if (!HasContinuePattern()) {
                     // case: start
-                    if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetStartPatternReg(), exception)) {
+                    if (BoostRegexSearch(content.data(), content.size(), GetStartPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() - 1 - multiStartIndex),
                                        isLastLog,
                                        sourceKey,
@@ -259,8 +270,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                                    logGroup,
                                    newEvents);
                     ADD_COUNTER(mMatchedEventsTotal, 1);
-                    if (!BoostRegexSearch(
-                            content.data(), content.size(), *mMultiline.GetStartPatternReg(), exception)) {
+                    if (!BoostRegexSearch(content.data(), content.size(), GetStartPatternReg(), exception)) {
                         // when no end pattern is given, the only chance to enter unmatched state is when both
                         // start and continue pattern are given, and the current line is not matched against the
                         // start pattern
@@ -278,7 +288,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
     // when in unmatched state, the unmatched log is handled one by one, so there is no need for additional handle
     // here
     if (isPartialLog && multiStartIndex - sourceVal.data() < static_cast<int64_t>(sourceVal.size())) {
-        if (mMultiline.GetEndPatternReg() == nullptr) {
+        if (!HasEndPattern()) {
             CreateNewEvent(StringView(multiStartIndex, sourceVal.data() + sourceVal.size() - multiStartIndex),
                            true,
                            sourceKey,
@@ -381,6 +391,18 @@ StringView ProcessorSplitMultilineLogStringNative::GetNextLine(StringView log, s
         }
     }
     return StringView(log.data() + begin, log.size() - begin);
+}
+
+const boost::regex& ProcessorSplitMultilineLogStringNative::GetStartPatternReg() const {
+    return mStartPatternReg[ProcessorRunner::GetThreadNo()];
+}
+
+const boost::regex& ProcessorSplitMultilineLogStringNative::GetContinuePatternReg() const {
+    return mContinuePatternReg[ProcessorRunner::GetThreadNo()];
+}
+
+const boost::regex& ProcessorSplitMultilineLogStringNative::GetEndPatternReg() const {
+    return mEndPatternReg[ProcessorRunner::GetThreadNo()];
 }
 
 } // namespace logtail
