@@ -25,21 +25,20 @@ using namespace std;
 
 namespace logtail {
 
+const char* JSON_KEY_TIME = "__time__";
 
-    const char* JSON_KEY_TIME = "__time__";
-
-    // Helper function to serialize common fields (tags and time)
-    template <typename WriterType>
-    void SerializeCommonFields(const SizedMap& tags, uint64_t timestamp, WriterType& writer) {
-        // Serialize tags
-        for (const auto& tag : tags.mInner) {
-            writer.Key(tag.first.to_string().c_str());
-            writer.String(tag.second.to_string().c_str());
-        }
-        // Serialize time
-        writer.Key(JSON_KEY_TIME);
-        writer.Uint64(timestamp);
+// Helper function to serialize common fields (tags and time)
+template <typename WriterType>
+void SerializeCommonFields(const SizedMap& tags, uint64_t timestamp, WriterType& writer) {
+    // Serialize tags
+    for (const auto& tag : tags.mInner) {
+        writer.Key(tag.first.to_string().c_str());
+        writer.String(tag.second.to_string().c_str());
     }
+    // Serialize time
+    writer.Key(JSON_KEY_TIME);
+    writer.Uint64(timestamp);
+}
 
 bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
     if (group.mEvents.empty()) {

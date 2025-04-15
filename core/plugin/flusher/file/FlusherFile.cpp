@@ -54,7 +54,6 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
         sName, fileSink, spdlog::thread_pool(), spdlog::async_overflow_policy::block);
     mFileWriter->set_pattern("%v");
 
-    mBatcher.Init(Json::Value(), this, DefaultFlushStrategyOptions{});
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     return true;
