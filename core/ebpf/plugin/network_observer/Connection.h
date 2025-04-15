@@ -144,8 +144,8 @@ public:
     bool IsLocalhost() const;
 
     void TryAttachL7Meta(support_role_e role, support_proto_e protocol);
-    void TryAttachSelfMeta(bool enable = true);
-    void TryAttachPeerMeta(bool enable = true, int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
+    void TryAttachSelfMeta();
+    void TryAttachPeerMeta(int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
     // void UpdateRole(enum support_role_e role);
 

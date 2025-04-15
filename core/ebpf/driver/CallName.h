@@ -21,6 +21,8 @@
 namespace logtail {
 namespace ebpf {
 
+#define ERR_UNKNOWN_CALLNAME -1
+
 static inline int GetCallNameIdx(const std::string& call_name) {
     if (call_name == "security_file_permission") {
         return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION;
@@ -41,7 +43,7 @@ static inline int GetCallNameIdx(const std::string& call_name) {
     }
     ebpf_log(
         logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[GetCallNameIdx] unknown call name: %s \n", call_name.c_str());
-    return -1;
+    return ERR_UNKNOWN_CALLNAME;
 }
 
 } // namespace ebpf

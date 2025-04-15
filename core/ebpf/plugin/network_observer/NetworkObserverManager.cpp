@@ -20,6 +20,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
@@ -31,7 +32,6 @@
 #include "ebpf/util/TraceId.h"
 #include "logger/Logger.h"
 #include "metadata/K8sMetadata.h"
-#include "models/StringView.h"
 
 extern "C" {
 #include <coolbpf/net.h>
@@ -116,6 +116,21 @@ enum {
     TCP_CLOSING = 11,
     TCP_NEW_SYN_RECV = 12,
     TCP_MAX_STATES = 13,
+};
+
+enum class JobType {
+    METRIC_AGG,
+    SPAN_AGG,
+    LOG_AGG,
+    HOST_META_UPDATE,
+};
+
+class NetworkObserverScheduleConfig : public ScheduleConfig {
+public:
+    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
+        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
+
+    JobType mJobType;
 };
 
 NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -293,6 +308,18 @@ NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManag
         mNetMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
         mNetMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
         mNetMetaAttachRollbackTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL);
+
+        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}};
+        ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        mPushMetricsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushMetricGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+        eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}};
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mPushSpansTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushSpanGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     }
 }
 
@@ -496,9 +523,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 }
                 // set time stamp
                 HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
-                auto timeSpec = KernelNanoTimeToUTC(httpRecord->GetStartTimeStamp());
-                // auto ts = httpRecord->GetStartTimeStamp() + mTimeDiff.count();
-                // auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
+                auto timeSpec = KernelTimeNanoToUTC(httpRecord->GetStartTimeStamp());
                 logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
                 logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
                 logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
@@ -776,7 +801,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(
                     eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                     eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 } else {
-                    LOG_INFO(sLogger, ("no app id retrieve from metadata", "use configure"));
+                    LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
                     eventGroup.SetTag(kAppId.MetricKey(), mAppId);
                     eventGroup.SetTag(kAppName.MetricKey(), mAppName);
                     if (mHostIp.empty()) {
@@ -978,7 +1003,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                         eventGroup.SetTagNoCopy(kHostIp.SpanKey(), StringView(podIp.data, podIp.size)); // pod ip
                         eventGroup.SetTagNoCopy(kHostName.SpanKey(), StringView(podIp.data, podIp.size)); // pod name
                     } else {
-                        LOG_INFO(sLogger, ("no app id retrieve from metadata", "use configure"));
+                        LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
                         eventGroup.SetTag(kAppId.SpanKey(), mAppId);
                         eventGroup.SetTag(kAppName.SpanKey(), mAppName);
                         if (mHostIp.empty()) {
@@ -1030,13 +1055,14 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(
                 spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(record->GetRespBodySize()));
                 spanEvent->SetTag(kHTTPVersion.SpanKey(), record->GetProtocolVersion());
 
-                auto startTime = record->GetStartTimeStamp() + this->mTimeDiff.count();
-                spanEvent->SetStartTimeNs(startTime);
-                auto endTime = record->GetEndTimeStamp() + this->mTimeDiff.count();
-                spanEvent->SetEndTimeNs(endTime);
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(startTime));
-                spanEvent->SetTimestamp(seconds.count(), startTime);
-                LOG_DEBUG(sLogger, ("add one span, startTs", startTime)("entTs", endTime));
+                struct timespec startTime = KernelTimeNanoToUTC(record->GetStartTimeStamp());
+                struct timespec endTime = KernelTimeNanoToUTC(record->GetEndTimeStamp());
+                spanEvent->SetStartTimeNs(startTime.tv_sec * 1000000000 + startTime.tv_nsec);
+                spanEvent->SetEndTimeNs(endTime.tv_sec * 1000000000 + endTime.tv_nsec);
+                spanEvent->SetTimestamp(startTime.tv_sec, startTime.tv_nsec);
+                LOG_DEBUG(sLogger,
+                          ("add one span, startTs", startTime.tv_sec * 1000000000 + startTime.tv_nsec)(
+                              "entTs", endTime.tv_sec * 1000000000 + endTime.tv_nsec));
                 needPush = true;
             }
         });
@@ -1161,12 +1187,6 @@ int NetworkObserverManager::Update(
                          [this](const int& oldValue, const int& newValue) {
                              this->mConnectionManager->UpdateMaxConnectionThreshold(newValue);
                          });
-        CompareAndUpdate("DisableMetadata",
-                         mPreviousOpt->mDisableMetadata,
-                         opt->mDisableMetadata,
-                         [this](const bool& oldValue, const bool& newValue) {
-                             this->mConnectionManager->SetMetadataEnableStatus(!newValue);
-                         });
     }
 
     // update previous opt
@@ -1191,7 +1211,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mConnectionManager = ConnectionManager::Create();
     mConnectionManager->SetConnStatsStatus(!opt->mDisableConnStats);
     mConnectionManager->UpdateMaxConnectionThreshold(opt->mMaxConnections);
-    mConnectionManager->SetMetadataEnableStatus(!opt->mDisableMetadata);
     mConnectionManager->RegisterConnStatsFunc(
         [this](const std::shared_ptr<AbstractRecord>& record) { ProcessRecord(record); });
 
@@ -1210,71 +1229,17 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         mClusterId = StringTo<std::string>(value);
     }
 
-    std::shared_ptr<AbstractManager> managerPtr
-        = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+    auto now = std::chrono::steady_clock::now();
+    std::shared_ptr<ScheduleConfig> metricConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(15), JobType::METRIC_AGG);
+    std::shared_ptr<ScheduleConfig> spanConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::SPAN_AGG);
+    std::shared_ptr<ScheduleConfig> logConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::LOG_AGG);
+    ScheduleNext(now, metricConfig);
+    ScheduleNext(now, spanConfig);
+    ScheduleNext(now, logConfig);
 
-    // TODO @qianlu.kk init converger later ...
-
-    std::unique_ptr<AggregateEvent> appTraceEvent = std::make_unique<AggregateEvent>(
-        1,
-        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
-            return networkObserverManager->ConsumeSpanAggregateTree(execTime);
-        },
-        [managerPtr]() { // stop checker
-            if (!managerPtr->IsExists()) {
-                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
-                return true;
-            }
-            return false;
-        });
-
-    std::unique_ptr<AggregateEvent> appLogEvent = std::make_unique<AggregateEvent>(
-        1,
-        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
-            return networkObserverManager->ConsumeLogAggregateTree(execTime);
-        },
-        [managerPtr]() { // stop checker
-            if (!managerPtr->IsExists()) {
-                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
-                return true;
-            }
-            return false;
-        });
-
-    std::unique_ptr<AggregateEvent> appMetricEvent = std::make_unique<AggregateEvent>(
-        15,
-        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
-            return networkObserverManager->ConsumeMetricAggregateTree(execTime);
-        },
-        [managerPtr]() { // stop checker
-            if (!managerPtr->IsExists()) {
-                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
-                return true;
-            }
-            return false;
-        });
-
-    std::unique_ptr<AggregateEvent> netMetricEvent = std::make_unique<AggregateEvent>(
-        15,
-        [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
-            return networkObserverManager->ConsumeNetMetricAggregateTree(execTime);
-        },
-        [managerPtr]() { // stop checker
-            if (!managerPtr->IsExists()) {
-                LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
-                return true;
-            }
-            return false;
-        });
-
-    Timer::GetInstance()->PushEvent(std::move(appMetricEvent));
-    Timer::GetInstance()->PushEvent(std::move(netMetricEvent));
-    Timer::GetInstance()->PushEvent(std::move(appTraceEvent));
-    Timer::GetInstance()->PushEvent(std::move(appLogEvent));
     // init sampler
     {
         if (opt->mSampleRate < 0) {
@@ -1358,36 +1323,12 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
 
     // register update host K8s metadata task ...
-    if (!opt->mDisableMetadata && K8sMetadata::GetInstance().Enable()) {
+    if (K8sMetadata::GetInstance().Enable()) {
         config.mCidOffset = mCidOffset;
         config.mEnableCidFilter = true;
-
-        std::unique_ptr<AggregateEvent> hostMetaUpdateTask = std::make_unique<AggregateEvent>(
-            5,
-            [managerPtr](const std::chrono::steady_clock::time_point& execTime) {
-                std::vector<std::string> keys;
-                auto request = K8sMetadata::GetInstance().BuildAsyncRequest(
-                    keys,
-                    PodInfoType::HostInfo,
-                    [managerPtr]() { return managerPtr->IsExists(); },
-                    [managerPtr](const std::vector<std::string>& podIpVec) {
-                        NetworkObserverManager* networkObserverManager
-                            = static_cast<NetworkObserverManager*>(managerPtr.get());
-                        if (networkObserverManager) {
-                            networkObserverManager->HandleHostMetadataUpdate(podIpVec);
-                        }
-                    });
-                AsynCurlRunner::GetInstance()->AddRequest(std::move(request));
-                return true;
-            },
-            [managerPtr]() { // stop checker
-                if (!managerPtr->IsExists()) {
-                    LOG_INFO(sLogger, ("plugin not exists", "stop schedule")("ref cnt", managerPtr.use_count()));
-                    return true;
-                }
-                return false;
-            });
-        Timer::GetInstance()->PushEvent(std::move(hostMetaUpdateTask));
+        std::shared_ptr<ScheduleConfig> config
+            = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(5), JobType::HOST_META_UPDATE);
+        ScheduleNext(std::chrono::steady_clock::now(), config);
     }
 
     pc->mConfig = config;
@@ -1402,6 +1343,29 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     this->mFlag = true;
     this->RunInThread();
     return 0;
+}
+
+bool NetworkObserverManager::UploadHostMetadataUpdateTask() {
+    std::vector<std::string> keys;
+    auto request = K8sMetadata::GetInstance().BuildAsyncRequest(
+        keys,
+        PodInfoType::HostInfo,
+        []() {
+            auto managerPtr = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+            return managerPtr && managerPtr->IsExists();
+        },
+        [](const std::vector<std::string>& podIpVec) {
+            auto managerPtr = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+            if (managerPtr == nullptr) {
+                return;
+            }
+            NetworkObserverManager* networkObserverManager = static_cast<NetworkObserverManager*>(managerPtr.get());
+            if (networkObserverManager) {
+                networkObserverManager->HandleHostMetadataUpdate(podIpVec);
+            }
+        });
+    AsynCurlRunner::GetInstance()->AddRequest(std::move(request));
+    return true;
 }
 
 void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
@@ -1435,6 +1399,46 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
 
     mEnabledCids = std::move(currentCids);
     UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
+}
+
+bool NetworkObserverManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                                          const std::shared_ptr<ScheduleConfig>& config) {
+    NetworkObserverScheduleConfig* noConfig = static_cast<NetworkObserverScheduleConfig*>(config.get());
+    if (noConfig == nullptr) {
+        LOG_WARNING(sLogger, ("config is null", ""));
+        return false;
+    }
+
+    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEventV2>(nextTime, config));
+
+    LOG_DEBUG(sLogger, ("exec schedule task", magic_enum::enum_name(noConfig->mJobType)));
+
+    switch (noConfig->mJobType) {
+        case JobType::METRIC_AGG: {
+            ConsumeNetMetricAggregateTree(execTime);
+            ConsumeMetricAggregateTree(execTime);
+            break;
+        }
+        case JobType::SPAN_AGG: {
+            ConsumeSpanAggregateTree(execTime);
+            break;
+        }
+        case JobType::LOG_AGG: {
+            ConsumeLogAggregateTree(execTime);
+            break;
+        }
+        case JobType::HOST_META_UPDATE: {
+            UploadHostMetadataUpdateTask();
+            break;
+        }
+        default: {
+            LOG_ERROR(sLogger, ("skip schedule, unknown job type", magic_enum::enum_name(noConfig->mJobType)));
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void NetworkObserverManager::RunInThread() {

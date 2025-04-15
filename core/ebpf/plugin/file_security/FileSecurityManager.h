@@ -60,6 +60,9 @@ public:
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
+    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                      const std::shared_ptr<ScheduleConfig>& config) override;
+
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();

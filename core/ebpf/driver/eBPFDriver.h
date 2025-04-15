@@ -25,7 +25,6 @@ using resume_plugin_func = int (*)(logtail::ebpf::PluginConfig*);
 using poll_plugin_pbs_func = int (*)(logtail::ebpf::PluginType, int32_t, int32_t*, int);
 using set_networkobserver_config_func = void (*)(int32_t, int32_t);
 using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, bool);
-
 using update_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*, uint64_t);
 
 extern "C" {

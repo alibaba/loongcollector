@@ -23,16 +23,17 @@
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "common/http/Curl.h"
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
-#include "models/StringView.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
 
 DEFINE_FLAG_STRING(ipv4_cluster_cidrs, "cluster cidr", "");
+DEFINE_FLAG_BOOL(disable_k8s_meta, "disable k8s metadata", false);
 
 namespace logtail {
 
@@ -101,13 +102,13 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    mEnable = true;
+    mEnable = BOOL_FLAG(disable_k8s_meta);
 #else
     mEnable = getenv("KUBERNETES_SERVICE_HOST") && AppConfig::GetInstance()->IsPurageContainerMode()
-        && mServiceHost.size() && mServicePort > 0;
+        && mServiceHost.size() && mServicePort > 0 && !BOOL_FLAG(disable_k8s_meta);
     LOG_INFO(sLogger,
-             ("k8smetadata enable status", mEnable)("host ip", mHostIp)("serviceHost", mServiceHost)("servicePort",
-                                                                                                     mServicePort));
+             ("k8smetadata enable status", mEnable)("disable flag", BOOL_FLAG(disable_k8s_meta))("host ip", mHostIp)(
+                 "serviceHost", mServiceHost)("servicePort", mServicePort));
 #endif
 
     // self monitor

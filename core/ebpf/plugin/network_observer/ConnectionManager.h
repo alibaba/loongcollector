@@ -37,8 +37,8 @@ namespace ebpf {
 // hold by one thread
 class ConnectionManager {
 public:
-    static std::unique_ptr<ConnectionManager> Create(int maxConnections = 5000, bool enableMetadata = true) {
-        return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections, enableMetadata));
+    static std::unique_ptr<ConnectionManager> Create(int maxConnections = 5000) {
+        return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
     using ConnStatsHandler = std::function<void(const std::shared_ptr<AbstractRecord>& record)>;
@@ -57,11 +57,9 @@ public:
 
     int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
-    void SetMetadataEnableStatus(bool enable) { mEnableMetadata = enable; }
 
 private:
-    ConnectionManager(int maxConnections, bool enableMetadata)
-        : mMaxConnections(maxConnections), mEnableMetadata(enableMetadata), mConnectionTotal(0) {}
+    ConnectionManager(int maxConnections) : mMaxConnections(maxConnections), mConnectionTotal(0) {}
 
     std::shared_ptr<Connection> GetOrCreateConnection(const ConnId&);
     void DeleteConnection(const ConnId&);
@@ -71,7 +69,6 @@ private:
     int mReportIntervalSec;
 
     std::atomic_int mMaxConnections;
-    std::atomic_bool mEnableMetadata;
 
     std::atomic_bool mEnableConnStats = false;
     ConnStatsHandler mConnStatsHandler = nullptr;

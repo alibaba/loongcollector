@@ -23,6 +23,8 @@
 namespace logtail {
 namespace ebpf {
 
+#define ERR_LIMIT_EXCEEDED -1
+
 template <typename BPFMap>
 class IdManager {
 public:
@@ -37,7 +39,7 @@ public:
         }
 
         if (mNextId >= mIdMax) {
-            return -1;
+            return ERR_LIMIT_EXCEEDED;
         }
         return mNextId++;
     }

@@ -96,8 +96,12 @@ public:
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    bool UploadHostMetadataUpdateTask();
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec);
+
+    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                      const std::shared_ptr<ScheduleConfig>& config) override;
 
 private:
     void ProcessRecord(const std::shared_ptr<AbstractRecord>& record);
@@ -133,6 +137,11 @@ private:
     CounterPtr mAppMetaAttachSuccessTotal;
     CounterPtr mAppMetaAttachFailedTotal;
     CounterPtr mAppMetaAttachRollbackTotal;
+
+    CounterPtr mPushSpansTotal;
+    CounterPtr mPushSpanGroupTotal;
+    CounterPtr mPushMetricsTotal;
+    CounterPtr mPushMetricGroupTotal;
 
     mutable ReadWriteLock mSamplerLock;
     std::shared_ptr<Sampler> mSampler;

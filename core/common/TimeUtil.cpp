@@ -428,14 +428,12 @@ std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
 #endif
 }
 
-struct timespec KernelNanoTimeToUTC(uint64_t nano) {
-    static std::chrono::nanoseconds diff = GetTimeDiffFromMonotonic();
-    auto ts = std::chrono::nanoseconds(nano + diff.count());
+struct timespec KernelTimeNanoToUTC(uint64_t nano) {
+    static auto diff = GetTimeDiffFromMonotonic().count();
+    auto ts = std::chrono::nanoseconds(nano + diff);
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
     auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
-    struct timespec res;
-    res.tv_sec = seconds.count();
-    res.tv_nsec = nanoseconds.count();
+    struct timespec res = {seconds.count(), nanoseconds.count()};
     return res;
 }
 

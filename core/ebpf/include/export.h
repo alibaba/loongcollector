@@ -12,6 +12,9 @@ extern "C" {
 #include <coolbpf/net.h>
 }
 
+#define ERR_DRIVER_INTERNAL 1
+#define ERR_DRIVER_INVALID_PARAM 2
+
 namespace logtail {
 namespace ebpf {
 
@@ -29,7 +32,6 @@ struct ObserverNetworkOption {
     bool mEnableLog = false;
     double mSampleRate = 0.01;
     int mMaxConnections = 5000;
-    bool mDisableMetadata = false;
     std::string mAppId; // optional
     std::string mAppName; // optional
     std::string mHostName; // optional

@@ -20,9 +20,9 @@
 
 #include <numeric>
 
-#include "StringView.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"

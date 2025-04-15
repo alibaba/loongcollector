@@ -21,7 +21,7 @@
 #include <vector>
 
 #include "models/LogEvent.h"
-#include "models/StringView.h"
+#include "common/StringView.h"
 
 /*
  * FSM(finite state machine) for csv parser

@@ -59,6 +59,9 @@ public:
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
+    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                      const std::shared_ptr<ScheduleConfig>& config) override;
+
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();

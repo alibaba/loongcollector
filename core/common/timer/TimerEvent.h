@@ -27,7 +27,7 @@ public:
 
     virtual bool IsValid() const = 0;
     virtual bool Execute() = 0;
-    virtual bool IsPeriodicalEvent() { return false; }
+    // virtual bool IsPeriodicalEvent() { return false; }
 
     std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
     void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
@@ -36,22 +36,23 @@ protected:
     std::chrono::steady_clock::time_point mExecTime;
 };
 
-class PeriodicalTimerEvent : public TimerEvent {
-public:
-    PeriodicalTimerEvent(int intervalSec)
-        : TimerEvent(std::chrono::steady_clock::now() + std::chrono::seconds(intervalSec)), mIntervalSec(intervalSec) {}
-    virtual ~PeriodicalTimerEvent() = default;
+// class PeriodicalTimerEvent : public TimerEvent {
+// public:
+//     PeriodicalTimerEvent(int intervalSec)
+//         : TimerEvent(std::chrono::steady_clock::now() + std::chrono::seconds(intervalSec)), mIntervalSec(intervalSec)
+//         {}
+//     virtual ~PeriodicalTimerEvent() = default;
 
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
-    virtual bool IsPeriodicalEvent() override { return true; }
-    virtual void ScheduleNext() { mExecTime += std::chrono::seconds(mIntervalSec); }
-    virtual bool IsStop() = 0;
+//     virtual bool IsValid() const = 0;
+//     virtual bool Execute() = 0;
+//     virtual bool IsPeriodicalEvent() override { return true; }
+//     virtual void ScheduleNext() { mExecTime += std::chrono::seconds(mIntervalSec); }
+//     virtual bool IsStop() = 0;
 
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
+//     std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
 
-protected:
-    int mIntervalSec;
-};
+// protected:
+//     int mIntervalSec;
+// };
 
 } // namespace logtail

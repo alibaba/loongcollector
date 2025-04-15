@@ -15,7 +15,7 @@
 
 #include "PipelineEvent.h"
 #include "SizedContainer.h"
-#include "StringView.h"
+#include "common/StringView.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

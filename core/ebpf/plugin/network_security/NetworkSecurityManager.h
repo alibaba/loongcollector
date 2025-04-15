@@ -24,6 +24,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/NetworkEvent.h"
 
 
@@ -62,6 +63,9 @@ public:
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
+
+    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                      const std::shared_ptr<ScheduleConfig>& config) override;
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {

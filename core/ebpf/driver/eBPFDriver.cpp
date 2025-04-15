@@ -105,7 +105,7 @@ int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
         }
         case logtail::ebpf::PluginType::NETWORK_OBSERVE:
         default:
-            return 1;
+            return ERR_DRIVER_INTERNAL;
     }
     auto config = arg->mConfig;
     // create pb and set perf buffer meta
@@ -124,7 +124,7 @@ int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
                          magic_enum::enum_name(arg->mPluginType).data(),
                          spec.mName.c_str(),
                          spec.mSize);
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             pbs.push_back(pb);
         }
@@ -220,7 +220,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
                                  cn.c_str());
-                        return 1;
+                        return ERR_DRIVER_INTERNAL;
                     }
                 }
             }
@@ -229,7 +229,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "file security: DynamicAttachBPFObject success\n");
@@ -268,7 +268,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
                                  cn.c_str());
-                        return 1;
+                        return ERR_DRIVER_INTERNAL;
                     }
                 }
             }
@@ -277,7 +277,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "network security: DynamicAttachBPFObject success\n");
@@ -331,7 +331,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "process security: DynamicAttachBPFObject fail ret:%d\n",
                          ret);
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "process security: DynamicAttachBPFObject success\n");
@@ -396,7 +396,7 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "file security: DynamicAttachBPFObject success\n");
@@ -418,7 +418,7 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
-                return 1;
+                return ERR_DRIVER_INTERNAL;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "network security: DynamicAttachBPFObject success\n");
@@ -452,7 +452,7 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[update plugin] network security delete filter for callname %s failed.\n",
                                  cn.c_str());
-                        return 1;
+                        return ERR_DRIVER_INTERNAL;
                     }
 
                     ret = logtail::ebpf::CreateNetworkFilterForCallname(gWrapper, cn, opt.mFilter);

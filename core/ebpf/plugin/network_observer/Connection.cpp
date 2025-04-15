@@ -111,7 +111,7 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
         LOG_DEBUG(sLogger, ("netMeta already attached", ""));
         UpdateL4Meta(event);
         MarkL4MetaAttached();
-        TryAttachPeerMeta(true, event->si.family, event->si.ap.daddr);
+        TryAttachPeerMeta(event->si.family, event->si.ap.daddr);
         TryAttachSelfMeta();
     }
 
@@ -282,16 +282,6 @@ void Connection::UpdateL4Meta(struct conn_stats_event_t* event) {
     mTags.Set<kTraceRole>(std::string(magic_enum::enum_name(mRole)));
     mTags.Set<kIp>(sip);
     mTags.Set<kRemoteIp>(dip);
-
-    // MarkL4MetaAttached();
-
-    // for peer meta
-    // LOG_DEBUG(sLogger, ("try attach peer meta", GetRemoteIp()));
-    // TryAttachPeerMeta(true, si.family, si.ap.daddr);
-
-    // // for self meta
-    // LOG_DEBUG(sLogger, ("try attach self meta", GetContainerId()));
-    // TryAttachSelfMeta();
 }
 
 void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
@@ -388,11 +378,11 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     }
 }
 
-void Connection::TryAttachSelfMeta(bool enable) {
+void Connection::TryAttachSelfMeta() {
     if (IsSelfMetaAttachReady()) {
         return;
     }
-    if (!enable || !K8sMetadata::GetInstance().Enable()) {
+    if (!K8sMetadata::GetInstance().Enable()) {
         // set self metadata ...
         MarkSelfMetaAttached();
         return;
@@ -416,11 +406,11 @@ void Connection::TryAttachSelfMeta(bool enable) {
     }
 }
 
-void Connection::TryAttachPeerMeta(bool enable, int family, uint32_t ip) {
+void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
     if (IsPeerMetaAttachReady()) {
         return;
     }
-    if (!enable || !K8sMetadata::GetInstance().Enable()) {
+    if (!K8sMetadata::GetInstance().Enable()) {
         // k8smetadata not enable, mark attached ...
         MarkPeerMetaAttached();
         return;

@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "models/Span.h"
-#include "models/StringView.h"
+#include "common/Span.h"
+#include "common/StringView.h"
 
 namespace logtail {
 namespace ebpf {

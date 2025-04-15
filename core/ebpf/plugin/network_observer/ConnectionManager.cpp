@@ -124,8 +124,8 @@ void ConnectionManager::Iterations(int count) {
             continue;
         }
 
-        it.second->TryAttachPeerMeta(mEnableMetadata);
-        it.second->TryAttachSelfMeta(mEnableMetadata);
+        it.second->TryAttachPeerMeta();
+        it.second->TryAttachSelfMeta();
 
         bool forceGenRecord = false;
         if (it.second && it.second->ReadyToDestroy(now)) {

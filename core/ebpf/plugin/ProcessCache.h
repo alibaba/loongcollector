@@ -20,10 +20,10 @@
 #include <deque>
 #include <mutex>
 
+#include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "ebpf/type/table/StaticDataRow.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

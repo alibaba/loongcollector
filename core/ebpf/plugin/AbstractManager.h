@@ -31,6 +31,7 @@
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
@@ -69,6 +70,10 @@ public:
     bool IsExists() { return mFlag; }
 
     int GetCallNameIdx(const std::string& callName);
+
+    virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                              const std::shared_ptr<ScheduleConfig>& config)
+        = 0;
 
     virtual PluginType GetPluginType() = 0;
 
@@ -134,17 +139,10 @@ protected:
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 
-    // static ...
-    std::chrono::nanoseconds mTimeDiff;
-
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
-    CounterPtr mPushSpansTotal;
-    CounterPtr mPushSpanGroupTotal;
-    CounterPtr mPushMetricsTotal;
-    CounterPtr mPushMetricGroupTotal;
 
     std::vector<MetricLabels> mRefAndLabels;
 };

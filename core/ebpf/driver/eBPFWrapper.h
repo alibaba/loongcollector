@@ -55,6 +55,11 @@ public:
     virtual ~BPFWrapperBase() = default;
 };
 
+#define ERR_INIT_SKEL 1
+#define ERR_INVALID_PARAM 2
+#define ERR_LIBBPF 3
+#define ERR_NOT_FOUND -1
+
 template <typename T>
 class BPFWrapper : public BPFWrapperBase {
 public:
@@ -72,7 +77,7 @@ public:
         mSkel = T::open_and_load();
         mFlag = true;
         if (!mSkel) {
-            return 1;
+            return ERR_INIT_SKEL;
         }
         bpf_map* map = nullptr;
         bpf_object__for_each_map(map, mSkel->obj) {
@@ -141,7 +146,7 @@ public:
     int SetTailCall(const std::string& mapName, const std::vector<std::string>& functions) {
         int mapFd = SearchMapFd(mapName);
         if (mapFd < 0) {
-            return 1;
+            return ERR_NOT_FOUND;
         }
 
         for (int i = 0; i < (int)functions.size(); i++) {
@@ -163,7 +168,7 @@ public:
     int DeleteInnerMap(const std::string& outterMapName, void* outterKey) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
-            return 1;
+            return ERR_NOT_FOUND;
         }
 
         // delete bpf map
@@ -189,7 +194,7 @@ public:
     int DeleteInnerMapElem(const std::string& outterMapName, void* outterKey, void* innerKey) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
-            return 1;
+            return ERR_NOT_FOUND;
         }
         int innerMapFd = -1;
         uint32_t innerMapId = 0;
@@ -200,35 +205,10 @@ public:
 
         innerMapFd = bpf_map_get_fd_by_id(innerMapId);
         if (innerMapFd < 0) {
-            return 1;
+            return ERR_NOT_FOUND;
         }
 
         ret = bpf_map_delete_elem(innerMapFd, innerKey);
-
-        close(innerMapFd);
-
-        return ret;
-    }
-
-    template <typename MapInMapType>
-    int LookupInnerMapElem(const std::string& outterMapName, void* outterKey, void* innerKey, void* innerVal) {
-        int mapFd = SearchMapFd(outterMapName);
-        if (mapFd < 0) {
-            return 1;
-        }
-        int innerMapFd = -1;
-        uint32_t innerMapId = 0;
-        int ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
-        if (ret) {
-            return 1;
-        }
-
-        innerMapFd = bpf_map_get_fd_by_id(innerMapId);
-        if (innerMapFd < 0) {
-            return 1;
-        }
-
-        ret = bpf_map_lookup_elem(innerMapFd, innerKey, innerVal);
 
         close(innerMapFd);
 
@@ -240,7 +220,10 @@ public:
         const std::string& outterMapName, void* outterKey, void* innerKey, void* innerValue, uint64_t flag) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
-            return 1;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[BPFWrapper][UpdateInnerMapElem] find outter hash map failed for: %s \n",
+                     outterMapName.c_str());
+            return ERR_NOT_FOUND;
         }
         int innerMapFd = -1;
         uint32_t innerMapId = 0;
@@ -266,7 +249,10 @@ public:
                                     BPFMapTraits<MapInMapType>::inner_max_entries,
                                     popt);
             if (fd < 0) {
-                return 1;
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                         "[BPFWrapper][UpdateInnerMapElem] failed to create inner map for outter map: %s \n",
+                         outterMapName.c_str());
+                return ERR_LIBBPF;
             }
 
             int* key = static_cast<int*>(outterKey);
@@ -278,12 +264,18 @@ public:
 
         ret = bpf_map_lookup_elem(mapFd, outterKey, &innerMapId);
         if (ret) {
-            return 1;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[BPFWrapper][UpdateInnerMapElem] failed to lookup inner map for outter map: %s \n",
+                     outterMapName.c_str());
+            return ret;
         }
 
         innerMapFd = bpf_map_get_fd_by_id(innerMapId);
         if (innerMapFd < 0) {
-            return 1;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[BPFWrapper][UpdateInnerMapElem] failed to find inner map fd by id for outter map: %s \n",
+                     outterMapName.c_str());
+            return ERR_NOT_FOUND;
         }
 
         ret = bpf_map_update_elem(innerMapFd, innerKey, innerValue, flag);
@@ -305,7 +297,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][UpdateBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return 1;
+            return ERR_NOT_FOUND;
         }
         return bpf_map_update_elem(mapFd, key, value, flag);
     }
@@ -323,7 +315,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][LookupBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return 1;
+            return ERR_NOT_FOUND;
         }
         return bpf_map_lookup_elem(mapFd, key, value);
     }
@@ -341,7 +333,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][RemoveBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return 1;
+            return ERR_NOT_FOUND;
         }
         bpf_map_delete_elem(mapFd, key);
         return 0;
@@ -419,12 +411,11 @@ public:
         DetachAllPerfBuffers();
         mInited = false;
     }
-    // pin map
 
     int SearchProgFd(const std::string& name) {
         auto it = mBpfProgs.find(name);
         if (it == mBpfProgs.end()) {
-            return -1;
+            return ERR_NOT_FOUND;
         }
 
         return bpf_program__fd(it->second);
@@ -433,27 +424,13 @@ public:
     int SearchMapFd(const std::string& name) {
         auto it = mBpfMaps.find(name);
         if (it == mBpfMaps.end()) {
-            return -1;
+            return ERR_NOT_FOUND;
         }
 
         return bpf_map__fd(it->second);
     }
 
-    int GetBPFMapFdById(int id) { return bpf_map_get_fd_by_id(id); }
-
     int GetBPFProgFdById(int id) { return bpf_prog_get_fd_by_id(id); }
-
-    bool CreateBPFMap(enum bpf_map_type mapType, int keySize, int valueSize, int maxEntries, unsigned int mapFlags) {
-        bpf_create_map(mapType, keySize, valueSize, maxEntries, mapFlags);
-        return true;
-    }
-
-    bool CreateBPFMapInMap() {
-        // TODO @qianlu.kk
-        // bpf_create_map_in_map(enum bpf_map_type map_type, const char *name, int key_size, int inner_map_fd, int
-        // max_entries, bpf_create_map_in_map();
-        return true;
-    }
 
 private:
     // {map_name, map_fd}

@@ -27,9 +27,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/StringView.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/collector/BaseCollector.h"
-#include "models/StringView.h"
 
 using namespace std::chrono;
 

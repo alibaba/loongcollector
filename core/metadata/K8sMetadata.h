@@ -26,8 +26,8 @@
 #include "common/LRUCache.h"
 #include "common/Lock.h"
 #include "common/NetworkUtil.h"
+#include "common/StringView.h"
 #include "common/http/HttpRequest.h"
-#include "models/StringView.h"
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/MetricTypes.h"
 

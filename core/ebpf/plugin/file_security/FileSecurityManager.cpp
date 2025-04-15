@@ -18,6 +18,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
@@ -149,11 +150,8 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-
-                auto ts = std::chrono::nanoseconds(innerEvent->mTimestamp + this->mTimeDiff.count());
-                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
-                auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
-                logEvent->SetTimestamp(seconds.count(), nanoseconds.count());
+                struct timespec ts = KernelTimeNanoToUTC(innerEvent->mTimestamp);
+                logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
                 logEvent->SetContent(FileSecurityManager::sPathKey, group->mPath);
                 // set callnames
                 switch (innerEvent->mEventType) {
@@ -197,27 +195,20 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     return true;
 }
 
+bool FileSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                                       const std::shared_ptr<ScheduleConfig>& config) {
+    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEventV2>(nextTime, config));
+    return ConsumeAggregateTree(execTime);
+}
+
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // set init flag ...
     mFlag = true;
-    std::shared_ptr<AbstractManager> managerPtr
-        = eBPFServer::GetInstance()->GetPluginManager(PluginType::FILE_SECURITY);
 
-    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
-        2,
-        [managerPtr](const std::chrono::steady_clock::time_point& execTime) { // handler
-            FileSecurityManager* mgr = static_cast<FileSecurityManager*>(managerPtr.get());
-            return mgr->ConsumeAggregateTree(execTime);
-        },
-        [managerPtr]() { // stop checker
-            if (!managerPtr->IsExists()) {
-                LOG_INFO(sLogger, ("plugin not exists", "stop schedule"));
-                return true;
-            }
-            return false;
-        });
-
-    Timer::GetInstance()->PushEvent(std::move(event));
+    std::shared_ptr<ScheduleConfig> scheduleConfig
+        = std::make_shared<ScheduleConfig>(PluginType::FILE_SECURITY, std::chrono::seconds(2));
+    ScheduleNext(std::chrono::steady_clock::now(), scheduleConfig);
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;

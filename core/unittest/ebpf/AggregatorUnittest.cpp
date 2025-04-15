@@ -182,7 +182,7 @@ void AggregatorUnittest::TestAggregator() {
                     APSARA_TEST_EQUAL(fe->mPath, "path-2");
                 }
                 auto* logEvent = eventGroup.AddLogEvent();
-                auto ts = innerEvent->mTimestamp; // + this->mTimeDiff.count();
+                auto ts = innerEvent->mTimestamp;
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                 logEvent->SetTimestamp(seconds.count(), ts);
                 if (innerEvent->mTimestamp) {
@@ -215,32 +215,32 @@ void AggregatorUnittest::TestAggregator() {
 }
 
 void AggregatorUnittest::TestAggManager() {
-    std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
-        1,
-        [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-            if (!this->mFlag) {
-                return false;
-            }
-            this->mVec.push_back(1);
-            return true;
-        },
-        [this]() { // validator
-            auto isStop = !this->mFlag.load();
-            if (isStop) {
-                LOG_INFO(sLogger, ("stop schedule, mflag", this->mFlag));
-            }
-            return isStop;
-        });
+    // std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
+    //     1,
+    //     [this](const std::chrono::steady_clock::time_point& execTime) { // handler
+    //         if (!this->mFlag) {
+    //             return false;
+    //         }
+    //         this->mVec.push_back(1);
+    //         return true;
+    //     },
+    //     [this]() { // validator
+    //         auto isStop = !this->mFlag.load();
+    //         if (isStop) {
+    //             LOG_INFO(sLogger, ("stop schedule, mflag", this->mFlag));
+    //         }
+    //         return isStop;
+    //     });
 
-    Timer::GetInstance()->PushEvent(std::move(event));
+    // Timer::GetInstance()->PushEvent(std::move(event));
 
-    std::this_thread::sleep_for(std::chrono::seconds(4));
-    mFlag = false;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    APSARA_TEST_EQUAL(mVec.size(), 3UL);
-    mFlag = true;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    APSARA_TEST_EQUAL(mVec.size(), 3UL);
+    // std::this_thread::sleep_for(std::chrono::seconds(4));
+    // mFlag = false;
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
+    // mFlag = true;
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
 }
 
 void AggregatorUnittest::TestBasicAgg() {

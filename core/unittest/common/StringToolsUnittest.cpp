@@ -16,8 +16,8 @@
 
 #include <cstdint>
 
-#include "StringView.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

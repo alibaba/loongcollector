@@ -33,12 +33,12 @@
 #include "common/HashUtil.h"
 #include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInformationTools.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 
 DEFINE_FLAG_INT32(process_collect_silent_count, "number of process scanned between a sleep", 1000);
 

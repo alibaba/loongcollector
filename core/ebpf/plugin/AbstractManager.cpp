@@ -27,8 +27,6 @@ AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCac
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                  PluginMetricManagerPtr mgr)
     : mProcessCacheManager(processCacheMgr), mSourceManager(sourceManager), mCommonEventQueue(queue), mMetricMgr(mgr) {
-    mTimeDiff = GetTimeDiffFromMonotonic();
-
     if (!mMetricMgr) {
         return;
     }
@@ -46,18 +44,6 @@ AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCac
     mRefAndLabels.emplace_back(eventTypeLabels);
     mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
     mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
-
-    eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}};
-    ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
-    mRefAndLabels.emplace_back(eventTypeLabels);
-    mPushMetricsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
-    mPushMetricGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
-
-    eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}};
-    mRefAndLabels.emplace_back(eventTypeLabels);
-    ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
-    mPushSpansTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
-    mPushSpanGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
 }
 
 AbstractManager::~AbstractManager() {

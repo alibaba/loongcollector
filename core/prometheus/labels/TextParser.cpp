@@ -22,10 +22,10 @@
 
 #include "boost/algorithm/string.hpp"
 
+#include "common/StringView.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 #include "prometheus/Utils.h"
 
 using namespace std;

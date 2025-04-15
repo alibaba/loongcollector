@@ -41,7 +41,7 @@ protected:
     void TearDown() override {}
 
 private:
-    std::shared_ptr<ConnectionManager> CreateManager() { return ConnectionManager::Create(200, 15); }
+    std::shared_ptr<ConnectionManager> CreateManager() { return ConnectionManager::Create(200); }
 
     ConnId CreateTestConnId(int fd = 1, uint32_t tgid = 1000, uint64_t start = 123456) {
         return ConnId(fd, tgid, start);

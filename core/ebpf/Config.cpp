@@ -84,17 +84,6 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-    // DisableMetadata (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "DisableMetadata", thisObserverNetworkOption.mDisableMetadata, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
     // SampleRate (Optional)
     if (!GetOptionalDoubleParam(probeConfig, "SampleRate", thisObserverNetworkOption.mSampleRate, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
