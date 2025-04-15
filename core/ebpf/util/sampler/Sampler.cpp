@@ -14,8 +14,7 @@
 
 #include "Sampler.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 // we only use the least 56 bit of spanID
 constexpr uint64_t kMaxAdjustedCount = ((uint64_t)1 << 56);
@@ -37,7 +36,7 @@ uint64_t ProbabilityToThreshold(double fraction) {
     if (fraction >= 1) {
         return kAlwaysSampleThresHold;
     }
-    uint64_t scaled = uint64_t((double)kMaxAdjustedCount * fraction);
+    auto scaled = uint64_t((double)kMaxAdjustedCount * fraction);
     return kMaxAdjustedCount - scaled;
 }
 
@@ -57,5 +56,4 @@ bool RatioSampler::ShouldSample(const std::array<uint64_t, 2>& traceID) const {
 HashRatioSampler::HashRatioSampler(const double fraction) : RatioSampler(fraction, ProbabilityToThreshold(fraction)) {
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

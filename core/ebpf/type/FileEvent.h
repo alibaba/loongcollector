@@ -9,8 +9,7 @@
 
 #include "CommonDataEvent.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class FileEvent : public CommonEvent {
 public:
@@ -18,7 +17,7 @@ public:
         : CommonEvent(pid, ktime, type, timestamp) {}
     FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, const std::string& path)
         : CommonEvent(pid, ktime, type, timestamp), mPath(path) {}
-    virtual PluginType GetPluginType() const { return PluginType::FILE_SECURITY; };
+    [[nodiscard]] PluginType GetPluginType() const override { return PluginType::FILE_SECURITY; };
     std::string mPath;
 };
 
@@ -32,5 +31,4 @@ public:
     std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

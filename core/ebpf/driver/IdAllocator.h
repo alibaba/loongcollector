@@ -87,8 +87,8 @@ private:
 
     template <typename BPFMap>
     IdManager<BPFMap>& GetIdManager() {
-        static IdManager<BPFMap> manager;
-        return manager;
+        static IdManager<BPFMap> sManager;
+        return sManager;
     }
 };
 

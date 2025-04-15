@@ -21,8 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class Sampler {
 public:
@@ -55,5 +54,4 @@ public:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -85,9 +85,9 @@ public:
     }
 
     template <class ContainerType>
-    bool Aggregate(const Value& d, const ContainerType& agg_keys) {
+    bool Aggregate(const Value& d, const ContainerType& aggKeys) {
         auto p = mRootNode.get();
-        for (auto& val : agg_keys) {
+        for (auto& val : aggKeys) {
             auto result = p->mChild.find(val);
             if (result == p->mChild.end() && mNodeCount >= mMaxNodes) {
                 // when we exceed the maximum limit, we will drop new metrics
@@ -152,9 +152,9 @@ public:
 private:
     void GetNodes(size_t depth,
                   const std::unique_ptr<AggNode<Data, KeyType>>& root,
-                  size_t target_depth,
+                  size_t targetDepth,
                   std::vector<AggNode<Data, KeyType>*>& ans) {
-        if (depth >= target_depth) {
+        if (depth >= targetDepth) {
             // we are done, add mChild to ans and return
             for (auto& c : root->mChild) {
                 ans.push_back(c.second.get());
@@ -163,7 +163,7 @@ private:
         }
         // go to next depth
         for (auto& c : root->mChild) {
-            GetNodes(depth + 1, c.second, target_depth, ans);
+            GetNodes(depth + 1, c.second, targetDepth, ans);
         }
     }
 };

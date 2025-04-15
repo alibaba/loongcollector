@@ -17,8 +17,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "ebpf/type/table/DataTable.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 inline constexpr DataElement kProcessCacheElements[] = {
     kExecId, kProcessId, kUid, kUser, kBinary, kArguments, kCWD, kKtime, kCapInheritable, kCapPermitted, kCapEffective};
@@ -27,5 +26,4 @@ inline constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements
 
 inline constexpr auto kProcessCacheTable = DataTableSchema("process_cache_table", "", kProcessCacheElements);
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

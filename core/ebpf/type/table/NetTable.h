@@ -17,8 +17,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "ebpf/type/table/DataTable.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 inline constexpr DataElement kNetMetricsElements[] = {
     kHostName, // host
@@ -41,5 +40,4 @@ inline constexpr size_t kNetMetricsNum = std::size(kNetMetricsElements);
 
 inline constexpr auto kNetMetricsTable = DataTableSchema("net_metrics", "net metrics table", kNetMetricsElements);
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

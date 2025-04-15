@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
 
 #include <common/StringView.h>
@@ -24,9 +40,9 @@ template <const DataTableSchema* schema>
 class StaticDataRow {
 public:
     StaticDataRow() : mSourceBuffer(std::make_shared<SourceBuffer>()) {}
-    StaticDataRow(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
+    explicit StaticDataRow(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
 
-    constexpr size_t Size() const { return schema->Size(); }
+    [[nodiscard]] constexpr size_t Size() const { return schema->Size(); }
 
     template <const DataElement& TElement>
     inline void SetNoCopy(const StringView& val) {
@@ -103,13 +119,13 @@ public:
     }
 
     template <const size_t TIndex>
-    inline const StringView& Get() const {
+    [[nodiscard]] inline const StringView& Get() const {
         static_assert(TIndex < schema->Size());
         return mRow[TIndex];
     }
 
     template <const DataElement& TElement>
-    inline const StringView& Get() const {
+    [[nodiscard]] inline const StringView& Get() const {
         constexpr uint32_t idx = schema->ColIndex(TElement.Name());
         static_assert(idx < schema->Size());
         return mRow[idx];
@@ -126,25 +142,25 @@ public:
     StringView& operator[](size_t idx) { return mRow[idx]; }
 
     template <const size_t TIndex>
-    constexpr const StringView& GetColName() const {
+    [[nodiscard]] constexpr const StringView& GetColName() const {
         static_assert(TIndex < schema->Size());
         return schema->ColName(TIndex);
     }
 
     template <const size_t TIndex>
-    constexpr const StringView& GetLogKey() const {
+    [[nodiscard]] constexpr const StringView& GetLogKey() const {
         static_assert(TIndex < schema->Size());
         return schema->ColLogKey(TIndex);
     }
 
     template <const size_t TIndex>
-    constexpr const StringView& GetMetricKey() const {
+    [[nodiscard]] constexpr const StringView& GetMetricKey() const {
         static_assert(TIndex < schema->Size());
         return schema->ColMetricKey(TIndex);
     }
 
     template <const size_t TIndex>
-    constexpr const StringView& GetSpanKey() const {
+    [[nodiscard]] constexpr const StringView& GetSpanKey() const {
         static_assert(TIndex < schema->Size());
         return schema->ColSpanKey(TIndex);
     }

@@ -26,8 +26,8 @@
 extern "C" {
 #include <coolbpf/net.h>
 }
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 std::set<support_proto_e> ProtocolParserManager::AvaliableProtocolTypes() const {
     return {support_proto_e::ProtoHTTP};
@@ -37,9 +37,9 @@ support_proto_e ProtocolStringToEnum(std::string protocol) {
     std::transform(protocol.begin(), protocol.end(), protocol.begin(), [](unsigned char c) { return std::toupper(c); });
     if (protocol == "HTTP") {
         return support_proto_e::ProtoHTTP;
-    } else {
-        return support_proto_e::ProtoUnknown;
     }
+
+    return support_proto_e::ProtoUnknown;
 }
 
 bool ProtocolParserManager::AddParser(const std::string& protocol) {
@@ -64,14 +64,14 @@ bool ProtocolParserManager::AddParser(support_proto_e type) {
         return false;
     }
     WriteLock lock(mLock);
-    auto parser = ProtocolParserRegistry::instance().createParser(type);
+    auto parser = ProtocolParserRegistry::GetInstance().CreateParser(type);
     if (parser) {
         LOG_DEBUG(sLogger, ("add protocol parser", std::string(magic_enum::enum_name(type))));
         mParsers[type] = std::move(parser);
         return true;
-    } else {
-        LOG_ERROR(sLogger, ("No parser available for type ", magic_enum::enum_name(type)));
     }
+    LOG_ERROR(sLogger, ("No parser available for type ", magic_enum::enum_name(type)));
+
     return false;
 }
 
@@ -95,11 +95,10 @@ std::vector<std::shared_ptr<AbstractRecord>> ProtocolParserManager::Parse(suppor
     ReadLock lock(mLock);
     if (mParsers.find(type) != mParsers.end()) {
         return mParsers[type]->Parse(data, conn, sampler);
-    } else {
-        LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
-        return std::vector<std::shared_ptr<AbstractRecord>>();
     }
+
+    LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
+    return std::vector<std::shared_ptr<AbstractRecord>>();
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

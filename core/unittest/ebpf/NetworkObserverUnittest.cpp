@@ -224,16 +224,16 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     auto conn = record->GetConnection();
     APSARA_TEST_TRUE(conn != nullptr);
 
-    APSARA_TEST_TRUE(mManager->mConnectionManager->GetConnection(conn->GetConnId()) != nullptr);
+    APSARA_TEST_TRUE(mManager->mConnectionManager->getConnection(conn->GetConnId()) != nullptr);
 
     // destroy connection
     conn->MarkClose();
     for (size_t i = 0; i < 12; i++) {
-        mManager->mConnectionManager->Iterations(i);
+        mManager->mConnectionManager->Iterations();
     }
 
     // connection that record holds still available
-    APSARA_TEST_TRUE(mManager->mConnectionManager->GetConnection(conn->GetConnId()) == nullptr);
+    APSARA_TEST_TRUE(mManager->mConnectionManager->getConnection(conn->GetConnId()) == nullptr);
 
     // verify attributes
     HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
@@ -319,7 +319,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
 
     auto statsEvent = CreateConnStatsEvent();
     mManager->AcceptNetStatsEvent(&statsEvent);
-    auto cnn = mManager->mConnectionManager->GetConnection({0, 2, 1});
+    auto cnn = mManager->mConnectionManager->getConnection({0, 2, 1});
     APSARA_TEST_TRUE(cnn != nullptr);
     APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
     APSARA_TEST_TRUE(cnn->IsPeerMetaAttachReady());
@@ -416,7 +416,7 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
             mManager->AcceptDataEvent(dataEvent);
             free(dataEvent);
         }
-        auto cnn = mManager->mConnectionManager->GetConnection({0, 2, 1});
+        auto cnn = mManager->mConnectionManager->getConnection({0, 2, 1});
         APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

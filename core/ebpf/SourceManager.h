@@ -28,8 +28,7 @@
 #include "common/DynamicLibHelper.h"
 #include "ebpf/include/export.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 inline constexpr int kDefaultMaxBatchConsumeSize = 1024;
 inline constexpr int kDefaultMaxWaitTimeMS = 200;
@@ -43,20 +42,20 @@ public:
 
     void Init();
 
-    bool StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+    bool StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
-    bool StopPlugin(PluginType plugin_type);
+    bool StopPlugin(PluginType pluginType);
 
     // detach bpf progs ...
-    bool SuspendPlugin(PluginType plugin_type);
+    bool SuspendPlugin(PluginType pluginType);
 
     // just update configs ...
-    bool UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+    bool UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
     // re-attach bpf progs ...
-    bool ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf);
+    bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
-    bool CheckPluginRunning(PluginType plugin_type);
+    bool CheckPluginRunning(PluginType pluginType);
 
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
 
@@ -64,15 +63,15 @@ public:
     bool SetNetworkObserverCidFilter(const std::string&, bool update);
 
     // for bpf object operations ...
-    bool BPFMapUpdateElem(PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag);
+    bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
 
     SourceManager();
     ~SourceManager();
 
 private:
-    bool LoadDynamicLib(const std::string& lib_name);
-    bool LoadCoolBPF();
-    bool DynamicLibSuccess();
+    bool loadDynamicLib(const std::string& libName);
+    bool loadCoolBPF();
+    bool dynamicLibSuccess();
 
     enum class network_observer_uprobe_funcs {
         EBPF_NETWORK_OBSERVER_CLEAN_UP_DOG,
@@ -114,5 +113,4 @@ private:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -27,8 +27,7 @@
 #include "ebpf/type/table/StaticDataRow.h"
 #include "logger/Logger.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class Connection;
 
@@ -42,23 +41,23 @@ class AbstractRecord {
 public:
     virtual ~AbstractRecord() {}
     virtual RecordType GetRecordType() = 0;
-    virtual std::string GetSpanName() = 0;
+    virtual const std::string& GetSpanName() = 0;
 
     uint64_t GetStartTimeStamp() { return mStartTs; }
     uint64_t GetEndTimeStamp() { return mEndTs; }
-    double GetLatencyNs() const { return mEndTs - mStartTs; }
-    double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
-    double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
+    [[nodiscard]] double GetLatencyNs() const { return mEndTs - mStartTs; }
+    [[nodiscard]] double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
+    [[nodiscard]] double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
     void SetStartTsNs(uint64_t startTsNs) { mStartTs = startTsNs; }
     void SetEndTsNs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
-    int RollbackCount() const { return mRollbackCount; }
-    int Rollback() { return mRollbackCount++; }
+    [[nodiscard]] int RollbackCount() const { return mRollbackCount; }
+    [[nodiscard]] int Rollback() { return mRollbackCount++; }
     bool ShouldSample() const { return mIsSample; }
     void MarkSample() { mIsSample = true; }
 
-    virtual bool IsError() const = 0;
-    virtual bool IsSlow() const = 0;
-    virtual int GetStatusCode() const = 0;
+    [[nodiscard]] virtual bool IsError() const = 0;
+    [[nodiscard]] virtual bool IsSlow() const = 0;
+    [[nodiscard]] virtual int GetStatusCode() const = 0;
 
 protected:
     uint64_t mStartTs;
@@ -67,14 +66,16 @@ protected:
     int mRollbackCount = 0;
 };
 
+inline const std::string kSpanNameEmpty;
+inline const std::string kConnStatsSpan = "CONN_STATS";
 
 class AbstractNetRecord : public AbstractRecord {
 public:
     ~AbstractNetRecord() override {}
-    std::string GetSpanName() override { return ""; }
+    const std::string& GetSpanName() override { return kSpanNameEmpty; }
     RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
-    std::shared_ptr<Connection> GetConnection() const { return mConnection; }
-    explicit AbstractNetRecord(std::shared_ptr<Connection> connection) : mConnection(connection) {}
+    [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
+    explicit AbstractNetRecord(std::shared_ptr<Connection>& connection) : mConnection(connection) {}
 
 protected:
     std::shared_ptr<Connection> mConnection;
@@ -83,14 +84,14 @@ protected:
 class ConnStatsRecord : public AbstractNetRecord {
 public:
     ~ConnStatsRecord() override {}
-    ConnStatsRecord(std::shared_ptr<Connection> connection) : AbstractNetRecord(connection) {}
+    explicit ConnStatsRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
     RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
-    bool IsError() const override { return false; }
-    bool IsSlow() const override { return false; }
-    int GetStatusCode() const override { return 0; }
+    [[nodiscard]] bool IsError() const override { return false; }
+    [[nodiscard]] bool IsSlow() const override { return false; }
+    [[nodiscard]] int GetStatusCode() const override { return 0; }
 
-    std::string GetSpanName() override { return "CONN_STATS"; }
-    int mState;
+    const std::string& GetSpanName() override { return kConnStatsSpan; }
+    int mState = 0;
     uint64_t mDropCount = 0;
     uint64_t mRttVar = 0;
     uint64_t mRtt = 0;
@@ -105,34 +106,32 @@ public:
 // is L7, while ConnStatsRecord is L5.
 class AbstractAppRecord : public AbstractNetRecord {
 public:
-    explicit AbstractAppRecord(std::shared_ptr<Connection> connection) : AbstractNetRecord(connection) {}
+    explicit AbstractAppRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
     ~AbstractAppRecord() override {}
 
-    void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = std::move(traceId); }
-    void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = std::move(spanId); }
+    void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = traceId; }
+    void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = spanId; }
 
     RecordType GetRecordType() override { return RecordType::APP_RECORD; }
 
-    virtual std::string GetReqBody() const = 0;
-    virtual std::string GetRespBody() const = 0;
+    virtual const std::string& GetReqBody() const = 0;
+    virtual const std::string& GetRespBody() const = 0;
     virtual size_t GetReqBodySize() const = 0;
     virtual size_t GetRespBodySize() const = 0;
-    virtual std::string GetMethod() const = 0;
+    virtual const std::string& GetMethod() const = 0;
     virtual const HeadersMap& GetReqHeaderMap() const = 0;
     virtual const HeadersMap& GetRespHeaderMap() const = 0;
-    virtual std::string GetProtocolVersion() const = 0;
-    virtual std::string GetPath() const = 0;
+    virtual const std::string& GetProtocolVersion() const = 0;
+    virtual const std::string& GetPath() const = 0;
 
-    mutable std::array<uint64_t, 4> mTraceId;
-    mutable std::array<uint64_t, 2> mSpanId;
+    mutable std::array<uint64_t, 4> mTraceId{};
+    mutable std::array<uint64_t, 2> mSpanId{};
 };
 
 class HttpRecord : public AbstractAppRecord {
 public:
-    static std::atomic_int sConstructCount;
-    static std::atomic_int sDestructCount;
-    ~HttpRecord() override { sDestructCount++; }
-    HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) { sConstructCount++; }
+    ~HttpRecord() override {}
+    explicit HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) {}
 
     void SetPath(const std::string& path) { mPath = path; }
 
@@ -156,21 +155,20 @@ public:
 
     bool IsError() const override { return mCode >= 400; }
 
-    // TODO @qianlu.kk
     bool IsSlow() const override { return GetLatencyMs() > 500; }
     int GetStatusCode() const override { return mCode; }
-    std::string GetReqBody() const { return mReqBody; }
-    std::string GetRespBody() const { return mRespBody; }
+    const std::string& GetReqBody() const override { return mReqBody; }
+    const std::string& GetRespBody() const override { return mRespBody; }
     std::string GetRespMsg() const { return mRespMsg; }
-    size_t GetReqBodySize() const { return mReqBodySize; }
-    size_t GetRespBodySize() const { return mRespBodySize; }
-    std::string GetMethod() const { return mHttpMethod; }
-    const HeadersMap& GetReqHeaderMap() const { return mReqHeaderMap; }
-    const HeadersMap& GetRespHeaderMap() const { return mRespHeaderMap; }
-    std::string GetProtocolVersion() const { return mProtocolVersion; }
-    std::string GetPath() const { return mPath; }
-    std::string GetRealPath() const { return mRealPath; }
-    std::string GetSpanName() override { return mPath; }
+    size_t GetReqBodySize() const override { return mReqBodySize; }
+    size_t GetRespBodySize() const override { return mRespBodySize; }
+    const std::string& GetMethod() const override { return mHttpMethod; }
+    const HeadersMap& GetReqHeaderMap() const override { return mReqHeaderMap; }
+    const HeadersMap& GetRespHeaderMap() const override { return mRespHeaderMap; }
+    const std::string& GetProtocolVersion() const override { return mProtocolVersion; }
+    const std::string& GetPath() const override { return mPath; }
+    const std::string& GetRealPath() const { return mRealPath; }
+    const std::string& GetSpanName() override { return mPath; }
 
     int mCode = 0;
     size_t mReqBodySize = 0;
@@ -190,14 +188,13 @@ public:
 class MetricData {
 public:
     virtual ~MetricData() {}
-    MetricData(std::shared_ptr<Connection> conn) : mConnection(conn) {}
-    // ConnId mConnId;
+    explicit MetricData(std::shared_ptr<Connection>& conn) : mConnection(conn) {}
     std::shared_ptr<Connection> mConnection;
 };
 
 class AppMetricData : public MetricData {
 public:
-    AppMetricData(const std::shared_ptr<Connection>& conn,
+    AppMetricData(std::shared_ptr<Connection>& conn,
                   const std::shared_ptr<SourceBuffer>& sourceBuffer,
                   const StringView& spanName)
         : MetricData(conn), mTags(sourceBuffer) {
@@ -205,7 +202,7 @@ public:
     }
     ~AppMetricData() {}
 
-    std::string ToString() const {
+    [[nodiscard]] std::string ToString() const {
         std::string res;
         for (size_t i = 0; i < kAppMetricsNum; i++) {
             res += std::string(mTags[i]);
@@ -232,10 +229,10 @@ public:
 #define LC_TCP_MAX_STATES 13
 class NetMetricData : public MetricData {
 public:
-    NetMetricData(const std::shared_ptr<Connection>& conn, const std::shared_ptr<SourceBuffer>& sourceBuffer)
+    NetMetricData(std::shared_ptr<Connection>& conn, const std::shared_ptr<SourceBuffer>& sourceBuffer)
         : MetricData(conn), mTags(sourceBuffer) {}
     ~NetMetricData() {}
-    std::string ToString() const {
+    [[nodiscard]] std::string ToString() const {
         std::string res;
         for (size_t i = 0; i < kNetMetricsNum; i++) {
             res += std::string(mTags[i]);
@@ -258,7 +255,7 @@ public:
 
 class AppSpanGroup {
 public:
-    AppSpanGroup() {}
+    AppSpanGroup() = default;
     ~AppSpanGroup() {}
 
     std::vector<std::shared_ptr<AbstractRecord>> mRecords;
@@ -266,12 +263,11 @@ public:
 
 class AppLogGroup {
 public:
-    AppLogGroup() {}
+    AppLogGroup() = default;
     ~AppLogGroup() {}
 
     std::vector<std::shared_ptr<AbstractRecord>> mRecords;
 };
 
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

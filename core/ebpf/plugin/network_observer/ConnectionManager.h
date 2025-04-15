@@ -31,25 +31,24 @@ extern "C" {
 #include <coolbpf/net.h>
 };
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
-// hold by one thread
+// used in poller thread
 class ConnectionManager {
 public:
     static std::unique_ptr<ConnectionManager> Create(int maxConnections = 5000) {
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
-    using ConnStatsHandler = std::function<void(const std::shared_ptr<AbstractRecord>& record)>;
+    using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
 
     ~ConnectionManager() {}
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
-    const std::shared_ptr<Connection> AcceptNetDataEvent(struct conn_data_event_t* event);
+    std::shared_ptr<Connection> AcceptNetDataEvent(struct conn_data_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
-    void Iterations(int count);
+    void Iterations();
 
     void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
 
@@ -59,14 +58,11 @@ public:
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
 
 private:
-    ConnectionManager(int maxConnections) : mMaxConnections(maxConnections), mConnectionTotal(0) {}
+    explicit ConnectionManager(int maxConnections) : mMaxConnections(maxConnections), mConnectionTotal(0) {}
 
-    std::shared_ptr<Connection> GetOrCreateConnection(const ConnId&);
-    void DeleteConnection(const ConnId&);
-    std::shared_ptr<Connection> GetConnection(const ConnId&);
-
-    int mItIntervalMs;
-    int mReportIntervalSec;
+    std::shared_ptr<Connection> getOrCreateConnection(const ConnId&);
+    void deleteConnection(const ConnId&);
+    std::shared_ptr<Connection> getConnection(const ConnId&);
 
     std::atomic_int mMaxConnections;
 
@@ -87,5 +83,4 @@ private:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

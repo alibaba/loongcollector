@@ -82,7 +82,7 @@ namespace ebpf {
 SourceManager::SourceManager() = default;
 
 SourceManager::~SourceManager() {
-    if (!DynamicLibSuccess()) {
+    if (!dynamicLibSuccess()) {
         return;
     }
 
@@ -149,8 +149,8 @@ void SourceManager::Init() {
     };
 }
 
-bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
-    if (DynamicLibSuccess()) {
+bool SourceManager::loadDynamicLib(const std::string& libName) {
+    if (dynamicLibSuccess()) {
         // already load
         return true;
     }
@@ -158,7 +158,7 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
     LOG_INFO(sLogger, ("[SourceManager] begin load ebpf dylib, path:", mBinaryPath));
     std::string loadErr;
-    if (!tmp_lib->LoadDynLib(lib_name, loadErr, mBinaryPath)) {
+    if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
         return false;
     }
@@ -183,7 +183,7 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     }
 
     // load offset ...
-    if (!LoadCoolBPF()) {
+    if (!loadCoolBPF()) {
         LOG_ERROR(sLogger, ("failed to load coolbpf", ""));
         return false;
     }
@@ -203,8 +203,8 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
     return true;
 }
 
-bool SourceManager::LoadCoolBPF() {
-    if (DynamicLibSuccess()) {
+bool SourceManager::loadCoolBPF() {
+    if (dynamicLibSuccess()) {
         // already load
         return true;
     }
@@ -236,29 +236,30 @@ bool SourceManager::LoadCoolBPF() {
     return true;
 }
 
-bool SourceManager::DynamicLibSuccess() {
+bool SourceManager::dynamicLibSuccess() {
     // #ifdef APSARA_UNIT_TEST_MAIN
     //     return true;
     // #endif
-    if (!mLib)
+    if (!mLib) {
         return false;
+    }
     if (!std::all_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x != nullptr; })) {
         return false;
     }
     return true;
 }
 
-bool SourceManager::CheckPluginRunning(PluginType plugin_type) {
-    if (!LoadDynamicLib(mDriverLibName)) {
-        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(plugin_type)));
+bool SourceManager::CheckPluginRunning(PluginType pluginType) {
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(pluginType)));
         return false;
     }
 
-    return mRunning[int(plugin_type)];
+    return mRunning[int(pluginType)];
 }
 
 bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
-    if (!DynamicLibSuccess()) {
+    if (!dynamicLibSuccess()) {
         return false;
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)];
@@ -276,7 +277,7 @@ bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
 }
 
 bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
-    if (!DynamicLibSuccess()) {
+    if (!dynamicLibSuccess()) {
         return false;
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)];
@@ -293,33 +294,33 @@ bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool upd
 #endif
 }
 
-int32_t SourceManager::PollPerfBuffers(PluginType plugin_type, int32_t maxEvents, int32_t* flag, int timeoutMs) {
-    if (!DynamicLibSuccess()) {
+int32_t SourceManager::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, int32_t* flag, int timeoutMs) {
+    if (!dynamicLibSuccess()) {
         return -1;
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, poll perf buffer func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, poll perf buffer func ptr is null", int(pluginType)));
         return -1;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return 0;
 #else
-    auto poll_func = (poll_plugin_pbs_func)f;
-    return poll_func(plugin_type, maxEvents, flag, timeoutMs);
+    auto pollFunc = (poll_plugin_pbs_func)f;
+    return pollFunc(pluginType, maxEvents, flag, timeoutMs);
 #endif
 }
 
-bool SourceManager::StartPlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
-    if (CheckPluginRunning(plugin_type)) {
+bool SourceManager::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+    if (CheckPluginRunning(pluginType)) {
         // plugin update ...
-        return UpdatePlugin(plugin_type, std::move(conf));
+        return UpdatePlugin(pluginType, std::move(conf));
     }
 
     // plugin not started ...
-    LOG_INFO(sLogger, ("begin to start plugin, type", int(plugin_type)));
+    LOG_INFO(sLogger, ("begin to start plugin, type", int(pluginType)));
     if (conf->mPluginType == PluginType::NETWORK_OBSERVE) {
-        auto nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
+        auto* nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
         if (nconf) {
             nconf->mSo = mBinaryPath + "libcoolbpf.so.1.0.0";
             nconf->mLogHandler = mLogPrinter;
@@ -336,123 +337,123 @@ bool SourceManager::StartPlugin(PluginType plugin_type, std::unique_ptr<PluginCo
 
     void* f = mFuncs[(int)ebpf_func::EBPF_START_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
-    auto start_f = (start_plugin_func)f;
-    int res = start_f(conf.get());
+    auto startF = (start_plugin_func)f;
+    int res = startF(conf.get());
     if (!res)
-        mRunning[int(plugin_type)] = true;
+        mRunning[int(pluginType)] = true;
     return !res;
 #endif
 }
 
-bool SourceManager::ResumePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
-    if (!CheckPluginRunning(plugin_type)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", int(plugin_type)));
+bool SourceManager::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+    if (!CheckPluginRunning(pluginType)) {
+        LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
         return false;
     }
 
-    LOG_INFO(sLogger, ("begin to resume plugin, type", int(plugin_type)));
+    LOG_INFO(sLogger, ("begin to resume plugin, type", int(pluginType)));
     void* f = mFuncs[(int)ebpf_func::EBPF_RESUME_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
-    auto resume_f = (resume_plugin_func)f;
-    int res = resume_f(conf.get());
+    auto resumeF = (resume_plugin_func)f;
+    int res = resumeF(conf.get());
     return !res;
 #endif
 }
 
-bool SourceManager::UpdatePlugin(PluginType plugin_type, std::unique_ptr<PluginConfig> conf) {
-    if (!CheckPluginRunning(plugin_type)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", int(plugin_type)));
+bool SourceManager::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+    if (!CheckPluginRunning(pluginType)) {
+        LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
         return false;
     }
 
-    LOG_INFO(sLogger, ("begin to update plugin, type", int(plugin_type)));
+    LOG_INFO(sLogger, ("begin to update plugin, type", int(pluginType)));
     void* f = mFuncs[(int)ebpf_func::EBPF_UPDATE_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
-    auto update_f = (update_plugin_func)f;
-    int res = update_f(conf.get());
+    auto updateF = (update_plugin_func)f;
+    int res = updateF(conf.get());
     return !res;
 #endif
 }
 
-bool SourceManager::SuspendPlugin(PluginType plugin_type) {
-    if (!CheckPluginRunning(plugin_type)) {
-        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(plugin_type)));
+bool SourceManager::SuspendPlugin(PluginType pluginType) {
+    if (!CheckPluginRunning(pluginType)) {
+        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(pluginType)));
         return false;
     }
     void* f = mFuncs[(int)ebpf_func::EBPF_SUSPEND_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
-    auto suspend_f = (suspend_plugin_func)f;
-    int res = suspend_f(plugin_type);
+    auto suspendF = (suspend_plugin_func)f;
+    int res = suspendF(pluginType);
 
     return !res;
 #endif
 }
 
-bool SourceManager::StopPlugin(PluginType plugin_type) {
-    if (!CheckPluginRunning(plugin_type)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
+bool SourceManager::StopPlugin(PluginType pluginType) {
+    if (!CheckPluginRunning(pluginType)) {
+        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));
         return true;
     }
 
     auto config = std::make_unique<PluginConfig>();
-    config->mPluginType = plugin_type;
+    config->mPluginType = pluginType;
     void* f = mFuncs[(int)ebpf_func::EBPF_STOP_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
-    auto stop_f = (stop_plugin_func)f;
-    int res = stop_f(plugin_type);
+    auto stopF = (stop_plugin_func)f;
+    int res = stopF(pluginType);
     if (!res)
-        mRunning[int(plugin_type)] = false;
+        mRunning[int(pluginType)] = false;
     return !res;
 #endif
 }
 
 bool SourceManager::BPFMapUpdateElem(
-    PluginType plugin_type, const std::string& map_name, void* key, void* value, uint64_t flag) {
-    if (!CheckPluginRunning(plugin_type)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
+    PluginType pluginType, const std::string& map_name, void* key, void* value, uint64_t flag) {
+    if (!CheckPluginRunning(pluginType)) {
+        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));
         return true;
     }
 
     void* f = mFuncs[(int)ebpf_func::EBPF_MAP_UPDATE_ELEM];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update bpf map elem func ptr is null", int(plugin_type)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update bpf map elem func ptr is null", int(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
 #else
     auto ff = (update_bpf_map_elem_func)f;
-    int res = ff(plugin_type, map_name.c_str(), key, value, flag);
+    int res = ff(pluginType, map_name.c_str(), key, value, flag);
     return res == 0;
 #endif
 }

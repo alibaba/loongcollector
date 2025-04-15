@@ -31,8 +31,8 @@ extern "C" {
 #include <coolbpf/net.h>
 };
 
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class AbstractRecord;
 class ConnStatsRecord;
@@ -52,13 +52,17 @@ public:
 class Connection {
 public:
     ~Connection() {}
-    Connection(const ConnId& connId) : mConnId(connId) {}
+    Connection(const Connection&) = delete;
+    Connection(Connection&&) = delete;
+    Connection& operator=(const Connection&) = delete;
+    Connection& operator=(Connection&&) = delete;
+    explicit Connection(const ConnId& connId) : mConnId(connId) {}
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
-    const ConnId GetConnId() const { return mConnId; };
+    [[nodiscard]] ConnId GetConnId() const { return mConnId; };
 
     bool ReadyToDestroy(const std::chrono::time_point<std::chrono::steady_clock>& now) {
         if (mIsClose && this->mEpoch < 0) {
@@ -68,9 +72,9 @@ public:
         return nowTs > mLastActiveTs && (nowTs - mLastActiveTs) > 10000; // 10s
     }
 
-    bool IsClose() const { return mIsClose; }
+    [[nodiscard]] bool IsClose() const { return mIsClose; }
 
-    int GetEpoch() const { return mEpoch; }
+    [[nodiscard]] int GetEpoch() const { return mEpoch; }
 
     void CountDown() { this->mEpoch--; }
 
@@ -79,41 +83,36 @@ public:
 
     inline bool IsMetaAttachReadyForAppRecord() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return (flags & sFlagAppRecordAttachReady) == sFlagAppRecordAttachReady;
+        return (flags & kSFlagAppRecordAttachReady) == kSFlagAppRecordAttachReady;
     }
     inline bool IsMetaAttachReadyForNetRecord() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return (flags & sFlagNetRecordAttachReady) == sFlagNetRecordAttachReady;
+        return (flags & kSFlagNetRecordAttachReady) == kSFlagNetRecordAttachReady;
     }
 
     inline bool IsL7MetaAttachReady() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagL7MetaAttached;
+        return flags & kSFlagL7MetaAttached;
     }
 
     inline bool IsL4MetaAttachReady() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagL4MetaAttached;
+        return flags & kSFlagL4MetaAttached;
     }
 
     inline bool IsSelfMetaAttachReady() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagSelfMetaAttached;
+        return flags & kSFlagSelfMetaAttached;
     }
 
     inline bool IsPeerMetaAttachReady() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagPeerMetaAttached;
-    }
-
-    inline bool IsConnStatsEventReceived() {
-        Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagConnStatsEventReceived;
+        return flags & kSFlagPeerMetaAttached;
     }
 
     inline bool IsConnDeleted() {
         Flag flags = mMetaFlags.load(std::memory_order_acquire);
-        return flags & sFlagConnDeleted;
+        return flags & kSFlagConnDeleted;
     }
 
     std::string DumpConnection() {
@@ -135,63 +134,56 @@ public:
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
 
-    const StringView& GetContainerId() const { return mTags.Get<kContainerId>(); }
+    [[nodiscard]] const StringView& GetContainerId() const { return mTags.Get<kContainerId>(); }
 
-    const StringView& GetRemoteIp() const { return mTags.Get<kRemoteIp>(); }
+    [[nodiscard]] const StringView& GetRemoteIp() const { return mTags.Get<kRemoteIp>(); }
 
-    const StringView& GetSourceIp() const { return mTags.Get<kIp>(); }
+    [[nodiscard]] const StringView& GetSourceIp() const { return mTags.Get<kIp>(); }
 
-    bool IsLocalhost() const;
+    [[nodiscard]] bool IsLocalhost() const;
 
     void TryAttachL7Meta(support_role_e role, support_proto_e protocol);
     void TryAttachSelfMeta();
     void TryAttachPeerMeta(int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
-    // void UpdateRole(enum support_role_e role);
+    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
 
-    // void UpdateProtocol(support_proto_e protocol);
+    [[nodiscard]] support_role_e GetRole() const { return mRole; }
 
-    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& record);
+    [[nodiscard]] unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
 
-    support_role_e GetRole() const { return mRole; }
-
-    unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
-
-    void MarkConnStatsEventReceived() { mMetaFlags.fetch_or(sFlagConnStatsEventReceived, std::memory_order_release); }
-
-    void MarkConnDeleted() { mMetaFlags.fetch_or(sFlagConnDeleted, std::memory_order_release); }
+    void MarkConnDeleted() { mMetaFlags.fetch_or(kSFlagConnDeleted, std::memory_order_release); }
 
 private:
-    void UpdateL4Meta(struct conn_stats_event_t* event);
+    void updateL4Meta(struct conn_stats_event_t* event);
     // peer pod meta
-    void UpdatePeerPodMetaForExternal();
-    void UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
-    void UpdatePeerPodMetaForLocalhost();
+    void updatePeerPodMetaForExternal();
+    void updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
+    void updatePeerPodMetaForLocalhost();
 
     // self pod meta
-    void UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
-    void UpdateSelfPodMetaForUnknown();
+    void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
+    void updateSelfPodMetaForUnknown();
 
     using Flag = unsigned int;
 
 
-    static constexpr Flag sFlagL4MetaAttached = 0b0001; // Flags[0]
-    static constexpr Flag sFlagSelfMetaAttached = 0b0010; // Flags[1]
-    static constexpr Flag sFlagPeerMetaAttached = 0b0100; // Flags[2]
-    static constexpr Flag sFlagL7MetaAttached = 0b1000; // Flags[3]
-    static constexpr Flag sFlagConnStatsEventReceived = 0b10000; // Flags[4]
-    static constexpr Flag sFlagConnDeleted = 0b100000; // Flags[5]
+    static constexpr Flag kSFlagL4MetaAttached = 0b0001; // Flags[0]
+    static constexpr Flag kSFlagSelfMetaAttached = 0b0010; // Flags[1]
+    static constexpr Flag kSFlagPeerMetaAttached = 0b0100; // Flags[2]
+    static constexpr Flag kSFlagL7MetaAttached = 0b1000; // Flags[3]
+    static constexpr Flag kSFlagConnDeleted = 0b10000; // Flags[4]
 
-    static constexpr Flag sFlagNetRecordAttachReady
-        = (sFlagL4MetaAttached | sFlagSelfMetaAttached | sFlagPeerMetaAttached);
-    static constexpr Flag sFlagAppRecordAttachReady = (sFlagNetRecordAttachReady | sFlagL7MetaAttached);
+    static constexpr Flag kSFlagNetRecordAttachReady
+        = (kSFlagL4MetaAttached | kSFlagSelfMetaAttached | kSFlagPeerMetaAttached);
+    static constexpr Flag kSFlagAppRecordAttachReady = (kSFlagNetRecordAttachReady | kSFlagL7MetaAttached);
 
-    void MarkSelfMetaAttached() { mMetaFlags.fetch_or(sFlagSelfMetaAttached, std::memory_order_release); }
-    void MarkPeerMetaAttached() { mMetaFlags.fetch_or(sFlagPeerMetaAttached, std::memory_order_release); }
-    void MarkL4MetaAttached() { mMetaFlags.fetch_or(sFlagL4MetaAttached, std::memory_order_release); }
-    void MarkL7MetaAttached() { mMetaFlags.fetch_or(sFlagL7MetaAttached, std::memory_order_release); }
+    void MarkSelfMetaAttached() { mMetaFlags.fetch_or(kSFlagSelfMetaAttached, std::memory_order_release); }
+    void MarkPeerMetaAttached() { mMetaFlags.fetch_or(kSFlagPeerMetaAttached, std::memory_order_release); }
+    void MarkL4MetaAttached() { mMetaFlags.fetch_or(kSFlagL4MetaAttached, std::memory_order_release); }
+    void MarkL7MetaAttached() { mMetaFlags.fetch_or(kSFlagL7MetaAttached, std::memory_order_release); }
 
-    support_proto_e GetProtocol() const { return mProtocol; }
+    [[nodiscard]] support_proto_e GetProtocol() const { return mProtocol; }
 
     void MarkClose() {
         this->mIsClose = true;
@@ -227,5 +219,4 @@ private:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

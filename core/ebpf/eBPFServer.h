@@ -65,8 +65,8 @@ public:
     void Init() override;
 
     static eBPFServer* GetInstance() {
-        static eBPFServer instance;
-        return &instance;
+        static eBPFServer sInstance;
+        return &sInstance;
     }
 
     void Stop() override;
@@ -75,16 +75,16 @@ public:
 
     void UpdatePipelineName(PluginType type, const std::string& name, const std::string& project);
 
-    bool EnablePlugin(const std::string& pipeline_name,
-                      uint32_t plugin_index,
+    bool EnablePlugin(const std::string& pipelineName,
+                      uint32_t pluginIndex,
                       PluginType type,
                       const logtail::CollectionPipelineContext* ctx,
                       const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                       PluginMetricManagerPtr mgr);
 
-    bool DisablePlugin(const std::string& pipeline_name, PluginType type);
+    bool DisablePlugin(const std::string& pipelineName, PluginType type);
 
-    bool SuspendPlugin(const std::string& pipeline_name, PluginType type);
+    bool SuspendPlugin(const std::string& pipelineName, PluginType type);
 
     bool HasRegisteredPlugins() const override;
 
@@ -101,8 +101,8 @@ public:
     void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
 
 private:
-    bool StartPluginInternal(const std::string& pipeline_name,
-                             uint32_t plugin_index,
+    bool startPluginInternal(const std::string& pipelineName,
+                             uint32_t pluginIndex,
                              PluginType type,
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
@@ -110,7 +110,7 @@ private:
     eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
 
     void
-    UpdateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
+    updateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
 
     std::shared_ptr<SourceManager> mSourceManager;
 

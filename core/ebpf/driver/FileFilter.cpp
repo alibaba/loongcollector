@@ -24,7 +24,6 @@ extern "C" {
 #include <unistd.h>
 
 #include <string>
-#include <vector>
 
 #include "BPFMapTraits.h"
 #include "CallName.h"
@@ -53,8 +52,6 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
     }
 
     auto filter = std::get_if<SecurityFileFilter>(&config);
-    // update filters map
-    std::vector<path_entry> path_entries;
     // concatenate path and filename, then write the resulting char* path into path_filter_list
     // TODO qianlu.kk use map in map feature to support filters for different call names
     if (filter && filter->mFilePathList.size()) {

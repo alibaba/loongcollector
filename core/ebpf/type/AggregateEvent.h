@@ -20,8 +20,7 @@
 #include "common/timer/Timer.h"
 #include "ebpf/include/export.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class ScheduleConfig {
 public:
@@ -30,36 +29,16 @@ public:
     ScheduleConfig(PluginType type, const std::chrono::seconds& interval) : mType(type), mInterval(interval) {}
 };
 
-class AggregateEventV2 : public TimerEvent {
+class AggregateEvent : public TimerEvent {
 public:
-    AggregateEventV2(const std::chrono::steady_clock::time_point& execTime,
-                     const std::shared_ptr<ScheduleConfig> config)
+    AggregateEvent(const std::chrono::steady_clock::time_point& execTime, const std::shared_ptr<ScheduleConfig>& config)
         : TimerEvent(execTime), mScheduleConfig(config) {}
 
-    bool IsValid() const override;
+    [[nodiscard]] bool IsValid() const override;
     bool Execute() override;
 
 private:
     std::shared_ptr<ScheduleConfig> mScheduleConfig;
 };
 
-// class AggregateEvent : public PeriodicalTimerEvent {
-// public:
-//     AggregateEvent(int interval,
-//                    std::function<bool(const std::chrono::steady_clock::time_point&)> handler,
-//                    std::function<bool()> stopChecker)
-//         : PeriodicalTimerEvent(interval), mHandler(std::move(handler)), mStopChecker(std::move(stopChecker)) {}
-
-//     bool IsValid() const override { return true; }
-
-//     bool Execute() override { return mHandler(mExecTime); }
-
-//     bool IsStop() override { return mStopChecker(); }
-
-// private:
-//     std::function<bool(const std::chrono::steady_clock::time_point& execTime)> mHandler;
-//     std::function<bool()> mStopChecker;
-// };
-
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

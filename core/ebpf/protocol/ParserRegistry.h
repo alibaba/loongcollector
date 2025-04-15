@@ -22,40 +22,40 @@
 extern "C" {
 #include <coolbpf/net.h>
 }
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class ProtocolParserRegistry {
 public:
     using CreatorFunc = std::function<std::shared_ptr<AbstractProtocolParser>()>;
 
-    static ProtocolParserRegistry& instance() {
-        static ProtocolParserRegistry registry;
-        return registry;
+    static ProtocolParserRegistry& GetInstance() {
+        static ProtocolParserRegistry sRegistry;
+        return sRegistry;
     }
 
-    void registerParser(support_proto_e type, CreatorFunc creator) { registry_[type] = std::move(creator); }
+    void RegisterParser(support_proto_e type, CreatorFunc creator) { mRegistry[type] = std::move(creator); }
 
-    std::shared_ptr<AbstractProtocolParser> createParser(support_proto_e type) {
-        if (registry_.find(type) != registry_.end()) {
-            return registry_[type]();
+    std::shared_ptr<AbstractProtocolParser> CreateParser(support_proto_e type) {
+        if (mRegistry.find(type) != mRegistry.end()) {
+            return mRegistry[type]();
         }
         return nullptr;
     }
 
 private:
     ProtocolParserRegistry() = default;
-    std::unordered_map<support_proto_e, CreatorFunc> registry_;
+    std::unordered_map<support_proto_e, CreatorFunc> mRegistry;
 };
 
 #define REGISTER_PROTOCOL_PARSER(type, className) \
     namespace { \
     struct className##AutoRegister { \
         className##AutoRegister() { \
-            ProtocolParserRegistry::instance().registerParser(type, []() { return std::make_shared<className>(); }); \
+            ProtocolParserRegistry::GetInstance().RegisterParser(type, \
+                                                                 []() { return std::make_shared<className>(); }); \
         } \
     }; \
     static className##AutoRegister global_##className##AutoRegister_instance; \
     }
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

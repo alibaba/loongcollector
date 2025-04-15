@@ -23,9 +23,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "ebpf/include/export.h"
 
-
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 /////////////////////  /////////////////////
 
@@ -91,7 +89,7 @@ struct ProcessProbeConfig {
 
 class eBPFAdminConfig {
 public:
-    eBPFAdminConfig() {}
+    eBPFAdminConfig() = default;
     ~eBPFAdminConfig() {}
 
     void LoadEbpfConfig(const Json::Value& confJson);
@@ -113,24 +111,23 @@ public:
     const ProcessProbeConfig& GetProcessProbeConfig() const { return mProcessProbeConfig; }
 
 private:
-    int32_t mReceiveEventChanCap;
+    int32_t mReceiveEventChanCap = 0;
     AdminConfig mAdminConfig;
 
-    AggregationConfig mAggregationConfig;
+    AggregationConfig mAggregationConfig{};
 
     ConverageConfig mConverageConfig;
 
     SampleConfig mSampleConfig;
 
-    SocketProbeConfig mSocketProbeConfig;
+    SocketProbeConfig mSocketProbeConfig{};
 
-    ProfileProbeConfig mProfileProbeConfig;
+    ProfileProbeConfig mProfileProbeConfig{};
 
-    ProcessProbeConfig mProcessProbeConfig;
+    ProcessProbeConfig mProcessProbeConfig{};
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

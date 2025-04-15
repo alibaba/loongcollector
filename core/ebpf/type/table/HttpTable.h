@@ -17,8 +17,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "ebpf/type/table/DataTable.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 constexpr DataElement kStatusCode = {
     "status_code",
@@ -100,5 +99,4 @@ constexpr DataElement kHTTPRespHeader = {
     "http resp.header",
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

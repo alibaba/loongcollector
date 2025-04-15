@@ -15,52 +15,31 @@
 #include "ebpf/util/sampler/Sampler.h"
 #include "picohttpparser.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
+
 constexpr size_t kMaxNumHeaders = 50;
 
-struct State {
-    bool conn_closed = false;
-};
-
-
 struct HTTPRequest {
-    const char* method = nullptr;
-    size_t method_len = 0;
-    const char* path = nullptr;
-    size_t path_len = 0;
-    int minor_version = 0;
-    struct phr_header headers[kMaxNumHeaders];
+    const char* mMethod = nullptr;
+    size_t mMethodLen = 0;
+    const char* mPath = nullptr;
+    size_t mPathLen = 0;
+    int mMinorVersion = 0;
+    struct phr_header mHeaders[kMaxNumHeaders];
     // Set header number to maximum we can accept.
     // Pico will change it to the number of headers parsed for us.
-    size_t num_headers = kMaxNumHeaders;
+    size_t mNumHeaders = kMaxNumHeaders;
 };
 
 struct HTTPResponse {
-    const char* msg = nullptr;
-    size_t msg_len = 0;
-    int status = 0;
-    int minor_version = 0;
-    struct phr_header headers[kMaxNumHeaders];
+    const char* mMsg = nullptr;
+    size_t mMsgLen = 0;
+    int mStatus = 0;
+    int mMinorVersion = 0;
+    struct phr_header mHeaders[kMaxNumHeaders];
     // Set header number to maximum we can accept.
     // Pico will change it to the number of headers parsed for us.
-    size_t num_headers = kMaxNumHeaders;
-};
-
-struct Message {
-    int minor_version = -1;
-    HeadersMap headers = {};
-
-    std::string req_method = "-";
-    std::string req_path = "-";
-
-    int resp_status = -1;
-    std::string resp_message = "-";
-
-    std::string body = "-";
-    size_t body_size = 0;
-
-    size_t headers_byte_size = 0;
+    size_t mNumHeaders = kMaxNumHeaders;
 };
 
 enum class ParseState {
@@ -95,13 +74,13 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& resu
 
 ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result);
 
-HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t num_headers);
+HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t numHeaders);
 
-ParseState ParseContent(std::string_view& content_len_str,
+ParseState ParseContent(std::string_view& contentLenStr,
                         std::string_view& data,
-                        size_t body_size_limit_bytes,
+                        size_t bodySizeLimitBytes,
                         std::string& result,
-                        size_t& body_size);
+                        size_t& bodySize);
 
 ParseState
 ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample = false);
@@ -114,12 +93,11 @@ class HTTPProtocolParser : public AbstractProtocolParser {
 public:
     std::shared_ptr<AbstractProtocolParser> Create() override { return std::make_shared<HTTPProtocolParser>(); }
 
-    std::vector<std::shared_ptr<AbstractRecord>> Parse(struct conn_data_event_t* data_event,
+    std::vector<std::shared_ptr<AbstractRecord>> Parse(struct conn_data_event_t* dataEvent,
                                                        const std::shared_ptr<Connection>& conn,
                                                        const std::shared_ptr<Sampler>& sampler = nullptr) override;
 };
 
 REGISTER_PROTOCOL_PARSER(support_proto_e::ProtoHTTP, HTTPProtocolParser)
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

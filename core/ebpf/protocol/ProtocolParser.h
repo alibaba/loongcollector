@@ -28,13 +28,8 @@
 extern "C" {
 #include <coolbpf/net.h>
 }
-namespace logtail {
-namespace ebpf {
 
-class ParseResult {
-    int status;
-    std::vector<std::shared_ptr<AbstractRecord>> records;
-};
+namespace logtail::ebpf {
 
 class ProtocolParserManager {
 public:
@@ -43,8 +38,8 @@ public:
 
     // singleton
     static ProtocolParserManager& GetInstance() {
-        static ProtocolParserManager instance;
-        return instance;
+        static ProtocolParserManager sInstance;
+        return sInstance;
     }
 
     bool AddParser(const std::string& protocol);
@@ -67,5 +62,4 @@ private:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -16,8 +16,7 @@
 
 #include "ebpf/type/table/DataTable.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 inline constexpr DataElement kHostIp = {
     "host_ip",
@@ -573,5 +572,4 @@ inline constexpr DataElement kFilePath = {
     "file path",
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -42,7 +42,7 @@ public:
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(std::shared_ptr<ProcessCacheManager>& mgr,
-           std::shared_ptr<SourceManager> sourceManager,
+           std::shared_ptr<SourceManager>& sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            PluginMetricManagerPtr metricMgr) {
         return std::make_shared<ProcessSecurityManager>(mgr, sourceManager, queue, metricMgr);

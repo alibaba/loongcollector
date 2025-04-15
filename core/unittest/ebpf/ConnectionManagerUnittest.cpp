@@ -65,14 +65,14 @@ void ConnectionManagerUnittest::TestBasicOperations() {
     auto manager = CreateManager();
 
     auto connId = CreateTestConnId();
-    auto tracker = manager->GetOrCreateConnection(connId);
+    auto tracker = manager->getOrCreateConnection(connId);
     ValidateTracker(tracker, true);
 
-    auto existingTracker = manager->GetConnection(connId);
+    auto existingTracker = manager->getConnection(connId);
     EXPECT_EQ(existingTracker, tracker);
 
-    manager->DeleteConnection(connId);
-    auto nullTracker = manager->GetConnection(connId);
+    manager->deleteConnection(connId);
+    auto nullTracker = manager->getConnection(connId);
     ValidateTracker(nullTracker, false);
 }
 
@@ -88,7 +88,7 @@ void ConnectionManagerUnittest::TestEventHandling() {
     connectEvent.ts = 1;
 
     manager->AcceptNetCtrlEvent(&connectEvent);
-    auto tracker = manager->GetConnection(connId);
+    auto tracker = manager->getConnection(connId);
     ValidateTracker(tracker, true);
 
     struct conn_data_event_t dataEvent = {};
@@ -112,14 +112,14 @@ void ConnectionManagerUnittest::TestEventHandling() {
     statsEvent.ts = 2;
 
     manager->AcceptNetStatsEvent(&statsEvent);
-    tracker = manager->GetConnection(connId);
+    tracker = manager->getConnection(connId);
     ValidateTracker(tracker, true, support_role_e::IsClient);
 
     struct conn_ctrl_event_t closeEvent = connectEvent;
     closeEvent.type = EventClose;
 
     manager->AcceptNetCtrlEvent(&closeEvent);
-    tracker = manager->GetConnection(connId);
+    tracker = manager->getConnection(connId);
     EXPECT_TRUE(tracker->IsClose());
 }
 
@@ -127,7 +127,7 @@ void ConnectionManagerUnittest::TestTimeoutMechanism() {
     auto manager = CreateManager();
     auto connId = CreateTestConnId();
 
-    auto tracker = manager->GetOrCreateConnection(connId);
+    auto tracker = manager->getOrCreateConnection(connId);
     ValidateTracker(tracker, true);
 
     struct conn_ctrl_event_t closeEvent = {};
@@ -139,17 +139,17 @@ void ConnectionManagerUnittest::TestTimeoutMechanism() {
     manager->AcceptNetCtrlEvent(&closeEvent);
 
     for (size_t i = 0; i < 12; i++) {
-        manager->Iterations(i);
+        manager->Iterations();
     }
 
-    auto nullTracker = manager->GetConnection(connId);
+    auto nullTracker = manager->getConnection(connId);
     ValidateTracker(nullTracker, false);
 }
 
 void ConnectionManagerUnittest::TestMetadataHandling() {
     auto manager = CreateManager();
     auto connId = CreateTestConnId();
-    auto tracker = manager->GetOrCreateConnection(connId);
+    auto tracker = manager->getOrCreateConnection(connId);
 
     struct conn_stats_event_t statsEvent = {};
     statsEvent.conn_id.fd = connId.fd;
@@ -165,7 +165,7 @@ void ConnectionManagerUnittest::TestMetadataHandling() {
 
     manager->AcceptNetStatsEvent(&statsEvent);
 
-    auto updatedTracker = manager->GetConnection(connId);
+    auto updatedTracker = manager->getConnection(connId);
     EXPECT_EQ(updatedTracker->GetSourceIp(), "127.0.0.1");
     EXPECT_EQ(updatedTracker->GetRemoteIp(), "192.168.1.1");
 }
@@ -173,7 +173,7 @@ void ConnectionManagerUnittest::TestMetadataHandling() {
 void ConnectionManagerUnittest::TestProtocolDetection() {
     auto manager = CreateManager();
     auto connId = CreateTestConnId();
-    auto tracker = manager->GetOrCreateConnection(connId);
+    auto tracker = manager->getOrCreateConnection(connId);
 
     struct conn_stats_event_t statsEvent = {};
     statsEvent.conn_id.fd = connId.fd;
@@ -201,7 +201,7 @@ void ConnectionManagerUnittest::TestResourceManagement() {
     for (int i = 0; i < connectionCount; ++i) {
         auto connId = CreateTestConnId(i);
         connIds.push_back(connId);
-        auto tracker = manager->GetOrCreateConnection(connId);
+        auto tracker = manager->getOrCreateConnection(connId);
         ValidateTracker(tracker, true);
     }
 
@@ -217,11 +217,11 @@ void ConnectionManagerUnittest::TestResourceManagement() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     for (size_t i = 0; i < 12; i++) {
-        manager->Iterations(i);
+        manager->Iterations();
     }
 
     for (int i = 0; i < connectionCount; ++i) {
-        auto tracker = manager->GetConnection(connIds[i]);
+        auto tracker = manager->getConnection(connIds[i]);
         if (i < connectionCount / 2) {
             ValidateTracker(tracker, false);
         } else {
@@ -234,13 +234,13 @@ void ConnectionManagerUnittest::TestErrorHandling() {
     auto manager = CreateManager();
 
     ConnId invalidConnId(-1, 0, 0);
-    auto nullTracker = manager->GetConnection(invalidConnId);
+    auto nullTracker = manager->getConnection(invalidConnId);
     ValidateTracker(nullTracker, false);
 
     auto connId = CreateTestConnId();
-    manager->DeleteConnection(connId);
+    manager->deleteConnection(connId);
     // re-delete
-    manager->DeleteConnection(connId);
+    manager->deleteConnection(connId);
 }
 
 UNIT_TEST_CASE(ConnectionManagerUnittest, TestBasicOperations);

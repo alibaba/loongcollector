@@ -16,16 +16,13 @@
 
 #include <coolbpf/security/type.h>
 
-#include "common/TimeUtil.h"
-#include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
-namespace logtail {
-namespace ebpf {
-AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager> processCacheMgr,
-                                 std::shared_ptr<SourceManager> sourceManager,
+namespace logtail::ebpf {
+AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager>& processCacheMgr,
+                                 std::shared_ptr<SourceManager>&& sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                 PluginMetricManagerPtr mgr)
+                                 PluginMetricManagerPtr&& mgr)
     : mProcessCacheManager(processCacheMgr), mSourceManager(sourceManager), mCommonEventQueue(queue), mMetricMgr(mgr) {
     if (!mMetricMgr) {
         return;
@@ -54,34 +51,4 @@ AbstractManager::~AbstractManager() {
     }
 }
 
-int AbstractManager::GetCallNameIdx(const std::string& callName) {
-    if (callName == "security_file_permission") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION;
-    }
-    if (callName == "security_mmap_file") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_MMAP_FILE;
-    }
-    if (callName == "security_path_truncate") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_SECURITY_PATH_TRUNCATE;
-    }
-    if (callName == "sys_write") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_SYS_WRITE;
-    }
-    if (callName == "sys_read") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_SYS_READ;
-    }
-    if (callName == "tcp_close") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_TCP_CLOSE;
-    }
-    if (callName == "tcp_connect") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_TCP_CONNECT;
-    }
-    if (callName == "tcp_sendmsg") {
-        return SECURE_FUNC_TRACEPOINT_FUNC_TCP_SENDMSG;
-    }
-    LOG_WARNING(sLogger, ("unknown call name", callName));
-    return -1;
-}
-
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

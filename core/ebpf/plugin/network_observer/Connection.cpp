@@ -12,42 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 #include "Connection.h"
 
 #include <cctype>
 
 #include "common/NetworkUtil.h"
 #include "common/magic_enum.hpp"
-#include "ebpf/type/table/DataTable.h"
+#include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
-#include "type/table/BaseElements.h"
+#include "metadata/K8sMetadata.h"
 
 extern "C" {
 #include <coolbpf/net.h>
 }
 
-#include "metadata/K8sMetadata.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
-static constexpr StringView EXTERNAL_STR = "external";
-static constexpr StringView LOCALHOST_STR = "localhost";
-static constexpr StringView HTTP_STR = "http";
-static constexpr StringView RPC_25_STR = "25";
-static constexpr StringView RPC_0_STR = "0";
-static constexpr StringView HTTP_CLIENT_STR = "http_client";
-static constexpr StringView UNKNOWN_STR = "unknown";
-static constexpr StringView IPV4_STR = "ipv4";
-static constexpr StringView IPV6_STR = "ipv6";
-static constexpr StringView ZERO_ADDR_STR = "0.0.0.0";
-static constexpr StringView LOOPBACK_STR = "127.0.0.1";
+static constexpr StringView kExternalStr = "external";
+static constexpr StringView kLocalhostStr = "localhost";
+static constexpr StringView kHttpStr = "http";
+static constexpr StringView kRpc25Str = "25";
+static constexpr StringView kRpc0Str = "0";
+static constexpr StringView kHttpClientStr = "http_client";
+static constexpr StringView kUnknownStr = "unknown";
+static constexpr StringView kZeroAddrStr = "0.0.0.0";
+static constexpr StringView kLoopbackStr = "127.0.0.1";
 
 std::regex Connection::mContainerIdRegex = std::regex("[a-f0-9]{64}");
 
 bool Connection::IsLocalhost() const {
     const auto& remoteIp = GetRemoteIp();
-    return (remoteIp == LOOPBACK_STR || remoteIp == LOCALHOST_STR || remoteIp == ZERO_ADDR_STR);
+    return (remoteIp == kLoopbackStr || remoteIp == kLocalhostStr || remoteIp == kZeroAddrStr);
 }
 
 // only called by poller thread ...
@@ -59,41 +56,13 @@ void Connection::UpdateConnState(struct conn_ctrl_event_t* event) {
     }
 }
 
-// void Connection::UpdateRole(enum support_role_e role) {
-//     if (!IsL7MetaAttachReady()) {
-//         // WriteLock lock(mProtocolAndRoleLock);
-//         if (mRole != IsUnknown && mRole != role) {
-//             LOG_WARNING(
-//                 sLogger,
-//                 ("role change!! last role", magic_enum::enum_name(mRole))("new role", magic_enum::enum_name(role)));
-//         } else {
-//             mRole = role;
-//             TryAttachL7Meta();
-//         }
-//     }
-// }
-
-// void Connection::UpdateProtocol(support_proto_e protocol) {
-//     if (!IsL7MetaAttachReady()) {
-//         // WriteLock lock(mProtocolAndRoleLock);
-//         if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
-//             LOG_WARNING(sLogger,
-//                         ("protocol change!! last protocol",
-//                          magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
-//         } else {
-//             mProtocol = protocol;
-//             TryAttachL7Meta();
-//         }
-//     }
-// }
-
 // only called by poller thread ...
 void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     if (event->conn_events == StatusClose) {
         MarkClose();
     }
 
-    int64_t eventTs = static_cast<int64_t>(event->ts);
+    auto eventTs = static_cast<int64_t>(event->ts);
     if (eventTs <= this->mLastUpdateTs) {
         // event comes later ...
         LOG_DEBUG(sLogger, ("event comes later", "skip process"));
@@ -101,15 +70,9 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     }
 
     this->mLastUpdateTs = eventTs;
-    // if (IsL4MetaAttachReady()) {
-    //     LOG_DEBUG(sLogger, ("netMeta already attached", ""));
-    //     UpdateL4Meta(event);
-    // MarkXXX();
-    // TryAttachSelf();
-    // }
     if (!IsL4MetaAttachReady()) {
         LOG_DEBUG(sLogger, ("netMeta already attached", ""));
-        UpdateL4Meta(event);
+        updateL4Meta(event);
         MarkL4MetaAttached();
         TryAttachPeerMeta(event->si.family, event->si.ap.daddr);
         TryAttachSelfMeta();
@@ -142,7 +105,7 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
 }
 
 bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in) {
-    ConnStatsRecord* record = static_cast<ConnStatsRecord*>(in.get());
+    auto* record = static_cast<ConnStatsRecord*>(in.get());
     if (!record) {
         return false;
     }
@@ -166,25 +129,6 @@ bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& 
     return true;
 }
 
-// void Connection::TryAttachL7Meta() {
-//     if (mProtocol == support_proto_e::ProtoUnknown || IsL7MetaAttachReady()) {
-//         return;
-//     }
-
-//     mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
-//     if (mRole == support_role_e::IsClient) {
-//         mTags.SetNoCopy<kRpcType>(RPC_25_STR);
-//         mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
-//         mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
-//         MarkL7MetaAttached();
-//     } else if (mRole == support_role_e::IsServer) {
-//         mTags.SetNoCopy<kRpcType>(RPC_0_STR);
-//         mTags.SetNoCopy<kCallKind>(HTTP_STR);
-//         mTags.SetNoCopy<kCallType>(HTTP_STR);
-//         MarkL7MetaAttached();
-//     }
-// }
-
 void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) {
     if (IsL7MetaAttachReady()) {
         return;
@@ -206,48 +150,20 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
 
     if (mProtocol == support_proto_e::ProtoHTTP) {
         if (mRole == support_role_e::IsClient) {
-            mTags.SetNoCopy<kRpcType>(RPC_25_STR);
-            mTags.SetNoCopy<kCallKind>(HTTP_CLIENT_STR);
-            mTags.SetNoCopy<kCallType>(HTTP_CLIENT_STR);
+            mTags.SetNoCopy<kRpcType>(kRpc25Str);
+            mTags.SetNoCopy<kCallKind>(kHttpClientStr);
+            mTags.SetNoCopy<kCallType>(kHttpClientStr);
             MarkL7MetaAttached();
         } else if (mRole == support_role_e::IsServer) {
-            mTags.SetNoCopy<kRpcType>(RPC_0_STR);
-            mTags.SetNoCopy<kCallKind>(HTTP_STR);
-            mTags.SetNoCopy<kCallType>(HTTP_STR);
+            mTags.SetNoCopy<kRpcType>(kRpc0Str);
+            mTags.SetNoCopy<kCallKind>(kHttpStr);
+            mTags.SetNoCopy<kCallType>(kHttpStr);
             MarkL7MetaAttached();
         }
     }
-
-    // MarkL7MetaAttached();
-
-    // if (!IsL7MetaAttachReady()) {
-    //     // WriteLock lock(mProtocolAndRoleLock);
-    //     if (mRole != IsUnknown && mRole != role) {
-    //         LOG_WARNING(
-    //             sLogger,
-    //             ("role change!! last role", magic_enum::enum_name(mRole))("new role", magic_enum::enum_name(role)));
-    //     } else {
-    //         mRole = role;
-    //         TryAttachL7Meta();
-    //     }
-    // }
-
-    // if (!IsL7MetaAttachReady()) {
-    //     // WriteLock lock(mProtocolAndRoleLock);
-    //     if (mProtocol != support_proto_e::ProtoUnknown && mProtocol != protocol) {
-    //         LOG_WARNING(sLogger,
-    //                     ("protocol change!! last protocol",
-    //                      magic_enum::enum_name(mProtocol))("new protocol", magic_enum::enum_name(protocol)));
-    //     } else {
-    //         mProtocol = protocol;
-    //         TryAttachL7Meta();
-    //     }
-    // }
 }
 
-void Connection::UpdateL4Meta(struct conn_stats_event_t* event) {
-    MarkConnStatsEventReceived();
-
+void Connection::updateL4Meta(struct conn_stats_event_t* event) {
     // handle container id ...
     std::string cidTrim;
     if (strlen(event->docker_id) > 0) {
@@ -284,7 +200,7 @@ void Connection::UpdateL4Meta(struct conn_stats_event_t* event) {
     mTags.Set<kRemoteIp>(dip);
 }
 
-void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
+void Connection::updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     if (!pod) {
         // no meta info ...
         LOG_WARNING(sLogger, ("no pod info ... cid:", mTags.Get<kContainerId>()));
@@ -306,14 +222,14 @@ void Connection::UpdateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     mTags.Set<kHostName>(pod->mPodName);
 }
 
-void Connection::UpdatePeerPodMetaForExternal() {
-    mTags.SetNoCopy<kPeerAppName>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerPodName>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerPodIp>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerWorkloadName>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerWorkloadKind>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerNamespace>(EXTERNAL_STR);
-    mTags.SetNoCopy<kPeerServiceName>(EXTERNAL_STR);
+void Connection::updatePeerPodMetaForExternal() {
+    mTags.SetNoCopy<kPeerAppName>(kExternalStr);
+    mTags.SetNoCopy<kPeerPodName>(kExternalStr);
+    mTags.SetNoCopy<kPeerPodIp>(kExternalStr);
+    mTags.SetNoCopy<kPeerWorkloadName>(kExternalStr);
+    mTags.SetNoCopy<kPeerWorkloadKind>(kExternalStr);
+    mTags.SetNoCopy<kPeerNamespace>(kExternalStr);
+    mTags.SetNoCopy<kPeerServiceName>(kExternalStr);
     if (mRole == IsClient) {
         auto daddr = mTags.Get<kRemoteAddr>();
         mTags.SetNoCopy<kDestId>(daddr);
@@ -321,29 +237,29 @@ void Connection::UpdatePeerPodMetaForExternal() {
     }
 }
 
-void Connection::UpdatePeerPodMetaForLocalhost() {
-    mTags.SetNoCopy<kPeerAppName>(LOCALHOST_STR);
-    mTags.SetNoCopy<kPeerPodName>(LOCALHOST_STR);
-    mTags.SetNoCopy<kPeerPodIp>(LOCALHOST_STR);
-    mTags.SetNoCopy<kPeerWorkloadName>(LOCALHOST_STR);
-    mTags.SetNoCopy<kPeerWorkloadKind>(LOCALHOST_STR);
+void Connection::updatePeerPodMetaForLocalhost() {
+    mTags.SetNoCopy<kPeerAppName>(kLocalhostStr);
+    mTags.SetNoCopy<kPeerPodName>(kLocalhostStr);
+    mTags.SetNoCopy<kPeerPodIp>(kLocalhostStr);
+    mTags.SetNoCopy<kPeerWorkloadName>(kLocalhostStr);
+    mTags.SetNoCopy<kPeerWorkloadKind>(kLocalhostStr);
     if (mRole == IsClient) {
-        mTags.SetNoCopy<kDestId>(LOCALHOST_STR);
-        mTags.SetNoCopy<kEndpoint>(LOCALHOST_STR);
+        mTags.SetNoCopy<kDestId>(kLocalhostStr);
+        mTags.SetNoCopy<kEndpoint>(kLocalhostStr);
     }
 }
 
-void Connection::UpdateSelfPodMetaForUnknown() {
-    mTags.SetNoCopy<kAppName>(UNKNOWN_STR);
-    mTags.SetNoCopy<kAppId>(UNKNOWN_STR);
-    mTags.SetNoCopy<kPodIp>(UNKNOWN_STR);
-    mTags.SetNoCopy<kWorkloadName>(UNKNOWN_STR);
-    mTags.SetNoCopy<kWorkloadKind>(UNKNOWN_STR);
-    mTags.SetNoCopy<kNamespace>(UNKNOWN_STR);
-    mTags.SetNoCopy<kHostName>(UNKNOWN_STR);
+void Connection::updateSelfPodMetaForUnknown() {
+    mTags.SetNoCopy<kAppName>(kUnknownStr);
+    mTags.SetNoCopy<kAppId>(kUnknownStr);
+    mTags.SetNoCopy<kPodIp>(kUnknownStr);
+    mTags.SetNoCopy<kWorkloadName>(kUnknownStr);
+    mTags.SetNoCopy<kWorkloadKind>(kUnknownStr);
+    mTags.SetNoCopy<kNamespace>(kUnknownStr);
+    mTags.SetNoCopy<kHostName>(kUnknownStr);
 }
 
-void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
+void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     if (!pod) {
         // no meta info ...
         return;
@@ -354,13 +270,13 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : UNKNOWN_STR);
-    mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : UNKNOWN_STR);
-    mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : UNKNOWN_STR);
-    mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : UNKNOWN_STR);
-    mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : UNKNOWN_STR);
-    mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : UNKNOWN_STR);
-    mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : UNKNOWN_STR);
+    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : kUnknownStr);
+    mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : kUnknownStr);
+    mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : kUnknownStr);
+    mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : kUnknownStr);
+    mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : kUnknownStr);
+    mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : kUnknownStr);
+    mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : kUnknownStr);
 
     // set destId and endpoint ...
     if (mRole == IsClient) {
@@ -371,8 +287,8 @@ void Connection::UpdatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         } else if (pod->mServiceName.size()) {
             mTags.Set<kDestId>(pod->mServiceName);
         } else {
-            // TODO set to rpc value...
-            mTags.Set<kDestId>(UNKNOWN_STR);
+            // TODO(qianlu.kk): set to rpc value...
+            mTags.Set<kDestId>(kUnknownStr);
         }
         mTags.Set<kEndpoint>(mTags.Get<kRemoteAddr>());
     }
@@ -386,10 +302,11 @@ void Connection::TryAttachSelfMeta() {
         // set self metadata ...
         MarkSelfMetaAttached();
         return;
-    } else if (IsConnStatsEventReceived()) {
+    }
+    if (IsL4MetaAttachReady()) {
         const auto& cid = GetContainerId();
         if (cid.empty()) {
-            UpdateSelfPodMetaForUnknown();
+            updateSelfPodMetaForUnknown();
             MarkSelfMetaAttached();
             return;
         }
@@ -397,7 +314,7 @@ void Connection::TryAttachSelfMeta() {
         auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
         if (info) {
             LOG_DEBUG(sLogger, ("get meta from cache", ""));
-            UpdateSelfPodMeta(info);
+            updateSelfPodMeta(info);
             MarkSelfMetaAttached();
             return;
         }
@@ -417,29 +334,29 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
     }
 
     if (IsLocalhost()) {
-        UpdatePeerPodMetaForLocalhost();
+        updatePeerPodMetaForLocalhost();
         MarkPeerMetaAttached();
         return;
-    } else {
-        // not cluster ip
-        if (family == AF_INET && !K8sMetadata::GetInstance().IsClusterIpForIPv4(ip)) {
-            UpdatePeerPodMetaForExternal();
-            MarkPeerMetaAttached();
-            return;
-        }
     }
 
-    if (IsConnStatsEventReceived()) {
+    // not cluster ip
+    if (family == AF_INET && !K8sMetadata::GetInstance().IsClusterIpForIPv4(ip)) {
+        updatePeerPodMetaForExternal();
+        MarkPeerMetaAttached();
+        return;
+    }
+
+    if (IsL4MetaAttachReady()) {
         const auto& dip = GetRemoteIp();
         if (dip.empty()) {
             LOG_WARNING(sLogger, ("dip is empty, conn", DumpConnection()));
-            UpdatePeerPodMetaForExternal();
+            updatePeerPodMetaForExternal();
             MarkPeerMetaAttached();
             return;
         }
         auto info = K8sMetadata::GetInstance().GetInfoByIpFromCache(dip);
         if (info) {
-            UpdatePeerPodMeta(info);
+            updatePeerPodMeta(info);
             MarkPeerMetaAttached();
             return; // fill by cache
         }
@@ -447,7 +364,7 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
         // if we don't find metadata info from cache,
         // we need to find out whether is an external ip ...
         if (K8sMetadata::GetInstance().IsExternalIp(dip)) {
-            UpdatePeerPodMetaForExternal();
+            updatePeerPodMetaForExternal();
             MarkPeerMetaAttached();
             return;
         }
@@ -458,5 +375,4 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
     }
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -36,31 +36,29 @@ const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
 const std::string FileSecurityManager::sTruncateValue = "security_path_truncate";
 const std::string FileSecurityManager::sPermissionValue = "security_file_permission";
 
-void HandleFileKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
+void HandleFileKernelEvent(void* ctx, int, void* data, __u32) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return;
     }
-    FileSecurityManager* ss = static_cast<FileSecurityManager*>(ctx);
-    if (ss == nullptr)
+    auto* ss = static_cast<FileSecurityManager*>(ctx);
+    if (ss == nullptr) {
         return;
-    file_data_t* event = static_cast<file_data_t*>(data);
+    }
+    auto* event = static_cast<file_data_t*>(data);
     ss->RecordFileEvent(event);
-    // TODO @qianlu.kk  self monitor
-    //   ss->UpdateRecvKernelEventsTotal();
-    return;
 }
 
-void HandleFileKernelEventLoss(void* ctx, int cpu, __u64 num) {
+void HandleFileKernelEventLoss(void* ctx, int, __u64 num) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", "")("lost network kernel events num", num));
         return;
     }
-    FileSecurityManager* ss = static_cast<FileSecurityManager*>(ctx);
-    if (ss == nullptr)
+    auto* ss = static_cast<FileSecurityManager*>(ctx);
+    if (ss == nullptr) {
         return;
+    }
     ss->UpdateLossKernelEventsTotal(num);
-    return;
 }
 
 void FileSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
@@ -96,19 +94,19 @@ FileSecurityManager::FileSecurityManager(std::shared_ptr<ProcessCacheManager>& b
                                          std::shared_ptr<SourceManager> sourceManager,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          PluginMetricManagerPtr mgr)
-    : AbstractManager(baseMgr, sourceManager, queue, mgr),
+    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(mgr)),
       mAggregateTree(
           4096,
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
-              base->mInnerEvents.emplace_back(std::move(other));
+              base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>& sourceBuffer) {
-              FileEvent* in = static_cast<FileEvent*>(ce.get());
+          [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>&) {
+              auto* in = static_cast<FileEvent*>(ce.get());
               return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
           }) {
 }
 
-bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime) {
+bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point&) {
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
@@ -157,17 +155,17 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_MMAP: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sMmapValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     default:
@@ -198,7 +196,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
 bool FileSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                                        const std::shared_ptr<ScheduleConfig>& config) {
     std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEventV2>(nextTime, config));
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
     return ConsumeAggregateTree(execTime);
 }
 
@@ -229,7 +227,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
     FileEvent* event = static_cast<FileEvent*>(ce.get());
     // calculate agg key
-    std::array<size_t, 2> result;
+    std::array<size_t, 2> result{};
     result.fill(0UL);
     std::hash<uint64_t> hasher;
     std::array<uint64_t, 2> arr = {uint64_t(event->mPid), event->mKtime};

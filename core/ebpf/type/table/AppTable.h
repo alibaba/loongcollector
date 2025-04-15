@@ -17,8 +17,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "ebpf/type/table/DataTable.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 inline constexpr DataElement kConnTrackerElements[] = {
     kHostName,
@@ -83,5 +82,4 @@ inline constexpr size_t kAppMetricsNum = std::size(kAppMetricsElements);
 
 inline constexpr auto kAppMetricsTable = DataTableSchema("app_metrics", "app metrics table", kAppMetricsElements);
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

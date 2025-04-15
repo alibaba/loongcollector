@@ -18,18 +18,18 @@
 #include <queue>
 #include <vector>
 
-#include "ConnectionManager.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/plugin/network_observer/ConnectionManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class NetworkObserverManager : public AbstractManager {
 public:
@@ -59,7 +59,7 @@ public:
 
     int PollPerfBuffer() override { return 0; }
 
-    void RecordEventLost(enum callback_type_e type, uint64_t lost_count);
+    void RecordEventLost(enum callback_type_e type, uint64_t lostCount);
 
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
@@ -80,14 +80,14 @@ public:
         return ebpfConfig;
     }
 
-    virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
-    virtual int Suspend() override {
+    int Suspend() override {
         mSuspendFlag = true;
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
         mSuspendFlag = false;
         return 0;
     }
@@ -98,22 +98,22 @@ public:
     bool ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool UploadHostMetadataUpdateTask();
 
-    void HandleHostMetadataUpdate(const std::vector<std::string>& podIpVec);
+    void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
 
     bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                       const std::shared_ptr<ScheduleConfig>& config) override;
 
 private:
-    void ProcessRecord(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
-    void ProcessRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
+    void processRecord(const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
 
-    void HandleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
+    void handleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
 
-    void RunInThread();
+    void runInThread();
 
-    bool UpdateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
+    bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
 
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
@@ -155,9 +155,9 @@ private:
 
     std::thread mRecordConsume;
 
-    std::atomic_bool mEnableSpan;
-    std::atomic_bool mEnableLog;
-    std::atomic_bool mEnableMetric;
+    std::atomic_bool mEnableSpan = false;
+    std::atomic_bool mEnableLog = false;
+    std::atomic_bool mEnableMetric = false;
 
     FrequencyManager mPollKernelFreqMgr;
     FrequencyManager mConsumerFreqMgr;
@@ -188,7 +188,7 @@ private:
     std::string mHostIp;
 
     template <typename T, typename Func>
-    void CompareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {
+    void compareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {
         if (oldValue != newValue) {
             LOG_INFO(sLogger, ("config change!, fieldName", fieldName));
             onUpdate(oldValue, newValue);
@@ -208,5 +208,4 @@ private:
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

@@ -36,18 +36,17 @@
 #include "ebpf/util/AggregateTree.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class AbstractManager {
 public:
-    inline static constexpr StringView sKprobeValue = "kprobe";
+    inline static constexpr StringView kKprobeValue = "kprobe";
 
     AbstractManager() = delete;
-    explicit AbstractManager(std::shared_ptr<ProcessCacheManager>,
-                             std::shared_ptr<SourceManager> sourceManager,
+    explicit AbstractManager(std::shared_ptr<ProcessCacheManager>&,
+                             std::shared_ptr<SourceManager>&& sourceManager,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             PluginMetricManagerPtr mgr);
+                             PluginMetricManagerPtr&& mgr);
     virtual ~AbstractManager();
 
     virtual int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
@@ -58,7 +57,7 @@ public:
 
     virtual int PollPerfBuffer() {
         int zero = 0;
-        // TODO @qianlu.kk do we need to hold some events for a while and enqueue bulk??
+        // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
         return mSourceManager->PollPerfBuffers(
@@ -68,8 +67,6 @@ public:
     bool IsRunning() { return mFlag && !mSuspendFlag; }
 
     bool IsExists() { return mFlag; }
-
-    int GetCallNameIdx(const std::string& callName);
 
     virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                               const std::shared_ptr<ScheduleConfig>& config)
@@ -147,5 +144,4 @@ protected:
     std::vector<MetricLabels> mRefAndLabels;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

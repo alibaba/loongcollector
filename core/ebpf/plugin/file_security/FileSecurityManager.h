@@ -24,8 +24,8 @@
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/FileEvent.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
+
 class FileSecurityManager : public AbstractManager {
 public:
     static const std::string sPathKey;
@@ -79,5 +79,4 @@ private:
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

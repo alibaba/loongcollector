@@ -8,8 +8,7 @@
 
 #include "CommonDataEvent.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class NetworkEvent : public CommonEvent {
 public:
@@ -32,7 +31,7 @@ public:
           mSaddr(saddr),
           mDaddr(daddr),
           mNetns(netNs) {}
-    virtual PluginType GetPluginType() const { return PluginType::NETWORK_SECURITY; };
+    [[nodiscard]] PluginType GetPluginType() const override { return PluginType::NETWORK_SECURITY; };
     uint16_t mProtocol;
     uint16_t mFamily;
     uint16_t mSport; // Source port
@@ -75,5 +74,4 @@ public:
     std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

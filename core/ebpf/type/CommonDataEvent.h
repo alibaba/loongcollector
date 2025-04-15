@@ -40,8 +40,8 @@ public:
         : mPid(pid), mKtime(ktime), mEventType(type), mTimestamp(timestamp) {}
     virtual ~CommonEvent() {}
 
-    virtual PluginType GetPluginType() const = 0;
-    virtual KernelEventType GetKernelEventType() const { return mEventType; }
+    [[nodiscard]] virtual PluginType GetPluginType() const = 0;
+    [[nodiscard]] virtual KernelEventType GetKernelEventType() const { return mEventType; }
     uint32_t mPid;
     uint64_t mKtime;
     KernelEventType mEventType;

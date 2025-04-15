@@ -14,15 +14,12 @@
 
 #include "ebpf/eBPFServer.h"
 
-#include <algorithm>
 #include <future>
-#include <map>
 #include <string>
 #include <vector>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
-#include "common/Lock.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/http/AsynCurlRunner.h"
@@ -30,7 +27,6 @@
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
-#include "metadata/K8sMetadata.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
@@ -41,12 +37,11 @@ DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
                   4019000000);
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
-static const uint16_t KERNEL_VERSION_310 = 3010; // for centos7
-static const std::string KERNEL_NAME_CENTOS = "CentOS";
-static const uint16_t KERNEL_CENTOS_MIN_VERSION = 7006;
+static const uint16_t kKernelVersion310 = 3010; // for centos7
+static const std::string kKernelNameCentos = "CentOS";
+static const uint16_t kKernelCentosMinVersion = 7006;
 
 bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
@@ -115,7 +110,7 @@ void EnvManager::InitEnvInfo() {
         mBTFSupport = true;
         return;
     }
-    if (version / 1000000 != KERNEL_VERSION_310) {
+    if (version / 1000000 != kKernelVersion310) {
         LOG_WARNING(sLogger, ("unsupported kernel version, will not start eBPF plugin ... version", version));
         m310Support = false;
         return;
@@ -125,16 +120,15 @@ void EnvManager::InitEnvInfo() {
     int64_t osVersion;
     if (GetRedHatReleaseInfo(os, osVersion, STRING_FLAG(default_container_host_path))
         || GetRedHatReleaseInfo(os, osVersion)) {
-        if (os == KERNEL_NAME_CENTOS && osVersion >= KERNEL_CENTOS_MIN_VERSION) {
+        if (os == kKernelNameCentos && osVersion >= kKernelCentosMinVersion) {
             m310Support = true;
             return;
-        } else {
-            LOG_WARNING(
-                sLogger,
-                ("unsupported os for 310 kernel, will not start eBPF plugin ...", "")("os", os)("version", osVersion));
-            m310Support = false;
-            return;
         }
+        LOG_WARNING(
+            sLogger,
+            ("unsupported os for 310 kernel, will not start eBPF plugin ...", "")("os", os)("version", osVersion));
+        m310Support = false;
+        return;
     }
     LOG_WARNING(sLogger, ("not redhat release, will not start eBPF plugin ...", ""));
     m310Support = false;
@@ -251,21 +245,21 @@ void eBPFServer::Stop() {
 }
 
 // maybe update or create
-bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
-                                     uint32_t plugin_index,
+bool eBPFServer::startPluginInternal(const std::string& pipelineName,
+                                     uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                                      PluginMetricManagerPtr mgr) {
-    std::string prev_pipeline_name = CheckLoadedPipelineName(type);
-    if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
+    std::string prevPipelineName = CheckLoadedPipelineName(type);
+    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
         LOG_WARNING(sLogger,
                     ("pipeline already loaded, plugin type",
-                     magic_enum::enum_name(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+                     magic_enum::enum_name(type))("prev pipeline", prevPipelineName)("curr pipeline", pipelineName));
         return false;
     }
 
-    if (prev_pipeline_name.size() && prev_pipeline_name == pipeline_name) {
+    if (prevPipelineName.size() && prevPipelineName == pipelineName) {
         LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
         auto pluginMgr = GetPluginManager(type);
         if (pluginMgr) {
@@ -278,7 +272,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             if (res) {
                 return false;
             }
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
             LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type))("res", res));
             return true;
         } else {
@@ -287,16 +281,13 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
         }
     }
 
-    UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
+    UpdatePipelineName(type, pipelineName, ctx->GetProjectName());
 
     if (type != PluginType::NETWORK_OBSERVE) {
         LOG_INFO(sLogger, ("hostname", mHostName)("mHostPathPrefix", mHostPathPrefix));
         auto res = mProcessCacheManager->Init();
         LOG_INFO(sLogger, ("ProcessCacheManager init ", res));
     }
-
-    // init self monitor
-    // mMonitorMgr->Init(type, mgr, pipeline_name, ctx->GetProjectName());
 
     // step1: convert options to export type
     bool ret = false;
@@ -342,7 +333,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             return false;
     }
 
-    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
     ret = (pluginMgr->Init(options) == 0);
 
     if (ret) {
@@ -354,15 +345,16 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
 bool eBPFServer::HasRegisteredPlugins() const {
     std::lock_guard<std::mutex> lk(mMtx);
-    for (auto& pipeline : mLoadedPipeline) {
-        if (!pipeline.empty())
+    for (const auto& pipeline : mLoadedPipeline) {
+        if (!pipeline.empty()) {
             return true;
+        }
     }
     return false;
 }
 
-bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
-                              uint32_t plugin_index,
+bool eBPFServer::EnablePlugin(const std::string& pipelineName,
+                              uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
                               const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
@@ -370,7 +362,7 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
     if (!IsSupportedEnv(type)) {
         return false;
     }
-    return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options, mgr);
+    return startPluginInternal(pipelineName, pluginIndex, type, ctx, options, mgr);
 }
 
 bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
@@ -386,21 +378,21 @@ bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
     }
 }
 
-bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type) {
+bool eBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
     }
-    std::string prev_pipeline = CheckLoadedPipelineName(type);
-    if (prev_pipeline == pipeline_name) {
+    std::string prevPipeline = CheckLoadedPipelineName(type);
+    if (prevPipeline == pipelineName) {
         UpdatePipelineName(type, "", "");
     } else {
         LOG_WARNING(
             sLogger,
-            ("the specified config is not running, prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
+            ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
         return true;
     }
 
-    LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipeline_name));
+    LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipelineName));
     auto pluginManager = GetPluginManager(type);
     if (pluginManager && pluginManager->IsExists()) {
         pluginManager->UpdateContext(nullptr, -1, -1);
@@ -409,7 +401,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
             ADD_COUNTER(mStopPluginTotal, 1);
             UpdatePluginManager(type, nullptr);
             // pluginManager->UpdateProcessCacheManager(nullptr); // deprecated ... TODO @qianlu.kk
-            LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
+            LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
             if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
                 || type == PluginType::FILE_SECURITY) {
                 // check if we need stop ProcessCacheManager
@@ -418,12 +410,12 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type
                 }
             }
         } else {
-            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipeline_name));
+            LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         }
     } else {
         LOG_WARNING(sLogger,
                     ("no plugin registered or not running, plugin type", magic_enum::enum_name(type))("pipeline",
-                                                                                                      pipeline_name));
+                                                                                                      pipelineName));
     }
     return true;
 }
@@ -501,18 +493,18 @@ std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
     if (type == PluginType::MAX) {
         return nullptr;
-    } else {
-        return mPlugins[static_cast<int>(type)];
     }
+
+    return mPlugins[static_cast<int>(type)];
 }
 
 void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
     std::lock_guard<std::mutex> lk(mMtx);
     if (type == PluginType::MAX) {
         return;
-    } else {
-        mPlugins[static_cast<int>(type)] = mgr;
     }
+
+    mPlugins[static_cast<int>(type)] = mgr;
 }
 
 void eBPFServer::HandlerEvents() {
@@ -542,5 +534,4 @@ void eBPFServer::HandlerEvents() {
     }
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

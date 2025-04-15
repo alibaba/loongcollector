@@ -28,9 +28,9 @@
 #include "ebpf/SourceManager.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/type/CommonDataEvent.h"
+#include "ebpf/util/FrequencyManager.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "util/FrequencyManager.h"
 
 namespace logtail {
 namespace ebpf {

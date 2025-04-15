@@ -15,7 +15,7 @@
 #pragma once
 
 extern "C" {
-#include <bpf/libbpf.h>
+// #include <bpf/libbpf.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>
@@ -26,7 +26,7 @@ extern "C" {
 
 #include <string>
 
-#include "eBPFWrapper.h"
+#include "ebpf/driver/eBPFWrapper.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {

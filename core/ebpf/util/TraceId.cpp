@@ -24,23 +24,23 @@ namespace ebpf {
 
 template <size_t N>
 void GenerateRand64(std::array<uint64_t, N>& result) {
-    thread_local static std::random_device rd;
-    thread_local static std::mt19937_64 generator(rd());
-    thread_local static std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
+    thread_local static std::random_device sRd;
+    thread_local static std::mt19937_64 sGenerator(sRd());
+    thread_local static std::uniform_int_distribution<uint64_t> sDistribution(0, std::numeric_limits<uint64_t>::max());
 
     for (size_t i = 0; i < N; i++) {
-        result[i] = distribution(generator);
+        result[i] = sDistribution(sGenerator);
     }
 }
 
 std::array<uint64_t, 4> GenerateTraceID() {
-    std::array<uint64_t, 4> result;
+    std::array<uint64_t, 4> result{};
     GenerateRand64<4>(result);
     return result;
 }
 
 std::array<uint64_t, 2> GenerateSpanID() {
-    std::array<uint64_t, 2> result;
+    std::array<uint64_t, 2> result{};
     GenerateRand64<2>(result);
     return result;
 }

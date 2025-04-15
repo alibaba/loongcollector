@@ -35,8 +35,7 @@
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -135,7 +134,7 @@ StringBuffer ToStringBuffer(std::shared_ptr<SourceBuffer> sourceBuffer, int32_t 
 bool ProcessSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                                           const std::shared_ptr<ScheduleConfig>& config) {
     std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEventV2>(nextTime, config));
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
     return ConsumeAggregateTree(execTime);
 }
 
@@ -187,14 +186,14 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
                     case KernelEventType::PROCESS_EXECVE_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(), ProcessSecurityManager::kExecveValue);
                         // ? kprobe or execve
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::sKprobeValue);
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::kKprobeValue);
                         break;
                     }
                     case KernelEventType::PROCESS_EXIT_EVENT: {
                         CommonEvent* ce = innerEvent.get();
                         auto* exitEvent = static_cast<ProcessExitEvent*>(ce);
                         logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(ProcessSecurityManager::kExitValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         auto exitCode = ToStringBuffer(eventGroup.GetSourceBuffer(), exitEvent->mExitCode);
                         auto exitTid = ToStringBuffer(eventGroup.GetSourceBuffer(), exitEvent->mExitTid);
                         logEvent->SetContentNoCopy(ProcessSecurityManager::kExitCodeKey,
@@ -205,7 +204,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
                     }
                     case KernelEventType::PROCESS_CLONE_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(), ProcessSecurityManager::kCloneValue);
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::sKprobeValue);
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), ProcessSecurityManager::kKprobeValue);
                         break;
                     }
                     default:
@@ -233,5 +232,4 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
 
     return true;
 }
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

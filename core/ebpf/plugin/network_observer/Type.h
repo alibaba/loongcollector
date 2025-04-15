@@ -23,8 +23,10 @@ extern "C" {
 #include <string>
 #include <vector>
 
-namespace logtail {
-namespace ebpf {
+#include "common/HashUtil.h"
+
+
+namespace logtail::ebpf {
 
 struct CaseInsensitiveLess {
     struct NoCaseCompare {
@@ -58,9 +60,10 @@ public:
     uint32_t tgid;
     uint64_t start;
 
-    ConnId(int32_t fd, uint32_t tgid, uint64_t start) : fd(fd), tgid(tgid), start(start) {}
+    ~ConnId() {}
 
-    ConnId(const ConnId& other) : fd(other.fd), tgid(other.tgid), start(other.start) {}
+    ConnId(int32_t fd, uint32_t tgid, uint64_t start) : fd(fd), tgid(tgid), start(start) {}
+    ConnId(const ConnId& other) = default;
     ConnId& operator=(const ConnId& other) {
         if (this != &other) {
             fd = other.fd;
@@ -70,7 +73,7 @@ public:
         return *this;
     }
 
-    ConnId(ConnId&& other) : fd(other.fd), tgid(other.tgid), start(other.start) {}
+    ConnId(ConnId&& other) noexcept : fd(other.fd), tgid(other.tgid), start(other.start) {}
     ConnId& operator=(ConnId&& other) noexcept {
         if (this != &other) {
             fd = other.fd;
@@ -80,27 +83,23 @@ public:
         return *this;
     }
 
-    explicit ConnId(const struct connect_id_t& conn_id) : fd(conn_id.fd), tgid(conn_id.tgid), start(conn_id.start) {}
+    explicit ConnId(const struct connect_id_t& connId) : fd(connId.fd), tgid(connId.tgid), start(connId.start) {}
 
     bool operator==(const ConnId& other) const { return fd == other.fd && tgid == other.tgid && start == other.start; }
 };
 
 struct ConnIdHash {
-    inline static void combine(std::size_t& hash_result, std::size_t hash) {
-        hash_result ^= hash + 0x9e3779b9 + (hash_result << 6) + (hash_result >> 2);
-    }
-
     std::size_t operator()(const ConnId& obj) const {
-        std::size_t hash_result = 0UL;
-        combine(hash_result, std::hash<int32_t>{}(obj.fd));
-        combine(hash_result, std::hash<uint32_t>{}(obj.tgid));
-        combine(hash_result, std::hash<uint64_t>{}(obj.start));
-        return hash_result;
+        std::size_t hashResult = 0UL;
+        AttrHashCombine(hashResult, std::hash<int32_t>{}(obj.fd));
+        AttrHashCombine(hashResult, std::hash<uint32_t>{}(obj.tgid));
+        AttrHashCombine(hashResult, std::hash<uint64_t>{}(obj.start));
+        return hashResult;
     }
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+
 
 namespace std {
 template <>

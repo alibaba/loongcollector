@@ -28,8 +28,7 @@
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class eBPFServer;
 
@@ -37,7 +36,7 @@ const std::string NetworkSecurityManager::kTcpSendMsgValue = "tcp_sendmsg";
 const std::string NetworkSecurityManager::kTcpCloseValue = "tcp_close";
 const std::string NetworkSecurityManager::kTcpConnectValue = "tcp_connect";
 
-void HandleNetworkKernelEvent(void* ctx, int cpu, void* data, __u32 data_sz) {
+void HandleNetworkKernelEvent(void* ctx, int, void* data, __u32) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return;
@@ -55,11 +54,11 @@ void HandleNetworkKernelEventLoss(void* ctx, int cpu, __u64 num) {
         LOG_ERROR(sLogger, ("ctx is null", "")("lost network kernel events num", num));
         return;
     }
-    NetworkSecurityManager* ss = static_cast<NetworkSecurityManager*>(ctx);
-    if (ss == nullptr)
+    auto* ss = static_cast<NetworkSecurityManager*>(ctx);
+    if (ss == nullptr) {
         return;
+    }
     ss->UpdateLossKernelEventsTotal(num);
-    return;
 }
 
 void NetworkSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
@@ -104,14 +103,14 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManag
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                PluginMetricManagerPtr mgr)
-    : AbstractManager(base, sourceManager, queue, mgr),
+    : AbstractManager(base, std::move(sourceManager), queue, std::move(mgr)),
       mAggregateTree(
           4096,
-          [this](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
-              base->mInnerEvents.emplace_back(std::move(other));
+          [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
+              base->mInnerEvents.emplace_back(other);
           },
-          [this](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>& sourceBuffer) {
-              NetworkEvent* in = static_cast<NetworkEvent*>(ce.get());
+          [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>&) {
+              auto* in = static_cast<NetworkEvent*>(ce.get());
               return std::make_unique<NetworkEventGroup>(in->mPid,
                                                          in->mKtime,
                                                          in->mProtocol,
@@ -124,7 +123,7 @@ NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManag
           }) {
 }
 
-bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime) {
+bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point&) {
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
@@ -190,19 +189,19 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                     case KernelEventType::TCP_SENDMSG_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpSendMsgValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CONNECT_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpConnectValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::TCP_CLOSE_EVENT: {
                         logEvent->SetContentNoCopy(kCallName.LogKey(),
                                                    StringView(NetworkSecurityManager::kTcpCloseValue));
-                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::sKprobeValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     default:
@@ -233,12 +232,12 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
 bool NetworkSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                                           const std::shared_ptr<ScheduleConfig>& config) {
     std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEventV2>(nextTime, config));
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
     return ConsumeAggregateTree(execTime);
 }
 
 int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    auto securityOpts = std::get_if<SecurityOptions*>(&options);
+    const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
     if (!securityOpts) {
         LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
         return -1;
@@ -272,9 +271,9 @@ int NetworkSecurityManager::Destroy() {
 }
 
 std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<CommonEvent>& in) {
-    NetworkEvent* event = static_cast<NetworkEvent*>(in.get());
+    auto* event = static_cast<NetworkEvent*>(in.get());
     // calculate agg key
-    std::array<size_t, 2> result;
+    std::array<size_t, 2> result{};
     result.fill(0UL);
     std::hash<uint64_t> hasher;
 
@@ -319,7 +318,4 @@ int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     return 0;
 }
 
-// TODO perf worker functions ...
-
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

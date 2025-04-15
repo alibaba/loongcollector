@@ -27,9 +27,7 @@
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/NetworkEvent.h"
 
-
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class NetworkSecurityManager : public AbstractManager {
 public:
@@ -83,5 +81,4 @@ private:
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree; // guard by mLock
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

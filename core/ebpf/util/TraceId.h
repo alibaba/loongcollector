@@ -19,8 +19,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 template <size_t N>
 std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
@@ -35,5 +34,4 @@ std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
 std::array<uint64_t, 4> GenerateTraceID();
 std::array<uint64_t, 2> GenerateSpanID();
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
