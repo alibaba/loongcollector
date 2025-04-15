@@ -253,6 +253,7 @@ public:
         auto& k8sMetadata = K8sMetadata::GetInstance();
         APSARA_TEST_TRUE(k8sMetadata.mIsValid);
         APSARA_TEST_TRUE(k8sMetadata.mEnable);
+        APSARA_TEST_EQUAL(k8sMetadata.mFailCount, 0);
         for (int i = 0; i < 10; i++) {
             // fail request
             k8sMetadata.AsyncQueryMetadata(PodInfoType::IpInfo, "192.168.0." + std::to_string(i));

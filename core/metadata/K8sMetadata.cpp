@@ -88,7 +88,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mServiceHost = STRING_FLAG(singleton_service);
     mServicePort = INT32_FLAG(singleton_port);
     const char* value = getenv("_node_ip_");
-    if (value != NULL) {
+    if (value != nullptr) {
         mHostIp = StringTo<string>(value);
     } else {
         mHostIp = GetHostIp();
@@ -105,7 +105,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    mEnable = BOOL_FLAG(disable_k8s_meta);
+    mEnable = !BOOL_FLAG(disable_k8s_meta);
 #else
     mEnable = getenv("KUBERNETES_SERVICE_HOST") && AppConfig::GetInstance()->IsPurageContainerMode()
         && mServiceHost.size() && mServicePort > 0 && !BOOL_FLAG(disable_k8s_meta);

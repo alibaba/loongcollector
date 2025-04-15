@@ -44,6 +44,8 @@ public:
     void TestErrorHandling();
     void TestPluginLifecycle();
     void TestHandleHostMetadataUpdate();
+    void TestGuessContainerIdOffSet();
+    void TestPeriodicalTask();
 
 protected:
     void SetUp() override {
@@ -618,6 +620,45 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
     APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
 }
 
+void NetworkObserverManagerUnittest::TestGuessContainerIdOffSet() {
+    auto offset = GuessContainerIdOffset();
+    APSARA_TEST_GT(offset, 0);
+}
+
+void NetworkObserverManagerUnittest::TestPeriodicalTask() {
+    // manager init, will execute
+    mManager->mFlag = true;
+    Timer::GetInstance()->Clear();
+    eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+
+    auto now = std::chrono::steady_clock::now();
+    std::shared_ptr<ScheduleConfig> metricConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(15), JobType::METRIC_AGG);
+    std::shared_ptr<ScheduleConfig> spanConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::SPAN_AGG);
+    std::shared_ptr<ScheduleConfig> logConfig
+        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::LOG_AGG);
+    mManager->ScheduleNext(now, metricConfig);
+    mManager->ScheduleNext(now, spanConfig);
+    mManager->ScheduleNext(now, logConfig);
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 4);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 6);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 8);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 10);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 12);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 14);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 16);
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    // execute 2 metric task
+    APSARA_TEST_EQUAL(mManager->mExecTimes, 20);
+}
+
 
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
@@ -629,6 +670,9 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestGuessContainerIdOffSet);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);
+
 
 } // namespace ebpf
 } // namespace logtail

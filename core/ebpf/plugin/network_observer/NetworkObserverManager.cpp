@@ -115,21 +115,6 @@ enum {
     TCP_MAX_STATES = 13,
 };
 
-enum class JobType {
-    METRIC_AGG,
-    SPAN_AGG,
-    LOG_AGG,
-    HOST_META_UPDATE,
-};
-
-class NetworkObserverScheduleConfig : public ScheduleConfig {
-public:
-    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
-        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
-
-    JobType mJobType;
-};
-
 NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
                                                std::shared_ptr<SourceManager> sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -465,6 +450,9 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    mExecTimes++;
+#endif
 
     WriteLock lk(mLogAggLock);
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> aggTree = this->mLogAggregator.GetAndReset();
@@ -596,6 +584,9 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    mExecTimes++;
+#endif
 
     WriteLock lk(mLogAggLock);
     SIZETAggTreeWithSourceBuffer<NetMetricData, std::shared_ptr<AbstractRecord>> aggTree
@@ -749,6 +740,9 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    mExecTimes++;
+#endif
 
     LOG_DEBUG(sLogger, ("enter aggregator ...", mAppAggregator.NodeCount()));
 
@@ -950,6 +944,9 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
     }
+#ifdef APSARA_UNIT_TEST_MAIN
+    mExecTimes++;
+#endif
 
     WriteLock lk(mSpanAggLock);
     SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractRecord>> aggTree = this->mSpanAggregator.GetAndReset();

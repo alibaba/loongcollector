@@ -31,6 +31,21 @@
 
 namespace logtail::ebpf {
 
+enum class JobType {
+    METRIC_AGG,
+    SPAN_AGG,
+    LOG_AGG,
+    HOST_META_UPDATE,
+};
+
+class NetworkObserverScheduleConfig : public ScheduleConfig {
+public:
+    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
+        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
+
+    JobType mJobType;
+};
+
 class NetworkObserverManager : public AbstractManager {
 public:
     static std::shared_ptr<NetworkObserverManager>
@@ -205,7 +220,13 @@ private:
 
     std::vector<std::string> mEnableCids;
     std::vector<std::string> mDisableCids;
+
+    std::atomic_int mExecTimes = 0;
 #endif
 };
+
+#ifdef APSARA_UNIT_TEST_MAIN
+int GuessContainerIdOffset();
+#endif
 
 } // namespace logtail::ebpf

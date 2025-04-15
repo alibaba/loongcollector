@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "common/timer/Timer.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -57,30 +56,7 @@ void TimerUnittest::TestPushEvent() {
     timer.mQueue.pop();
 }
 
-void TimerUnittest::TestPeriodicEvent() {
-    // Timer::GetInstance()->Init();
-    // mFlag = true;
-    // std::unique_ptr<ebpf::AggregateEvent> event = std::make_unique<ebpf::AggregateEvent>(
-    //     1, // interval second
-    //     [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-    //         this->mVec.push_back(1);
-    //         return true;
-    //     },
-    //     [this]() { // validator
-    //         return !this->mFlag;
-    //     });
-    // Timer::GetInstance()->PushEvent(std::move(event));
-    // std::this_thread::sleep_for(std::chrono::seconds(5));
-    // // update start uid, invalid event schedule ...
-    // mFlag = false;
-    // std::this_thread::sleep_for(std::chrono::seconds(2));
-    // APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.empty());
-    // APSARA_TEST_EQUAL(mVec.size(), 5UL);
-    // Timer::GetInstance()->Stop();
-}
-
 UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
-UNIT_TEST_CASE(TimerUnittest, TestPeriodicEvent)
 
 
 } // namespace logtail
