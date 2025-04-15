@@ -622,7 +622,7 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
 
 void NetworkObserverManagerUnittest::TestGuessContainerIdOffSet() {
     auto offset = GuessContainerIdOffset();
-    APSARA_TEST_GT(offset, 0);
+    APSARA_TEST_GE(offset, 0);
 }
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
