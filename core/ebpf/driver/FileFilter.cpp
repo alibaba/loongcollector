@@ -48,7 +48,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
 
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx == ERR_UNKNOWN_CALLNAME) {
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
 
     auto filter = std::get_if<SecurityFileFilter>(&config);
@@ -63,7 +63,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[CreateFilterForCallname][IDAllocator] Failed to get next id, reach max %d\n",
                      IdAllocator::GetInstance()->GetMaxId<StringPrefixMap>());
-            return ERR_DRIVER_INVALID_PARAM;
+            return kErrDriverInvalidParam;
         }
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                  "[CreateFilterForCallname] Get index %d for %s\n",
@@ -122,7 +122,7 @@ int DeleteFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "DeleteFilterForCallname %s\n", callName.c_str());
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx == ERR_UNKNOWN_CALLNAME) {
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
     int ret = 0;
     // step1: detach callname

@@ -165,7 +165,7 @@ int SetCommonAddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                     logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                     "[CreateNetFilterForCallname][IDAllocator] Failed to get next id for addr4 map, reach max %d\n",
                     IdAllocator::GetInstance()->GetMaxId<Addr4Map>());
-                return ERR_DRIVER_INVALID_PARAM;
+                return kErrDriverInvalidParam;
             }
             kFilter.map_idx[0] = ipv4Idx;
             for (auto arg4 : addr4Tries) {
@@ -203,7 +203,7 @@ int SetCommonAddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                     logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                     "[CreateNetFilterForCallname][IDAllocator] Failed to get next id for addr6 map, reach max %d\n",
                     IdAllocator::GetInstance()->GetMaxId<Addr6Map>());
-                return ERR_DRIVER_INVALID_PARAM;
+                return kErrDriverInvalidParam;
             }
             kFilter.map_idx[1] = ipv6Idx;
             for (auto arg6 : addr6Tries) {
@@ -249,7 +249,7 @@ int SetCommonPortFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                  "[CreateNetFilterForCallname][IDAllocator] Failed to get next id for port map, reach max %d\n",
                  IdAllocator::GetInstance()->GetMaxId<PortMap>());
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
     selector_filter kFilter{};
     kFilter.filter_type = filterType;
@@ -258,7 +258,7 @@ int SetCommonPortFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
 
     if (filters.filter_count >= MAX_FILTER_FOR_PER_CALLNAME) {
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_WARN, "filters count exceeded! max: %d\n", MAX_FILTER_FOR_PER_CALLNAME);
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
     filters.filters[filters.filter_count++] = kFilter;
     for (uint32_t port : portList) {
@@ -361,22 +361,22 @@ int CreateNetworkFilterForCallname(
     int ret = 0;
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx == ERR_UNKNOWN_CALLNAME) {
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
     const auto* filter = std::get_if<SecurityNetworkFilter>(&newConfig);
 
     if (filter) {
         if (filter->mDestAddrBlackList.size() && filter->mDestAddrList.size()) {
-            return ERR_DRIVER_INVALID_PARAM;
+            return kErrDriverInvalidParam;
         }
         if (filter->mSourceAddrBlackList.size() && filter->mSourceAddrList.size()) {
-            return ERR_DRIVER_INVALID_PARAM;
+            return kErrDriverInvalidParam;
         }
         if (filter->mDestPortList.size() && filter->mDestPortBlackList.size()) {
-            return ERR_DRIVER_INVALID_PARAM;
+            return kErrDriverInvalidParam;
         }
         if (filter->mSourcePortList.size() && filter->mSourcePortBlackList.size()) {
-            return ERR_DRIVER_INVALID_PARAM;
+            return kErrDriverInvalidParam;
         }
         selector_filters kernelFilters{};
         ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "filter not empty!\n");
@@ -416,7 +416,7 @@ int DeleteNetworkFilterForCallname(std::shared_ptr<BPFWrapper<security_bpf>>& wr
     ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "DisableCallName %s\n", callName.c_str());
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx == ERR_UNKNOWN_CALLNAME) {
-        return ERR_DRIVER_INVALID_PARAM;
+        return kErrDriverInvalidParam;
     }
     int ret = 0;
 

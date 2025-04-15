@@ -55,10 +55,9 @@ public:
     virtual ~BPFWrapperBase() = default;
 };
 
-#define ERR_INIT_SKEL 1
-#define ERR_INVALID_PARAM 2
-#define ERR_LIBBPF 3
-#define ERR_NOT_FOUND -1
+inline constexpr int kErrInitSkel = 1;
+inline constexpr int kErrLibbpf = 2;
+inline constexpr int kErrNotFound = -1;
 
 template <typename T>
 class BPFWrapper : public BPFWrapperBase {
@@ -77,7 +76,7 @@ public:
         mSkel = T::open_and_load();
         mFlag = true;
         if (!mSkel) {
-            return ERR_INIT_SKEL;
+            return kErrInitSkel;
         }
         bpf_map* map = nullptr;
         bpf_object__for_each_map(map, mSkel->obj) {
@@ -146,7 +145,7 @@ public:
     int SetTailCall(const std::string& mapName, const std::vector<std::string>& functions) {
         int mapFd = SearchMapFd(mapName);
         if (mapFd < 0) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         for (int i = 0; i < (int)functions.size(); i++) {
@@ -168,7 +167,7 @@ public:
     int DeleteInnerMap(const std::string& outterMapName, void* outterKey) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         // delete bpf map
@@ -194,7 +193,7 @@ public:
     int DeleteInnerMapElem(const std::string& outterMapName, void* outterKey, void* innerKey) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
         int innerMapFd = -1;
         uint32_t innerMapId = 0;
@@ -205,7 +204,7 @@ public:
 
         innerMapFd = bpf_map_get_fd_by_id(innerMapId);
         if (innerMapFd < 0) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         ret = bpf_map_delete_elem(innerMapFd, innerKey);
@@ -223,7 +222,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[BPFWrapper][UpdateInnerMapElem] find outter hash map failed for: %s \n",
                      outterMapName.c_str());
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
         int innerMapFd = -1;
         uint32_t innerMapId = 0;
@@ -252,7 +251,7 @@ public:
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[BPFWrapper][UpdateInnerMapElem] failed to create inner map for outter map: %s \n",
                          outterMapName.c_str());
-                return ERR_LIBBPF;
+                return kErrLibbpf;
             }
 
             int* key = static_cast<int*>(outterKey);
@@ -275,7 +274,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[BPFWrapper][UpdateInnerMapElem] failed to find inner map fd by id for outter map: %s \n",
                      outterMapName.c_str());
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         ret = bpf_map_update_elem(innerMapFd, innerKey, innerValue, flag);
@@ -297,7 +296,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][UpdateBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
         return bpf_map_update_elem(mapFd, key, value, flag);
     }
@@ -315,7 +314,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][LookupBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
         return bpf_map_lookup_elem(mapFd, key, value);
     }
@@ -333,7 +332,7 @@ public:
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "[BPFWrapper][RemoveBPFHashMap] find hash map failed for: %s \n",
                      mapName.c_str());
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
         bpf_map_delete_elem(mapFd, key);
         return 0;
@@ -415,7 +414,7 @@ public:
     int SearchProgFd(const std::string& name) {
         auto it = mBpfProgs.find(name);
         if (it == mBpfProgs.end()) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         return bpf_program__fd(it->second);
@@ -424,7 +423,7 @@ public:
     int SearchMapFd(const std::string& name) {
         auto it = mBpfMaps.find(name);
         if (it == mBpfMaps.end()) {
-            return ERR_NOT_FOUND;
+            return kErrNotFound;
         }
 
         return bpf_map__fd(it->second);

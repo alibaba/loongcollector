@@ -1314,7 +1314,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         config.mEnableCidFilter = true;
         std::shared_ptr<ScheduleConfig> config
             = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(5), JobType::HOST_META_UPDATE);
-        ScheduleNext(std::chrono::steady_clock::now(), config);
+        ScheduleNext(now, config);
     }
 
     pc->mConfig = config;

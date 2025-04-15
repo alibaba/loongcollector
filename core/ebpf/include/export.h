@@ -12,11 +12,11 @@ extern "C" {
 #include <coolbpf/net.h>
 }
 
-#define ERR_DRIVER_INTERNAL 1
-#define ERR_DRIVER_INVALID_PARAM 2
 
-namespace logtail {
-namespace ebpf {
+inline constexpr int kErrDriverInternal = 1;
+inline constexpr int kErrDriverInvalidParam = 2;
+
+namespace logtail::ebpf {
 
 using PerfBufferSampleHandler = void (*)(void* ctx, int cpu, void* data, uint32_t size);
 using PerfBufferLostHandler = void (*)(void* ctx, int cpu, unsigned long long cnt);
@@ -151,6 +151,4 @@ struct PluginConfig {
     std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig> mConfig;
 };
 
-} // namespace ebpf
-
-} // namespace logtail
+} // namespace logtail::ebpf
