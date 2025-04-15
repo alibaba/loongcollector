@@ -25,4 +25,3 @@ template class StaticDataRow<&kNetMetricsTable>;
 template class StaticDataRow<&kProcessCacheTable>;
 
 } // namespace logtail::ebpf
-
