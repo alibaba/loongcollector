@@ -490,9 +490,15 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
     while (ReadNextEncryption(pos, filename, encryption, meta, readResult, bufferMeta)) {
         logData.clear();
         bool sendResult = false;
-        if (!readResult || bufferMeta.project().empty()) {
+        if (!readResult || bufferMeta.project().empty() || bufferMeta.aliuid().size() > 16) {
             if (meta.mHandled == 1)
                 continue;
+            // If buffer is broken, aliuid may be too large. Normal aliuid size is 16.
+            if (readResult && bufferMeta.aliuid().size() > 16) {
+                LOG_ERROR(sLogger,
+                          ("send disk buffer fail",
+                           "abnormal aliuid size")("filename", filename)("size", bufferMeta.aliuid().size()));
+            }
             sendResult = true;
             discardCount++;
         }
