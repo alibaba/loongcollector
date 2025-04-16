@@ -35,8 +35,8 @@
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/MetricTypes.h"
 
-DECLARE_FLAG_STRING(singleton_service);
-DECLARE_FLAG_INT32(singleton_port);
+DECLARE_FLAG_STRING(k8s_metadata_server_name);
+DECLARE_FLAG_INT32(k8s_metadata_server_port);
 
 namespace logtail {
 

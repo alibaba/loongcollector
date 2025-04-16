@@ -129,8 +129,10 @@ DEFINE_FLAG_STRING(operator_service, "loong collector operator service", "");
 DEFINE_FLAG_INT32(operator_service_port, "loong collector operator service port", 8888);
 DEFINE_FLAG_INT32(k8s_meta_service_port, "loong collector operator service port", 9000);
 
-DEFINE_FLAG_STRING(singleton_service, "loong collector singleton service", "loongcollector-singleton");
-DEFINE_FLAG_INT32(singleton_port, "loong collector singleton service port", 8899);
+DEFINE_FLAG_STRING(k8s_metadata_server_name,
+                   "loong collector singleton service for k8s metadata server",
+                   "loongcollector-singleton");
+DEFINE_FLAG_INT32(k8s_metadata_server_port, "loong collector singleton service port for k8s metadata server", 8899);
 DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
 
 DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");

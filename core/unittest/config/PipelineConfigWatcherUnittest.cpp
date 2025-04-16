@@ -28,6 +28,11 @@
 
 using namespace std;
 
+DECLARE_FLAG_BOOL(enable_ebpf_network_secure);
+DECLARE_FLAG_BOOL(enable_ebpf_file_secure);
+DECLARE_FLAG_BOOL(enable_ebpf_process_secure);
+DECLARE_FLAG_BOOL(enable_ebpf_network_observer);
+
 namespace logtail {
 
 class PipelineConfigWatcherUnittest : public testing::Test {
@@ -39,6 +44,10 @@ public:
 
 protected:
     static void SetUpTestCase() {
+        FLAGS_enable_ebpf_network_observer = true;
+        FLAGS_enable_ebpf_process_secure = true;
+        FLAGS_enable_ebpf_file_secure = true;
+        FLAGS_enable_ebpf_network_secure = true;
         PluginRegistry::GetInstance()->LoadPlugins();
         PipelineConfigWatcher::GetInstance()->SetPipelineManager(PipelineManagerMock::GetInstance());
     }

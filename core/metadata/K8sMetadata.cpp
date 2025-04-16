@@ -85,8 +85,8 @@ K8sMetadata::~K8sMetadata() {
 
 K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externalIpCacheSize)
     : mIpCache(ipCacheSize, 20), mContainerCache(cidCacheSize, 20), mExternalIpCache(externalIpCacheSize, 20) {
-    mServiceHost = STRING_FLAG(singleton_service);
-    mServicePort = INT32_FLAG(singleton_port);
+    mServiceHost = STRING_FLAG(k8s_metadata_server_name);
+    mServicePort = INT32_FLAG(k8s_metadata_server_port);
     const char* value = getenv("_node_ip_");
     if (value != nullptr) {
         mHostIp = StringTo<string>(value);
