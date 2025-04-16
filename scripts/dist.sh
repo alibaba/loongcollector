@@ -47,10 +47,10 @@ cp -a "${ROOTDIR}/${OUT_DIR}/conf/continuous_pipeline_config/local" "${ROOTDIR}/
 if file "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"; fi
 
 # Splitting debug info at build time with -gsplit-dwarf does not work with current gcc version
-# Strip binary to reduce size here
-strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/loongcollector"
-strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginAdapter.so"
-strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginBase.so"
+# Strip binary to reduce size here, we still to keep a static symbol table for good stack traces.
+strip --strip-debug "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/loongcollector"
+strip --strip-debug "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginAdapter.so"
+strip --strip-debug "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginBase.so"
 
 # pack dist dir
 cd "${ROOTDIR}/${DIST_DIR}"
