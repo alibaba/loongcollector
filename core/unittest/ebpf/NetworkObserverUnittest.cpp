@@ -46,6 +46,7 @@ public:
     void TestHandleHostMetadataUpdate();
     void TestGuessContainerIdOffSet();
     void TestPeriodicalTask();
+    void BenchmarkConsumeTask();
 
 protected:
     void SetUp() override {
@@ -659,6 +660,8 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     APSARA_TEST_EQUAL(mManager->mExecTimes, 20);
 }
 
+void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {
+}
 
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
@@ -672,6 +675,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestGuessContainerIdOffSet);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 
 
 } // namespace ebpf

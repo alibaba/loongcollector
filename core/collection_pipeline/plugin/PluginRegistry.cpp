@@ -69,17 +69,10 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
-#ifdef APSARA_UNIT_TEST_MAIN
-DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", true);
-#else
 DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", false);
 DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
-#endif
 
 using namespace std;
 

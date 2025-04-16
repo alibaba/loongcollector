@@ -144,10 +144,6 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
         mTags.Set<kProtocol>(std::string(magic_enum::enum_name(mProtocol)));
     }
 
-    LOG_INFO(sLogger,
-             ("protocol", magic_enum::enum_name(protocol))("role", magic_enum::enum_name(role))(
-                 "mprotocol", magic_enum::enum_name(mProtocol))("mrole", magic_enum::enum_name(mRole)));
-
     if (mProtocol == support_proto_e::ProtoHTTP) {
         if (mRole == support_role_e::IsClient) {
             mTags.SetNoCopy<kRpcType>(kRpc25Str);

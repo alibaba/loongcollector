@@ -31,7 +31,7 @@ public:
     std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
     void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
 
-protected:
+private:
     std::chrono::steady_clock::time_point mExecTime;
 };
 

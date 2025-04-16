@@ -24,7 +24,7 @@ bool AggregateEvent::Execute() {
         return false;
     }
 
-    return manager->ScheduleNext(mExecTime, mScheduleConfig);
+    return manager->ScheduleNext(GetExecTime(), mScheduleConfig);
 }
 
 bool AggregateEvent::IsValid() const {

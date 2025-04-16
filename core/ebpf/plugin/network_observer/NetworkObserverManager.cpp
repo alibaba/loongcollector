@@ -1307,16 +1307,6 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
         mgr->RecordEventLost(type, lostCount);
     };
 
-
-    // register update host K8s metadata task ...
-    if (K8sMetadata::GetInstance().Enable()) {
-        config.mCidOffset = mCidOffset;
-        config.mEnableCidFilter = true;
-        std::shared_ptr<ScheduleConfig> config
-            = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(5), JobType::HOST_META_UPDATE);
-        ScheduleNext(now, config);
-    }
-
     pc->mConfig = config;
     auto ret = mSourceManager->StartPlugin(PluginType::NETWORK_OBSERVE, std::move(pc));
     if (!ret) {
@@ -1328,6 +1318,16 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     LOG_INFO(sLogger, ("begin to start ebpf ... ", ""));
     this->mFlag = true;
     this->runInThread();
+
+    // register update host K8s metadata task ...
+    if (K8sMetadata::GetInstance().Enable()) {
+        config.mCidOffset = mCidOffset;
+        config.mEnableCidFilter = true;
+        std::shared_ptr<ScheduleConfig> config
+            = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(5), JobType::HOST_META_UPDATE);
+        ScheduleNext(now, config);
+    }
+
     return 0;
 }
 
