@@ -90,9 +90,9 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
     auto conn = getOrCreateConnection(connId);
     if (conn == nullptr) {
         // log error
-        LOG_WARNING(sLogger,
-                    ("GetOrCreateConntracker get null. pid",
-                     event->conn_id.tgid)("fd", event->conn_id.fd)("start", event->conn_id.start));
+        LOG_DEBUG(sLogger,
+                  ("GetOrCreateConntracker get null. pid",
+                   event->conn_id.tgid)("fd", event->conn_id.fd)("start", event->conn_id.start));
         return;
     }
 

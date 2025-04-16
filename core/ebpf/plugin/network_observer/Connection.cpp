@@ -80,20 +80,10 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
 
     TryAttachL7Meta(event->role, event->protocol);
 
-    // 合并成 L7 meta
-    // UpdateRole(event->role);
-
-    // UpdateProtocol(event->protocol);
-
-    mCurrStats.mSendBytes = event->wr_bytes;
-    mCurrStats.mRecvBytes = event->rd_bytes;
-    mCurrStats.mSendPackets = event->wr_pkts;
-    mCurrStats.mRecvPackets = event->rd_pkts;
-
-    mLastStats.mSendBytes = event->last_output_wr_bytes;
-    mLastStats.mRecvBytes = event->last_output_rd_bytes;
-    mLastStats.mSendPackets = event->last_output_wr_pkts;
-    mLastStats.mRecvPackets = event->last_output_rd_pkts;
+    mCurrStats.mSendBytes += (event->last_output_wr_bytes == 0) ? 0 : (event->wr_bytes - event->last_output_wr_bytes);
+    mCurrStats.mRecvBytes += (event->last_output_rd_bytes == 0) ? 0 : (event->rd_bytes - event->last_output_rd_bytes);
+    mCurrStats.mSendPackets += (event->last_output_wr_pkts == 0) ? 0 : (event->wr_pkts - event->last_output_wr_pkts);
+    mCurrStats.mRecvPackets += (event->last_output_rd_pkts == 0) ? 0 : (event->rd_pkts - event->last_output_rd_pkts);
 
     LOG_DEBUG(sLogger,
               ("stage", "updateConnStates")("mSendBytes", event->wr_bytes)("mRecvBytes", event->rd_bytes)(
@@ -110,21 +100,11 @@ bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& 
         return false;
     }
 
-    record->mDropCount = (mLastStats.mDropCount == 0) ? 0 : mCurrStats.mDropCount - mLastStats.mDropCount;
-    record->mRetransCount = (mLastStats.mRetransCount == 0) ? 0 : mCurrStats.mRetransCount - mLastStats.mRetransCount;
-    record->mRecvPackets = (mLastStats.mRecvPackets == 0) ? 0 : mCurrStats.mRecvPackets - mLastStats.mRecvPackets;
-    record->mSendPackets = (mLastStats.mSendPackets == 0) ? 0 : mCurrStats.mSendPackets - mLastStats.mSendPackets;
-    record->mRecvBytes = (mLastStats.mRecvBytes == 0) ? 0 : mCurrStats.mRecvBytes - mLastStats.mRecvBytes;
-    record->mSendBytes = (mLastStats.mSendBytes == 0) ? 0 : mCurrStats.mSendBytes - mLastStats.mSendBytes;
-    record->mRtt = mCurrStats.mRtt;
-    LOG_DEBUG(
-        sLogger,
-        ("stage", "GenerateConnStatsRecord")("mSendBytes", mCurrStats.mSendBytes)("mRecvBytes", mCurrStats.mRecvBytes)(
-            "mSendPackets", mCurrStats.mSendPackets)("mRecvPackets", mCurrStats.mRecvPackets)("last", "")(
-            "mSendBytes", mLastStats.mSendBytes)("mRecvBytes", mLastStats.mRecvBytes)(
-            "mSendPackets", mLastStats.mSendPackets)("mRecvPackets", mLastStats.mRecvPackets)("record", "")(
-            "dropCount", record->mDropCount)("retrans", record->mRetransCount)("sendPkts", record->mSendPackets)(
-            "sendBytes", record->mSendBytes)("recvPkts", record->mRecvPackets)("recvBytes", record->mRecvPackets));
+    record->mRecvPackets = (mCurrStats.mRecvPackets == 0) ? 0 : mCurrStats.mRecvPackets;
+    record->mSendPackets = (mCurrStats.mSendPackets == 0) ? 0 : mCurrStats.mSendPackets;
+    record->mRecvBytes = (mCurrStats.mRecvBytes == 0) ? 0 : mCurrStats.mRecvBytes;
+    record->mSendBytes = (mCurrStats.mSendBytes == 0) ? 0 : mCurrStats.mSendBytes;
+    mCurrStats.Clear();
 
     return true;
 }

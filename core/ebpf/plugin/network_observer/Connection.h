@@ -39,6 +39,7 @@ class ConnStatsRecord;
 
 struct ConnStatsData {
 public:
+    void Clear() { ::memset(this, 0, sizeof(ConnStatsData)); }
     uint64_t mDropCount = 0;
     uint64_t mRttVar = 0;
     uint64_t mRtt = 0;
@@ -210,7 +211,6 @@ private:
     static std::regex mContainerIdRegex;
 
     ConnStatsData mCurrStats;
-    ConnStatsData mLastStats;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
