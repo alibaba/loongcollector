@@ -143,10 +143,11 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
 void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGroup& eGroup,
                                                          prom::AutoMetric& autoMetric) const {
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION)) {
-        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION),autoMetric.mScrapeDurationSeconds);
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION), autoMetric.mScrapeDurationSeconds);
     }
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE)) {
-        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE),autoMetric.mScrapeResponseSizeBytes);
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE),
+                 autoMetric.mScrapeResponseSizeBytes);
     }
     autoMetric.mScrapeSamplesLimit = mScrapeConfigPtr->mSampleLimit;
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED)) {

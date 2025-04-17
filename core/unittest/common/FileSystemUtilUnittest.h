@@ -188,8 +188,8 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
         EXPECT_TRUE(fsutil::PathStat::stat(filePath, stat));
         DevInode devInode = stat.GetDevInode();
         EXPECT_EQ(devInode, GetFileDevInode(filePath));
-        EXPECT_GT(devInode.dev, 0);
-        EXPECT_GT(devInode.inode, 0);
+        EXPECT_GT(devInode.dev, 0UL);
+        EXPECT_GT(devInode.inode, 0UL);
         int64_t sec = -1, nsec = -1;
         stat.GetLastWriteTime(sec, nsec);
         EXPECT_GE(sec, 0);
@@ -205,9 +205,10 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
         EXPECT_TRUE(fsutil::PathStat::stat(dirPath, stat));
         DevInode devInode = stat.GetDevInode();
         EXPECT_EQ(devInode, GetFileDevInode(dirPath));
-        EXPECT_GT(devInode.dev, 0);
-        EXPECT_GT(devInode.inode, 0);
-        int64_t sec = -1, nsec = -1;
+        EXPECT_GT(devInode.dev, 0UL);
+        EXPECT_GT(devInode.inode, 0UL);
+        int64_t sec = -1;
+        int64_t nsec = -1;
         stat.GetLastWriteTime(sec, nsec);
         EXPECT_GE(sec, 0);
         EXPECT_GE(nsec, 0);
@@ -221,19 +222,20 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
 }
 
 TEST_F(FileSystemUtilUnittest, TestPathStat_fstat) {
-    auto currentTime = time(NULL);
+    auto currentTime = time(nullptr);
     auto filePath = ((mTestRoot / "file").string());
     { std::ofstream(filePath).write("xxx", 3); }
 
     FILE* file = fopen(filePath.c_str(), "r");
-    EXPECT_TRUE(file != NULL);
+    EXPECT_TRUE(file != nullptr);
     fsutil::PathStat stat;
     EXPECT_TRUE(fsutil::PathStat::fstat(file, stat));
     DevInode devInode = stat.GetDevInode();
     EXPECT_EQ(devInode, GetFileDevInode(filePath));
-    EXPECT_GT(devInode.dev, 0);
-    EXPECT_GT(devInode.inode, 0);
-    int64_t sec = -1, nsec = -1;
+    EXPECT_GT(devInode.dev, 0UL);
+    EXPECT_GT(devInode.inode, 0UL);
+    int64_t sec = -1;
+    int64_t nsec = -1;
     stat.GetLastWriteTime(sec, nsec);
     EXPECT_GE(sec, 0);
     EXPECT_GE(nsec, 0);
@@ -267,7 +269,8 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetLastWriteTime) {
     { std::ofstream(filePath).write("xxx", 3); }
 
     {
-        int64_t sec = -1, nsec = -1;
+        int64_t sec = -1;
+        int64_t nsec = -1;
         fsutil::PathStat fileStat;
         fsutil::PathStat::stat(filePath, fileStat);
         fileStat.GetLastWriteTime(sec, nsec);
@@ -276,7 +279,8 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetLastWriteTime) {
     }
 
     {
-        int64_t sec = -1, nsec = -1;
+        int64_t sec = -1;
+        int64_t nsec = -1;
         fsutil::PathStat dirStat;
         fsutil::PathStat::stat(mTestRoot.string(), dirStat);
         dirStat.GetLastWriteTime(sec, nsec);
@@ -293,8 +297,8 @@ TEST_F(FileSystemUtilUnittest, TestFileReadOnlyOpen) {
     // Open the file and delete it before closing.
     // File can still be read after deleting.
     // After closing, the file is no more existing.
-    auto file = FileReadOnlyOpen(filePath.c_str(), "r");
-    EXPECT_TRUE(file != NULL);
+    auto* file = FileReadOnlyOpen(filePath.c_str(), "r");
+    EXPECT_TRUE(file != nullptr);
     EXPECT_TRUE(bfs::remove(filePath));
     std::vector<char> buffer(fileContent.length(), '\0');
     auto nbytes = fread(buffer.data(), sizeof(char), fileContent.length(), file);
@@ -359,7 +363,7 @@ TEST_F(FileSystemUtilUnittest, TestFileWriteOnlyOpen) {
 
         auto file = FileWriteOnlyOpen(filePath.c_str(), "w");
         ASSERT_TRUE(file != NULL);
-        EXPECT_EQ(fread(buffer.data(), 1, buffer.size(), file), 0);
+        EXPECT_EQ(fread(buffer.data(), 1, buffer.size(), file), 0UL);
         fclose(file);
     }
 }
@@ -388,9 +392,9 @@ TEST_F(FileSystemUtilUnittest, TestFileAppendOpen) {
     {
         auto file = FileAppendOpen(filePath.c_str(), "a");
         ASSERT_TRUE(file != NULL);
-        EXPECT_EQ(ftell(file), fileContentLen);
+        EXPECT_EQ(ftell(file), static_cast<long>(fileContentLen));
         EXPECT_EQ(fwrite(fileContent.data(), 1, fileContentLen, file), fileContentLen);
-        EXPECT_EQ(ftell(file), fileContentLen * 2);
+        EXPECT_EQ(ftell(file), static_cast<long>(fileContentLen * 2));
         fflush(file);
 
         FILE* in = fopen(filePath.c_str(), "r");
@@ -410,7 +414,7 @@ TEST_F(FileSystemUtilUnittest, TestFileAppendOpen) {
         { std::ofstream(filePath) << fileContent; }
 
         auto file = FileAppendOpen(filePath.c_str(), "a");
-        EXPECT_EQ(ftell(file), fileContentLen);
+        EXPECT_EQ(ftell(file), static_cast<long>(fileContentLen));
         fclose(file);
     }
 }

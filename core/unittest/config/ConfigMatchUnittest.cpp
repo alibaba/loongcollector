@@ -701,7 +701,7 @@ private:
             size_t pos = line.find("LOGID:");
             if (std::string::npos == pos) {
                 continue;
-}
+            }
             int32_t logid{};
             StringTo(SplitString(line.substr(line.find("LOGID:")), ":")[1], logid);
             collectedLogIDs.push_back(logid);
