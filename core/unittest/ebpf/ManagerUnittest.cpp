@@ -150,7 +150,8 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
 void ManagerUnittest::TestManagerConcurrency() {
     auto processManager
         = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
-    // auto fileManager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    // auto fileManager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue,
+    // nullptr);
 
     SecurityOptions options;
     processManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));

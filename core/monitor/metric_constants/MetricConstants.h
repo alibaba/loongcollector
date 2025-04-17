@@ -331,9 +331,6 @@ extern const std::string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE;
 /**********************************************************
  *   ebpf server
  **********************************************************/
-extern const std::string METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL;
-extern const std::string METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL;
-extern const std::string METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL;

@@ -128,9 +128,6 @@ private:
     EnvManager mEnvMgr;
     MetricsRecordRef mRef;
 
-    CounterPtr mStartPluginTotal;
-    CounterPtr mStopPluginTotal;
-    CounterPtr mSuspendPluginTotal;
     CounterPtr mPollProcessEventsTotal;
     CounterPtr mLossProcessEventsTotal;
     CounterPtr mProcessCacheMissTotal;

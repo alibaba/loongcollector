@@ -73,9 +73,6 @@ const string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE = "polling_file_cache_si
 /**********************************************************
  *   ebpf server
  **********************************************************/
-const string METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL = "start_plugin_total";
-const string METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL = "stop_plugin_total";
-const string METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL = "suspend_plugin_total";
 const string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL = "poll_process_events_total";
 const string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL = "loss_process_events_total";
 const string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL = "process_cache_miss_total";

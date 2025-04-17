@@ -184,9 +184,6 @@ void EBPFServer::Init() {
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
         std::move(dynamicLabels));
 
-    mStartPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL);
-    mStopPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL);
-    mSuspendPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL);
     mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
     mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
     mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
@@ -282,7 +279,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     // step1: convert options to export type
-    bool ret = false;
     auto eBPFConfig = std::make_unique<PluginConfig>();
     eBPFConfig->mPluginType = type;
     // call update function
@@ -331,13 +327,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-    ret = (pluginMgr->Init(options) == 0);
-
-    if (ret) {
-        ADD_COUNTER(mStartPluginTotal, 1);
-    }
-
-    return ret;
+    return (pluginMgr->Init(options) == 0);
 }
 
 bool EBPFServer::HasRegisteredPlugins() const {
@@ -394,7 +384,6 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         pluginManager->UpdateContext(nullptr, -1, -1);
         int ret = pluginManager->Destroy();
         if (ret == 0) {
-            ADD_COUNTER(mStopPluginTotal, 1);
             UpdatePluginManager(type, nullptr);
             // pluginManager->UpdateProcessCacheManager(nullptr); // deprecated ... TODO @qianlu.kk
             LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
@@ -457,7 +446,6 @@ bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
         LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(type)));
         return false;
     }
-    ADD_COUNTER(mSuspendPluginTotal, 1);
     return true;
 }
 
