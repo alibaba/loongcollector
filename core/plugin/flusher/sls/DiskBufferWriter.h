@@ -91,6 +91,7 @@ private:
     std::string GetBufferFileName();
     void SetBufferFileName(const std::string& filename);
     std::string GetBufferFileHeader();
+    bool CheckBufferMetaValidation(const std::string& filename, const sls_logs::LogtailBufferMeta& bufferMeta);
 
     SafeQueue<SenderQueueItem*> mQueue;
 
