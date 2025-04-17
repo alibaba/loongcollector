@@ -21,15 +21,15 @@ extern "C" {
 }
 #include <sys/resource.h>
 
-#include "ebpf/driver/eBPFWrapper.h"
+#include "ebpf/driver/BPFWrapper.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
 namespace ebpf {
 
-class eBPFWrapperUnittest : public ::testing::Test {
+class BPFWrapperUnittest : public ::testing::Test {
 public:
-    eBPFWrapperUnittest() {
+    BPFWrapperUnittest() {
         struct rlimit rlim_new = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
@@ -58,11 +58,11 @@ private:
     std::shared_ptr<BPFWrapper<security_bpf>> mWrapper;
 };
 
-void eBPFWrapperUnittest::TestInitialization() {
+void BPFWrapperUnittest::TestInitialization() {
     APSARA_TEST_EQUAL(mWrapper->Init(), 0);
 }
 
-void eBPFWrapperUnittest::TestMapOperations() {
+void BPFWrapperUnittest::TestMapOperations() {
     // APSARA_TEST_EQUAL(mWrapper->Init(), 0);
 
     // uint32_t key = 1;
@@ -88,7 +88,7 @@ void eBPFWrapperUnittest::TestMapOperations() {
     // );
 }
 
-void eBPFWrapperUnittest::TestPerfBufferOperations() {
+void BPFWrapperUnittest::TestPerfBufferOperations() {
     APSARA_TEST_EQUAL(mWrapper->Init(), 0);
 
     auto sample_cb = [](void* ctx, int cpu, void* data, uint32_t size) {};
@@ -100,7 +100,7 @@ void eBPFWrapperUnittest::TestPerfBufferOperations() {
     mWrapper->DeletePerfBuffer(pb);
 }
 
-void eBPFWrapperUnittest::TestAttachOperations() {
+void BPFWrapperUnittest::TestAttachOperations() {
     // APSARA_TEST_EQUAL(mWrapper->Init(), 0);
 
     // // 测试动态附加
@@ -120,7 +120,7 @@ void eBPFWrapperUnittest::TestAttachOperations() {
     // );
 }
 
-void eBPFWrapperUnittest::TestTailCall() {
+void BPFWrapperUnittest::TestTailCall() {
     APSARA_TEST_EQUAL(mWrapper->Init(), 0);
 
     std::pair<const std::string, const std::vector<std::string>> tailCall
@@ -144,11 +144,11 @@ void eBPFWrapperUnittest::TestTailCall() {
     APSARA_TEST_TRUE(progFd >= 0);
 }
 
-UNIT_TEST_CASE(eBPFWrapperUnittest, TestInitialization);
-UNIT_TEST_CASE(eBPFWrapperUnittest, TestMapOperations);
-UNIT_TEST_CASE(eBPFWrapperUnittest, TestPerfBufferOperations);
-UNIT_TEST_CASE(eBPFWrapperUnittest, TestAttachOperations);
-UNIT_TEST_CASE(eBPFWrapperUnittest, TestTailCall);
+UNIT_TEST_CASE(BPFWrapperUnittest, TestInitialization);
+UNIT_TEST_CASE(BPFWrapperUnittest, TestMapOperations);
+UNIT_TEST_CASE(BPFWrapperUnittest, TestPerfBufferOperations);
+UNIT_TEST_CASE(BPFWrapperUnittest, TestAttachOperations);
+UNIT_TEST_CASE(BPFWrapperUnittest, TestTailCall);
 
 } // namespace ebpf
 } // namespace logtail

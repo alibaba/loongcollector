@@ -29,9 +29,9 @@ extern "C" {
 #include <vector>
 
 #include "BPFMapTraits.h"
+#include "BPFWrapper.h"
 #include "IdAllocator.h"
 #include "Log.h"
-#include "eBPFWrapper.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {

@@ -22,7 +22,7 @@
 #include "common/NetworkUtil.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
@@ -30,7 +30,7 @@
 
 namespace logtail::ebpf {
 
-class eBPFServer;
+class EBPFServer;
 
 const std::string NetworkSecurityManager::kTcpSendMsgValue = "tcp_sendmsg";
 const std::string NetworkSecurityManager::kTcpCloseValue = "tcp_close";
@@ -100,10 +100,10 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 
 
 NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
-                                               const std::shared_ptr<SourceManager>& sourceManager,
+                                               const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(base, sourceManager, queue, metricManager),
+    : AbstractManager(base, eBPFAdapter, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -262,12 +262,12 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
-    return mSourceManager->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
+    return mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
 }
 
 int NetworkSecurityManager::Destroy() {
     mFlag = false;
-    return mSourceManager->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
+    return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
 }
 
 std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<CommonEvent>& in) {

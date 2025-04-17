@@ -138,7 +138,7 @@ std::string DecodeArgs(StringView& rawArgs) {
     return args;
 }
 
-ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
+ProcessCacheManager::ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          const std::string& hostName,
                                          const std::string& hostPathPrefix,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -146,7 +146,7 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
                                          CounterPtr lossEventsTotal,
                                          CounterPtr cacheMissTotal,
                                          IntGaugePtr cacheSize)
-    : mSourceManager(sm),
+    : mEBPFAdapter(eBPFAdapter),
       mProcParser(hostPathPrefix),
       mHostName(hostName),
       mHostPathPrefix(hostPathPrefix),
@@ -172,7 +172,7 @@ bool ProcessCacheManager::Init() {
     ebpfConfig->mConfig = pconfig;
     mRunFlag = true;
     mPoller = async(std::launch::async, &ProcessCacheManager::pollPerfBuffers, this);
-    bool status = mSourceManager->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
+    bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
         LOG_ERROR(sLogger, ("failed to start process security plugin", ""));
         return false;
@@ -188,7 +188,7 @@ void ProcessCacheManager::Stop() {
     if (!mInited) {
         return;
     }
-    auto res = mSourceManager->StopPlugin(PluginType::PROCESS_SECURITY);
+    auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);
     LOG_INFO(sLogger, ("stop process probes for base manager, status", res));
     mRunFlag = false;
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
@@ -420,7 +420,7 @@ int ProcessCacheManager::syncAllProc() {
     value.pkey.ktime = 1;
     value.key.pid = 0;
     value.key.ktime = 1;
-    mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &key.pid, &value, 0);
+    mEBPFAdapter->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &key.pid, &value, 0);
 
     // generage execve event ...
     for (const auto& proc : procs) {
@@ -474,7 +474,7 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     ::memcpy(value.bin.path, proc->exe.data(), std::min(BINARY_PATH_MAX_LEN, static_cast<int>(proc->exe.size())));
 
     // update bpf map
-    int res = mSourceManager->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &proc->pid, &value, 0);
+    int res = mEBPFAdapter->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &proc->pid, &value, 0);
     LOG_DEBUG(sLogger, ("update bpf map, pid", proc->pid)("res", res));
     return res;
 }
@@ -497,7 +497,7 @@ void ProcessCacheManager::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        auto ret = mSourceManager->PollPerfBuffers(
+        auto ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
         LOG_DEBUG(sLogger, ("poll event num", ret));
     }

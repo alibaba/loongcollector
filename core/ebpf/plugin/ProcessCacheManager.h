@@ -25,7 +25,7 @@
 
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "ebpf/SourceManager.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/util/FrequencyManager.h"
@@ -41,7 +41,7 @@ public:
     static constexpr size_t kMaxCacheSize = 4194304UL;
     static constexpr size_t kMaxDataMapSize = kInitDataMapSize * 4;
     ProcessCacheManager() = delete;
-    ProcessCacheManager(std::shared_ptr<SourceManager>& sm,
+    ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         const std::string& hostName,
                         const std::string& hostPathPrefix,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
@@ -89,7 +89,7 @@ private:
 
     std::atomic_bool mInited = false;
     std::atomic_bool mRunFlag = false;
-    std::shared_ptr<SourceManager> mSourceManager = nullptr;
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
     ProcessCache mProcessCache;
     using DataEventMap = std::unordered_map<data_event_id, std::string, DataEventIdHash, DataEventIdEqual>;

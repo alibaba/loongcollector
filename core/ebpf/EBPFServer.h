@@ -24,7 +24,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
-#include "ebpf/SourceManager.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
@@ -53,17 +53,17 @@ private:
 #endif
 };
 
-class eBPFServer : public InputRunner {
+class EBPFServer : public InputRunner {
 public:
-    eBPFServer(const eBPFServer&) = delete;
-    eBPFServer& operator=(const eBPFServer&) = delete;
+    EBPFServer(const EBPFServer&) = delete;
+    EBPFServer& operator=(const EBPFServer&) = delete;
 
-    ~eBPFServer() = default;
+    ~EBPFServer() = default;
 
     void Init() override;
 
-    static eBPFServer* GetInstance() {
-        static eBPFServer sInstance;
+    static EBPFServer* GetInstance() {
+        static EBPFServer sInstance;
         return &sInstance;
     }
 
@@ -105,12 +105,12 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                              const PluginMetricManagerPtr& metricManager);
-    eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
+    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mDataEventQueue(4096) {}
 
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
 
-    std::shared_ptr<SourceManager> mSourceManager;
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
 
     mutable std::mutex mMtx;
     std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};

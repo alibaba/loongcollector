@@ -22,7 +22,7 @@
 
 #include "ProcParser.h"
 #include "common/memory/SourceBuffer.h"
-#include "ebpf/SourceManager.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "models/PipelineEventGroup.h"
@@ -37,11 +37,11 @@ using namespace logtail::ebpf;
 class ProcessCacheManagerUnittest : public ::testing::Test {
 protected:
     void SetUp() override {
-        mSourceManager = std::make_shared<SourceManager>();
+        mEBPFAdapter = std::make_shared<EBPFAdapter>();
         mTestRoot = std::filesystem::path(GetProcessExecutionDir()) / "ProcessCacheManagerUnittest";
         mProcDir = mTestRoot / "proc";
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mSourceManager, "test_host", mTestRoot.string(), mEventQueue, nullptr, nullptr, nullptr, nullptr);
+            mEBPFAdapter, "test_host", mTestRoot.string(), mEventQueue, nullptr, nullptr, nullptr, nullptr);
     }
 
     void TearDown() override {
@@ -79,7 +79,7 @@ private:
     void FillExecveEventNoClone(msg_execve_event& event);
     void FillExecveEventLongFilename(msg_execve_event& event);
 
-    std::shared_ptr<SourceManager> mSourceManager;
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::filesystem::path mTestRoot;

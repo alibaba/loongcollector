@@ -23,7 +23,7 @@
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/AggregateEvent.h"
@@ -37,7 +37,7 @@ extern "C" {
 
 namespace logtail::ebpf {
 
-class eBPFServer;
+class EBPFServer;
 
 inline constexpr int kNetObserverMaxBatchConsumeSize = 4096;
 inline constexpr int kNetObserverMaxWaitTimeMS = 0;
@@ -115,26 +115,11 @@ enum {
     TCP_MAX_STATES = 13,
 };
 
-enum class JobType {
-    METRIC_AGG,
-    SPAN_AGG,
-    LOG_AGG,
-    HOST_META_UPDATE,
-};
-
-class NetworkObserverScheduleConfig : public ScheduleConfig {
-public:
-    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
-        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
-
-    JobType mJobType;
-};
-
 NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
-                                               const std::shared_ptr<SourceManager>& sourceManager,
+                                               const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, sourceManager, queue, metricManager),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractRecord>& o) {
@@ -523,7 +508,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
                 }
                 // set time stamp
                 auto* httpRecord = static_cast<HttpRecord*>(record);
-                auto timeSpec = KernelTimeNanoToUTC(httpRecord->GetStartTimeStamp());
+                auto timeSpec = ConvertKernelTimeToUnixTime(httpRecord->GetStartTimeStamp());
                 logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
                 logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
                 logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
@@ -1328,7 +1313,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     }
 
     pc->mConfig = config;
-    auto ret = mSourceManager->StartPlugin(PluginType::NETWORK_OBSERVE, std::move(pc));
+    auto ret = mEBPFAdapter->StartPlugin(PluginType::NETWORK_OBSERVE, std::move(pc));
     if (!ret) {
         return -1;
     }
@@ -1355,11 +1340,11 @@ bool NetworkObserverManager::UploadHostMetadataUpdateTask() {
         keys,
         PodInfoType::HostInfo,
         []() {
-            auto managerPtr = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+            auto managerPtr = EBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
             return managerPtr && managerPtr->IsExists();
         },
         [](const std::vector<std::string>& podIpVec) {
-            auto managerPtr = eBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
+            auto managerPtr = EBPFServer::GetInstance()->GetPluginManager(PluginType::NETWORK_OBSERVE);
             if (managerPtr == nullptr) {
                 return;
             }
@@ -1620,7 +1605,7 @@ void NetworkObserverManager::PollBufferWrapper() {
         }
 
         // poll stats -> ctrl -> info
-        int ret = mSourceManager->PollPerfBuffers(
+        int ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, kNetObserverMaxWaitTimeMS);
         if (ret < 0) {
             LOG_WARNING(sLogger, ("poll event err, ret", ret));
@@ -1711,7 +1696,7 @@ int NetworkObserverManager::Destroy() {
         return 0;
     }
     LOG_INFO(sLogger, ("prepare to destroy", ""));
-    mSourceManager->StopPlugin(PluginType::NETWORK_OBSERVE);
+    mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
     LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
     this->mFlag = false;
 
@@ -1779,12 +1764,12 @@ void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableC
 #endif
     for (auto& cid : enableCids) {
         LOG_INFO(sLogger, ("UpdateWhitelists cid", cid));
-        mSourceManager->SetNetworkObserverCidFilter(cid, true);
+        mEBPFAdapter->SetNetworkObserverCidFilter(cid, true);
     }
 
     for (auto& cid : disableCids) {
         LOG_INFO(sLogger, ("UpdateBlacklists cid", cid));
-        mSourceManager->SetNetworkObserverCidFilter(cid, false);
+        mEBPFAdapter->SetNetworkObserverCidFilter(cid, false);
     }
 }
 

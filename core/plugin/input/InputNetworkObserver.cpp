@@ -15,7 +15,7 @@
 #include "plugin/input/InputNetworkObserver.h"
 
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
@@ -27,12 +27,12 @@ namespace logtail {
 const std::string InputNetworkObserver::sName = "input_network_observer";
 
 bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE)) {
+    ebpf::EBPFServer::GetInstance()->Init();
+    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -63,7 +63,7 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputNetworkObserver::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+    return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
                                                          logtail::ebpf::PluginType::NETWORK_OBSERVE,
                                                          mContext,
@@ -73,11 +73,11 @@ bool InputNetworkObserver::Start() {
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+        ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
                                                        logtail::ebpf::PluginType::NETWORK_OBSERVE);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+    return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
                                                           logtail::ebpf::PluginType::NETWORK_OBSERVE);
 }
 

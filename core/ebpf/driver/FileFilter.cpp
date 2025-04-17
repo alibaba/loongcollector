@@ -26,11 +26,11 @@ extern "C" {
 #include <string>
 
 #include "BPFMapTraits.h"
+#include "BPFWrapper.h"
 #include "CallName.h"
 #include "FileFilter.h"
 #include "IdAllocator.h"
 #include "Log.h"
-#include "eBPFWrapper.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {

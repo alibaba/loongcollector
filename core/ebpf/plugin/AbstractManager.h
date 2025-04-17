@@ -28,7 +28,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/SourceManager.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/AggregateEvent.h"
@@ -44,7 +44,7 @@ public:
 
     AbstractManager() = delete;
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
-                             const std::shared_ptr<SourceManager>& sourceManager,
+                             const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                              const PluginMetricManagerPtr& metricManager);
     virtual ~AbstractManager();
@@ -60,7 +60,7 @@ public:
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
-        return mSourceManager->PollPerfBuffers(
+        return mEBPFAdapter->PollPerfBuffers(
             GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
     }
 
@@ -77,7 +77,7 @@ public:
     virtual int Suspend() {
         WriteLock lock(mMtx);
         mSuspendFlag = true;
-        bool ret = mSourceManager->SuspendPlugin(GetPluginType());
+        bool ret = mEBPFAdapter->SuspendPlugin(GetPluginType());
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(GetPluginType())));
             return 1;
@@ -90,7 +90,7 @@ public:
             WriteLock lock(mMtx);
             mSuspendFlag = false;
         }
-        bool ret = mSourceManager->ResumePlugin(GetPluginType(), GeneratePluginConfig(options));
+        bool ret = mEBPFAdapter->ResumePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
             return 1;
@@ -102,7 +102,7 @@ public:
     GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
 
     virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-        bool ret = mSourceManager->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
+        bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
             return 1;
@@ -126,7 +126,7 @@ private:
 protected:
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
-    std::shared_ptr<SourceManager> mSourceManager;
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     PluginMetricManagerPtr mMetricMgr;
 

@@ -30,11 +30,11 @@ extern "C" {
 #include "ebpf/driver/eBPFDriver.h"
 }
 
+#include "BPFWrapper.h"
 #include "FileFilter.h"
 #include "Log.h"
 #include "NetworkFilter.h"
 #include "common/magic_enum.hpp"
-#include "eBPFWrapper.h"
 
 int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     set_log_handler(fn);

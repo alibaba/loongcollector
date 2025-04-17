@@ -35,16 +35,16 @@ public:
 
     FileSecurityManager() = delete;
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
-                        const std::shared_ptr<SourceManager>& sourceManager,
+                        const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         const PluginMetricManagerPtr& metricManager);
 
     static std::shared_ptr<FileSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
-           const std::shared_ptr<SourceManager>& sourceManager,
+           const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, sourceManager, queue, metricMgr);
+        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
     }
 
     ~FileSecurityManager() {}

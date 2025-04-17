@@ -33,12 +33,12 @@ namespace logtail::ebpf {
 inline constexpr int kDefaultMaxBatchConsumeSize = 1024;
 inline constexpr int kDefaultMaxWaitTimeMS = 200;
 
-class SourceManager {
+class EBPFAdapter {
 public:
     const std::string mDriverLibName = "eBPFDriver";
 
-    SourceManager(const SourceManager&) = delete;
-    SourceManager& operator=(const SourceManager&) = delete;
+    EBPFAdapter(const EBPFAdapter&) = delete;
+    EBPFAdapter& operator=(const EBPFAdapter&) = delete;
 
     void Init();
 
@@ -65,8 +65,8 @@ public:
     // for bpf object operations ...
     bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
 
-    SourceManager();
-    ~SourceManager();
+    EBPFAdapter();
+    ~EBPFAdapter();
 
 private:
     bool loadDynamicLib(const std::string& libName);

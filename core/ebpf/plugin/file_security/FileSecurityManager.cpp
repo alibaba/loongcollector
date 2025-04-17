@@ -21,7 +21,7 @@
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
@@ -29,7 +29,7 @@
 namespace logtail {
 namespace ebpf {
 
-class eBPFServer;
+class EBPFServer;
 
 const std::string FileSecurityManager::sPathKey = "path";
 const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
@@ -91,10 +91,10 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
 }
 
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
-                                         const std::shared_ptr<SourceManager>& sourceManager,
+                                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(baseMgr, sourceManager, queue, metricManager),
+    : AbstractManager(baseMgr, eBPFAdapter, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -221,7 +221,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
             [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
-    return mSourceManager->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
+    return mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
 }
 
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
@@ -264,7 +264,7 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 
 int FileSecurityManager::Destroy() {
     mFlag = false;
-    return mSourceManager->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
+    return mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
 }
 
 } // namespace ebpf

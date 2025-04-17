@@ -19,8 +19,8 @@
 #include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "ebpf/SourceManager.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFAdapter.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/plugin/network_observer/NetworkObserverManager.h"
 #include "ebpf/protocol/ProtocolParser.h"
@@ -52,28 +52,28 @@ protected:
     void SetUp() override {
         Timer::GetInstance()->Init();
         AsynCurlRunner::GetInstance()->Stop();
-        mSourceManager = std::make_shared<SourceManager>();
-        mSourceManager->Init();
+        mEBPFAdapter = std::make_shared<EBPFAdapter>();
+        mEBPFAdapter->Init();
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mSourceManager, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
+            mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
-        mManager = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
-        eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+        EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
     }
 
     void TearDown() override {
         Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
         mManager->Destroy();
-        eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
+        EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
     }
 
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
+        return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
     }
 
-    std::shared_ptr<SourceManager> mSourceManager;
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::shared_ptr<NetworkObserverManager> mManager;
@@ -94,7 +94,7 @@ void NetworkObserverManagerUnittest::TestInitialization() {
 }
 
 void NetworkObserverManagerUnittest::TestEventHandling() {
-    // auto mManager = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mEventQueue, nullptr);
+    // auto mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
     EXPECT_NE(mManager, nullptr);
     ObserverNetworkOption options;
     options.mEnableProtocols = {"HTTP"};
@@ -630,7 +630,7 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
     mManager->mFlag = true;
     Timer::GetInstance()->Clear();
-    eBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+    EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
 
     auto now = std::chrono::steady_clock::now();
     std::shared_ptr<ScheduleConfig> metricConfig

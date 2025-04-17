@@ -14,12 +14,12 @@
 
 #include "AggregateEvent.h"
 
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 
 namespace logtail::ebpf {
 
 bool AggregateEvent::Execute() {
-    auto manager = eBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
+    auto manager = EBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
     if (manager == nullptr || !manager->IsExists()) {
         return false;
     }
@@ -28,7 +28,7 @@ bool AggregateEvent::Execute() {
 }
 
 bool AggregateEvent::IsValid() const {
-    auto manager = eBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
+    auto manager = EBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
     if (manager == nullptr) {
         return false;
     }

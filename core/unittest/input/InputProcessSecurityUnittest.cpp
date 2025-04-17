@@ -21,7 +21,7 @@
 #include "common/http/AsynCurlRunner.h"
 #include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "plugin/input/InputProcessSecurity.h"
 #include "unittest/Unittest.h"
 
@@ -43,11 +43,11 @@ protected:
         p.mName = "test_config";
         ctx.SetConfigName("test_config");
         ctx.SetPipeline(p);
-        ebpf::eBPFServer::GetInstance()->Init();
+        ebpf::EBPFServer::GetInstance()->Init();
     }
 
     void TearDown() override {
-        ebpf::eBPFServer::GetInstance()->Stop();
+        ebpf::EBPFServer::GetInstance()->Stop();
         Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
     }
@@ -108,7 +108,7 @@ void InputProcessSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     input->Stop(true);
@@ -131,16 +131,16 @@ void InputProcessSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     // APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
     serverPipelineName
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 

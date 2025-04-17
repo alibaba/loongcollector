@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ebpf/SourceManager.h"
-
 #include <memory>
 #include <string>
 
@@ -21,6 +19,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
@@ -79,9 +78,9 @@ namespace ebpf {
     })
 
 
-SourceManager::SourceManager() = default;
+EBPFAdapter::EBPFAdapter() = default;
 
-SourceManager::~SourceManager() {
+EBPFAdapter::~EBPFAdapter() {
     if (!dynamicLibSuccess()) {
         return;
     }
@@ -100,7 +99,7 @@ SourceManager::~SourceManager() {
 #endif
 }
 
-void SourceManager::Init() {
+void EBPFAdapter::Init() {
     mBinaryPath = GetProcessExecutionDir();
     mFullLibName = "lib" + mDriverLibName + ".so";
     for (auto& x : mRunning) {
@@ -149,14 +148,14 @@ void SourceManager::Init() {
     };
 }
 
-bool SourceManager::loadDynamicLib(const std::string& libName) {
+bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     if (dynamicLibSuccess()) {
         // already load
         return true;
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[SourceManager] begin load ebpf dylib, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path:", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
@@ -203,14 +202,14 @@ bool SourceManager::loadDynamicLib(const std::string& libName) {
     return true;
 }
 
-bool SourceManager::loadCoolBPF() {
+bool EBPFAdapter::loadCoolBPF() {
     if (dynamicLibSuccess()) {
         // already load
         return true;
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[SourceManager] begin load libcoolbpf, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path:", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf, path", mBinaryPath)("error", loadErr));
@@ -236,7 +235,7 @@ bool SourceManager::loadCoolBPF() {
     return true;
 }
 
-bool SourceManager::dynamicLibSuccess() {
+bool EBPFAdapter::dynamicLibSuccess() {
     // #ifdef APSARA_UNIT_TEST_MAIN
     //     return true;
     // #endif
@@ -249,7 +248,7 @@ bool SourceManager::dynamicLibSuccess() {
     return true;
 }
 
-bool SourceManager::CheckPluginRunning(PluginType pluginType) {
+bool EBPFAdapter::CheckPluginRunning(PluginType pluginType) {
     if (!loadDynamicLib(mDriverLibName)) {
         LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(pluginType)));
         return false;
@@ -258,7 +257,7 @@ bool SourceManager::CheckPluginRunning(PluginType pluginType) {
     return mRunning[int(pluginType)];
 }
 
-bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
+bool EBPFAdapter::SetNetworkObserverConfig(int32_t key, int32_t value) {
     if (!dynamicLibSuccess()) {
         return false;
     }
@@ -276,7 +275,7 @@ bool SourceManager::SetNetworkObserverConfig(int32_t key, int32_t value) {
 #endif
 }
 
-bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
+bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
     if (!dynamicLibSuccess()) {
         return false;
     }
@@ -294,7 +293,7 @@ bool SourceManager::SetNetworkObserverCidFilter(const std::string& cid, bool upd
 #endif
 }
 
-int32_t SourceManager::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, int32_t* flag, int timeoutMs) {
+int32_t EBPFAdapter::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, int32_t* flag, int timeoutMs) {
     if (!dynamicLibSuccess()) {
         return -1;
     }
@@ -311,7 +310,7 @@ int32_t SourceManager::PollPerfBuffers(PluginType pluginType, int32_t maxEvents,
 #endif
 }
 
-bool SourceManager::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
     if (CheckPluginRunning(pluginType)) {
         // plugin update ...
         return UpdatePlugin(pluginType, std::move(conf));
@@ -351,7 +350,7 @@ bool SourceManager::StartPlugin(PluginType pluginType, std::unique_ptr<PluginCon
 #endif
 }
 
-bool SourceManager::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+bool EBPFAdapter::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(pluginType)) {
         LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
         return false;
@@ -372,7 +371,7 @@ bool SourceManager::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginCo
 #endif
 }
 
-bool SourceManager::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
+bool EBPFAdapter::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(pluginType)) {
         LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
         return false;
@@ -393,7 +392,7 @@ bool SourceManager::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginCo
 #endif
 }
 
-bool SourceManager::SuspendPlugin(PluginType pluginType) {
+bool EBPFAdapter::SuspendPlugin(PluginType pluginType) {
     if (!CheckPluginRunning(pluginType)) {
         LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(pluginType)));
         return false;
@@ -413,7 +412,7 @@ bool SourceManager::SuspendPlugin(PluginType pluginType) {
 #endif
 }
 
-bool SourceManager::StopPlugin(PluginType pluginType) {
+bool EBPFAdapter::StopPlugin(PluginType pluginType) {
     if (!CheckPluginRunning(pluginType)) {
         LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));
         return true;
@@ -437,7 +436,7 @@ bool SourceManager::StopPlugin(PluginType pluginType) {
 #endif
 }
 
-bool SourceManager::BPFMapUpdateElem(
+bool EBPFAdapter::BPFMapUpdateElem(
     PluginType pluginType, const std::string& map_name, void* key, void* value, uint64_t flag) {
     if (!CheckPluginRunning(pluginType)) {
         LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));

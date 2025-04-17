@@ -19,8 +19,8 @@
 #include "common/JsonUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "ebpf/Config.h"
-#include "ebpf/SourceManager.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFAdapter.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
 #include "plugin/input/InputFileSecurity.h"
@@ -97,12 +97,12 @@ protected:
         mConfig->mProfileProbeConfig.mProfileSampleRate = 10;
         mConfig->mProfileProbeConfig.mProfileUploadDuration = 10;
         mConfig->mProcessProbeConfig.mEnableOOMDetect = false;
-        ebpf::eBPFServer::GetInstance()->Init();
+        ebpf::EBPFServer::GetInstance()->Init();
     }
 
     void TearDown() override {
         mConfig.reset();
-        eBPFServer::GetInstance()->Stop();
+        EBPFServer::GetInstance()->Stop();
         Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
     }
@@ -145,9 +145,9 @@ void eBPFServerUnittest::TestNetworkObserver() {
     input->SetMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(initStatus);
-    EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
-    EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
-    res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
+    EXPECT_TRUE(ebpf::EBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+    EXPECT_TRUE(ebpf::EBPFServer::GetInstance()->mEBPFAdapter != nullptr);
+    res = ebpf::EBPFServer::GetInstance()->EnablePlugin(
         "test", 1, logtail::ebpf::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMetricPtr);
     EXPECT_TRUE(res);
 
@@ -267,8 +267,8 @@ void eBPFServerUnittest::TestProcessSecurity() {
     auto res = input->Start();
     EXPECT_TRUE(res);
 
-    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
-    APSARA_TEST_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager != nullptr);
+    APSARA_TEST_TRUE(ebpf::EBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+    APSARA_TEST_TRUE(ebpf::EBPFServer::GetInstance()->mEBPFAdapter != nullptr);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -579,35 +579,35 @@ void eBPFServerUnittest::TestEbpfParameters() {
 }
 
 void eBPFServerUnittest::TestEnvManager() {
-    eBPFServer::GetInstance()->mEnvMgr.InitEnvInfo();
+    EBPFServer::GetInstance()->mEnvMgr.InitEnvInfo();
 
-    EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mArchSupport);
+    EXPECT_TRUE(EBPFServer::GetInstance()->mEnvMgr.mArchSupport);
 
-    eBPFServer::GetInstance()->mEnvMgr.m310Support = false;
-    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = false;
-    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), false);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
+    EBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    EBPFServer::GetInstance()->mEnvMgr.mArchSupport = false;
+    EBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 
-    eBPFServer::GetInstance()->mEnvMgr.m310Support = false;
-    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
-    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
+    EBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    EBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    EBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
 
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), true);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), true);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), true);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), true);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), true);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), true);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), true);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), true);
 
-    eBPFServer::GetInstance()->mEnvMgr.m310Support = true;
-    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
-    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = false;
+    EBPFServer::GetInstance()->mEnvMgr.m310Support = true;
+    EBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    EBPFServer::GetInstance()->mEnvMgr.mBTFSupport = false;
 
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), true);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
-    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE), true);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);

@@ -29,7 +29,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/AggregateEvent.h"
@@ -37,10 +37,10 @@
 
 namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
-                                               const std::shared_ptr<SourceManager>& sourceManager,
+                                               const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, sourceManager, queue, metricManager),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {

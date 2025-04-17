@@ -14,7 +14,7 @@
 
 #include "plugin/input/InputNetworkSecurity.h"
 
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
 
@@ -28,12 +28,12 @@ const std::string InputNetworkSecurity::sName = "input_network_security";
 // update: init -> stop(false) -> start
 // stop: stop(true)
 bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY)) {
+    ebpf::EBPFServer::GetInstance()->Init();
+    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -57,7 +57,7 @@ bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputNetworkSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+    return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
                                                          logtail::ebpf::PluginType::NETWORK_SECURITY,
                                                          mContext,
@@ -67,11 +67,11 @@ bool InputNetworkSecurity::Start() {
 
 bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+        ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
                                                        logtail::ebpf::PluginType::NETWORK_SECURITY);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+    return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
                                                           logtail::ebpf::PluginType::NETWORK_SECURITY);
 }
 

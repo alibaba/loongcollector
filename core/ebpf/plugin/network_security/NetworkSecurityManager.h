@@ -36,17 +36,17 @@ public:
     static const std::string kTcpConnectValue;
 
     NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
-                           const std::shared_ptr<SourceManager>& sourceManager,
+                           const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
-           const std::shared_ptr<SourceManager>& sourceManager,
+           const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<NetworkSecurityManager>(processCacheManager, sourceManager, queue, metricMgr);
+        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
     }
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;

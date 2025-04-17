@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 
 #include <future>
 #include <string>
@@ -135,11 +135,11 @@ void EnvManager::InitEnvInfo() {
     m310Support = false;
 }
 
-bool eBPFServer::IsSupportedEnv(PluginType type) {
+bool EBPFServer::IsSupportedEnv(PluginType type) {
     return mEnvMgr.IsSupportedEnv(type);
 }
 
-void eBPFServer::Init() {
+void EBPFServer::Init() {
     if (mInited) {
         return;
     }
@@ -170,9 +170,9 @@ void eBPFServer::Init() {
     Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
     LOG_DEBUG(sLogger, ("begin to start poller", ""));
-    mPoller = async(std::launch::async, &eBPFServer::PollPerfBuffers, this);
+    mPoller = async(std::launch::async, &EBPFServer::PollPerfBuffers, this);
     LOG_DEBUG(sLogger, ("begin to start handler", ""));
-    mHandler = async(std::launch::async, &eBPFServer::HandlerEvents, this);
+    mHandler = async(std::launch::async, &EBPFServer::HandlerEvents, this);
     // check env
 
     // mMonitorMgr = std::make_unique<eBPFSelfMonitorMgr>();
@@ -192,9 +192,9 @@ void eBPFServer::Init() {
     mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
     mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
 
-    mSourceManager->Init();
+    mEBPFAdapter->Init();
 
-    mProcessCacheManager = std::make_shared<ProcessCacheManager>(mSourceManager,
+    mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
                                                                  mHostPathPrefix,
                                                                  mDataEventQueue,
@@ -207,7 +207,7 @@ void eBPFServer::Init() {
     mAdminConfig.LoadEbpfConfig(configJson);
 }
 
-void eBPFServer::Stop() {
+void EBPFServer::Stop() {
     if (!mInited) {
         return;
     }
@@ -246,7 +246,7 @@ void eBPFServer::Stop() {
 }
 
 // maybe update or create
-bool eBPFServer::startPluginInternal(const std::string& pipelineName,
+bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
@@ -292,7 +292,7 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -301,7 +301,7 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -310,7 +310,7 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -319,7 +319,7 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr
-                    = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
+                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -339,7 +339,7 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
     return ret;
 }
 
-bool eBPFServer::HasRegisteredPlugins() const {
+bool EBPFServer::HasRegisteredPlugins() const {
     std::lock_guard<std::mutex> lk(mMtx);
     for (const auto& pipeline : mLoadedPipeline) {
         if (!pipeline.empty()) {
@@ -349,7 +349,7 @@ bool eBPFServer::HasRegisteredPlugins() const {
     return false;
 }
 
-bool eBPFServer::EnablePlugin(const std::string& pipelineName,
+bool EBPFServer::EnablePlugin(const std::string& pipelineName,
                               uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
@@ -361,7 +361,7 @@ bool eBPFServer::EnablePlugin(const std::string& pipelineName,
     return startPluginInternal(pipelineName, pluginIndex, type, ctx, options, mgr);
 }
 
-bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
+bool EBPFServer::CheckIfNeedStopProcessCacheManager() const {
     std::lock_guard<std::mutex> lk(mMtx);
     auto nsMgr = mPlugins[static_cast<int>(PluginType::NETWORK_SECURITY)];
     auto psMgr = mPlugins[static_cast<int>(PluginType::PROCESS_SECURITY)];
@@ -373,7 +373,7 @@ bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
     return true;
 }
 
-bool eBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
+bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
     }
@@ -415,12 +415,12 @@ bool eBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     return true;
 }
 
-std::string eBPFServer::CheckLoadedPipelineName(PluginType type) {
+std::string EBPFServer::CheckLoadedPipelineName(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
     return mLoadedPipeline[int(type)];
 }
 
-std::string eBPFServer::GetAllProjects() {
+std::string EBPFServer::GetAllProjects() {
     std::lock_guard<std::mutex> lk(mMtx);
     std::string res;
     for (int i = 0; i < int(PluginType::MAX); i++) {
@@ -432,13 +432,13 @@ std::string eBPFServer::GetAllProjects() {
     return res;
 }
 
-void eBPFServer::UpdatePipelineName(PluginType type, const std::string& name, const std::string& project) {
+void EBPFServer::UpdatePipelineName(PluginType type, const std::string& name, const std::string& project) {
     std::lock_guard<std::mutex> lk(mMtx);
     mLoadedPipeline[int(type)] = name;
     mPluginProject[int(type)] = project;
 }
 
-bool eBPFServer::SuspendPlugin(const std::string&, PluginType type) {
+bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return false;
     }
@@ -460,7 +460,7 @@ bool eBPFServer::SuspendPlugin(const std::string&, PluginType type) {
     return true;
 }
 
-void eBPFServer::PollPerfBuffers() {
+void EBPFServer::PollPerfBuffers() {
     mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
         auto now = std::chrono::steady_clock::now();
@@ -484,7 +484,7 @@ void eBPFServer::PollPerfBuffers() {
     }
 }
 
-std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
+std::shared_ptr<AbstractManager> EBPFServer::GetPluginManager(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
     if (type == PluginType::MAX) {
         return nullptr;
@@ -492,7 +492,7 @@ std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
     return mPlugins[static_cast<int>(type)];
 }
 
-void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
+void EBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
     std::lock_guard<std::mutex> lk(mMtx);
     if (type == PluginType::MAX) {
         return;
@@ -500,7 +500,7 @@ void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractMa
     mPlugins[static_cast<int>(type)] = mgr;
 }
 
-void eBPFServer::HandlerEvents() {
+void EBPFServer::HandlerEvents() {
     std::vector<std::shared_ptr<CommonEvent>> items(1024);
     while (mRunning) {
         // consume queue

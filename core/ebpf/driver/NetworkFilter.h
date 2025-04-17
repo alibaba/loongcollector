@@ -26,7 +26,7 @@ extern "C" {
 
 #include <string>
 
-#include "ebpf/driver/eBPFWrapper.h"
+#include "ebpf/driver/BPFWrapper.h"
 #include "ebpf/include/export.h"
 
 namespace logtail {

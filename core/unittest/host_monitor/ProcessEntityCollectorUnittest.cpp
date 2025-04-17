@@ -58,7 +58,7 @@ void ProcessEntityCollectorUnittest::TestSortProcessByCpu() const {
     collector.GetSortedProcess(processes, 3);
     APSARA_TEST_EQUAL(3, processes.size());
     auto prev = processes[0];
-    for (auto i = 1; i < processes.size(); i++) {
+    for (auto i = 1UL; i < processes.size(); i++) {
         auto process = processes[i];
         APSARA_TEST_TRUE(process->cpuInfo.percent >= prev->cpuInfo.percent);
         prev = process;
