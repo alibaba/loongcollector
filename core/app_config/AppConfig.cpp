@@ -189,8 +189,8 @@ std::string GetLoongcollectorEnv(const std::string& flagName) {
 void CreateAgentDir() {
     try {
         const char* value = getenv("LOGTAIL_MODE");
-        if (value != NULL) {
-            STRING_FLAG(logtail_mode) = StringTo(value);
+        if (value != nullptr) {
+            STRING_FLAG(logtail_mode) = value;
         }
     } catch (const exception& e) {
         std::cout << "load config from env error, env_name:LOGTAIL_MODE, error:" << e.what() << std::endl;
@@ -805,8 +805,8 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
         char* value = NULL;
         value = getenv(envKey);
         if (value != NULL) {
-            T val = StringTo<T>(value);
-            if (val >= minValue) {
+            T val{};
+            if (StringTo(value, val) && val >= minValue) {
                 configValue = val;
                 LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
                 return true;
@@ -820,8 +820,8 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
         const auto newEnvKey = LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(envKey);
         value = getenv(newEnvKey.c_str());
         if (value != NULL) {
-            T val = StringTo<T>(value);
-            if (val >= minValue) {
+            T val{};
+            if (StringTo(value, val) && val >= minValue) {
                 configValue = val;
                 LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
                 return true;

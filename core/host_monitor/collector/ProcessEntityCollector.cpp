@@ -138,7 +138,10 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
             readCount = 0;
             std::this_thread::sleep_for(milliseconds{100});
         }
-        auto pid = StringTo<pid_t>(dirName);
+        pid_t pid{};
+        if (!StringTo(dirName, pid)) {
+            return;
+        }
         if (pid != 0) {
             bool isFirstCollect = false;
             auto ptr = GetProcessStat(pid, isFirstCollect);
@@ -290,7 +293,12 @@ int64_t ProcessEntityCollector::GetHostSystemBootTime() {
         auto cpuMetric = SplitString(line);
         // example: btime 1719922762
         if (cpuMetric.size() >= 2 && cpuMetric[0] == "btime") {
-            systemBootSeconds = StringTo<int64_t>(cpuMetric[1]);
+            if (!StringTo(cpuMetric[1], systemBootSeconds)) {
+                LOG_WARNING(sLogger,
+                            ("failed to get system boot time",
+                             "use current time instead")("error msg", "parse btime erorr " + cpuMetric[1]));
+                return currentSeconds;
+            }
             return systemBootSeconds;
         }
     }

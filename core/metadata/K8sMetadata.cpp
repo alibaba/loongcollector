@@ -89,7 +89,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mServicePort = INT32_FLAG(k8s_metadata_server_port);
     const char* value = getenv("_node_ip_");
     if (value != nullptr) {
-        mHostIp = StringTo<string>(value);
+        mHostIp = value;
     } else {
         mHostIp = GetHostIp();
     }

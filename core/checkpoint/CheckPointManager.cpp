@@ -188,8 +188,9 @@ void CheckPointManager::LoadDirCheckPoint(const Json::Value& root) {
     }
 }
 void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
-    if (root.isMember("check_point") == false)
+    if (root.isMember("check_point") == false) {
         return;
+    }
     const Json::Value::Members& fileKeyNames = root["check_point"].getMemberNames();
     mReaderCount = fileKeyNames.size();
     for (size_t index = 0; index < fileKeyNames.size(); ++index) {
@@ -198,7 +199,10 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
         int32_t update_time = meta["update_time"].asInt();
         // use inode comparison instead
         try {
-            int64_t offset = StringTo<int64_t>(meta["offset"].asString());
+            int64_t offset{};
+            if (!StringTo(meta["offset"].asString(), offset)) {
+                throw runtime_error("offset is not a number");
+            }
             DevInode devInode;
             uint32_t sigSize = 0;
             uint64_t sigHash = 0;

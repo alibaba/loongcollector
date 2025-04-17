@@ -21,9 +21,7 @@ using namespace std;
 namespace logtail {
 
 Timer::~Timer() {
-#ifdef APSARA_UNIT_TEST_MAIN
     Stop();
-#endif
 }
 
 void Timer::Init() {

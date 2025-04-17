@@ -170,7 +170,8 @@ bool ParseCIDR(const std::string& cidrStr, CIDR* cidr) {
     if (items.size() != 2) {
         return false;
     }
-    int prefixLen = StringTo<int>(items[1]);
+    int prefixLen = -1;
+    StringTo(items[1], prefixLen);
     if (prefixLen < 0) {
         return false;
     }

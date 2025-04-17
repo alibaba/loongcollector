@@ -103,36 +103,6 @@ std::string ToHexString(const T& value) {
 template <>
 std::string ToHexString(const std::string& value);
 
-// TODO: These function should be deprecated in preference to the new StringTo<T>(in, out&) version
-// This version is slow and not exception free. It throws boost::bad_lexical_cast.
-template <typename T>
-T StringTo(const std::string& str) {
-    return boost::lexical_cast<T>(str);
-}
-
-template <typename T>
-T StringTo(const char* str) {
-    return boost::lexical_cast<T>(str);
-}
-
-template <typename T>
-T StringTo(const StringView& str) {
-    return boost::lexical_cast<T>(str);
-}
-
-// @return true if str is equal to "true", otherwise false.
-inline bool StringTo(const std::string& str) {
-    // 先检查长度是否为4
-    if (str.length() != 4) {
-        return false;
-    }
-    // 直接比较每个字符（忽略大小写）
-    return (std::tolower(static_cast<unsigned char>(str[0])) == 't'
-            && std::tolower(static_cast<unsigned char>(str[1])) == 'r'
-            && std::tolower(static_cast<unsigned char>(str[2])) == 'u'
-            && std::tolower(static_cast<unsigned char>(str[3])) == 'e');
-}
-
 // Split string by delimiter.
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim = " ");
 
@@ -293,11 +263,83 @@ private:
 
 template <class T>
 bool StringTo(const char* first, const char* last, T& val, int base = 10) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+
     auto convresult = std::from_chars(first, last, val, base);
     if (convresult.ec != std::errc() || convresult.ptr != last) {
         return false;
     }
     return true;
+}
+
+template <>
+inline bool StringTo<double>(const char* first, const char* last, double& val, [[maybe_unused]] int base) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+
+    // 重置 errno 以检测转换错误
+    errno = 0;
+    char* end = nullptr;
+    val = std::strtod(first, &end);
+
+    // 检查转换是否成功
+    if (end != last) {
+        return false; // 没有完全转换所有字符
+    }
+
+    if (errno == ERANGE) {
+        return false; // 超出范围
+    }
+    return true;
+}
+
+template <>
+inline bool StringTo<float>(const char* first, const char* last, float& val, [[maybe_unused]] int base) {
+    double result{};
+    if (!StringTo(first, last, result)) {
+        return false;
+    }
+    // 检查结果是否在 float 的范围内
+    if (result > std::numeric_limits<float>::max() || result < std::numeric_limits<float>::lowest()) {
+        return false; // 超出 float 范围
+    }
+
+    val = static_cast<float>(result);
+    return true;
+}
+
+template <>
+inline bool StringTo<bool>(const char* first, const char* last, bool& val, [[maybe_unused]] int base) {
+    // 先检查长度是否为4
+    if (first == nullptr || last - first != 4) {
+        val = false;
+    } else { // 直接比较每个字符（忽略大小写）
+        val = (std::tolower(static_cast<unsigned char>(first[0])) == 't'
+               && std::tolower(static_cast<unsigned char>(first[1])) == 'r'
+               && std::tolower(static_cast<unsigned char>(first[2])) == 'u'
+               && std::tolower(static_cast<unsigned char>(first[3])) == 'e');
+    }
+    return true;
+}
+
+template <>
+inline bool StringTo<std::string>(const char* first, const char* last, std::string& val, [[maybe_unused]] int base) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+    val.assign(first, last);
+    return true;
+}
+
+template <class T>
+bool StringTo(const char* str, T& val, int base = 10) {
+    if (!str) {
+        return false;
+    }
+    return StringTo(str, str + strlen(str), val, base);
 }
 
 template <class T>

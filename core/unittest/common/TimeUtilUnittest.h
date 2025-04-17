@@ -62,11 +62,11 @@ void TimeUtilUnittest::TestDeduceYear() {
         std::string current;
         int expected;
     };
-    auto Parse = [](const std::string& s, struct tm* t) {
+    auto parse = [](const std::string& s, struct tm* t) {
         auto sp = SplitString(s, "/");
-        t->tm_year = StringTo<int>(sp[0]) - 1900;
-        t->tm_mon = StringTo<int>(sp[1]) - 1;
-        t->tm_mday = StringTo<int>(sp[2]);
+        StringTo(sp[0],t->tm_year) - 1900;
+        StringTo(sp[1],t->tm_mon) - 1;
+        StringTo(sp[2],t->tm_mday);
     };
 
     std::vector<Case> cases{{"0/12/31", "2018/1/1", 2017},
@@ -77,9 +77,10 @@ void TimeUtilUnittest::TestDeduceYear() {
                             {"0/9/9", "2018/1/1", 2018}};
 
     for (auto& c : cases) {
-        struct tm input, current;
-        Parse(c.input, &input);
-        Parse(c.current, &current);
+        struct tm input{};
+        struct tm current{};
+        parse(c.input, &input);
+        parse(c.current, &current);
         EXPECT_EQ(c.expected, 1900 + DeduceYear(&input, &current));
     }
 }

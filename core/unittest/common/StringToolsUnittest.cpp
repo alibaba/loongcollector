@@ -57,13 +57,6 @@ TEST_F(StringToolsUnittest, TestEndWith) {
     EXPECT_FALSE(EndWith("a.json ", ".json"));
 }
 
-TEST_F(StringToolsUnittest, TestStringToBoolean) {
-    EXPECT_TRUE(StringTo("true"));
-    EXPECT_FALSE(StringTo("false"));
-    EXPECT_FALSE(StringTo("any"));
-    EXPECT_FALSE(StringTo(""));
-}
-
 TEST_F(StringToolsUnittest, TestReplaceString) {
     std::string raw;
 
@@ -399,6 +392,9 @@ TEST_F(StringToolsUnittest, TestStringViewSplitterMultiEmptyEmpty) {
 
 TEST_F(StringToolsUnittest, TestStringTo) {
     int i = 0;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, i));
+    APSARA_TEST_FALSE(StringTo((const char*)1, nullptr, i));
+    APSARA_TEST_FALSE(StringTo(nullptr, (const char*)1, i));
     APSARA_TEST_TRUE(StringTo(std::string("666"), i));
     APSARA_TEST_EQUAL(666, i);
     long j = 0;
@@ -409,6 +405,28 @@ TEST_F(StringToolsUnittest, TestStringTo) {
     APSARA_TEST_EQUAL(777U, l);
     uint64_t k = 0;
     APSARA_TEST_FALSE(StringTo(std::string_view("-888"), k));
+
+    bool b = false;
+    APSARA_TEST_TRUE(StringTo("true", b));
+    APSARA_TEST_EQUAL(true, b);
+    APSARA_TEST_TRUE(StringTo("false", b));
+    APSARA_TEST_EQUAL(false, b);
+    APSARA_TEST_TRUE(StringTo("any", b));
+    APSARA_TEST_EQUAL(false, b);
+    APSARA_TEST_FALSE(StringTo(nullptr, b));
+
+    float f = 0.0F;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, f));
+    APSARA_TEST_FALSE(StringTo(std::to_string(std::numeric_limits<double>::max()), f));
+    APSARA_TEST_TRUE(StringTo("111.111", f));
+    APSARA_TEST_EQUAL(111.111F, f);
+
+    double d = 0.0;
+    APSARA_TEST_TRUE(StringTo("1111.1111", d));
+    APSARA_TEST_EQUAL(1111.1111, d);
+
+    std::string s;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, s));
 }
 
 UNIT_TEST_MAIN

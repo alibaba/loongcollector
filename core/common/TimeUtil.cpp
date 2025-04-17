@@ -375,8 +375,13 @@ bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond) {
         return false;
     }
     std::string hourStr = logTZ.substr(4, 2);
-    std::string minitueStr = logTZ.substr(7, 2);
-    logTZSecond = StringTo<int>(hourStr) * 3600 + StringTo<int>(minitueStr) * 60;
+    std::string minuteStr = logTZ.substr(7, 2);
+    int hour{};
+    int minute{};
+    if (!StringTo(hourStr, hour) || !StringTo(minuteStr, minute)) {
+        return false;
+    }
+    logTZSecond = hour * 3600 + minute * 60;
     if (logTZ[3] == '-') {
         logTZSecond = -logTZSecond;
     }

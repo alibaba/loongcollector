@@ -101,9 +101,7 @@ bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
             if (cpuMetric[0] == "cpu") {
                 cpuStat.index = -1;
             } else {
-                try {
-                    cpuStat.index = StringTo<int32_t>(cpuMetric[0].substr(3));
-                } catch (...) {
+                if (!StringTo(cpuMetric[0].substr(3), cpuStat.index)) {
                     LOG_ERROR(sLogger, ("failed to parse cpu index", "skip")("wrong cpu index", cpuMetric[0]));
                     continue;
                 }
@@ -125,14 +123,16 @@ bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
 }
 
 double CPUCollector::ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const {
-    try {
-        if (cpuMetric.size() <= static_cast<size_t>(key)) {
-            return 0;
-        }
-        return StringTo<double>(cpuMetric[static_cast<size_t>(key)]);
-    } catch (...) {
+    if (cpuMetric.size() <= static_cast<size_t>(key)) {
         return 0.0;
     }
+    double value = 0.0;
+    if (!StringTo(cpuMetric[static_cast<size_t>(key)], value)) {
+        LOG_WARNING(
+            sLogger,
+            ("failed to parse cpu metric", static_cast<size_t>(key))("value", cpuMetric[static_cast<size_t>(key)]));
+    }
+    return value;
 }
 
 } // namespace logtail
