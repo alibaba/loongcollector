@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ebpf/EBPFAdapter.h"
+
 #include <memory>
 #include <string>
 
@@ -19,7 +21,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
-#include "ebpf/EBPFAdapter.h"
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
