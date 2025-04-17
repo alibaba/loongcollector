@@ -32,16 +32,42 @@ void GenerateRand64(std::array<uint64_t, N>& result) {
     }
 }
 
+template <size_t N>
+std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
+    constexpr size_t charsPerInt = 16; // 每个 uint64_t 需要 16 个字符
+    std::array<char, N * charsPerInt + 1> buffer{}; // +1 for null terminator
+
+    for (size_t i = 0; i < N; ++i) {
+        constexpr const char* hexChars = "0123456789abcdef";
+        uint64_t value = id[i];
+        for (int j = charsPerInt - 1; j >= 0; --j) {
+            buffer[i * charsPerInt + j] = hexChars[value & 0xF];
+            value >>= 4;
+        }
+    }
+
+    buffer[N * charsPerInt] = '\0'; // Null terminator
+    return std::string(buffer.data());
+}
+
 std::array<uint64_t, 4> GenerateTraceID() {
     std::array<uint64_t, 4> result{};
-    GenerateRand64<4>(result);
+    GenerateRand64(result);
     return result;
 }
 
 std::array<uint64_t, 2> GenerateSpanID() {
     std::array<uint64_t, 2> result{};
-    GenerateRand64<2>(result);
+    GenerateRand64(result);
     return result;
+}
+
+std::string TraceIDToString(const std::array<uint64_t, 4>& traceID) {
+    return FromRandom64ID(traceID);
+}
+
+std::string SpanIDToString(const std::array<uint64_t, 2>& spanID) {
+    return FromRandom64ID(spanID);
 }
 
 } // namespace ebpf

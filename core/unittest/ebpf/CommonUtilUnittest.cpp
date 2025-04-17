@@ -40,7 +40,6 @@ public:
     void TestSpanIDConversion();
     void TraceIDBenchmark();
     void FromTraceIDBenchmark();
-    void FromSpanIDBenchmark();
 
     void TestInitialState();
     void TestPeriodSetting();
@@ -75,12 +74,8 @@ void CommonUtilUnittest::TestTraceIDGeneration() {
 
 void CommonUtilUnittest::TestTraceIDFormat() {
     auto traceId = GenerateTraceID();
-    std::string hexString = FromRandom64ID<4>(traceId);
-
-    LOG_INFO(sLogger, ("traceId", hexString));
-
+    std::string hexString = TraceIDToString(traceId);
     APSARA_TEST_EQUAL(hexString.length(), 64UL);
-
     APSARA_TEST_TRUE(IsValidHexString(hexString));
 }
 
@@ -90,7 +85,7 @@ void CommonUtilUnittest::TestTraceIDUniqueness() {
 
     for (int i = 0; i < numIds; ++i) {
         auto traceId = GenerateTraceID();
-        std::string hexString = FromRandom64ID<4>(traceId);
+        std::string hexString = TraceIDToString(traceId);
         traceIds.insert(hexString);
     }
 
@@ -113,7 +108,7 @@ void CommonUtilUnittest::TestSpanIDGeneration() {
 
 void CommonUtilUnittest::TestSpanIDFormat() {
     auto spanId = GenerateSpanID();
-    std::string hexString = FromRandom64ID<2>(spanId);
+    std::string hexString = SpanIDToString(spanId);
 
     LOG_INFO(sLogger, ("spanId", hexString));
 
@@ -129,7 +124,7 @@ void CommonUtilUnittest::TestSpanIDUniqueness() {
 
     for (int i = 0; i < numIds; ++i) {
         auto spanId = GenerateSpanID();
-        std::string hexString = FromRandom64ID<2>(spanId);
+        std::string hexString = SpanIDToString(spanId);
         spanIds.insert(hexString);
     }
 
@@ -145,7 +140,7 @@ void CommonUtilUnittest::TestTraceIDConversion() {
     }
 
     // 转换为字符串
-    std::string hexString = FromRandom64ID<4>(traceId);
+    std::string hexString = TraceIDToString(traceId);
 
     // 验证转换结果
     std::string expected;
@@ -165,7 +160,7 @@ void CommonUtilUnittest::TestSpanIDConversion() {
     }
 
     // 转换为字符串
-    std::string hexString = FromRandom64ID<2>(spanId);
+    std::string hexString = SpanIDToString(spanId);
 
     // 验证转换结果
     std::string expected;
@@ -294,7 +289,7 @@ void CommonUtilUnittest::TestMultipleCycles() {
 
 void CommonUtilUnittest::TraceIDBenchmark() {
     auto tid = GenerateTraceID();
-    auto str = FromRandom64ID<4>(tid);
+    auto str = TraceIDToString(tid);
     LOG_INFO(sLogger, ("origin traceID", str));
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
@@ -308,76 +303,19 @@ void CommonUtilUnittest::TraceIDBenchmark() {
 
 void CommonUtilUnittest::FromTraceIDBenchmark() {
     auto tid = GenerateTraceID();
-    auto str = FromRandom64ID<4>(tid);
+    auto str = TraceIDToString(tid);
     std::vector<std::array<uint64_t, 4>> traceIDs;
     for (int i = 0; i < 1000000; i++) {
         traceIDs.push_back(GenerateTraceID());
     }
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
-        FromRandom64ID(traceIDs[i]);
+        TraceIDToString(traceIDs[i]);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     std::cout << "[FromTraceID] elapsed: " << elapsed.count() << " seconds" << std::endl;
-}
-
-char randHexChar() {
-    thread_local static std::random_device rd;
-    thread_local static std::mt19937 generator(rd());
-    thread_local static std::uniform_int_distribution<int> distribution(0, 15);
-    static const char hexChars[] = "0123456789abcdef";
-    return hexChars[distribution(generator)];
-}
-std::string RandHexStr(int len) {
-    std::string res(len, '0'); // Initialize string with '0' of length 'len'
-    for (int i = 0; i < len; ++i) { // Corrected loop condition
-        res[i] = randHexChar();
-    }
-    return res;
-}
-
-void CommonUtilUnittest::FromSpanIDBenchmark() {
-    auto traceID = GenerateSpanID();
-    auto traceID1 = FromRandom64ID(traceID);
-    auto traceID2 = RandHexStr(32);
-    std::cout << traceID1 << " ||| " << traceID2 << std::endl;
-    std::cout << "begin" << std::endl;
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 1000000; i++) {
-        auto traceID = GenerateSpanID();
-        auto tid = FromRandom64ID(traceID);
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    std::cout << "[FromSpanID] elapsed: " << elapsed.count() << " seconds" << std::endl;
-
-    start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 1000000; i++) {
-        auto traceID = RandHexStr(32);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    elapsed = end - start;
-    std::cout << "[FromRandomHexCharFroSpanId] elapsed: " << elapsed.count() << " seconds" << std::endl;
-
-    start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 1000000; i++) {
-        auto traceID = GenerateTraceID();
-        auto tid = FromRandom64ID(traceID);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    elapsed = end - start;
-    std::cout << "[FromTraceID] elapsed: " << elapsed.count() << " seconds" << std::endl;
-
-    start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 1000000; i++) {
-        auto traceID = RandHexStr(64);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    elapsed = end - start;
-    std::cout << "[FromRandomHexCharFroTraceId] elapsed: " << elapsed.count() << " seconds" << std::endl;
 }
 
 // for trace id util
@@ -392,8 +330,6 @@ UNIT_TEST_CASE(CommonUtilUnittest, TestSpanIDConversion);
 
 UNIT_TEST_CASE(CommonUtilUnittest, TraceIDBenchmark);
 UNIT_TEST_CASE(CommonUtilUnittest, FromTraceIDBenchmark);
-UNIT_TEST_CASE(CommonUtilUnittest, FromSpanIDBenchmark);
-
 // for freq manager
 UNIT_TEST_CASE(CommonUtilUnittest, TestInitialState);
 UNIT_TEST_CASE(CommonUtilUnittest, TestPeriodSetting);

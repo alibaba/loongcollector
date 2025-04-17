@@ -14,23 +14,15 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
 
 #include <array>
 
 namespace logtail::ebpf {
 
-template <size_t N>
-std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
-    std::string result;
-    result.reserve(N << 4);
-    for (size_t i = 0; i < N; i++) {
-        fmt::format_to(std::back_inserter(result), "{:016lx}", id[i]);
-    }
-    return result;
-}
 
 std::array<uint64_t, 4> GenerateTraceID();
 std::array<uint64_t, 2> GenerateSpanID();
+std::string TraceIDToString(const std::array<uint64_t, 4>& traceID);
+std::string SpanIDToString(const std::array<uint64_t, 2>& spanID);
 
 } // namespace logtail::ebpf

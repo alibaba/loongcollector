@@ -1027,8 +1027,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
                     LOG_DEBUG(sLogger, ("record span tags", "")(std::string(kConnTrackerTable.ColSpanKey(i)), sb.data));
                 }
 
-                spanEvent->SetTraceId(FromRandom64ID(record->mTraceId));
-                spanEvent->SetSpanId(FromRandom64ID(record->mSpanId));
+                spanEvent->SetTraceId(TraceIDToString(record->mTraceId));
+                spanEvent->SetSpanId(SpanIDToString(record->mSpanId));
                 spanEvent->SetStatus(record->IsError() ? SpanEvent::StatusCode::Error : SpanEvent::StatusCode::Ok);
                 auto role = ct->GetRole();
                 if (role == support_role_e::IsClient) {

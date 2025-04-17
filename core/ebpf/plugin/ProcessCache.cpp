@@ -14,8 +14,6 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
-#include <spdlog/fmt/bundled/format.h>
-
 #include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
 #include "type/table/ProcessTable.h"
