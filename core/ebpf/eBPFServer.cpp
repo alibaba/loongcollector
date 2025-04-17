@@ -75,8 +75,9 @@ bool EnvManager::AbleToLoadDyLib() {
 }
 
 void EnvManager::InitEnvInfo() {
-    if (mInited)
+    if (mInited) {
         return;
+    }
     mInited = true;
 
 #ifdef _MSC_VER
@@ -98,7 +99,7 @@ void EnvManager::InitEnvInfo() {
 #endif
     mArchSupport = true;
     std::string release;
-    int64_t version;
+    int64_t version = 0;
     GetKernelInfo(release, version);
     LOG_INFO(sLogger, ("ebpf kernel release", release)("kernel version", version));
     if (release.empty()) {
@@ -117,7 +118,7 @@ void EnvManager::InitEnvInfo() {
     }
 
     std::string os;
-    int64_t osVersion;
+    int64_t osVersion = 0;
     if (GetRedHatReleaseInfo(os, osVersion, STRING_FLAG(default_container_host_path))
         || GetRedHatReleaseInfo(os, osVersion)) {
         if (os == kKernelNameCentos && osVersion >= kKernelCentosMinVersion) {
@@ -249,17 +250,10 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
-                                     const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
-                                     PluginMetricManagerPtr mgr) {
+                                     const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                                     const PluginMetricManagerPtr& metricManager) {
     std::string prevPipelineName = CheckLoadedPipelineName(type);
-    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
-        LOG_WARNING(sLogger,
-                    ("pipeline already loaded, plugin type",
-                     magic_enum::enum_name(type))("prev pipeline", prevPipelineName)("curr pipeline", pipelineName));
-        return false;
-    }
-
-    if (prevPipelineName.size() && prevPipelineName == pipelineName) {
+    if (prevPipelineName == pipelineName) {
         LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
         auto pluginMgr = GetPluginManager(type);
         if (pluginMgr) {
@@ -275,18 +269,16 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
             LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type))("res", res));
             return true;
-        } else {
-            LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
-            return false;
         }
+        LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
+        return false;
     }
 
     UpdatePipelineName(type, pipelineName, ctx->GetProjectName());
 
     if (type != PluginType::NETWORK_OBSERVE) {
-        LOG_INFO(sLogger, ("hostname", mHostName)("mHostPathPrefix", mHostPathPrefix));
         auto res = mProcessCacheManager->Init();
-        LOG_INFO(sLogger, ("ProcessCacheManager init ", res));
+        LOG_INFO(sLogger, ("ProcessCacheManager inited", res));
     }
 
     // step1: convert options to export type
@@ -299,7 +291,8 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                pluginMgr = ProcessSecurityManager::Create(
+                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -307,7 +300,8 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
 
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
-                pluginMgr = NetworkObserverManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                pluginMgr = NetworkObserverManager::Create(
+                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -315,7 +309,8 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
 
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = NetworkSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                pluginMgr = NetworkSecurityManager::Create(
+                    mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -323,7 +318,8 @@ bool eBPFServer::startPluginInternal(const std::string& pipelineName,
 
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, mgr);
+                pluginMgr
+                    = FileSecurityManager::Create(mProcessCacheManager, mSourceManager, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -357,8 +353,8 @@ bool eBPFServer::EnablePlugin(const std::string& pipelineName,
                               uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
-                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
-                              PluginMetricManagerPtr mgr) {
+                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                              const PluginMetricManagerPtr& mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
     }
@@ -372,10 +368,9 @@ bool eBPFServer::CheckIfNeedStopProcessCacheManager() const {
     auto fsMgr = mPlugins[static_cast<int>(PluginType::FILE_SECURITY)];
     if ((nsMgr && nsMgr->IsExists()) || (psMgr && psMgr->IsExists()) || (fsMgr && fsMgr->IsExists())) {
         return false;
-    } else {
-        LOG_INFO(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
-        return true;
     }
+    LOG_INFO(sLogger, ("no security plugin registerd", "begin to stop base manager ... "));
+    return true;
 }
 
 bool eBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
@@ -494,7 +489,6 @@ std::shared_ptr<AbstractManager> eBPFServer::GetPluginManager(PluginType type) {
     if (type == PluginType::MAX) {
         return nullptr;
     }
-
     return mPlugins[static_cast<int>(type)];
 }
 
@@ -503,7 +497,6 @@ void eBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractMa
     if (type == PluginType::MAX) {
         return;
     }
-
     mPlugins[static_cast<int>(type)] = mgr;
 }
 

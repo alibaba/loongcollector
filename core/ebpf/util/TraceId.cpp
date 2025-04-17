@@ -16,7 +16,6 @@
 
 #include <cstring>
 
-#include <iomanip>
 #include <random>
 
 namespace logtail {

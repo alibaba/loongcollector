@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include <common/StringView.h>
 #include <cstddef>
 
 #include <array>
 
+#include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/DataTable.h"

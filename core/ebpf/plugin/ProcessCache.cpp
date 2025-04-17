@@ -14,7 +14,7 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
-#include <iostream>
+#include <spdlog/fmt/bundled/format.h>
 
 #include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
@@ -107,6 +107,16 @@ void ProcessCache::ClearExpiredCache(time_t ktime) {
         LOG_DEBUG(sLogger, ("[RecordExecveEvent][DUMP] clear expired cache pid", key.pid)("ktime", key.time));
         removeCache(key);
         mCacheExpireQueue.pop_front();
+    }
+}
+
+void ProcessCache::PrintDebugInfo() {
+    for (const auto& [key, value] : mCache) {
+        LOG_ERROR(sLogger, ("[DUMP CACHE] pid", key.pid)("ktime", key.time));
+    }
+    for (const auto& entry : mCacheExpireQueue) {
+        LOG_ERROR(sLogger,
+                  ("[DUMP EXPIRE Q] pid", entry.key.pid)("ktime", entry.key.time)("enqueue ktime", entry.time));
     }
 }
 

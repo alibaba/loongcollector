@@ -36,11 +36,11 @@
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail::ebpf {
-ProcessSecurityManager::ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                                               std::shared_ptr<SourceManager> sourceManager,
+ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                                               const std::shared_ptr<SourceManager>& sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               PluginMetricManagerPtr mgr)
-    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(mgr)),
+                                               const PluginMetricManagerPtr& metricManager)
+    : AbstractManager(processCacheManager, sourceManager, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -180,7 +180,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-                struct timespec ts = KernelTimeNanoToUTC(innerEvent->mTimestamp);
+                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
                 switch (innerEvent->mEventType) {
                     case KernelEventType::PROCESS_EXECVE_EVENT: {

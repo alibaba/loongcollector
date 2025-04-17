@@ -46,14 +46,14 @@ void ProcessEntityCollectorUnittest::TestGetNewProcessStat() const {
     auto collector = ProcessEntityCollector();
     auto ptr = collector.ReadNewProcessStat(1);
     APSARA_TEST_NOT_EQUAL(nullptr, ptr);
-    APSARA_TEST_EQUAL(1, ptr->pid);
-    APSARA_TEST_EQUAL("cat", ptr->name);
+    APSARA_TEST_EQUAL(1, ptr->stat.pid);
+    APSARA_TEST_EQUAL("cat", ptr->stat.name);
 }
 
 void ProcessEntityCollectorUnittest::TestSortProcessByCpu() const {
     PROCESS_DIR = "/proc";
     auto collector = ProcessEntityCollector();
-    auto processes = vector<ProcessStatPtr>();
+    auto processes = vector<ExtendedProcessStatPtr>();
     collector.GetSortedProcess(processes, 3); // fist time will be ignored
     collector.GetSortedProcess(processes, 3);
     APSARA_TEST_EQUAL(3, processes.size());

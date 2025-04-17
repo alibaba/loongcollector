@@ -103,14 +103,35 @@ std::string ToHexString(const T& value) {
 template <>
 std::string ToHexString(const std::string& value);
 
+// TODO: These function should be deprecated in preference to the new StringTo<T>(in, out&) version
+// This version is slow and not exception free. It throws boost::bad_lexical_cast.
 template <typename T>
 T StringTo(const std::string& str) {
     return boost::lexical_cast<T>(str);
 }
 
+template <typename T>
+T StringTo(const char* str) {
+    return boost::lexical_cast<T>(str);
+}
+
+template <typename T>
+T StringTo(const StringView& str) {
+    return boost::lexical_cast<T>(str);
+}
+
 // @return true if str is equal to "true", otherwise false.
-template <>
-bool StringTo<bool>(const std::string& str);
+inline bool StringTo(const std::string& str) {
+    // 先检查长度是否为4
+    if (str.length() != 4) {
+        return false;
+    }
+    // 直接比较每个字符（忽略大小写）
+    return (std::tolower(static_cast<unsigned char>(str[0])) == 't'
+            && std::tolower(static_cast<unsigned char>(str[1])) == 'r'
+            && std::tolower(static_cast<unsigned char>(str[2])) == 'u'
+            && std::tolower(static_cast<unsigned char>(str[3])) == 'e');
+}
 
 // Split string by delimiter.
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim = " ");
@@ -286,6 +307,11 @@ bool StringTo(const std::string& str, T& val, int base = 10) {
 
 template <class T>
 bool StringTo(const std::string_view& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+template <class T>
+bool StringTo(const StringView& str, T& val, int base = 10) {
     return StringTo(str.data(), str.data() + str.size(), val, base);
 }
 

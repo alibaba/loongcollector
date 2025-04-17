@@ -151,7 +151,7 @@ void CommonUtilUnittest::TestTraceIDConversion() {
     std::string expected;
     for (size_t i = 0; i < traceId.size(); ++i) {
         char buf[17];
-        snprintf(buf, sizeof(buf), "%016x", traceId[i]);
+        snprintf(buf, sizeof(buf), "%016lx", traceId[i]);
         expected += buf;
     }
     APSARA_TEST_EQUAL(hexString, expected);
@@ -171,7 +171,7 @@ void CommonUtilUnittest::TestSpanIDConversion() {
     std::string expected;
     for (size_t i = 0; i < spanId.size(); ++i) {
         char buf[17];
-        snprintf(buf, sizeof(buf), "%016x", spanId[i]);
+        snprintf(buf, sizeof(buf), "%016lx", spanId[i]);
         expected += buf;
     }
     APSARA_TEST_EQUAL(hexString, expected);
@@ -240,13 +240,13 @@ void CommonUtilUnittest::TestReset() {
     // 第一次重置
     manager.Reset(now);
     APSARA_TEST_EQUAL(manager.Next(), now + period);
-    APSARA_TEST_EQUAL(manager.Count(), 1);
+    APSARA_TEST_EQUAL(manager.Count(), 1U);
 
     // 第二次重置
     auto nextTime = now + std::chrono::milliseconds(200);
     manager.Reset(nextTime);
     APSARA_TEST_EQUAL(manager.Next(), nextTime + period);
-    APSARA_TEST_EQUAL(manager.Count(), 2);
+    APSARA_TEST_EQUAL(manager.Count(), 2U);
 }
 
 void CommonUtilUnittest::TestCycleCount() {
@@ -259,17 +259,17 @@ void CommonUtilUnittest::TestCycleCount() {
     auto now = std::chrono::steady_clock::now();
 
     // 验证初始计数
-    APSARA_TEST_EQUAL(manager.Count(), 0);
+    APSARA_TEST_EQUAL(manager.Count(), 0U);
 
     // 连续重置几次，验证计数增加
     manager.Reset(now);
-    APSARA_TEST_EQUAL(manager.Count(), 1);
+    APSARA_TEST_EQUAL(manager.Count(), 1U);
 
     manager.Reset(now + std::chrono::milliseconds(100));
-    APSARA_TEST_EQUAL(manager.Count(), 2);
+    APSARA_TEST_EQUAL(manager.Count(), 2U);
 
     manager.Reset(now + std::chrono::milliseconds(200));
-    APSARA_TEST_EQUAL(manager.Count(), 3);
+    APSARA_TEST_EQUAL(manager.Count(), 3U);
 }
 
 void CommonUtilUnittest::TestMultipleCycles() {
@@ -287,7 +287,7 @@ void CommonUtilUnittest::TestMultipleCycles() {
         auto cycleTime = now + std::chrono::milliseconds(i * 100);
         APSARA_TEST_TRUE(manager.Expired(cycleTime));
         manager.Reset(cycleTime);
-        APSARA_TEST_EQUAL(manager.Count(), i + 1);
+        APSARA_TEST_EQUAL(manager.Count(), uint32_t(i + 1));
         APSARA_TEST_EQUAL(manager.Next(), cycleTime + period);
     }
 }

@@ -162,7 +162,7 @@ void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGrou
     }
 
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE)) {
-        autoMetric.mUp = StringTo<bool>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
+        autoMetric.mUp = StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
     }
 }
 

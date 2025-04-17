@@ -18,12 +18,16 @@
 
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
-namespace logtail::ebpf {
-AbstractManager::AbstractManager(std::shared_ptr<ProcessCacheManager>& processCacheMgr,
-                                 std::shared_ptr<SourceManager>&& sourceManager,
+namespace logtail {
+namespace ebpf {
+AbstractManager::AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheMgr,
+                                 const std::shared_ptr<SourceManager>& sourceManager,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                 PluginMetricManagerPtr&& mgr)
-    : mProcessCacheManager(processCacheMgr), mSourceManager(sourceManager), mCommonEventQueue(queue), mMetricMgr(mgr) {
+                                 const PluginMetricManagerPtr& metricManager)
+    : mProcessCacheManager(processCacheMgr),
+      mSourceManager(sourceManager),
+      mCommonEventQueue(queue),
+      mMetricMgr(metricManager) {
     if (!mMetricMgr) {
         return;
     }

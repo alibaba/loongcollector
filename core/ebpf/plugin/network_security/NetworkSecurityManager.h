@@ -35,18 +35,18 @@ public:
     static const std::string kTcpCloseValue;
     static const std::string kTcpConnectValue;
 
-    NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
-                           std::shared_ptr<SourceManager> sourceManager,
+    NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
+                           const std::shared_ptr<SourceManager>& sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           PluginMetricManagerPtr mgr);
+                           const PluginMetricManagerPtr& metricManager);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
-    Create(std::shared_ptr<ProcessCacheManager>& mgr,
-           std::shared_ptr<SourceManager> sourceManager,
+    Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+           const std::shared_ptr<SourceManager>& sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           PluginMetricManagerPtr metricMgr) {
-        return std::make_shared<NetworkSecurityManager>(mgr, sourceManager, queue, metricMgr);
+           const PluginMetricManagerPtr& metricMgr) {
+        return std::make_shared<NetworkSecurityManager>(processCacheManager, sourceManager, queue, metricMgr);
     }
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;

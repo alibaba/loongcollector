@@ -80,9 +80,9 @@ private:
     bool fillProcessDataFields(const msg_execve_event& event, ProcessCacheValue& cacheValue);
     std::shared_ptr<ProcessCacheValue> msgCloneEventToProcessCacheValue(const msg_clone_event& event);
 
-    // NOT thread-safe
+    // thread-safe
     void dataAdd(msg_data* data);
-    // NOT thread-safe
+    // thread-safe
     std::string dataGetAndRemove(const data_event_desc* desc);
     // NOT thread-safe
     void clearExpiredData(time_t ktime);

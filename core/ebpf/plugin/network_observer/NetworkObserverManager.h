@@ -49,20 +49,20 @@ public:
 class NetworkObserverManager : public AbstractManager {
 public:
     static std::shared_ptr<NetworkObserverManager>
-    Create(std::shared_ptr<ProcessCacheManager>& mgr,
-           std::shared_ptr<SourceManager> sourceManager,
+    Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+           const std::shared_ptr<SourceManager>& sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           PluginMetricManagerPtr metricMgr) {
-        return std::make_shared<NetworkObserverManager>(mgr, sourceManager, queue, metricMgr);
+           const PluginMetricManagerPtr& metricManager) {
+        return std::make_shared<NetworkObserverManager>(processCacheManager, sourceManager, queue, metricManager);
     }
 
     NetworkObserverManager() = delete;
     ~NetworkObserverManager() override { LOG_INFO(sLogger, ("begin destruct plugin", "network_observer")); }
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
-    NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                           std::shared_ptr<SourceManager> sourceManager,
+    NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                           const std::shared_ptr<SourceManager>& sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           PluginMetricManagerPtr mgr);
+                           const PluginMetricManagerPtr& metricManager);
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 

@@ -181,8 +181,14 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
         proc.ktime = i * 1000000000UL;
         proc.pktime = (i - 1) * 1000000000UL;
         proc.auid = i + 500;
-        proc.uids = {i + 500, i + 500, i + 500, i + 500}; // Real UID, Effective UID, Saved Set-UID, Filesystem UID
-        proc.gids = {i + 500, i + 500, i + 500, i + 500};
+        proc.realUid = i + 500;
+        proc.effectiveUid = i + 500;
+        proc.savedUid = i + 500;
+        proc.fsUid = i + 500;
+        proc.realGid = i + 500;
+        proc.effectiveGid = i + 500;
+        proc.savedGid = i + 500;
+        proc.fsGid = i + 500;
         proc.tid = proc.pid;
         proc.nspid = proc.pid;
         proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID);
@@ -229,8 +235,14 @@ void ProcessCacheManagerUnittest::TestListRunningProcs() {
         APSARA_TEST_EQUAL(proc->ppid, expected.ppid);
         APSARA_TEST_EQUAL(proc->ktime, expected.ktime);
         APSARA_TEST_EQUAL(proc->auid, expected.auid);
-        APSARA_TEST_EQUAL(proc->uids, expected.uids);
-        APSARA_TEST_EQUAL(proc->gids, expected.gids);
+        APSARA_TEST_EQUAL(proc->realUid, expected.realUid);
+        APSARA_TEST_EQUAL(proc->effectiveUid, expected.effectiveUid);
+        APSARA_TEST_EQUAL(proc->savedUid, expected.savedUid);
+        APSARA_TEST_EQUAL(proc->fsUid, expected.fsUid);
+        APSARA_TEST_EQUAL(proc->realGid, expected.realGid);
+        APSARA_TEST_EQUAL(proc->effectiveGid, expected.effectiveGid);
+        APSARA_TEST_EQUAL(proc->savedGid, expected.savedGid);
+        APSARA_TEST_EQUAL(proc->fsGid, expected.fsGid);
         APSARA_TEST_EQUAL(proc->tid, expected.tid);
         APSARA_TEST_EQUAL(proc->nspid, expected.nspid);
         APSARA_TEST_EQUAL(proc->flags, expected.flags);

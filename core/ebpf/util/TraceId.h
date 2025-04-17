@@ -14,10 +14,9 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
+#include <spdlog/spdlog.h>
 
-#include "spdlog/spdlog.h"
+#include <array>
 
 namespace logtail::ebpf {
 
@@ -26,7 +25,7 @@ std::string FromRandom64ID(const std::array<uint64_t, N>& id) {
     std::string result;
     result.reserve(N << 4);
     for (size_t i = 0; i < N; i++) {
-        fmt::format_to(std::back_inserter(result), "{:016x}", id[i]);
+        fmt::format_to(std::back_inserter(result), "{:016lx}", id[i]);
     }
     return result;
 }

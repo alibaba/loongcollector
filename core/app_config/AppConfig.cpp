@@ -190,7 +190,7 @@ void CreateAgentDir() {
     try {
         const char* value = getenv("LOGTAIL_MODE");
         if (value != NULL) {
-            STRING_FLAG(logtail_mode) = StringTo<bool>(value);
+            STRING_FLAG(logtail_mode) = StringTo(value);
         }
     } catch (const exception& e) {
         std::cout << "load config from env error, env_name:LOGTAIL_MODE, error:" << e.what() << std::endl;
@@ -204,8 +204,8 @@ void CreateAgentDir() {
     try { \
         const auto env_name = GetLoongcollectorEnv(#flag_name); \
         const char* value = getenv(env_name.c_str()); \
-        if (value != NULL) { \
-            STRING_FLAG(flag_name) = StringTo<string>(value); \
+        if (value != nullptr) { \
+            STRING_FLAG(flag_name) = value; \
         } \
     } catch (const exception& e) { \
         std::cout << "load config from env error, env_name:" << #flag_name << "\terror:" << e.what() << std::endl; \

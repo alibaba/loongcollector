@@ -58,10 +58,10 @@ TEST_F(StringToolsUnittest, TestEndWith) {
 }
 
 TEST_F(StringToolsUnittest, TestStringToBoolean) {
-    EXPECT_TRUE(StringTo<bool>("true"));
-    EXPECT_FALSE(StringTo<bool>("false"));
-    EXPECT_FALSE(StringTo<bool>("any"));
-    EXPECT_FALSE(StringTo<bool>(""));
+    EXPECT_TRUE(StringTo("true"));
+    EXPECT_FALSE(StringTo("false"));
+    EXPECT_FALSE(StringTo("any"));
+    EXPECT_FALSE(StringTo(""));
 }
 
 TEST_F(StringToolsUnittest, TestReplaceString) {

@@ -35,17 +35,17 @@ public:
     inline static constexpr StringView kExitValue = "exit";
 
     ProcessSecurityManager() = delete;
-    ProcessSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                           std::shared_ptr<SourceManager> sourceManager,
+    ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                           const std::shared_ptr<SourceManager>& sourceManager,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           PluginMetricManagerPtr mgr);
+                           const PluginMetricManagerPtr& metricManager);
 
     static std::shared_ptr<ProcessSecurityManager>
-    Create(std::shared_ptr<ProcessCacheManager>& mgr,
-           std::shared_ptr<SourceManager>& sourceManager,
+    Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+           const std::shared_ptr<SourceManager>& sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           PluginMetricManagerPtr metricMgr) {
-        return std::make_shared<ProcessSecurityManager>(mgr, sourceManager, queue, metricMgr);
+           const PluginMetricManagerPtr& metricMgr) {
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, sourceManager, queue, metricMgr);
     }
 
     ~ProcessSecurityManager() = default;

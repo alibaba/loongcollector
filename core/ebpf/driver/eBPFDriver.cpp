@@ -41,16 +41,17 @@ int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     return 0;
 }
 
-void bump_memlock_rlimit(void) {
+int bump_memlock_rlimit(void) {
     struct rlimit rlim_new = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY,
     };
 
-    if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-        fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
-        exit(1);
+    if (0 != setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+        return -1;
     }
+    return 0;
 }
 
 std::mutex gPbMtx;
@@ -138,7 +139,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 2. start consumer
     // 3. attach prog
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "enter start_plugin, arg is null: %d \n", arg == nullptr);
-    bump_memlock_rlimit();
+    if (0 != bump_memlock_rlimit()) {
+        return -1;
+    }
 
     switch (arg->mPluginType) {
         case logtail::ebpf::PluginType::NETWORK_OBSERVE: {

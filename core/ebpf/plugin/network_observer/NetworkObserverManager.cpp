@@ -115,11 +115,26 @@ enum {
     TCP_MAX_STATES = 13,
 };
 
-NetworkObserverManager::NetworkObserverManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                                               std::shared_ptr<SourceManager> sourceManager,
+enum class JobType {
+    METRIC_AGG,
+    SPAN_AGG,
+    LOG_AGG,
+    HOST_META_UPDATE,
+};
+
+class NetworkObserverScheduleConfig : public ScheduleConfig {
+public:
+    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
+        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
+
+    JobType mJobType;
+};
+
+NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                                               const std::shared_ptr<SourceManager>& sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               PluginMetricManagerPtr mgr)
-    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(mgr)),
+                                               const PluginMetricManagerPtr& metricManager)
+    : AbstractManager(processCacheManager, sourceManager, queue, metricManager),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractRecord>& o) {
@@ -1046,8 +1061,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
                 spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(record->GetRespBodySize()));
                 spanEvent->SetTag(kHTTPVersion.SpanKey(), record->GetProtocolVersion());
 
-                struct timespec startTime = KernelTimeNanoToUTC(record->GetStartTimeStamp());
-                struct timespec endTime = KernelTimeNanoToUTC(record->GetEndTimeStamp());
+                struct timespec startTime = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
+                struct timespec endTime = ConvertKernelTimeToUnixTime(record->GetEndTimeStamp());
                 spanEvent->SetStartTimeNs(startTime.tv_sec * 1000000000 + startTime.tv_nsec);
                 spanEvent->SetEndTimeNs(endTime.tv_sec * 1000000000 + endTime.tv_nsec);
                 spanEvent->SetTimestamp(startTime.tv_sec, startTime.tv_nsec);
@@ -1212,7 +1227,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     const char* value = getenv("_cluster_id_");
     if (value != nullptr) {
-        mClusterId = StringTo<std::string>(value);
+        mClusterId = value;
     }
 
     auto now = std::chrono::steady_clock::now();

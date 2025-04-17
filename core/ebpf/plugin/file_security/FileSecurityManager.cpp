@@ -90,11 +90,11 @@ void FileSecurityManager::RecordFileEvent(file_data_t* event) {
     mCommonEventQueue.enqueue(std::move(evt));
 }
 
-FileSecurityManager::FileSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                                         std::shared_ptr<SourceManager> sourceManager,
+FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
+                                         const std::shared_ptr<SourceManager>& sourceManager,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                         PluginMetricManagerPtr mgr)
-    : AbstractManager(baseMgr, std::move(sourceManager), queue, std::move(mgr)),
+                                         const PluginMetricManagerPtr& metricManager)
+    : AbstractManager(baseMgr, sourceManager, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -148,7 +148,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-                struct timespec ts = KernelTimeNanoToUTC(innerEvent->mTimestamp);
+                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
                 logEvent->SetContent(FileSecurityManager::sPathKey, group->mPath);
                 // set callnames

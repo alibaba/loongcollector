@@ -99,11 +99,11 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 }
 
 
-NetworkSecurityManager::NetworkSecurityManager(std::shared_ptr<ProcessCacheManager>& base,
-                                               std::shared_ptr<SourceManager> sourceManager,
+NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
+                                               const std::shared_ptr<SourceManager>& sourceManager,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               PluginMetricManagerPtr mgr)
-    : AbstractManager(base, std::move(sourceManager), queue, std::move(mgr)),
+                                               const PluginMetricManagerPtr& metricManager)
+    : AbstractManager(base, sourceManager, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -181,7 +181,7 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
                 logEvent->SetContentNoCopy(kDport.LogKey(), StringView(dportSb.data, dportSb.size));
                 logEvent->SetContentNoCopy(kNetNs.LogKey(), StringView(netnsSb.data, netnsSb.size));
 
-                struct timespec ts = KernelTimeNanoToUTC(innerEvent->mTimestamp);
+                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
 
                 // set callnames

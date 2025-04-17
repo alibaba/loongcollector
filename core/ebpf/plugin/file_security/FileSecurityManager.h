@@ -34,17 +34,17 @@ public:
     static const std::string sPermissionValue;
 
     FileSecurityManager() = delete;
-    FileSecurityManager(std::shared_ptr<ProcessCacheManager>& baseMgr,
-                        std::shared_ptr<SourceManager> sourceManager,
+    FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
+                        const std::shared_ptr<SourceManager>& sourceManager,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        PluginMetricManagerPtr mgr);
+                        const PluginMetricManagerPtr& metricManager);
 
     static std::shared_ptr<FileSecurityManager>
-    Create(std::shared_ptr<ProcessCacheManager>& mgr,
-           std::shared_ptr<SourceManager> sourceManager,
+    Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+           const std::shared_ptr<SourceManager>& sourceManager,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           PluginMetricManagerPtr metricMgr) {
-        return std::make_shared<FileSecurityManager>(mgr, sourceManager, queue, metricMgr);
+           const PluginMetricManagerPtr& metricMgr) {
+        return std::make_shared<FileSecurityManager>(processCacheManager, sourceManager, queue, metricMgr);
     }
 
     ~FileSecurityManager() {}

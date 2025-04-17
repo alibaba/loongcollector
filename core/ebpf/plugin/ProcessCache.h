@@ -15,7 +15,6 @@
 
 #include <coolbpf/security/data_msg.h>
 #include <cstdint>
-#include <spdlog/fmt/bundled/format.h>
 
 #include <deque>
 #include <mutex>
@@ -132,6 +131,8 @@ public:
     void ClearCache();
     // NOT thread-safe, only single write call, no contention with read
     void ClearExpiredCache(time_t ktime);
+
+    void PrintDebugInfo();
 
 private:
     // thread-safe, only single write call, but contention with read

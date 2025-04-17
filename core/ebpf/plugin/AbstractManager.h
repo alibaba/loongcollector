@@ -43,10 +43,10 @@ public:
     inline static constexpr StringView kKprobeValue = "kprobe";
 
     AbstractManager() = delete;
-    explicit AbstractManager(std::shared_ptr<ProcessCacheManager>&,
-                             std::shared_ptr<SourceManager>&& sourceManager,
+    explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                             const std::shared_ptr<SourceManager>& sourceManager,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             PluginMetricManagerPtr&& mgr);
+                             const PluginMetricManagerPtr& metricManager);
     virtual ~AbstractManager();
 
     virtual int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;

@@ -411,7 +411,6 @@ long GetTicksPerSecond() {
 }
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
-    LOG_INFO(sLogger, ("enter", "aaa"));
 #if defined(__linux__)
     struct timespec t;
     int ret = clock_gettime(CLOCK_MONOTONIC, &t);
@@ -428,7 +427,7 @@ std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
 #endif
 }
 
-struct timespec KernelTimeNanoToUTC(uint64_t nano) {
+struct timespec ConvertKernelTimeToUnixTime(uint64_t nano) {
     static auto diff = GetTimeDiffFromMonotonic().count();
     auto ts = std::chrono::nanoseconds(nano + diff);
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);

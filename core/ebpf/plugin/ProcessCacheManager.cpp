@@ -97,6 +97,10 @@ void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long cnt) {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+/* Decode rawArgs to readable args string
+ * @param rawArgs: \0 separated arg buffer, e.g. arg1\0arg 2\0arg"3"
+ * @return: decoded args string, e.g. arg1 "arg 2" arg\"3\"
+ */
 std::string DecodeArgs(StringView& rawArgs) {
     std::string args;
     if (rawArgs.empty()) {
@@ -208,14 +212,19 @@ void ProcessCacheManager::UpdateLossEventTotal(uint64_t count) {
 void ProcessCacheManager::RecordExecveEvent(msg_execve_event* eventPtr) {
     auto cacheValue = msgExecveEventToProcessCacheValue(*eventPtr);
     mProcessCache.IncRef({cacheValue->mPPid, cacheValue->mPKtime});
+    LOG_DEBUG(sLogger, ("push execve event. IncRef pid", cacheValue->mPPid)("ktime", cacheValue->mPKtime));
     mProcessCache.AddCache({eventPtr->process.pid, eventPtr->process.ktime}, std::move(cacheValue));
+    LOG_DEBUG(sLogger, ("push execve event. AddCache pid", eventPtr->process.pid)("ktime", eventPtr->process.ktime));
 
     if (eventPtr->cleanup_key.ktime != 0) {
-        mProcessCache.DecRef({eventPtr->cleanup_key.pid, eventPtr->cleanup_key.ktime}, eventPtr->common.ktime);
         auto parent = mProcessCache.Lookup({eventPtr->cleanup_key.pid, eventPtr->cleanup_key.ktime});
         if (parent) { // dec grand parent's ref count
             mProcessCache.DecRef({parent->mPPid, parent->mPKtime}, eventPtr->common.ktime);
+            LOG_DEBUG(sLogger, ("push execve event. DecRef pid", parent->mPPid)("ktime", parent->mPKtime));
         }
+        mProcessCache.DecRef({eventPtr->cleanup_key.pid, eventPtr->cleanup_key.ktime}, eventPtr->common.ktime);
+        LOG_DEBUG(sLogger,
+                  ("push execve event. DecRef pid", eventPtr->cleanup_key.pid)("ktime", eventPtr->cleanup_key.ktime));
     }
     if (mFlushProcessEvent) {
         auto processEvent = std::make_shared<ProcessEvent>(eventPtr->process.pid,
@@ -239,7 +248,9 @@ void ProcessCacheManager::RecordExitEvent(msg_exit* eventPtr) {
     auto cacheValue = mProcessCache.Lookup({eventPtr->current.pid, eventPtr->current.ktime});
     if (cacheValue) { // dec self and parent's ref
         mProcessCache.DecRef({cacheValue->mPPid, cacheValue->mPKtime}, eventPtr->common.ktime);
+        LOG_DEBUG(sLogger, ("push exit event. DecRef pid", cacheValue->mPPid)("ktime", cacheValue->mPKtime));
         mProcessCache.DecRef({eventPtr->current.pid, eventPtr->current.ktime}, eventPtr->common.ktime);
+        LOG_DEBUG(sLogger, ("push exit event. DecRef pid", eventPtr->current.pid)("ktime", eventPtr->current.ktime));
     }
     if (mFlushProcessEvent) {
         auto event = std::make_shared<ProcessExitEvent>(eventPtr->current.pid,
@@ -261,7 +272,9 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
         return;
     }
     mProcessCache.IncRef({eventPtr->parent.pid, eventPtr->parent.ktime});
+    LOG_DEBUG(sLogger, ("push clone event. IncRef pid", eventPtr->parent.pid)("ktime", eventPtr->parent.ktime));
     mProcessCache.AddCache({eventPtr->tgid, eventPtr->ktime}, std::move(cacheValue));
+    LOG_DEBUG(sLogger, ("push clone event. AddCache pid", eventPtr->tgid)("ktime", eventPtr->ktime));
     if (mFlushProcessEvent) {
         auto event = std::make_shared<ProcessEvent>(static_cast<uint32_t>(eventPtr->tgid),
                                                     static_cast<uint64_t>(eventPtr->ktime),
@@ -275,8 +288,10 @@ void ProcessCacheManager::RecordCloneEvent(msg_clone_event* eventPtr) {
     // restrict memory usage in abnormal conditions
     // if we cannot clear old data, just clear all
     // TODO: maybe we can iterate over the /proc folder and remove unexisting entries
-    if (mProcessCache.Size() > kMaxCacheSize) {
+    // if (mProcessCache.Size() > kMaxCacheSize) {
+    if (mProcessCache.Size() > 3000) {
         LOG_WARNING(sLogger, ("process cache size exceed limit", kMaxCacheSize)("size", mProcessCache.Size()));
+        mProcessCache.PrintDebugInfo();
         mProcessCache.ClearCache();
     }
 }
@@ -467,6 +482,7 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
 void ProcessCacheManager::pushProcEvent(const Proc& proc) {
     std::shared_ptr<ProcessCacheValue> cacheValue = procToProcessCacheValue(proc);
     mProcessCache.AddCache({proc.pid, proc.ktime}, std::move(cacheValue));
+    LOG_DEBUG(sLogger, ("push proc event. AddCache pid", proc.pid)("ktime", proc.ktime));
 }
 
 void ProcessCacheManager::pollPerfBuffers() {
@@ -519,8 +535,8 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::procToProcessCacheValue(
         // event.process.flags = static_cast<uint32_t>(EVENT_PROC_FS);
     } else {
         cacheValue->SetContent<kBinary>(proc.exe);
-        cacheValue->SetContent<kUid>(proc.uids[1]);
-        auto userName = mProcParser.GetUserNameByUid(proc.uids[1]);
+        cacheValue->SetContent<kUid>(proc.effectiveUid);
+        auto userName = mProcParser.GetUserNameByUid(proc.effectiveUid);
         auto permitted = GetCapabilities(proc.permitted, *cacheValue->GetSourceBuffer());
         auto effective = GetCapabilities(proc.effective, *cacheValue->GetSourceBuffer());
         auto inheritable = GetCapabilities(proc.inheritable, *cacheValue->GetSourceBuffer());

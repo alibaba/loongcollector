@@ -52,7 +52,7 @@ void TimeUtilUnittest::TestBootTimeDiff() {
 }
 
 void TimeUtilUnittest::TestKernelTimeToUTC() {
-    auto ts = KernelTimeNanoToUTC(1000);
+    auto ts = ConvertKernelTimeToUnixTime(1000);
     APSARA_TEST_GE(ts.tv_nsec, 1000);
 }
 

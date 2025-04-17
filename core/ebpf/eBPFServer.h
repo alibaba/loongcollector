@@ -17,14 +17,12 @@
 #include <array>
 #include <atomic>
 #include <future>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <variant>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/SourceManager.h"
 #include "ebpf/include/export.h"
@@ -79,8 +77,8 @@ public:
                       uint32_t pluginIndex,
                       PluginType type,
                       const logtail::CollectionPipelineContext* ctx,
-                      const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
-                      PluginMetricManagerPtr mgr);
+                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                      const PluginMetricManagerPtr& mgr);
 
     bool DisablePlugin(const std::string& pipelineName, PluginType type);
 
@@ -105,12 +103,12 @@ private:
                              uint32_t pluginIndex,
                              PluginType type,
                              const logtail::CollectionPipelineContext* ctx,
-                             const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
-                             PluginMetricManagerPtr mgr);
+                             const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                             const PluginMetricManagerPtr& metricManager);
     eBPFServer() : mSourceManager(std::make_shared<SourceManager>()), mDataEventQueue(4096) {}
 
     void
-    updateCBContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
+    updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
 
     std::shared_ptr<SourceManager> mSourceManager;
 

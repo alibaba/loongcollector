@@ -70,11 +70,6 @@ std::string ToString(const std::vector<std::string>& vec) {
     return ret;
 }
 
-template <>
-bool StringTo<bool>(const std::string& str) {
-    return str == "true";
-}
-
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim) {
     std::vector<std::string> tokens;
     boost::split(tokens, str, boost::is_any_of(delim));

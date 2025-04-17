@@ -25,8 +25,16 @@ Proc CreateStubProc() {
     static const char environ[] = "PATH=/usr/bin\0USER=root\0HOME=/root";
     proc.environ = std::string(environ, sizeof(environ) - 1);
 
-    proc.uids = {0, 0, 0, 0};
-    proc.gids = {0, 0, 0, 0};
+    proc.realUid = 0;
+    proc.effectiveUid = 0;
+    proc.savedUid = 0;
+    proc.fsUid = 0;
+
+    proc.realGid = 0;
+    proc.effectiveGid = 0;
+    proc.savedGid = 0;
+    proc.fsGid = 0;
+
     proc.auid = 0;
 
     proc.inheritable = 0;
@@ -68,7 +76,7 @@ class ProcFsStub {
             std::ofstream stat(pidDir / "stat");
             stat << proc.pid << " (" << proc.comm << ") S " << proc.ppid
                  << " 1 1 0 -1 4194560 26161309 468512616 0 5596 6902 28376 5714130 192403 20 0 1 0 "
-                 << proc.ktime / (kNanoPerSeconds / GetTicksPerSecond())
+                 << proc.ktime * GetTicksPerSecond() / kNanoPerSeconds
                  << " 5578752 645 "
                     "18446744073709551615 4194304 5100836 140725119433184 0 0 0 65536 4 81922 0 0 0 17 10 0 0 0 0 0 "
                     "7200240 "
@@ -79,15 +87,17 @@ class ProcFsStub {
             std::ofstream status(pidDir / "status");
             status << "Name:   " << proc.comm << "\n"
                    << "NStgid: " << proc.pid << "\n"
-                   << "Uid:    " << proc.uids[0] << "    " << proc.uids[1] << "    " << proc.uids[2] << "    "
-                   << proc.uids[3] << "\n"
-                   << "Gid:    " << proc.gids[0] << "    " << proc.gids[1] << "    " << proc.gids[2] << "    "
-                   << proc.gids[3] << "\n"
-                   << std::hex << std::setw(16) << std::setfill('0') << "CapInh: " << proc.inheritable << "\n"
-                   << "CapPrm: " << proc.permitted << "\n"
-                   << "CapEff: " << proc.effective << "\n"
-                   << std::dec << std::setw(0) << std::setfill(' ');
+                   << "Uid:    " << proc.realUid << "\t" << proc.effectiveUid << "\t" << proc.savedUid << "\t"
+                   << proc.fsUid << "\n"
+                   << "Gid:    " << proc.realGid << "\t" << proc.effectiveGid << "\t" << proc.savedGid << "\t"
+                   << proc.fsGid << "\n"
+                   << std::hex << std::setfill('0') << "CapInh: " << std::setw(16) << proc.inheritable << "\n"
+                   << "CapPrm: " << std::setw(16) << proc.permitted << "\n"
+                   << "CapEff: " << std::setw(16) << proc.effective << "\n"
+                   << std::dec << std::setfill(' ');
         }
+        // std::ifstream status(pidDir / "status");
+        // std::cerr << status.rdbuf();
 
         // Create loginuid file
         { std::ofstream(pidDir / "loginuid") << proc.auid; }
