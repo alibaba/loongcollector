@@ -23,7 +23,7 @@
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
-#include "plugin/input/InputFileSecurity.h"
+// #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
@@ -42,13 +42,13 @@ public:
     void TestNetworkObserver();
     void TestProcessSecurity();
     void TestNetworkSecurity();
-    void TestFileSecurity();
+    // void TestFileSecurity();
 
     // for start and stop all ...
     void TestAllStartAndStop();
 
     // for update scenario ...
-    void TestUpdateFileSecurity();
+    // void TestUpdateFileSecurity();
     void TestUpdateNetworkSecurity();
 
     void TestLoadEbpfParametersV1();
@@ -200,51 +200,51 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     EXPECT_TRUE(res);
 }
 
-void eBPFServerUnittest::TestFileSecurity() {
-    std::string configStr = R"(
-        {
-            "Type": "input_file_security",
-            "ProbeConfig":
-            {
-                "FilePathFilter": [
-                    "/etc/passwd",
-                    "/etc/shadow",
-                    "/bin"
-                ]
-            }
-        }
-    )";
+// void eBPFServerUnittest::TestFileSecurity() {
+//     std::string configStr = R"(
+//         {
+//             "Type": "input_file_security",
+//             "ProbeConfig":
+//             {
+//                 "FilePathFilter": [
+//                     "/etc/passwd",
+//                     "/etc/shadow",
+//                     "/bin"
+//                 ]
+//             }
+//         }
+//     )";
 
-    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+//     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
 
-    std::string errorMsg;
-    Json::Value configJson, optionalGoPipeline;
+//     std::string errorMsg;
+//     Json::Value configJson, optionalGoPipeline;
 
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 
-    input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
-    auto initStatus = input->Init(configJson, optionalGoPipeline);
-    APSARA_TEST_TRUE(initStatus);
+//     input->SetContext(ctx);
+//     input->SetMetricsRecordRef("test", "1");
+//     auto initStatus = input->Init(configJson, optionalGoPipeline);
+//     APSARA_TEST_TRUE(initStatus);
 
-    ctx.SetConfigName("test-1");
-    auto res = input->Start();
-    EXPECT_TRUE(res);
+//     ctx.SetConfigName("test-1");
+//     auto res = input->Start();
+//     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    // stop
-    res = input->Stop(true);
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+//     // stop
+//     res = input->Stop(true);
+//     EXPECT_TRUE(res);
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    // re-run...
-    input->Start();
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    res = input->Stop(true);
-    EXPECT_TRUE(res);
-}
+//     // re-run...
+//     input->Start();
+//     EXPECT_TRUE(res);
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
+//     res = input->Stop(true);
+//     EXPECT_TRUE(res);
+// }
 
 void eBPFServerUnittest::TestProcessSecurity() {
     std::string configStr = R"(
@@ -283,64 +283,64 @@ void eBPFServerUnittest::TestProcessSecurity() {
     EXPECT_TRUE(res);
 }
 
-void eBPFServerUnittest::TestUpdateFileSecurity() {
-    std::string configStr = R"(
-        {
-            "Type": "input_file_security",
-            "ProbeConfig":
-            {
-                "FilePathFilter": [
-                    "/etc/passwd",
-                    "/etc/shadow",
-                    "/bin"
-                ]
-            }
-        }
-    )";
+// void eBPFServerUnittest::TestUpdateFileSecurity() {
+//     std::string configStr = R"(
+//         {
+//             "Type": "input_file_security",
+//             "ProbeConfig":
+//             {
+//                 "FilePathFilter": [
+//                     "/etc/passwd",
+//                     "/etc/shadow",
+//                     "/bin"
+//                 ]
+//             }
+//         }
+//     )";
 
-    ctx.SetConfigName("test-pipeline-1");
-    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
-    input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+//     ctx.SetConfigName("test-pipeline-1");
+//     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+//     input->SetContext(ctx);
+//     input->SetMetricsRecordRef("test", "1");
 
-    std::string errorMsg;
-    Json::Value configJson, optionalGoPipeline;
-    ;
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    auto res = input->Init(configJson, optionalGoPipeline);
-    res = input->Start();
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    // suspend
-    res = input->Stop(false);
-    EXPECT_TRUE(res);
+//     std::string errorMsg;
+//     Json::Value configJson, optionalGoPipeline;
+//     ;
+//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+//     auto res = input->Init(configJson, optionalGoPipeline);
+//     res = input->Start();
+//     EXPECT_TRUE(res);
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
+//     // suspend
+//     res = input->Stop(false);
+//     EXPECT_TRUE(res);
 
-    // resume ...
-    input = std::make_shared<InputFileSecurity>();
-    configStr = R"(
-        {
-            "Type": "input_file_security",
-            "ProbeConfig":
-            {
-                "FilePathFilter": [
-                    "/lib"
-                ]
-            }
-        }
-    )";
-    input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "2");
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    res = input->Init(configJson, optionalGoPipeline);
-    EXPECT_TRUE(res);
-    res = input->Start();
-    EXPECT_TRUE(res);
+//     // resume ...
+//     input = std::make_shared<InputFileSecurity>();
+//     configStr = R"(
+//         {
+//             "Type": "input_file_security",
+//             "ProbeConfig":
+//             {
+//                 "FilePathFilter": [
+//                     "/lib"
+//                 ]
+//             }
+//         }
+//     )";
+//     input->SetContext(ctx);
+//     input->SetMetricsRecordRef("test", "2");
+//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+//     res = input->Init(configJson, optionalGoPipeline);
+//     EXPECT_TRUE(res);
+//     res = input->Start();
+//     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    res = input->Stop(true);
-    EXPECT_TRUE(res);
-}
+//     res = input->Stop(true);
+//     EXPECT_TRUE(res);
+// }
 
 void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     std::string configStr = R"(

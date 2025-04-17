@@ -34,7 +34,7 @@
 #include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
-#include "plugin/input/InputFileSecurity.h"
+// #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputNetworkObserver.h"
@@ -151,9 +151,9 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     }
-    if (BOOL_FLAG(enable_ebpf_file_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
-    }
+    // if (BOOL_FLAG(enable_ebpf_file_secure)) {
+    //     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    // }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
