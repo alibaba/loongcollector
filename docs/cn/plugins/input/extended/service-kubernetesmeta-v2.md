@@ -57,6 +57,11 @@
 | Namespace2CronJob | string, 无默认值（可选） | Namespace到CronJob的关系名，不填则不生成关系。 |
 | Namespace2PersistentVolumeClaim | string, 无默认值（可选） | Namespace到PersistentVolumeClaim的关系名，不填则不生成关系。 |
 | Namespace2Ingress | string, 无默认值（可选） | Namespace到Ingress的关系名，不填则不生成关系。 |
+| Cluster2Namespace | string, 无默认值（可选） | Cluster到Namespace的关系名，不填则不生成关系。 |
+| Cluster2Node | string, 无默认值（可选） | Cluster到Node的关系名，不填则不生成关系。 |
+| Cluster2PersistentVolume | string, 无默认值（可选） | Cluster到PersistentVolume的关系名，不填则不生成关系。 |
+| Cluster2StorageClass | string, 无默认值（可选） | Cluster到StorageClass的关系名，不填则不生成关系。 |
+
 
 ## 环境变量
 

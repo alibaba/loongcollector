@@ -60,6 +60,12 @@ type ServiceK8sMeta struct {
 	Namespace2StorageClass          string
 	Namespace2Ingress               string
 
+	// restrict cluster link dest target
+	Cluster2Node             string
+	Cluster2Namespace        string
+	Cluster2PersistentVolume string
+	Cluster2StorageClass     string
+
 	// other
 	context       pipeline.Context
 	metaManager   *k8smeta.MetaManager

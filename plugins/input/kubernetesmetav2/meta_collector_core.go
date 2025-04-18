@@ -231,7 +231,11 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storeage_requests", obj.Spec.Resources.Requests.Storage().String())
-		log.Contents.Add("storage_class_name", obj.Spec.StorageClassName)
+		if obj.Spec.StorageClassName != nil {
+			log.Contents.Add("storage_class_name", *obj.Spec.StorageClassName)
+		} else {
+			log.Contents.Add("storage_class_name", "")
+		}
 		log.Contents.Add("volume_name", obj.Spec.VolumeName)
 		return []models.PipelineEvent{log}
 	}
