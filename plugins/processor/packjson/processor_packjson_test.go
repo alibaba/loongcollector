@@ -77,5 +77,5 @@ func TestAlarmIfEmpty(t *testing.T) {
 	processor.processLog(log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
-	assert.Truef(t, strings.Contains(memoryLog, "PACK_JSON_ALARM\tSourceKeys not found [b]"), "got %s", memoryLog)
+	assert.Truef(t, strings.Contains(memoryLog, "PROCESSOR_PROCESS_ALARM\tprocessor_packjson SourceKeys not found [b]"), "got %s", memoryLog)
 }

@@ -21,6 +21,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -67,7 +68,7 @@ func (h *HostEnv) initSSHClient() {
 		Callback: ssh.InsecureIgnoreHostKey(),
 	})
 	if err != nil {
-		logger.Errorf(context.TODO(), "SSHExec", "error in create ssh client: %v", err)
+		logger.Errorf(context.TODO(), util.SshExecAlarm, "error in create ssh client: %v", err)
 		return
 	}
 	h.sshClient = client

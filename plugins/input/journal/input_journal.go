@@ -31,6 +31,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/coreos/go-systemd/sdjournal"
 )
@@ -126,9 +127,9 @@ func (sj *ServiceJournal) SaveCheckpoint(forceFlag bool) {
 		sj.ResetIntervalSecond = defaultResetInterval
 	}
 	if cursor, err := sj.journal.GetCursor(); err != nil {
-		logger.Error(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "get cursor error", err)
+		logger.Error(sj.context.GetRuntimeContext(), util.CheckpointAlarm, "save checkpoint error, get cursor error", err)
 	} else if err := sj.context.SaveCheckPoint(checkPointKey, []byte(cursor)); err != nil {
-		logger.Error(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "save checkpoint error", err)
+		logger.Error(sj.context.GetRuntimeContext(), util.CheckpointAlarm, "save checkpoint error", err)
 	}
 }
 
@@ -194,7 +195,7 @@ func (sj *ServiceJournal) initJournal() error {
 		if err == nil {
 			logger.Infof(sj.context.GetRuntimeContext(), "Seek to [%s] successful", position)
 		} else {
-			logger.Warningf(sj.context.GetRuntimeContext(), "JOURNAL_SEEK_ALARM", "Could not seek to %s: %v", position, err)
+			logger.Warningf(sj.context.GetRuntimeContext(), util.InputCollectAlarm, "Could not seek to %s: %v", position, err)
 		}
 		return err
 	}
@@ -265,7 +266,7 @@ func (sj *ServiceJournal) initJournal() error {
 		_ = seekToHelper(sj.lastCPCursor, sj.journal.SeekCursor(sj.lastCPCursor))
 		_, err = sj.journal.Next()
 		if err != nil {
-			logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "call next when init error", err)
+			logger.Warning(sj.context.GetRuntimeContext(), util.InputCollectAlarm, "call next when init error", err)
 			err = nil
 		}
 	}

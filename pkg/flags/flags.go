@@ -58,8 +58,9 @@ const (
 
 // LogInfo contains metadata about a log message
 type LogInfo struct {
-	LogType LogType
-	Content string
+	LogType   LogType
+	AlarmType util.AlarmType
+	Content   string
 }
 
 var (
@@ -265,8 +266,9 @@ func LoadEnvToFlags() {
 		getter, ok := f.Value.(flag.Getter)
 		if !ok {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
-				LogType: LogTypeError,
-				Content: fmt.Sprintf("Flag does not support Get operation, flag: %s, value: %s", flagName, oldValue),
+				LogType:   LogTypeError,
+				AlarmType: util.EnvFlagAlarm,
+				Content:   fmt.Sprintf("Flag does not support Get operation, flag: %s, value: %s", flagName, oldValue),
 			})
 			continue
 		}
@@ -288,24 +290,27 @@ func LoadEnvToFlags() {
 			// No validation needed
 		default:
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
-				LogType: LogTypeError,
-				Content: fmt.Sprintf("Unsupported flag type: %s (%T)", flagName, actualValue),
+				LogType:   LogTypeError,
+				AlarmType: util.EnvFlagAlarm,
+				Content:   fmt.Sprintf("Unsupported flag type: %s (%T)", flagName, actualValue),
 			})
 			continue
 		}
 
 		if err != nil {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
-				LogType: LogTypeError,
-				Content: fmt.Sprintf("Invalid value for flag %s (%T): %s - %v", flagName, actualValue, value, err),
+				LogType:   LogTypeError,
+				AlarmType: util.EnvFlagAlarm,
+				Content:   fmt.Sprintf("Invalid value for flag %s (%T): %s - %v", flagName, actualValue, value, err),
 			})
 			continue
 		}
 
 		if err := f.Value.Set(value); err != nil {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
-				LogType: LogTypeError,
-				Content: fmt.Sprintf("Failed to set flag %s: %v (old: %s, new: %s)", flagName, err, oldValue, value),
+				LogType:   LogTypeError,
+				AlarmType: util.EnvFlagAlarm,
+				Content:   fmt.Sprintf("Failed to set flag %s: %v (old: %s, new: %s)", flagName, err, oldValue, value),
 			})
 			continue
 		}
@@ -369,7 +374,7 @@ func GetFlusherConfiguration() (flusherCategory string, flusherOptions map[strin
 			m := make(map[string]interface{})
 			err := json.Unmarshal(cfg, &m)
 			if err != nil {
-				logger.Error(context.Background(), "DEFAULT_FLUSHER_ALARM", "err", err)
+				logger.Error(context.Background(), util.CategoryConfigAlarm, "default flusher err", err)
 				return "", nil, false
 			}
 			c, ok := m["type"].(string)
