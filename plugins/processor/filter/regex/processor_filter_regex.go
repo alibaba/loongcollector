@@ -19,6 +19,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -125,6 +126,94 @@ func (p *ProcessorRegexFilter) ProcessLogs(logArray []*protocol.Log) []*protocol
 	}
 	logArray = logArray[:nextIdx]
 	return logArray
+}
+
+func (p *ProcessorRegexFilter) isEventMatch(event models.PipelineEvent) bool {
+	if log, ok := event.(*models.Log); ok {
+		return p.isLogEventMatch(log)
+	}
+	tags := event.GetTags().Iterator()
+	for key, reg := range p.includeRegex {
+		if v, ok := tags[key]; ok && reg.MatchString(v) {
+			continue
+		}
+		return false
+	}
+	for key, reg := range p.excludeRegex {
+		if v, ok := tags[key]; ok && reg.MatchString(v) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p *ProcessorRegexFilter) isLogEventMatch(event *models.Log) bool {
+	tags := event.GetTags().Iterator()
+	contents := event.Contents.Iterator()
+	for key, reg := range p.includeRegex {
+		if v, ok := tags[key]; ok && reg.MatchString(v) {
+			continue
+		}
+		if v, ok := contents[key]; ok {
+			switch value := v.(type) {
+			case string:
+				if reg.MatchString(value) {
+					continue
+				}
+			case []byte:
+				if reg.Match(value) {
+					continue
+				}
+			default:
+				str := fmt.Sprintf("%v", value)
+				if reg.MatchString(str) {
+					continue
+				}
+			}
+		}
+		return false
+	}
+	for key, reg := range p.excludeRegex {
+		if v, ok := tags[key]; ok && reg.MatchString(v) {
+			return false
+		}
+		if v, ok := contents[key]; ok {
+			switch value := v.(type) {
+			case string:
+				if reg.MatchString(value) {
+					return false
+				}
+			case []byte:
+				if reg.Match(value) {
+					return false
+				}
+			default:
+				str := fmt.Sprintf("%v", value)
+				if reg.MatchString(str) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+func (p *ProcessorRegexFilter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	totalLen := len(in.Events)
+	nextIdx := 0
+	for idx := 0; idx < totalLen; idx++ {
+		if p.isEventMatch(in.Events[idx]) {
+			if idx != nextIdx {
+				in.Events[nextIdx] = in.Events[idx]
+			}
+			nextIdx++
+		} else {
+			p.filterMetric.Add(1)
+		}
+		p.processedMetric.Add(1)
+	}
+	in.Events = in.Events[:nextIdx]
+	context.Collector().Collect(in.Group, in.Events...)
 }
 
 func init() {
