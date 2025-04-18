@@ -68,15 +68,4 @@ extern const std::string LOG_RESERVED_KEY_TOPIC;
 extern const std::string LOG_RESERVED_KEY_MACHINE_UUID;
 extern const std::string LOG_RESERVED_KEY_PACKAGE_ID;
 
-////////////////////////// METRIC ////////////////////////
-extern const std::string DEFAULT_METRIC_TAG_NAMESPACE;
-extern const std::string DEFAULT_METRIC_TAG_POD_NAME;
-extern const std::string DEFAULT_METRIC_TAG_POD_UID;
-extern const std::string DEFAULT_METRIC_TAG_CONTAINER_NAME;
-extern const std::string DEFAULT_METRIC_TAG_CONTAINER_IP;
-extern const std::string DEFAULT_METRIC_TAG_IMAGE_NAME;
-
-////////////////////////// TRACE ////////////////////////
-
-
 } // namespace logtail

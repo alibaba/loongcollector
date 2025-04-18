@@ -25,9 +25,9 @@
 #include "json/json.h"
 #endif
 
+#include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

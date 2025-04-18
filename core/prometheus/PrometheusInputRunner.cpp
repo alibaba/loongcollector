@@ -169,7 +169,9 @@ void PrometheusInputRunner::Init() {
                             if (tmpStr.empty()) {
                                 mUnRegisterMs = 0;
                             } else {
-                                mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                uint64_t unRegisterMs{};
+                                StringTo(tmpStr, unRegisterMs);
+                                mUnRegisterMs.store(unRegisterMs);
                                 // adjust unRegisterMs to scrape targets for zero-cost
                                 mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
@@ -200,11 +202,6 @@ void PrometheusInputRunner::Stop() {
     if (mThreadRes.valid()) {
         mThreadRes.wait_for(chrono::seconds(1));
     }
-
-#ifndef APSARA_UNIT_TEST_MAIN
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
-    AsynCurlRunner::GetInstance()->Stop();
-#endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();

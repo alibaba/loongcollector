@@ -20,8 +20,8 @@
 
 #include <string>
 
+#include "common/StringView.h"
 #include "models/MetricEvent.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

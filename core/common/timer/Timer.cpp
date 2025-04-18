@@ -20,6 +20,10 @@ using namespace std;
 
 namespace logtail {
 
+Timer::~Timer() {
+    Stop();
+}
+
 void Timer::Init() {
     {
         lock_guard<mutex> lock(mThreadRunningMux);

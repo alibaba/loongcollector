@@ -218,13 +218,10 @@ void DiskBufferWriter::BufferSenderThread() {
             if (FileEncryption::CheckHeader(fileName, kvMap)) {
                 int32_t keyVersion = -1;
                 if (kvMap.find(STRING_FLAG(file_encryption_field_key_version)) != kvMap.end()) {
-                    try {
-                        keyVersion = StringTo<int32_t>(kvMap[STRING_FLAG(file_encryption_field_key_version)]);
-                    } catch (...) {
+                    if (!StringTo(kvMap[STRING_FLAG(file_encryption_field_key_version)], keyVersion)) {
                         LOG_ERROR(sLogger,
                                   ("convert key_version to int32_t fail",
                                    kvMap[STRING_FLAG(file_encryption_field_key_version)]));
-                        keyVersion = -1;
                     }
                 }
                 if (keyVersion >= 1 && keyVersion <= FileEncryption::GetInstance()->GetDefaultKeyVersion()) {
@@ -315,12 +312,13 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
     while ((ent = dir.ReadNext())) {
         string filename = ent.Name();
         if (filename.find(GetSendBufferFileNamePrefix()) == 0) {
-            try {
-                int32_t filetime = StringTo<int32_t>(filename.substr(GetSendBufferFileNamePrefix().size()));
-                if (filetime < timeLine)
-                    filesToSend.push_back(filename);
-            } catch (...) {
+            int32_t filetime{};
+            if (!StringTo(filename.substr(GetSendBufferFileNamePrefix().size()), filetime)) {
                 LOG_INFO(sLogger, ("can not get file time from file name", filename));
+                continue;
+            }
+            if (filetime < timeLine) {
+                filesToSend.push_back(filename);
             }
         }
     }

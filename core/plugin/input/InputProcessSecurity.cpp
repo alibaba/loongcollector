@@ -14,7 +14,7 @@
 
 #include "plugin/input/InputProcessSecurity.h"
 
-#include "ebpf/eBPFServer.h"
+#include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 
 using namespace std;
@@ -24,12 +24,12 @@ namespace logtail {
 const std::string InputProcessSecurity::sName = "input_process_security";
 
 bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    ebpf::eBPFServer::GetInstance()->Init();
-    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::PROCESS_SECURITY)) {
+    ebpf::EBPFServer::GetInstance()->Init();
+    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY)) {
         return false;
     }
     std::string prev_pipeline_name
-        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -41,27 +41,34 @@ bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optional
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(
+    mPluginMetricPtr = std::make_shared<PluginMetricManager>(
         GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return mSecurityOptions.Init(ebpf::SecurityProbeType::PROCESS, config, mContext, sName);
 }
 
 bool InputProcessSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        mContext->GetConfigName(), mIndex, nami::PluginType::PROCESS_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
+                                                         mIndex,
+                                                         logtail::ebpf::PluginType::PROCESS_SECURITY,
+                                                         mContext,
+                                                         &mSecurityOptions,
+                                                         mPluginMetricPtr);
 }
 
 bool InputProcessSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::PROCESS_SECURITY);
+        ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                       logtail::ebpf::PluginType::PROCESS_SECURITY);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
-                                                          nami::PluginType::PROCESS_SECURITY);
+    return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+                                                          logtail::ebpf::PluginType::PROCESS_SECURITY);
 }
 
 } // namespace logtail

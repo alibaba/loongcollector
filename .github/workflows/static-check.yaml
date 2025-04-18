@@ -104,9 +104,9 @@ jobs:
       - name: C++ Core Lint
         uses: jidicula/clang-format-action@v4.14.0
         with:
-          clang-format-version: "18"
-          check-path: "core"
-          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp'
+          clang-format-version: '18'
+          check-path: 'core'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
           include-regex: '.*\.(cpp|h)$'
 
       - name: Go Plugin Lint

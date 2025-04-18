@@ -19,8 +19,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/StringView.h"
 #include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

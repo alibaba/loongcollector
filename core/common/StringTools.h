@@ -15,14 +15,20 @@
  */
 
 #pragma once
+
 #include <algorithm>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#include "boost/lexical_cast.hpp"
+#pragma GCC diagnostic pop
+#include <charconv>
+
 #include <string>
 #include <vector>
 
-#include "boost/lexical_cast.hpp"
 #include "boost/regex.hpp"
 
-#include "models/StringView.h"
+#include "common/StringView.h"
 
 namespace logtail {
 
@@ -97,15 +103,6 @@ std::string ToHexString(const T& value) {
 template <>
 std::string ToHexString(const std::string& value);
 
-template <typename T>
-T StringTo(const std::string& str) {
-    return boost::lexical_cast<T>(str);
-}
-
-// @return true if str is equal to "true", otherwise false.
-template <>
-bool StringTo<bool>(const std::string& str);
-
 // Split string by delimiter.
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim = " ");
 
@@ -158,5 +155,206 @@ inline bool IsInt(const std::string& str) {
 #define FNM_PATHNAME 0
 int fnmatch(const char* pattern, const char* dirPath, int flag);
 #endif
+
+// trim from start (returns a new string_view)
+static inline StringView Ltrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_prefix(std::min(s.find_first_not_of(blank), s.size()));
+    return s;
+}
+
+// trim from end (returns a new string_view)
+static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_suffix(std::min(s.size() - s.find_last_not_of(blank) - 1, s.size()));
+    return s;
+}
+
+// trim from both ends (returns a new string_view)
+static inline StringView Trim(StringView s) {
+    return Ltrim(Rtrim(s));
+}
+
+static constexpr StringView kNullSv("\0", 1);
+
+class StringViewSplitterIterator {
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = StringView;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+    StringViewSplitterIterator() = default;
+
+    StringViewSplitterIterator(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter), mPos(0) {
+        findNext();
+    }
+
+    value_type operator*() { return mField; }
+
+    pointer operator->() { return &mField; }
+
+    StringViewSplitterIterator& operator++() {
+        findNext();
+        return *this;
+    }
+
+    StringViewSplitterIterator operator++(int) {
+        StringViewSplitterIterator tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+
+    friend bool operator==(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return a.mPos == b.mPos;
+    }
+
+    friend bool operator!=(const StringViewSplitterIterator& a, const StringViewSplitterIterator& b) {
+        return !(a == b);
+    }
+
+private:
+    void findNext() {
+        if (mPos == StringView::npos) {
+            mField = {};
+            return;
+        }
+
+        size_t end = 0;
+        if (mDelimiter.empty()) {
+            end = mPos + 1;
+        } else {
+            end = mStr.find(mDelimiter, mPos);
+        }
+        if (end == StringView::npos) {
+            if (mPos <= mStr.size()) { // last field
+                mField = mStr.substr(mPos);
+                mPos = mStr.size() + 1;
+            } else { // equivalent to end
+                mField = {};
+                mPos = StringView::npos;
+            }
+        } else {
+            mField = mStr.substr(mPos, end - mPos);
+            mPos = end + mDelimiter.size();
+        }
+    }
+
+    StringView mStr;
+    StringView mDelimiter;
+    StringView mField;
+    size_t mPos = StringView::npos;
+};
+
+class StringViewSplitter {
+public:
+    using value_type = StringView;
+    using iterator = StringViewSplitterIterator;
+
+    StringViewSplitter(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter) {}
+
+    iterator begin() const { return iterator(mStr, mDelimiter); }
+
+    iterator end() const { return iterator(); }
+
+private:
+    StringView mStr;
+    StringView mDelimiter;
+};
+
+template <class T>
+bool StringTo(const char* first, const char* last, T& val, int base = 10) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+
+    auto convresult = std::from_chars(first, last, val, base);
+    if (convresult.ec != std::errc() || convresult.ptr != last) {
+        return false;
+    }
+    return true;
+}
+
+template <>
+inline bool StringTo<double>(const char* first, const char* last, double& val, [[maybe_unused]] int base) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+
+    // 重置 errno 以检测转换错误
+    errno = 0;
+    char* end = nullptr;
+    val = std::strtod(first, &end);
+
+    // 检查转换是否成功
+    if (end != last) {
+        return false; // 没有完全转换所有字符
+    }
+
+    if (errno == ERANGE) {
+        return false; // 超出范围
+    }
+    return true;
+}
+
+template <>
+inline bool StringTo<float>(const char* first, const char* last, float& val, [[maybe_unused]] int base) {
+    double result{};
+    if (!StringTo(first, last, result)) {
+        return false;
+    }
+    // 检查结果是否在 float 的范围内
+    if (result > std::numeric_limits<float>::max() || result < std::numeric_limits<float>::lowest()) {
+        return false; // 超出 float 范围
+    }
+
+    val = static_cast<float>(result);
+    return true;
+}
+
+template <>
+inline bool StringTo<bool>(const char* first, const char* last, bool& val, [[maybe_unused]] int base) {
+    // 先检查长度是否为4
+    if (first == nullptr || last - first != 4) {
+        val = false;
+    } else { // 直接比较每个字符（忽略大小写）
+        val = (std::tolower(static_cast<unsigned char>(first[0])) == 't'
+               && std::tolower(static_cast<unsigned char>(first[1])) == 'r'
+               && std::tolower(static_cast<unsigned char>(first[2])) == 'u'
+               && std::tolower(static_cast<unsigned char>(first[3])) == 'e');
+    }
+    return true;
+}
+
+template <>
+inline bool StringTo<std::string>(const char* first, const char* last, std::string& val, [[maybe_unused]] int base) {
+    if (first == nullptr || first >= last) {
+        return false; // 空字符串，转换失败
+    }
+    val.assign(first, last);
+    return true;
+}
+
+template <class T>
+bool StringTo(const char* str, T& val, int base = 10) {
+    if (!str) {
+        return false;
+    }
+    return StringTo(str, str + strlen(str), val, base);
+}
+
+template <class T>
+bool StringTo(const std::string& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+template <class T>
+bool StringTo(const std::string_view& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+template <class T>
+bool StringTo(const StringView& str, T& val, int base = 10) {
+    return StringTo(str.data(), str.data() + str.size(), val, base);
+}
 
 } // namespace logtail

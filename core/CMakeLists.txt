@@ -92,7 +92,6 @@ endif ()
 # To be compatible with low version Linux.
 if (ENABLE_COMPATIBLE_MODE)
     message(STATUS "Enable compatible mode.")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c90")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--wrap=memcpy")
     add_definitions(-DENABLE_COMPATIBLE_MODE)
 endif ()
@@ -127,7 +126,7 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/observer ebpf/security ebpf/handler
+        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         parser
         host_monitor host_monitor/collector
         )
@@ -146,6 +145,7 @@ endif()
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
@@ -222,6 +222,9 @@ endif ()
 # Generate independent libraries.
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
+# Build eBPF dependencies
+set(EBPF_DIRVER_TARGET "eBPFDriver")
+add_subdirectory(ebpf/driver)
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
@@ -231,6 +234,7 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
+    add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
 endif()
 
 # Logtail UT.

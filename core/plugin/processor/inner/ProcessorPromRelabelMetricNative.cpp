@@ -20,9 +20,9 @@
 
 #include <numeric>
 
-#include "StringView.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
@@ -143,17 +143,15 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
 void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGroup& eGroup,
                                                          prom::AutoMetric& autoMetric) const {
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION)) {
-        autoMetric.mScrapeDurationSeconds
-            = StringTo<double>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION).to_string());
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION), autoMetric.mScrapeDurationSeconds);
     }
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE)) {
-        autoMetric.mScrapeResponseSizeBytes
-            = StringTo<uint64_t>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE).to_string());
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE),
+                 autoMetric.mScrapeResponseSizeBytes);
     }
     autoMetric.mScrapeSamplesLimit = mScrapeConfigPtr->mSampleLimit;
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED)) {
-        autoMetric.mScrapeSamplesScraped
-            = StringTo<uint64_t>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED).to_string());
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED), autoMetric.mScrapeSamplesScraped);
     }
     autoMetric.mScrapeTimeoutSeconds = mScrapeConfigPtr->mScrapeTimeoutSeconds;
 
@@ -162,7 +160,7 @@ void ProcessorPromRelabelMetricNative::UpdateAutoMetrics(const PipelineEventGrou
     }
 
     if (eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE)) {
-        autoMetric.mUp = StringTo<bool>(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
+        StringTo(eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE), autoMetric.mUp);
     }
 }
 
@@ -180,7 +178,8 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& eGroup
     targetTags[prometheus::LC_TARGET_HASH] = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID);
 
     StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
-    auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
+    uint64_t timestampMilliSec{};
+    StringTo(scrapeTimestampMilliSecStr, timestampMilliSec);
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
 

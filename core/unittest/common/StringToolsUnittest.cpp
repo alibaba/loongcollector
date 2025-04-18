@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
 extern std::vector<std::string> GetTopicNames(const boost::regex& regex);
+}
+
+using namespace logtail;
 
 class StringToolsUnittest : public ::testing::Test {};
 
@@ -49,13 +55,6 @@ TEST_F(StringToolsUnittest, TestEndWith) {
     EXPECT_FALSE(EndWith("a.json.bak", ".json"));
     EXPECT_FALSE(EndWith("a.json", "xxx.json"));
     EXPECT_FALSE(EndWith("a.json ", ".json"));
-}
-
-TEST_F(StringToolsUnittest, TestStringToBoolean) {
-    EXPECT_TRUE(StringTo<bool>("true"));
-    EXPECT_FALSE(StringTo<bool>("false"));
-    EXPECT_FALSE(StringTo<bool>("any"));
-    EXPECT_FALSE(StringTo<bool>(""));
 }
 
 TEST_F(StringToolsUnittest, TestReplaceString) {
@@ -275,10 +274,159 @@ TEST_F(StringToolsUnittest, TestExtractTopics) {
     }
 }
 
-} // namespace logtail
+TEST_F(StringToolsUnittest, TestLtrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Ltrim(v1));
 
-int main(int argc, char** argv) {
-    logtail::Logger::Instance().InitGlobalLoggers();
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Ltrim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView("33"), Ltrim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44 "), Ltrim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView("55 "), Ltrim(v5));
 }
+
+TEST_F(StringToolsUnittest, TestRtrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Rtrim(v1));
+
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Rtrim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView(" 33"), Rtrim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44"), Rtrim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView(" 55"), Rtrim(v5));
+}
+
+TEST_F(StringToolsUnittest, TestTrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Trim(v1));
+
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Trim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView("33"), Trim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44"), Trim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView("55"), Trim(v5));
+}
+
+TEST_F(StringToolsUnittest, TestStringViewSplitterEmpty) {
+    StringView sv("");
+    int i = 0;
+    for (auto field : StringViewSplitter(sv, StringView("\0", 1))) {
+        APSARA_TEST_EQUAL_FATAL(StringView(""), field);
+        ++i;
+    }
+    APSARA_TEST_EQUAL(1, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringViewSplitterSingle) {
+    StringView sv("111");
+    int i = 0;
+    for (auto field : StringViewSplitter(sv, StringView("\0", 1))) {
+        if (i == 0) {
+            APSARA_TEST_EQUAL_FATAL(StringView("111"), field);
+        }
+        ++i;
+    }
+    APSARA_TEST_EQUAL(1, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringViewSplitterMulti) {
+    static const char data[] = "111\000222 333\000444";
+    StringView sv(data, sizeof(data) - 1);
+    int i = 0;
+    for (auto field : StringViewSplitter(sv, StringView("\0", 1))) {
+        if (i == 0) {
+            APSARA_TEST_EQUAL_FATAL(StringView("111"), field);
+        } else if (i == 1) {
+            APSARA_TEST_EQUAL_FATAL(StringView("222 333"), field);
+        } else {
+            APSARA_TEST_EQUAL_FATAL(StringView("444"), field);
+        }
+        ++i;
+    }
+    APSARA_TEST_EQUAL(3, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringViewSplitterMultiEmpty) {
+    static const char data[] = "111\000";
+    StringView sv(data, sizeof(data) - 1);
+    int i = 0;
+    for (auto field : StringViewSplitter(sv, StringView("\0", 1))) {
+        if (i == 0) {
+            APSARA_TEST_EQUAL_FATAL(StringView("111"), field);
+        } else if (i == 1) {
+            APSARA_TEST_EQUAL_FATAL(StringView(""), field);
+        }
+        ++i;
+    }
+    APSARA_TEST_EQUAL(2, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringViewSplitterMultiEmptyEmpty) {
+    static const char data[] = "\000";
+    StringView sv(data, sizeof(data) - 1);
+    int i = 0;
+    for (auto field : StringViewSplitter(sv, StringView("\0", 1))) {
+        APSARA_TEST_EQUAL_FATAL(StringView(""), field);
+        ++i;
+    }
+    APSARA_TEST_EQUAL(2, i);
+}
+
+TEST_F(StringToolsUnittest, TestStringTo) {
+    int i = 0;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, i));
+    APSARA_TEST_FALSE(StringTo((const char*)1, nullptr, i));
+    APSARA_TEST_FALSE(StringTo(nullptr, (const char*)1, i));
+    APSARA_TEST_TRUE(StringTo(std::string("666"), i));
+    APSARA_TEST_EQUAL(666, i);
+    long j = 0;
+    APSARA_TEST_TRUE(StringTo(std::string("-666666"), j));
+    APSARA_TEST_EQUAL(-666666, j);
+    uint32_t l = 0;
+    APSARA_TEST_TRUE(StringTo(std::string_view("777"), l));
+    APSARA_TEST_EQUAL(777U, l);
+    uint64_t k = 0;
+    APSARA_TEST_FALSE(StringTo(std::string_view("-888"), k));
+
+    bool b = false;
+    APSARA_TEST_TRUE(StringTo("true", b));
+    APSARA_TEST_EQUAL(true, b);
+    APSARA_TEST_TRUE(StringTo("false", b));
+    APSARA_TEST_EQUAL(false, b);
+    APSARA_TEST_TRUE(StringTo("any", b));
+    APSARA_TEST_EQUAL(false, b);
+    APSARA_TEST_FALSE(StringTo(nullptr, b));
+
+    float f = 0.0F;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, f));
+    APSARA_TEST_FALSE(StringTo(std::to_string(std::numeric_limits<double>::max()), f));
+    APSARA_TEST_TRUE(StringTo("111.111", f));
+    APSARA_TEST_EQUAL(111.111F, f);
+
+    double d = 0.0;
+    APSARA_TEST_TRUE(StringTo("1111.1111", d));
+    APSARA_TEST_EQUAL(1111.1111, d);
+
+    std::string s;
+    APSARA_TEST_FALSE(StringTo(nullptr, nullptr, s));
+}
+
+UNIT_TEST_MAIN

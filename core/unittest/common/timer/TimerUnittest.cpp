@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <vector>
+
 #include "common/timer/Timer.h"
 #include "unittest/Unittest.h"
 
@@ -31,6 +33,11 @@ struct TimerEventMock : public TimerEvent {
 class TimerUnittest : public ::testing::Test {
 public:
     void TestPushEvent();
+    void TestPeriodicEvent();
+
+private:
+    std::vector<int> mVec;
+    int mFlag = 0;
 };
 
 void TimerUnittest::TestPushEvent() {
@@ -50,6 +57,7 @@ void TimerUnittest::TestPushEvent() {
 }
 
 UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
+
 
 } // namespace logtail
 
