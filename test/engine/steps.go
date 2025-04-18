@@ -70,7 +70,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^generate \{(\d+)\} json logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, log.JSONSingle)
 	ctx.When(`^generate \{(\d+)\} multiline json logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, log.JSONMultiline)
 	ctx.When(`^generate random nginx logs to file, speed \{(\d+)\}MB/s, total \{(\d+)\}min, to file \{(.*)\}`, log.Nginx)
-	ctx.When(`^start monitor \{(\S+)\}`, monitor.StartMonitor)
+	ctx.When(`^start monitor \{(\S+)\}, with timeout \{(\d+)\} min$`, monitor.StartMonitor)
 	ctx.When(`^wait monitor until log processing finished$`, monitor.WaitMonitorUntilProcessingFinished)
 	ctx.When(`^change log rotate interval to \{(\d+)\}s$`, log.ChangeRotateInterval)
 

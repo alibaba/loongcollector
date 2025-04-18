@@ -14,6 +14,7 @@
 package e2e
 
 import (
+	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -22,13 +23,19 @@ import (
 )
 
 func TestE2EOnDockerComposePerformance(t *testing.T) {
+	tags := "@e2e-performance && @docker-compose && ~@ebpf"
+	agentTag := os.Getenv("AGENT")
+	if agentTag != "" {
+		tags += "&& @" + agentTag
+	}
+
 	suite := godog.TestSuite{
 		Name:                "E2EOnDockerCompose",
 		ScenarioInitializer: engine.ScenarioInitializer,
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"test_cases"},
-			Tags:     "@e2e-performance && @docker-compose && ~@ebpf",
+			Tags:     tags,
 			TestingT: t,
 		},
 	}

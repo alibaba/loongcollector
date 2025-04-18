@@ -210,11 +210,9 @@ unittest_pluginmanager: clean import_plugins
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
 
-# benchmark
 .PHONY: benchmark
-benchmark: clean e2edocker
-	./scripts/e2e.sh benchmark performance
-	./scripts/benchmark_collect_result.sh
+benchmark: dist
+	./scripts/docker_build.sh production "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(DOCKER_PUSH)" "$(DOCKER_BUILD_USE_BUILDKIT)"
 
 
 .PHONY: all

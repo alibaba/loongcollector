@@ -29,19 +29,29 @@ type BootController struct {
 
 func (c *BootController) Init(bootType dockercompose.BootType) error {
 	logger.Info(context.Background(), "boot controller is initializing....")
-	return dockercompose.Load(bootType)
+	if err := dockercompose.Load(bootType); err != nil {
+		logger.Error(context.Background(), "BOOT_LOAD_ALARM", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (c *BootController) Start(ctx context.Context) error {
 	logger.Info(context.Background(), "boot controller is starting....")
 	if _, err := os.Stat(config.ConfigDir); os.IsNotExist(err) {
 		if err = os.Mkdir(config.ConfigDir, 0750); err != nil {
+			logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
 			return err
 		}
 	} else if err != nil {
+		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
 		return err
 	}
-	return dockercompose.Start(ctx)
+	if err := dockercompose.Start(ctx); err != nil {
+		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (c *BootController) Clean() {

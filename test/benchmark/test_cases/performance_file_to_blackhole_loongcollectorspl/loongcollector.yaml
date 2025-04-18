@@ -1,0 +1,13 @@
+enable: true
+inputs:
+  - Type: input_file
+    FilePaths: 
+      - /home/loongcollector/*.log
+processors:
+  - Type: processor_spl
+    Script: |
+      * | parse-regexp content, '^([^ ]*) ([^ ]*) ([^ ]*) \[([^\]]*)\] "(\S+) ([^\"]*) (\S*)" ([^ ]*) ([^ ]*) "([^\"]*)" "([^\"]*)"' as ip, ident, auth, timestamp, method, request, http_version, response_code, bytes, referrer, user_agent
+      | where user_agent='no-agent'
+flushers:
+  - Type: flusher_blackhole
+
