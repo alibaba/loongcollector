@@ -18,6 +18,7 @@
 #include <queue>
 #include <vector>
 
+#include "ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
@@ -224,9 +225,5 @@ private:
     std::atomic_int mExecTimes = 0;
 #endif
 };
-
-#ifdef APSARA_UNIT_TEST_MAIN
-int GuessContainerIdOffset();
-#endif
 
 } // namespace logtail::ebpf

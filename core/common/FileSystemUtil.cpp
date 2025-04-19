@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #elif defined(__linux__)
 #include <fnmatch.h>
+#include <sys/statvfs.h>
 #endif
 #include <fstream>
 
@@ -122,24 +123,54 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
-bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize) {
-    FILE* pFile = fopen(fileName.c_str(), "r");
-    if (pFile == NULL) {
-        APSARA_LOG_DEBUG(sLogger, ("open file fail", fileName)("errno", strerror(errno)));
-        return false;
+long GetPageSize() {
+    static long pageSize = sysconf(_SC_PAGESIZE);
+    return (pageSize > 0) ? static_cast<size_t>(pageSize) : 4096;
+}
+
+size_t GetBlockSize(const std::filesystem::path& path) {
+#if defined(__linux__)
+    struct statvfs buf {};
+    if (statvfs(path.c_str(), &buf) == 0) {
+        return buf.f_bsize;
+    }
+#endif
+    return 0UL;
+}
+
+FileReadResult ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize) {
+    std::ifstream ifs(fileName, std::ios::binary);
+    if (!ifs) {
+        return FileReadResult::kError;
     }
 
     content.clear();
-    char* buffer = new char[maxFileSize];
-    uint32_t readBytes = fread(buffer, 1, maxFileSize, pFile);
-    if (readBytes > 0) {
-        content.append(buffer, readBytes);
-        delete[] buffer;
-    } else
-        delete[] buffer;
+    uint64_t fileSize = std::filesystem::file_size(fileName);
+    content.reserve(std::min(maxFileSize, fileSize));
 
-    fclose(pFile);
-    return true;
+    static const long bufferSize = GetPageSize();
+    std::vector<char> buffer(bufferSize);
+
+    try {
+        while (ifs) {
+            uint64_t remainingSize = maxFileSize - content.size();
+            if (remainingSize == 0) {
+                // 已达到 maxFileSize，检查是否还有更多内容
+                char extraByte;
+                if (ifs.read(&extraByte, 1)) {
+                    return FileReadResult::kTruncated;
+                }
+                break; // 文件恰好读完，不需要截断
+            }
+
+            ifs.read(buffer.data(), std::min(static_cast<uint64_t>(buffer.size()), remainingSize));
+            content.append(buffer.data(), ifs.gcount());
+        }
+    } catch (const std::ios_base::failure& e) {
+        return FileReadResult::kError;
+    }
+
+    return FileReadResult::kOK; // 如果到达这里，文件一定是完整读取的
 }
 
 int GetLines(std::istream& is,
