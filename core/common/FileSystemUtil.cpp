@@ -145,31 +145,24 @@ FileReadResult ReadFileContent(const std::string& fileName, std::string& content
     }
 
     content.clear();
-    uint64_t fileSize = std::filesystem::file_size(fileName);
-    content.reserve(std::min(maxFileSize, fileSize));
-
-    static const long bufferSize = GetPageSize();
-    std::vector<char> buffer(bufferSize);
+    uint64_t fileSize = 0;
+    try {
+        fileSize = std::filesystem::file_size(fileName);
+        content.resize(std::min(maxFileSize, fileSize));
+    } catch (const std::filesystem::filesystem_error& e) {
+        return FileReadResult::kError;
+    }
 
     try {
-        while (ifs) {
-            uint64_t remainingSize = maxFileSize - content.size();
-            if (remainingSize == 0) {
-                // 已达到 maxFileSize，检查是否还有更多内容
-                char extraByte;
-                if (ifs.read(&extraByte, 1)) {
-                    return FileReadResult::kTruncated;
-                }
-                break; // 文件恰好读完，不需要截断
-            }
-
-            ifs.read(buffer.data(), std::min(static_cast<uint64_t>(buffer.size()), remainingSize));
-            content.append(buffer.data(), ifs.gcount());
-        }
+        ifs.read(content.data(), content.size());
+        content.resize(ifs.gcount()); // avoid read less unexpectedly if file truncated
     } catch (const std::ios_base::failure& e) {
         return FileReadResult::kError;
     }
 
+    if (fileSize != content.size()) {
+        return FileReadResult::kTruncated;
+    }
     return FileReadResult::kOK; // 如果到达这里，文件一定是完整读取的
 }
 
