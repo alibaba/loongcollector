@@ -202,7 +202,24 @@ public:
     int64_t GetStatsKtime(ProcessStat& procStat) const;
     uid_t GetLoginUid(uint32_t pid) const;
 
-    std::string GetPIDDockerId(uint32_t) const;
+    /**
+     * Retrieves the container ID associated with the specified pid.
+     *
+     * @param pid The PID.
+     * @param containerID The output parameter to store the container ID.
+     * @return offset of containerId in the last segment path
+     */
+    int GetPIDDockerId(uint32_t pid, std::string& containerId) const;
+
+    /**
+     * Retrieves the container ID associated with the specified cgroup path.
+     *
+     * @param cgroupPath The path to the cgroup.
+     * @param containerID The output parameter to store the container ID.
+     * @return offset of containerId in the last segment path
+     */
+    static int GetContainerId(const std::string& cgroupPath, std::string& containerId);
+
     uint32_t GetPIDNsInode(uint32_t pid, const std::string& nsStr) const;
     std::string GetPIDExePath(uint32_t pid) const;
     std::tuple<std::string, std::string> ProcsFilename(const std::string& args);
@@ -213,8 +230,8 @@ private:
     std::filesystem::path procPidPath(uint32_t pid, const std::string& subpath) const;
     std::string readPidFile(uint32_t pid, const std::string& filename) const;
     std::string readPidLink(uint32_t pid, const std::string& filename) const;
-    StringView lookupContainerId(const StringView& cgroupline) const;
-    bool isValidContainerId(const StringView& id) const;
+    static int lookupContainerId(const StringView& cgroupline, StringView& containerId);
+    static bool isValidContainerId(const StringView& id);
 
     std::filesystem::path mProcPath;
 

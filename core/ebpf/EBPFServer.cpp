@@ -153,10 +153,6 @@ void EBPFServer::Init() {
     mHostIp = GetHostIp();
     mHostName = GetHostName();
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    mHostPathPrefix = "/logtail_host";
-    LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
-#else
     // read host path prefix
     if (AppConfig::GetInstance()->IsPurageContainerMode()) {
         mHostPathPrefix = STRING_FLAG(default_container_host_path);
@@ -165,7 +161,7 @@ void EBPFServer::Init() {
         LOG_INFO(sLogger, ("running in host mode", "would not set host path prefix ..."));
         mHostPathPrefix = "/";
     }
-#endif
+
     LOG_DEBUG(sLogger, ("begin to init timer", ""));
     Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();

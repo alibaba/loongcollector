@@ -219,7 +219,7 @@ ExtendedProcessStatPtr ProcessEntityCollector::ReadNewProcessStat(pid_t pid) {
     auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
 
     std::string line;
-    if (!ReadFileContent(processStat.string(), line)) {
+    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
         LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
         return nullptr;
     }

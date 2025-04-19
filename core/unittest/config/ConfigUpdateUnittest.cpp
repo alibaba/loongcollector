@@ -261,7 +261,7 @@ void ConfigUpdateUnittest::OnStartUp() const {
     APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
-    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    const auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
     APSARA_TEST_NOT_EQUAL(nullptr, ptr);
     APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
     APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);

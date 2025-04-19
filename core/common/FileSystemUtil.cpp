@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #elif defined(__linux__)
 #include <fnmatch.h>
+#include <sys/statvfs.h>
 #endif
 #include <fstream>
 
@@ -122,24 +123,47 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
-bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize) {
-    FILE* pFile = fopen(fileName.c_str(), "r");
-    if (pFile == NULL) {
-        APSARA_LOG_DEBUG(sLogger, ("open file fail", fileName)("errno", strerror(errno)));
-        return false;
+long GetPageSize() {
+    static long pageSize = sysconf(_SC_PAGESIZE);
+    return (pageSize > 0) ? static_cast<size_t>(pageSize) : 4096;
+}
+
+size_t GetBlockSize(const std::filesystem::path& path) {
+#if defined(__linux__)
+    struct statvfs buf {};
+    if (statvfs(path.c_str(), &buf) == 0) {
+        return buf.f_bsize;
+    }
+#endif
+    return 0UL;
+}
+
+FileReadResult ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize) {
+    std::ifstream ifs(fileName, std::ios::binary);
+    if (!ifs) {
+        return FileReadResult::kError;
     }
 
     content.clear();
-    char* buffer = new char[maxFileSize];
-    uint32_t readBytes = fread(buffer, 1, maxFileSize, pFile);
-    if (readBytes > 0) {
-        content.append(buffer, readBytes);
-        delete[] buffer;
-    } else
-        delete[] buffer;
+    uint64_t fileSize = 0;
+    try {
+        fileSize = std::filesystem::file_size(fileName);
+        content.resize(std::min(maxFileSize, fileSize));
+    } catch (const std::filesystem::filesystem_error& e) {
+        return FileReadResult::kError;
+    }
 
-    fclose(pFile);
-    return true;
+    try {
+        ifs.read(content.data(), content.size());
+        content.resize(ifs.gcount()); // avoid read less unexpectedly if file truncated
+    } catch (const std::ios_base::failure& e) {
+        return FileReadResult::kError;
+    }
+
+    if (fileSize != content.size()) {
+        return FileReadResult::kTruncated;
+    }
+    return FileReadResult::kOK; // 如果到达这里，文件一定是完整读取的
 }
 
 int GetLines(std::istream& is,
