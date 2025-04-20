@@ -209,7 +209,7 @@ int ProcParser::GetContainerId(const std::string& cgroupPath, std::string& conta
         StringView containerIdView;
         int offset = lookupContainerId(line, containerIdView);
         if (offset >= 0) {
-            LOG_DEBUG(sLogger, ("Found container ID using lookup", containerId)("offset", offset));
+            LOG_DEBUG(sLogger, ("Found container ID using lookup", containerIdView)("offset", offset));
             containerId = containerIdView.to_string();
             return offset;
         }

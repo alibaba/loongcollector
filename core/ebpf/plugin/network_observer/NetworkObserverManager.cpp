@@ -1107,7 +1107,7 @@ std::string GetLastPathSegment(const std::string& path) {
 int GuessContainerIdOffset() {
     static const std::string kCgroupFilePath = "/proc/self/cgroup";
     std::string containerId;
-    return ProcParser::GetContainerId("/proc/self/cgroup", containerId);
+    return ProcParser::GetContainerId(kCgroupFilePath, containerId);
 }
 
 int NetworkObserverManager::Update(
