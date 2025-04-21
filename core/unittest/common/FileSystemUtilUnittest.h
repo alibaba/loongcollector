@@ -480,4 +480,41 @@ TEST_F(FileSystemUtilUnittest, TestPathJoin) {
 #endif
 }
 
+TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
+    auto filePath = (mTestRoot / "file").string();
+
+    // Write 1MB to file.
+    {
+        std::ofstream out(filePath);
+        std::vector<char> content(1024 * 1024, 'A');
+        out.write(content.data(), content.size());
+    }
+
+    std::string content;
+    FileReadResult ret = ReadFileContent((mTestRoot / "not—exist-file").string(), content);
+    EXPECT_EQ(FileReadResult::kError, ret);
+
+    ret = ReadFileContent(filePath, content);
+
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_EQ(1024 * 1024UL, content.size());
+
+    // Write 2MB to file.
+    {
+        std::ofstream out(filePath);
+        std::vector<char> content(1024 * 1024, 'A');
+        for (int i = 0; i < 2; ++i) {
+            out.write(content.data(), content.size());
+        }
+    }
+
+    ret = ReadFileContent(filePath, content);
+    EXPECT_EQ(FileReadResult::kTruncated, ret);
+    EXPECT_EQ(1024 * 1024UL, content.size());
+
+    ret = ReadFileContent("/proc/self/cgroup", content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_GT(content.size(), 0UL);
+}
+
 } // namespace logtail

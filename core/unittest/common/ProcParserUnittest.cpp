@@ -295,9 +295,11 @@ void ProcParserUnittest::TestGetPIDDockerId() {
 0::/
 )");
 
-    std::string dockerId = mParser->GetPIDDockerId(testPid);
+    std::string dockerId;
+    int offset = mParser->GetPIDDockerId(testPid, dockerId);
     APSARA_TEST_STREQ_DESC(
         dockerId.c_str(), "8a53be7205b36249cca2cd327abc1932233426c717a5a9008eac6724dfc62f09", "Docker ID should match");
+    APSARA_TEST_EQUAL(15, offset);
 
     // K8s docker cgroup file
     CreateProcCgroupTestFile(
@@ -315,9 +317,10 @@ void ProcParserUnittest::TestGetPIDDockerId() {
 2:net_cls,net_prio:/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-poddc9b221f_eb6e_4af5_8328_c9cd9058c064.slice/docker-212634dc854800cbb27247c97d5314161b09b9f592bb3da2245b2f8805d81f60.scope
 1:name=systemd:/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-poddc9b221f_eb6e_4af5_8328_c9cd9058c064.slice/docker-212634dc854800cbb27247c97d5314161b09b9f592bb3da2245b2f8805d81f60.scope
 )");
-    dockerId = mParser->GetPIDDockerId(testPid);
+    offset = mParser->GetPIDDockerId(testPid, dockerId);
     APSARA_TEST_STREQ_DESC(
         dockerId.c_str(), "212634dc854800cbb27247c97d5314161b09b9f592bb3da2245b2f8805d81f60", "Docker ID should match");
+    APSARA_TEST_EQUAL(7, offset);
 
     // local docker cgroup file
     CreateProcCgroupTestFile(testPid,
@@ -335,9 +338,10 @@ void ProcParserUnittest::TestGetPIDDockerId() {
 1:name=systemd:/docker/f1549dc3c94d8114b4de51487eb0c31cb8169bde5f798dea5cb980ea2018771b
 0::/
 )");
-    dockerId = mParser->GetPIDDockerId(testPid);
+    offset = mParser->GetPIDDockerId(testPid, dockerId);
     APSARA_TEST_STREQ_DESC(
         dockerId.c_str(), "f1549dc3c94d8114b4de51487eb0c31cb8169bde5f798dea5cb980ea2018771b", "Docker ID should match");
+    APSARA_TEST_EQUAL(0, offset);
 
     // no containerid cgroup file
     CreateProcCgroupTestFile(testPid,
@@ -355,8 +359,9 @@ void ProcParserUnittest::TestGetPIDDockerId() {
 1:name=systemd:/user.slice/user-2917.slice/session-168660.scope
 0::/
 )");
-    dockerId = mParser->GetPIDDockerId(testPid);
+    offset = mParser->GetPIDDockerId(testPid, dockerId);
     APSARA_TEST_STREQ_DESC(dockerId.c_str(), "", "Docker ID should match");
+    APSARA_TEST_EQUAL(-1, offset);
 }
 
 void ProcParserUnittest::TestGetPIDExePath() {

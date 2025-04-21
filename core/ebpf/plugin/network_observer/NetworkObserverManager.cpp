@@ -1106,33 +1106,8 @@ std::string GetLastPathSegment(const std::string& path) {
 
 int GuessContainerIdOffset() {
     static const std::string kCgroupFilePath = "/proc/self/cgroup";
-    std::ifstream cgroupFile(kCgroupFilePath);
-    const std::regex regex("[a-f0-9]{64}");
-    std::smatch match;
-
-    std::string line;
-    std::string lastSegment;
-    while (std::getline(cgroupFile, line)) {
-        // cgroup file format：<hierarchy-id>:<subsystem>:/<cgroup-path>
-        LOG_DEBUG(sLogger, ("cgroup line", line));
-        size_t lastColonPosition = line.find_last_of(':');
-        if (lastColonPosition != std::string::npos) {
-            std::string cgroupPath = line.substr(lastColonPosition + 1);
-            lastSegment = GetLastPathSegment(cgroupPath);
-            LOG_DEBUG(sLogger, ("The last segment in the cgroup path", lastSegment));
-            if (std::regex_search(lastSegment, match, regex)) {
-                auto cid = match.str(0);
-                LOG_DEBUG(sLogger, ("lastSegment", line)("pos", match.position())("cid", cid)("size", cid.size()));
-                cgroupFile.close();
-                return match.position();
-            }
-            LOG_DEBUG(sLogger, ("Find next line, Current line unexpected format in cgroup line", lastSegment));
-            continue;
-        }
-    }
-    cgroupFile.close();
-    LOG_ERROR(sLogger, ("No valid cgroup line to parse ... ", ""));
-    return -1;
+    std::string containerId;
+    return ProcParser::GetContainerId(kCgroupFilePath, containerId);
 }
 
 int NetworkObserverManager::Update(

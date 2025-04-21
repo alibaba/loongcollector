@@ -58,19 +58,11 @@ std::string ProcParser::readPidLink(uint32_t pid, const std::string& filename) c
 
 std::string ProcParser::readPidFile(uint32_t pid, const std::string& filename) const {
     std::filesystem::path fpath = mProcPath / std::to_string(pid) / filename;
-    std::ifstream ifs(fpath);
-    if (!ifs) {
+    std::string content;
+    if (FileReadResult::kOK != ReadFileContent(fpath, content)) {
         return "";
     }
-    try {
-        std::string res((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-        if (!res.empty() && res[res.size() - 1] == 0) {
-            res.pop_back();
-        }
-        return res;
-    } catch (const std::ios_base::failure& e) {
-    }
-    return "";
+    return content;
 }
 
 bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
@@ -123,7 +115,7 @@ bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
     proc.time_ns = GetPIDNsInode(pid, "time");
     proc.time_for_children_ns = GetPIDNsInode(pid, "time_for_children");
 
-    proc.container_id = GetPIDDockerId(pid);
+    GetPIDDockerId(pid, proc.container_id);
     if (proc.container_id.empty()) {
         proc.nspid = 0;
     }
@@ -158,7 +150,7 @@ std::string ProcParser::GetPIDEnviron(uint32_t pid) const {
     return readPidFile(pid, "environ");
 }
 
-bool ProcParser::isValidContainerId(const StringView& id) const {
+bool ProcParser::isValidContainerId(const StringView& id) {
     // 检查长度是否匹配
     if (id.size() != kContainerIdLength) {
         return false;
@@ -172,17 +164,20 @@ bool ProcParser::isValidContainerId(const StringView& id) const {
     return true;
 }
 
-StringView ProcParser::lookupContainerId(const StringView& cgroupline) const {
-    if (cgroupline.length() <= kContainerIdLength
+int ProcParser::lookupContainerId(const StringView& cgroupline, StringView& containerId) {
+    if (cgroupline.length() <= kContainerIdLength || cgroupline.find(':') == std::string::npos
         || (cgroupline.find("pods") == std::string::npos && cgroupline.find("docker") == std::string::npos
             && cgroupline.find("containerd") == std::string::npos && cgroupline.find("libpod") == std::string::npos
             && cgroupline.find("lxc") == std::string::npos && cgroupline.find("podman") == std::string::npos
             && cgroupline.find("cri-") == std::string::npos)) {
-        return kEmptyStringView;
+        containerId = kEmptyStringView;
+        return -1;
     }
+
     auto lastSlash = cgroupline.rfind('/');
     if (lastSlash != std::string::npos && lastSlash + 1 < cgroupline.size()) {
-        auto potentialId = cgroupline.substr(lastSlash + 1);
+        auto lastSegment = cgroupline.substr(lastSlash + 1);
+        auto potentialId = lastSegment;
         auto lastDash = potentialId.rfind('-');
         if (lastDash != std::string::npos && lastDash + 1 < potentialId.size()) {
             potentialId = potentialId.substr(lastDash + 1);
@@ -192,23 +187,42 @@ StringView ProcParser::lookupContainerId(const StringView& cgroupline) const {
             potentialId = potentialId.substr(0, kContainerIdLength);
         }
         if (isValidContainerId(potentialId)) {
-            return potentialId;
+            containerId = potentialId;
+            return containerId.data() - lastSegment.data();
         }
     }
-    return kEmptyStringView;
+    containerId = kEmptyStringView;
+    return -1;
 }
 
-std::string ProcParser::GetPIDDockerId(uint32_t pid) const {
-    std::string cgroups = readPidFile(pid, "cgroup");
-    StringViewSplitter splitter(cgroups, "\n");
+int ProcParser::GetContainerId(const std::string& cgroupPath, std::string& containerId) {
+    std::string content;
+    if (FileReadResult::kOK != ReadFileContent(cgroupPath, content)) {
+        LOG_DEBUG(sLogger, ("Failed to read cgroup file", cgroupPath));
+        containerId.clear();
+        return -1;
+    }
+
+    StringViewSplitter splitter(content, "\n");
     for (const auto& line : splitter) {
-        auto container = lookupContainerId(line);
-        if (!container.empty()) {
-            LOG_DEBUG(sLogger, ("[ProcsFindDockerId] containerid", container));
-            return container.to_string();
+        LOG_DEBUG(sLogger, ("cgroup line", line.to_string()));
+        StringView containerIdView;
+        int offset = lookupContainerId(line, containerIdView);
+        if (offset >= 0) {
+            LOG_DEBUG(sLogger, ("Found container ID using lookup", containerIdView)("offset", offset));
+            containerId = containerIdView.to_string();
+            return offset;
         }
     }
-    return "";
+
+    LOG_DEBUG(sLogger, ("No valid container ID found in cgroup file", cgroupPath));
+    containerId.clear();
+    return -1;
+}
+
+int ProcParser::GetPIDDockerId(uint32_t pid, std::string& containerId) const {
+    std::filesystem::path fpath = mProcPath / std::to_string(pid) / "cgroup";
+    return GetContainerId(fpath, containerId);
 }
 
 std::string ProcParser::GetPIDExePath(uint32_t pid) const {
@@ -325,7 +339,7 @@ bool ProcParser::ReadProcessStat(pid_t pid, ProcessStat& ps) const {
     auto processStat = mProcPath / std::to_string(pid) / "stat";
 
     std::string line;
-    if (!ReadFileContent(processStat.string(), line)) {
+    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
         LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
         return false;
     }
@@ -424,7 +438,7 @@ bool ProcParser::ReadProcessStatus(pid_t pid, ProcessStatus& ps) const {
     auto processStatus = mProcPath / std::to_string(pid) / "status";
 
     std::string content;
-    if (!ReadFileContent(processStatus.string(), content)) {
+    if (FileReadResult::kOK != ReadFileContent(processStatus.string(), content)) {
         LOG_ERROR(sLogger, ("read process status", "fail")("file", processStatus));
         return false;
     }
