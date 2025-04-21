@@ -15,7 +15,7 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/dockercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -26,7 +26,7 @@ type InputContainer struct {
 
 func (r *InputContainer) Init(context pipeline.Context) (int, error) {
 	r.context = context
-	helper.InitContainer()
+	dockercenter.InitContainer()
 	return 0, nil
 }
 

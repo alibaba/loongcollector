@@ -30,6 +30,7 @@ import (
 	"github.com/docker/docker/api/types"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/dockercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -91,7 +92,7 @@ type InputDockerFile struct {
 	ExcludeLabelRegex map[string]*regexp.Regexp
 	IncludeEnvRegex   map[string]*regexp.Regexp
 	ExcludeEnvRegex   map[string]*regexp.Regexp
-	K8sFilter         *helper.K8SFilter
+	K8sFilter         *dockercenter.K8SFilter
 
 	lastContainerInfoCache map[string]ContainerInfoCache
 
@@ -107,7 +108,7 @@ type InputDockerFile struct {
 
 	// Last return of GetAllAcceptedInfoV2
 	fullList                 map[string]bool
-	matchList                map[string]*helper.DockerInfoDetail
+	matchList                map[string]*dockercenter.DockerInfoDetail
 	CollectingContainersMeta bool
 	firstStart               bool
 
@@ -141,7 +142,7 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 
 	idf.firstStart = true
 	idf.fullList = make(map[string]bool)
-	idf.matchList = make(map[string]*helper.DockerInfoDetail)
+	idf.matchList = make(map[string]*dockercenter.DockerInfoDetail)
 	// Because docker on Windows will convert all mounted path to lowercase (see
 	// Mounts field in output of docker inspect), so we have to change LogPath to
 	// lowercase if it is a Windows path (with colon).
@@ -150,7 +151,7 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 		idf.LogPath = strings.ToLower(idf.LogPath)
 	}
 	idf.lastClearTime = time.Now()
-	helper.ContainerCenterInit()
+	dockercenter.ContainerCenterInit()
 
 	if idf.HostFlag {
 		idf.MountPath = ""
@@ -160,7 +161,7 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 		}
 		idf.MountPath = envPath
 	} else {
-		idf.MountPath = helper.DefaultLogtailMountPath
+		idf.MountPath = dockercenter.DefaultLogtailMountPath
 	}
 	idf.updateEmptyFlag = true
 
@@ -171,11 +172,11 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.updateMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginUpdateContainerTotal)
 
 	var err error
-	idf.IncludeEnv, idf.IncludeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)
+	idf.IncludeEnv, idf.IncludeEnvRegex, err = dockercenter.SplitRegexFromMap(idf.IncludeEnv)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
-	idf.ExcludeEnv, idf.ExcludeEnvRegex, err = helper.SplitRegexFromMap(idf.ExcludeEnv)
+	idf.ExcludeEnv, idf.ExcludeEnvRegex, err = dockercenter.SplitRegexFromMap(idf.ExcludeEnv)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 	}
@@ -193,15 +194,15 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	} else {
 		idf.ExcludeLabel = idf.ExcludeContainerLabel
 	}
-	idf.IncludeLabel, idf.IncludeLabelRegex, err = helper.SplitRegexFromMap(idf.IncludeLabel)
+	idf.IncludeLabel, idf.IncludeLabelRegex, err = dockercenter.SplitRegexFromMap(idf.IncludeLabel)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	idf.ExcludeLabel, idf.ExcludeLabelRegex, err = helper.SplitRegexFromMap(idf.ExcludeLabel)
+	idf.ExcludeLabel, idf.ExcludeLabelRegex, err = dockercenter.SplitRegexFromMap(idf.ExcludeLabel)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
-	idf.K8sFilter, err = helper.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
+	idf.K8sFilter, err = dockercenter.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
 
 	logger.Debugf(idf.context.GetRuntimeContext(), "InputDockerFile inited successfully")
 	return idf.FlushIntervalMs, err
@@ -212,7 +213,7 @@ func (idf *InputDockerFile) Description() string {
 }
 
 // addMappingToLogtail  添加容器信息到allCmd里面，allCmd不为nil时，只添加不执行，allCmd为nil时，添加并执行
-func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, containerInfo ContainerInfoCache, allCmd *DockerFileUpdateCmdAll) {
+func (idf *InputDockerFile) addMappingToLogtail(info *dockercenter.DockerInfoDetail, containerInfo ContainerInfoCache, allCmd *DockerFileUpdateCmdAll) {
 	var cmd DockerFileUpdateCmd
 	cmd.ID = info.ContainerInfo.ID
 	cmd.UpperDir = filepath.Clean(containerInfo.UpperDir)
@@ -283,7 +284,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 	}
 }
 
-func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, allCmd *DockerFileUpdateCmdAll) {
+func (idf *InputDockerFile) updateMapping(info *dockercenter.DockerInfoDetail, allCmd *DockerFileUpdateCmdAll) {
 	logPath := filepath.Clean(info.StdoutPath)
 	id := info.ContainerInfo.ID
 	mounts := info.ContainerInfo.Mounts
@@ -344,7 +345,7 @@ func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, allCmd 
 // deleteMapping  删除容器信息
 func (idf *InputDockerFile) deleteMapping(id string) {
 	idf.deleteMappingFromLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "id", helper.GetShortID(id),
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "id", dockercenter.GetShortID(id),
 		"logPath", idf.lastContainerInfoCache[id].LogPath,
 		"upperDir", idf.lastContainerInfoCache[id].UpperDir,
 		"mounts", idf.lastContainerInfoCache[id].Mounts)
@@ -354,14 +355,14 @@ func (idf *InputDockerFile) deleteMapping(id string) {
 // notifyStop 通知容器停止
 func (idf *InputDockerFile) notifyStop(id string) {
 	idf.notifyStopToLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "id", helper.GetShortID(id),
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "id", dockercenter.GetShortID(id),
 		"logPath", idf.lastContainerInfoCache[id].LogPath,
 		"upperDir", idf.lastContainerInfoCache[id].UpperDir,
 		"mounts", idf.lastContainerInfoCache[id].Mounts)
 }
 
 func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
-	newUpdateTime := helper.GetContainersLastUpdateTime()
+	newUpdateTime := dockercenter.GetContainersLastUpdateTime()
 	if idf.lastUpdateTime != 0 {
 		// Nothing update, just skip.
 		if idf.lastUpdateTime >= newUpdateTime {
@@ -375,7 +376,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 	if len(idf.lastContainerInfoCache) == 0 {
 		allCmd = new(DockerFileUpdateCmdAll)
 	}
-	newCount, delCount, addResultList, deleteResultList := helper.GetContainerByAcceptedInfoV2(
+	newCount, delCount, addResultList, deleteResultList := dockercenter.GetContainerByAcceptedInfoV2(
 
 		idf.fullList, idf.matchList,
 		idf.IncludeLabel, idf.ExcludeLabel,
@@ -400,7 +401,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 	idf.avgInstanceMetric.Add(int64(len(dockerInfoDetails)))
 
 	for k, info := range dockerInfoDetails {
-		if len(idf.LogPath) > 0 && info.ContainerInfo.State.Status == helper.ContainerStatusRunning {
+		if len(idf.LogPath) > 0 && info.ContainerInfo.State.Status == dockercenter.ContainerStatusRunning {
 			// inputFile
 			idf.updateMapping(info, allCmd)
 		} else if len(idf.LogPath) == 0 {
@@ -413,57 +414,57 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 
 			formatSourcePath := formatPath(sourcePath)
 			formateContainerPath := formatPath(containerPath)
-			destPath := helper.GetMountedFilePathWithBasePath(idf.MountPath, formatSourcePath) + idf.LogPath[len(formateContainerPath):]
+			destPath := dockercenter.GetMountedFilePathWithBasePath(idf.MountPath, formatSourcePath) + idf.LogPath[len(formateContainerPath):]
 
 			if ok, err := util.PathExists(destPath); err == nil {
 				if !ok {
-					nothavingPathkeys = append(nothavingPathkeys, helper.GetShortID(k))
+					nothavingPathkeys = append(nothavingPathkeys, dockercenter.GetShortID(k))
 				} else {
-					havingPathkeys = append(havingPathkeys, helper.GetShortID(k))
+					havingPathkeys = append(havingPathkeys, dockercenter.GetShortID(k))
 				}
 			} else {
-				nothavingPathkeys = append(nothavingPathkeys, helper.GetShortID(k))
+				nothavingPathkeys = append(nothavingPathkeys, dockercenter.GetShortID(k))
 			}
 		}
 	}
 	if idf.CollectingContainersMeta {
-		var configResult *helper.ContainerConfigResult
+		var configResult *dockercenter.ContainerConfigResult
 		if len(idf.LogPath) == 0 {
 			keys := make([]string, 0, len(idf.matchList))
 			for k := range idf.matchList {
 				if len(k) > 0 {
-					keys = append(keys, helper.GetShortID(k))
+					keys = append(keys, dockercenter.GetShortID(k))
 				}
 			}
-			configResult = &helper.ContainerConfigResult{
+			configResult = &dockercenter.ContainerConfigResult{
 				DataType:                   "container_config_result",
 				Project:                    idf.context.GetProject(),
 				Logstore:                   idf.context.GetLogstore(),
 				ConfigName:                 idf.context.GetConfigName(),
-				PathExistInputContainerIDs: helper.GetStringFromList(keys),
+				PathExistInputContainerIDs: dockercenter.GetStringFromList(keys),
 				SourceAddress:              "stdout",
 				InputType:                  "input_container_stdio",
 				FlusherType:                "flusher_sls",
 				FlusherTargetAddress:       fmt.Sprintf("%s/%s", idf.context.GetProject(), idf.context.GetLogstore()),
 			}
 		} else {
-			configResult = &helper.ContainerConfigResult{
+			configResult = &dockercenter.ContainerConfigResult{
 				DataType:                      "container_config_result",
 				Project:                       idf.context.GetProject(),
 				Logstore:                      idf.context.GetLogstore(),
 				ConfigName:                    idf.context.GetConfigName(),
 				SourceAddress:                 fmt.Sprintf("%s/**/%s", idf.LogPath, idf.FilePattern),
-				PathExistInputContainerIDs:    helper.GetStringFromList(havingPathkeys),
-				PathNotExistInputContainerIDs: helper.GetStringFromList(nothavingPathkeys),
+				PathExistInputContainerIDs:    dockercenter.GetStringFromList(havingPathkeys),
+				PathNotExistInputContainerIDs: dockercenter.GetStringFromList(nothavingPathkeys),
 				InputType:                     "file_log",
 				InputIsContainerFile:          "true",
 				FlusherType:                   "flusher_sls",
 				FlusherTargetAddress:          fmt.Sprintf("%s/%s", idf.context.GetProject(), idf.context.GetLogstore()),
 			}
 		}
-		helper.RecordContainerConfigResultMap(configResult)
+		dockercenter.RecordContainerConfigResultMap(configResult)
 		if newCount != 0 || delCount != 0 || idf.firstStart {
-			helper.RecordContainerConfigResultIncrement(configResult)
+			dockercenter.RecordContainerConfigResultIncrement(configResult)
 			idf.firstStart = false
 		}
 		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v", addResultList, deleteResultList)
@@ -474,7 +475,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			idf.deleteMetric.Add(1)
 			idf.notifyStop(id)
 			idf.deleteMapping(id)
-		} else if c.Status() != helper.ContainerStatusRunning && len(idf.LogPath) > 0 { // input_file时会触发
+		} else if c.Status() != dockercenter.ContainerStatusRunning && len(idf.LogPath) > 0 { // input_file时会触发
 			if idf.forceReleaseStopContainerFile {
 				idf.deleteMetric.Add(1)
 				idf.notifyStop(id)

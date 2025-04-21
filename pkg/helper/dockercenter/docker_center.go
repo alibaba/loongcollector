@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package dockercenter
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -428,13 +429,13 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 				tagKV := strings.SplitN(value, "=", 2)
 				// if tag exist in EnvTags, just skip this tag
 				if len(tagKV) == 2 {
-					if !HasEnvTags(tagKV[0], tagKV[1]) {
+					if !helper.HasEnvTags(tagKV[0], tagKV[1]) {
 						did.ContainerNameTag[tagKV[0]] = tagKV[1]
 					} else {
 						logger.Info(context.Background(), "skip set this tag, as this exist in self env tags, key", tagKV[0], "value", tagKV[1])
 					}
 				} else {
-					if !HasEnvTags(tagKV[0], tagKV[0]) {
+					if !helper.HasEnvTags(tagKV[0], tagKV[0]) {
 						did.ContainerNameTag[tagKV[0]] = tagKV[0]
 					} else {
 						logger.Info(context.Background(), "skip set this tag, as this exist in self env tags, key&value", tagKV[0])
@@ -661,7 +662,7 @@ func getDockerCenterInstance() *DockerCenter {
 	onceDocker.Do(func() {
 		logger.InitLogger()
 		// load EnvTags first
-		LoadEnvTags()
+		helper.LoadEnvTags()
 		dockerCenterInstance = &DockerCenter{
 			containerHelper: &ContainerHelperWrapper{},
 		}

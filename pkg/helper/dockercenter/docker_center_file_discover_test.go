@@ -15,7 +15,7 @@
 //go:build !windows
 // +build !windows
 
-package helper
+package dockercenter
 
 import (
 	"fmt"
@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -789,8 +790,8 @@ func TestLoadStaticContainerConfigTwice(t *testing.T) {
 func checkSameDevInode(t *testing.T, oldname, newname string) {
 	logNameStat, _ := os.Stat(oldname)
 	logStat0, _ := os.Stat(newname)
-	logNameOSStat := GetOSState(logNameStat)
-	logOSStat0 := GetOSState(logStat0)
+	logNameOSStat := helper.GetOSState(logNameStat)
+	logOSStat0 := helper.GetOSState(logStat0)
 	if logOSStat0.Device != logNameOSStat.Device ||
 		logOSStat0.Inode != logNameOSStat.Inode ||
 		logOSStat0.ModifyTime != logNameOSStat.ModifyTime ||
