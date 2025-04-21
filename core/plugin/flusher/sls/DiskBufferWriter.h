@@ -57,6 +57,7 @@ public:
 
 private:
     static const int32_t BUFFER_META_BASE_SIZE;
+    static const size_t BUFFER_META_MAX_SIZE;
 
     struct EncryptionStateMeta {
         int32_t mLogDataSize;
