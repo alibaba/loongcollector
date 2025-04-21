@@ -92,6 +92,7 @@ enum class FileReadResult {
 };
 
 // ReadFileContent reads up to maxFileSize content of @fileName to @content.
+// Cannot garantee the content is complete if the file is changed during reading.
 FileReadResult
 ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize = kDefaultMaxFileSize);
 

@@ -14,6 +14,10 @@
 
 #include "FileSystemUtil.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <sys/types.h>
+
 #if defined(_MSC_VER)
 #include <direct.h>
 #include <fcntl.h>
@@ -145,25 +149,39 @@ FileReadResult ReadFileContent(const std::string& fileName, std::string& content
     }
 
     content.clear();
-    uint64_t fileSize = 0;
     try {
-        fileSize = std::filesystem::file_size(fileName);
-        content.resize(std::min(maxFileSize, fileSize));
-    } catch (const std::filesystem::filesystem_error& e) {
-        return FileReadResult::kError;
-    }
+        constexpr uint64_t kFileReadBufferSize = 32 * 1024;
+        // 设定为32K，对于特殊文件（如 /proc 中的文件）
+        // 尽可能一次性读进来 https://github.com/giampaolo/psutil/issues/2050
+        uint64_t totalRead = 0;
+        uint64_t bytesRead = 0;
+        content.resize(std::min(kFileReadBufferSize, maxFileSize));
 
-    try {
-        ifs.read(content.data(), content.size());
-        content.resize(ifs.gcount()); // avoid read less unexpectedly if file truncated
+        while (ifs && totalRead < maxFileSize) {
+            ifs.read(content.data() + totalRead, std::min(kFileReadBufferSize, maxFileSize - totalRead));
+            bytesRead = ifs.gcount();
+            totalRead += bytesRead;
+
+            if (bytesRead > 0 && totalRead < maxFileSize) {
+                content.resize(totalRead + kFileReadBufferSize);
+            }
+        }
+
+        content.resize(totalRead);
+
+        // Check if file is larger than maxFileSize
+        char extra = 0;
+        if (ifs.read(&extra, 1)) {
+            return FileReadResult::kTruncated;
+        }
     } catch (const std::ios_base::failure& e) {
         return FileReadResult::kError;
+    } catch (const std::filesystem::filesystem_error& e) {
+        // Handle filesystem errors (e.g., permissions)
+        return FileReadResult::kError;
     }
 
-    if (fileSize != content.size()) {
-        return FileReadResult::kTruncated;
-    }
-    return FileReadResult::kOK; // 如果到达这里，文件一定是完整读取的
+    return FileReadResult::kOK;
 }
 
 int GetLines(std::istream& is,
