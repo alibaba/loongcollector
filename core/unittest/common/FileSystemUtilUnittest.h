@@ -491,7 +491,11 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     }
 
     std::string content;
-    FileReadResult ret = ReadFileContent(filePath, content);
+    FileReadResult ret = ReadFileContent((mTestRoot / "not—exist-file").string(), content);
+    EXPECT_EQ(FileReadResult::kError, ret);
+
+    ret = ReadFileContent(filePath, content);
+
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_EQ(1024 * 1024UL, content.size());
 
