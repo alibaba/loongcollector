@@ -458,7 +458,7 @@ type DockerCenter struct {
 	// For the CRI scenario, the container list only contains the real containers and excludes the sandbox containers. But the
 	// sandbox meta would be saved to its bound container.
 	containerMap                   map[string]*DockerInfoDetail // all containers will in this map
-	client                         DockerCenterClientInterface
+	client                         ClientInterface
 	containerHelper                ContainerHelperInterface
 	lastErrMu                      sync.Mutex
 	lastErr                        error
@@ -472,7 +472,7 @@ type DockerCenter struct {
 	initStaticContainerInfoSuccess bool
 }
 
-type DockerCenterClientInterface interface {
+type ClientInterface interface {
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
 	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
