@@ -14,6 +14,7 @@
 
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "collection_pipeline/limiter/RateLimiter.h"
@@ -46,6 +47,9 @@ DEFINE_FLAG_INT32(send_retry_sleep_interval, "sleep microseconds when sync send 
 DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer period", 60);
 DEFINE_FLAG_INT32(unauthorized_wait_interval, "", 1);
 DEFINE_FLAG_INT32(send_retrytimes, "how many times should retry if PostLogStoreLogs operation fail", 3);
+DEFINE_FLAG_INT32(max_log_meta_buffer_size,
+                  "max log meta buffer size, larger than this will be recognized as illegal and be skipped",
+                  1 * 1024 * 1024);
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
 
@@ -962,7 +966,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
 }
 
 bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
-                                             const sls_logs::LogtailBufferMeta& bufferMeta) {
+                                                 const sls_logs::LogtailBufferMeta& bufferMeta) {
     if (bufferMeta.project().empty()) {
         LOG_ERROR(sLogger, ("send disk buffer fail", "project is empty")("filename", filename));
         return false;
@@ -973,7 +977,7 @@ bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
                                                                         filename)("size", bufferMeta.aliuid().size()));
         return false;
     }
-    if (sizeof(bufferMeta) > 1 * 1024 * 1024) {
+    if (sizeof(bufferMeta) > INT32_FLAG(max_log_meta_buffer_size)) {
         LOG_ERROR(
             sLogger,
             ("send disk buffer fail", "buffer meta is too large")("filename", filename)("size", sizeof(bufferMeta)));
