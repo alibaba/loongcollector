@@ -54,19 +54,17 @@ void ProcessorPromRelabelMetricNative::Process(PipelineEventGroup& metricGroup) 
     // if mMetricRelabelConfigs is empty and honor_labels is true, skip it
     auto targetTags = metricGroup.GetTags();
 
-    if (!mScrapeConfigPtr->mMetricRelabelConfigs.Empty() || !targetTags.empty()) {
-        EventsContainer& events = metricGroup.MutableEvents();
-        size_t wIdx = 0;
-        for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-            if (ProcessEvent(events[rIdx], targetTags)) {
-                if (wIdx != rIdx) {
-                    events[wIdx] = std::move(events[rIdx]);
-                }
-                ++wIdx;
+    EventsContainer& events = metricGroup.MutableEvents();
+    size_t wIdx = 0;
+    for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+        if (ProcessEvent(events[rIdx], targetTags)) {
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
             }
+            ++wIdx;
         }
-        events.resize(wIdx);
     }
+    events.resize(wIdx);
 
     if (metricGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_TOTAL)) {
         auto autoMetric = prom::AutoMetric();
@@ -124,7 +122,9 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
         auto& inner = eventTags.mInner;
 
         inner.erase(
-            std::remove_if(inner.begin(), inner.end(), [](const auto& item) { return item.first.starts_with("__"); }),
+            std::remove_if(inner.begin(),
+                           inner.end(),
+                           [](const auto& item) { return item.first.starts_with("__") || item.second.empty(); }),
             inner.end());
 
         eventTags.mAllocatedSize
@@ -134,7 +134,9 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
     }
 
     for (const auto& [k, v] : mScrapeConfigPtr->mExternalLabels) {
-        appendLabels(k, v, mScrapeConfigPtr->mHonorLabels);
+        if (!v.empty()) {
+            appendLabels(k, v, mScrapeConfigPtr->mHonorLabels);
+        }
     }
 
     return true;
