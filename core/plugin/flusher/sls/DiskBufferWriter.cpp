@@ -14,6 +14,9 @@
 
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 
+#include <cstddef>
+
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "collection_pipeline/limiter/RateLimiter.h"
@@ -100,6 +103,7 @@ static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compress
 }
 
 const int32_t DiskBufferWriter::BUFFER_META_BASE_SIZE = 65536;
+const size_t DiskBufferWriter::BUFFER_META_MAX_SIZE = 1 * 1024 * 1024;
 
 void DiskBufferWriter::Init() {
     mBufferDivideTime = time(NULL);
@@ -488,7 +492,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
     while (ReadNextEncryption(pos, filename, encryption, meta, readResult, bufferMeta)) {
         logData.clear();
         bool sendResult = false;
-        if (!readResult || bufferMeta.project().empty()) {
+        if (!readResult || !CheckBufferMetaValidation(filename, bufferMeta)) {
             if (meta.mHandled == 1)
                 continue;
             sendResult = true;
@@ -957,6 +961,27 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
             return response;
         }
     }
+}
+
+bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
+                                                 const sls_logs::LogtailBufferMeta& bufferMeta) {
+    if (bufferMeta.project().empty()) {
+        LOG_ERROR(sLogger, ("send disk buffer fail", "project is empty")("filename", filename));
+        return false;
+    }
+    if (bufferMeta.aliuid().size() > 16) {
+        LOG_ERROR(sLogger,
+                  ("send disk buffer fail", "aliuid size is too large")("filename",
+                                                                        filename)("size", bufferMeta.aliuid().size()));
+        return false;
+    }
+    if (sizeof(bufferMeta) > BUFFER_META_MAX_SIZE) {
+        LOG_ERROR(
+            sLogger,
+            ("send disk buffer fail", "buffer meta is too large")("filename", filename)("size", sizeof(bufferMeta)));
+        return false;
+    }
+    return true;
 }
 
 } // namespace logtail
