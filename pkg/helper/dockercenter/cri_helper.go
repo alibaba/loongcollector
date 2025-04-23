@@ -18,9 +18,13 @@
 package dockercenter
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 var containerdUnixSocket = "/run/containerd/containerd.sock"
@@ -37,6 +41,38 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 	}
 
 	return addr, dial, nil
+}
+
+func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
+	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
+		fallbackEndpoint := fallbackProtocol + "://" + endpoint
+		protocol, addr, err = parseEndpoint(fallbackEndpoint)
+		if err == nil {
+			logger.Infof(context.Background(), "Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+		}
+	}
+	return
+}
+
+func parseEndpoint(endpoint string) (string, string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch u.Scheme {
+	case "tcp":
+		return "tcp", u.Host, nil
+
+	case "unix":
+		return "unix", u.Path, nil
+
+	case "":
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
+
+	default:
+		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
+	}
 }
 
 func dial(addr string, timeout time.Duration) (net.Conn, error) {

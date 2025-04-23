@@ -163,9 +163,9 @@ func (c *ContainerDiscoverManager) Init() bool {
 	defer dockerCenterRecover()
 
 	// discover which runtime is valid
-	if IsCRIRuntimeValid(containerdUnixSocket) {
+	if ok, runtimeInfo := IsCRIRuntimeValid(containerdUnixSocket); ok {
 		var err error
-		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
+		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance, runtimeInfo)
 		if err != nil {
 			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
 			criRuntimeWrapper = nil
