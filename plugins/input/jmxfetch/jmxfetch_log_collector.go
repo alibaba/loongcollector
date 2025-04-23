@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LogCollector struct {
@@ -31,7 +32,7 @@ type LogCollector struct {
 
 const (
 	startLogPath = "start.log"
-	JMXAlarmType = "JMXFETCH_ALARM"
+	JMXAlarmType = util.JmxfetchAlarm
 )
 
 // NewLogCollector create a log collector to read jmxfetch log.

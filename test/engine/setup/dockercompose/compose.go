@@ -35,6 +35,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -119,14 +120,14 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		if execError.Error == nil {
 			break
 		}
-		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
+		logger.Error(context.Background(), util.StartDockerComposeAlarm,
 			"stdout", execError.Error.Error())
 		if i == 2 {
 			return execError.Error
 		}
 		execError = testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 		if execError.Error != nil {
-			logger.Error(context.Background(), "DOWN_DOCKER_COMPOSE_ERROR",
+			logger.Error(context.Background(), util.DownDockerComposeAlarm,
 				"stdout", execError.Error.Error())
 			return execError.Error
 		}
@@ -144,7 +145,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		),
 	})
 	if len(list) != 1 {
-		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "logtail container size is not equal 1, got %d count", len(list))
+		logger.Errorf(context.Background(), util.LogtailComposeAlarm, "logtail container size is not equal 1, got %d count", len(list))
 		return err
 	}
 	c.logtailID = list[0].ID
@@ -152,7 +153,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		Filters: filters.NewArgs(filters.Arg("name", "goc")),
 	})
 	if len(gocList) != 1 {
-		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "goc container size is not equal 1, got %d count", len(list))
+		logger.Errorf(context.Background(), util.LogtailComposeAlarm, "goc container size is not equal 1, got %d count", len(list))
 		return err
 	}
 	c.gocID = gocList[0].ID
@@ -183,7 +184,7 @@ func (c *ComposeBooter) Stop() error {
 		}
 		execCmd := []string{"sh", "-c", cmd}
 		if err := c.exec(c.gocID, execCmd); err != nil {
-			logger.Error(context.Background(), "FETCH_COVERAGE_ALARM", "err", err)
+			logger.Error(context.Background(), util.FetchCoverageAlarm, "err", err)
 		}
 	}
 	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
@@ -192,7 +193,7 @@ func (c *ComposeBooter) Stop() error {
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
 	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 	if execError.Error != nil {
-		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
+		logger.Error(context.Background(), util.StopDockerComposeAlarm,
 			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
 		return execError.Error
 	}
@@ -207,7 +208,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 	}
 	resp, err := c.cli.ContainerExecCreate(context.Background(), id, cfg)
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
+		logger.Errorf(context.Background(), util.DockerExecAlarm, "cannot create exec config: %v", err)
 		return err
 	}
 	err = c.cli.ContainerExecStart(context.Background(), resp.ID, dockertypes.ExecStartCheck{
@@ -215,7 +216,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 		Tty:    false,
 	})
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot start exec config: %v", err)
+		logger.Errorf(context.Background(), util.DockerExecAlarm, "cannot start exec config: %v", err)
 		return err
 	}
 	return nil
@@ -229,13 +230,13 @@ func (c *ComposeBooter) CopyCoreLogs() {
 		output, err := cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
-			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
+			logger.Error(context.Background(), util.CopyLogAlarm, "type", "main", "err", err)
 		}
 		cmd = exec.Command("docker", "cp", c.logtailID+":/loongcollector/log/go_plugin.LOG", config.LogDir)
 		output, err = cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
-			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "plugin", "err", err)
+			logger.Error(context.Background(), util.CopyLogAlarm, "type", "plugin", "err", err)
 		}
 	}
 }

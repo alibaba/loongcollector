@@ -19,6 +19,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"regexp"
 	"time"
@@ -125,7 +126,7 @@ func (p *ProcessorSplitRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.
 			destArray = p.SplitLog(destArray, newLog, destCont)
 		} else {
 			if p.NoKeyError {
-				logger.Warning(p.context.GetRuntimeContext(), "LOG_REGEX_FIND_ALARM", "can't find split key", p.SplitKey)
+				logger.Warning(p.context.GetRuntimeContext(), util.LogRegexFindAlarm, "processor_split_log_string can't find split key", p.SplitKey)
 			}
 			if p.PreserveOthers {
 				destArray = append(destArray, newLog)

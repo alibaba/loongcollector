@@ -677,7 +677,7 @@ func getDockerCenterInstance() *DockerCenter {
 					break
 				}
 				if retryCount%10 == 0 {
-					logger.Error(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
+					logger.Error(context.Background(), util.DockerCenterAlarm, "docker center init failed", "retry count", retryCount)
 				}
 				retryCount++
 				time.Sleep(time.Second * 1)
@@ -698,7 +698,7 @@ func (dc *DockerCenter) readStaticConfig(forceFlush bool) {
 	defer staticDockerContainerLock.Unlock()
 	containerInfo, removedIDs, changed, err := tryReadStaticContainerInfo()
 	if err != nil {
-		logger.Warning(context.Background(), "READ_STATIC_CONFIG_ALARM", "read static container info error", err)
+		logger.Warning(context.Background(), util.DockerCenterAlarm, "read static container info error", err)
 	}
 	if !dc.initStaticContainerInfoSuccess && len(containerInfo) > 0 {
 		dc.initStaticContainerInfoSuccess = true
@@ -734,7 +734,7 @@ func (dc *DockerCenter) setLastError(err error, msg string) {
 	dc.lastErr = err
 	dc.lastErrMu.Unlock()
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), util.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -906,7 +906,7 @@ func (dc *DockerCenter) getAllAcceptedInfoV2(
 		if ok {
 			matchList[id] = c
 		} else {
-			logger.Warningf(context.Background(), "DOCKER_MATCH_ALARM", "matched container not in docker center")
+			logger.Warningf(context.Background(), util.DockerCenterAlarm, "matched container not in docker center")
 		}
 	}
 
@@ -1178,7 +1178,7 @@ func dockerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "docker center runtime error", err, "stack", string(trace))
+		logger.Error(context.Background(), util.PluginRuntimeAlarm, "docker center runtime error", err, "stack", string(trace))
 	}
 }
 
@@ -1209,7 +1209,7 @@ func (dc *DockerCenter) eventListener() {
 			select {
 			case event, ok := <-events:
 				if !ok {
-					logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
+					logger.Errorf(context.Background(), util.DockerCenterAlarm, "docker event listener stop")
 					errorCount++
 					breakFlag = true
 					break
@@ -1231,15 +1231,15 @@ func (dc *DockerCenter) eventListener() {
 					select {
 					case dc.eventChan <- event:
 					default:
-						logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "event queue is full, miss event", event)
+						logger.Error(context.Background(), util.DockerCenterAlarm, "docker event queue is full, miss event", event)
 					}
 				}
 				dc.eventChanLock.Unlock()
 			case err = <-errors:
-				logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
+				logger.Error(context.Background(), util.DockerCenterAlarm, "docker event listener error", err)
 				breakFlag = true
 			case <-timer.C:
-				logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
+				logger.Errorf(context.Background(), util.DockerCenterAlarm, "no docker event in 1 hour. Reset event listener")
 				breakFlag = true
 			}
 		}

@@ -19,6 +19,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -26,11 +27,11 @@ import (
 
 type goKitLogWrapper struct {
 	context   pipeline.Context
-	alarmType string
+	alarmType util.AlarmType
 }
 
 // NewGoKitLogWrapper returns a logger that log with context.
-func NewGoKitLogWrapper(context pipeline.Context, alarmType string) log.Logger {
+func NewGoKitLogWrapper(context pipeline.Context, alarmType util.AlarmType) log.Logger {
 	logger := &goKitLogWrapper{
 		context:   context,
 		alarmType: alarmType,

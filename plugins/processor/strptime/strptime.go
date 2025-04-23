@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -135,7 +136,7 @@ func (s *Strptime) processLog(log *protocol.Log) {
 		logTime, err = strtime.Strptime(value, s.Format)
 		if err != nil || (logTime == time.Time{}) {
 			if s.AlarmIfFail {
-				logger.Warningf(s.context.GetRuntimeContext(), "STRPTIME_PARSE_ALARM", "strptime(%v, %v) failed: %v, %v",
+				logger.Warningf(s.context.GetRuntimeContext(), util.ParseTimeFailAlarm, "strptime(%v, %v) failed: %v, %v",
 					content.Value, s.Format, logTime, err)
 			}
 			break

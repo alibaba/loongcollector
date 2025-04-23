@@ -187,7 +187,7 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 	wrapper.Aggregator = aggregator
 	err := wrapper.Init(pluginMeta)
 	if err != nil {
-		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", aggregator.Description(), "error", err)
+		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorInitAlarm, "Aggregator failed to initialize", aggregator.Description(), "error", err)
 		return err
 	}
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
@@ -223,7 +223,7 @@ func (p *pluginv2Runner) runInput() {
 			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "start run service", service)
 			defer panicRecover(service.Input.Description())
 			if err := service.StartService(p.InputPipeContext); err != nil {
-				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "PLUGIN_ALARM", "start service error, err", err)
+				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.PluginAlarm, "start service error, err", err)
 			}
 			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "service done", service.Input.Description())
 		})
@@ -241,7 +241,7 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 				}, cc)
 			})
 		} else {
-			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "METRIC_INPUT_V2_START_FAILURE", "type assertion", "failure")
+			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.InputStartAlarm, "metric input v2 start error, type assertion", "failure")
 		}
 	}
 }
@@ -294,7 +294,7 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 						}
 						// wait until shutdown is active
 						if tryCount%100 == 0 {
-							logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), "AGGREGATOR_ADD_ALARM", "error", err)
+							logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorAddAlarm, "error", err)
 						}
 						time.Sleep(time.Millisecond * 10)
 					}
@@ -362,7 +362,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 					for _, flusher := range p.FlusherPlugins {
 						err := flusher.Export(data, p.FlushPipeContext)
 						if err != nil {
-							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error",
+							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.SendDataFailAlarm, "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)
 						}
 					}
@@ -415,7 +415,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	}
 	for idx, flusher := range p.FlusherPlugins {
 		if err := flusher.Flusher.Stop(); err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_FLUSHER_ALARM",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.FlusherStopAlarm,
 				"Failed to stop %vth flusher (description: %v): %v",
 				idx, flusher.Flusher.Description(), err)
 		}
@@ -425,7 +425,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	for _, extension := range p.ExtensionPlugins {
 		err := extension.Stop()
 		if err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_EXTENSION_ALARM",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.ExtensionAlarm,
 				"failed to stop extension (description: %v): %v", extension.Description(), err)
 		}
 	}
@@ -442,7 +442,7 @@ func (p *pluginv2Runner) ReceiveLogGroup(in pipeline.LogGroupWithContext) {
 		for k, v := range in.Context {
 			value, ok := v.(string)
 			if !ok {
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "RECEIVE_LOG_GROUP_ALARM", "unknown values found in context, type is %T", v)
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.WrongProtobufAlarm, "receive log group error, unknown values found in context, type is %T", v)
 				continue
 			}
 			meta.Add(k, value)
@@ -482,7 +482,7 @@ func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
 					tags.Add(tag.GetKey(), tag.GetValue())
 				}
 			default:
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "RECEIVE_RAW_LOG_ALARM", "unknown values found in context, type is %T", v)
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.WrongProtobufAlarm, "receive raw log error, unknown values found in context, type is %T", v)
 			}
 		}
 	}

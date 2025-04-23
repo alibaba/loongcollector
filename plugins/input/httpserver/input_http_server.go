@@ -31,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -154,7 +155,7 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		MethodNotAllowed(w)
 	}
 	if err != nil {
-		logger.Warning(s.context.GetRuntimeContext(), "READ_BODY_FAIL_ALARM", "read body failed", err, "request", r.URL.String())
+		logger.Warning(s.context.GetRuntimeContext(), util.InputCollectAlarm, "read body failed", err, "request", r.URL.String())
 		return
 	}
 
@@ -171,7 +172,7 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case v1:
 		logs, err := s.decoder.Decode(data, r, s.Tags)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.InputCollectAlarm, "decode body failed", err, "request", r.URL.String())
 			BadRequest(w)
 			return
 		}
@@ -181,7 +182,7 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case v2:
 		groups, err := s.decoder.DecodeV2(data, r)
 		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			logger.Warning(s.context.GetRuntimeContext(), util.InputCollectAlarm, "decode body failed", err, "request", r.URL.String())
 			BadRequest(w)
 			return
 		}
@@ -278,7 +279,7 @@ func (s *ServiceHTTP) start() error {
 		logger.Info(s.context.GetRuntimeContext(), "http server start", s.Address, "listener", listener.Addr().String())
 		err := server.Serve(listener)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "INIT_SERVER_ARMAR", "err", err.Error())
+			logger.Error(s.context.GetRuntimeContext(), util.InputStartAlarm, "err", err.Error())
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.ShutdownTimeoutSec)*time.Second)
 		defer cancel()

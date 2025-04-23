@@ -22,6 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
@@ -123,7 +124,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 			if p.timestampFormat {
 				i, err := strconv.ParseInt(content.Value, 10, 64)
 				if err != nil && p.AlarmIfFail {
-					logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_PARSE_ALARM", "ParseInt(%v, %v) failed: %v",
+					logger.Warningf(p.context.GetRuntimeContext(), util.ParseTimeFailAlarm, "Gotime ParseInt(%v, %v) failed: %v",
 						p.SourceFormat, content.Value, err)
 					return
 				}
@@ -131,7 +132,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 			} else {
 				parsedStringTime, err := time.ParseInLocation(p.SourceFormat, content.Value, p.sourceLocation)
 				if err != nil && p.AlarmIfFail {
-					logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_PARSE_ALARM", "ParseInLocation(%v, %v, %v) failed: %v",
+					logger.Warningf(p.context.GetRuntimeContext(), util.ParseTimeFailAlarm, "Gotime ParseInLocation(%v, %v, %v) failed: %v",
 						p.SourceFormat, content.Value, p.sourceLocation, err)
 					return
 				}
@@ -161,7 +162,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 		}
 	}
 	if !found && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_FIND_ALARM", "cannot find key %v", p.SourceKey)
+		logger.Warningf(p.context.GetRuntimeContext(), util.ParseTimeFailAlarm, "Gotime cannot find key %v", p.SourceKey)
 	}
 }
 

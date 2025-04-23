@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type RdbFunc func() error //nolint:revive
@@ -84,14 +85,13 @@ type Rdb struct {
 }
 
 func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
-	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
 	m.Context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
 		data, err := os.ReadFile(m.StateMentPath)
 		if err != nil && len(data) > 0 {
 			m.StateMent = string(data)
 		} else {
-			logger.Warning(m.Context.GetRuntimeContext(), initAlarmName, "init sql statement error", err)
+			logger.Warning(m.Context.GetRuntimeContext(), util.InputInitAlarm, strings.ToUpper(m.Driver)+" init sql statement error", err)
 		}
 	}
 	if len(m.StateMent) == 0 {
@@ -99,7 +99,7 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 	}
 	err := rdbFunc()
 	if err != nil {
-		logger.Warning(m.Context.GetRuntimeContext(), initAlarmName, "init rdbFunc error", err)
+		logger.Warning(m.Context.GetRuntimeContext(), util.InputInitAlarm, strings.ToUpper(m.Driver)+" init rdbFunc error", err)
 	}
 
 	metricsRecord := m.Context.GetMetricRecord()
@@ -113,10 +113,9 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 }
 
 func (m *Rdb) initRdbsql(connStr string, rdbFunc RdbFunc) error {
-	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
 	err := rdbFunc()
 	if err != nil {
-		logger.Error(m.Context.GetRuntimeContext(), initAlarmName, "rdb func ", err)
+		logger.Error(m.Context.GetRuntimeContext(), util.InputInitAlarm, strings.ToUpper(m.Driver)+" rdb func ", err)
 		return err
 	}
 	for tryTime := 0; tryTime < m.ConnectionRetryTime; tryTime++ {
@@ -129,7 +128,7 @@ func (m *Rdb) initRdbsql(connStr string, rdbFunc RdbFunc) error {
 					logger.Debug(m.Context.GetRuntimeContext(), "sql connect success, ping error", m.dbInstance.Ping())
 					break
 				} else {
-					logger.Warning(m.Context.GetRuntimeContext(), initAlarmName, "init db statement error, err", err)
+					logger.Warning(m.Context.GetRuntimeContext(), util.InputInitAlarm, strings.ToUpper(m.Driver)+" init db statement error, err", err)
 					break
 				}
 			}
@@ -149,9 +148,6 @@ func (m *Rdb) CheckPointToString() string {
 
 // Start starts the ServiceInput's service, whatever that may be
 func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
-	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
-	timeoutAlarmName := fmt.Sprintf("%s_TIMEOUT_ALARM", strings.ToUpper(m.Driver))
-	queryAlarmName := fmt.Sprintf("%s_QUERY_ALARM", strings.ToUpper(m.Driver))
 	m.waitGroup.Add(1)
 	defer m.waitGroup.Done()
 	// initialize additional query intervals
@@ -169,11 +165,11 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 
 			switch {
 			case err != nil:
-				logger.Error(m.Context.GetRuntimeContext(), checkpointAlarmName, "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
+				logger.Error(m.Context.GetRuntimeContext(), util.CheckpointAlarm, strings.ToUpper(m.Driver)+" init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
 			case cp.CheckPointColumn == m.CheckPointColumn && m.CheckPointColumnType == cp.CheckPointColumnType:
 				m.checkpointValue = cp.Value
 			default:
-				logger.Warning(m.Context.GetRuntimeContext(), checkpointAlarmName, "not matched checkpoint, may be config update, last column",
+				logger.Warning(m.Context.GetRuntimeContext(), util.CheckpointAlarm, strings.ToUpper(m.Driver)+" not matched checkpoint, may be config update, last column",
 					cp.CheckPointColumn, "now column", m.CheckPointColumn, "last type", cp.CheckPointColumnType, "now type", m.CheckPointColumnType)
 			}
 		}
@@ -196,12 +192,12 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 			startTime := time.Now()
 			err = m.Collect(collector, columnResolverFuncMap)
 			if err != nil {
-				logger.Error(m.Context.GetRuntimeContext(), queryAlarmName, "collect err", err)
+				logger.Error(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" query alarm, collect err", err)
 			}
 			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()
 			if endTime.Sub(startTime) > time.Duration(m.IntervalMs)*time.Millisecond/2 {
-				logger.Warning(m.Context.GetRuntimeContext(), timeoutAlarmName, "sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
+				logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" timeout alarm, sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
 				timer.Reset(time.Duration(m.IntervalMs) * time.Millisecond)
 			} else {
 				timer.Reset(time.Duration(m.IntervalMs)*time.Millisecond - endTime.Sub(startTime))
@@ -279,7 +275,6 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 }
 
 func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
-	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
 	cp := CheckPoint{
 		CheckPointColumn:     m.CheckPointColumn,
 		CheckPointColumnType: m.CheckPointColumnType,
@@ -287,9 +282,9 @@ func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
 		LastUpdateTime:       time.Now(),
 	}
 	buf, err := json.Marshal(&cp)
-	logger.Info(m.Context.GetRuntimeContext(), checkpointAlarmName, string(buf))
+	logger.Info(m.Context.GetRuntimeContext(), util.CheckpointAlarm.String(), string(buf))
 	if err != nil {
-		logger.Warning(m.Context.GetRuntimeContext(), checkpointAlarmName, "save checkpoint marshal error, checkpoint", cp, "error", err)
+		logger.Warning(m.Context.GetRuntimeContext(), util.CheckpointAlarm, strings.ToUpper(m.Driver)+" save checkpoint marshal error, checkpoint", cp, "error", err)
 		return
 	}
 	err = m.Context.SaveCheckPoint(m.CheckPointColumn, buf)
@@ -297,22 +292,21 @@ func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
 		m.checkpointMetric.Set(m.CheckPointColumn)
 	}
 	if err != nil {
-		logger.Warning(m.Context.GetRuntimeContext(), checkpointAlarmName, "save checkpoint dump error, checkpoint", cp, "error", err)
+		logger.Warning(m.Context.GetRuntimeContext(), util.CheckpointAlarm, strings.ToUpper(m.Driver)+" save checkpoint dump error, checkpoint", cp, "error", err)
 	}
 }
 
 func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector pipeline.Collector) int {
-	parseAlarmName := fmt.Sprintf("%s_PARSE_ALARM", strings.ToUpper(m.Driver))
 	defer rows.Close()
 	rowCount := 0
 	if m.columnsKeyBuffer == nil {
 		columns, err := rows.Columns()
 		if err != nil {
-			logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, "no columns info, use default columns info, error", err)
+			logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" parse alarm, no columns info, use default columns info, error", err)
 		}
 		m.columnTypes, err = rows.ColumnTypes()
 		if err != nil {
-			logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, "no columns type info, use default columns info, error", err)
+			logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" parse alarm, no columns type info, use default columns info, error", err)
 		}
 
 		m.columnsKeyBuffer = make([]string, len(columns))
@@ -331,7 +325,7 @@ func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnR
 			}
 		}
 		if m.CheckPoint && len(m.CheckPointColumn) != 0 && !foundCheckpointColumn {
-			logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, "no checkpoint column", m.CheckPointColumn)
+			logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" parse alarm, no checkpoint column", m.CheckPointColumn)
 		}
 
 		m.columnValues = make([]sql.NullString, len(m.columnsKeyBuffer))
@@ -348,7 +342,7 @@ func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnR
 	for rows.Next() {
 		err := rows.Scan(m.columnValuePointers...)
 		if err != nil {
-			logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, "scan error, row", rowCount, "error", err)
+			logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" parse alarm, scan error, row", rowCount, "error", err)
 			return rowCount
 		}
 		for index, val := range m.columnValues {
@@ -371,7 +365,7 @@ func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnR
 		rowCount++
 	}
 	if rowCount != 0 {
-		logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, m.columnStringValues[m.checkpointColumnIndex], "rowCount", rowCount)
+		logger.Warning(m.Context.GetRuntimeContext(), util.InputCollectAlarm, strings.ToUpper(m.Driver)+" parse alarm, "+m.columnStringValues[m.checkpointColumnIndex], "rowCount", rowCount)
 		m.checkpointValue = m.columnStringValues[m.checkpointColumnIndex]
 	}
 	return rowCount

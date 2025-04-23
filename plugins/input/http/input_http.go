@@ -255,7 +255,7 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logger.Error(h.context.GetRuntimeContext(), "HTTP_PARSE_ALARM", "Read body of HTTP response failed", err)
+		logger.Error(h.context.GetRuntimeContext(), util.HttpParseAlarm, "Read body of HTTP response failed", err)
 		fields["_result_"] = "invalid_body"
 		fields["_response_match_"] = "no"
 		return fields, nil
@@ -268,7 +268,7 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 		if h.compiledStringMatch == nil {
 			h.compiledStringMatch, err = regexp.Compile(h.ResponseStringMatch)
 			if err != nil {
-				logger.Error(h.context.GetRuntimeContext(), "HTTP_INIT_ALARM", "Compile regular expression faild", h.ResponseStringMatch, "error", err)
+				logger.Error(h.context.GetRuntimeContext(), util.HttpInitAlarm, "Compile regular expression faild", h.ResponseStringMatch, "error", err)
 				fields["_result_"] = "match_regex_invalid"
 				return fields, nil
 			}
@@ -304,7 +304,7 @@ func (h *Response) Collect(collector pipeline.Collector) error {
 		if curTime.Sub(h.lastLoadAddressTime).Seconds() > float64(h.FlushAddressIntervalSec) {
 			err := h.loadAddresses()
 			if err != nil {
-				logger.Warning(h.context.GetRuntimeContext(), "HTTP_LOAD_ADDRESS_ALARM", "load address error, file", h.AddressPath, "error", err)
+				logger.Warning(h.context.GetRuntimeContext(), util.HttpLoadAddressAlarm, "load address error, file", h.AddressPath, "error", err)
 			}
 		}
 	}
@@ -313,7 +313,7 @@ func (h *Response) Collect(collector pipeline.Collector) error {
 	for _, address := range h.Addresses {
 		fields, err := h.httpGather(address)
 		if err != nil {
-			logger.Warning(h.context.GetRuntimeContext(), "HTTP_COLLECT_ALARM", "collect error, address", address, "error", err)
+			logger.Warning(h.context.GetRuntimeContext(), util.HttpCollectAlarm, "collect error, address", address, "error", err)
 		}
 		if len(fields) > 0 {
 			// Add metrics

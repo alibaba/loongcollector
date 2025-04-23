@@ -26,6 +26,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -69,7 +70,7 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 	strategyWrappers := withExposedService(compose)
 	execError := compose.Invoke()
 	if execError.Error != nil {
-		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
+		logger.Error(context.Background(), util.StartDockerComposeAlarm,
 			"stdout", execError.Error.Error())
 		return execError.Error
 	}
@@ -83,7 +84,7 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 		Filters: filters.NewArgs(filters.Arg("name", "benchmark-cadvisor")),
 	})
 	if len(list) != 1 {
-		logger.Errorf(context.Background(), "CADVISOR_COMPOSE_ALARM", "cadvisor container size is not equal 1, got %d count", len(list))
+		logger.Errorf(context.Background(), util.CadvisorComposeAlarm, "cadvisor container size is not equal 1, got %d count", len(list))
 		return err
 	}
 	c.cadvisorID = list[0].ID
@@ -105,7 +106,7 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 func (c *ComposeBenchmarkBooter) Stop() error {
 	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
 	if execError.Error != nil {
-		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
+		logger.Error(context.Background(), util.StopDockerComposeAlarm,
 			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
 		return execError.Error
 	}
@@ -120,7 +121,7 @@ func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
 	}
 	resp, err := c.cli.ContainerExecCreate(context.Background(), id, cfg)
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
+		logger.Errorf(context.Background(), util.DockerExecAlarm, "cannot create exec config: %v", err)
 		return err
 	}
 	err = c.cli.ContainerExecStart(context.Background(), resp.ID, dockertypes.ExecStartCheck{
@@ -128,7 +129,7 @@ func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
 		Tty:    false,
 	})
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot start exec config: %v", err)
+		logger.Errorf(context.Background(), util.DockerExecAlarm, "cannot start exec config: %v", err)
 		return err
 	}
 	return nil

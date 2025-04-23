@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type FlusherKafka struct {
@@ -51,12 +52,12 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if k.Brokers == nil || len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Error(k.context.GetRuntimeContext(), util.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 	config := sarama.NewConfig()
 	if len(k.SASLUsername) == 0 {
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "SASL information is not set, access Kafka server without authentication")
+		logger.Warning(k.context.GetRuntimeContext(), util.FlusherInitAlarm, "SASL information is not set, access Kafka server without authentication")
 	} else {
 		config.Net.SASL.Enable = true
 		config.Net.SASL.User = k.SASLUsername
@@ -80,13 +81,13 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	case "random":
 		partitioner = sarama.NewRandomPartitioner
 	default:
-		logger.Error(k.context.GetRuntimeContext(), "INVALID_KAFKA_PARTITIONER", "invalid PartitionerType, use RandomPartitioner instead, type", k.PartitionerType)
+		logger.Error(k.context.GetRuntimeContext(), util.FlusherInitAlarm, "invalid PartitionerType, use RandomPartitioner instead, type", k.PartitionerType)
 	}
 	config.Producer.Partitioner = partitioner
 	config.Producer.Timeout = 5 * time.Second
 	producer, err := sarama.NewAsyncProducer(k.Brokers, config)
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Error(k.context.GetRuntimeContext(), util.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 	SIGTERM := make(chan bool)
@@ -97,7 +98,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 			select {
 			case err := <-errors:
 				if err != nil {
-					logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
+					logger.Error(k.context.GetRuntimeContext(), util.FlusherFlushAlarm, "flush kafka write data fail, error", err)
 				}
 			case <-success:
 				// Do Nothing
