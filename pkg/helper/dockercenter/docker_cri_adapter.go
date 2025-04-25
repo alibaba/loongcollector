@@ -31,8 +31,7 @@ import (
 )
 
 const (
-	kubeRuntimeAPIVersion = "0.1.0"
-	maxMsgSize            = 1024 * 1024 * 16
+	maxMsgSize = 1024 * 1024 * 16
 )
 
 var criRuntimeWrapper *CRIRuntimeWrapper
