@@ -70,7 +70,7 @@ type CRIV1Alpha2Wrapper struct {
 }
 
 // NewCRIV1Alpha2Wrapper ...
-func NewCRIV1Alpha2Wrapper(dockerCenter *DockerCenter, info runtimeInfo) (*CRIV1Alpha2Wrapper, error) {
+func NewCRIV1Alpha2Wrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIV1Alpha2Wrapper, error) {
 	client, err := newCRIV1Alpha2RuntimeServiceClient()
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)

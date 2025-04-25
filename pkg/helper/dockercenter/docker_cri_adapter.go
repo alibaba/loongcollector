@@ -45,11 +45,11 @@ type innerContainerInfo struct {
 	Status string
 }
 
-type runtimeInfo struct {
+type RuntimeInfo struct {
 	version           string
 	runtimeName       string
 	runtimeVersion    string
-	runtimeApiVersion string
+	runtimeAPIVersion string
 }
 
 type CRIInterface interface {
@@ -68,13 +68,13 @@ type CRIInterface interface {
 
 type CRIRuntimeWrapper struct {
 	CRIInterface
-	runtimeInfo runtimeInfo
+	RuntimeInfo RuntimeInfo
 }
 
-func NewCRIRuntimeWrapper(dockerCenter *DockerCenter, info runtimeInfo) (*CRIRuntimeWrapper, error) {
+func NewCRIRuntimeWrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIRuntimeWrapper, error) {
 	var wrapper CRIInterface
 	var err error
-	switch info.runtimeApiVersion {
+	switch info.runtimeAPIVersion {
 	case "v1alpha2":
 		wrapper, err = NewCRIV1Alpha2Wrapper(dockerCenter, info)
 		if err != nil {
@@ -83,24 +83,24 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter, info runtimeInfo) (*CRIRun
 	// Todo: support v1
 	// case "v1":
 	default:
-		return nil, fmt.Errorf("unsupported cri runtimr api version %q", info.runtimeApiVersion)
+		return nil, fmt.Errorf("unsupported cri runtimr api version %q", info.runtimeAPIVersion)
 	}
 
 	return &CRIRuntimeWrapper{
 		CRIInterface: wrapper,
-		runtimeInfo:  info,
+		RuntimeInfo:  info,
 	}, nil
 }
 
-func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, runtimeInfo) {
+func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {
 	// Verify containerd.sock cri valid.
 	if fi, err := os.Stat(criRuntimeEndpoint); err != nil || fi.IsDir() {
-		return false, runtimeInfo{}
+		return false, RuntimeInfo{}
 	}
 
 	addr, dailer, err := GetAddressAndDialer(criRuntimeEndpoint)
 	if err != nil {
-		return false, runtimeInfo{}
+		return false, RuntimeInfo{}
 	}
 	ctx, cancel := getContextWithTimeout(time.Minute)
 	defer cancel()
@@ -108,7 +108,7 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, runtimeInfo) {
 	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*16)))
 	if err != nil {
 		logger.Debug(context.Background(), "Dial", addr, "failed", err)
-		return false, runtimeInfo{}
+		return false, RuntimeInfo{}
 	}
 	// must close，otherwise connections will leak and case mem increase
 	defer conn.Close()
@@ -117,11 +117,11 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, runtimeInfo) {
 	v1Client := criv1.NewRuntimeServiceClient(conn)
 	v1Version, err := v1Client.Version(ctx, &criv1.VersionRequest{})
 	if err == nil {
-		info := runtimeInfo{
+		info := RuntimeInfo{
 			version:           v1Version.Version,
 			runtimeName:       v1Version.RuntimeName,
 			runtimeVersion:    v1Version.RuntimeVersion,
-			runtimeApiVersion: v1Version.RuntimeApiVersion,
+			runtimeAPIVersion: v1Version.RuntimeApiVersion,
 		}
 		// check running containers
 		var containersResp *criv1.ListContainersResponse
@@ -129,20 +129,19 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, runtimeInfo) {
 		if err == nil {
 			logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
 			return containersResp.Containers != nil, info
-		} else {
-			logger.Debug(context.Background(), "ListContainers failed", err)
-			return false, info
 		}
+		logger.Debug(context.Background(), "ListContainers failed", err)
+		return false, info
 	}
 	// 如果v1失败，尝试使用v1alpha2版本的CRI API
 	v1alpha2Client := criv1alpha2.NewRuntimeServiceClient(conn)
 	v1alpha2Version, err := v1alpha2Client.Version(ctx, &criv1alpha2.VersionRequest{})
 	if err == nil {
-		info := runtimeInfo{
+		info := RuntimeInfo{
 			version:           v1alpha2Version.Version,
 			runtimeName:       v1alpha2Version.RuntimeName,
 			runtimeVersion:    v1alpha2Version.RuntimeVersion,
-			runtimeApiVersion: v1alpha2Version.RuntimeApiVersion,
+			runtimeAPIVersion: v1alpha2Version.RuntimeApiVersion,
 		}
 		// check running containers
 		var containersResp *criv1alpha2.ListContainersResponse
@@ -150,13 +149,12 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, runtimeInfo) {
 		if err == nil {
 			logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
 			return containersResp.Containers != nil, info
-		} else {
-			logger.Debug(context.Background(), "ListContainers failed", err)
-			return false, info
 		}
+		logger.Debug(context.Background(), "ListContainers failed", err)
+		return false, info
 	}
 	logger.Errorf(context.Background(), "Failed to get CRI version from both v1alpha2 and v1", err.Error())
-	return false, runtimeInfo{}
+	return false, RuntimeInfo{}
 }
 
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
