@@ -2,7 +2,7 @@
 Feature: performance file to blackhole vector
   Performance file to blackhole vector
 
-  @e2e-performance @docker-compose @vector
+  @e2e-performance @docker-compose @vector-blackhole
   Scenario: PerformanceFileToBlackholeVector
     Given {docker-compose} environment
     Given docker-compose boot type {benchmark}
