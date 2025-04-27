@@ -39,8 +39,8 @@ protected:
 private:
     BatchedEvents
     createBatchedLogEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
-    BatchedEvents
-    createBatchedMetricEvents(bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue = false);
+    BatchedEvents createBatchedMetricEvents(
+        bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue = false);
     BatchedEvents
     createBatchedRawEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
     BatchedEvents createBatchedSpanEvents();
@@ -59,25 +59,31 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedLogEvents(false), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
-        { // nano second enabled, and set 
-            // Todo
+        { // nano second enabled, and set
+          // Todo
         }
         { // nano second enabled, not set
             const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedLogEvents(false), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // with empty event
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedLogEvents(false, true, true), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"key\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // only empty event
@@ -93,25 +99,36 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, true), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
+                              "\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // multi value
             string res;
             string errorMsg;
-            APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"__name__\":\"test_gauge\",\"__value__\":{\"test-1\":10.0,\"test-2\":2.0}}\n", res);
+            APSARA_TEST_TRUE(
+                serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
+            APSARA_TEST_EQUAL(
+                "{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__"
+                "topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":\"value1\",\"key2\":\"value2\"},"
+                "\"__name__\":\"test_gauge\",\"__value__\":{\"test-1\":10.0,\"test-2\":2.0}}\n",
+                res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // nano second disabled
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, false), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"__name__\":\"test_gauge\",\"__value__\":0.1}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
+                              "\"value1\",\"key2\":\"value2\"},\"__name__\":\"test_gauge\",\"__value__\":0.1}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // nano second enabled
-            // Todo
+          // Todo
         }
         { // empty metric value
             string res;
@@ -136,25 +153,31 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedRawEvents(false), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // nano second enabled, and set
-            // Todo
+          // Todo
         }
         { // nano second enabled, not set
             const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedRawEvents(false), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // with empty event
             string res;
             string errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedRawEvents(false, true, true), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n", res);
+            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"content\":\"value\"}\n",
+                              res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // only empty event
@@ -165,7 +188,7 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL("", errorMsg);
         }
     }
-    { // empty log group    
+    { // empty log group
         PipelineEventGroup group(make_shared<SourceBuffer>());
         BatchedEvents batch(std::move(group.MutableEvents()),
                             std::move(group.GetSizedTags()),
@@ -173,7 +196,7 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
                             group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                             std::move(group.GetExactlyOnceCheckpoint()));
         string res;
-            string errorMsg;
+        string errorMsg;
         APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
         APSARA_TEST_EQUAL("", res);
         APSARA_TEST_EQUAL("empty event group", errorMsg);
@@ -216,11 +239,8 @@ JsonSerializerUnittest::createBatchedLogEvents(bool enableNanosecond, bool withE
     return batch;
 }
 
-BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(bool enableNanosecond,
-                                                               uint32_t nanoTimestamp,
-                                                               bool emptyValue,
-                                                               bool onlyOneTag,
-                                                               bool multiValue) {
+BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(
+    bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
@@ -247,8 +267,8 @@ BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(bool enableNanos
             e->SetValue<UntypedSingleValue>(value);
         } else {
             UntypedMultiDoubleValues v({{"test-1", {UntypedValueMetricType::MetricTypeCounter, 10.0}},
-                {"test-2", {UntypedValueMetricType::MetricTypeGauge, 2.0}}},
-               nullptr);
+                                        {"test-2", {UntypedValueMetricType::MetricTypeGauge, 2.0}}},
+                                       nullptr);
             e->SetValue(v);
         }
     }
