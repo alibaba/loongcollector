@@ -2,7 +2,7 @@
 Feature: performance file to blackhole filebeat
   Performance file to blackhole filebeat
 
-  @e2e-performance @docker-compose @filebeat
+  @e2e-performance @docker-compose @filebeat-blackhole
   Scenario: PerformanceFileToBlackholeFilebeat
     Given {docker-compose} environment
     Given docker-compose boot type {benchmark}
