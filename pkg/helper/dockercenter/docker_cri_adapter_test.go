@@ -53,6 +53,7 @@ func TestCriVersion(t *testing.T) {
 		| containerd 版本 | cri-api 支持的版本 |
 		| v1.4.13        | v1alpha2         |
 		| v1.5.17        | v1alpha2         |
+		| v1.6.38        | v1alpha2, v1     |
 		| v1.7.27        | v1alpha2, v1     |
 		| v2.0.5         | v1               |
 		| -------------- | ---------------- |
@@ -113,15 +114,15 @@ func TestCriVersion(t *testing.T) {
 
 		# 生成默认配置文件
 		echo "Generating default config for containerd-${VERSION}..."
-		sudo containerd-${VERSION} config default | sudo tee "/etc/containerd-${VERSION}/config.toml"
+		sudo containerd-${VERSION} config default | sudo tee "${CONTAINERD_DIR}/config.toml"
 
 		# 修改配置文件以使用不同的 Unix 域套接字路径和 state 路径
 		echo "Updating config file paths..."
-		sudo sed -i "s|/etc/containerd|/etc/containerd-${VERSION}|" "/etc/containerd-${VERSION}/config.toml"
-		sudo sed -i "s|/run/containerd|/run/containerd-${VERSION}|" "/etc/containerd-${VERSION}/config.toml"
-		sudo sed -i "s|/var/lib/containerd|/var/lib/containerd-${VERSION}|" "/etc/containerd-${VERSION}/config.toml"
-		sudo sed -i "s|/opt/containerd|/opt/containerd-${VERSION}|" "/etc/containerd-${VERSION}/config.toml"
-		sudo sed -i "s|containerd-shim|containerd-${VERSION}-shim|" "/etc/containerd-${VERSION}/config.toml"
+		sudo sed -i "s|/etc/containerd|/etc/containerd-${VERSION}|" "${CONTAINERD_DIR}/config.toml"
+		sudo sed -i "s|/run/containerd|/run/containerd-${VERSION}|" "${CONTAINERD_DIR}/config.toml"
+		sudo sed -i "s|/var/lib/containerd|/var/lib/containerd-${VERSION}|" "${CONTAINERD_DIR}/config.toml"
+		sudo sed -i "s|/opt/containerd|/opt/containerd-${VERSION}|" "${CONTAINERD_DIR}/config.toml"
+		sudo sed -i "s|containerd-shim|containerd-${VERSION}-shim|" "${CONTAINERD_DIR}/config.toml"
 
 		# 停止旧版本的 containerd 进程（如果存在）
 		echo "Stopping old containerd processes (if any)..."
@@ -136,7 +137,7 @@ func TestCriVersion(t *testing.T) {
 
 		# 启动 containerd
 		echo "Starting containerd-${VERSION}..."
-		nohup containerd-${VERSION} --config "/etc/containerd-${VERSION}/config.toml" \
+		nohup containerd-${VERSION} --config "${CONTAINERD_DIR}/config.toml" \
 		    --root "/var/lib/containerd-${VERSION}" \
 		    --state "/run/containerd-${VERSION}" \
 		    > "${CONTAINERD_DIR}/stdout" \
@@ -146,10 +147,11 @@ func TestCriVersion(t *testing.T) {
 		```
 	*/
 	containerdVersions := []string{
-		"1.4.13", // only support v1alpha2
+		// "1.4.13", // only support v1alpha2
 		"1.5.17", // only support v1alpha2
-		"1.7.27", // support v1alpha2 and v1, use v1
-		"2.0.5",  // only support v1
+		// "1.6.38", // support v1alpha2 and v1, use v1alpha2
+		// "1.7.27", // support v1alpha2 and v1, use v1alpha2
+		// "2.0.5",  // only support v1
 	}
 	for _, version := range containerdVersions {
 		t.Log("start check cri", version)

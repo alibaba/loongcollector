@@ -113,27 +113,7 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {
 	// must close，otherwise connections will leak and case mem increase
 	defer conn.Close()
 
-	// 尝试使用v1版本的CRI API
-	v1Client := criv1.NewRuntimeServiceClient(conn)
-	v1Version, err := v1Client.Version(ctx, &criv1.VersionRequest{})
-	if err == nil {
-		info := RuntimeInfo{
-			version:           v1Version.Version,
-			runtimeName:       v1Version.RuntimeName,
-			runtimeVersion:    v1Version.RuntimeVersion,
-			runtimeAPIVersion: v1Version.RuntimeApiVersion,
-		}
-		// check running containers
-		var containersResp *criv1.ListContainersResponse
-		containersResp, err = v1Client.ListContainers(ctx, &criv1.ListContainersRequest{Filter: nil})
-		if err == nil {
-			logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
-			return containersResp.Containers != nil, info
-		}
-		logger.Debug(context.Background(), "ListContainers failed", err)
-		return false, info
-	}
-	// 如果v1失败，尝试使用v1alpha2版本的CRI API
+	// 优先尝试使用v1alpha2版本的CRI API
 	v1alpha2Client := criv1alpha2.NewRuntimeServiceClient(conn)
 	v1alpha2Version, err := v1alpha2Client.Version(ctx, &criv1alpha2.VersionRequest{})
 	if err == nil {
@@ -153,6 +133,27 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {
 		logger.Debug(context.Background(), "ListContainers failed", err)
 		return false, info
 	}
+	// 如果v1alpha2失败，尝试使用v1版本的CRI API
+	v1Client := criv1.NewRuntimeServiceClient(conn)
+	v1Version, err := v1Client.Version(ctx, &criv1.VersionRequest{})
+	if err == nil {
+		info := RuntimeInfo{
+			version:           v1Version.Version,
+			runtimeName:       v1Version.RuntimeName,
+			runtimeVersion:    v1Version.RuntimeVersion,
+			runtimeAPIVersion: v1Version.RuntimeApiVersion,
+		}
+		// check running containers
+		var containersResp *criv1.ListContainersResponse
+		containersResp, err = v1Client.ListContainers(ctx, &criv1.ListContainersRequest{Filter: nil})
+		if err == nil {
+			logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
+			return containersResp.Containers != nil, info
+		}
+		logger.Debug(context.Background(), "ListContainers failed", err)
+		return false, info
+	}
+
 	logger.Errorf(context.Background(), "Failed to get CRI version from both v1alpha2 and v1", err.Error())
 	return false, RuntimeInfo{}
 }
