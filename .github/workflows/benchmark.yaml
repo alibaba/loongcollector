@@ -28,7 +28,6 @@ on:
 
 jobs:
   Build-LoongCollector:
-    if: github.event.pull_request.merged == true
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -88,10 +87,21 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
+        test-agent: 
+          - "loongcollector-blackhole"
+          - "loongcollector-spl-blackhole"
+          - "filebeat-blackhole"
+          - "fluentbit-blackhole"
+          - "vector-blackhole"
+          - "loongcollector-file"
+          - "loongcollector-spl-file"
+          - "loongcollector-cgo-file"
+          - "filebeat-file"
+          - "fluentbit-file"
+          - "vector-file"
         go-version: [ 1.19.10 ]
         python-version: [ 3.8 ]
         runner: [ ubuntu-latest ]
-        test-agent: ["loongcollector", "loongcollectorspl", "filebeat", "vector", "fluentbit"]
       fail-fast: false
     permissions:
       contents: write
