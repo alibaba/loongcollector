@@ -45,7 +45,7 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
     // MaxFileSize
     GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles
-    GetMandatoryUIntParam(config, "MaxFiles", mMaxFileSize, errorMsg);
+    GetMandatoryUIntParam(config, "MaxFiles", mMaxFiles, errorMsg);
 
     // create file writer
     auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
