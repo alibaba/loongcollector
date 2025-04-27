@@ -31,6 +31,7 @@
 #include "common/FileInfo.h"
 #include "common/LogFileOperator.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "constants/TagConstants.h"
@@ -40,7 +41,6 @@
 #include "file_server/event/Event.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "logger/Logger.h"
-#include "models/StringView.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {

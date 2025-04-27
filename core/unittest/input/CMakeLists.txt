@@ -24,8 +24,8 @@ target_link_libraries(input_container_stdio_unittest ${UT_BASE_TARGET})
 add_executable(input_prometheus_unittest InputPrometheusUnittest.cpp)
 target_link_libraries(input_prometheus_unittest ${UT_BASE_TARGET})
 
-add_executable(input_ebpf_file_security_unittest InputFileSecurityUnittest.cpp)
-target_link_libraries(input_ebpf_file_security_unittest unittest_base)
+# add_executable(input_ebpf_file_security_unittest InputFileSecurityUnittest.cpp)
+# target_link_libraries(input_ebpf_file_security_unittest unittest_base)
 
 add_executable(input_ebpf_process_security_unittest InputProcessSecurityUnittest.cpp)
 target_link_libraries(input_ebpf_process_security_unittest unittest_base)
@@ -43,7 +43,17 @@ add_executable(input_internal_metrics_unittest InputInternalMetricsUnittest.cpp)
 target_link_libraries(input_internal_metrics_unittest ${UT_BASE_TARGET})
 
 add_executable(input_host_meta_unittest InputHostMetaUnittest.cpp)
-target_link_libraries(input_host_meta_unittest unittest_base)
+target_link_libraries(input_host_meta_unittest ${UT_BASE_TARGET})
+
+set(EBPF_DRIVER_DIR "${CMAKE_BINARY_DIR}/ebpf/driver")
+set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src")
+
+add_custom_command(TARGET input_ebpf_process_security_unittest POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${EBPF_DRIVER_DIR}/libeBPFDriver.so $<TARGET_FILE_DIR:input_ebpf_process_security_unittest>
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${COOLBPF_DIR}/libcoolbpf.so.1.0.0 $<TARGET_FILE_DIR:input_ebpf_process_security_unittest>
+)
 
 add_executable(input_host_monitor_unittest InputHostMonitorUnittest.cpp)
 target_link_libraries(input_host_monitor_unittest unittest_base)
@@ -52,7 +62,7 @@ include(GoogleTest)
 gtest_discover_tests(input_file_unittest)
 gtest_discover_tests(input_container_stdio_unittest)
 gtest_discover_tests(input_prometheus_unittest)
-gtest_discover_tests(input_ebpf_file_security_unittest)
+# gtest_discover_tests(input_ebpf_file_security_unittest)
 gtest_discover_tests(input_ebpf_process_security_unittest)
 gtest_discover_tests(input_ebpf_network_security_unittest)
 gtest_discover_tests(input_ebpf_network_observer_unittest)

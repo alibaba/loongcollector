@@ -13,6 +13,7 @@ import (
 	"github.com/google/cadvisor/client"
 	v1 "github.com/google/cadvisor/info/v1"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -25,6 +26,7 @@ const (
 	exitCodeSuccess = iota
 	exitCodeErrorNotProcessing
 	exitCodeErrorGetContainerInfo
+	exitCodeErrorTimeout
 )
 
 var monitor Monitor
@@ -35,14 +37,16 @@ type Monitor struct {
 	stopCh       chan int
 }
 
-func StartMonitor(ctx context.Context, containerName string) (context.Context, error) {
-	return monitor.Start(ctx, containerName)
+func StartMonitor(ctx context.Context, containerName string, timeout int) (context.Context, error) {
+	return monitor.Start(ctx, containerName, timeout)
 }
 
 func WaitMonitorUntilProcessingFinished(ctx context.Context) (context.Context, error) {
 	errCode := <-monitor.Done()
 	switch errCode {
 	case exitCodeSuccess:
+		return ctx, nil
+	case exitCodeErrorTimeout:
 		return ctx, nil
 	case exitCodeErrorNotProcessing:
 		return ctx, fmt.Errorf("monitoring error: CPU usage is too low, not processing")
@@ -53,7 +57,7 @@ func WaitMonitorUntilProcessingFinished(ctx context.Context) (context.Context, e
 	}
 }
 
-func (m *Monitor) Start(ctx context.Context, containerName string) (context.Context, error) {
+func (m *Monitor) Start(ctx context.Context, containerName string, timeout int) (context.Context, error) {
 	// connect to cadvisor
 	client, err := client.NewClient("http://localhost:8080/")
 	if err != nil {
@@ -62,7 +66,7 @@ func (m *Monitor) Start(ctx context.Context, containerName string) (context.Cont
 	// 获取所有容器信息
 	allContainers, err := client.AllDockerContainers(&v1.ContainerInfoRequest{NumStats: 10})
 	if err != nil {
-		fmt.Println("Error getting all containers info:", err)
+		logger.Error(ctx, "MONITOR_START_ALARM", "Error getting all containers info:", err)
 		return ctx, err
 	}
 	for _, container := range allContainers {
@@ -71,8 +75,7 @@ func (m *Monitor) Start(ctx context.Context, containerName string) (context.Cont
 			m.isMonitoring.Store(true)
 			m.statistic = NewMonitorStatistic(config.CaseName)
 			m.stopCh = make(chan int)
-			fmt.Println("Start monitoring container:", containerFullName)
-			go m.monitoring(client, containerFullName)
+			go m.monitoring(client, containerFullName, timeout)
 			return ctx, nil
 		}
 	}
@@ -80,7 +83,7 @@ func (m *Monitor) Start(ctx context.Context, containerName string) (context.Cont
 	return ctx, err
 }
 
-func (m *Monitor) monitoring(client *client.Client, containerName string) {
+func (m *Monitor) monitoring(client *client.Client, containerName string, timeout int) {
 	// create csv file
 	root, _ := filepath.Abs(".")
 	reportDir := root + "/report/"
@@ -93,17 +96,32 @@ func (m *Monitor) monitoring(client *client.Client, containerName string) {
 	// read from cadvisor per interval seconds
 	ticker := time.NewTicker(interval * time.Second)
 	defer ticker.Stop()
+	// monitor should force exit after timeout min
+	timeoutTimer := time.NewTimer(time.Duration(timeout) * time.Minute)
+	defer timeoutTimer.Stop()
+
+	logger.Info(context.Background(), "Start monitoring container:", containerName)
 	request := &v1.ContainerInfoRequest{NumStats: 10}
 	for {
 		select {
+		case <-timeoutTimer.C:
+			logger.Error(context.Background(), "MONITOR_TIMEOUT_ALARM", "Monitoring timeout after", timeout, "minutes")
+			bytes, _ := m.statistic.MarshalStatisticJSON()
+			_ = os.WriteFile(statisticFile, bytes, 0600)
+			bytes, _ = m.statistic.MarshalRecordsJSON()
+			_ = os.WriteFile(recordsFile, bytes, 0600)
+			m.isMonitoring.Store(false)
+			m.stopCh <- exitCodeErrorTimeout
+			m.statistic.ClearStatistic()
+			return
 		case <-timerCal.C:
 			// 计算CPU使用率的下阈值
 			cpuRawData := make([]float64, len(m.statistic.GetCPURawData()))
 			copy(cpuRawData, m.statistic.GetCPURawData())
 			sort.Float64s(cpuRawData)
 			lowThreshold = cpuRawData[len(cpuRawData)/2] * 0.3
-			fmt.Println("median of CPU usage rate(%):", cpuRawData[len(cpuRawData)/2])
-			fmt.Println("Low threshold of CPU usage rate(%):", lowThreshold)
+			logger.Info(context.Background(), "median of CPU usage rate(%)", cpuRawData[len(cpuRawData)/2])
+			logger.Info(context.Background(), "Low threshold of CPU usage rate(%)", lowThreshold)
 			if lowThreshold < 1 {
 				m.isMonitoring.Store(false)
 				m.stopCh <- exitCodeErrorNotProcessing

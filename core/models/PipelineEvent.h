@@ -24,8 +24,8 @@
 #include <optional>
 #include <string>
 
+#include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
-#include "models/StringView.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "json/json.h"

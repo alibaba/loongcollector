@@ -27,6 +27,8 @@
 // Time and timestamp utility.
 namespace logtail {
 
+static constexpr int64_t kNanoPerSeconds = 1000000000;
+
 extern const std::string PRECISE_TIMESTAMP_DEFAULT_KEY;
 
 enum class TimeStampUnit { SECOND, MILLISECOND, MICROSECOND, NANOSECOND };
@@ -94,4 +96,11 @@ bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond);
 bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffsetSecond);
 
 std::string NumberToDigitString(uint32_t number, uint8_t length);
+
+long GetTicksPerSecond();
+
+std::chrono::nanoseconds GetTimeDiffFromMonotonic();
+
+struct timespec ConvertKernelTimeToUnixTime(uint64_t ktime);
+
 } // namespace logtail

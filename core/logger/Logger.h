@@ -119,6 +119,14 @@ public:
         } \
     } while (0)
 
+#define SHOULD_LOG(logger, level) logger->should_log(level)
+#define SHOULD_LOG_TRACE(logger) SHOULD_LOG(logger, spdlog::level::trace)
+#define SHOULD_LOG_DEBUG(logger) SHOULD_LOG(logger, spdlog::level::debug)
+#define SHOULD_LOG_INFO(logger) SHOULD_LOG(logger, spdlog::level::info)
+#define SHOULD_LOG_WARNING(logger) SHOULD_LOG(logger, spdlog::level::warn)
+#define SHOULD_LOG_ERROR(logger) SHOULD_LOG(logger, spdlog::level::err)
+#define SHOULD_LOG_FATAL(logger) SHOULD_LOG(logger, spdlog::level::info)
+
 #ifndef LOG_INFO
 #define LOG_TRACE(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::trace)
 #define LOG_DEBUG(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::debug)

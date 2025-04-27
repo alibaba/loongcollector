@@ -19,7 +19,7 @@
 #include <map>
 #include <vector>
 
-#include "models/StringView.h"
+#include "common/StringView.h"
 
 namespace logtail {
 

@@ -20,8 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "common/StringView.h"
 #include "models/LogEvent.h"
-#include "models/StringView.h"
 
 /*
  * FSM(finite state machine) for csv parser

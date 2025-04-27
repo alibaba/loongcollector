@@ -394,5 +394,4 @@ void HashCombine(size_t& seed, size_t value) {
     boost::hash_combine(seed, value);
 }
 
-
 } // namespace logtail

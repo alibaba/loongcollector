@@ -14,7 +14,7 @@
 
 # goc server is only for e2e test to analysis code coverage.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.3 as build
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.3 AS build
 
 USER root
 ENTRYPOINT ["goc","server"]

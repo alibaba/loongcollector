@@ -202,6 +202,22 @@ func (m *metaCollector) Stop() error {
 	return nil
 }
 
+func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) bool {
+	if strings.ToLower(resourceType) == "namespace" && serviceK8sMeta.Namespace && serviceK8sMeta.Cluster2Namespace != "" {
+		return true
+	}
+	if strings.ToLower(resourceType) == "node" && serviceK8sMeta.Node && serviceK8sMeta.Cluster2Node != "" {
+		return true
+	}
+	if strings.ToLower(resourceType) == "persistentvolume" && serviceK8sMeta.PersistentVolume && serviceK8sMeta.Cluster2PersistentVolume != "" {
+		return true
+	}
+	if strings.ToLower(resourceType) == "storageclass" && serviceK8sMeta.StorageClass && serviceK8sMeta.Cluster2StorageClass != "" {
+		return true
+	}
+	return false
+}
+
 func (m *metaCollector) handleEvent(event []*k8smeta.K8sMetaEvent) {
 	if len(event) == 0 {
 		return
@@ -225,7 +241,7 @@ func (m *metaCollector) handleAddOrUpdate(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Update")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			if isEntity(event.Object.ResourceType) {
+			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) {
 				link := m.generateEntityClusterLink(log)
 				m.send(link, true)
 			}
@@ -238,7 +254,7 @@ func (m *metaCollector) handleDelete(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Expire")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			if isEntity(event.Object.ResourceType) {
+			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) {
 				link := m.generateEntityClusterLink(log)
 				m.send(link, true)
 			}

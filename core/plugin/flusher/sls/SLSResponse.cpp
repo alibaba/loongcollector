@@ -69,9 +69,8 @@ void ErrorCheck(const string& response, const string& requestId, const int32_t h
     } catch (JsonException& e) {
         if (httpCode >= 500) {
             throw LOGException(LOGE_INTERNAL_SERVER_ERROR, response, requestId, httpCode);
-        } else {
-            throw LOGException(LOGE_BAD_RESPONSE, string("Unextractable error:") + response, requestId, httpCode);
         }
+        throw LOGException(LOGE_BAD_RESPONSE, string("Unextractable error:") + response, requestId, httpCode);
     }
 }
 
@@ -129,29 +128,23 @@ bool IsSLSResponse(const HttpResponse& response) {
 time_t GetServerTime(const HttpResponse& response) {
 #define METHOD_LOG_PATTERN ("method", "GetServerTimeFromHeader")
     // Priority: x-log-time -> Date
-    string errMsg;
-    try {
-        const auto iter = response.GetHeader().find("x-log-time");
-        if (iter != response.GetHeader().end()) {
-            return StringTo<time_t>(iter->second);
+    auto iter = response.GetHeader().find("x-log-time");
+    if (iter != response.GetHeader().end()) {
+        time_t serverTime{};
+        if (StringTo(iter->second, serverTime)) {
+            return serverTime;
         }
-    } catch (const exception& e) {
-        errMsg = e.what();
-    } catch (...) {
-        errMsg = "unknown";
-    }
-    if (!errMsg.empty()) {
-        LOG_ERROR(sLogger, METHOD_LOG_PATTERN("parse x-log-time error", errMsg));
+        LOG_ERROR(sLogger, METHOD_LOG_PATTERN("parse x-log-time error", iter->second));
     }
 
-    const auto iter = response.GetHeader().find("Date");
+    iter = response.GetHeader().find("Date");
     if (iter == response.GetHeader().end()) {
         LOG_WARNING(sLogger, METHOD_LOG_PATTERN("no Date in HTTP header", ""));
         return 0;
     }
     // Date sample: Thu, 18 Feb 2021 03:09:29 GMT
     LogtailTime ts;
-    int nanosecondLength;
+    int nanosecondLength{};
     if (Strptime(iter->second.c_str(), "%a, %d %b %Y %H:%M:%S", &ts, nanosecondLength) == NULL) {
         LOG_ERROR(sLogger, METHOD_LOG_PATTERN("parse Date error", ErrnoToString(GetErrno()))("value", iter->second));
         return 0;

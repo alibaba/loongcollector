@@ -5,8 +5,8 @@
 #include <iomanip>
 
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "http/HttpResponse.h"
-#include "models/StringView.h"
 
 using namespace std;
 
