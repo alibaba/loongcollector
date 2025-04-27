@@ -15,19 +15,16 @@
 name: Benchmark
 
 on:
-  pull_request:
+  push:
     branches:
       - main
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
-      - 'docker/**'
       - 'k8s_template/**'
       - 'changes/**'
       - 'licenses/**'
       - 'CHANGELOG.md'
-    types:
-      - closed
 
 jobs:
   Build-LoongCollector:
