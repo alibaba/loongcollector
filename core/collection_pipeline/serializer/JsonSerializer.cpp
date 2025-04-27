@@ -45,6 +45,9 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         // should not happen
         errorMsg = "unsupported event type in event group";
         return false;
+    } else if (eventType == PipelineEvent::Type::SPAN) {
+        errorMsg = "invalid event type, span type is not yet supported";
+        return false;
     }
 
     // Create reusable StringBuffer and Writer
@@ -60,6 +63,9 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         case PipelineEvent::Type::LOG:
             for (const auto& item : group.mEvents) {
                 const auto& e = item.Cast<LogEvent>();
+                if (e.Empty()) {
+                    continue;
+                }
                 resetBuffer();
 
                 writer.StartObject();
@@ -115,15 +121,12 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 res.append("\n");
             }
             break;
-        case PipelineEvent::Type::SPAN:
-            // TODO: implement span serializer
-            LOG_ERROR(
-                sLogger,
-                ("invalid event type", "span type is not supported")("config", mFlusher->GetContext().GetConfigName()));
-            break;
         case PipelineEvent::Type::RAW:
             for (const auto& item : group.mEvents) {
                 const auto& e = item.Cast<RawEvent>();
+                if (e.GetContent().empty()) {
+                    continue;
+                }
                 resetBuffer();
 
                 writer.StartObject();
@@ -139,7 +142,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         default:
             break;
     }
-    return true;
+    return !res.empty();
 }
 
 } // namespace logtail
