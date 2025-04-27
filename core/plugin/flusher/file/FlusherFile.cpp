@@ -16,7 +16,6 @@
 
 #include "spdlog/async.h"
 #include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
@@ -43,82 +42,52 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    // Pattern
-    // GetMandatoryStringParam(config, "Pattern", mPattern, errorMsg);
     // MaxFileSize
-    // GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
+    GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles
-    // GetMandatoryUIntParam(config, "MaxFiles", mMaxFileSize, errorMsg);
+    GetMandatoryUIntParam(config, "MaxFiles", mMaxFiles, errorMsg);
 
     // create file writer
-    auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
-    mFileWriter = std::make_shared<spdlog::async_logger>(
-        sName, file_sink, spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-    mFileWriter->set_pattern(mPattern);
+    auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
+    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+    mFileWriter
+        = std::make_shared<spdlog::async_logger>(sName, fileSink, threadPool, spdlog::async_overflow_policy::block);
+    mFileWriter->set_pattern("%v");
 
-    mBatcher.Init(Json::Value(), this, DefaultFlushStrategyOptions{});
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     return true;
 }
 
 bool FlusherFile::Send(PipelineEventGroup&& g) {
-    if (g.IsReplay()) {
-        return SerializeAndPush(std::move(g));
-    } else {
-        vector<BatchedEventsList> res;
-        mBatcher.Add(std::move(g), res);
-        return SerializeAndPush(std::move(res));
-    }
+    return SerializeAndPush(std::move(g));
 }
 
 bool FlusherFile::Flush(size_t key) {
-    BatchedEventsList res;
-    mBatcher.FlushQueue(key, res);
-    return SerializeAndPush(std::move(res));
+    return true;
 }
 
 bool FlusherFile::FlushAll() {
-    vector<BatchedEventsList> res;
-    mBatcher.FlushAll(res);
-    return SerializeAndPush(std::move(res));
+    return true;
 }
 
 bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
-    string serializedData, errorMsg;
+    string serializedData;
+    string errorMsg;
     BatchedEvents g(std::move(group.MutableEvents()),
                     std::move(group.GetSizedTags()),
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                     std::move(group.GetExactlyOnceCheckpoint()));
-    mGroupSerializer->DoSerialize(move(g), serializedData, errorMsg);
+    mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg);
     if (errorMsg.empty()) {
-        mFileWriter->info(serializedData);
+        if (!serializedData.empty() && serializedData.back() == '\n') {
+            serializedData.pop_back();
+        }
+        mFileWriter->info(std::move(serializedData));
+        mFileWriter->flush();
     } else {
         LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
-    }
-    mFileWriter->flush();
-    return true;
-}
-
-bool FlusherFile::SerializeAndPush(BatchedEventsList&& groupList) {
-    string serializedData;
-    for (auto& group : groupList) {
-        string errorMsg;
-        mGroupSerializer->DoSerialize(move(group), serializedData, errorMsg);
-        if (errorMsg.empty()) {
-            mFileWriter->info(serializedData);
-        } else {
-            LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
-        }
-    }
-    mFileWriter->flush();
-    return true;
-}
-
-bool FlusherFile::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
-    for (auto& groupList : groupLists) {
-        SerializeAndPush(std::move(groupList));
     }
     return true;
 }

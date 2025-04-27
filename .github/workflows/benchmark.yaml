@@ -82,7 +82,6 @@ jobs:
           make benchmark DOCKER_REPOSITORY=ghcr.io/$REPO_OWNER/loongcollector DOCKER_PUSH=true VERSION=edge
 
   Benchmark:
-    if: github.event.pull_request.merged == true
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
