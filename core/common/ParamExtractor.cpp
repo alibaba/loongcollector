@@ -133,7 +133,7 @@ bool GetMandatoryIntParam(const Json::Value& config, const string& key, int32_t&
 bool GetMandatoryUInt64Param(const Json::Value& config, const string& key, uint64_t& param, string& errorMsg) {
     errorMsg.clear();
     if (!config.isMember(ExtractCurrentKey(key))) {
-        errorMsg = "madatory param " + key + " is missing";
+        errorMsg = "mandatory param " + key + " is missing";
         return false;
     }
     return GetOptionalUInt64Param(config, key, param, errorMsg);

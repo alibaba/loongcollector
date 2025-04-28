@@ -96,7 +96,7 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         string signature;
         signature.resize(1024);
         is.read(&signature[0], 1024);
-        if (is.gcount() < 0) {
+        if (is.bad()) {
             LOG_WARNING(sLogger,
                         ("failed to read first 1024 bytes of file",
                          "skip")("config", configName)("input idx", idx)("filepath", file));
@@ -116,7 +116,7 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
              ("create checkpoint succeeded, config", configName)("input idx", idx)("file count", fileCpts.size()));
     {
         lock_guard<mutex> lock(mUpdateMux);
-        auto it = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, move(fileCpts)).first;
+        auto it = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts)).first;
         if (!DumpCheckpointFile(it->second)) {
             LOG_WARNING(sLogger, ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
         }

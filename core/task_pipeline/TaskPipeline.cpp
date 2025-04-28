@@ -16,7 +16,7 @@
 
 #include "task_pipeline/TaskPipeline.h"
 
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "task_pipeline/TaskRegistry.h"
 
 using namespace std;
@@ -35,7 +35,7 @@ bool TaskPipeline::Init(TaskConfig&& config) {
         return false;
     }
     if (mIsOnetime) {
-        OnetimeConfigManager::GetInstance()->UpdateConfig(
+        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
             mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
     }
     return true;
@@ -51,7 +51,7 @@ void TaskPipeline::Stop(bool isRemoving) {
     // only valid for onetime config
     // for update, the old expire has been replaced by the new one on init, should not remove here
     if (isRemoving) {
-        OnetimeConfigManager::GetInstance()->RemoveConfig(mName);
+        OnetimeConfigInfoManager::GetInstance()->RemoveConfig(mName);
     }
 }
 

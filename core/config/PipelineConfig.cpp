@@ -15,7 +15,7 @@
 #include "config/PipelineConfig.h"
 
 #include "common/JsonUtil.h"
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -66,7 +66,7 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
     }
     uint32_t expireTime = 0;
     auto status
-        = OnetimeConfigManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(mName, mConfigHash, &expireTime);
+        = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(mName, mConfigHash, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
             mExpireTime = expireTime;

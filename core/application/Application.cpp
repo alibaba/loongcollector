@@ -35,7 +35,7 @@
 #include "common/version.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/ConfigManager.h"
@@ -267,7 +267,7 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    OnetimeConfigManager::GetInstance()->LoadCheckpointFile();
+    OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
            lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnunsedCheckpointsTime = 0;
@@ -281,7 +281,7 @@ void Application::Start() { // GCOVR_EXCL_START
             lastCheckTagsTime = curTime;
         }
         if (curTime - lastOnetimeConfigTimeoutCheckTime >= 10) {
-            OnetimeConfigManager::GetInstance()->DeleteTimeoutConfigFiles();
+            OnetimeConfigInfoManager::GetInstance()->DeleteTimeoutConfigFiles();
             lastOnetimeConfigTimeoutCheckTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
@@ -293,7 +293,7 @@ void Application::Start() { // GCOVR_EXCL_START
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
             }
             if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
-                OnetimeConfigManager::GetInstance()->DumpCheckpointFile();
+                OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
 
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -316,7 +316,7 @@ void Application::Start() { // GCOVR_EXCL_START
         }
         if (curTime - lastCheckUnunsedCheckpointsTime >= 60) {
             CollectionPipelineManager::GetInstance()->ClearInputUnusedCheckpoints();
-            OnetimeConfigManager::GetInstance()->ClearUnusedCheckpoints();
+            OnetimeConfigInfoManager::GetInstance()->ClearUnusedCheckpoints();
             lastCheckUnunsedCheckpointsTime = curTime;
         }
         CollectionPipelineManager::GetInstance()->InputRunnerEventGC();

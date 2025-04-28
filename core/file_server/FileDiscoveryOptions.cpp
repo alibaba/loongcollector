@@ -452,12 +452,12 @@ bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) co
         return false;
     }
 
-    for (auto& fp : mFilePathBlacklist) {
+    for (const auto& fp : mFilePathBlacklist) {
         if (0 == fnmatch(fp.c_str(), filepath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
-    for (auto& fp : mMLFilePathBlacklist) {
+    for (const auto& fp : mMLFilePathBlacklist) {
         if (0 == fnmatch(fp.c_str(), filepath.c_str(), 0)) {
             return true;
         }

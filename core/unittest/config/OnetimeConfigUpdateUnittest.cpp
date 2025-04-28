@@ -15,7 +15,7 @@
 // #include "common/FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/JsonUtil.h"
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
@@ -53,12 +53,12 @@ protected:
     }
 
 private:
-    static OnetimeConfigManager* sConfigManager;
+    static OnetimeConfigInfoManager* sConfigManager;
 
     filesystem::path mConfigDir = "./continuous_pipeline_config";
 };
 
-OnetimeConfigManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigManager::GetInstance();
+OnetimeConfigInfoManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigInfoManager::GetInstance();
 
 void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
     map<string, uint64_t> configHash;

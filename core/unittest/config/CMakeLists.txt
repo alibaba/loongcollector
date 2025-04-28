@@ -42,7 +42,7 @@ target_link_libraries(config_feedback_receiver_unittest ${UT_BASE_TARGET})
 add_executable(singleton_input_collection_config_update_unittest SingletonInputCollectionConfigUpdateUnittest.cpp)
 target_link_libraries(singleton_input_collection_config_update_unittest ${UT_BASE_TARGET})
 
-add_executable(onetime_config_manager_unittest OnetimeConfigManagerUnittest.cpp)
+add_executable(onetime_config_manager_unittest OnetimeConfigInfoManagerUnittest.cpp)
 target_link_libraries(onetime_config_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(onetime_config_update_unittest OnetimeConfigUpdateUnittest.cpp)

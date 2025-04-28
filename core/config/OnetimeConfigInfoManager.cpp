@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
@@ -25,13 +25,14 @@ using namespace std;
 
 namespace logtail {
 
-OnetimeConfigManager::OnetimeConfigManager()
+OnetimeConfigInfoManager::OnetimeConfigInfoManager()
     : mCheckpointFilePath(filesystem::path(GetAgentDataDir()) / "onetime_config_info.json") {
 }
 
-OnetimeConfigStatus OnetimeConfigManager::GetOnetimeConfigStatusFromCheckpoint(const string& configName,
+OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint(const string& configName,
                                                                                uint64_t hash,
                                                                                uint32_t* expireTime) {
+    lock_guard<mutex> lock(mMux);
     auto it = mConfigExpireTimeCheckpoint.find(configName);
     if (it == mConfigExpireTimeCheckpoint.end()) {
         return OnetimeConfigStatus::NEW;
@@ -51,8 +52,9 @@ OnetimeConfigStatus OnetimeConfigManager::GetOnetimeConfigStatusFromCheckpoint(c
     return status;
 }
 
-bool OnetimeConfigManager::UpdateConfig(
+bool OnetimeConfigInfoManager::UpdateConfig(
     const string& configName, ConfigType type, const filesystem::path& filepath, uint64_t hash, uint32_t expireTime) {
+    lock_guard<mutex> lock(mMux);
     auto it = mConfigInfoMap.find(configName);
     if (it != mConfigInfoMap.end()) {
         // on update
@@ -65,7 +67,8 @@ bool OnetimeConfigManager::UpdateConfig(
     return true;
 }
 
-bool OnetimeConfigManager::RemoveConfig(const string& configName) {
+bool OnetimeConfigInfoManager::RemoveConfig(const string& configName) {
+    lock_guard<mutex> lock(mMux);
     auto it = mConfigInfoMap.find(configName);
     if (it == mConfigInfoMap.end()) {
         return false;
@@ -74,7 +77,8 @@ bool OnetimeConfigManager::RemoveConfig(const string& configName) {
     return true;
 }
 
-void OnetimeConfigManager::DeleteTimeoutConfigFiles() {
+void OnetimeConfigInfoManager::DeleteTimeoutConfigFiles() {
+    lock_guard<mutex> lock(mMux);
     for (auto it = mConfigInfoMap.begin(); it != mConfigInfoMap.end();) {
         if (time(nullptr) >= it->second.mExpireTime) {
             error_code ec;
@@ -96,7 +100,8 @@ void OnetimeConfigManager::DeleteTimeoutConfigFiles() {
     }
 }
 
-void OnetimeConfigManager::ClearUnusedCheckpoints() {
+void OnetimeConfigInfoManager::ClearUnusedCheckpoints() {
+    lock_guard<mutex> lock(mMux);
     if (mConfigExpireTimeCheckpoint.empty()
         || time(nullptr) - Application::GetInstance()->GetStartTime()
             < INT32_FLAG(unused_checkpoints_clear_interval_sec)) {
@@ -105,7 +110,7 @@ void OnetimeConfigManager::ClearUnusedCheckpoints() {
     mConfigExpireTimeCheckpoint.clear();
 }
 
-bool OnetimeConfigManager::LoadCheckpointFile() {
+bool OnetimeConfigInfoManager::LoadCheckpointFile() {
     error_code ec;
     filesystem::file_status s = filesystem::status(mCheckpointFilePath, ec);
     if (ec) {
@@ -167,12 +172,16 @@ bool OnetimeConfigManager::LoadCheckpointFile() {
                             "filepath", mCheckpointFilePath.string())("config", config));
             continue;
         }
-        mConfigExpireTimeCheckpoint.try_emplace(config, hash, expireTime);
+        {
+            lock_guard<mutex> lock(mMux);
+            mConfigExpireTimeCheckpoint.try_emplace(config, hash, expireTime);
+        }
     }
     return true;
 }
 
-void OnetimeConfigManager::DumpCheckpointFile() const {
+void OnetimeConfigInfoManager::DumpCheckpointFile() const {
+    lock_guard<mutex> lock(mMux);
     Json::Value res;
     // checkpoint must be dumped again, in case remote configs are partially loaded (which happens when local config
     // files are removed on restart and multiple remote config sources exists)
@@ -197,7 +206,8 @@ void OnetimeConfigManager::DumpCheckpointFile() const {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-void OnetimeConfigManager::Clear() {
+void OnetimeConfigInfoManager::Clear() {
+    lock_guard<mutex> lock(mMux);
     mConfigInfoMap.clear();
     mConfigExpireTimeCheckpoint.clear();
 }

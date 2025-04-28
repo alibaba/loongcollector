@@ -125,7 +125,7 @@ private:
     friend class InputFileUnittest;
     friend class InputStaticFileUnittest;
     friend class InputContainerStdioUnittest;
-    friend class InputPrometheuspUnittest;
+    friend class InputPrometheusUnittest;
     friend class InputFileSecurityUnittest;
     friend class InputProcessSecurityUnittest;
     friend class InputNetworkSecurityUnittest;

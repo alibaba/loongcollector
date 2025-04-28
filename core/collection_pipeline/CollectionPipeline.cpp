@@ -32,7 +32,7 @@
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
@@ -345,7 +345,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     // for symetry consideration, the following should be done on pipeline start. However, since it relies much on
     // config, it is more reasonable to do it here.
     if (mIsOnetime) {
-        OnetimeConfigManager::GetInstance()->UpdateConfig(
+        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
             mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
     }
 
@@ -480,7 +480,7 @@ void CollectionPipeline::Stop(bool isRemoving) {
     // only valid for onetime config
     // for update, the old expire has been replaced by the new one on init, should not remove here
     if (isRemoving) {
-        OnetimeConfigManager::GetInstance()->RemoveConfig(mName);
+        OnetimeConfigInfoManager::GetInstance()->RemoveConfig(mName);
     }
 
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));

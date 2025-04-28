@@ -197,7 +197,7 @@ bool CollectionConfig::Parse() {
         }
         const string pluginType = it->asString();
         // when input is singleton, there should only one input to simpify config load transaction
-        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType, mExpireTime.has_value())) {
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType, IsOnetime())) {
             mSingletonInput = pluginType;
             if (itr->size() > 1) {
                 PARAM_ERROR_RETURN(sLogger,
@@ -213,7 +213,7 @@ bool CollectionConfig::Parse() {
         if (i == 0) {
             if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
-            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, mExpireTime.has_value())) {
+            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                 mHasNativeInput = true;
             } else {
                 PARAM_ERROR_RETURN(
@@ -221,7 +221,7 @@ bool CollectionConfig::Parse() {
             }
         } else {
             if (mHasGoInput) {
-                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, mExpireTime.has_value())) {
+                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native and extended input plugins coexist",
@@ -244,8 +244,7 @@ bool CollectionConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType,
-                                                                                    mExpireTime.has_value())) {
+                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                     PARAM_ERROR_RETURN(
                         sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
                 }

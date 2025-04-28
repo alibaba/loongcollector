@@ -42,8 +42,8 @@ public:
     StaticFileServer& operator=(const StaticFileServer&) = delete;
 
     static StaticFileServer* GetInstance() {
-        static StaticFileServer instance;
-        return &instance;
+        static StaticFileServer sInstance;
+        return &sInstance;
     }
 
     void Init() override;

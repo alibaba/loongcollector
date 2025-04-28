@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "config/PipelineConfig.h"
 #include "unittest/Unittest.h"
 
@@ -39,10 +39,10 @@ protected:
     }
 
 private:
-    static OnetimeConfigManager* sConfigManager;
+    static OnetimeConfigInfoManager* sConfigManager;
 };
 
-OnetimeConfigManager* PipelineConfigUnittest::sConfigManager = OnetimeConfigManager::GetInstance();
+OnetimeConfigInfoManager* PipelineConfigUnittest::sConfigManager = OnetimeConfigInfoManager::GetInstance();
 
 
 void PipelineConfigUnittest::TestOnetimeConfig() const {

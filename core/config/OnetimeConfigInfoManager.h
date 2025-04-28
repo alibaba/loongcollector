@@ -32,13 +32,13 @@ enum class OnetimeConfigStatus {
     OBSOLETE,
 };
 
-class OnetimeConfigManager {
+class OnetimeConfigInfoManager {
 public:
-    OnetimeConfigManager(const OnetimeConfigManager&) = delete;
-    OnetimeConfigManager& operator=(const OnetimeConfigManager&) = delete;
+    OnetimeConfigInfoManager(const OnetimeConfigInfoManager&) = delete;
+    OnetimeConfigInfoManager& operator=(const OnetimeConfigInfoManager&) = delete;
 
-    static OnetimeConfigManager* GetInstance() {
-        static OnetimeConfigManager instance;
+    static OnetimeConfigInfoManager* GetInstance() {
+        static OnetimeConfigInfoManager instance;
         return &instance;
     }
 
@@ -70,18 +70,19 @@ private:
             : mType(type), mFilepath(filepath), mHash(hash), mExpireTime(expireTime) {}
     };
 
-    OnetimeConfigManager();
-    ~OnetimeConfigManager() = default;
-
-    // only accessed by main thread
-    std::map<std::string, ConfigInfo> mConfigInfoMap;
+    OnetimeConfigInfoManager();
+    ~OnetimeConfigInfoManager() = default;
 
     std::filesystem::path mCheckpointFilePath;
+
+    // only accessed by main thread, however, for protection, we still add a lock
+    std::mutex mMux;
+    std::map<std::string, ConfigInfo> mConfigInfoMap;
     std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;
-    friend class OnetimeConfigManagerUnittest;
+    friend class OnetimeConfigInfoManagerUnittest;
     friend class OnetimeConfigUpdateUnittest;
 #endif
 };

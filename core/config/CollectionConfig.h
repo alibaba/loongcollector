@@ -72,6 +72,8 @@ struct CollectionConfig : public PipelineConfig {
 
     bool HasGoPlugin() const { return mHasGoFlusher || mHasGoProcessor || mHasGoInput; }
 
+    bool IsOnetime() const { return mExpireTime.has_value(); }
+
     bool ReplaceEnvVar();
 };
 

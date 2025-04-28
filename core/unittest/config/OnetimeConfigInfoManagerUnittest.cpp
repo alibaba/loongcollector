@@ -14,14 +14,14 @@
 
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
-#include "config/OnetimeConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
 
 namespace logtail {
 
-class OnetimeConfigManagerUnittest : public testing::Test {
+class OnetimeConfigInfoManagerUnittest : public testing::Test {
 public:
     void TestLoadCheckpointFile() const;
     void TestGetOnetimeConfigStatusFromCheckpoint() const;
@@ -38,12 +38,12 @@ protected:
     }
 
 private:
-    static OnetimeConfigManager* sManager;
+    static OnetimeConfigInfoManager* sManager;
 };
 
-OnetimeConfigManager* OnetimeConfigManagerUnittest::sManager = OnetimeConfigManager::GetInstance();
+OnetimeConfigInfoManager* OnetimeConfigInfoManagerUnittest::sManager = OnetimeConfigInfoManager::GetInstance();
 
-void OnetimeConfigManagerUnittest::TestLoadCheckpointFile() const {
+void OnetimeConfigInfoManagerUnittest::TestLoadCheckpointFile() const {
     {
         // non-existing checkpoint file
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile());
@@ -101,7 +101,7 @@ void OnetimeConfigManagerUnittest::TestLoadCheckpointFile() const {
     }
 }
 
-void OnetimeConfigManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint() const {
+void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint() const {
     {
         ofstream fout(sManager->mCheckpointFilePath);
         fout << R"({
@@ -148,7 +148,7 @@ void OnetimeConfigManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint() co
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
 
-void OnetimeConfigManagerUnittest::TestUpdateConfig() const {
+void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
     filesystem::create_directories("test_config");
     { ofstream fout("test_config/test_config_1.json"); }
     { ofstream fout("test_config/test_config_2.json"); }
@@ -206,7 +206,7 @@ void OnetimeConfigManagerUnittest::TestUpdateConfig() const {
     filesystem::remove_all("test_config");
 }
 
-void OnetimeConfigManagerUnittest::TestDumpCheckpointFile() const {
+void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
     {
         ofstream fout(sManager->mCheckpointFilePath);
         fout << R"({
@@ -260,10 +260,10 @@ void OnetimeConfigManagerUnittest::TestDumpCheckpointFile() const {
     APSARA_TEST_EQUAL(2100000000U, res["test_config_5"]["expire_time"].asUInt());
 }
 
-UNIT_TEST_CASE(OnetimeConfigManagerUnittest, TestLoadCheckpointFile)
-UNIT_TEST_CASE(OnetimeConfigManagerUnittest, TestGetOnetimeConfigStatusFromCheckpoint)
-UNIT_TEST_CASE(OnetimeConfigManagerUnittest, TestUpdateConfig)
-UNIT_TEST_CASE(OnetimeConfigManagerUnittest, TestDumpCheckpointFile)
+UNIT_TEST_CASE(OnetimeConfigInfoManagerUnittest, TestLoadCheckpointFile)
+UNIT_TEST_CASE(OnetimeConfigInfoManagerUnittest, TestGetOnetimeConfigStatusFromCheckpoint)
+UNIT_TEST_CASE(OnetimeConfigInfoManagerUnittest, TestUpdateConfig)
+UNIT_TEST_CASE(OnetimeConfigInfoManagerUnittest, TestDumpCheckpointFile)
 
 } // namespace logtail
 
