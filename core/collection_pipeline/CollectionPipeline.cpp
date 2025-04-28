@@ -80,7 +80,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mIsOnetime = config.mExpireTime.has_value();
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
-    mContext.SetIsFromCheckpoint(config.mIsFromCheckpoint);
+    mContext.SetIsOnetimePipelineRunningBeforeStart(config.mIsRunningBeforeStart);
     mContext.SetPipeline(*this);
     mContext.SetIsFirstProcessorJsonFlag(config.mIsFirstProcessorJson);
     mContext.SetHasNativeProcessorsFlag(config.mHasNativeProcessor);

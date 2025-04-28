@@ -126,7 +126,7 @@ bool InputStaticFile::Start() {
         // mFileDiscovery.SetContainerInfo();
     }
     optional<vector<filesystem::path>> files;
-    if (!mContext->IsFromCheckpoint()) {
+    if (!mContext->IsOnetimePipelineRunningBeforeStart()) {
         files = GetFiles();
     }
     StaticFileServer::GetInstance()->AddInput(
@@ -142,11 +142,12 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
 vector<filesystem::path> InputStaticFile::GetFiles() const {
     vector<filesystem::path> res;
     vector<filesystem::path> baseDirs;
+    const auto &wildcardPaths = mFileDiscovery.GetWildcardPaths();
     if (!mEnableContainerDiscovery) {
-        if (mFileDiscovery.GetWildcardPaths().empty()) {
+        if (wildcardPaths.empty()) {
             baseDirs.emplace_back(mFileDiscovery.GetBasePath());
         } else {
-            GetValidBaseDirs(mFileDiscovery.GetWildcardPaths()[0], 0, baseDirs);
+            GetValidBaseDirs(wildcardPaths[0], 0, baseDirs);
             if (baseDirs.empty()) {
                 LOG_WARNING(sLogger,
                             ("no files found", "base dir path invalid")("base dir", mFileDiscovery.GetBasePath())(
@@ -166,7 +167,7 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
         set<DevInode> visitedDirs;
         for (const auto& item : *mFileDiscovery.GetContainerInfo()) {
             baseDirs.clear();
-            if (mFileDiscovery.GetWildcardPaths().empty()) {
+            if (wildcardPaths.empty()) {
                 baseDirs.emplace_back(item.mRealBaseDir);
             } else {
                 GetValidBaseDirs(item.mRealBaseDir, 0, baseDirs);
@@ -202,12 +203,13 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
 void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
                                        uint32_t depth,
                                        vector<filesystem::path>& filepaths) const {
+    const auto &wildcardPaths = mFileDiscovery.GetWildcardPaths();
     bool finish = false;
-    if (depth + 2 == mFileDiscovery.GetWildcardPaths().size()) {
+    if (depth + 2 == wildcardPaths.size()) {
         finish = true;
     }
 
-    if (depth == 0 && !IsValidDir(mFileDiscovery.GetWildcardPaths()[depth])) {
+    if (depth == 0 && !IsValidDir(wildcardPaths[depth])) {
         return;
     }
 
@@ -225,7 +227,7 @@ void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
             GetValidBaseDirs(path, depth + 1, filepaths);
         }
     } else {
-        auto pattern = filesystem::path(mFileDiscovery.GetWildcardPaths()[depth + 1]).filename();
+        auto pattern = filesystem::path(wildcardPaths[depth + 1]).filename();
         error_code ec;
         for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
             const auto& path = entry.path();

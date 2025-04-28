@@ -51,8 +51,8 @@ public:
     }
     void SetProcessQueueKey(QueueKey key) { mProcessQueueKey = key; }
     QueueKey GetProcessQueueKey() const { return mProcessQueueKey; }
-    void SetIsFromCheckpoint(bool flag) { mIsFromCheckpoint = flag; }
-    bool IsFromCheckpoint() const { return mIsFromCheckpoint; }
+    void SetIsOnetimePipelineRunningBeforeStart(bool flag) { mIsOnetimePipelineRunningBeforeStart = flag; }
+    bool IsOnetimePipelineRunningBeforeStart() const { return mIsOnetimePipelineRunningBeforeStart; }
     const CollectionPipeline& GetPipeline() const { return *mPipeline; }
     CollectionPipeline& GetPipeline() { return *mPipeline; }
     void SetPipeline(CollectionPipeline& pipeline) { mPipeline = &pipeline; }
@@ -87,7 +87,7 @@ private:
     uint32_t mCreateTime;
     GlobalConfig mGlobalConfig;
     QueueKey mProcessQueueKey = -1;
-    bool mIsFromCheckpoint = false;
+    bool mIsOnetimePipelineRunningBeforeStart = false;
     CollectionPipeline* mPipeline = nullptr;
 
     const FlusherSLS* mSLSInfo = nullptr;

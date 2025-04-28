@@ -34,7 +34,7 @@ struct PipelineConfig {
     uint32_t mCreateTime = 0;
     // valid for onetime config
     std::optional<uint32_t> mExpireTime;
-    bool mIsFromCheckpoint = false;
+    bool mIsRunningBeforeStart = false;
 
     PipelineConfig(const std::string& name,
                    std::unique_ptr<Json::Value>&& detail,

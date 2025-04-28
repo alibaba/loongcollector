@@ -457,7 +457,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
-        ctx.SetIsFromCheckpoint(true);
+        ctx.SetIsOnetimePipelineRunningBeforeStart(true);
         input.SetContext(ctx);
         input.SetMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));

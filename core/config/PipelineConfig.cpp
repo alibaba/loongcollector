@@ -70,7 +70,7 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
     switch (status) {
         case OnetimeConfigStatus::OLD:
             mExpireTime = expireTime;
-            mIsFromCheckpoint = true;
+            mIsRunningBeforeStart = true;
             LOG_INFO(sLogger, ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
             return true;
         case OnetimeConfigStatus::NEW:
