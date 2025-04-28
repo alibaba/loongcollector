@@ -76,7 +76,7 @@ private:
     std::filesystem::path mCheckpointFilePath;
 
     // only accessed by main thread, however, for protection, we still add a lock
-    std::mutex mMux;
+    mutable std::mutex mMux;
     std::map<std::string, ConfigInfo> mConfigInfoMap;
     std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
 
