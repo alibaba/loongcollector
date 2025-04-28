@@ -157,7 +157,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    // RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
     // TODO: remove these gflag when plugin is stablized
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
