@@ -174,14 +174,8 @@ void StaticFileServer::ReadFiles() {
 }
 
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
-    while (true) {
-        FileFingerprint fingerprint;
-        if (!InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(
-                configName, idx, &fingerprint)) {
-            // all files have been read
-            mDeletedInputs.emplace(configName, idx);
-            return LogFileReaderPtr();
-        }
+    FileFingerprint fingerprint;
+    while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
         LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(fingerprint.mFilePath.parent_path().string(),
                                                                    fingerprint.mFilePath.filename().string(),
                                                                    fingerprint.mDevInode,
@@ -209,6 +203,9 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
         }
         return reader;
     }
+    // all files have been read
+    mDeletedInputs.emplace(configName, idx);
+    return LogFileReaderPtr();
 }
 
 void StaticFileServer::UpdateInputs() {

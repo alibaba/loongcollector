@@ -137,9 +137,8 @@ bool PluginRegistry::IsValidGoPlugin(const string& name) const {
 bool PluginRegistry::IsValidNativeInputPlugin(const string& name, bool isOnetime) const {
     if (isOnetime) {
         return mPluginDict.find(PluginKey(ONETIME_INPUT_PLUGIN, name)) != mPluginDict.end();
-    } else {
-        return mPluginDict.find(PluginKey(CONTINUOUS_INPUT_PLUGIN, name)) != mPluginDict.end();
     }
+    return mPluginDict.find(PluginKey(CONTINUOUS_INPUT_PLUGIN, name)) != mPluginDict.end();
 }
 
 bool PluginRegistry::IsValidNativeProcessorPlugin(const string& name) const {
