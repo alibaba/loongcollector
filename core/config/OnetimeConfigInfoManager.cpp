@@ -200,7 +200,7 @@ void OnetimeConfigInfoManager::DumpCheckpointFile() const {
         itemJson["expire_time"] = info.mExpireTime;
     }
     string errMsg;
-    if (!WriteFile(mCheckpointFilePath.string(), res.toStyledString(), errMsg)) {
+    if (!UpdateFileContent(mCheckpointFilePath, res.toStyledString(), errMsg)) {
         LOG_WARNING(sLogger, ("failed to write checkpoint file", errMsg)("filepath", mCheckpointFilePath.string()));
     }
 }

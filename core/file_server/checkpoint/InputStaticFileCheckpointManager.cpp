@@ -116,7 +116,8 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
              ("create checkpoint succeeded, config", configName)("input idx", idx)("file count", fileCpts.size()));
     {
         lock_guard<mutex> lock(mUpdateMux);
-        auto it = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts)).first;
+        auto it
+            = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts)).first;
         if (!DumpCheckpointFile(it->second)) {
             LOG_WARNING(sLogger, ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
         }
@@ -331,10 +332,8 @@ bool InputStaticFileCheckpointManager::DumpCheckpointFile(const InputStaticFileC
         // should not happen
         return false;
     }
-
-    filesystem::path filePath = mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex());
-    string errorMsg;
-    return WriteFile(filePath.string(), res, errorMsg);
+    string errMsg;
+    return UpdateFileContent(mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex()), res, errMsg);
 }
 
 bool InputStaticFileCheckpointManager::LoadCheckpointFile(const filesystem::path& filepath,
