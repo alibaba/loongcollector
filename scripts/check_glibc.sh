@@ -23,6 +23,7 @@ ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 BIN="${ROOTDIR}/${OUT_DIR}/loongcollector"
 ADAPTER="${ROOTDIR}/${OUT_DIR}/libGoPluginAdapter.so"
 PLUGIN="${ROOTDIR}/${OUT_DIR}/libGoPluginBase.so"
+EBPF_DRIVER="${ROOTDIR}/${OUT_DIR}/libeBPFDriver.so"
 
 # check if the symbols in loongcollector are compatible with GLIBC_2.5
 awk_script=$(cat <<- EOF
@@ -51,7 +52,7 @@ END {
 }
 EOF
 )
-all=("$BIN" "$ADAPTER" "$PLUGIN")
+all=("$BIN" "$ADAPTER" "$PLUGIN" "$EBPF_DRIVER")
 failed=0
 for obj in "${all[@]}"; do
     echo "Checking symbols in $obj ..."

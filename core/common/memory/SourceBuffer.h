@@ -19,7 +19,7 @@
 #include <list>
 #include <memory>
 
-#include "models/StringView.h"
+#include "common/StringView.h"
 
 namespace logtail {
 

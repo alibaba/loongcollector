@@ -28,7 +28,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
 #pragma once
 #include <cstdint>
 
@@ -41,7 +40,6 @@
 #include <thread>
 #include <unordered_map>
 
-namespace logtail {
 namespace lru11 {
 /*
  * a noop lockable concept that can be used in place of std::mutex
@@ -66,9 +64,8 @@ struct KeyValuePair {
 public:
     K key;
     V value;
-    std::chrono::steady_clock::time_point timestamp;
 
-    KeyValuePair(K k, V v) : key(std::move(k)), value(std::move(v)), timestamp(std::chrono::steady_clock::now()) {}
+    KeyValuePair(K k, V v) : key(std::move(k)), value(std::move(v)) {}
 };
 
 /**
@@ -103,16 +100,8 @@ public:
      * using a std::unordered_map
      * directly anyway! :)
      */
-    explicit Cache(size_t maxSize = 64, size_t elasticity = 10)
-        : maxSize_(maxSize), elasticity_(elasticity), prune_thread(&Cache::pruneThreadFunc, this) {}
-
-    virtual ~Cache() {
-        stop_pruning = true;
-        if (prune_thread.joinable()) {
-            prune_thread.join();
-        }
-    }
-
+    explicit Cache(size_t maxSize = 64, size_t elasticity = 10) : maxSize_(maxSize), elasticity_(elasticity) {}
+    virtual ~Cache() = default;
     size_t size() const {
         Guard g(lock_);
         return cache_.size();
@@ -131,7 +120,6 @@ public:
         const auto iter = cache_.find(k);
         if (iter != cache_.end()) {
             iter->second->value = v;
-            iter->second->timestamp = std::chrono::steady_clock::now();
             keys_.splice(keys_.begin(), keys_, iter->second);
             return;
         }
@@ -140,9 +128,15 @@ public:
         cache_[k] = keys_.begin();
         prune();
     }
+    void emplace(const Key& k, Value&& v) {
+        Guard g(lock_);
+        keys_.emplace_front(k, std::move(v));
+        cache_[k] = keys_.begin();
+        prune();
+    }
     /**
-      for backward compatibility. redirects to tryGetCopy()
-    */
+      for backward compatibity. redirects to tryGetCopy()
+     */
     bool tryGet(const Key& kIn, Value& vOut) { return tryGetCopy(kIn, vOut); }
 
     bool tryGetCopy(const Key& kIn, Value& vOut) {
@@ -171,7 +165,7 @@ public:
 
     /**
         added for backward compatibility
-    */
+     */
     Value get(const Key& k) { return getCopy(k); }
     /**
      * returns a copy of the stored object (if found)
@@ -207,10 +201,10 @@ public:
     }
 
 protected:
-    Value get_nolock(const Key& k) {
+    const Value& get_nolock(const Key& k) {
         const auto iter = cache_.find(k);
         if (iter == cache_.end()) {
-            return nullptr;
+            throw KeyNotFound();
         }
         keys_.splice(keys_.begin(), keys_, iter->second);
         return iter->second->value;
@@ -238,27 +232,6 @@ protected:
         return count;
     }
 
-    size_t pruneExpired() {
-        Guard g(lock_);
-        size_t count = 0;
-        auto now = std::chrono::steady_clock::now();
-        auto cutoff = now - std::chrono::minutes(5);
-
-        while (!keys_.empty() && keys_.back().timestamp < cutoff) {
-            cache_.erase(keys_.back().key);
-            keys_.pop_back();
-            ++count;
-        }
-        return count;
-    }
-
-    void pruneThreadFunc() {
-        while (!stop_pruning) {
-            pruneExpired();
-            std::this_thread::sleep_for(std::chrono::seconds(60)); // 每60秒检查一次
-        }
-    }
-
 private:
     // Disallow copying.
     Cache(const Cache&) = delete;
@@ -269,13 +242,6 @@ private:
     list_type keys_;
     size_t maxSize_;
     size_t elasticity_;
-    std::atomic<bool> stop_pruning{false};
-    std::thread prune_thread;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class LRUCacheUnittest;
-#endif
 };
 
 } // namespace lru11
-} // namespace logtail

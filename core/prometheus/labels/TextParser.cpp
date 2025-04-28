@@ -20,12 +20,11 @@
 
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-
+#include "common/StringTools.h"
+#include "common/StringView.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 #include "prometheus/Utils.h"
 
 using namespace std;
@@ -253,9 +252,7 @@ void TextParser::HandleSampleValue(MetricEvent& metricEvent) {
     auto tmpSampleValue = mLine.substr(mPos - mTokenLength, mTokenLength);
     mDoubleStr = tmpSampleValue.to_string();
 
-    try {
-        mSampleValue = std::stod(mDoubleStr);
-    } catch (...) {
+    if (!StringTo(mDoubleStr, mSampleValue)) {
         HandleError("invalid sample value");
         mTokenLength = 0;
         return;
@@ -293,9 +290,7 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
     }
     mDoubleStr = tmpTimestamp.to_string();
     double milliTimestamp = 0;
-    try {
-        milliTimestamp = stod(mDoubleStr);
-    } catch (...) {
+    if (!StringTo(mDoubleStr, milliTimestamp)) {
         HandleError("invalid timestamp");
         mTokenLength = 0;
         return;

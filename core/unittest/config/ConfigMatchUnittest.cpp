@@ -699,9 +699,12 @@ private:
         std::string line;
         while (std::getline(in, line)) {
             size_t pos = line.find("LOGID:");
-            if (std::string::npos == pos)
+            if (std::string::npos == pos) {
                 continue;
-            collectedLogIDs.push_back(StringTo<int32_t>(SplitString(line.substr(line.find("LOGID:")), ":")[1]));
+            }
+            int32_t logid{};
+            StringTo(SplitString(line.substr(line.find("LOGID:")), ":")[1], logid);
+            collectedLogIDs.push_back(logid);
         }
         APSARA_TEST_EQUAL(acceptedLogIDs.size(), collectedLogIDs.size());
         std::sort(collectedLogIDs.begin(), collectedLogIDs.end());

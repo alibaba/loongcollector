@@ -129,6 +129,11 @@ DEFINE_FLAG_STRING(metrics_report_method,
 DEFINE_FLAG_STRING(operator_service, "loong collector operator service", "");
 DEFINE_FLAG_INT32(operator_service_port, "loong collector operator service port", 8888);
 DEFINE_FLAG_INT32(k8s_meta_service_port, "loong collector operator service port", 9000);
+
+DEFINE_FLAG_STRING(k8s_metadata_server_name,
+                   "loong collector singleton service for k8s metadata server",
+                   "loongcollector-singleton");
+DEFINE_FLAG_INT32(k8s_metadata_server_port, "loong collector singleton service port for k8s metadata server", 8899);
 DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
 
 DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
@@ -178,8 +183,8 @@ std::string GetLoongcollectorEnv(const std::string& flagName) {
 void CreateAgentDir() {
     try {
         const char* value = getenv("LOGTAIL_MODE");
-        if (value != NULL) {
-            STRING_FLAG(logtail_mode) = StringTo<bool>(value);
+        if (value != nullptr) {
+            STRING_FLAG(logtail_mode) = value;
         }
     } catch (const exception& e) {
         std::cout << "load config from env error, env_name:LOGTAIL_MODE, error:" << e.what() << std::endl;
@@ -193,8 +198,8 @@ void CreateAgentDir() {
     try { \
         const auto env_name = GetLoongcollectorEnv(#flag_name); \
         const char* value = getenv(env_name.c_str()); \
-        if (value != NULL) { \
-            STRING_FLAG(flag_name) = StringTo<string>(value); \
+        if (value != nullptr) { \
+            STRING_FLAG(flag_name) = value; \
         } \
     } catch (const exception& e) { \
         std::cout << "load config from env error, env_name:" << #flag_name << "\terror:" << e.what() << std::endl; \
@@ -786,8 +791,8 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
         char* value = NULL;
         value = getenv(envKey);
         if (value != NULL) {
-            T val = StringTo<T>(value);
-            if (val >= minValue) {
+            T val{};
+            if (StringTo(value, val) && val >= minValue) {
                 configValue = val;
                 LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
                 return true;
@@ -801,8 +806,8 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
         const auto newEnvKey = LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(envKey);
         value = getenv(newEnvKey.c_str());
         if (value != NULL) {
-            T val = StringTo<T>(value);
-            if (val >= minValue) {
+            T val{};
+            if (StringTo(value, val) && val >= minValue) {
                 configValue = val;
                 LOG_INFO(sLogger, (string("set ") + envKey + " from env, value", value));
                 return true;

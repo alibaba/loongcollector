@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
+FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 AS build
 ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 WORKDIR /usr/local

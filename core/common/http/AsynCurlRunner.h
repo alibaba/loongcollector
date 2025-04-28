@@ -55,6 +55,7 @@ private:
 
     std::future<void> mThreadRes;
     std::atomic_bool mIsFlush = false;
+    std::atomic_bool mInited = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class HttpRequestTimerEventUnittest;

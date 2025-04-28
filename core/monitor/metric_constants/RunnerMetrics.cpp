@@ -29,7 +29,8 @@ const string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER = "flusher_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK = "http_sink";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR = "processor_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
-const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_server";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_runner";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA = "k8s_metadata_runner";
 
 // metric keys
 const string& METRIC_RUNNER_IN_EVENTS_TOTAL = METRIC_IN_EVENTS_TOTAL;
@@ -72,8 +73,19 @@ const string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE = "polling_file_cache_si
 /**********************************************************
  *   ebpf server
  **********************************************************/
-const string METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL = "start_plugin_total";
-const string METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL = "stop_plugin_total";
-const string METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL = "suspend_plugin_total";
+const string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL = "poll_process_events_total";
+const string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL = "loss_process_events_total";
+const string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL = "process_cache_miss_total";
+const string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE = "process_cache_size";
+
+/**********************************************************
+ *   k8s metadata
+ **********************************************************/
+const string METRIC_RUNNER_METADATA_CID_CACHE_SIZE = "cid_cache_size";
+const string METRIC_RUNNER_METADATA_IP_CACHE_SIZE = "ip_cache_size";
+const string METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE = "external_ip_cache_size";
+const string METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL = "request_metadata_server_total";
+const string METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL = "request_metadata_server_failed_total";
+
 
 } // namespace logtail

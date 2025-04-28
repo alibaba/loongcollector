@@ -35,7 +35,7 @@ public:
     bool SupportAck() const override { return false; }
 
     ebpf::SecurityOptions mSecurityOptions;
-    PluginMetricManagerPtr mPluginMgr;
+    PluginMetricManagerPtr mPluginMetricPtr;
 };
 
 } // namespace logtail

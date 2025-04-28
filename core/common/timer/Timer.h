@@ -34,6 +34,7 @@ struct TimerEventCompare {
 
 class Timer {
 public:
+    ~Timer();
     Timer(const Timer&) = delete;
     Timer(Timer&&) = delete;
     Timer& operator=(const Timer&) = delete;
@@ -51,7 +52,6 @@ public:
 
 private:
     Timer() = default;
-    ~Timer() = default;
     void Run();
 
     mutable std::mutex mQueueMux;

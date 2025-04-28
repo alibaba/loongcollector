@@ -57,6 +57,7 @@ public:
 
 private:
     static const int32_t BUFFER_META_BASE_SIZE;
+    static const size_t BUFFER_META_MAX_SIZE;
 
     struct EncryptionStateMeta {
         int32_t mLogDataSize;
@@ -91,6 +92,7 @@ private:
     std::string GetBufferFileName();
     void SetBufferFileName(const std::string& filename);
     std::string GetBufferFileHeader();
+    bool CheckBufferMetaValidation(const std::string& filename, const sls_logs::LogtailBufferMeta& bufferMeta);
 
     SafeQueue<SenderQueueItem*> mQueue;
 

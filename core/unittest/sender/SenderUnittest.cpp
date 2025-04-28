@@ -2585,7 +2585,7 @@ public:
                 if (0 == regionName.find("__default"))
                     projectIndex = 0;
                 else if (0 == regionName.find("1000")) {
-                    projectIndex = StringTo<int32_t>(regionName.substr(std::string("100000").length(), 1));
+                    StringTo(regionName.substr(std::string("100000").length(), 1), projectIndex);
                 }
                 if (0 <= projectIndex && projectIndex <= 3) {
                     EXPECT_EQ(iter->second->mConcurrency, 30 / regionMap.size());

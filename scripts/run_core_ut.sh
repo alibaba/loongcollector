@@ -24,11 +24,12 @@ search_files() {
         elif [[ -f "$file" ]]; then
             unittest="${file##*_}"
             if [ "$unittest" == "unittest" ]; then
-                echo "============== ${file##*/} =============="
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${file##*/} Start **********"
                 cd ${file%/*}
                 ./${file##*/}
                 cd -
-                echo "===================================="
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${file##*/} End ############"
+                echo
             fi
         fi
     done
