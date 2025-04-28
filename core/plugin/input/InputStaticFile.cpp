@@ -142,7 +142,7 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
 vector<filesystem::path> InputStaticFile::GetFiles() const {
     vector<filesystem::path> res;
     vector<filesystem::path> baseDirs;
-    const auto &wildcardPaths = mFileDiscovery.GetWildcardPaths();
+    const auto& wildcardPaths = mFileDiscovery.GetWildcardPaths();
     if (!mEnableContainerDiscovery) {
         if (wildcardPaths.empty()) {
             baseDirs.emplace_back(mFileDiscovery.GetBasePath());
@@ -203,7 +203,7 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
 void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
                                        uint32_t depth,
                                        vector<filesystem::path>& filepaths) const {
-    const auto &wildcardPaths = mFileDiscovery.GetWildcardPaths();
+    const auto& wildcardPaths = mFileDiscovery.GetWildcardPaths();
     bool finish = false;
     if (depth + 2 == wildcardPaths.size()) {
         finish = true;

@@ -270,7 +270,7 @@ void Application::Start() { // GCOVR_EXCL_START
     OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnunsedCheckpointsTime = 0;
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
@@ -314,10 +314,10 @@ void Application::Start() { // GCOVR_EXCL_START
             SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
         }
-        if (curTime - lastCheckUnunsedCheckpointsTime >= 60) {
+        if (curTime - lastCheckUnusedCheckpointsTime >= 60) {
             CollectionPipelineManager::GetInstance()->ClearInputUnusedCheckpoints();
             OnetimeConfigInfoManager::GetInstance()->ClearUnusedCheckpoints();
-            lastCheckUnunsedCheckpointsTime = curTime;
+            lastCheckUnusedCheckpointsTime = curTime;
         }
         CollectionPipelineManager::GetInstance()->InputRunnerEventGC();
         if (curTime - lastUpdateMetricTime >= 40) {

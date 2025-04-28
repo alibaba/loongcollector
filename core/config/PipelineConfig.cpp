@@ -65,8 +65,8 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
         return true;
     }
     uint32_t expireTime = 0;
-    auto status
-        = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(mName, mConfigHash, &expireTime);
+    auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
+        mName, mConfigHash, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
             mExpireTime = expireTime;

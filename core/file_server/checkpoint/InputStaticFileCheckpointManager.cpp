@@ -333,7 +333,8 @@ bool InputStaticFileCheckpointManager::DumpCheckpointFile(const InputStaticFileC
         return false;
     }
     string errMsg;
-    return UpdateFileContent(mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex()), res, errMsg);
+    return UpdateFileContent(
+        mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex()), res, errMsg);
 }
 
 bool InputStaticFileCheckpointManager::LoadCheckpointFile(const filesystem::path& filepath,

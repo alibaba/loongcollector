@@ -30,8 +30,8 @@ OnetimeConfigInfoManager::OnetimeConfigInfoManager()
 }
 
 OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint(const string& configName,
-                                                                               uint64_t hash,
-                                                                               uint32_t* expireTime) {
+                                                                                   uint64_t hash,
+                                                                                   uint32_t* expireTime) {
     lock_guard<mutex> lock(mMux);
     auto it = mConfigExpireTimeCheckpoint.find(configName);
     if (it == mConfigExpireTimeCheckpoint.end()) {
