@@ -20,6 +20,7 @@
 
 #include <filesystem>
 #include <map>
+#include <mutex>
 #include <string>
 
 #include "config/ConfigUtil.h"
