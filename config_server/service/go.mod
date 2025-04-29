@@ -3,6 +3,7 @@ module config-server
 go 1.19
 
 require (
+	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/gin-gonic/gin v1.8.1
 	github.com/syndtr/goleveldb v1.0.0
 	google.golang.org/protobuf v1.28.0

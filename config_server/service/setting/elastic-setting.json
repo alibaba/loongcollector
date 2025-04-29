@@ -1,0 +1,14 @@
+{
+  "ip": "127.0.0.1",
+  "port": "8899",
+  "store_mode": "elastic",
+  "es_config": {
+    "addresses": [
+      "http://localhost:9200"
+    ],
+    "username": "elastic",
+    "password": "somethingsecret"
+  },
+  "agent_update_interval": 1,
+  "config_sync_interval": 3
+}

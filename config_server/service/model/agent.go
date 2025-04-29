@@ -20,6 +20,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -86,6 +87,7 @@ type Agent struct {
 	RunningStatus  string          `json:"RunningStatus"`
 	StartupTime    int64           `json:"StartupTime"`
 	Interval       int32           `json:"Interval"`
+	Timestamp      time.Time       `json:"Timestamp"`
 }
 
 func (Agent) TableName() string {
