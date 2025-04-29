@@ -72,7 +72,7 @@ if [[ $MOD = "vendor" ]]; then
   cd vendor/github.com/valyala/gozstd
 else
   "$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
-  cd $(go env GOPATH)/pkg/mod/github.com/valyala/gozstd@*
+  cd $(go env GOMODCACHE)/github.com/valyala/gozstd@*
 fi
 # if libzstd.a is available in the image, copy instead of rebuild
 lib_name=libzstd_${GOOS}_${GOARCH}.a
