@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dockercenter
+package containercenter
 
 import (
 	"context"
@@ -38,7 +38,7 @@ var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIV1Alpha2Wrapper wrapper for containerd client
 type innerContainerInfo struct {
-	State criv1alpha2.ContainerState
+	State int32
 	// criv1.ContainerState
 	Pid    int
 	Name   string
@@ -53,7 +53,7 @@ type RuntimeInfo struct {
 }
 
 type CRIInterface interface {
-	createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state criv1alpha2.ContainerState, err error)
+	createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state int32, err error)
 	fetchAll() error
 	fetchOne(containerID string) error
 	getContainerUpperDir(containerid string, snapshotter string) string
@@ -71,25 +71,32 @@ type CRIRuntimeWrapper struct {
 	RuntimeInfo RuntimeInfo
 }
 
-func NewCRIRuntimeWrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIRuntimeWrapper, error) {
-	var wrapper CRIInterface
-	var err error
-	switch info.runtimeAPIVersion {
-	case "v1alpha2":
-		wrapper, err = NewCRIV1Alpha2Wrapper(dockerCenter, info)
-		if err != nil {
-			return nil, err
+func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
+	if ok, info := IsCRIRuntimeValid(containerdUnixSocket); ok {
+		var wrapper CRIInterface
+		var err error
+		switch info.runtimeAPIVersion {
+		case "v1alpha2":
+			wrapper, err = NewCRIV1Alpha2Wrapper(dockerCenter, info)
+			if err != nil {
+				return nil, err
+			}
+		// Todo: support v1
+		case "v1":
+			wrapper, err = NewCRIV1Wrapper(dockerCenter, info)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("unsupported cri runtimr api version %q", info.runtimeAPIVersion)
 		}
-	// Todo: support v1
-	// case "v1":
-	default:
-		return nil, fmt.Errorf("unsupported cri runtimr api version %q", info.runtimeAPIVersion)
-	}
 
-	return &CRIRuntimeWrapper{
-		CRIInterface: wrapper,
-		RuntimeInfo:  info,
-	}, nil
+		return &CRIRuntimeWrapper{
+			CRIInterface: wrapper,
+			RuntimeInfo:  info,
+		}, nil
+	}
+	return nil, nil
 }
 
 func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {

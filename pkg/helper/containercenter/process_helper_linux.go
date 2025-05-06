@@ -12,11 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !linux
-// +build !linux
+//go:build linux
+// +build linux
 
-package dockercenter
+package containercenter
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
+)
 
 func ContainerProcessAlive(pid int) bool {
+	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
+	exist, err := util.PathExists(procStatPath)
+	if err != nil {
+		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
+	} else if !exist {
+		return false
+	}
 	return true
 }

@@ -15,7 +15,7 @@
 //go:build !windows
 // +build !windows
 
-package dockercenter
+package containercenter
 
 import (
 	"io/fs"

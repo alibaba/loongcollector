@@ -15,7 +15,7 @@
 //go:build linux
 // +build linux
 
-package dockercenter
+package containercenter
 
 import (
 	"fmt"
@@ -147,14 +147,15 @@ func TestCriVersion(t *testing.T) {
 		```
 	*/
 	containerdVersions := []string{
-		// "1.4.13", // only support v1alpha2
+		"1.4.13", // only support v1alpha2
 		"1.5.17", // only support v1alpha2
-		// "1.6.38", // support v1alpha2 and v1, use v1alpha2
-		// "1.7.27", // support v1alpha2 and v1, use v1alpha2
-		// "2.0.5",  // only support v1
+		"1.6.38", // support v1alpha2 and v1, use v1alpha2
+		"1.7.27", // support v1alpha2 and v1, use v1alpha2
+		"2.0.5",  // only support v1
 	}
 	for _, version := range containerdVersions {
 		t.Log("start check cri", version)
 		t.Log(IsCRIRuntimeValid(fmt.Sprintf("/run/containerd-%s/containerd.sock", version)))
 	}
+	t.Log(IsCRIRuntimeValid("/run/containerd/containerd.sock"))
 }

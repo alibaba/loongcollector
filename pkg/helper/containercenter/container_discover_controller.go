@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dockercenter
+package containercenter
 
 import (
 	"context"
@@ -163,15 +163,12 @@ func (c *ContainerDiscoverManager) Init() bool {
 	defer dockerCenterRecover()
 
 	// discover which runtime is valid
-	if ok, runtimeInfo := IsCRIRuntimeValid(containerdUnixSocket); ok {
-		var err error
-		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance, runtimeInfo)
-		if err != nil {
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
-			criRuntimeWrapper = nil
-		} else {
-			logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
-		}
+	var err error
+	if criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance); err != nil {
+		logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		criRuntimeWrapper = nil
+	} else {
+		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
 	}
 	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
 		if !ok {
@@ -249,7 +246,6 @@ func (c *ContainerDiscoverManager) Init() bool {
 	}
 	logger.Info(context.Background(), "init docker center, max fetchOne count per second", MaxFetchOneTriggerPerSecond)
 
-	var err error
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false

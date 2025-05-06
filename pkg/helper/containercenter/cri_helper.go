@@ -15,7 +15,7 @@
 //go:build linux
 // +build linux
 
-package dockercenter
+package containercenter
 
 import (
 	"context"

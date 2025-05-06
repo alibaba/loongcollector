@@ -15,7 +15,7 @@
 package event
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper/dockercenter"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"strconv"
@@ -38,7 +38,7 @@ type ServiceDockerEvents struct {
 
 func (p *ServiceDockerEvents) Init(context pipeline.Context) (int, error) {
 	p.context = context
-	dockercenter.ContainerCenterInit()
+	containercenter.ContainerCenterInit()
 	return 0, nil
 }
 
@@ -87,9 +87,9 @@ func (p *ServiceDockerEvents) Start(c pipeline.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	p.innerEventQueue = make(chan events.Message, p.EventQueueSize)
-	dockercenter.RegisterDockerEventListener(p.innerEventQueue)
+	containercenter.RegisterDockerEventListener(p.innerEventQueue)
 	defer func() {
-		dockercenter.UnRegisterDockerEventListener(p.innerEventQueue)
+		containercenter.UnRegisterDockerEventListener(p.innerEventQueue)
 		close(p.innerEventQueue)
 		p.waitGroup.Done()
 	}()

@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dockercenter
+package containercenter
 
 import (
 	"context"
@@ -32,10 +32,10 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"google.golang.org/grpc"
-	criv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func newCRIV1Alpha2RuntimeServiceClient() (criv1alpha2.RuntimeServiceClient, error) {
+func newCRIV1RuntimeServiceClient() (criv1.RuntimeServiceClient, error) {
 	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
 	if err != nil {
 		return nil, err
@@ -48,13 +48,13 @@ func newCRIV1Alpha2RuntimeServiceClient() (criv1alpha2.RuntimeServiceClient, err
 	if err != nil {
 		return nil, err
 	}
-	return criv1alpha2.NewRuntimeServiceClient(conn), nil
+	return criv1.NewRuntimeServiceClient(conn), nil
 }
 
-type CRIV1Alpha2Wrapper struct {
+type CRIV1Wrapper struct {
 	dockerCenter *DockerCenter
 	nativeClient *containerd.Client
-	client       criv1alpha2.RuntimeServiceClient
+	client       criv1.RuntimeServiceClient
 	runtimeName  string
 
 	containersLock sync.Mutex
@@ -69,9 +69,9 @@ type CRIV1Alpha2Wrapper struct {
 	listContainerStartTime int64 // in nanosecond
 }
 
-// NewCRIV1Alpha2Wrapper ...
-func NewCRIV1Alpha2Wrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIV1Alpha2Wrapper, error) {
-	client, err := newCRIV1Alpha2RuntimeServiceClient()
+// NewCRIV1Wrapper ...
+func NewCRIV1Wrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIV1Wrapper, error) {
+	client, err := newCRIV1RuntimeServiceClient()
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
@@ -89,7 +89,7 @@ func NewCRIV1Alpha2Wrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIV1
 		}
 	}
 
-	return &CRIV1Alpha2Wrapper{
+	return &CRIV1Wrapper{
 		dockerCenter:           dockerCenter,
 		client:                 client,
 		nativeClient:           containerdClient,
@@ -102,16 +102,20 @@ func NewCRIV1Alpha2Wrapper(dockerCenter *DockerCenter, info RuntimeInfo) (*CRIV1
 	}, nil
 }
 
+func V1StateToInt32(state criv1.ContainerState) int32 {
+	return int32(state)
+}
+
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
-func (cw *CRIV1Alpha2Wrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state criv1alpha2.ContainerState, err error) {
+func (cw *CRIV1Wrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state int32, err error) {
 	ctx, cancel := getContextWithTimeout(time.Second * 10)
-	status, err := cw.client.ContainerStatus(ctx, &criv1alpha2.ContainerStatusRequest{
+	status, err := cw.client.ContainerStatus(ctx, &criv1.ContainerStatusRequest{
 		ContainerId: containerID,
 		Verbose:     true,
 	})
 	cancel()
 	if err != nil {
-		return nil, "", criv1alpha2.ContainerState_CONTAINER_UNKNOWN, err
+		return nil, "", V1StateToInt32(criv1.ContainerState_CONTAINER_UNKNOWN), err
 	}
 
 	var ci containerdcriserver.ContainerInfo
@@ -128,7 +132,7 @@ func (cw *CRIV1Alpha2Wrapper) createContainerInfo(containerID string) (detail *D
 
 	if !foundInfo {
 		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
-		return nil, "", criv1alpha2.ContainerState_CONTAINER_UNKNOWN, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
+		return nil, "", V1StateToInt32(criv1.ContainerState_CONTAINER_UNKNOWN), fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 	}
 
 	labels := status.GetStatus().GetLabels()
@@ -142,9 +146,9 @@ func (cw *CRIV1Alpha2Wrapper) createContainerInfo(containerID string) (detail *D
 	}
 
 	// Judge Container Liveness by Pid
-	state = status.Status.State
+	state = V1StateToInt32(status.Status.State)
 	stateStatus := ContainerStatusExited
-	if state == criv1alpha2.ContainerState_CONTAINER_RUNNING && ContainerProcessAlive(int(ci.Pid)) {
+	if state == V1StateToInt32(criv1.ContainerState_CONTAINER_RUNNING) && ContainerProcessAlive(int(ci.Pid)) {
 		stateStatus = ContainerStatusRunning
 	}
 	dockerContainer := types.ContainerJSON{
@@ -219,7 +223,7 @@ func (cw *CRIV1Alpha2Wrapper) createContainerInfo(containerID string) (detail *D
 	return cw.dockerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 
-func (cw *CRIV1Alpha2Wrapper) fetchAll() error {
+func (cw *CRIV1Wrapper) fetchAll() error {
 	// fetchAll and syncContainers must be isolated
 	// if one procedure read container list then locked out
 	// when it resumes, it may process on a staled list and make wrong decisions
@@ -227,15 +231,15 @@ func (cw *CRIV1Alpha2Wrapper) fetchAll() error {
 	defer cw.containersLock.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	containersResp, err := cw.client.ListContainers(ctx, &criv1alpha2.ListContainersRequest{})
+	containersResp, err := cw.client.ListContainers(ctx, &criv1.ListContainersRequest{})
 	if err != nil {
 		return err
 	}
-	sandboxResp, err := cw.client.ListPodSandbox(ctx, &criv1alpha2.ListPodSandboxRequest{Filter: nil})
+	sandboxResp, err := cw.client.ListPodSandbox(ctx, &criv1.ListPodSandboxRequest{Filter: nil})
 	if err != nil {
 		return err
 	}
-	sandboxMap := make(map[string]*criv1alpha2.PodSandbox, len(sandboxResp.Items))
+	sandboxMap := make(map[string]*criv1.PodSandbox, len(sandboxResp.Items))
 	for _, item := range sandboxResp.Items {
 		sandboxMap[item.Id] = item
 	}
@@ -247,9 +251,9 @@ func (cw *CRIV1Alpha2Wrapper) fetchAll() error {
 		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, c)
 		allContainerMap[c.GetId()] = true
 		switch c.State {
-		case criv1alpha2.ContainerState_CONTAINER_RUNNING:
+		case criv1.ContainerState_CONTAINER_RUNNING:
 			runningMap[c.GetId()] = true
-		case criv1alpha2.ContainerState_CONTAINER_EXITED:
+		case criv1.ContainerState_CONTAINER_EXITED:
 			runningMap[c.GetId()] = false
 		default:
 			continue
@@ -268,7 +272,7 @@ func (cw *CRIV1Alpha2Wrapper) fetchAll() error {
 			continue
 		}
 		cw.containers[c.GetId()] = &innerContainerInfo{
-			State:  c.State,
+			State:  V1StateToInt32(c.State),
 			Pid:    dockerContainer.ContainerInfo.State.Pid,
 			Name:   dockerContainer.ContainerInfo.Name,
 			Status: dockerContainer.Status(),
@@ -303,7 +307,7 @@ func (cw *CRIV1Alpha2Wrapper) fetchAll() error {
 	return nil
 }
 
-func (cw *CRIV1Alpha2Wrapper) loopSyncContainers() {
+func (cw *CRIV1Wrapper) loopSyncContainers() {
 	ticker := time.NewTicker(DefaultSyncContainersPeriod)
 	for {
 		select {
@@ -318,24 +322,24 @@ func (cw *CRIV1Alpha2Wrapper) loopSyncContainers() {
 	}
 }
 
-func (cw *CRIV1Alpha2Wrapper) syncContainers() error {
+func (cw *CRIV1Wrapper) syncContainers() error {
 	cw.containersLock.Lock()
 	defer cw.containersLock.Unlock()
 	ctx, cancel := getContextWithTimeout(time.Second * 20)
 	defer cancel()
 	logger.Debug(context.Background(), "cri sync containers", "begin")
-	containersResp, err := cw.client.ListContainers(ctx, &criv1alpha2.ListContainersRequest{})
+	containersResp, err := cw.client.ListContainers(ctx, &criv1.ListContainersRequest{})
 	if err != nil {
 		return err
 	}
 
-	newContainers := map[string]*criv1alpha2.Container{}
+	newContainers := map[string]*criv1.Container{}
 	for i, c := range containersResp.Containers {
 		// https://github.com/containerd/containerd/blob/main/pkg/cri/store/container/status.go
 		// We only care RUNNING and EXITED
 		// This is only an early prune, accurate status must be detected by ContainerProcessAlive
-		if c.State != criv1alpha2.ContainerState_CONTAINER_RUNNING &&
-			(c.State != criv1alpha2.ContainerState_CONTAINER_EXITED || c.GetCreatedAt() < cw.listContainerStartTime) {
+		if c.State != criv1.ContainerState_CONTAINER_RUNNING &&
+			(c.State != criv1.ContainerState_CONTAINER_EXITED || c.GetCreatedAt() < cw.listContainerStartTime) {
 			continue
 		}
 		id := containersResp.Containers[i].GetId()
@@ -347,8 +351,8 @@ func (cw *CRIV1Alpha2Wrapper) syncContainers() error {
 			if oldInfo.Status == ContainerStatusRunning && ContainerProcessAlive(oldInfo.Pid) {
 				status = ContainerStatusRunning
 			}
-			if oldInfo.State != criv1alpha2.ContainerState_CONTAINER_RUNNING || // not running
-				(oldInfo.State == c.State && oldInfo.Name == c.Metadata.Name && oldInfo.Status == status) { // no state change
+			if oldInfo.State != V1StateToInt32(criv1.ContainerState_CONTAINER_RUNNING) || // not running
+				(oldInfo.State == V1StateToInt32(c.State) && oldInfo.Name == c.Metadata.Name && oldInfo.Status == status) { // no state change
 				continue
 			}
 		} else if inHistory {
@@ -361,7 +365,7 @@ func (cw *CRIV1Alpha2Wrapper) syncContainers() error {
 
 	// delete container
 	for oldID, c := range cw.containers {
-		if _, ok := newContainers[oldID]; !ok || c.State == criv1alpha2.ContainerState_CONTAINER_EXITED {
+		if _, ok := newContainers[oldID]; !ok || c.State == V1StateToInt32(criv1.ContainerState_CONTAINER_EXITED) {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
 			cw.dockerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)
@@ -371,7 +375,7 @@ func (cw *CRIV1Alpha2Wrapper) syncContainers() error {
 	return nil
 }
 
-func (cw *CRIV1Alpha2Wrapper) fetchOne(containerID string) error {
+func (cw *CRIV1Wrapper) fetchOne(containerID string) error {
 	logger.Debug(context.Background(), "trigger fetchOne")
 	dockerContainer, sandboxID, status, err := cw.createContainerInfo(containerID)
 	if err != nil {
@@ -399,9 +403,9 @@ func (cw *CRIV1Alpha2Wrapper) fetchOne(containerID string) error {
 	return nil
 }
 
-func (cw *CRIV1Alpha2Wrapper) wrapperK8sInfoByID(sandboxID string, detail *DockerInfoDetail) {
+func (cw *CRIV1Wrapper) wrapperK8sInfoByID(sandboxID string, detail *DockerInfoDetail) {
 	ctx, cancel := getContextWithTimeout(time.Second * 10)
-	status, err := cw.client.PodSandboxStatus(ctx, &criv1alpha2.PodSandboxStatusRequest{
+	status, err := cw.client.PodSandboxStatus(ctx, &criv1.PodSandboxStatusRequest{
 		PodSandboxId: sandboxID,
 		Verbose:      true,
 	})
@@ -413,7 +417,7 @@ func (cw *CRIV1Alpha2Wrapper) wrapperK8sInfoByID(sandboxID string, detail *Docke
 	cw.wrapperK8sInfoByLabels(status.GetStatus().GetLabels(), detail)
 }
 
-func (cw *CRIV1Alpha2Wrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]string, detail *DockerInfoDetail) {
+func (cw *CRIV1Wrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]string, detail *DockerInfoDetail) {
 	if detail.K8SInfo == nil || sandboxLabels == nil {
 		return
 	}
@@ -428,7 +432,7 @@ func (cw *CRIV1Alpha2Wrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]st
 	}
 }
 
-func (cw *CRIV1Alpha2Wrapper) sweepCache() {
+func (cw *CRIV1Wrapper) sweepCache() {
 	// clear unuseful cache
 	usedCacheItem := make(map[string]bool)
 	cw.dockerCenter.lock.RLock()
@@ -446,14 +450,14 @@ func (cw *CRIV1Alpha2Wrapper) sweepCache() {
 	cw.rootfsLock.Unlock()
 }
 
-func (cw *CRIV1Alpha2Wrapper) lookupRootfsCache(containerID string) (string, bool) {
+func (cw *CRIV1Wrapper) lookupRootfsCache(containerID string) (string, bool) {
 	cw.rootfsLock.RLock()
 	defer cw.rootfsLock.RUnlock()
 	dir, ok := cw.rootfsCache[containerID]
 	return dir, ok
 }
 
-func (cw *CRIV1Alpha2Wrapper) lookupContainerRootfsAbsDir(info types.ContainerJSON) string {
+func (cw *CRIV1Wrapper) lookupContainerRootfsAbsDir(info types.ContainerJSON) string {
 	// For cri-runtime
 	containerID := info.ID
 	if dir, ok := cw.lookupRootfsCache(containerID); ok {
@@ -515,7 +519,7 @@ func (cw *CRIV1Alpha2Wrapper) lookupContainerRootfsAbsDir(info types.ContainerJS
 	return ""
 }
 
-func (cw *CRIV1Alpha2Wrapper) getContainerUpperDir(containerid, snapshotter string) string {
+func (cw *CRIV1Wrapper) getContainerUpperDir(containerid, snapshotter string) string {
 	// For Containerd
 
 	if cw.nativeClient == nil {
