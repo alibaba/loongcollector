@@ -770,7 +770,7 @@ bool NetworkObserverManager::TryInitMetricEventGroupAppInfo(PipelineEventGroup& 
     } else {
         LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
         ReadLock lk(mAppMetaLock);
-        if (mAppId.emtpy() || mAppName.empty()) {
+        if (mAppId.empty() || mAppName.empty()) {
             return false;
         }
         auto appIdSb = eventGroup.GetSourceBuffer()->CopyString(mAppId);

@@ -96,7 +96,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // AppId (Optional)
-    if (!GetOptionalDoubleParam(probeConfig, "AppId", thisObserverNetworkOption.mAppId, errorMsg)) {
+    if (!GetOptionalStringParam(probeConfig, "AppId", thisObserverNetworkOption.mAppId, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -107,7 +107,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // AppName (Optional)
-    if (!GetOptionalDoubleParam(probeConfig, "AppName", thisObserverNetworkOption.mAppName, errorMsg)) {
+    if (!GetOptionalStringParam(probeConfig, "AppName", thisObserverNetworkOption.mAppName, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
