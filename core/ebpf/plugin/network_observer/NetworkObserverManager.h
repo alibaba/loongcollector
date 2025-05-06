@@ -108,6 +108,11 @@ public:
         return 0;
     }
 
+    void InitAppTagEvent(PipelineEventGroup& eventGroup,
+                         const AppMetricData* group,
+                         const StringView& appId,
+                         const StringView& appName);
+    bool TryInitMetricEventGroupAppInfo(PipelineEventGroup& eventGroup, const AppMetricData* group);
     bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
     bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
@@ -198,10 +203,10 @@ private:
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
     std::string mClusterId;
+
+    ReadWriteLock mAppMetaLock;
     std::string mAppId;
     std::string mAppName;
-    std::string mHostName;
-    std::string mHostIp;
 
     template <typename T, typename Func>
     void compareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

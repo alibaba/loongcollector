@@ -736,6 +736,57 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
     return true;
 }
 
+void NetworkObserverManager::InitAppTagEvent(PipelineEventGroup& eventGroup,
+                                             const AppMetricData* group,
+                                             const StringView& appId,
+                                             const StringView& appName) {
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    auto* tagMetric = eventGroup.AddMetricEvent();
+    tagMetric->SetName(kMetricNameTag);
+    tagMetric->SetValue(UntypedSingleValue{1.0});
+    tagMetric->SetTimestamp(seconds, 0);
+    tagMetric->SetTagNoCopy(kTagAgentVersionKey, kTagV1Value);
+    tagMetric->SetTagNoCopy(kTagAppKey, appName); // app ===> appname
+    tagMetric->SetTagNoCopy(kTagResourceIdKey, appId); // resourceid -==> pid
+    tagMetric->SetTagNoCopy(kTagResourceTypeKey, kTagApplicationValue); // resourcetype ===> APPLICATION
+    tagMetric->SetTagNoCopy(kTagVersionKey, kTagV1Value); // version ===> v1
+    tagMetric->SetTagNoCopy(kTagClusterIdKey,
+                            mClusterId); // clusterId ===> TODO read from env _cluster_id_
+    tagMetric->SetTagNoCopy(kTagHostKey, group->mTags.Get<kIp>()); // host ===>
+    tagMetric->SetTagNoCopy(kTagHostnameKey, group->mTags.Get<kHostName>()); // hostName ===>
+    tagMetric->SetTagNoCopy(kTagNamespaceKey, group->mTags.Get<kNamespace>()); // namespace ===>
+    tagMetric->SetTagNoCopy(kTagWorkloadKindKey, group->mTags.Get<kWorkloadKind>()); // workloadKind ===>
+    tagMetric->SetTagNoCopy(kTagWorkloadNameKey, group->mTags.Get<kWorkloadName>()); // workloadName ===>
+}
+
+bool NetworkObserverManager::TryInitMetricEventGroupAppInfo(PipelineEventGroup& eventGroup,
+                                                            const AppMetricData* group) {
+    if (group->mTags.Get<kAppId>().size() && group->mTags.Get<kAppName>().size()) {
+        eventGroup.SetTagNoCopy(kAppId.MetricKey(), group->mTags.Get<kAppId>());
+        eventGroup.SetTagNoCopy(kAppName.MetricKey(), group->mTags.Get<kAppName>());
+        InitAppTagEvent(eventGroup, group, group->mTags.Get<kAppId>(), group->mTags.Get<kAppName>());
+    } else {
+        LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
+        ReadLock lk(mAppMetaLock);
+        if (mAppId.emtpy() || mAppName.empty()) {
+            return false;
+        }
+        auto appIdSb = eventGroup.GetSourceBuffer()->CopyString(mAppId);
+        auto appNameSb = eventGroup.GetSourceBuffer()->CopyString(mAppName);
+        StringView appId(appIdSb.data, appIdSb.size);
+        StringView appName(appNameSb.data, appNameSb.size);
+        eventGroup.SetTagNoCopy(kAppId.MetricKey(), appId);
+        eventGroup.SetTagNoCopy(kAppName.MetricKey(), appName);
+        InitAppTagEvent(eventGroup, group, appId, appName);
+    }
+    eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
+    eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod ip
+
+    return true;
+}
+
 bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
@@ -772,53 +823,13 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
         eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
 
-        bool needPush = false;
-
         bool init = false;
         aggTree.ForEach(node, [&](const AppMetricData* group) {
             LOG_DEBUG(sLogger,
                       ("dump group attrs", group->ToString())("ct attrs", group->mConnection->DumpConnection()));
             // instance dim
-            if (group->mTags.Get<kAppId>().size() || mAppId.size()) {
-                needPush = true;
-            }
-
             if (!init) {
-                if (group->mTags.Get<kAppId>().size()) {
-                    eventGroup.SetTagNoCopy(kAppId.MetricKey(), group->mTags.Get<kAppId>());
-                    eventGroup.SetTagNoCopy(kAppName.MetricKey(), group->mTags.Get<kAppName>());
-                    eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
-                    eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod ip
-                } else {
-                    LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
-                    eventGroup.SetTag(kAppId.MetricKey(), mAppId);
-                    eventGroup.SetTag(kAppName.MetricKey(), mAppName);
-                    if (mHostIp.empty()) {
-                        eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
-                        eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod name
-                    } else {
-                        eventGroup.SetTag(kIp.MetricKey(), mHostIp); // pod ip
-                        eventGroup.SetTag(kHostName.MetricKey(), mHostIp); // pod name
-                    }
-                }
-
-                auto* tagMetric = eventGroup.AddMetricEvent();
-                tagMetric->SetName(kMetricNameTag);
-                tagMetric->SetValue(UntypedSingleValue{1.0});
-                tagMetric->SetTimestamp(seconds, 0);
-                tagMetric->SetTagNoCopy(kTagAgentVersionKey, kTagV1Value);
-                tagMetric->SetTagNoCopy(kTagAppKey, group->mTags.Get<kAppName>()); // app ===> appname
-                tagMetric->SetTagNoCopy(kTagResourceIdKey, group->mTags.Get<kAppId>()); // resourceid -==> pid
-                tagMetric->SetTagNoCopy(kTagResourceTypeKey, kTagApplicationValue); // resourcetype ===> APPLICATION
-                tagMetric->SetTagNoCopy(kTagVersionKey, kTagV1Value); // version ===> v1
-                tagMetric->SetTagNoCopy(kTagClusterIdKey,
-                                        mClusterId); // clusterId ===> TODO read from env _cluster_id_
-                tagMetric->SetTagNoCopy(kTagHostKey, group->mTags.Get<kIp>()); // host ===>
-                tagMetric->SetTagNoCopy(kTagHostnameKey, group->mTags.Get<kHostName>()); // hostName ===>
-                tagMetric->SetTagNoCopy(kTagNamespaceKey, group->mTags.Get<kNamespace>()); // namespace ===>
-                tagMetric->SetTagNoCopy(kTagWorkloadKindKey, group->mTags.Get<kWorkloadKind>()); // workloadKind ===>
-                tagMetric->SetTagNoCopy(kTagWorkloadNameKey, group->mTags.Get<kWorkloadName>()); // workloadName ===>
-                init = true;
+                init = TryInitMetricEventGroupAppInfo(eventGroup, group);
             }
 
             LOG_DEBUG(sLogger,
@@ -906,7 +917,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
         ADD_COUNTER(mPushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        if (needPush) {
+        if (init) {
             std::lock_guard lk(mContextMutex);
             if (this->mPipelineCtx == nullptr) {
                 return true;
@@ -976,10 +987,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
                 const auto& ct = record->GetConnection();
                 const auto& ctAttrs = ct->GetConnTrackerAttrs();
 
-                if ((mAppName.empty() && ctAttrs.Get<kAppNameIndex>().empty()) || !ct) {
-                    LOG_DEBUG(sLogger,
-                              ("no app name or ct null, skip, spanname ", record->GetSpanName())(
-                                  "appname", ctAttrs.Get<kAppNameIndex>())("ct null", ct == nullptr));
+                if (!ct) {
+                    LOG_DEBUG(sLogger, ("connection is null, skip span", record->GetSpanName()));
                     continue;
                 }
 
@@ -990,21 +999,20 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
                         eventGroup.SetTagNoCopy(kAppName.SpanKey(), StringView(appName.data, appName.size)); // app name
                         auto appId = sourceBuffer->CopyString(ctAttrs.Get<kAppIdIndex>());
                         eventGroup.SetTagNoCopy(kAppId.SpanKey(), StringView(appId.data, appId.size)); // app id
-                        auto podIp = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
-                        eventGroup.SetTagNoCopy(kHostIp.SpanKey(), StringView(podIp.data, podIp.size)); // pod ip
-                        eventGroup.SetTagNoCopy(kHostName.SpanKey(), StringView(podIp.data, podIp.size)); // pod name
                     } else {
                         LOG_DEBUG(sLogger, ("no app id retrieve from metadata", "use configure"));
+                        ReadLock lk(mAppMetaLock);
+                        if (mAppName.empty() || mAppId.empty()) {
+                            LOG_DEBUG(sLogger, ("no app info, skip, spanname ", record->GetSpanName()));
+                            continue;
+                        }
                         eventGroup.SetTag(kAppId.SpanKey(), mAppId);
                         eventGroup.SetTag(kAppName.SpanKey(), mAppName);
-                        if (mHostIp.empty()) {
-                            eventGroup.SetTagNoCopy(kIp.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
-                            eventGroup.SetTagNoCopy(kHostName.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
-                        } else {
-                            eventGroup.SetTag(kIp.SpanKey(), mHostIp); // pod ip
-                            eventGroup.SetTag(kHostName.SpanKey(), mHostIp); // pod name
-                        }
                     }
+
+                    auto podIp = sourceBuffer->CopyString(ctAttrs.Get<kIp>());
+                    eventGroup.SetTagNoCopy(kHostIp.SpanKey(), StringView(podIp.data, podIp.size)); // pod ip
+                    eventGroup.SetTagNoCopy(kHostName.SpanKey(), StringView(podIp.data, podIp.size)); // pod name
                     eventGroup.SetTagNoCopy(kAppType.SpanKey(), kEBPFValue);
                     eventGroup.SetTagNoCopy(kDataType.SpanKey(), kTraceValue);
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
@@ -1135,6 +1143,16 @@ int NetworkObserverManager::Update(
             WriteLock lk(mSamplerLock);
             mSampler = std::make_shared<HashRatioSampler>(newValue);
         });
+        compareAndUpdate(
+            "mAppName", mPreviousOpt->mAppName, opt->mAppName, [this](const std::string&, const std::string& newValue) {
+                WriteLock lk(mAppMetaLock);
+                this->mAppName = newValue;
+            });
+        compareAndUpdate(
+            "mAppId", mPreviousOpt->mAppId, opt->mAppId, [this](const std::string&, const std::string& newValue) {
+                WriteLock lk(mAppMetaLock);
+                this->mAppId = newValue;
+            });
         compareAndUpdate("EnableProtocols",
                          mPreviousOpt->mEnableProtocols,
                          opt->mEnableProtocols,
@@ -1175,10 +1193,12 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mConnectionManager->RegisterConnStatsFunc(
         [this](std::shared_ptr<AbstractRecord>& record) { processRecord(record); });
 
-    mAppId = opt->mAppId;
-    mAppName = opt->mAppName;
-    mHostName = opt->mHostName;
-    mHostIp = opt->mHostIp;
+
+    {
+        WriteLock lk(mAppMetaLock);
+        mAppId = opt->mAppId;
+        mAppName = opt->mAppName;
+    }
 
     mPollKernelFreqMgr.SetPeriod(std::chrono::milliseconds(200));
     mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(300));
