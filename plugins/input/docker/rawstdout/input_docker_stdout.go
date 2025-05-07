@@ -371,7 +371,7 @@ type ServiceDockerStdout struct {
 
 func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.context = context
-	containercenter.ContainerCenterInit()
+	containercenter.Init()
 	sds.synerMap = make(map[string]*stdoutSyner)
 
 	var err error

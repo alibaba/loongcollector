@@ -216,7 +216,7 @@ func UnRegisterDockerEventListener(c chan events.Message) {
 	getDockerCenterInstance().unRegisterEventListener(c)
 }
 
-func ContainerCenterInit() {
+func Init() {
 	getDockerCenterInstance()
 }
 

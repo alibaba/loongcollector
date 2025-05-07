@@ -62,7 +62,7 @@ func (k *KubernetesConfig) NewDiscoverer(options discovery.DiscovererOptions) (d
 }
 
 func (k *KubernetesConfig) InitDiscoverer() {
-	containercenter.ContainerCenterInit()
+	containercenter.Init()
 	var err error
 	k.IncludeEnv, k.includeEnvRegex, err = containercenter.SplitRegexFromMap(k.IncludeEnv)
 	if err != nil {

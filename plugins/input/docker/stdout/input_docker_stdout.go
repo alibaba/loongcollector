@@ -187,7 +187,7 @@ type ServiceDockerStdout struct {
 
 func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.context = context
-	containercenter.ContainerCenterInit()
+	containercenter.Init()
 	sds.fullList = make(map[string]bool)
 	sds.matchList = make(map[string]*containercenter.DockerInfoDetail)
 	sds.synerMap = make(map[string]*DockerFileSyner)

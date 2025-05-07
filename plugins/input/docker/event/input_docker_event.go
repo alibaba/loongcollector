@@ -38,7 +38,7 @@ type ServiceDockerEvents struct {
 
 func (p *ServiceDockerEvents) Init(context pipeline.Context) (int, error) {
 	p.context = context
-	containercenter.ContainerCenterInit()
+	containercenter.Init()
 	return 0, nil
 }
 

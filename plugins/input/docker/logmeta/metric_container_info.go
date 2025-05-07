@@ -151,7 +151,7 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 		idf.LogPath = strings.ToLower(idf.LogPath)
 	}
 	idf.lastClearTime = time.Now()
-	containercenter.ContainerCenterInit()
+	containercenter.Init()
 
 	if idf.HostFlag {
 		idf.MountPath = ""
