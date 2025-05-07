@@ -39,6 +39,7 @@ public:
     void TestWhitelistManagement();
     void TestPerfBufferOperations();
     void TestRecordProcessing();
+    void TestInitAppMeta();
     void TestRollbackProcessing();
     void TestConfigUpdate();
     void TestErrorHandling();
@@ -657,6 +658,58 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
 void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {
 }
 
+void NetworkObserverManagerUnittest::TestInitAppMeta() {
+    // use label
+    ConnId connId(1, 1000, 123456);
+    auto conn = std::make_shared<Connection>(connId);
+    std::string podIp = "test-pod-ip";
+    std::string podName = "test-pod-name";
+
+    std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+    AppMetricData data(conn, sourceBuffer, "test_span");
+    data.mTags.Set<kIp>(podIp);
+    data.mTags.Set<kHostName>(podName);
+
+    data.mCount = 100;
+    data.mSum = 1000.0;
+    data.mSlowCount = 5;
+    data.mErrCount = 2;
+    data.m2xxCount = 80;
+    data.m3xxCount = 10;
+    data.m4xxCount = 8;
+    data.m5xxCount = 2;
+
+    APSARA_TEST_EQUAL(data.mCount, 100UL);
+    APSARA_TEST_EQUAL(data.mSum, 1000.0);
+    APSARA_TEST_EQUAL(data.mSlowCount, 5UL);
+    APSARA_TEST_EQUAL(data.mErrCount, 2UL);
+    APSARA_TEST_EQUAL(data.m2xxCount, 80UL);
+    APSARA_TEST_EQUAL(data.m3xxCount, 10UL);
+    APSARA_TEST_EQUAL(data.m4xxCount, 8UL);
+    APSARA_TEST_EQUAL(data.m5xxCount, 2UL);
+
+    PipelineEventGroup eventGroup(sourceBuffer);
+    {
+        // use config
+        mManager->mAppId = "default-app-id";
+        mManager->mAppName = "default-app-name";
+        mManager->TryInitMetricEventGroupAppInfo(eventGroup, &data);
+        APSARA_TEST_EQUAL(eventGroup.GetTag(kAppId.MetricKey()), "default-app-id");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(kAppName.MetricKey()), "default-app-name");
+    }
+
+    {
+        // use config
+        std::string appId = "test-app-id";
+        std::string appName = "test-app-name";
+        data.mTags.Set<kAppId>(appId);
+        data.mTags.Set<kAppName>(appName);
+        mManager->TryInitMetricEventGroupAppInfo(eventGroup, &data);
+        APSARA_TEST_EQUAL(eventGroup.GetTag(kAppId.MetricKey()), "test-app-id");
+        APSARA_TEST_EQUAL(eventGroup.GetTag(kAppName.MetricKey()), "test-app-name");
+    }
+}
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestDataEventProcessing);
@@ -666,6 +719,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitAppMeta);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
