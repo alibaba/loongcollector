@@ -106,50 +106,51 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {
 }
 
 func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
-	if ok, info := IsCRIRuntimeValid(containerdUnixSocket); ok {
-		addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
-		if err != nil {
-			return nil, err
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-
-		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-		if err != nil {
-			return nil, err
-		}
-
-		client, err := NewRuntimeServiceClient(ctx, conn)
-		if err != nil {
-			logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
-			return nil, err
-		}
-
-		var containerdClient *containerd.Client
-		if *flags.EnableContainerdUpperDirDetect {
-			containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
-			if err == nil {
-				_, err = containerdClient.Version(context.Background())
-			}
-			if err != nil {
-				logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "Connect containerd failed", err)
-				containerdClient = nil
-			}
-		}
-
-		return &CRIRuntimeWrapper{
-			dockerCenter:           dockerCenter,
-			client:                 client,
-			nativeClient:           containerdClient,
-			runtimeInfo:            info,
-			containers:             make(map[string]*innerContainerInfo),
-			containerHistory:       make(map[string]bool),
-			stopCh:                 make(<-chan struct{}),
-			rootfsCache:            make(map[string]string),
-			listContainerStartTime: time.Now().UnixNano(),
-		}, nil
+	ok, info := IsCRIRuntimeValid(containerdUnixSocket)
+	if !ok {
+		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
 	}
-	return nil, nil
+	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewRuntimeServiceClient(ctx, conn)
+	if err != nil {
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
+		return nil, err
+	}
+
+	var containerdClient *containerd.Client
+	if *flags.EnableContainerdUpperDirDetect {
+		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
+		if err == nil {
+			_, err = containerdClient.Version(context.Background())
+		}
+		if err != nil {
+			logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "Connect containerd failed", err)
+			containerdClient = nil
+		}
+	}
+
+	return &CRIRuntimeWrapper{
+		dockerCenter:           dockerCenter,
+		client:                 client,
+		nativeClient:           containerdClient,
+		runtimeInfo:            info,
+		containers:             make(map[string]*innerContainerInfo),
+		containerHistory:       make(map[string]bool),
+		stopCh:                 make(<-chan struct{}),
+		rootfsCache:            make(map[string]string),
+		listContainerStartTime: time.Now().UnixNano(),
+	}, nil
 }
 
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
@@ -492,6 +493,16 @@ func (cw *CRIRuntimeWrapper) sweepCache() {
 	cw.rootfsLock.Unlock()
 }
 
+func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+func parseContainerInfo(data string) (containerdcriserver.ContainerInfo, error) {
+	var ci containerdcriserver.ContainerInfo
+	err := json.Unmarshal([]byte(data), &ci)
+	return ci, err
+}
+
 func (cw *CRIRuntimeWrapper) lookupRootfsCache(containerID string) (string, bool) {
 	cw.rootfsLock.RLock()
 	defer cw.rootfsLock.RUnlock()
@@ -593,16 +604,6 @@ func (cw *CRIRuntimeWrapper) getContainerUpperDir(containerid, snapshotter strin
 		}
 	}
 	return ""
-}
-
-func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), timeout)
-}
-
-func parseContainerInfo(data string) (containerdcriserver.ContainerInfo, error) {
-	var ci containerdcriserver.ContainerInfo
-	err := json.Unmarshal([]byte(data), &ci)
-	return ci, err
 }
 
 func init() {
