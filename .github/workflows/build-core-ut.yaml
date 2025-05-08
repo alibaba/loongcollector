@@ -30,7 +30,7 @@ on:
       - 1.*
 
 jobs:
-  CI:
+  BuildCoreUT:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -82,8 +82,16 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           fetch-depth: 2
+      
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Build Unit Test
         env:
@@ -117,7 +125,7 @@ jobs:
   result:
     runs-on: arc-runner-set-ilogtail
     timeout-minutes: 90
-    needs: [CI]
+    needs: [BuildCoreUT]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"

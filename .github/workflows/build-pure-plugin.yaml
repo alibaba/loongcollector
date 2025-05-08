@@ -29,7 +29,7 @@ on:
       - main
       - 1.*
 jobs:
-  CI:
+  BuildPurePlugin:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -93,7 +93,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
 
       - name: Build pure plugin
         run: make plugin_main
@@ -101,7 +101,7 @@ jobs:
   result:
     runs-on: arc-runner-set-ilogtail
     timeout-minutes: 60
-    needs: [CI]
+    needs: [BuildPurePlugin]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
