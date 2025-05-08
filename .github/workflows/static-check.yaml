@@ -30,7 +30,7 @@ on:
       - 1.*
       - benchmark
 jobs:
-  CI:
+  StaticCheck:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
     runs-on: ${{ matrix.runner }}-latest
@@ -45,22 +45,6 @@ jobs:
       - name: prepare ubuntu environment
         if: matrix.runner == 'ubuntu'
         run: |
-          sudo bash -c 'cat > /etc/apt/sources.list << EOL
-          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-
-          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          EOL'
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
@@ -87,7 +71,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: false
 
       - name: Copy Lib
         if: matrix.runner == 'ubuntu'
@@ -121,7 +105,7 @@ jobs:
   result:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [CI]
+    needs: [StaticCheck]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
