@@ -30,7 +30,7 @@ on:
       - 1.*
       - benchmark
 jobs:
-  CI:
+  StaticCheck:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
     runs-on: ${{ matrix.runner }}-latest
@@ -87,7 +87,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: false
 
       - name: Copy Lib
         if: matrix.runner == 'ubuntu'

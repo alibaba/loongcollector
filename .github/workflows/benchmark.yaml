@@ -59,7 +59,21 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: false
+  
+      - name: Set custom submodule URL and fetch
+        if: steps.cache-submodule.outputs.cache-hit != 'true'
+        run: |
+          TARGET_COMMIT=$(git submodule status | grep "core/_thirdparty/coolbpf" | awk '{print $1}')
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule init
+          git submodule update --recursive
+          cd $SUBMODULE_PATH
+          git checkout $TARGET_COMMIT
+          echo "Current commit: $(git rev-parse HEAD)"
+          cd core/_thirdparty/coolbpf
+          git log -1
 
       - name: Update Docker-compose to v2
         run: |
@@ -134,7 +148,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: false
 
       - name: Update Docker-compose to v2
         run: |
@@ -175,7 +189,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: false
 
       - name: Download benchmark results
         uses: actions/download-artifact@v4
