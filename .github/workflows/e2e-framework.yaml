@@ -95,7 +95,7 @@ jobs:
   result:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [CI]
+    needs: [E2EFramework]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"

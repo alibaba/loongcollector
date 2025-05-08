@@ -131,7 +131,7 @@ jobs:
   result:
     runs-on: arc-runner-set-ilogtail
     timeout-minutes: 90
-    needs: [CI]
+    needs: [BuildCoreUT]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
