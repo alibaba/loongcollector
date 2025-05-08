@@ -69,10 +69,6 @@ jobs:
           git submodule update --recursive
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
-          else
-            echo "Already at target commit, skipping checkout"
-          fi
-          echo "Final commit: $(git rev-parse HEAD)"
 
       - name: Update Docker-compose to v2
         run: |
