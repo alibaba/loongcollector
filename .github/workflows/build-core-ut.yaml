@@ -87,18 +87,12 @@ jobs:
       
       - name: Set custom submodule URL and fetch
         run: |
-          TARGET_COMMIT=$(git submodule status | grep "core/_thirdparty/coolbpf" | awk '{print $1}' | tr -d '[:space:]')
           SUBMODULE_PATH="core/_thirdparty/coolbpf"
           git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
           git submodule init
           git submodule update --recursive
           cd $SUBMODULE_PATH
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "Current commit: $CURRENT_COMMIT"
-          echo "Expected commit_id: $TARGET_COMMIT"
-          if [ "$CURRENT_COMMIT" != "$TARGET_COMMIT" ]; then
-            echo "Commit mismatch - performing checkout"
-            git checkout $TARGET_COMMIT
+          echo "Current commit: $(git rev-parse HEAD)"
           else
             echo "Already at target commit, skipping checkout"
           fi
