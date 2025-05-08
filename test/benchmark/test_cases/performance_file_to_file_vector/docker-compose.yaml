@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  vector:
+    image: timberio/vector:0.45.0-debian
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml
+      - .:/home/vector-log
+
+  cleanup:
+    image: alpine:latest
+    command: >
+      sh -c "chmod +x /home/vector-log/clear_files.sh && 
+             /home/vector-log/clear_files.sh"
+    volumes:
+      - .:/home/vector-log
+      - ./clear_files.sh:/home/vector-log/clear_files.sh
+    depends_on:
+      - vector

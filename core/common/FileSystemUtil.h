@@ -35,6 +35,7 @@
 // Filesystem utility.
 namespace logtail {
 
+constexpr size_t kDefaultMaxFileSize = 1024 * 1024; // 1 MB
 // Separator of path, use std::string to concat with const char *.
 extern const std::string PATH_SEPARATOR;
 
@@ -81,8 +82,19 @@ int64_t FTell(FILE* stream);
 // TrimLastSeperator removes last path separator unless @path is equal to '/'.
 void TrimLastSeperator(std::string& path);
 
-// ReadFileContent reads all content of @fileName to @content.
-bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize = 8192);
+long GetPageSize();
+size_t GetBlockSize(const std::filesystem::path& path);
+
+enum class FileReadResult {
+    kError = -1, // 发生错误
+    kOK = 0, // 文件成功读取完毕
+    kTruncated = 1 // 文件被截断（超过最大大小限制）
+};
+
+// ReadFileContent reads up to maxFileSize content of @fileName to @content.
+// Cannot garantee the content is complete if the file is changed during reading.
+FileReadResult
+ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize = kDefaultMaxFileSize);
 
 int GetLines(std::istream& is,
              bool enableEmptyLine,

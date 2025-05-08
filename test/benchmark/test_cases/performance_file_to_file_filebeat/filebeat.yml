@@ -1,0 +1,18 @@
+filebeat.inputs:
+- type: filestream
+  id: input-file
+  paths:
+    - /home/filebeat/*.log
+  prospector.scanner.check_interval: 1s
+
+processors:
+  - dissect:
+      tokenizer: '%{ip} %{ident} %{auth} [%{timestamp}] "%{method} %{request} HTTP/%{http_version}" %{response_code} %{bytes} "%{referrer}" "%{user_agent}"'
+      field: "message"
+      target_prefix: "parsed"
+
+output.file:
+  path: /home/filebeat
+  filename: test.out
+  rotate_every_kb: 10240
+  number_of_files: 10

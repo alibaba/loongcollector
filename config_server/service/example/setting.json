@@ -1,8 +1,0 @@
-{
-    "ip":"127.0.0.1",
-    "store_mode": "leveldb",
-    "port": "8899",
-    "db_path": "./DB",
-    "agent_message_update_interval": 1,
-    "collection_config_sync_interval": 3
-}

@@ -44,7 +44,6 @@ public:
     void TestErrorHandling();
     void TestPluginLifecycle();
     void TestHandleHostMetadataUpdate();
-    void TestGuessContainerIdOffSet();
     void TestPeriodicalTask();
     void BenchmarkConsumeTask();
 
@@ -621,11 +620,6 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
     APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
 }
 
-void NetworkObserverManagerUnittest::TestGuessContainerIdOffSet() {
-    auto offset = GuessContainerIdOffset();
-    APSARA_TEST_GE(offset, 0);
-}
-
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
     mManager->mFlag = true;
@@ -673,7 +667,6 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestGuessContainerIdOffSet);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 
