@@ -15,15 +15,15 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"context"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ReaderMetricTracker struct {
@@ -144,7 +144,7 @@ func (r *LogFileReader) GetLastEndOfLine(n int) int {
 }
 
 func (r *LogFileReader) CheckFileChange() bool {
-	if newStat, err := os.Stat(r.checkpoint.Path); err == nil {
+	if newStat, err := os.Stat(r.checkpoint.Path); err == nil { // stat by filename to check if size changed or file changed
 		newOsStat := GetOSState(newStat)
 		// logger.Debug("check file change", newOsStat.String())
 		if r.checkpoint.State.IsChange(newOsStat) {
@@ -175,6 +175,17 @@ func (r *LogFileReader) CheckFileChange() bool {
 			return true
 		}
 		r.foundFile = true
+	} else if r.file != nil { // stat by file handle to check if size changed
+		if newStat, statErr := r.file.Stat(); statErr == nil {
+			newOsStat := GetOSState(newStat)
+			// logger.Debug("check file change", newOsStat.String())
+			if r.checkpoint.State.IsChange(newOsStat) {
+				r.checkpointLock.Lock()
+				r.checkpoint.State = newOsStat
+				r.checkpointLock.Unlock()
+				return true
+			}
+		}
 	} else {
 		if os.IsNotExist(err) {
 			if r.foundFile {
