@@ -92,8 +92,16 @@ jobs:
           git submodule init
           git submodule update --recursive
           cd $SUBMODULE_PATH
-          git checkout $TARGET_COMMIT
-          echo "Current commit: $(git rev-parse HEAD)"
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "Current commit: $CURRENT_COMMIT"
+          echo "Expected commit_id: $TARGET_COMMIT"
+          if [ "$CURRENT_COMMIT" != "$TARGET_COMMIT" ]; then
+            echo "Commit mismatch - performing checkout"
+            git checkout $TARGET_COMMIT
+          else
+            echo "Already at target commit, skipping checkout"
+          fi
+          echo "Final commit: $(git rev-parse HEAD)"
 
       - name: Build Binary
         env:
