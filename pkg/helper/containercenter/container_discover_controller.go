@@ -163,12 +163,12 @@ func (c *ContainerDiscoverManager) Init() bool {
 	defer dockerCenterRecover()
 
 	// discover which runtime is valid
-	var err error
-	if criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance); err != nil {
+	if wrapper, err := NewCRIRuntimeWrapper(dockerCenterInstance); err != nil {
 		logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
 		criRuntimeWrapper = nil
 	} else {
 		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+		criRuntimeWrapper = wrapper
 	}
 	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
 		if !ok {
@@ -246,6 +246,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 	}
 	logger.Info(context.Background(), "init docker center, max fetchOne count per second", MaxFetchOneTriggerPerSecond)
 
+	var err error
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false

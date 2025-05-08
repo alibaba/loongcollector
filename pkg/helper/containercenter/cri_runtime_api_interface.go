@@ -17,142 +17,158 @@ package containercenter
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 )
 
-type criContainerState int32
+type CriContainerState int32
 
 const (
-	ContainerState_CONTAINER_CREATED criContainerState = 0
-	ContainerState_CONTAINER_RUNNING criContainerState = 1
-	ContainerState_CONTAINER_EXITED  criContainerState = 2
-	ContainerState_CONTAINER_UNKNOWN criContainerState = 3
+	ContainerStateContainerCreated CriContainerState = 0
+	ContainerStateContainerRunning CriContainerState = 1
+	ContainerStateContainerExited  CriContainerState = 2
+	ContainerStateContainerUnknown CriContainerState = 3
 )
 
-type criMountPropagation int32
+type CriMountPropagation int32
 
 const (
-	MountPropagation_PROPAGATION_PRIVATE           criMountPropagation = 0
-	MountPropagation_PROPAGATION_HOST_TO_CONTAINER criMountPropagation = 1
-	MountPropagation_PROPAGATION_BIDIRECTIONAL     criMountPropagation = 2
+	MountPropagationPropagationPrivate         CriMountPropagation = 0
+	MountPropagationPropagationHostToContainer CriMountPropagation = 1
+	MountPropagationPropagationBidirectional   CriMountPropagation = 2
 )
 
-type criVersionResponse struct {
+type CriVersionResponse struct {
 	Version           string
 	RuntimeName       string
 	RuntimeVersion    string
 	RuntimeAPIVersion string
 }
 
-type criContainerMetadata struct {
+type CriContainerMetadata struct {
 	Name    string
 	Attempt uint32
 }
 
-type criImageSpec struct {
+type CriImageSpec struct {
 	Image       string
 	Annotations map[string]string
 }
 
-type criContainer struct {
-	Id           string
-	PodSandboxId string
-	Metadata     *criContainerMetadata
-	Image        *criImageSpec
+type CriContainer struct {
+	ID           string
+	PodSandboxID string
+	Metadata     *CriContainerMetadata
+	Image        *CriImageSpec
 	ImageRef     string
-	State        criContainerState
+	State        CriContainerState
 	CreatedAt    int64
 	Labels       map[string]string
 	Annotations  map[string]string
 }
 
-type criListContainersResponse struct {
-	Containers []*criContainer
+type CriListContainersResponse struct {
+	Containers []*CriContainer
 }
 
-type criMount struct {
+type CriMount struct {
 	ContainerPath  string
 	HostPath       string
 	Readonly       bool
 	SelinuxRelabel bool
-	Propagation    criMountPropagation
+	Propagation    CriMountPropagation
 }
 
-type criContainerStatus struct {
-	Id          string
-	Metadata    *criContainerMetadata
-	State       criContainerState
+type CriContainerStatus struct {
+	ID          string
+	Metadata    *CriContainerMetadata
+	State       CriContainerState
 	CreatedAt   int64
 	StartedAt   int64
 	FinishedAt  int64
 	ExitCode    int32
-	Image       *criImageSpec
+	Image       *CriImageSpec
 	ImageRef    string
 	Reason      string
 	Message     string
 	Labels      map[string]string
 	Annotations map[string]string
-	Mounts      []*criMount
+	Mounts      []*CriMount
 	LogPath     string
 }
 
-type criContainerStatusResponse struct {
-	Status *criContainerStatus
+type CriContainerStatusResponse struct {
+	Status *CriContainerStatus
 	Info   map[string]string
 }
 
-type criPodSandboxMetadata struct {
+type CriPodSandboxMetadata struct {
 	Name      string
-	Uid       string
+	UID       string
 	Namespace string
 	Attempt   uint32
 }
 
-type criPodSandbox struct {
-	Id             string
-	Metadata       *criPodSandboxMetadata
-	State          criContainerState
+type CriPodSandbox struct {
+	ID             string
+	Metadata       *CriPodSandboxMetadata
+	State          CriContainerState
 	CreatedAt      int64
 	Labels         map[string]string
 	Annotations    map[string]string
 	RuntimeHandler string
 }
 
-type criListPodSandboxResponse struct {
-	Items []*criPodSandbox
+type CriListPodSandboxResponse struct {
+	Items []*CriPodSandbox
 }
 
-type criPodSandboxStatus struct {
-	Id             string
-	Metadata       *criPodSandboxMetadata
-	State          criContainerState
+type CriPodSandboxStatus struct {
+	ID             string
+	Metadata       *CriPodSandboxMetadata
+	State          CriContainerState
 	CreatedAt      int64
 	Labels         map[string]string
 	Annotations    map[string]string
 	RuntimeHandler string
 }
 
-type criPodSandboxStatusResponse struct {
-	Status *criPodSandboxStatus
+type CriPodSandboxStatusResponse struct {
+	Status *CriPodSandboxStatus
 	Info   map[string]string
 }
 
 type RuntimeService interface {
-	Version(ctx context.Context) (criVersionResponse, error)
-	ListContainers(ctx context.Context) (criListContainersResponse, error)
-	ContainerStatus(ctx context.Context, containerID string, verbose bool) (criContainerStatusResponse, error)
-	ListPodSandbox(ctx context.Context) (criListPodSandboxResponse, error)
-	PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (criPodSandboxStatusResponse, error)
+	Version(ctx context.Context) (CriVersionResponse, error)
+	ListContainers(ctx context.Context) (CriListContainersResponse, error)
+	ContainerStatus(ctx context.Context, containerID string, verbose bool) (CriContainerStatusResponse, error)
+	ListPodSandbox(ctx context.Context) (CriListPodSandboxResponse, error)
+	PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (CriPodSandboxStatusResponse, error)
 }
 
 type RuntimeServiceClient struct {
 	service RuntimeService
 	info    RuntimeInfo
+	conn    *grpc.ClientConn
 }
 
-func NewRuntimeServiceClient(ctx context.Context, conn *grpc.ClientConn) (*RuntimeServiceClient, error) {
-	client := &RuntimeServiceClient{}
+func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSize int) (*RuntimeServiceClient, error) {
+	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := getContextWithTimeout(contextTimeout)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallRecvMsgSize)))
+	if err != nil {
+		return nil, err
+	}
+
+	client := &RuntimeServiceClient{
+		conn: conn,
+	}
 	// Try v1alpha2 first
 	client.service = newCRIRuntimeServiceV1Alpha2Adapter(conn)
 	if client.checkVersion(ctx) == nil {
@@ -165,42 +181,44 @@ func NewRuntimeServiceClient(ctx context.Context, conn *grpc.ClientConn) (*Runti
 		return client, nil
 	}
 
+	// if create client failed, close the connection
+	conn.Close()
 	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) Version(ctx context.Context) (criVersionResponse, error) {
+func (c *RuntimeServiceClient) Version(ctx context.Context) (CriVersionResponse, error) {
 	if c.service != nil {
 		return c.service.Version(ctx)
 	}
-	return criVersionResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return CriVersionResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ListContainers(ctx context.Context) (criListContainersResponse, error) {
+func (c *RuntimeServiceClient) ListContainers(ctx context.Context) (CriListContainersResponse, error) {
 	if c.service != nil {
 		return c.service.ListContainers(ctx)
 	}
-	return criListContainersResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return CriListContainersResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ContainerStatus(ctx context.Context, containerID string, verbose bool) (criContainerStatusResponse, error) {
+func (c *RuntimeServiceClient) ContainerStatus(ctx context.Context, containerID string, verbose bool) (CriContainerStatusResponse, error) {
 	if c.service != nil {
 		return c.service.ContainerStatus(ctx, containerID, verbose)
 	}
-	return criContainerStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return CriContainerStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ListPodSandbox(ctx context.Context) (criListPodSandboxResponse, error) {
+func (c *RuntimeServiceClient) ListPodSandbox(ctx context.Context) (CriListPodSandboxResponse, error) {
 	if c.service != nil {
 		return c.service.ListPodSandbox(ctx)
 	}
-	return criListPodSandboxResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return CriListPodSandboxResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (criPodSandboxStatusResponse, error) {
+func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (CriPodSandboxStatusResponse, error) {
 	if c.service != nil {
 		return c.service.PodSandboxStatus(ctx, sandboxID, verbose)
 	}
-	return criPodSandboxStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return CriPodSandboxStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
 func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
@@ -214,4 +232,10 @@ func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
 		}
 	}
 	return err
+}
+
+func (c *RuntimeServiceClient) Close() {
+	if c.conn != nil {
+		c.conn.Close()
+	}
 }

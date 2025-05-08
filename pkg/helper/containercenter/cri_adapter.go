@@ -29,7 +29,6 @@ import (
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"google.golang.org/grpc"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -43,7 +42,7 @@ var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIRuntimeWrapper wrapper for containerd client
 type innerContainerInfo struct {
-	State  criContainerState
+	State  CriContainerState
 	Pid    int
 	Name   string
 	Status string
@@ -74,55 +73,33 @@ type CRIRuntimeWrapper struct {
 	listContainerStartTime int64 // in nanosecond
 }
 
-func IsCRIRuntimeValid(criRuntimeEndpoint string) (bool, RuntimeInfo) {
+func IsCRIRuntimeValid() bool {
 	// Verify containerd.sock cri valid.
-	if fi, err := os.Stat(criRuntimeEndpoint); err != nil || fi.IsDir() {
-		return false, RuntimeInfo{}
+	if fi, err := os.Stat(containerdUnixSocket); err != nil || fi.IsDir() {
+		return false
 	}
 
-	addr, dailer, err := GetAddressAndDialer(criRuntimeEndpoint)
+	client, err := NewRuntimeServiceClient(time.Minute, 1024*1024*16)
 	if err != nil {
-		return false, RuntimeInfo{}
+		logger.Debug(context.Background(), "NewRuntimeServiceClient", containerdUnixSocket, "failed", err)
+		return false
 	}
-	ctx, cancel := getContextWithTimeout(time.Minute)
+	defer client.Close()
+
+	ctx, cancel := getContextWithTimeout(time.Second * 10)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*16)))
-	if err != nil {
-		logger.Debug(context.Background(), "Dial", addr, "failed", err)
-		return false, RuntimeInfo{}
-	}
-	// must close，otherwise connections will leak and case mem increase
-	defer conn.Close()
-
-	client, err := NewRuntimeServiceClient(ctx, conn)
-	if err != nil {
-		logger.Debug(context.Background(), "NewRuntimeServiceClient", addr, "failed", err)
-		return false, RuntimeInfo{}
-	}
-
 	containerResp, err := client.ListContainers(ctx)
-	return err == nil && len(containerResp.Containers) != 0, client.info
+	return err == nil && len(containerResp.Containers) != 0
 }
 
 func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
-	ok, info := IsCRIRuntimeValid(containerdUnixSocket)
+	ok := IsCRIRuntimeValid()
 	if !ok {
 		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
 	}
-	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := NewRuntimeServiceClient(ctx, conn)
+	client, err := NewRuntimeServiceClient(time.Second*10, maxMsgSize)
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
@@ -144,7 +121,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 		dockerCenter:           dockerCenter,
 		client:                 client,
 		nativeClient:           containerdClient,
-		runtimeInfo:            info,
+		runtimeInfo:            client.info,
 		containers:             make(map[string]*innerContainerInfo),
 		containerHistory:       make(map[string]bool),
 		stopCh:                 make(<-chan struct{}),
@@ -154,12 +131,12 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 }
 
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
-func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state criContainerState, err error) {
+func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state CriContainerState, err error) {
 	ctx, cancel := getContextWithTimeout(time.Second * 10)
 	status, err := cw.client.ContainerStatus(ctx, containerID, true)
 	cancel()
 	if err != nil {
-		return nil, "", ContainerState_CONTAINER_UNKNOWN, err
+		return nil, "", ContainerStateContainerUnknown, err
 	}
 
 	var ci containerdcriserver.ContainerInfo
@@ -176,7 +153,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 
 	if !foundInfo {
 		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
-		return nil, "", ContainerState_CONTAINER_UNKNOWN, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
+		return nil, "", ContainerStateContainerUnknown, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 	}
 
 	labels := status.Status.Labels
@@ -194,7 +171,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	// Judge Container Liveness by Pid
 	state = status.Status.State
 	stateStatus := ContainerStatusExited
-	if state == ContainerState_CONTAINER_RUNNING && ContainerProcessAlive(int(ci.Pid)) {
+	if state == ContainerStateContainerRunning && ContainerProcessAlive(int(ci.Pid)) {
 		stateStatus = ContainerStatusRunning
 	}
 	dockerContainer := types.ContainerJSON{
@@ -285,9 +262,9 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	if err != nil {
 		return err
 	}
-	sandboxMap := make(map[string]*criPodSandbox, len(sandboxResp.Items))
+	sandboxMap := make(map[string]*CriPodSandbox, len(sandboxResp.Items))
 	for _, item := range sandboxResp.Items {
-		sandboxMap[item.Id] = item
+		sandboxMap[item.ID] = item
 	}
 
 	allContainerMap := make(map[string]bool)           // all listable containers
@@ -295,17 +272,17 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	containerMap := make(map[string]*DockerInfoDetail) // pid exists
 	for i, c := range containersResp.Containers {
 		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, c)
-		allContainerMap[c.Id] = true
+		allContainerMap[c.ID] = true
 		switch c.State {
-		case ContainerState_CONTAINER_RUNNING:
-			runningMap[c.Id] = true
-		case ContainerState_CONTAINER_EXITED:
-			runningMap[c.Id] = false
+		case ContainerStateContainerRunning:
+			runningMap[c.ID] = true
+		case ContainerStateContainerExited:
+			runningMap[c.ID] = false
 		default:
 			continue
 		}
 
-		dockerContainer, _, _, err := cw.createContainerInfo(c.Id)
+		dockerContainer, _, _, err := cw.createContainerInfo(c.ID)
 		if err != nil {
 			logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
 			continue
@@ -317,17 +294,17 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 		if dockerContainer.Status() != ContainerStatusRunning {
 			continue
 		}
-		cw.containers[c.Id] = &innerContainerInfo{
+		cw.containers[c.ID] = &innerContainerInfo{
 			State:  c.State,
 			Pid:    dockerContainer.ContainerInfo.State.Pid,
 			Name:   dockerContainer.ContainerInfo.Name,
 			Status: dockerContainer.Status(),
 		}
-		cw.containerHistory[c.Id] = true
-		containerMap[c.Id] = dockerContainer
+		cw.containerHistory[c.ID] = true
+		containerMap[c.ID] = dockerContainer
 
 		// append the pod labels to the k8s info.
-		if sandbox, ok := sandboxMap[c.PodSandboxId]; ok {
+		if sandbox, ok := sandboxMap[c.PodSandboxID]; ok {
 			cw.wrapperK8sInfoByLabels(sandbox.Labels, dockerContainer)
 		}
 		logger.Debugf(context.Background(), "Create container info, id:%v\tname:%v\tcreated:%v\tstatus:%v\tdetail:%+v",
@@ -358,6 +335,7 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 	for {
 		select {
 		case <-cw.stopCh:
+			cw.client.Close()
 			ticker.Stop()
 			return
 		case <-ticker.C:
@@ -379,16 +357,16 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 		return err
 	}
 
-	newContainers := map[string]*criContainer{}
+	newContainers := map[string]*CriContainer{}
 	for i, c := range containersResp.Containers {
 		// https://github.com/containerd/containerd/blob/main/pkg/cri/store/container/status.go
 		// We only care RUNNING and EXITED
 		// This is only an early prune, accurate status must be detected by ContainerProcessAlive
-		if c.State != ContainerState_CONTAINER_RUNNING &&
-			(c.State != ContainerState_CONTAINER_EXITED || c.CreatedAt < cw.listContainerStartTime) {
+		if c.State != ContainerStateContainerRunning &&
+			(c.State != ContainerStateContainerExited || c.CreatedAt < cw.listContainerStartTime) {
 			continue
 		}
-		id := containersResp.Containers[i].Id
+		id := containersResp.Containers[i].ID
 		newContainers[id] = containersResp.Containers[i]
 		oldInfo, ok := cw.containers[id]
 		_, inHistory := cw.containerHistory[id]
@@ -397,7 +375,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 			if oldInfo.Status == ContainerStatusRunning && ContainerProcessAlive(oldInfo.Pid) {
 				status = ContainerStatusRunning
 			}
-			if oldInfo.State != ContainerState_CONTAINER_RUNNING || // not running
+			if oldInfo.State != ContainerStateContainerRunning || // not running
 				(oldInfo.State == c.State && oldInfo.Name == c.Metadata.Name && oldInfo.Status == status) { // no state change
 				continue
 			}
@@ -411,7 +389,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 
 	// delete container
 	for oldID, c := range cw.containers {
-		if _, ok := newContainers[oldID]; !ok || c.State == ContainerState_CONTAINER_EXITED {
+		if _, ok := newContainers[oldID]; !ok || c.State == ContainerStateContainerExited {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
 			cw.dockerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)
