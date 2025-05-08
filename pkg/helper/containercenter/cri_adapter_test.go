@@ -29,7 +29,7 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 	crirt := &CRIRuntimeWrapper{
 		dockerCenter: nil,
 		client:       nil,
-		runtimeInfo:  RuntimeInfo{},
+		runtimeInfo:  CriVersionResponse{},
 		containers:   make(map[string]*innerContainerInfo),
 		stopCh:       make(<-chan struct{}),
 		rootfsCache:  make(map[string]string),

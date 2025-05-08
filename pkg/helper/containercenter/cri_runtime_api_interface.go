@@ -149,7 +149,7 @@ type RuntimeService interface {
 
 type RuntimeServiceClient struct {
 	service RuntimeService
-	info    RuntimeInfo
+	info    CriVersionResponse
 	conn    *grpc.ClientConn
 }
 
@@ -224,12 +224,7 @@ func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID s
 func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
 	versionResp, err := c.service.Version(ctx)
 	if err == nil {
-		c.info = RuntimeInfo{
-			version:           versionResp.Version,
-			runtimeName:       versionResp.RuntimeName,
-			runtimeVersion:    versionResp.RuntimeVersion,
-			runtimeAPIVersion: versionResp.RuntimeAPIVersion,
-		}
+		c.info = versionResp
 	}
 	return err
 }

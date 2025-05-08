@@ -48,18 +48,11 @@ type innerContainerInfo struct {
 	Status string
 }
 
-type RuntimeInfo struct {
-	version           string
-	runtimeName       string
-	runtimeVersion    string
-	runtimeAPIVersion string
-}
-
 type CRIRuntimeWrapper struct {
 	dockerCenter *DockerCenter
 	nativeClient *containerd.Client
 	client       *RuntimeServiceClient
-	runtimeInfo  RuntimeInfo
+	runtimeInfo  CriVersionResponse
 
 	containersLock sync.Mutex
 
@@ -79,7 +72,7 @@ func IsCRIRuntimeValid() bool {
 		return false
 	}
 
-	client, err := NewRuntimeServiceClient(time.Minute, 1024*1024*16)
+	client, err := NewRuntimeServiceClient(time.Minute, maxMsgSize)
 	if err != nil {
 		logger.Debug(context.Background(), "NewRuntimeServiceClient", containerdUnixSocket, "failed", err)
 		return false
@@ -185,7 +178,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 			},
 			HostConfig: &container.HostConfig{
 				VolumeDriver: ci.Snapshotter,
-				Runtime:      cw.runtimeInfo.runtimeName,
+				Runtime:      cw.runtimeInfo.RuntimeName,
 				LogConfig: container.LogConfig{
 					Type: "json-file",
 				},
