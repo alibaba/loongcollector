@@ -35,6 +35,7 @@ public:
     void TestSetMetadata();
     void TestDelMetadata();
     void TestFromJsonToJson();
+    void TestTagsHash();
 
 protected:
     void SetUp() override {
@@ -294,6 +295,22 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
 }
 
+void PipelineEventGroupUnittest::TestTagsHash() {
+    PipelineEventGroup g1(make_shared<SourceBuffer>());
+    g1.SetTag(string("key1"), string("value1"));
+    g1.SetTag(string("key2"), string("value2"));
+
+    PipelineEventGroup g2(make_shared<SourceBuffer>());
+    g2.SetTag(string("key2"), string("value2"));
+    g2.SetTag(string("key1"), string("value1"));
+    APSARA_TEST_EQUAL(g1.GetTagsHash(), g2.GetTagsHash());
+
+    PipelineEventGroup g3(make_shared<SourceBuffer>());
+    g3.SetTag(string("value1"), string("key1"));
+    g3.SetTag(string("value2"), string("key2"));
+    APSARA_TEST_NOT_EQUAL(g1.GetTagsHash(), g3.GetTagsHash());
+}
+
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestCreateEvent)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestAddEvent)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSwapEvents)
@@ -303,6 +320,7 @@ UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDestructor)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSetMetadata)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDelMetadata)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestFromJsonToJson)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestTagsHash)
 
 } // namespace logtail
 

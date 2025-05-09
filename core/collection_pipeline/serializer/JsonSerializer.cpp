@@ -17,6 +17,8 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "constants/Constants.h"
+
 using namespace std;
 
 namespace logtail {

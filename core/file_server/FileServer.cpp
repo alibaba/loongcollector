@@ -14,13 +14,13 @@
 
 #include "file_server/FileServer.h"
 
-#include "checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileTagOptions.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"

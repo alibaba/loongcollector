@@ -16,28 +16,21 @@
 
 #pragma once
 
-#include <cstdint>
-
-#include <memory>
-#include <string>
-
-#include "json/json.h"
+#include "config/PipelineConfig.h"
 
 namespace logtail {
 
-struct TaskConfig {
-    std::string mName;
-    std::unique_ptr<Json::Value> mDetail;
-    uint32_t mCreateTime = 0;
+struct TaskConfig : public PipelineConfig {
+    TaskConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail, const std::filesystem::path& filepath)
+        : PipelineConfig(name, std::move(detail), filepath) {}
+    TaskConfig(TaskConfig&& rhs) = default;
+    TaskConfig& operator=(TaskConfig&& rhs) noexcept = default;
 
-    TaskConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
-        : mName(name), mDetail(std::move(detail)) {}
-
-    bool Parse();
+    bool Parse() override;
 };
 
 inline bool operator==(const TaskConfig& lhs, const TaskConfig& rhs) {
-    return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
+    return static_cast<const PipelineConfig&>(lhs) == static_cast<const PipelineConfig&>(rhs);
 }
 
 inline bool operator!=(const TaskConfig& lhs, const TaskConfig& rhs) {
