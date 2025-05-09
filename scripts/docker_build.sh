@@ -112,22 +112,25 @@ if [[ $CATEGORY != "multi-arch-production" ]]; then
         --build-arg HOST_OS="$HOST_OS" \
         -t "$REPOSITORY":"$VERSION" \
         --no-cache -f $GEN_DOCKERFILE .
+    if [[ $PUSH = "true" ]]; then
+        echo "COMMAND:"
+        echo "docker push $REPOSITORY:$VERSION"
+        if [[ $VERSION = "latest" ]]; then
+            echo "Current operation is so dangerous, you should push by yourself !!!"
+        else
+            docker push "$REPOSITORY:$VERSION"
+        fi
+    fi
 else
+    OUTPUT_OPTION="-o type=docker"
+    if [[ "$PUSH" = "true" ]]; then
+        OUTPUT_OPTION="-o type=registry"
+    fi
     docker buildx build --platform linux/amd64,linux/arm64 \
         $BUILD_SSH_OPTS \
         --build-arg VERSION="$VERSION" \
         --build-arg HOST_OS="$HOST_OS" \
-        -t "$REPOSITORY":edge \
-        -o type=registry \
+        -t "$REPOSITORY":"$VERSION" \
+        $OUTPUT_OPTION \
         --no-cache -f $GEN_DOCKERFILE .
-fi
-
-if [[ $PUSH = "true" && $CATEGORY != "multi-arch-production" ]]; then
-    echo "COMMAND:"
-    echo "docker push $REPOSITORY:$VERSION"
-    if [[ $VERSION = "latest" ]]; then
-        echo "Current operation is so dangerous, you should push by yourself !!!"
-    else
-        docker push "$REPOSITORY:$VERSION"
-    fi
 fi
