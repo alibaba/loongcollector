@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <functional>
+#include <filesystem>
 #include <string>
+#include <vector>
+namespace logtail {
 
+bool GetHostSystemStatWithPath(std::vector<std::string>& lines,
+                               std::string& errorMessage,
+                               std::filesystem::path PROC_DIR);
 
-template <typename TClass, typename TField = double>
-class FieldName {
-public:
-    std::string_view name;
-    TField TClass::*ptr; // 成员指针，直接访问字段
-
-    constexpr FieldName(std::string_view n, TField TClass::*p) : name(n), ptr(p) {}
-
-    // 访问对象中的字段值
-    TField& value(TClass& obj) const { return obj.*ptr; }
-    const TField& value(const TClass& obj) const { return obj.*ptr; }
-};
-
-// 字段定义宏
-#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS>(#FIELD, &CLASS::FIELD)
+} // namespace logtail
