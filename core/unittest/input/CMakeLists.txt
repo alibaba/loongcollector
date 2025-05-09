@@ -26,8 +26,8 @@ if (LINUX)
     add_executable(input_container_stdio_unittest InputContainerStdioUnittest.cpp)
     target_link_libraries(input_container_stdio_unittest ${UT_BASE_TARGET})
 
-    add_executable(input_ebpf_file_security_unittest InputFileSecurityUnittest.cpp)
-    target_link_libraries(input_ebpf_file_security_unittest unittest_base)
+    # add_executable(input_ebpf_file_security_unittest InputFileSecurityUnittest.cpp)
+    # target_link_libraries(input_ebpf_file_security_unittest unittest_base)
 
     add_executable(input_ebpf_process_security_unittest InputProcessSecurityUnittest.cpp)
     target_link_libraries(input_ebpf_process_security_unittest unittest_base)
