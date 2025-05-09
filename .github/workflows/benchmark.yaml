@@ -217,3 +217,11 @@ jobs:
       
       - name: Push benchmark result
         run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
+
+  actions-timeline:
+    needs: [result]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2
