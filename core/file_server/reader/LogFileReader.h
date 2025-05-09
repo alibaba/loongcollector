@@ -562,7 +562,7 @@ protected:
 
 private:
     bool mHasReadContainerBom = false;
-#if deinfed(__linux__)
+#if defined(__linux__)
     void checkContainerType(LogFileOperator& op);
 #endif
 

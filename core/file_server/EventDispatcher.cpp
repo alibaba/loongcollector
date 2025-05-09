@@ -456,7 +456,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     // Determine the type of input plugin.
     string name = config->GetInputs()[0]->GetPlugin()->Name();
     const InputFile* inputFile = nullptr;
-#if deinfed(__linux__)
+#if defined(__linux__)
     const InputContainerStdio* inputContainerStdio = nullptr;
     if (name == InputFile::sName) {
         inputFile = static_cast<const InputFile*>(config->GetInputs()[0]->GetPlugin());
