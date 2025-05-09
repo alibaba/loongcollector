@@ -92,6 +92,28 @@ bool SystemInterface::GetProcessInformation(pid_t pid, ProcessInformation& proce
         pid);
 }
 
+bool SystemInterface::GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo) {
+    const std::string errorType = "system load";
+    return MemoizedCall(
+        mSystemLoadInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetSystemLoadInformationOnce(static_cast<SystemLoadInformation&>(info));
+        },
+        systemLoadInfo,
+        errorType);
+}
+
+bool SystemInterface::GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo) {
+    const std::string errorType = "cpu core num";
+    return MemoizedCall(
+        mCPUCoreNumInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetCPUCoreNumInformationOnce(static_cast<CpuCoreNumInformation&>(info));
+        },
+        cpuCoreNumInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {
