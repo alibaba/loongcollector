@@ -144,11 +144,13 @@ void PluginRegistry::LoadStaticPlugins() {
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
     RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
+    // if (BOOL_FLAG(enable_ebpf_file_secure)) {
+    //     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    // }
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
