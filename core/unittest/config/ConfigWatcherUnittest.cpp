@@ -152,7 +152,12 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
+        // TODO: windows
+        // if run this case with others, remove config will throw 'access deny' error.
+        // "config" maybe opened by other test case and not closed.
+#if !defined(_MSC_VER)
         filesystem::remove_all("config");
+#endif
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
     {

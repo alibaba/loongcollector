@@ -1551,7 +1551,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         if (!READ_BYTE) {
             return;
         }
-#if deinfed(__linux__)
+#if defined(__linux__)
         if (mReaderConfig.first->mInputType == FileReaderOptions::InputType::InputContainerStdio
             && !mHasReadContainerBom) {
             checkContainerType(mLogFileOp);
