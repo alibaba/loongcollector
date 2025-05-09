@@ -37,6 +37,7 @@ list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/BoostRegexVal
 if(MSVC)
     # remove LinuxDaemonUtil in common
     list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
+    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/ProcParser.h ${CMAKE_SOURCE_DIR}/common/ProcParser.cpp)
 elseif(UNIX)
     list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/WindowsDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/WindowsDaemonUtil.cpp)
 endif()
