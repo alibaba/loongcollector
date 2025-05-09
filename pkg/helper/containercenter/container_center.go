@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -428,13 +429,13 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 				tagKV := strings.SplitN(value, "=", 2)
 				// if tag exist in EnvTags, just skip this tag
 				if len(tagKV) == 2 {
-					if !HasEnvTags(tagKV[0], tagKV[1]) {
+					if !helper.HasEnvTags(tagKV[0], tagKV[1]) {
 						did.ContainerNameTag[tagKV[0]] = tagKV[1]
 					} else {
 						logger.Info(context.Background(), "skip set this tag, as this exist in self env tags, key", tagKV[0], "value", tagKV[1])
 					}
 				} else {
-					if !HasEnvTags(tagKV[0], tagKV[0]) {
+					if !helper.HasEnvTags(tagKV[0], tagKV[0]) {
 						did.ContainerNameTag[tagKV[0]] = tagKV[0]
 					} else {
 						logger.Info(context.Background(), "skip set this tag, as this exist in self env tags, key&value", tagKV[0])
@@ -457,7 +458,7 @@ type DockerCenter struct {
 	// For the CRI scenario, the container list only contains the real containers and excludes the sandbox containers. But the
 	// sandbox meta would be saved to its bound container.
 	containerMap                   map[string]*DockerInfoDetail // all containers will in this map
-	client                         DockerCenterClientInterface
+	client                         ClientInterface
 	containerHelper                ContainerHelperInterface
 	lastErrMu                      sync.Mutex
 	lastErr                        error
@@ -471,7 +472,7 @@ type DockerCenter struct {
 	initStaticContainerInfoSuccess bool
 }
 
-type DockerCenterClientInterface interface {
+type ClientInterface interface {
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
 	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
@@ -661,7 +662,7 @@ func getDockerCenterInstance() *DockerCenter {
 	onceDocker.Do(func() {
 		logger.InitLogger()
 		// load EnvTags first
-		LoadEnvTags()
+		helper.LoadEnvTags()
 		dockerCenterInstance = &DockerCenter{
 			containerHelper: &ContainerHelperWrapper{},
 		}

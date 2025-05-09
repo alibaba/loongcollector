@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2024 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-// +build linux
+//go:build !linux && !windows
+// +build !linux,!windows
 
-package helper
+package containercenter
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"net"
+	"time"
 )
 
-func ContainerProcessAlive(pid int) bool {
-	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
-	exist, err := util.PathExists(procStatPath)
-	if err != nil {
-		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
-	} else if !exist {
-		return false
-	}
-	return true
+var containerdUnixSocket = "/run/containerd/containerd.sock"
+
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
+func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+	return "", dial, nil
+}
+
+func dial(addr string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", addr, timeout)
 }

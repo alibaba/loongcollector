@@ -12,33 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-// +build linux
+//go:build windows
+// +build windows
 
-package helper
+package containercenter
 
 import (
-	"fmt"
 	"net"
 	"time"
+
+	winio "github.com/Microsoft/go-winio"
 )
 
-var containerdUnixSocket = "/run/containerd/containerd.sock"
+var containerdUnixSocket = `\\.\pipe\containerd-containerd`
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	endpoint = "unix://" + endpoint
-	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, "unix")
-	if err != nil {
-		return "", nil, err
-	}
-	if protocol != "unix" {
-		return "", nil, fmt.Errorf("only support unix socket endpoint")
-	}
-
-	return addr, dial, nil
+	return endpoint, dial, nil
 }
 
 func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", addr, timeout)
+	return winio.DialPipe(addr, &timeout)
 }

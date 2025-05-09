@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
@@ -101,7 +101,7 @@ func (st tcpState) String() string {
 func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	// mount the host proc path
-	fs, err := procfs.NewFS(helper.GetMountedFilePath(procfs.DefaultMountPoint))
+	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
 		logger.Error(r.context.GetRuntimeContext(), "READ_PROC_ALARM", "err", err)
 		return 0, err
@@ -145,7 +145,7 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 
 func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	// mount the host proc path
-	file, err := os.Open(helper.GetMountedFilePath("/proc/sys/fs/file-nr"))
+	file, err := os.Open(containercenter.GetMountedFilePath("/proc/sys/fs/file-nr"))
 	if err != nil {
 		logger.Error(r.context.GetRuntimeContext(), "OPEN_FILENR_ALARM", "err", err)
 		return
@@ -173,7 +173,7 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 // because one device would be mounted many times in virtual environment.
 func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 	// mount the host proc path
-	file, err := os.Open(helper.GetMountedFilePath("/proc/1/mounts"))
+	file, err := os.Open(containercenter.GetMountedFilePath("/proc/1/mounts"))
 	if err != nil {
 		logger.Error(r.context.GetRuntimeContext(), "OPEN_1MOUNTS_ALARM", "err", err)
 		return
@@ -204,7 +204,7 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 		labels.Append("device", parts[0])
 		labels.Append("fs_type", parts[2])
 		// wrapper with mountedpath because of using unix statfs rather than proc file system.
-		usage, err := disk.Usage(helper.GetMountedFilePath(parts[1]))
+		usage, err := disk.Usage(containercenter.GetMountedFilePath(parts[1]))
 		if err == nil {
 			r.addMetric(collector, "disk_space_usage", labels, usage.UsedPercent)
 			r.addMetric(collector, "disk_inode_usage", labels, usage.InodesUsedPercent)

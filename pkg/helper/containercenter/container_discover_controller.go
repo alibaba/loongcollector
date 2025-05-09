@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -163,15 +163,12 @@ func (c *ContainerDiscoverManager) Init() bool {
 	defer dockerCenterRecover()
 
 	// discover which runtime is valid
-	if IsCRIRuntimeValid(containerdUnixSocket) {
-		var err error
-		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
-		if err != nil {
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
-			criRuntimeWrapper = nil
-		} else {
-			logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
-		}
+	if wrapper, err := NewCRIRuntimeWrapper(dockerCenterInstance); err != nil {
+		logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		criRuntimeWrapper = nil
+	} else {
+		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+		criRuntimeWrapper = wrapper
 	}
 	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
 		if !ok {

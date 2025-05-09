@@ -15,11 +15,12 @@
 //go:build windows
 // +build windows
 
-package helper
+package containercenter
 
 import (
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +77,7 @@ func TestGetMountedFilePath(t *testing.T) {
 		require.Equal(t, c.outFilePath, GetMountedFilePath(c.filePath))
 	}
 
-	require.Equal(t, NormalizeWindowsPath("C:\\var\\addon-logtail\\token-config"), "C:\\var\\addon-logtail\\token-config")
-	require.Equal(t, NormalizeWindowsPath("/var/addon-logtail/token-config"), "C:\\var\\addon-logtail\\token-config")
-	require.Equal(t, NormalizeWindowsPath(""), "")
+	require.Equal(t, helper.NormalizeWindowsPath("C:\\var\\addon-logtail\\token-config"), "C:\\var\\addon-logtail\\token-config")
+	require.Equal(t, helper.NormalizeWindowsPath("/var/addon-logtail/token-config"), "C:\\var\\addon-logtail\\token-config")
+	require.Equal(t, helper.NormalizeWindowsPath(""), "")
 }

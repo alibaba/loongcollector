@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -216,7 +216,7 @@ func UnRegisterDockerEventListener(c chan events.Message) {
 	getDockerCenterInstance().unRegisterEventListener(c)
 }
 
-func ContainerCenterInit() {
+func Init() {
 	getDockerCenterInstance()
 }
 
