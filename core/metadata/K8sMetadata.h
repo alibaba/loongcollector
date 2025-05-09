@@ -18,6 +18,7 @@
 
 #include <ctime>
 
+#include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <string>
