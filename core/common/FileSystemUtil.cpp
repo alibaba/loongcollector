@@ -127,20 +127,20 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
+#if defined(__linux__)
 long GetPageSize() {
     static long pageSize = sysconf(_SC_PAGESIZE);
     return (pageSize > 0) ? static_cast<size_t>(pageSize) : 4096;
 }
 
 size_t GetBlockSize(const std::filesystem::path& path) {
-#if defined(__linux__)
     struct statvfs buf {};
     if (statvfs(path.c_str(), &buf) == 0) {
         return buf.f_bsize;
     }
-#endif
     return 0UL;
 }
+#endif
 
 FileReadResult ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize) {
     std::ifstream ifs(fileName, std::ios::binary);

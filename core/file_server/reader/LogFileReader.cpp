@@ -58,7 +58,9 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#if !defined(_MSC_VER)
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#endif
 
 using namespace sls_logs;
 using namespace std;
@@ -696,6 +698,7 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
     FixLastFilePos(op, endOffset);
 }
 
+#if defined(__linux__)
 void LogFileReader::checkContainerType(LogFileOperator& op) {
     // 判断container类型
     char containerBOMBuffer[2] = {0};
@@ -714,16 +717,19 @@ void LogFileReader::checkContainerType(LogFileOperator& op) {
     mLineParsers.emplace_back(baseLineParsePtr);
     mHasReadContainerBom = true;
 }
+#endif
 
 void LogFileReader::FixLastFilePos(LogFileOperator& op, int64_t endOffset) {
     // 此处要不要取消mLastFilePos == 0的限制
     if (mLastFilePos == 0 || op.IsOpen() == false) {
         return;
     }
+#if defined(__linux__)
     if (mReaderConfig.first->mInputType == FileReaderOptions::InputType::InputContainerStdio && !mHasReadContainerBom
         && endOffset > 0) {
         checkContainerType(op);
     }
+#endif
     int32_t readSize = endOffset - mLastFilePos < INT32_FLAG(max_fix_pos_bytes) ? endOffset - mLastFilePos
                                                                                 : INT32_FLAG(max_fix_pos_bytes);
     char* readBuf = (char*)malloc(readSize + 1);
@@ -1545,10 +1551,12 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         if (!READ_BYTE) {
             return;
         }
+#if deinfed(__linux__)
         if (mReaderConfig.first->mInputType == FileReaderOptions::InputType::InputContainerStdio
             && !mHasReadContainerBom) {
             checkContainerType(mLogFileOp);
         }
+#endif
         const size_t lastCacheSize = mCache.size();
         if (READ_BYTE < lastCacheSize) {
             READ_BYTE = lastCacheSize; // this should not happen, just avoid READ_BYTE >= 0 theoratically
@@ -1700,10 +1708,12 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         if (readCharCount == 0 && (!lastCacheSize || allowRollback)) { // just keep last cache
             return;
         }
+#if defined(__linux__)
         if (mReaderConfig.first->mInputType == FileReaderOptions::InputType::InputContainerStdio
             && !mHasReadContainerBom) {
             checkContainerType(mLogFileOp);
         }
+#endif
         if (lastCacheSize) {
             memcpy(gbkBuffer, mCache.data(), lastCacheSize); // copy from cache
             readCharCount += lastCacheSize;
@@ -2166,6 +2176,7 @@ LineInfo RawTextParser::GetLastLine(StringView buffer,
     return LineInfo(StringView(buffer.data(), end), 0, end, 1, true, 0);
 }
 
+#if defined(__linux__)
 LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
                                            int32_t end,
                                            size_t protocolFunctionIndex,
@@ -2400,9 +2411,11 @@ void ContainerdTextParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
         return;
     }
 }
+#endif
 
 void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
     // we store inner info in metadata
+#if defined(__linux__)
     switch (mFileLogFormat) {
         case LogFormat::DOCKER_JSON_FILE:
             group.SetMetadataNoCopy(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
@@ -2413,6 +2426,7 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         default:
             break;
     }
+#endif
     bool isContainerLog = mFileLogFormat == LogFormat::DOCKER_JSON_FILE || mFileLogFormat == LogFormat::CONTAINERD_TEXT;
     if (!isContainerLog) {
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, GetHostLogPath());

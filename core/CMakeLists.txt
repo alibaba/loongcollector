@@ -242,7 +242,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
-    add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    if (LINUX)
+        add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    endif()
 endif()
 
 # Logtail UT.
