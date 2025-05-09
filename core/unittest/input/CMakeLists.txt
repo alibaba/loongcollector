@@ -49,9 +49,6 @@ add_executable(input_internal_metrics_unittest InputInternalMetricsUnittest.cpp)
 target_link_libraries(input_internal_metrics_unittest ${UT_BASE_TARGET})
 
 if (LINUX)
-    add_executable(input_host_meta_unittest InputHostMetaUnittest.cpp)
-    target_link_libraries(input_host_meta_unittest ${UT_BASE_TARGET})
-
     set(EBPF_DRIVER_DIR "${CMAKE_BINARY_DIR}/ebpf/driver")
     set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src")
 
