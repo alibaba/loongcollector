@@ -18,10 +18,11 @@ project(input_unittest)
 add_executable(input_file_unittest InputFileUnittest.cpp)
 target_link_libraries(input_file_unittest ${UT_BASE_TARGET})
 
-add_executable(input_prometheus_unittest InputPrometheusUnittest.cpp)
-target_link_libraries(input_prometheus_unittest ${UT_BASE_TARGET})
 
 if (LINUX)
+    add_executable(input_prometheus_unittest InputPrometheusUnittest.cpp)
+    target_link_libraries(input_prometheus_unittest ${UT_BASE_TARGET})
+
     add_executable(input_container_stdio_unittest InputContainerStdioUnittest.cpp)
     target_link_libraries(input_container_stdio_unittest ${UT_BASE_TARGET})
 
@@ -67,10 +68,10 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(input_file_unittest)
-gtest_discover_tests(input_prometheus_unittest)
 gtest_discover_tests(input_internal_alarms_unittest)
 gtest_discover_tests(input_internal_metrics_unittest)
 if (LINUX)
+    gtest_discover_tests(input_prometheus_unittest)
     gtest_discover_tests(input_host_meta_unittest)
     gtest_discover_tests(input_container_stdio_unittest)
     gtest_discover_tests(input_ebpf_file_security_unittest)
