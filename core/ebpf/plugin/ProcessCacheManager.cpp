@@ -34,6 +34,7 @@
 #include "common/StringView.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "logger/Logger.h"
+#include "metadata/K8sMetadata.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "type/table/BaseElements.h"
 #include "util/FrequencyManager.h"
@@ -362,6 +363,22 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
     auto inheritable = sb->CopyString(proc.Get<kCapInheritable>());
     logEvent.SetContentNoCopy(kCapInheritable.LogKey(), StringView(inheritable.data, inheritable.size));
 
+    if (!proc.Get<kContainerId>().empty()) {
+        auto containerId = sb->CopyString(proc.Get<kContainerId>());
+        logEvent.SetContentNoCopy(kContainerId.LogKey(), StringView(containerId.data, containerId.size));
+    }
+    auto podInfo = proc.LoadK8sPodInfo();
+    if (podInfo) {
+        auto workloadKind = sb->CopyString(podInfo->mWorkloadKind);
+        logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), StringView(workloadKind.data, workloadKind.size));
+        auto workloadName = sb->CopyString(podInfo->mWorkloadName);
+        logEvent.SetContentNoCopy(kWorkloadName.LogKey(), StringView(workloadName.data, workloadName.size));
+        auto namespaceStr = sb->CopyString(podInfo->mNamespace);
+        logEvent.SetContentNoCopy(kNamespace.LogKey(), StringView(namespaceStr.data, namespaceStr.size));
+        auto podName = sb->CopyString(podInfo->mPodName);
+        logEvent.SetContentNoCopy(kPodName.LogKey(), StringView(podName.data, podName.size));
+    }
+
     auto parentProcPtr = mProcessCache.Lookup({proc.mPPid, proc.mPKtime});
     // for parent
     if (!parentProcPtr) {
@@ -402,6 +419,12 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
     auto parentInheritable = sb->CopyString(parentProc.Get<kCapInheritable>());
     logEvent.SetContentNoCopy(kParentCapInheritable.LogKey(),
                               StringView(parentInheritable.data, parentInheritable.size));
+
+    if (!parentProc.Get<kContainerId>().empty()) {
+        auto parentContainerId = sb->CopyString(parentProc.Get<kContainerId>());
+        logEvent.SetContentNoCopy(kParentContainerId.LogKey(),
+                                  StringView(parentContainerId.data, parentContainerId.size));
+    }
     return true;
 }
 
@@ -470,8 +493,8 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
                   proc->time_for_children_ns,
                   proc->cgroup_ns,
                   proc->user_ns}}};
-    value.bin.path_length = proc->exe.size();
-    ::memcpy(value.bin.path, proc->exe.data(), std::min(BINARY_PATH_MAX_LEN, static_cast<int>(proc->exe.size())));
+    value.bin.path_length = std::min(BINARY_PATH_MAX_LEN, static_cast<int>(proc->exe.size()));
+    ::memcpy(value.bin.path, proc->exe.data(), value.bin.path_length);
 
     // update bpf map
     int res = mEBPFAdapter->BPFMapUpdateElem(PluginType::PROCESS_SECURITY, "execve_map", &proc->pid, &value, 0);
@@ -589,7 +612,20 @@ ProcessCacheManager::msgExecveEventToProcessCacheValue(const msg_execve_event& e
     // event->process.ino = eventPtr->process.i_ino;
 
     // dockerid
-    // event->kube.docker = std::string(eventPtr->kube.docker_id);
+    StringView ebpfDockerId(event.kube.docker_id);
+    StringView containerId;
+    if (!ebpfDockerId.empty()) {
+        ProcParser::LookupContainerId(ebpfDockerId, true, containerId);
+        cacheValue->SetContentNoCopy<kContainerId>(containerId);
+        if (K8sMetadata::GetInstance().Enable()) {
+            auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
+            if (info) {
+                cacheValue->StoreK8sPodInfoUnsafe(info);
+            } else {
+                K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::ContainerIdInfo, containerId);
+            }
+        }
+    }
     return cacheValue;
 }
 
@@ -769,6 +805,15 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::msgCloneEventToProcessCa
     cacheValue->SetContent<kExecId>(execId);
     cacheValue->SetContent<kProcessId>(event.tgid);
     cacheValue->SetContent<kKtime>(event.ktime);
+    const auto& containerId = cacheValue->Get<kContainerId>();
+    if (K8sMetadata::GetInstance().Enable() && !containerId.empty() && !cacheValue->LoadK8sPodInfo()) {
+        auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
+        if (info) {
+            cacheValue->StoreK8sPodInfo(info);
+        } else {
+            K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::ContainerIdInfo, containerId);
+        }
+    }
     return cacheValue;
 }
 

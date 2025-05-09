@@ -19,6 +19,7 @@
 #include <deque>
 #include <mutex>
 
+#include "ContainerInfo.h"
 #include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "ebpf/type/table/ProcessTable.h"
@@ -85,6 +86,18 @@ public:
         mContents.Set<key>(uint64_t(val));
     }
 
+    void StoreK8sPodInfoUnsafe(std::shared_ptr<K8sPodInfo> k8sPodInfo) { mK8sPodInfo = std::move(k8sPodInfo); }
+
+    void StoreK8sPodInfo(std::shared_ptr<K8sPodInfo> k8sPodInfo) {
+        std::lock_guard<std::mutex> lock(mK8sPodInfoMutex);
+        mK8sPodInfo = std::move(k8sPodInfo);
+    }
+
+    std::shared_ptr<K8sPodInfo> LoadK8sPodInfo() const {
+        std::lock_guard<std::mutex> lock(mK8sPodInfoMutex);
+        return mK8sPodInfo;
+    }
+
     std::shared_ptr<SourceBuffer> GetSourceBuffer() { return mContents.GetSourceBuffer(); }
     int IncRef() { return ++mRefCount; }
     int DecRef() { return --mRefCount; }
@@ -93,6 +106,8 @@ public:
 
 private:
     ebpf::StaticDataRow<&ebpf::kProcessCacheTable> mContents;
+    mutable std::mutex mK8sPodInfoMutex;
+    std::shared_ptr<K8sPodInfo> mK8sPodInfo;
     int mRefCount = 0;
 };
 

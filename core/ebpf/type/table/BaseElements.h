@@ -514,6 +514,15 @@ inline constexpr DataElement kParentCapEffective = {
     "",
 };
 
+inline constexpr DataElement kParentContainerId = {
+    "parent_container_id",
+    "", // metric
+    "parent.container.id", // span
+    "parent.container.id", // log
+    "local parent container id",
+};
+
+
 // for network
 inline constexpr DataElement kSaddr = {
     "source.addr",

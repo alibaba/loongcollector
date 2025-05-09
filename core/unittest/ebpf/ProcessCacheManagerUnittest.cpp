@@ -309,6 +309,7 @@ void ProcessCacheManagerUnittest::TestProcToProcessCacheValue() {
         APSARA_TEST_EQUAL(cacheValue.Get<kCapPermitted>().to_string(), std::string());
         APSARA_TEST_EQUAL(cacheValue.Get<kCapEffective>().to_string(), std::string());
         APSARA_TEST_EQUAL(cacheValue.Get<kCapInheritable>().to_string(), std::string());
+        APSARA_TEST_EQUAL(cacheValue.Get<kContainerId>().to_string(), std::string());
     }
 }
 

@@ -219,6 +219,7 @@ public:
      * @return offset of containerId in the last segment path
      */
     static int GetContainerId(const std::string& cgroupPath, std::string& containerId);
+    static int LookupContainerId(const StringView& cgroupline, bool bpfSource, StringView& containerId);
 
     uint32_t GetPIDNsInode(uint32_t pid, const std::string& nsStr) const;
     std::string GetPIDExePath(uint32_t pid) const;
@@ -230,12 +231,12 @@ private:
     std::filesystem::path procPidPath(uint32_t pid, const std::string& subpath) const;
     std::string readPidFile(uint32_t pid, const std::string& filename) const;
     std::string readPidLink(uint32_t pid, const std::string& filename) const;
-    static int lookupContainerId(const StringView& cgroupline, StringView& containerId);
-    static bool isValidContainerId(const StringView& id);
+    static bool isValidContainerId(const StringView& id, bool bpfSource);
 
     std::filesystem::path mProcPath;
 
     static constexpr size_t kContainerIdLength = 64;
+    static constexpr size_t kBpfContainerIdLength = 31;
     static constexpr size_t kCgroupNameLength = 128;
 };
 } // namespace logtail

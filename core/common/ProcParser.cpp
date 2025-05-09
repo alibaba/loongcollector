@@ -97,7 +97,9 @@ bool ProcParser::ParseProc(uint32_t pid, Proc& proc) const {
     proc.effectiveGid = status.effectiveGid;
     proc.savedGid = status.savedGid;
     proc.fsGid = status.fsGid;
-    proc.nspid = status.nstgid[0];
+    if (!status.nstgid.empty()) {
+        proc.nspid = status.nstgid.back();
+    }
     proc.permitted = status.capPrm;
     proc.effective = status.capEff;
     proc.inheritable = status.capInh;
@@ -150,10 +152,12 @@ std::string ProcParser::GetPIDEnviron(uint32_t pid) const {
     return readPidFile(pid, "environ");
 }
 
-bool ProcParser::isValidContainerId(const StringView& id) {
+bool ProcParser::isValidContainerId(const StringView& id, bool bpfSource) {
     // 检查长度是否匹配
     if (id.size() != kContainerIdLength) {
-        return false;
+        if (!bpfSource || id.size() < kBpfContainerIdLength) {
+            return false;
+        }
     }
     // 这里假设合法 container id 只包含十六进制字符（即 0-9 和 a-f / A-F)
     for (char ch : id) {
@@ -164,32 +168,52 @@ bool ProcParser::isValidContainerId(const StringView& id) {
     return true;
 }
 
-int ProcParser::lookupContainerId(const StringView& cgroupline, StringView& containerId) {
-    if (cgroupline.length() <= kContainerIdLength || cgroupline.find(':') == std::string::npos
-        || (cgroupline.find("pods") == std::string::npos && cgroupline.find("docker") == std::string::npos
-            && cgroupline.find("containerd") == std::string::npos && cgroupline.find("libpod") == std::string::npos
-            && cgroupline.find("lxc") == std::string::npos && cgroupline.find("podman") == std::string::npos
-            && cgroupline.find("cri-") == std::string::npos)) {
+// The implementation may not be compatible with sysbox
+int ProcParser::LookupContainerId(const StringView& cgroupline, bool bpfSource, StringView& containerId) {
+    if (bpfSource) {
+        if (cgroupline.length() < kBpfContainerIdLength) {
+            containerId = kEmptyStringView;
+            return -1;
+        }
+    } else if (cgroupline.length() <= kContainerIdLength || cgroupline.find(':') == std::string::npos
+               || (cgroupline.find("pods") == std::string::npos && cgroupline.find("docker") == std::string::npos
+                   && cgroupline.find("containerd") == std::string::npos
+                   && cgroupline.find("libpod") == std::string::npos && cgroupline.find("lxc") == std::string::npos
+                   && cgroupline.find("podman") == std::string::npos && cgroupline.find("cri-") == std::string::npos)) {
         containerId = kEmptyStringView;
         return -1;
     }
 
+    size_t segmentEnd = cgroupline.size();
     auto lastSlash = cgroupline.rfind('/');
-    if (lastSlash != std::string::npos && lastSlash + 1 < cgroupline.size()) {
-        auto lastSegment = cgroupline.substr(lastSlash + 1);
-        auto potentialId = lastSegment;
-        auto lastDash = potentialId.rfind('-');
-        if (lastDash != std::string::npos && lastDash + 1 < potentialId.size()) {
-            potentialId = potentialId.substr(lastDash + 1);
+    if (lastSlash == std::string::npos) {
+        lastSlash = 0;
+    }
+    // Podman may set the last subdir to 'container'
+    if (lastSlash != 0 && cgroupline.substr(lastSlash) == "/container") {
+        segmentEnd = lastSlash;
+        lastSlash = cgroupline.rfind('/', lastSlash - 1);
+        if (lastSlash == std::string::npos) {
+            lastSlash = 0;
         }
-        // 如果末尾有".scope"则去除
-        if (potentialId.size() > kContainerIdLength && potentialId.find("scope") != std::string::npos) {
-            potentialId = potentialId.substr(0, kContainerIdLength);
+    }
+    size_t segmentBegin = cgroupline[lastSlash] == '/' ? lastSlash + 1 : lastSlash;
+    auto lastSegment = cgroupline.substr(segmentBegin, segmentEnd - segmentBegin);
+    auto potentialId = lastSegment;
+    auto lastDash = potentialId.rfind('-');
+    if (lastDash != std::string::npos && lastDash + 1 < potentialId.size()) {
+        potentialId = potentialId.substr(lastDash + 1);
+    }
+    // 如果末尾有".scope"则去除
+    if (potentialId.size() > kContainerIdLength && potentialId.find("scope") != std::string::npos) {
+        potentialId = potentialId.substr(0, kContainerIdLength);
+    }
+    if (isValidContainerId(potentialId, bpfSource)) {
+        containerId = potentialId;
+        if (containerId.size() != kContainerIdLength) {
+            containerId.substr(0, kBpfContainerIdLength);
         }
-        if (isValidContainerId(potentialId)) {
-            containerId = potentialId;
-            return containerId.data() - lastSegment.data();
-        }
+        return containerId.data() - lastSegment.data();
     }
     containerId = kEmptyStringView;
     return -1;
@@ -207,7 +231,7 @@ int ProcParser::GetContainerId(const std::string& cgroupPath, std::string& conta
     for (const auto& line : splitter) {
         LOG_DEBUG(sLogger, ("cgroup line", line.to_string()));
         StringView containerIdView;
-        int offset = lookupContainerId(line, containerIdView);
+        int offset = LookupContainerId(line, false, containerIdView);
         if (offset >= 0) {
             LOG_DEBUG(sLogger, ("Found container ID using lookup", containerIdView)("offset", offset));
             containerId = containerIdView.to_string();

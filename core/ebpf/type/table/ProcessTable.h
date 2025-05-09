@@ -20,7 +20,7 @@
 namespace logtail::ebpf {
 
 inline constexpr DataElement kProcessCacheElements[] = {
-    kExecId, kProcessId, kUid, kUser, kBinary, kArguments, kCWD, kKtime, kCapInheritable, kCapPermitted, kCapEffective};
+    kExecId, kProcessId, kUid, kUser, kBinary, kArguments, kCWD, kKtime, kCapInheritable, kCapPermitted, kCapEffective, kContainerId};
 
 inline constexpr size_t kProcessCacheTableSize = std::size(kProcessCacheElements);
 

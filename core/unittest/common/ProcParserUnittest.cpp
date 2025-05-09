@@ -31,6 +31,7 @@ public:
     void TestGetPIDComm();
     void TestGetPIDEnviron();
     void TestGetPIDCWD();
+    void TestLookupContainerId();
     void TestGetPIDDockerId();
     void TestGetPIDExePath();
     void TestGetLoginUid();
@@ -274,6 +275,15 @@ nonvoluntary_ctxt_switches:	5468)");
     APSARA_TEST_EQUAL(0x000001ffffffffffUL, ps.capEff); // 000001ffffffffff
 }
 
+void ProcParserUnittest::TestLookupContainerId() {
+    StringView cgroupLine = "8d86bfbc2357a258945d40fe65c1553fe5e316f5d57edd451f65fec7fed58615";
+    StringView containerId;
+    APSARA_TEST_EQUAL_FATAL(-1, ProcParser::LookupContainerId(cgroupLine, false, containerId));
+    APSARA_TEST_TRUE(containerId.empty());
+    APSARA_TEST_EQUAL_FATAL(0, ProcParser::LookupContainerId(cgroupLine, true, containerId));
+    APSARA_TEST_EQUAL_FATAL(cgroupLine, containerId);
+}
+
 void ProcParserUnittest::TestGetPIDDockerId() {
     const int testPid = 12345;
     // K8s containerd cgroup file
@@ -402,6 +412,7 @@ UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDCmdline);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDComm);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDEnviron);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDCWD);
+UNIT_TEST_CASE(ProcParserUnittest, TestLookupContainerId);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDDockerId);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDExePath);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetLoginUid);
