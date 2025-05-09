@@ -58,8 +58,10 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#if defined(__linux__)
+#include "plugin/input/InputContainerStdio.h"
+#endif
 
 using namespace std;
 using namespace sls_logs;
@@ -454,12 +456,18 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     // Determine the type of input plugin.
     string name = config->GetInputs()[0]->GetPlugin()->Name();
     const InputFile* inputFile = nullptr;
+#if deinfed(__linux__)
     const InputContainerStdio* inputContainerStdio = nullptr;
     if (name == InputFile::sName) {
         inputFile = static_cast<const InputFile*>(config->GetInputs()[0]->GetPlugin());
     } else if (name == InputContainerStdio::sName) {
         inputContainerStdio = static_cast<const InputContainerStdio*>(config->GetInputs()[0]->GetPlugin());
     }
+#else
+    if (name == InputFile::sName) {
+        inputFile = static_cast<const InputFile*>(config->GetInputs()[0]->GetPlugin());
+    }
+#endif
 
     // delete checkpoint if file path is not exist
     MapType<string, int>::Type::iterator pathIter = mPathWdMap.find(path);
@@ -542,7 +550,11 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             return ValidateCheckpointResult::kRotate;
         }
 
+#if defined(__linux__)
         if ((inputFile && 0 == inputFile->mExactlyOnceConcurrency) || inputContainerStdio) {
+#else
+        if (inputFile && 0 == inputFile->mExactlyOnceConcurrency) {
+#endif
             LOG_INFO(sLogger,
                      ("ignore check point, file signature has changed", filePath)("old real path", realFilePath)(
                          findIter->second.mFileDir, findIter->second.mFileName)("inode", checkpoint->mDevInode.inode));

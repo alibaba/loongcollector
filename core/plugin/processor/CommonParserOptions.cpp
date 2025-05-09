@@ -18,7 +18,9 @@
 
 #include "common/ParamExtractor.h"
 #include "constants/Constants.h"
+#if defined(__linux__)
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#endif
 
 using namespace std;
 
@@ -109,10 +111,13 @@ bool CommonParserOptions::ShouldEraseEvent(bool parseSuccess,
         auto offsetKey = metadata.find(EventGroupMetaKey::LOG_FILE_OFFSET_KEY);
         if (size == 1 && (offsetKey != metadata.end() && sourceEvent.cbegin()->first == offsetKey->second)) {
             return true;
-        } else if (size == 2 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerTimeKey)
-                   && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerSourceKey)) {
+        }
+#if defined(__linux__)
+        else if (size == 2 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerTimeKey)
+                 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerSourceKey)) {
             return true;
         }
+#endif
     }
     return false;
 }
