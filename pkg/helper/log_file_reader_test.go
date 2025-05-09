@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	testFilePath    = "./test.log"
-	newTestFilePath = "./new_test.log"
+	testFilePath = "./test.log"
 )
 
 var testFileStat StateOS
@@ -32,6 +31,9 @@ func setup() error {
 
 func teardown() error {
 	fmt.Println("Tearing down after tests...")
+	if _, err := os.Stat(testFilePath); os.IsNotExist(err) {
+		return nil
+	}
 	err := os.Remove(testFilePath)
 	if err != nil {
 		return err
@@ -96,11 +98,13 @@ func TestCheckFileChange(t *testing.T) {
 	assert.Equal(t, true, change)
 	reader.ReadAndProcess(false)
 
-	// write to file and rename, mock the file path in logfilereader unreachable
+	// write to file and remove, mock the file path in logfilereader unreachable
 	writeContent(testFilePath)
-	os.Rename(testFilePath, newTestFilePath)
+	os.Remove(testFilePath)
 	change = reader.CheckFileChange()
 	assert.Equal(t, true, change)
+
+	reader.CloseFile("finish test")
 }
 
 func TestMain(m *testing.M) {

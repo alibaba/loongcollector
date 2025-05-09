@@ -144,7 +144,8 @@ func (r *LogFileReader) GetLastEndOfLine(n int) int {
 }
 
 func (r *LogFileReader) CheckFileChange() bool {
-	if newStat, err := os.Stat(r.checkpoint.Path); err == nil { // stat by filename to check if size changed or file changed
+	switch newStat, err := os.Stat(r.checkpoint.Path); {
+	case err == nil: // stat by filename to check if size changed or file changed
 		newOsStat := GetOSState(newStat)
 		// logger.Debug("check file change", newOsStat.String())
 		if r.checkpoint.State.IsChange(newOsStat) {
@@ -175,7 +176,7 @@ func (r *LogFileReader) CheckFileChange() bool {
 			return true
 		}
 		r.foundFile = true
-	} else if r.file != nil { // stat by file handle to check if size changed
+	case r.file != nil: // Fallback to stat by file handle to check if size changed. This is necessary because the file path may become inaccessible in certain scenarios, such as when a container is stopped, but the file handle remains valid.
 		if newStat, statErr := r.file.Stat(); statErr == nil {
 			newOsStat := GetOSState(newStat)
 			// logger.Debug("check file change", newOsStat.String())
@@ -186,7 +187,7 @@ func (r *LogFileReader) CheckFileChange() bool {
 				return true
 			}
 		}
-	} else {
+	default:
 		if os.IsNotExist(err) {
 			if r.foundFile {
 				logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
@@ -195,7 +196,6 @@ func (r *LogFileReader) CheckFileChange() bool {
 		} else {
 			logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
 		}
-
 	}
 	return false
 }
