@@ -163,9 +163,9 @@ protected:
             pipeline.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        //if (isFileServerStart) {
-        //    FileServer::GetInstance()->Stop();
-        //}
+        // if (isFileServerStart) {
+        //     FileServer::GetInstance()->Stop();
+        // }
         ProcessorRunner::GetInstance()->Stop();
         FlusherRunner::GetInstance()->Stop();
         HttpSink::GetInstance()->Stop();
