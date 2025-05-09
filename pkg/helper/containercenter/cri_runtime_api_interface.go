@@ -182,7 +182,7 @@ func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSiz
 	}
 
 	// if create client failed, close the connection
-	conn.Close()
+	_ = conn.Close()
 	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
 }
 
@@ -231,6 +231,6 @@ func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
 
 func (c *RuntimeServiceClient) Close() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
 }
