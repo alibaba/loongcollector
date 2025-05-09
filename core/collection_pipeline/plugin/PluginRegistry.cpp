@@ -35,7 +35,6 @@
 #include "plugin/input/InputInternalMetrics.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputContainerStdio.h"
-#include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputNetworkObserver.h"
