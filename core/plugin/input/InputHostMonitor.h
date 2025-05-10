@@ -36,6 +36,7 @@ public:
 private:
     uint32_t mInterval = 0;
     std::vector<std::string> mCollectors;
+    std::vector<uint32_t> mIntervals;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InpuInputHostMonitorUnittest;
 #endif

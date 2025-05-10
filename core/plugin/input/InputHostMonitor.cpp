@@ -30,6 +30,7 @@ const uint32_t kDefaultInterval = 15; // seconds
 bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
     mInterval = kDefaultInterval;
+
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -55,9 +56,11 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     }
 
     // TODO: add more collectors
+    // use mInterval as init value
     // cpu
     bool enableCPU = true;
-    if (!GetOptionalBoolParam(config, "EnableCPU", enableCPU, errorMsg)) {
+    uint32_t cpu_interval = mInterval;
+    if (!GetOptionalBoolParam(config["CPU"], "Enable", enableCPU, errorMsg)) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
                            mContext->GetAlarm(),
                            errorMsg,
@@ -67,16 +70,29 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
+    if (!GetOptionalUIntParam(config["CPU"], "Interval", cpu_interval, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
     if (enableCPU) {
         mCollectors.push_back(CPUCollector::sName);
+        mIntervals.push_back(cpu_interval);
     }
+
     return true;
 }
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mCollectors, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
+        mCollectors, mIntervals, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
