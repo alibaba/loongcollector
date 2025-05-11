@@ -1,0 +1,549 @@
+# Copyright 2025 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
+  push:
+    branches:
+      - main
+      - 1.*
+
+jobs:
+  Build:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19]
+        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
+        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      - name: prepare ubuntu environment
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update     
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Binary
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+          MAKE_JOBS: 16
+        run: make dist
+
+      - name: Build Docker
+        run: make docker
+
+  BuildCore:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19]
+        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
+        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      - name: prepare ubuntu environment
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Binary
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+          MAKE_JOBS: 16
+          WITHSPL: ON
+        run: make core
+
+      - name: Check compatibility
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+        run: make dist && scripts/check_glibc.sh
+
+  BuildCoreUT:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        go-version: [1.19]
+        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
+        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      - name: prepare ubuntu environment
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update     
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 2
+      
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Unit Test
+        env:
+          BUILD_LOGTAIL: OFF
+          BUILD_LOGTAIL_UT: ON
+          ENABLE_COMPATIBLE_MODE: OFF
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+          MAKE_JOBS: 16
+          WITHSPL: ON
+          BUILD_TYPE: Debug
+        run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
+
+      - name: Build Coverage Image
+        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage .
+
+      - name: Unit Test
+        run: docker run --privileged -v /sys:/sys -v /:/logtail_host -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd) && make unittest_core"
+
+      - name: Unit Test Coverage
+        run: docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --gcov-ignore-parse-errors --merge-mode-functions=separate --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*\.pb\.cc\" -e \".*\.pb\.h\" -e \".*unittest.*\" -e \".*sdk.*\" -e \".*logger.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*runner.*\" -e \".*_thirdparty.*\""
+
+      - name: Setup Python3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Report code coverage
+        run: python3 tools/coverage-diff/main.py --path core/coverage.json --summary core/summary.json
+
+  BuildPurePlugin:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19]
+        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
+        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      # prepare ubuntu environment
+      - name: prepare ubuntu environment
+        if: matrix.runner == 'arc-runner-set-ilogtail'
+        run: |
+          sudo bash -c 'cat > /etc/apt/sources.list << EOL
+          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+
+          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
+
+          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+          EOL'
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        if: matrix.runner == 'arc-runner-set-ilogtail'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      # prepare windows environment
+      # https://github.com/actions/virtual-environments/issues/2549
+      - name: add mingw32 to path
+        if: matrix.runner == 'windows-2019'
+        shell: bash
+        run: |
+          echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Build pure plugin
+        run: make plugin_main
+
+  E2E:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19.10]
+        runner: [ubuntu-latest]
+      fail-fast: true
+    steps:
+      # Clean up space to prevent action from running out of disk space.
+      - name: clean
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Update Docker-compose to v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: System environment
+        run: |
+          uname -r
+          docker --version
+          go version
+
+      - name: E2E Behavior Test
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          WITHOUTGDB: ON
+        run: make e2e
+
+  E2EFramework:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19.10]
+        runner: [ubuntu-latest]
+      fail-fast: true
+    steps:
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Update Docker-compose to v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: E2E Plugin Framework Test
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          WITHOUTGDB: ON
+        run: make e2e-core
+
+      # Framework Test will provide local image that Unit Test required
+      - name: E2E Engine Unit Test
+        run: |
+          make unittest_e2e_engine
+
+  StaticCheck:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ${{ matrix.runner }}-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [1.19]
+        runner: [ubuntu]
+      fail-fast: true
+    steps:
+      # prepare ubuntu environment
+      - name: prepare ubuntu environment
+        if: matrix.runner == 'ubuntu'
+        run: |
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+
+      # Clean up space to prevent action from running out of disk space.
+      - name: Free disk space
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Copy Lib
+        if: matrix.runner == 'ubuntu'
+        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
+
+      - name: Check License Header
+        if: matrix.runner == 'ubuntu'
+        run: make check-license
+
+      - name: Check Dependencies Licences
+        if: matrix.runner == 'ubuntu'
+        run: make check-dependency-licenses
+
+      - name: C++ Core Lint
+        uses: jidicula/clang-format-action@v4.14.0
+        with:
+          clang-format-version: '18'
+          check-path: 'core'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
+          include-regex: '.*\.(cpp|h)$'
+
+      - name: Go Plugin Lint
+        run: make lint
+
+      - name: UnitTest
+        run: sudo make unittest_plugin
+
+      - name: UnitTest PluginManager
+        run: sudo make unittest_pluginmanager
+
+  ActionsTimeline:
+    needs:
+      - Build
+      - BuildCore
+      - BuildCoreUT
+      - BuildPurePlugin
+      - E2E
+      - E2EFramework
+      - StaticCheck
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2
