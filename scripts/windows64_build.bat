@@ -39,13 +39,22 @@ set LOONGCOLLECTOR_SRC_UNIX_PATH=%LOONGCOLLECTOR_SRC_PATH:\=/%
 echo looncollector dir: %LOONGCOLLECTOR_SRC_PATH%
 
 REM Change to where boost_1_68_0 locates
-set BOOST_ROOT=D:\loongcollector-windows-build\boost_1_68_0
+if not defined BOOST_ROOT (
+    set BOOST_ROOT=D:\loongcollector-windows-build\boost_1_68_0
+)
+
 REM Change to where ilogtail-deps.windows-x64 locates
-set LOONCOLLECTOR_DEPS_PATH=D:\loongcollector-windows-build\ilogtail-deps.windows-x64\ilogtail-deps.windows-x64
+if not defined LOONCOLLECTOR_DEPS_PATH (
+    set LOONCOLLECTOR_DEPS_PATH=D:\loongcollector-windows-build\ilogtail-deps.windows-x64\ilogtail-deps.windows-x64
+)
 REM avoid '\' beed treated as escape.
 set LOONCOLLECTOR_DEPS_PATH=%LOONCOLLECTOR_DEPS_PATH:\=/%
+
 REM Change to where cmake locates
-set CMAKE_BIN="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
+if not defined CMAKE_BIN (
+    set CMAKE_BIN="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
+)
+
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
 @REM REM Change to where go locates
