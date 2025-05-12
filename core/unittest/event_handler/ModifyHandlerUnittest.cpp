@@ -182,30 +182,31 @@ private:
 
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
+        std::string PATH_SEPARATOR = JsonEscapeDirPath(PATH_SEPARATOR);
         std::string containerStr = R"(
-        {
-            "ID": ")"
+            {
+                "ID": ")"
             + containerID + R"(",
-            "Mounts": [
-                {
-                    "Source": ")"
+                "Mounts": [
+                    {
+                        "Source": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-                    "Destination" : ")"
+                        "Destination" : ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"("
-                }
-            ],
-            "UpperDir": ")"
+                    }
+                ],
+                "UpperDir": ")"
             + gRootDir + R"(",
-            "LogPath": ")"
+                "LogPath": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-            "MetaDatas": [
-                "_container_name_",
-                "test-container"
-            ],
-            "Path": ")"
+                "MetaDatas": [
+                    "_container_name_",
+                    "test-container"
+                ],
+                "Path": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"("
-        }
-    )";
+            }
+        )";
         Json::Value containerJson;
         APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
         APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
@@ -225,12 +226,10 @@ std::string ModifyHandlerUnittest::gRootDir;
 std::string ModifyHandlerUnittest::gLogName;
 
 
-// TODO: windows
 #if defined(__linux__)
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase2);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase3);
@@ -239,6 +238,7 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartC
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
 #endif
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));
