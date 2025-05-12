@@ -28,6 +28,9 @@
 #include "runner/InputRunner.h"
 #include "apm/Types.h"
 #include "common/ProcParser.h"
+#include "apm/AttachManager.h"
+#include "apm/HookManager.h"
+#include "apm/PackageManager.h"
 
 namespace logtail::apm {
 
@@ -52,16 +55,19 @@ public:
     [[nodiscard]] bool HasRegisteredPlugins() const override;
     void EventGC() override {}
 
-    bool DoAttach(AttachConfig config);
+    bool DoAttach(const CollectionPipelineContext* ctx, uint32_t pluginIndex, AttachConfig& config);
 
 private:
     int findPidsByRule(MatchRule& rule, std::vector<int>& pids);
-    void reportInstallStatus();
     /**
      * 这个是否需要？
      * 控制台中是否只需要通过 UModel 数据来获取 ECS 上的进程即可？
      */
     std::vector<Proc> listAllProcess();
+
+    AttachManager mAttachMgr;
+    HookManager mHookMgr;
+    PackageManager mPackageMgr;
 };
 
 }
