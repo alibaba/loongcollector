@@ -35,8 +35,6 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
@@ -60,7 +58,7 @@ jobs:
           EOL'
           sudo apt update     
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-      # Clean up space to prevent action from running out of disk space.
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -74,10 +72,10 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -109,8 +107,6 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
@@ -134,7 +130,7 @@ jobs:
           EOL'
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-      # Clean up space to prevent action from running out of disk space.
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -148,10 +144,10 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -189,8 +185,6 @@ jobs:
     timeout-minutes: 90
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
@@ -214,7 +208,7 @@ jobs:
           EOL'
           sudo apt update     
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-      # Clean up space to prevent action from running out of disk space.
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -228,10 +222,10 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -281,14 +275,10 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
-      # prepare ubuntu environment
       - name: prepare ubuntu environment
-        if: matrix.runner == 'arc-runner-set-ilogtail'
         run: |
           sudo bash -c 'cat > /etc/apt/sources.list << EOL
           deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
@@ -309,9 +299,7 @@ jobs:
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
 
-      # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
-        if: matrix.runner == 'arc-runner-set-ilogtail'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -324,18 +312,10 @@ jobs:
         run: |
           df -hT $PWD
 
-      # prepare windows environment
-      # https://github.com/actions/virtual-environments/issues/2549
-      - name: add mingw32 to path
-        if: matrix.runner == 'windows-2019'
-        shell: bash
-        run: |
-          echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
-
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -350,11 +330,9 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19.10]
         runner: [ubuntu-latest]
       fail-fast: true
     steps:
-      # Clean up space to prevent action from running out of disk space.
       - name: clean
         if: matrix.runner == 'ubuntu-latest'
         run: |
@@ -369,13 +347,13 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
 
@@ -409,11 +387,9 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19.10]
         runner: [ubuntu-latest]
       fail-fast: true
     steps:
-      # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -427,13 +403,13 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
 
@@ -461,60 +437,42 @@ jobs:
         run: |
           make unittest_e2e_engine
 
-  StaticCheck:
+  CheckLicense:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ${{ matrix.runner }}-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        go-version: [1.19]
-        runner: [ubuntu]
       fail-fast: true
     steps:
-      # prepare ubuntu environment
-      - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu'
-        run: |
-          sudo apt update
-          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
-
-      # Clean up space to prevent action from running out of disk space.
-      - name: Free disk space
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.19
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
 
-      - name: Copy Lib
-        if: matrix.runner == 'ubuntu'
-        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
-
       - name: Check License Header
-        if: matrix.runner == 'ubuntu'
         run: make check-license
 
       - name: Check Dependencies Licences
-        if: matrix.runner == 'ubuntu'
         run: make check-dependency-licenses
+
+  CppLint:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: C++ Core Lint
         uses: jidicula/clang-format-action@v4.14.0
@@ -524,11 +482,65 @@ jobs:
           exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
           include-regex: '.*\.(cpp|h)$'
 
+  GoLint:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
       - name: Go Plugin Lint
         run: make lint
 
+  UnitTestPlugin:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
       - name: UnitTest
         run: sudo make unittest_plugin
+
+  UnitTestPluginManager:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: UnitTest PluginManager
         run: sudo make unittest_pluginmanager
@@ -541,7 +553,12 @@ jobs:
       - BuildPurePlugin
       - E2E
       - E2EFramework
+      - CheckLicense
       - StaticCheck
+      - CppLint
+      - GoLint
+      - UnitTestPlugin
+      - UnitTestPluginManager
     runs-on: ubuntu-latest
     permissions:
       actions: read
