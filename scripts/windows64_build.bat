@@ -48,8 +48,10 @@ REM Change to where cmake locates
 set CMAKE_BIN="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
-set GO_BIN="D:\loongcollector-windows-build\go1.24.1.windows-amd64\go\bin\go"
-
+@REM REM Change to where go locates
+@REM set GO_BIN="C:\Program Files\Go\bin\go.exe"
+@REM REM Change to where mingw locates
+@REM set MINGW_PATH=C:\workspace\mingw64\bin
 
 set OUTPUT_DIR=%LOONGCOLLECTOR_SRC_PATH%\output
 set LOONCOLLECTOR_CORE_BUILD_PATH=%LOONGCOLLECTOR_SRC_PATH%\core\build
@@ -71,7 +73,14 @@ cd %LOONGCOLLECTOR_SRC_PATH%\core
 IF exist build ( rd /s /q build )
 mkdir build
 cd build
-%CMAKE_BIN% -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DBUILD_LOGTAIL_UT=ON -DLOGTAIL_VERSION=%LOONCOLLECTOR_VERSION% -DDEPS_ROOT=%LOONCOLLECTOR_DEPS_PATH% ..
+
+set LOGTAIL_UT=OFF
+if defined BUILD_LOGTAIL_UT (
+    if /i "%BUILD_LOGTAIL_UT%"=="ON" (
+        set LOGTAIL_UT=ON
+    )
+)
+%CMAKE_BIN% -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DBUILD_LOGTAIL_UT=%LOGTAIL_ON% -DLOGTAIL_VERSION=%LOONCOLLECTOR_VERSION% -DDEPS_ROOT=%LOONCOLLECTOR_DEPS_PATH% ..
 if not %ERRORLEVEL% == 0 (
     echo Run cmake failed.
     exit /b 1
@@ -101,7 +110,7 @@ IF exist output ( rd /s /q output )
 mkdir output
 xcopy /Y %LOONCOLLECTOR_CORE_BUILD_PATH%\go_pipeline\Release\GoPluginAdapter.dll %LOONGCOLLECTOR_SRC_PATH%\pkg\logtail\
 set LDFLAGS="-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion=%LOONCOLLECTOR_VERSION%""
-%GO_BIN% build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\PluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
+%GO_BIN% build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\GoPluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
 if not %ERRORLEVEL% == 0 (
     echo Build iLogtail plugin source failed.
     exit /b 1
