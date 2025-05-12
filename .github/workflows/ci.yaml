@@ -87,6 +87,8 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: true
+    permissions:
+      packages: write
     steps:
       - name: prepare ubuntu environment
         run: |
@@ -160,7 +162,7 @@ jobs:
         run: docker save -o image.tar aliyun/loongcollector:0.0.1
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: loongcollector-image
           path: image.tar
@@ -266,9 +268,6 @@ jobs:
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
-      - name: Copy Lib
-        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
-
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
@@ -278,6 +277,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: false
+      
+      - name: Copy Lib
+        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
 
       - name: UnitTest Plugin
         run: sudo make unittest_plugin
