@@ -554,7 +554,6 @@ jobs:
       - E2E
       - E2EFramework
       - CheckLicense
-      - StaticCheck
       - CppLint
       - GoLint
       - UnitTestPlugin
