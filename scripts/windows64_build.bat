@@ -57,8 +57,6 @@ if not defined CMAKE_BIN (
 
 REM Change to where devenv locates
 set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
-@REM REM Change to where go locates
-@REM set GO_BIN="C:\Program Files\Go\bin\go.exe"
 @REM REM Change to where mingw locates
 @REM set MINGW_PATH=C:\workspace\mingw64\bin
 
