@@ -24,12 +24,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ContextImp struct {
-	MetricsRecords             []*pipeline.MetricsRecord
-	logstoreConfigMetricRecord *pipeline.MetricsRecord
+	MetricsRecords             []*selfmonitor.MetricsRecord
+	logstoreConfigMetricRecord *selfmonitor.MetricsRecord
 
 	common      *pkg.LogtailContextMeta
 	pluginNames string
@@ -100,29 +101,28 @@ func (p *ContextImp) InitContext(project, logstore, configName string) {
 	p.ctx, p.common = pkg.NewLogtailContextMeta(project, logstore, configName)
 }
 
-func (p *ContextImp) RegisterMetricRecord(labels []pipeline.LabelPair) *pipeline.MetricsRecord {
+func (p *ContextImp) RegisterMetricRecord(labels []selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 
-	metricsRecord := &pipeline.MetricsRecord{Context: p, Labels: labels}
+	metricsRecord := &selfmonitor.MetricsRecord{Labels: labels}
 
 	p.MetricsRecords = append(p.MetricsRecords, metricsRecord)
 	return metricsRecord
 }
 
-func (p *ContextImp) RegisterLogstoreConfigMetricRecord(labels []pipeline.LabelPair) *pipeline.MetricsRecord {
-	p.logstoreConfigMetricRecord = &pipeline.MetricsRecord{
-		Context: p,
-		Labels:  labels,
+func (p *ContextImp) RegisterLogstoreConfigMetricRecord(labels []selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
+	p.logstoreConfigMetricRecord = &selfmonitor.MetricsRecord{
+		Labels: labels,
 	}
 	return p.logstoreConfigMetricRecord
 }
 
-func (p *ContextImp) GetLogstoreConfigMetricRecord() *pipeline.MetricsRecord {
+func (p *ContextImp) GetLogstoreConfigMetricRecord() *selfmonitor.MetricsRecord {
 	return p.logstoreConfigMetricRecord
 }
 
-func (p *ContextImp) GetMetricRecord() *pipeline.MetricsRecord {
+func (p *ContextImp) GetMetricRecord() *selfmonitor.MetricsRecord {
 	contextMutex.RLock()
 	if len(p.MetricsRecords) > 0 {
 		defer contextMutex.RUnlock()

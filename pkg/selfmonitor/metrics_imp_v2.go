@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package selfmonitor
 
 import (
 	"context"
@@ -22,49 +22,49 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper/math"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 var (
-	_ pipeline.CounterMetric = (*cumulativeCounterImp)(nil)
-	_ pipeline.CounterMetric = (*counterImp)(nil)
-	_ pipeline.CounterMetric = (*averageImp)(nil)
-	_ pipeline.GaugeMetric   = (*gaugeImp)(nil)
-	_ pipeline.LatencyMetric = (*latencyImp)(nil)
-	_ pipeline.StringMetric  = (*strMetricImp)(nil)
+	_ CounterMetric = (*cumulativeCounterImp)(nil)
+	_ CounterMetric = (*counterImp)(nil)
+	_ CounterMetric = (*averageImp)(nil)
+	_ GaugeMetric   = (*gaugeImp)(nil)
+	_ LatencyMetric = (*latencyImp)(nil)
+	_ StringMetric  = (*strMetricImp)(nil)
 
-	_ pipeline.CounterMetric = (*errorNumericMetric)(nil)
-	_ pipeline.GaugeMetric   = (*errorNumericMetric)(nil)
-	_ pipeline.LatencyMetric = (*errorNumericMetric)(nil)
-	_ pipeline.StringMetric  = (*errorStrMetric)(nil)
+	_ CounterMetric = (*errorNumericMetric)(nil)
+	_ GaugeMetric   = (*errorNumericMetric)(nil)
+	_ LatencyMetric = (*errorNumericMetric)(nil)
+	_ StringMetric  = (*errorStrMetric)(nil)
 )
 
-func newMetric(metricType pipeline.SelfMetricType, metricSet pipeline.MetricSet, labelValues []string) pipeline.Metric {
+func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []string) Metric {
 	switch metricType {
-	case pipeline.CumulativeCounterType:
+	case CumulativeCounterType:
 		return newCumulativeCounter(metricSet, labelValues)
-	case pipeline.AverageType:
+	case AverageType:
 		return newAverage(metricSet, labelValues)
-	case pipeline.MaxType:
+	case MaxType:
 		return newMax(metricSet, labelValues)
-	case pipeline.CounterType:
+	case CounterType:
 		return newDeltaCounter(metricSet, labelValues)
-	case pipeline.GaugeType:
+	case GaugeType:
 		return newGauge(metricSet, labelValues)
-	case pipeline.StringType:
+	case StringType:
 		return newStringMetric(metricSet, labelValues)
-	case pipeline.LatencyType:
+	case LatencyType:
 		return newLatency(metricSet, labelValues)
 	}
 	return newErrorMetric(metricType, errors.New("invalid metric type"))
 }
 
 // ErrorMetrics always return error.
-func newErrorMetric(metricType pipeline.SelfMetricType, err error) pipeline.Metric {
+func newErrorMetric(metricType SelfMetricType, err error) Metric {
 	switch metricType {
-	case pipeline.StringType:
+	case StringType:
 		return newErrorStringMetric(err)
 	default:
 		return newErrorNumericMetric(err)
@@ -79,7 +79,7 @@ type cumulativeCounterImp struct {
 	Series
 }
 
-func newCumulativeCounter(ms pipeline.MetricSet, labelValues []string) pipeline.CounterMetric {
+func newCumulativeCounter(ms MetricSet, labelValues []string) CounterMetric {
 	c := &cumulativeCounterImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -90,9 +90,9 @@ func (c *cumulativeCounterImp) Add(delta int64) {
 	atomic.AddInt64(&c.value, delta)
 }
 
-func (c *cumulativeCounterImp) Collect() pipeline.MetricValue[float64] {
+func (c *cumulativeCounterImp) Collect() MetricValue[float64] {
 	value := atomic.LoadInt64(&c.value)
-	return pipeline.MetricValue[float64]{Name: c.Name(), Value: float64(value)}
+	return MetricValue[float64]{Name: c.Name(), Value: float64(value)}
 }
 
 func (c *cumulativeCounterImp) Clear() {
@@ -109,8 +109,8 @@ func (c *cumulativeCounterImp) Export() map[string]string {
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
-func (c *cumulativeCounterImp) Type() pipeline.SelfMetricType {
-	return pipeline.CounterType
+func (c *cumulativeCounterImp) Type() SelfMetricType {
+	return CounterType
 }
 
 // delta is a counter metric that can be incremented or decremented.
@@ -120,7 +120,7 @@ type counterImp struct {
 	Series
 }
 
-func newDeltaCounter(ms pipeline.MetricSet, labelValues []string) pipeline.CounterMetric {
+func newDeltaCounter(ms MetricSet, labelValues []string) CounterMetric {
 	c := &counterImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -131,9 +131,9 @@ func (c *counterImp) Add(delta int64) {
 	atomic.AddInt64(&c.value, delta)
 }
 
-func (c *counterImp) Collect() pipeline.MetricValue[float64] {
+func (c *counterImp) Collect() MetricValue[float64] {
 	value := atomic.SwapInt64(&c.value, 0)
-	return pipeline.MetricValue[float64]{Name: c.Name(), Value: float64(value)}
+	return MetricValue[float64]{Name: c.Name(), Value: float64(value)}
 }
 
 func (c *counterImp) Clear() {
@@ -150,8 +150,8 @@ func (c *counterImp) Export() map[string]string {
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
-func (c *counterImp) Type() pipeline.SelfMetricType {
-	return pipeline.CounterType
+func (c *counterImp) Type() SelfMetricType {
+	return CounterType
 }
 
 // gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
@@ -160,7 +160,7 @@ type gaugeImp struct {
 	Series
 }
 
-func newGauge(ms pipeline.MetricSet, labelValues []string) pipeline.GaugeMetric {
+func newGauge(ms MetricSet, labelValues []string) GaugeMetric {
 	g := &gaugeImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -168,15 +168,15 @@ func newGauge(ms pipeline.MetricSet, labelValues []string) pipeline.GaugeMetric 
 }
 
 func (g *gaugeImp) Set(f float64) {
-	AtomicStoreFloat64(&g.value, f)
+	math.AtomicStoreFloat64(&g.value, f)
 }
 
-func (g *gaugeImp) Collect() pipeline.MetricValue[float64] {
-	return pipeline.MetricValue[float64]{Name: g.Name(), Value: AtomicLoadFloat64(&g.value)}
+func (g *gaugeImp) Collect() MetricValue[float64] {
+	return MetricValue[float64]{Name: g.Name(), Value: math.AtomicLoadFloat64(&g.value)}
 }
 
 func (g *gaugeImp) Clear() {
-	AtomicStoreFloat64(&g.value, 0)
+	math.AtomicStoreFloat64(&g.value, 0)
 }
 
 func (g *gaugeImp) Serialize(log *protocol.Log) {
@@ -189,8 +189,8 @@ func (g *gaugeImp) Export() map[string]string {
 	return g.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
-func (g *gaugeImp) Type() pipeline.SelfMetricType {
-	return pipeline.GaugeType
+func (g *gaugeImp) Type() SelfMetricType {
+	return GaugeType
 }
 
 // averageImp is a metric to compute the average value of a series of values in the last window.
@@ -203,7 +203,7 @@ type averageImp struct {
 	Series
 }
 
-func newAverage(ms pipeline.MetricSet, labelValues []string) pipeline.CounterMetric {
+func newAverage(ms MetricSet, labelValues []string) CounterMetric {
 	a := &averageImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -217,15 +217,15 @@ func (a *averageImp) Add(f int64) {
 	a.count++
 }
 
-func (a *averageImp) Collect() pipeline.MetricValue[float64] {
+func (a *averageImp) Collect() MetricValue[float64] {
 	a.RLock()
 	defer a.RUnlock()
 	if a.count == 0 {
-		return pipeline.MetricValue[float64]{Name: a.Name(), Value: a.prevAvg}
+		return MetricValue[float64]{Name: a.Name(), Value: a.prevAvg}
 	}
 	avg := float64(a.value) / float64(a.count)
 	a.prevAvg, a.value, a.count = avg, 0, 0
-	return pipeline.MetricValue[float64]{Name: a.Name(), Value: avg}
+	return MetricValue[float64]{Name: a.Name(), Value: avg}
 }
 
 func (a *averageImp) Clear() {
@@ -246,8 +246,8 @@ func (a *averageImp) Export() map[string]string {
 	return a.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
-func (a *averageImp) Type() pipeline.SelfMetricType {
-	return pipeline.GaugeType
+func (a *averageImp) Type() SelfMetricType {
+	return GaugeType
 }
 
 // maxImp is a metric to compute the max value of a series of values in the last window.
@@ -258,7 +258,7 @@ type maxImp struct {
 	Series
 }
 
-func newMax(ms pipeline.MetricSet, labelValues []string) pipeline.GaugeMetric {
+func newMax(ms MetricSet, labelValues []string) GaugeMetric {
 	m := &maxImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -273,10 +273,10 @@ func (m *maxImp) Set(f float64) {
 	}
 }
 
-func (m *maxImp) Collect() pipeline.MetricValue[float64] {
+func (m *maxImp) Collect() MetricValue[float64] {
 	m.RLock()
 	defer m.RUnlock()
-	metric := pipeline.MetricValue[float64]{Name: m.Name(), Value: m.value}
+	metric := MetricValue[float64]{Name: m.Name(), Value: m.value}
 	m.value = 0
 	return metric
 }
@@ -286,8 +286,8 @@ func (m *maxImp) Export() map[string]string {
 	return m.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
-func (m *maxImp) Type() pipeline.SelfMetricType {
-	return pipeline.GaugeType
+func (m *maxImp) Type() SelfMetricType {
+	return GaugeType
 }
 
 // latencyImp is a metric to compute the average latency of a series of values in the last window.
@@ -298,7 +298,7 @@ type latencyImp struct {
 	Series
 }
 
-func newLatency(ms pipeline.MetricSet, labelValues []string) pipeline.LatencyMetric {
+func newLatency(ms MetricSet, labelValues []string) LatencyMetric {
 	l := &latencyImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -316,15 +316,15 @@ func (l *latencyImp) Record(d time.Duration) {
 	l.Observe(float64(d))
 }
 
-func (l *latencyImp) Collect() pipeline.MetricValue[float64] {
+func (l *latencyImp) Collect() MetricValue[float64] {
 	l.Lock()
 	defer l.Unlock()
 	if l.count == 0 {
-		return pipeline.MetricValue[float64]{Name: l.Name(), Value: 0}
+		return MetricValue[float64]{Name: l.Name(), Value: 0}
 	}
 	avg := l.latencySum / float64(l.count)
 	l.count, l.latencySum = 0, 0
-	return pipeline.MetricValue[float64]{Name: l.Name(), Value: avg}
+	return MetricValue[float64]{Name: l.Name(), Value: avg}
 }
 
 func (l *latencyImp) Clear() {
@@ -344,8 +344,8 @@ func (l *latencyImp) Export() map[string]string {
 	return l.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value/1000, 'f', 4, 64)) // ns to us
 }
 
-func (l *latencyImp) Type() pipeline.SelfMetricType {
-	return pipeline.GaugeType
+func (l *latencyImp) Type() SelfMetricType {
+	return GaugeType
 }
 
 // strMetricImp is a metric that represents a single string value.
@@ -355,7 +355,7 @@ type strMetricImp struct {
 	Series
 }
 
-func newStringMetric(ms pipeline.MetricSet, labelValues []string) pipeline.StringMetric {
+func newStringMetric(ms MetricSet, labelValues []string) StringMetric {
 	s := &strMetricImp{
 		Series: newSeries(ms, labelValues),
 	}
@@ -368,10 +368,10 @@ func (s *strMetricImp) Set(str string) {
 	s.value = str
 }
 
-func (s *strMetricImp) Collect() pipeline.MetricValue[string] {
+func (s *strMetricImp) Collect() MetricValue[string] {
 	s.RLock()
 	defer s.RUnlock()
-	return pipeline.MetricValue[string]{Name: s.Name(), Value: s.value}
+	return MetricValue[string]{Name: s.Name(), Value: s.value}
 }
 
 func (s *strMetricImp) Clear() {
@@ -390,16 +390,16 @@ func (s *strMetricImp) Export() map[string]string {
 	return s.Series.Export(metricValue.Name, metricValue.Value)
 }
 
-func (s *strMetricImp) Type() pipeline.SelfMetricType {
-	return pipeline.GaugeType
+func (s *strMetricImp) Type() SelfMetricType {
+	return GaugeType
 }
 
 type Series struct {
-	pipeline.MetricSet
+	MetricSet
 	labelValues []string
 }
 
-func newSeries(ms pipeline.MetricSet, labelValues []string) Series {
+func newSeries(ms MetricSet, labelValues []string) Series {
 	var indexToStore []string
 	if labelValues != nil {
 		indexToStore = make([]string, len(labelValues))
@@ -415,7 +415,7 @@ func newSeries(ms pipeline.MetricSet, labelValues []string) Series {
 func (s Series) SerializeWithStr(log *protocol.Log, metricName, metricValueStr string) {
 	log.Contents = append(log.Contents,
 		&protocol.Log_Content{Key: metricName, Value: metricValueStr},
-		&protocol.Log_Content{Key: pipeline.SelfMetricNameKey, Value: metricName})
+		&protocol.Log_Content{Key: SelfMetricNameKey, Value: metricName})
 
 	for _, v := range s.ConstLabels() {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: v.Key, Value: v.Value})
@@ -430,7 +430,7 @@ func (s Series) SerializeWithStr(log *protocol.Log, metricName, metricValueStr s
 func (s Series) Export(metricName, metricValue string) map[string]string {
 	ret := make(map[string]string, len(s.ConstLabels())+len(s.labelValues)+2)
 	ret[metricName] = metricValue
-	ret[pipeline.SelfMetricNameKey] = metricName
+	ret[SelfMetricNameKey] = metricName
 
 	for _, v := range s.ConstLabels() {
 		ret[v.Key] = v.Value
@@ -468,12 +468,12 @@ func (e *errorNumericMetric) Export() map[string]string {
 	return nil
 }
 
-func (e *errorNumericMetric) Type() pipeline.SelfMetricType {
-	return pipeline.CounterType
+func (e *errorNumericMetric) Type() SelfMetricType {
+	return CounterType
 }
 
-func (e *errorNumericMetric) Collect() pipeline.MetricValue[float64] {
-	return pipeline.MetricValue[float64]{Name: "", Value: 0}
+func (e *errorNumericMetric) Collect() MetricValue[float64] {
+	return MetricValue[float64]{Name: "", Value: 0}
 }
 
 func (e *errorNumericMetric) Clear() {}
@@ -490,10 +490,10 @@ func (e errorStrMetric) Set(s string) {
 	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
 }
 
-func (e errorStrMetric) Collect() pipeline.MetricValue[string] {
-	return pipeline.MetricValue[string]{Name: "", Value: ""}
+func (e errorStrMetric) Collect() MetricValue[string] {
+	return MetricValue[string]{Name: "", Value: ""}
 }
 
-func newErrorStringMetric(err error) pipeline.StringMetric {
+func newErrorStringMetric(err error) StringMetric {
 	return &errorStrMetric{errorNumericMetric: errorNumericMetric{err: err}}
 }

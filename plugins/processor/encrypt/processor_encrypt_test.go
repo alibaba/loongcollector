@@ -25,8 +25,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 )
 
@@ -58,7 +58,7 @@ func newProcessor(sourceKeys []string, key []byte, iv []byte, keyFilePath string
 
 	ctxImpl := &pluginmanager.ContextImp{}
 	ctxImpl.InitContext("test", "test", "test")
-	ctxImpl.RegisterMetricRecord(make([]pipeline.LabelPair, 0))
+	ctxImpl.RegisterMetricRecord(make([]selfmonitor.LabelPair, 0))
 	_ = p.Init(ctxImpl)
 	return p
 }

@@ -26,9 +26,9 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -83,9 +83,9 @@ type Mysql struct {
 	shutdown              chan struct{}
 	waitGroup             sync.WaitGroup
 	context               pipeline.Context
-	collectLatency        pipeline.LatencyMetric
-	collectTotal          pipeline.CounterMetric
-	checkpointMetric      pipeline.StringMetric
+	collectLatency        selfmonitor.LatencyMetric
+	collectTotal          selfmonitor.CounterMetric
+	checkpointMetric      selfmonitor.StringMetric
 }
 
 func (m *Mysql) Init(context pipeline.Context) (int, error) {
@@ -106,11 +106,11 @@ func (m *Mysql) Init(context pipeline.Context) (int, error) {
 	}
 
 	metricsRecord := m.context.GetMetricRecord()
-	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, helper.MetricPluginCollectAvgCostTimeMs)
-	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginCollectTotal)
+	m.collectLatency = selfmonitor.NewLatencyMetricAndRegister(metricsRecord, selfmonitor.MetricPluginCollectAvgCostTimeMs)
+	m.collectTotal = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginCollectTotal)
 
 	if m.CheckPoint {
-		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, "mysql_checkpoint")
+		m.checkpointMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, "mysql_checkpoint")
 	}
 	return 10000, nil
 }

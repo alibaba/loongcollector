@@ -26,8 +26,8 @@ import (
 type ProcessorRateLimit struct {
     // other fields
     context         pipeline.Context
-    limitMetric     pipeline.CounterMetric  // 第一个指标
-    processedMetric pipeline.CounterMetric   // 第二个指标
+    limitMetric     selfmonitor.CounterMetric  // 第一个指标
+    processedMetric selfmonitor.CounterMetric   // 第二个指标
 }
 ```
 
@@ -93,7 +93,7 @@ type FlusherHTTP struct {
     // other fields
 
     context     pipeline.Context
-    statusCodeStatistics pipeline.MetricVector[pipeline.CounterMetric] // 带有动态Label的指标
+    statusCodeStatistics pipeline.MetricVector[selfmonitor.CounterMetric] // 带有动态Label的指标
 }
 ```
 
@@ -111,7 +111,7 @@ f.statusCodeStatistics = helper.NewCounterMetricVectorAndRegister(metricsRecord,
 打点时通过WithLabels API传入动态Label的值，拿到一个Metric对象，然后进行打点：
 
 ```go
-f.statusCodeStatistics.WithLabels(pipeline.Label{Key: "status_code", Value: strconv.Itoa(response.StatusCode)}).Add(1)
+f.statusCodeStatistics.WithLabels(selfmonitor.LabelPair{Key: "status_code", Value: strconv.Itoa(response.StatusCode)}).Add(1)
 ```
 
 ## 示例

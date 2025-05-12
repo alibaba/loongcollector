@@ -17,10 +17,10 @@ package regex
 import (
 	"regexp"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const pluginType = "processor_filter_regex"
@@ -36,7 +36,7 @@ type ProcessorRegexFilter struct {
 
 	includeRegex map[string]*regexp.Regexp
 	excludeRegex map[string]*regexp.Regexp
-	filterMetric pipeline.CounterMetric
+	filterMetric selfmonitor.CounterMetric
 	context      pipeline.Context
 }
 
@@ -66,7 +66,7 @@ func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 		}
 	}
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
+	p.filterMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginDiscardedEventsTotal)
 	return nil
 }
 
