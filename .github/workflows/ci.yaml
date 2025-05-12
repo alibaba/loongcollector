@@ -156,6 +156,15 @@ jobs:
       - name: Build Docker
         run: make docker
 
+      - name: Export Image to Tar
+        run: docker save -o image.tar aliyun/loongcollector:0.0.1
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: loongcollector-image
+          path: image.tar
+
   # 编译并运行C++ UT，同时测试代码覆盖率
   UnitTestCpp:
     runs-on: arc-runner-set-ilogtail
@@ -255,7 +264,10 @@ jobs:
       - name: prepare ubuntu environment
         run: |
           sudo apt update
-          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+
+      - name: Copy Lib
+        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
 
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
@@ -274,6 +286,7 @@ jobs:
         run: sudo make unittest_pluginmanager 
 
   E2E:
+    needs: [Build]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -321,64 +334,17 @@ jobs:
           docker --version
           go version
 
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: loongcollector-image
+          path: ./image.tar
+
+      - name: Import Image from Tar
+        run: docker load -i ./image.tar
+
       - name: E2E Behavior Test
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          WITHOUTGDB: ON
-        run: make e2e
-
-  E2EFramework:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Set custom submodule URL and fetch
-        run: |
-          SUBMODULE_PATH="core/_thirdparty/coolbpf"
-          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
-          git submodule update --init
-          cd $SUBMODULE_PATH
-          echo "Current commit: $(git rev-parse HEAD)"
-
-      - name: Update Docker-compose to v2
-        run: |
-          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-
-      - name: E2E Plugin Framework Test
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          WITHOUTGDB: ON
-        run: make e2e-core
-
-      # Framework Test will provide local image that Unit Test required
-      - name: E2E Engine Unit Test
-        run: |
-          make unittest_e2e_engine
+        run: ./scripts/e2e.sh e2e core
 
   ActionsTimeline:
     needs:
@@ -388,7 +354,6 @@ jobs:
       - UnitTestCpp
       - UnitTestGo
       - E2E
-      - E2EFramework
     runs-on: ubuntu-latest
     permissions:
       actions: read
