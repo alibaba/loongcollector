@@ -182,7 +182,9 @@ private:
 
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
+#if defined(_MSC_VER)
         std::string PATH_SEPARATOR = JsonEscapeDirPath(PATH_SEPARATOR);
+#endif
         std::string containerStr = R"(
             {
                 "ID": ")"
