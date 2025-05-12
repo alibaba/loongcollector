@@ -30,48 +30,13 @@ on:
       - 1.*
 
 jobs:
-  Build:
-    runs-on: ${{ matrix.runner }}
+  # 检查 License
+  CheckLicense:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
-      - name: prepare ubuntu environment
-        run: |
-          sudo bash -c 'cat > /etc/apt/sources.list << EOL
-          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-
-          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          EOL'
-          sudo apt update     
-          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
@@ -82,32 +47,45 @@ jobs:
         with:
           submodules: false
 
-      - name: Set custom submodule URL and fetch
-        run: |
-          SUBMODULE_PATH="core/_thirdparty/coolbpf"
-          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
-          git submodule update --init
-          cd $SUBMODULE_PATH
-          echo "Current commit: $(git rev-parse HEAD)"
+      - name: Check License Header
+        run: make check-license
 
-      - name: Build Binary
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          ENABLE_COMPATIBLE_MODE: ON
-          ENABLE_STATIC_LINK_CRT: ON
-          WITHOUTGDB: ON
-          MAKE_JOBS: 16
-        run: make dist
+      - name: Check Dependencies Licences
+        run: make check-dependency-licenses
 
-      - name: Build Docker
-        run: make docker
-
-  BuildCore:
-    runs-on: ${{ matrix.runner }}
+  # 检查代码规范
+  Lint:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: C++ Core Lint
+        uses: jidicula/clang-format-action@v4.14.0
+        with:
+          clang-format-version: '18'
+          check-path: 'core'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
+          include-regex: '.*\.(cpp|h)$'
+      
+      - name: Go Plugin Lint
+        run: make lint
+
+  # Build 检查能否编译通过并成功打包，同时检查glibc
+  Build:
+    runs-on: arc-runner-set-ilogtail
+    timeout-minutes: 60
+    strategy:
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
@@ -170,22 +148,19 @@ jobs:
           WITHOUTGDB: ON
           MAKE_JOBS: 16
           WITHSPL: ON
-        run: make core
+        run: make dist
 
       - name: Check compatibility
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          ENABLE_COMPATIBLE_MODE: ON
-          ENABLE_STATIC_LINK_CRT: ON
-          WITHOUTGDB: ON
-        run: make dist && scripts/check_glibc.sh
+        run: scripts/check_glibc.sh
 
-  BuildCoreUT:
-    runs-on: ${{ matrix.runner }}
+      - name: Build Docker
+        run: make docker
+
+  # 编译并运行C++ UT，同时测试代码覆盖率
+  UnitTestCpp:
+    runs-on: arc-runner-set-ilogtail
     timeout-minutes: 90
     strategy:
-      matrix:
-        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
@@ -270,47 +245,17 @@ jobs:
       - name: Report code coverage
         run: python3 tools/coverage-diff/main.py --path core/coverage.json --summary core/summary.json
 
-  BuildPurePlugin:
-    runs-on: ${{ matrix.runner }}
+  # 运行Go UT
+  UnitTestGo:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
         run: |
-          sudo bash -c 'cat > /etc/apt/sources.list << EOL
-          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-
-          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          EOL'
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
 
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
@@ -322,19 +267,19 @@ jobs:
         with:
           submodules: false
 
-      - name: Build pure plugin
-        run: make plugin_main
+      - name: UnitTest Plugin
+        run: sudo make unittest_plugin
+
+      - name: UnitTest PluginManager
+        run: sudo make unittest_pluginmanager 
 
   E2E:
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        runner: [ubuntu-latest]
       fail-fast: true
     steps:
       - name: clean
-        if: matrix.runner == 'ubuntu-latest'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -383,11 +328,9 @@ jobs:
         run: make e2e
 
   E2EFramework:
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        runner: [ubuntu-latest]
       fail-fast: true
     steps:
       - name: Free disk space
@@ -437,127 +380,15 @@ jobs:
         run: |
           make unittest_e2e_engine
 
-  CheckLicense:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Check License Header
-        run: make check-license
-
-      - name: Check Dependencies Licences
-        run: make check-dependency-licenses
-
-  CppLint:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: C++ Core Lint
-        uses: jidicula/clang-format-action@v4.14.0
-        with:
-          clang-format-version: '18'
-          check-path: 'core'
-          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
-          include-regex: '.*\.(cpp|h)$'
-
-  GoLint:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Go Plugin Lint
-        run: make lint
-
-  UnitTestPlugin:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: UnitTest
-        run: sudo make unittest_plugin
-
-  UnitTestPluginManager:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
-    steps:
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
-
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: UnitTest PluginManager
-        run: sudo make unittest_pluginmanager
-
   ActionsTimeline:
     needs:
+      - CheckLicense
+      - Lint
       - Build
-      - BuildCore
-      - BuildCoreUT
-      - BuildPurePlugin
+      - UnitTestCpp
+      - UnitTestGo
       - E2E
       - E2EFramework
-      - CheckLicense
-      - CppLint
-      - GoLint
-      - UnitTestPlugin
-      - UnitTestPluginManager
     runs-on: ubuntu-latest
     permissions:
       actions: read
