@@ -27,37 +27,22 @@ on:
       - 'CHANGELOG.md'
 
 jobs:
-  Build-LoongCollector:
+  Build-LoongCollector-Linux:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        go-version: [ 1.19.10 ]
-        runner: [ ubuntu-latest ]
+        include:
+          - arch: amd64
+            runner: [self-hosted, Linux, X64]
+          - arch: arm64
+            runner: [self-hosted, Linux, ARM64]
+      fail-fast: false
     permissions:
       contents: write
       packages: write
     steps:
-      - name: Clean up space to prevent action from running out of disk space
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
   
@@ -69,25 +54,26 @@ jobs:
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
 
-      - name: Update Docker-compose to v2
-        run: |
-          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-
-      - name: System environment
-        run: |
-          uname -r
-          docker --version
-          go version
-
-      - name: Build LoongCollector image
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          WITHOUTGDB: ON
+      - name: Build linux/${{ matrix.arch }} image
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          make benchmark DOCKER_REPOSITORY=ghcr.io/$REPO_OWNER/loongcollector DOCKER_PUSH=true VERSION=edge
+          docker build --tag ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }} \
+              --file ./docker/Dockerfile_edge_linux .
+          docker push ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }}
+
+  Build-LoongCollector-Image:
+    runs-on: ubuntu-latest
+    needs: [ Build-LoongCollector-Linux ]
+    steps:
+      - name: Create and push manifest
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+          docker manifest create ghcr.io/$REPO_OWNER/loongcollector:edge \
+            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-amd64 \
+            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
+          docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
 
   Benchmark:
     runs-on: ${{ matrix.runner }}
@@ -106,29 +92,14 @@ jobs:
           - "filebeat-file"
           - "fluentbit-file"
           - "vector-file"
-        go-version: [ 1.19.10 ]
         python-version: [ 3.8 ]
         runner: [ ubuntu-latest ]
       fail-fast: false
     permissions:
       contents: write
       packages: read
-    needs: [ Build-LoongCollector ]
+    needs: [ Build-LoongCollector-Image ]
     steps:
-      - name: Clean up space to prevent action from running out of disk space
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
@@ -140,7 +111,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
 
@@ -214,7 +185,7 @@ jobs:
           git add dev/bench/records_all.js
           last_commit_message=$(git log -1 --pretty=%B)
           git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
-      
+
       - name: Push benchmark result
         run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
 
