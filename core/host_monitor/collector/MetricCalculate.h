@@ -1,11 +1,19 @@
-#ifndef LOONGCOLLECTOR_METRIC_CALCULATE_H
-#define LOONGCOLLECTOR_METRIC_CALCULATE_H
-#ifdef max
-#undef max
-#endif
-#ifdef min
-#undef min
-#endif
+/**
+ * Copyright 2025 Alibaba Cloud
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <algorithm>
 #include <memory>
 
@@ -13,6 +21,9 @@
 
 namespace logtail {
 
+// MetricCalculate 用于计算各个collector采集的指标的最大值、最小值和均值
+// TMetric为各个collector保存指标数据的类，TField为各个collector保存指标数据的字段
+// 计算完成后，各collector打上tag，生成对应的metricEvent
 template <typename TMetric, typename TField = double>
 class MetricCalculate {
 public:
@@ -31,7 +42,7 @@ public:
                 field.value(mLast) = metricValue;
             });
         } else {
-            enumerate([&](const FieldName<TMetric, TField>& field) {
+            enumerate([&](const FieldMeta& field) {
                 const TField& metricValue = field.value(v);
 
                 field.value(mMax) = std::max(field.value(mMax), metricValue);
@@ -49,7 +60,7 @@ public:
     bool GetAvgValue(TMetric& dst) const {
         bool exist = GetValue(mTotal, dst);
         if (exist && mCount > 1) {
-            enumerate([&](const FieldName<TMetric, TField>& field) { field.value(dst) /= mCount; });
+            enumerate([&](const FieldMeta& field) { field.value(dst) /= mCount; });
         }
         return exist;
     }
@@ -89,4 +100,3 @@ private:
 };
 
 } // namespace logtail
-#endif // LOONGCOLLECTOR_METRIC_CALCULATE_H

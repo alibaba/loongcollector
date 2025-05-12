@@ -1,3 +1,19 @@
+/**
+ * Copyright 2025 Alibaba Cloud
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef LOONGCOLLECTOR_FIELD_ENTRY_H
 #define LOONGCOLLECTOR_FIELD_ENTRY_H
 #include <functional>
@@ -20,19 +36,6 @@ public:
     const TFieldType& value(const TClass& p) const { return _fnGet(const_cast<TClass&>(p)); }
 
     TFieldType& value(TClass& p) const { return const_cast<TFieldType&>(_fnGet(p)); }
-};
-
-#define METRIC_FIELD_NAME_INITIALIZER(NAME, CLASS, F, BOOL) FIELD_NAME_INITIALIZER(NAME, CLASS, F), BOOL
-#define METRIC_FIELD_NAME_ENTRY(NAME, CLASS, F, BOOL) {METRIC_FIELD_NAME_INITIALIZER(NAME, CLASS, F, BOOL)}
-#define METRIC_FIELD_ENTRY(CLASS, F, BOOL) {METRIC_FIELD_NAME_INITIALIZER(#F, CLASS, F, BOOL)}
-
-template <typename TClass, typename TFieldType>
-struct MetricFieldName : FieldName<TClass, TFieldType> {
-    const bool isMetric;
-
-public:
-    MetricFieldName(const char* name, std::function<TFieldType&(TClass&)> fnGet, bool isMetric)
-        : FieldName<TClass, TFieldType>(name, fnGet), isMetric(isMetric) {}
 };
 
 #endif // LOONGCOLLECTOR_FIELD_ENTRY_H
