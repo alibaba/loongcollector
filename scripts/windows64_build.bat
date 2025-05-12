@@ -109,7 +109,7 @@ del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_debug.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_windows.go
 del /f/s/q %LOONGCOLLECTOR_SRC_PATH%\plugins\all\all_linux.go
-%GO_BIN% run -mod=mod %LOONGCOLLECTOR_SRC_UNIX_PATH%\tools\builder -root-dir=%LOONGCOLLECTOR_SRC_UNIX_PATH% -modfile="go.mod"
+go run -mod=mod %LOONGCOLLECTOR_SRC_UNIX_PATH%\tools\builder -root-dir=%LOONGCOLLECTOR_SRC_UNIX_PATH% -modfile="go.mod"
 echo generating plugins finished successfully
 
 REM Build plugins (GoPluginBase.dll, GoPluginBase.h)
@@ -119,7 +119,7 @@ IF exist output ( rd /s /q output )
 mkdir output
 xcopy /Y %LOONCOLLECTOR_CORE_BUILD_PATH%\go_pipeline\Release\GoPluginAdapter.dll %LOONGCOLLECTOR_SRC_PATH%\pkg\logtail\
 set LDFLAGS="-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion=%LOONCOLLECTOR_VERSION%""
-%GO_BIN% build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\GoPluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
+go build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o output\GoPluginBase.dll %LOONGCOLLECTOR_SRC_UNIX_PATH%\plugin_main
 if not %ERRORLEVEL% == 0 (
     echo Build iLogtail plugin source failed.
     exit /b 1
