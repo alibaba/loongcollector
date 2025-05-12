@@ -65,10 +65,6 @@ REM Clean up
 IF exist %OUTPUT_DIR% ( rd /s /q %OUTPUT_DIR% )
 mkdir %OUTPUT_DIR%
 
-
-set URL=http://100.100.100.200/latest/meta-data/instance-id
-powershell -Command "Invoke-RestMethod -Uri '%URL%'"
-
 REM Build C++ core(ilogtail.exe, GoPluginAdapter.dll)
 echo begin to compile core
 cd %LOONGCOLLECTOR_SRC_PATH%\core
