@@ -277,7 +277,8 @@ jobs:
       - name: UnitTest PluginManager
         run: sudo make unittest_pluginmanager 
   
-  GenerateTestCases:
+  # 生成E2E测试用例列表
+  GenerateE2ETestCases:
     runs-on: ubuntu-latest
     outputs:
       cases: ${{ steps.set-cases.outputs.cases }}
@@ -296,12 +297,15 @@ jobs:
           cat cases.json
           echo "cases=$(cat cases.json)" >> $GITHUB_OUTPUT
 
+  # E2E测试
   E2E:
-    needs: [Build, GenerateTestCases]
     runs-on: ubuntu-latest
+    needs: 
+      - Build
+      - GenerateE2ETestCases
     strategy:
       matrix:
-        test_case: ${{ fromJson(needs.GenerateTestCases.outputs.cases) }}
+        test_case: ${{ fromJson(needs.GenerateE2ETestCases.outputs.cases) }}
     timeout-minutes: 60
     steps:
       - name: Set up Go 1.19
