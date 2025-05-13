@@ -75,6 +75,13 @@ if (( $(echo "$us_time_connect < $cn_time_connect" | bc) )); then
     REG_REGION=$US_REGION
 fi
 echo "cn_time_connect=$cn_time_connect us_time_connect=$us_time_connect REG_REGION=$REG_REGION"
+IMAGE="$REG_REGION/loongcollector-community-edition/loongcollector-build-linux:2.1.3"
+if ! docker inspect "$IMAGE" > /dev/null 2>&1; then
+    echo "image $IMAGE not exists, pull..."
+    docker pull "$IMAGE"
+else
+    echo "image $IMAGE exists, skip pull..."
+fi
 
 mkdir -p $GENERATED_HOME
 rm -rf $GEN_DOCKERFILE
