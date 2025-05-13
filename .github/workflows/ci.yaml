@@ -281,7 +281,7 @@ jobs:
   GenerateE2ETestCases:
     runs-on: ubuntu-latest
     outputs:
-      cases: ${{ steps.set-cases.outputs.cases }}
+      cases: ${{ steps.discover.outputs.cases }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
