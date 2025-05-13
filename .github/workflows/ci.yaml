@@ -276,25 +276,31 @@ jobs:
 
       - name: UnitTest PluginManager
         run: sudo make unittest_pluginmanager 
+  
+  GenerateTestCases:
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.set-cases.outputs.cases }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Discover Test Cases
+        id: discover
+        run: |
+          # 发现所有test_cases目录下的子目录
+          cases=($(find test/e2e/test_cases -mindepth 1 -maxdepth 1 -type d -printf "%f\n"))
+          echo "Found cases: ${cases[*]}"
+          echo "cases=${cases[*]}" >> $GITHUB_OUTPUT
 
   E2E:
-    needs: [Build]
+    needs: [Build, GenerateTestCases]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test_case: ${{ split(needs.GenerateTestCases.outputs.cases, ' ') }}
     timeout-minutes: 60
     steps:
-      - name: clean
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
@@ -318,12 +324,6 @@ jobs:
           sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: System environment
-        run: |
-          uname -r
-          docker --version
-          go version
-
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
@@ -332,7 +332,9 @@ jobs:
       - name: Import Image from Tar
         run: docker load -i ./image.tar
 
-      - name: E2E Behavior Test
+      - name: E2E Behavior Test Case ${{ matrix.test_case }}
+        env:
+          TEST_CASE: ${{ matrix.test_case }}
         run: |
           make gocdocker
           ./scripts/e2e.sh e2e
