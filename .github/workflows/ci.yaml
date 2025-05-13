@@ -288,17 +288,20 @@ jobs:
       - name: Discover Test Cases
         id: discover
         run: |
-          # 发现所有test_cases目录下的子目录
+          # 使用JSON格式输出用例列表
           cases=($(find test/e2e/test_cases -mindepth 1 -maxdepth 1 -type d -printf "%f\n"))
           echo "Found cases: ${cases[*]}"
-          echo "cases=${cases[*]}" >> $GITHUB_OUTPUT
+          # 转换为JSON数组格式
+          printf '["%s"]' "$(IFS=$','; echo "${cases[*]}")" > cases.json
+          cat cases.json
+          echo "cases=$(cat cases.json)" >> $GITHUB_OUTPUT
 
   E2E:
     needs: [Build, GenerateTestCases]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        test_case: ${{ split(needs.GenerateTestCases.outputs.cases, ' ') }}
+        test_case: ${{ fromJson(needs.GenerateTestCases.outputs.cases) }}
     timeout-minutes: 60
     steps:
       - name: Set up Go 1.19
