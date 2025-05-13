@@ -33,9 +33,7 @@ jobs:
   # 检查 License
   CheckLicense:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
+    timeout-minutes: 20
     steps:
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
@@ -56,9 +54,7 @@ jobs:
   # 检查代码规范
   Lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: true
+    timeout-minutes: 30
     steps:
       - name: Set up Go 1.19
         uses: actions/setup-go@v4
@@ -85,8 +81,6 @@ jobs:
   Build:
     runs-on: arc-runner-set-ilogtail
     timeout-minutes: 60
-    strategy:
-      fail-fast: true
     permissions:
       packages: write
     steps:
@@ -170,9 +164,7 @@ jobs:
   # 编译并运行C++ UT，同时测试代码覆盖率
   UnitTestCpp:
     runs-on: arc-runner-set-ilogtail
-    timeout-minutes: 90
-    strategy:
-      fail-fast: true
+    timeout-minutes: 60
     steps:
       - name: prepare ubuntu environment
         run: |
@@ -260,8 +252,6 @@ jobs:
   UnitTestGo:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: true
     steps:
       - name: prepare ubuntu environment
         run: |
@@ -291,8 +281,6 @@ jobs:
     needs: [Build]
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: true
     steps:
       - name: clean
         run: |
@@ -345,7 +333,9 @@ jobs:
         run: docker load -i ./image.tar
 
       - name: E2E Behavior Test
-        run: ./scripts/e2e.sh e2e core
+        run: |
+          make gocdocker
+          ./scripts/e2e.sh e2e core
 
   ActionsTimeline:
     needs:
