@@ -291,11 +291,24 @@ jobs:
         run: |
           # 使用JSON格式输出用例列表
           cases=($(find test/e2e/test_cases -mindepth 1 -maxdepth 1 -type d -printf "%f\n"))
-          echo "Found cases: ${cases[*]}"
+          # 检查是否找到用例
+          if [ ${#cases[@]} -eq 0 ]; then
+            echo "Error: No test cases found"
+            exit 1
+          fi
           # 转换为JSON数组格式
-          printf '["%s"]' "$(IFS=$','; echo "${cases[*]}")" > cases.json
+          json="["
+          for i in "${!cases[@]}"; do
+            json+="\"${cases[$i]}\""
+            if [ $i -lt $((${#cases[@]}-1)) ]; then
+              json+=","
+            fi
+          done
+          json+="]"
+          # 输出JSON到文件和控制台
+          echo "$json" > cases.json
           cat cases.json
-          echo "cases=$(cat cases.json)" >> $GITHUB_OUTPUT
+          echo "cases=$json" >> $GITHUB_OUTPUT
 
   # E2E测试
   E2E:
