@@ -1,0 +1,175 @@
+/*
+ * Copyright 2025 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "system_interface/SystemInterface.h"
+
+#include <chrono>
+#include <mutex>
+#include <thread>
+#include <tuple>
+#include <utility>
+
+#include "common/Flags.h"
+#include "logger/Logger.h"
+#ifdef __linux__
+#include "system_interface/LinuxSystemInterface.h"
+#endif
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/system_interface/MockSystemInterface.h"
+#endif
+
+DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 500);
+
+namespace logtail {
+
+SystemInterface* SystemInterface::GetInstance() {
+#ifdef __linux__
+    return LinuxSystemInterface::GetInstance();
+#elif APSARA_UNIT_TEST_MAIN
+    return MockSystemInterface::GetInstance();
+#else
+    LOG_ERROR(sLogger, "SystemInterface is not implemented for this platform");
+    return nullptr;
+#endif
+}
+
+bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
+    // SystemInformation is static and will not be changed. So cache will never be expired.
+    static SystemInformation infoCache;
+    if (infoCache.collectTime.time_since_epoch().count() > 0) {
+        systemInfo = infoCache;
+        return true;
+    }
+    if (GetSystemInformationOnce(infoCache)) {
+        systemInfo = infoCache;
+        return true;
+    }
+    return false;
+}
+
+bool SystemInterface::GetCPUInformation(CPUInformation& cpuInfo) {
+    const std::string errorType = "cpu";
+    static SystemInformationCache<CPUInformation> cache(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+    return MemoizedCall(
+        cache,
+        [this](BaseInformation& info) { return this->GetCPUInformationOnce(static_cast<CPUInformation&>(info)); },
+        cpuInfo,
+        errorType);
+}
+
+bool SystemInterface::GetProcessListInformation(ProcessListInformation& processListInfo) {
+    const std::string errorType = "process list";
+    static SystemInformationCache<ProcessListInformation> cache(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+    return MemoizedCall(
+        cache,
+        [this](BaseInformation& info) {
+            return this->GetProcessListInformationOnce(static_cast<ProcessListInformation&>(info));
+        },
+        processListInfo,
+        errorType);
+}
+
+bool SystemInterface::GetProcessInformation(pid_t pid, ProcessInformation& processInfo) {
+    const std::string errorType = "process";
+    static SystemInformationCache<ProcessInformation, pid_t> cache(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+    return MemoizedCall(
+        cache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetProcessInformationOnce(pid, static_cast<ProcessInformation&>(info));
+        },
+        processInfo,
+        errorType,
+        pid);
+}
+
+template <typename F, typename InfoT, typename... Args>
+bool SystemInterface::MemoizedCall(
+    SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {
+    if (cache.GetWithTimeout(
+            info, std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}, args...)) {
+        return true;
+    }
+    bool status = std::forward<F>(func)(info, args...);
+    if (status) {
+        cache.Set(info, args...);
+    } else {
+        LOG_ERROR(sLogger, ("failed to get system information", errorType));
+    }
+    cache.GC();
+    return status;
+}
+
+template <typename InfoT, typename... Args>
+bool SystemInterface::SystemInformationCache<InfoT, Args...>::GetWithTimeout(InfoT& info,
+                                                                             std::chrono::milliseconds timeout,
+                                                                             Args... args) {
+    constexpr auto interval = std::chrono::milliseconds{10};
+    auto getStartTime = std::chrono::steady_clock::now();
+    while (true) {
+        auto now = std::chrono::steady_clock::now();
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            auto it = mCache.find(std::make_tuple(args...));
+            if (it != mCache.end()) {
+                if (now - it->second.first.collectTime < mTTL) {
+                    info = it->second.first; // copy to avoid external modify
+                    return true;
+                }
+                if (!it->second.second) {
+                    // the cache is stale and no thread is updating, will update by this thread
+                    it->second.second.store(true);
+                    return false;
+                }
+            } else {
+                // no data in cache, directly update
+                mCache[std::make_tuple(args...)] = std::make_pair(InfoT{}, true);
+                return false;
+            }
+        }
+        // the cache is stale and other threads is updating, wait for it
+        std::this_thread::sleep_for(interval);
+        if (now - getStartTime > timeout) {
+            return false;
+        }
+    }
+    return false;
+}
+
+template <typename InfoT, typename... Args>
+bool SystemInterface::SystemInformationCache<InfoT, Args...>::Set(InfoT& info, Args... args) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mCache[std::make_tuple(args...)] = std::make_pair(info, false);
+    return true;
+}
+
+template <typename InfoT, typename... Args>
+bool SystemInterface::SystemInformationCache<InfoT, Args...>::GC() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    auto now = std::chrono::steady_clock::now();
+    for (auto it = mCache.begin(); it != mCache.end();) {
+        if (now - it->second.first.collectTime > mTTL) {
+            it = mCache.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return true;
+}
+
+} // namespace logtail

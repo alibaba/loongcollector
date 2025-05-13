@@ -15,16 +15,16 @@
 cmake_minimum_required(VERSION 3.22)
 project(host_monitor_unittest)
 
-add_executable(process_entity_collector_unittest ProcessEntityCollectorUnittest.cpp)
-target_link_libraries(process_entity_collector_unittest ${UT_BASE_TARGET})
+add_executable(system_interface_unittest SystemInterfaceUnittest.cpp)
+target_link_libraries(system_interface_unittest ${UT_BASE_TARGET})
 
-add_executable(host_monitor_input_runner_unittest HostMonitorInputRunnerUnittest.cpp)
-target_link_libraries(host_monitor_input_runner_unittest ${UT_BASE_TARGET})
-
-add_executable(cpu_collector_unittest CPUCollectorUnittest.cpp)
-target_link_libraries(cpu_collector_unittest ${UT_BASE_TARGET})
+if (LINUX)
+    add_executable(linux_system_interface_unittest LinuxSystemInterfaceUnittest.cpp)
+    target_link_libraries(linux_system_interface_unittest ${UT_BASE_TARGET})
+endif()
 
 include(GoogleTest)
-gtest_discover_tests(process_entity_collector_unittest)
-gtest_discover_tests(host_monitor_input_runner_unittest)
-gtest_discover_tests(cpu_collector_unittest)
+gtest_discover_tests(system_interface_unittest)
+if (LINUX)
+    gtest_discover_tests(linux_system_interface_unittest)
+endif()

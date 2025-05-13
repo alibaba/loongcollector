@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "system_interface/Constants.h"
 
-#include <string>
-#include <vector>
+#include <unistd.h>
 
 namespace logtail {
 
-bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
+std::filesystem::path PROCESS_DIR = "/proc";
+const std::filesystem::path PROCESS_STAT = "stat";
+const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail
