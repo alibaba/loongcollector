@@ -306,7 +306,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       packages: write
-    jobs:
+    steps:
       - name: prepare ubuntu environment
         run: |
           sudo bash -c 'cat > /etc/apt/sources.list << EOL
