@@ -340,7 +340,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: loongcollector-image
-          path: ./image.tar
 
       - name: Import Image from Tar
         run: docker load -i ./image.tar
