@@ -334,8 +334,7 @@ jobs:
 
       - name: E2E Behavior Test
         run: |
-          make gocdocker
-          ./scripts/e2e.sh e2e core
+          ./scripts/e2e.sh e2e
 
   ActionsTimeline:
     needs:
