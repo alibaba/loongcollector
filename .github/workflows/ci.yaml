@@ -142,7 +142,7 @@ jobs:
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
-          MAKE_JOBS: 16
+          MAKE_JOBS: 24
           WITHSPL: ON
         run: make dist
 
@@ -226,7 +226,7 @@ jobs:
           ENABLE_COMPATIBLE_MODE: OFF
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
-          MAKE_JOBS: 16
+          MAKE_JOBS: 24
           WITHSPL: ON
           BUILD_TYPE: Debug
         run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
@@ -334,6 +334,7 @@ jobs:
 
       - name: E2E Behavior Test
         run: |
+          make gocdocker
           ./scripts/e2e.sh e2e
 
   ActionsTimeline:
