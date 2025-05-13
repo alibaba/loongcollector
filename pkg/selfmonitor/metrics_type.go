@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pipeline
+package selfmonitor
 
 type SelfMetricType int
 
@@ -34,7 +34,7 @@ const (
 	HistogramType
 )
 
-type Label struct {
+type LabelPair struct {
 	Key   string
 	Value string
 }
@@ -48,11 +48,11 @@ type MetricValue[T string | float64] struct {
 // A MetricSet has three properties:
 // 1. Metric Name.
 // 2. Constant Labels: Labels has constant value, e.g., "hostname=localhost", "namespace=default"
-// 3. Label Keys is label Keys that may have different values, e.g., "status_code=200", "status_code=404".
+// 3. LabelKeys is label Keys that may have different values, e.g., "status_code=200", "status_code=404".
 type MetricSet interface {
 	Name() string
 	Type() SelfMetricType
-	ConstLabels() []Label
+	ConstLabels() []LabelPair
 	LabelKeys() []string
 }
 
@@ -65,7 +65,7 @@ type MetricCollector interface {
 // WithLabels will return a unique Metric that is bound to a set of label values.
 // If the labels contain label names that are not in the MetricSet, the Metric will be invalid.
 type MetricVector[T Metric] interface {
-	WithLabels(labels ...Label) T
+	WithLabels(labels ...LabelPair) T
 }
 
 type Metric interface {

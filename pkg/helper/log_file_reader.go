@@ -22,29 +22,29 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ReaderMetricTracker struct {
-	OpenCounter        pipeline.CounterMetric
-	CloseCounter       pipeline.CounterMetric
-	FileSizeCounter    pipeline.CounterMetric
-	FileRotatorCounter pipeline.CounterMetric
-	ReadCounter        pipeline.CounterMetric
-	ReadSizeCounter    pipeline.CounterMetric
-	ProcessLatency     pipeline.LatencyMetric
+	OpenCounter        selfmonitor.CounterMetric
+	CloseCounter       selfmonitor.CounterMetric
+	FileSizeCounter    selfmonitor.CounterMetric
+	FileRotatorCounter selfmonitor.CounterMetric
+	ReadCounter        selfmonitor.CounterMetric
+	ReadSizeCounter    selfmonitor.CounterMetric
+	ProcessLatency     selfmonitor.LatencyMetric
 }
 
-func NewReaderMetricTracker(mr *pipeline.MetricsRecord) *ReaderMetricTracker {
+func NewReaderMetricTracker(mr *selfmonitor.MetricsRecord) *ReaderMetricTracker {
 	return &ReaderMetricTracker{
-		OpenCounter:        NewCounterMetricAndRegister(mr, "open_count"),
-		CloseCounter:       NewCounterMetricAndRegister(mr, "close_count"),
-		FileSizeCounter:    NewCounterMetricAndRegister(mr, "file_size"),
-		FileRotatorCounter: NewCounterMetricAndRegister(mr, "file_rotate"),
-		ReadCounter:        NewCounterMetricAndRegister(mr, "read_count"),
-		ReadSizeCounter:    NewCounterMetricAndRegister(mr, "read_size"),
-		ProcessLatency:     NewLatencyMetricAndRegister(mr, "log_process_latency"),
+		OpenCounter:        selfmonitor.NewCounterMetricAndRegister(mr, "open_count"),
+		CloseCounter:       selfmonitor.NewCounterMetricAndRegister(mr, "close_count"),
+		FileSizeCounter:    selfmonitor.NewCounterMetricAndRegister(mr, "file_size"),
+		FileRotatorCounter: selfmonitor.NewCounterMetricAndRegister(mr, "file_rotate"),
+		ReadCounter:        selfmonitor.NewCounterMetricAndRegister(mr, "read_count"),
+		ReadSizeCounter:    selfmonitor.NewCounterMetricAndRegister(mr, "read_size"),
+		ProcessLatency:     selfmonitor.NewLatencyMetricAndRegister(mr, "log_process_latency"),
 	}
 }
 

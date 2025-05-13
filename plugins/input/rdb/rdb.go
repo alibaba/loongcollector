@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type RdbFunc func() error //nolint:revive
@@ -78,9 +78,9 @@ type Rdb struct {
 	Shutdown              chan struct{}
 	waitGroup             sync.WaitGroup
 	Context               pipeline.Context
-	collectLatency        pipeline.LatencyMetric
-	collectTotal          pipeline.CounterMetric
-	checkpointMetric      pipeline.StringMetric
+	collectLatency        selfmonitor.LatencyMetric
+	collectTotal          selfmonitor.CounterMetric
+	checkpointMetric      selfmonitor.StringMetric
 }
 
 func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
@@ -104,10 +104,10 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 
 	metricsRecord := m.Context.GetMetricRecord()
 
-	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, helper.MetricPluginCollectAvgCostTimeMs)
-	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginCollectTotal)
+	m.collectLatency = selfmonitor.NewLatencyMetricAndRegister(metricsRecord, selfmonitor.MetricPluginCollectAvgCostTimeMs)
+	m.collectTotal = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginCollectTotal)
 	if m.CheckPoint {
-		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, fmt.Sprintf("%s_checkpoint", m.Driver))
+		m.checkpointMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, fmt.Sprintf("%s_checkpoint", m.Driver))
 	}
 	return 10000, nil
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
@@ -165,9 +166,9 @@ type ServiceDockerStdout struct {
 
 	// for tracker
 	tracker           *helper.ReaderMetricTracker
-	avgInstanceMetric pipeline.CounterMetric
-	addMetric         pipeline.CounterMetric
-	deleteMetric      pipeline.CounterMetric
+	avgInstanceMetric selfmonitor.CounterMetric
+	addMetric         selfmonitor.CounterMetric
+	deleteMetric      selfmonitor.CounterMetric
 
 	synerMap      map[string]*DockerFileSyner
 	checkpointMap map[string]helper.LogFileReaderCheckPoint
@@ -201,9 +202,9 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	metricsRecord := sds.context.GetMetricRecord()
 	sds.tracker = helper.NewReaderMetricTracker(metricsRecord)
 
-	sds.avgInstanceMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.MetricPluginContainerTotal)
-	sds.addMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginAddContainerTotal)
-	sds.deleteMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginRemoveContainerTotal)
+	sds.avgInstanceMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.MetricPluginContainerTotal)
+	sds.addMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginAddContainerTotal)
+	sds.deleteMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginRemoveContainerTotal)
 
 	var err error
 	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
