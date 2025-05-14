@@ -23,7 +23,11 @@ func (m *metaCollector) processDeploymentEntity(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Replicas != nil {
+			log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		} else {
+			log.Contents.Add("replicas", "")
+		}
 		log.Contents.Add("ready_replicas", strconv.FormatInt(int64(obj.Status.ReadyReplicas), 10))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
@@ -80,7 +84,11 @@ func (m *metaCollector) processStatefulSetEntity(data *k8smeta.ObjectWrapper, me
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Replicas != nil {
+			log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		} else {
+			log.Contents.Add("replicas", "")
+		}
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{
@@ -108,7 +116,11 @@ func (m *metaCollector) processReplicaSetEntity(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Replicas != nil {
+			log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		} else {
+			log.Contents.Add("replicas", "")
+		}
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{

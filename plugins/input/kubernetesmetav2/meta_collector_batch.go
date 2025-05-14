@@ -32,9 +32,21 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 			containerInfos = append(containerInfos, containerInfo)
 		}
 		log.Contents.Add("containers", m.processEntityJSONArray(containerInfos))
-		log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
-		log.Contents.Add("backoff_limit", strconv.FormatInt(int64(*obj.Spec.BackoffLimit), 10))
-		log.Contents.Add("completion", strconv.FormatInt(int64(*obj.Spec.Completions), 10))
+		if obj.Spec.Suspend != nil {
+			log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
+		} else {
+			log.Contents.Add("suspend", "")
+		}
+		if obj.Spec.BackoffLimit != nil {
+			log.Contents.Add("backoff_limit", strconv.FormatInt(int64(*obj.Spec.BackoffLimit), 10))
+		} else {
+			log.Contents.Add("backoff_limit", "")
+		}
+		if obj.Spec.Completions != nil {
+			log.Contents.Add("completion", strconv.FormatInt(int64(*obj.Spec.Completions), 10))
+		} else {
+			log.Contents.Add("completion", "")
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -53,7 +65,11 @@ func (m *metaCollector) processCronJobEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("schedule", obj.Spec.Schedule)
-		log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
+		if obj.Spec.Suspend != nil {
+			log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
+		} else {
+			log.Contents.Add("suspend", "")
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
