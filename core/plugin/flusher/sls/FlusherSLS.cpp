@@ -132,13 +132,13 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
         sLogstoreConcurrencyLimiterMap.try_emplace(key, limiter);
         return limiter;
     }
-    if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+    auto limiter = iter->second.lock();
+    if (!limiter) {
+        limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
                                                        AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
-        return limiter;
     }
-    return iter->second.lock();
+    return limiter;
 }
 
 shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const string& project) {
@@ -150,13 +150,13 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
-    if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
-                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
+    auto limiter = iter->second.lock();
+    if (!limiter) {
+        limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                    AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
-        return limiter;
     }
-    return iter->second.lock();
+    return limiter;
 }
 
 shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const string& region) {
@@ -171,16 +171,16 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
-    if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(
+    auto limiter = iter->second.lock();
+    if (!limiter) {
+        limiter = make_shared<ConcurrencyLimiter>(
             sName + "#network#region#" + region,
             AppConfig::GetInstance()->GetSendRequestConcurrency(),
             AppConfig::GetInstance()->GetSendRequestConcurrency()
                 * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
-        return limiter;
     }
-    return iter->second.lock();
+    return limiter;
 }
 
 void FlusherSLS::ClearInvalidConcurrencyLimiters() {
