@@ -17,13 +17,14 @@ package addfieldsv2
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/google/uuid"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/google/uuid"
 )
 
 // ProcessorAddFields struct implement the Processor interface.
@@ -66,6 +67,7 @@ func (p *ProcessorAddFields) Init(context pipeline.Context) error {
 	return nil
 }
 
+// Description ...
 func (*ProcessorAddFields) Description() string {
 	return "add fields v2 processor for ilogtail"
 }
@@ -112,7 +114,7 @@ func (p *ProcessorAddFields) processValue(value interface{}) string {
 	switch v := value.(type) {
 	case string:
 		return p.processInnerFunc(v)
-	case []interface{}, map[string]interface{}:
+	case []string, map[string]interface{}:
 		if b, err := json.Marshal(v); err == nil {
 			return string(b)
 		}
