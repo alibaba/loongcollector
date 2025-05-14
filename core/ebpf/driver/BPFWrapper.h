@@ -351,13 +351,8 @@ public:
             return nullptr;
         }
 
-        struct perf_buffer_opts pbOpts = {};
-        pbOpts.sample_cb = dataCb;
-        pbOpts.ctx = ctx;
-        pbOpts.lost_cb = lossCb;
-
         struct perf_buffer* pb = NULL;
-        pb = perf_buffer__new(mapFd, pageCnt == 0 ? 128 : pageCnt, &pbOpts);
+        pb = perf_buffer__new(mapFd, pageCnt == 0 ? 128 : pageCnt, dataCb, lossCb, ctx, NULL);
         auto err = libbpf_get_error(pb);
         if (err) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
