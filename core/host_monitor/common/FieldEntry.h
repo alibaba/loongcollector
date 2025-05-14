@@ -17,21 +17,19 @@
 #include <functional>
 #include <string>
 
-#define FIELD_NAME_INITIALIZER(NAME, CLASS, F) NAME, [](CLASS& p) { return std::ref(p.F); }
-#define FIELD_NAME_ENTRY(NAME, CLASS, F) {FIELD_NAME_INITIALIZER(NAME, CLASS, F)}
-// 适用于字段与Name同名的情况
-#define FIELD_ENTRY(CLASS, F) {#F, [](CLASS& p) { return std::ref(p.F); }}
 
-template <typename TClass, typename TFieldType = double>
+template <typename TClass, typename TField = double>
 class FieldName {
-    std::function<TFieldType&(TClass&)> _fnGet;
-
 public:
-    const std::string name; // 名称
+    std::string_view name;
+    TField TClass::*ptr; // 成员指针，直接访问字段
 
-    FieldName(const char* n, std::function<TFieldType&(TClass&)> fnGet) : _fnGet(fnGet), name(n == nullptr ? "" : n) {}
+    constexpr FieldName(std::string_view n, TField TClass::*p) : name(n), ptr(p) {}
 
-    const TFieldType& value(const TClass& p) const { return _fnGet(const_cast<TClass&>(p)); }
-
-    TFieldType& value(TClass& p) const { return const_cast<TFieldType&>(_fnGet(p)); }
+    // 访问对象中的字段值
+    TField& value(TClass& obj) const { return obj.*ptr; }
+    const TField& value(const TClass& obj) const { return obj.*ptr; }
 };
+
+// 字段定义宏
+#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS>(#FIELD, &CLASS::FIELD)

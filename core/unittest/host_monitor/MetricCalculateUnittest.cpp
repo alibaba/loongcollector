@@ -25,21 +25,21 @@ struct MockData {
     double data1;
     double data2;
     double data3;
+    // Define the field descriptors
+    static inline const FieldName<MockData> mockDataFields[] = {
+        FIELD_ENTRY(MockData, data1),
+        FIELD_ENTRY(MockData, data2),
+        FIELD_ENTRY(MockData, data3),
+    };
+
+    // Define the enumerate function for your metric type
+    static void enumerate(const std::function<void(const FieldName<MockData, double>&)>& callback) {
+        for (const auto& field : mockDataFields) {
+            callback(field);
+        }
+    }
 };
 
-const FieldName<MockData> mockDataMeta[] = {
-    FIELD_ENTRY(MockData, data1),
-    FIELD_ENTRY(MockData, data2),
-    FIELD_ENTRY(MockData, data3),
-};
-const size_t mockDataMetaSize = sizeof(mockDataMeta) / sizeof(mockDataMeta[0]);
-const FieldName<MockData>* const mockDataMetaEnd = mockDataMeta + mockDataMetaSize;
-static_assert(mockDataMetaSize == sizeof(MockData) / sizeof(double), "mockDataMeta unexpected");
-void enumerate(const std::function<void(const FieldName<MockData>&)>& callback) {
-    for (auto it = mockDataMeta; it < mockDataMetaEnd; ++it) {
-        callback(*it);
-    }
-}
 
 class MetricCalculateUnittest : public testing::Test {
 public:
