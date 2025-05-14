@@ -22,9 +22,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/google/uuid"
 )
 
 // ProcessorAddFields struct implement the Processor interface.
