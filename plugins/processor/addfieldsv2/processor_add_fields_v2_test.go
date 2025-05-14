@@ -67,13 +67,12 @@ func TestAddArrayFields(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	processor.Fields = map[string]interface{}{
-		"key1": "value1",
-		"key2": []string{"value21", "value22"},
+		"key1": []string{"1", "2"},
 	}
 	log := &protocol.Log{Time: 0}
 
 	processor.processLog(log)
-	assert.Equal(t, "[\"value21\",\"value22\"]", log.Contents[1].Value)
+	assert.Equal(t, "[\"1\",\"2\"]", log.Contents[0].Value)
 }
 
 // TestAddObjectFields ...
@@ -81,8 +80,7 @@ func TestAddObjectFields(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	processor.Fields = map[string]interface{}{
-		"key1": "value1",
-		"key2": map[string]interface{}{
+		"key1": map[string]interface{}{
 			"key31": "value31",
 			"key32": []string{"value32"},
 		},
@@ -90,7 +88,7 @@ func TestAddObjectFields(t *testing.T) {
 	log := &protocol.Log{Time: 0}
 
 	processor.processLog(log)
-	assert.Equal(t, "{\"key31\":\"value31\",\"key32\":[\"value32\"]}", log.Contents[1].Value)
+	assert.Equal(t, "{\"key31\":\"value31\",\"key32\":[\"value32\"]}", log.Contents[0].Value)
 }
 
 // TestAddBoolFields ...
@@ -112,14 +110,27 @@ func TestAddInnerFuncFields(t *testing.T) {
 	require.NoError(t, err)
 	processor.Fields = map[string]interface{}{
 		"key1": "${uuid()}",
-		"key2": "${env(RANDOM_STR)}",
+		"key2": "${env(PWD)}",
 		"key3": "${timestamp_ms()}",
 		"key4": "${timestamp_ns()}",
+	}
+	log := &protocol.Log{Time: 0}
+
+	processor.processLog(log)
+	t.Log(log.Contents)
+}
+
+// TestAddEnvFields ...
+func TestAddEnvFields(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+	processor.Fields = map[string]interface{}{
+		"key2": "${env(RANDOM_STR)}",
 	}
 	log := &protocol.Log{Time: 0}
 
 	_ = os.Setenv("RANDOM_STR", "abcdefg")
 
 	processor.processLog(log)
-	t.Log(log.Contents)
+	assert.Equal(t, "abcdefg", log.Contents[0].Value)
 }
