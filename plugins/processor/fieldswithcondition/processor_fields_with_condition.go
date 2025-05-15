@@ -19,10 +19,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -44,7 +44,7 @@ type ProcessorFieldsWithCondition struct {
 	DropIfNotMatchCondition bool        `comment:"Optional. When the case condition is not met, whether the log is discarded (true) or retained (false)"`
 	Switch                  []Condition `comment:"The switch-case conditions"`
 
-	filterMetric pipeline.CounterMetric
+	filterMetric selfmonitor.CounterMetric
 	context      pipeline.Context
 }
 
@@ -202,7 +202,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 		}
 	}
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
+	p.filterMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginDiscardedEventsTotal)
 	return nil
 }
 

@@ -15,9 +15,9 @@
 package pickkey
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const pluginType = "processor_pick_key"
@@ -32,7 +32,7 @@ type ProcessorPickKey struct {
 	includeLen int
 	excludeLen int
 
-	filterMetric pipeline.CounterMetric
+	filterMetric selfmonitor.CounterMetric
 	context      pipeline.Context
 }
 
@@ -40,7 +40,7 @@ type ProcessorPickKey struct {
 func (p *ProcessorPickKey) Init(context pipeline.Context) error {
 	p.context = context
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
+	p.filterMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginDiscardedEventsTotal)
 
 	if len(p.Include) > 0 {
 		p.includeMap = make(map[string]struct{})
