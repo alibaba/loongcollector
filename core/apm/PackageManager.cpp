@@ -14,37 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "apm/PackageManager.h"
 
 namespace logtail::apm {
-
-class HookManager {
-public:
-    HookManager(const HookManager&) = delete;
-    HookManager(HookManager&&) = delete;
-    HookManager& operator=(const HookManager&) = delete;
-    HookManager& operator=(HookManager&&) = delete;
-
-    explicit HookManager() = default;
-
-    virtual ~HookManager() = default;
-
-    /**
-     * PrepareExecHook is used to 
-     */
-    bool PrepareExecHook();
-
-    /**
-     * LoadExecHook is used to execute LD_PRELOAD
-     */
-    bool LoadExecHook();
-
-    bool UnloadExecHook();
-
-private:
-
-    void checkAndUpdateExecHook();
-
-};
 
 }

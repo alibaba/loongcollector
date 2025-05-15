@@ -21,6 +21,9 @@
 
 namespace logtail::apm {
 
+/**
+ * AttachManager is used to add attach config to target process.
+ */
 class AttachManager {
 public:
     AttachManager(const AttachManager&) = delete;

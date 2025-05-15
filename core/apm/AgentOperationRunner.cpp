@@ -64,7 +64,7 @@ int AgentOperationRunner::findPidsByRule(MatchRule& rule, std::vector<int>& pids
     return 0;
 }
 
-std::vector<Proc> AgentOperationRunner::listAllProcess() {}
+// std::vector<Proc> AgentOperationRunner::listAllProcess() {}
 
 
 
