@@ -512,9 +512,11 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     EXPECT_EQ(FileReadResult::kTruncated, ret);
     EXPECT_EQ(1024 * 1024UL, content.size());
 
+#if defined(__linux__)
     ret = ReadFileContent("/proc/self/cgroup", content);
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_GT(content.size(), 0UL);
+#endif
 }
 
 } // namespace logtail

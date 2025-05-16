@@ -388,8 +388,8 @@ void LogInput::ProcessLoop() {
             unique_lock<mutex> lock(mFeedbackMux);
             mFeedbackCV.wait_for(lock, chrono::microseconds(INT32_FLAG(log_input_thread_wait_interval)));
         }
-
-        if (mIdleFlag)
+        // check exiting
+        if (mIdleFlag && !Application::GetInstance()->IsExiting())
             continue;
 
         curTime = time(NULL);

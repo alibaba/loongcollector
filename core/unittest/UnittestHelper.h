@@ -15,8 +15,10 @@
  */
 
 #include <stdlib.h>
+#if !defined(_MSC_VER)
 #include <sys/errno.h>
 #include <sys/utsname.h>
+#endif
 
 #include <string>
 
@@ -67,6 +69,7 @@ public:
         return findRst.second && findRst.first == value;
     }
 
+#if defined(__linux__)
     static bool GetKernelVersion(int& mainVersion, int& subVersion) {
         struct utsname buf;
         if (uname(&buf) != 0) {
@@ -91,6 +94,21 @@ public:
         }
         return true;
     }
+#endif
+
+#if defined(_MSC_VER)
+    static std::string JsonEscapeDirPath(const std::string& path) {
+        std::string jsonPath = "";
+        for (auto& c : path) {
+            if (c == '\\') {
+                jsonPath += "\\\\";
+            } else {
+                jsonPath.push_back(c);
+            }
+        }
+        return jsonPath;
+    }
+#endif
 };
 
 } // namespace logtail
