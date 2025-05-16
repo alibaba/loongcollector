@@ -23,7 +23,6 @@
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
-#include "constants/Constants.h"
 #include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
