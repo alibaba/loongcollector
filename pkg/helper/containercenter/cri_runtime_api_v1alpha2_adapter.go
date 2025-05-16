@@ -29,95 +29,93 @@ func newCRIRuntimeServiceV1Alpha2Adapter(conn *grpc.ClientConn) *RuntimeServiceV
 	return &RuntimeServiceV1Alpha2Adapter{client: criv1alpha2.NewRuntimeServiceClient(conn)}
 }
 
-func (a *RuntimeServiceV1Alpha2Adapter) Version(ctx context.Context) (CriVersionResponse, error) {
+func (a *RuntimeServiceV1Alpha2Adapter) Version(ctx context.Context) (*CriVersionResponse, error) {
 	resp, err := a.client.Version(ctx, &criv1alpha2.VersionRequest{})
 	if err != nil {
-		return CriVersionResponse{}, err
+		return &CriVersionResponse{}, err
 	}
-	return CriVersionResponse{
-		resp.Version,
-		resp.RuntimeName,
-		resp.RuntimeVersion,
-		resp.RuntimeApiVersion,
+	return &CriVersionResponse{
+		CriVersionInfo{
+			resp.Version,
+			resp.RuntimeName,
+			resp.RuntimeVersion,
+			resp.RuntimeApiVersion,
+		},
 	}, nil
 }
 
-func (a *RuntimeServiceV1Alpha2Adapter) ListContainers(ctx context.Context) (CriListContainersResponse, error) {
+func (a *RuntimeServiceV1Alpha2Adapter) ListContainers(ctx context.Context) (*CriListContainersResponse, error) {
 	resp, err := a.client.ListContainers(ctx, &criv1alpha2.ListContainersRequest{})
 	if err != nil {
-		return CriListContainersResponse{}, err
+		return &CriListContainersResponse{}, err
 	}
 
 	containers := make([]*CriContainer, 0, len(resp.Containers))
-	if resp.Containers != nil {
-		for _, rawContainer := range resp.Containers {
-			container := &CriContainer{
-				ID:        rawContainer.Id,
-				State:     CriContainerState(rawContainer.State),
-				CreatedAt: rawContainer.CreatedAt,
-				ImageRef:  rawContainer.ImageRef,
-				Labels:    rawContainer.Labels,
-			}
-			if rawContainer.Image != nil {
-				container.Image = &CriImageSpec{
-					Image:       rawContainer.Image.Image,
-					Annotations: rawContainer.Image.Annotations,
-				}
-			}
-			if rawContainer.Metadata != nil {
-				container.Metadata = &CriContainerMetadata{
-					Name:    rawContainer.Metadata.Name,
-					Attempt: rawContainer.Metadata.Attempt,
-				}
-			}
-			containers = append(containers, container)
+	for _, rawContainer := range resp.Containers {
+		container := &CriContainer{
+			ID:           rawContainer.Id,
+			PodSandboxID: rawContainer.PodSandboxId,
+			Metadata:     &CriContainerMetadata{},
+			Image:        &CriImageSpec{},
+			ImageRef:     rawContainer.ImageRef,
+			State:        CriContainerState(rawContainer.State),
+			CreatedAt:    rawContainer.CreatedAt,
+			Labels:       rawContainer.Labels,
+			Annotations:  rawContainer.Annotations,
 		}
+		if rawContainer.Image != nil {
+			container.Image.Image = rawContainer.Image.Image
+			container.Image.Annotations = rawContainer.Image.Annotations
+		}
+		if rawContainer.Metadata != nil {
+			container.Metadata.Name = rawContainer.Metadata.Name
+			container.Metadata.Attempt = rawContainer.Metadata.Attempt
+		}
+		containers = append(containers, container)
 	}
 
-	return CriListContainersResponse{
+	return &CriListContainersResponse{
 		Containers: containers,
 	}, nil
 }
 
-func (a *RuntimeServiceV1Alpha2Adapter) ContainerStatus(ctx context.Context, containerID string, verbose bool) (CriContainerStatusResponse, error) {
+func (a *RuntimeServiceV1Alpha2Adapter) ContainerStatus(ctx context.Context, containerID string, verbose bool) (*CriContainerStatusResponse, error) {
 	rawStatus, err := a.client.ContainerStatus(ctx, &criv1alpha2.ContainerStatusRequest{
 		ContainerId: containerID,
 		Verbose:     verbose,
 	})
 	if err != nil {
-		return CriContainerStatusResponse{}, err
+		return &CriContainerStatusResponse{}, err
 	}
 
 	status := &CriContainerStatus{
 		ID:          rawStatus.Status.Id,
+		Metadata:    &CriContainerMetadata{},
 		State:       CriContainerState(rawStatus.Status.State),
 		CreatedAt:   rawStatus.Status.CreatedAt,
 		StartedAt:   rawStatus.Status.StartedAt,
 		FinishedAt:  rawStatus.Status.FinishedAt,
 		ExitCode:    rawStatus.Status.ExitCode,
+		Image:       &CriImageSpec{},
 		ImageRef:    rawStatus.Status.ImageRef,
 		Reason:      rawStatus.Status.Reason,
 		Message:     rawStatus.Status.Message,
 		Labels:      rawStatus.Status.Labels,
 		Annotations: rawStatus.Status.Annotations,
+		Mounts:      []*CriMount{},
 		LogPath:     rawStatus.Status.LogPath,
 	}
 	if rawStatus.Status.Metadata != nil {
-		status.Metadata = &CriContainerMetadata{
-			Name:    rawStatus.Status.Metadata.Name,
-			Attempt: rawStatus.Status.Metadata.Attempt,
-		}
+		status.Metadata.Name = rawStatus.Status.Metadata.Name
+		status.Metadata.Attempt = rawStatus.Status.Metadata.Attempt
 	}
 	if rawStatus.Status.Image != nil {
-		status.Image = &CriImageSpec{
-			Image:       rawStatus.Status.Image.Image,
-			Annotations: rawStatus.Status.Image.Annotations,
-		}
+		status.Image.Image = rawStatus.Status.Image.Image
+		status.Image.Annotations = rawStatus.Status.Image.Annotations
 	}
-	mounts := make([]*CriMount, 0, len(rawStatus.Status.Mounts))
 	if rawStatus.Status.Mounts != nil {
 		for _, rawMount := range rawStatus.Status.Mounts {
-			mounts = append(mounts, &CriMount{
+			status.Mounts = append(status.Mounts, &CriMount{
 				ContainerPath:  rawMount.ContainerPath,
 				HostPath:       rawMount.HostPath,
 				Readonly:       rawMount.Readonly,
@@ -126,18 +124,17 @@ func (a *RuntimeServiceV1Alpha2Adapter) ContainerStatus(ctx context.Context, con
 			})
 		}
 	}
-	status.Mounts = mounts
 
-	return CriContainerStatusResponse{
+	return &CriContainerStatusResponse{
 		Status: status,
 		Info:   rawStatus.Info,
 	}, nil
 }
 
-func (a *RuntimeServiceV1Alpha2Adapter) ListPodSandbox(ctx context.Context) (CriListPodSandboxResponse, error) {
+func (a *RuntimeServiceV1Alpha2Adapter) ListPodSandbox(ctx context.Context) (*CriListPodSandboxResponse, error) {
 	resp, err := a.client.ListPodSandbox(ctx, &criv1alpha2.ListPodSandboxRequest{})
 	if err != nil {
-		return CriListPodSandboxResponse{}, err
+		return &CriListPodSandboxResponse{}, err
 	}
 
 	sandboxs := make([]*CriPodSandbox, 0, len(resp.Items))
@@ -145,6 +142,7 @@ func (a *RuntimeServiceV1Alpha2Adapter) ListPodSandbox(ctx context.Context) (Cri
 		for _, rawSandbox := range resp.Items {
 			sandbox := &CriPodSandbox{
 				ID:             rawSandbox.Id,
+				Metadata:       &CriPodSandboxMetadata{},
 				State:          CriContainerState(rawSandbox.State),
 				CreatedAt:      rawSandbox.CreatedAt,
 				Labels:         rawSandbox.Labels,
@@ -152,47 +150,45 @@ func (a *RuntimeServiceV1Alpha2Adapter) ListPodSandbox(ctx context.Context) (Cri
 				RuntimeHandler: rawSandbox.RuntimeHandler,
 			}
 			if rawSandbox.Metadata != nil {
-				sandbox.Metadata = &CriPodSandboxMetadata{
-					Name:    rawSandbox.Metadata.Name,
-					Attempt: rawSandbox.Metadata.Attempt,
-				}
+				sandbox.Metadata.Name = rawSandbox.Metadata.Name
+				sandbox.Metadata.Attempt = rawSandbox.Metadata.Attempt
 			}
 			sandboxs = append(sandboxs, sandbox)
 		}
 	}
 
-	return CriListPodSandboxResponse{
+	return &CriListPodSandboxResponse{
 		Items: sandboxs,
 	}, nil
 }
 
-func (a *RuntimeServiceV1Alpha2Adapter) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (CriPodSandboxStatusResponse, error) {
+func (a *RuntimeServiceV1Alpha2Adapter) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (*CriPodSandboxStatusResponse, error) {
 	rawStatus, err := a.client.PodSandboxStatus(ctx, &criv1alpha2.PodSandboxStatusRequest{
 		PodSandboxId: sandboxID,
 		Verbose:      verbose,
 	})
 	if err != nil {
-		return CriPodSandboxStatusResponse{}, err
+		return &CriPodSandboxStatusResponse{}, err
 	}
 
-	status := &CriPodSandboxStatus{
-		ID:             rawStatus.Status.Id,
-		State:          CriContainerState(rawStatus.Status.State),
-		CreatedAt:      rawStatus.Status.CreatedAt,
-		Labels:         rawStatus.Status.Labels,
-		Annotations:    rawStatus.Status.Annotations,
-		RuntimeHandler: rawStatus.Status.RuntimeHandler,
-	}
-	if rawStatus.Status.Metadata != nil {
-		status.Metadata = &CriPodSandboxMetadata{
-			Name:      rawStatus.Status.Metadata.Name,
-			UID:       rawStatus.Status.Metadata.Uid,
-			Namespace: rawStatus.Status.Metadata.Namespace,
-			Attempt:   rawStatus.Status.Metadata.Attempt,
+	status := &CriPodSandboxStatus{}
+	if rawStatus.Status != nil {
+		status.ID = rawStatus.Status.Id
+		status.Metadata = &CriPodSandboxMetadata{}
+		if rawStatus.Status.Metadata != nil {
+			status.Metadata.Name = rawStatus.Status.Metadata.Name
+			status.Metadata.UID = rawStatus.Status.Metadata.Uid
+			status.Metadata.Namespace = rawStatus.Status.Metadata.Namespace
+			status.Metadata.Attempt = rawStatus.Status.Metadata.Attempt
 		}
+		status.State = CriContainerState(rawStatus.Status.State)
+		status.CreatedAt = rawStatus.Status.CreatedAt
+		status.Labels = rawStatus.Status.Labels
+		status.Annotations = rawStatus.Status.Annotations
+		status.RuntimeHandler = rawStatus.Status.RuntimeHandler
 	}
 
-	return CriPodSandboxStatusResponse{
+	return &CriPodSandboxStatusResponse{
 		Status: status,
 		Info:   rawStatus.Info,
 	}, nil

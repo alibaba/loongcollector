@@ -34,7 +34,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-var dockerCenterInstance *DockerCenter
+var containerCenterInstance *ContainerCenter
 var containerFindingManager *ContainerDiscoverManager
 var onceDocker sync.Once
 
@@ -451,7 +451,7 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 	}
 }
 
-type DockerCenter struct {
+type ContainerCenter struct {
 	// ContainerMap contains all container information.
 	// For the docker scenario, the container list is the same as the result executed with `docker ps` commands. So the container
 	// list would also contain the sandbox containers when docker is used as an engine in Kubernetes.
@@ -511,26 +511,26 @@ func getIPByHosts(hostFileName, hostname string) string {
 	return ""
 }
 
-func (dc *DockerCenter) registerEventListener(c chan events.Message) {
+func (dc *ContainerCenter) registerEventListener(c chan events.Message) {
 	dc.eventChanLock.Lock()
 	defer dc.eventChanLock.Unlock()
 	dc.eventChan = c
 }
 
-func (dc *DockerCenter) unRegisterEventListener(_ chan events.Message) {
+func (dc *ContainerCenter) unRegisterEventListener(_ chan events.Message) {
 	dc.eventChanLock.Lock()
 	defer dc.eventChanLock.Unlock()
 	dc.eventChan = nil
 }
 
-func (dc *DockerCenter) lookupImageCache(id string) (string, bool) {
+func (dc *ContainerCenter) lookupImageCache(id string) (string, bool) {
 	dc.imageLock.RLock()
 	defer dc.imageLock.RUnlock()
 	imageName, ok := dc.imageCache[id]
 	return imageName, ok
 }
 
-func (dc *DockerCenter) getImageName(id, defaultVal string) string {
+func (dc *ContainerCenter) getImageName(id, defaultVal string) string {
 	if len(id) == 0 || dc.client == nil {
 		return defaultVal
 	}
@@ -549,7 +549,7 @@ func (dc *DockerCenter) getImageName(id, defaultVal string) string {
 	return defaultVal
 }
 
-func (dc *DockerCenter) getIPAddress(info types.ContainerJSON) string {
+func (dc *ContainerCenter) getIPAddress(info types.ContainerJSON) string {
 	if detail, ok := dc.getContainerDetail(info.ID); ok && detail != nil {
 		return detail.ContainerIP
 	}
@@ -565,7 +565,7 @@ func (dc *DockerCenter) getIPAddress(info types.ContainerJSON) string {
 // CreateInfoDetail create DockerInfoDetail with docker.Container
 // Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
-func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
+func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	// Generate Log Tags
 	containerNameTag := make(map[string]string)
 	k8sInfo := K8SInfo{}
@@ -658,16 +658,16 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 	return did
 }
 
-func getDockerCenterInstance() *DockerCenter {
+func getContainerCenterInstance() *ContainerCenter {
 	onceDocker.Do(func() {
 		logger.InitLogger()
 		// load EnvTags first
 		helper.LoadEnvTags()
-		dockerCenterInstance = &DockerCenter{
+		containerCenterInstance = &ContainerCenter{
 			containerHelper: &ContainerHelperWrapper{},
 		}
-		dockerCenterInstance.imageCache = make(map[string]string)
-		dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+		containerCenterInstance.imageCache = make(map[string]string)
+		containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
@@ -687,14 +687,14 @@ func getDockerCenterInstance() *DockerCenter {
 			containerFindingManager.StartSyncContainers()
 		}()
 	})
-	return dockerCenterInstance
+	return containerCenterInstance
 }
 
 func SetEnvConfigPrefix(prefix string) {
 	envConfigPrefix = prefix
 }
 
-func (dc *DockerCenter) readStaticConfig(forceFlush bool) {
+func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 	staticDockerContainerLock.Lock()
 	defer staticDockerContainerLock.Unlock()
 	containerInfo, removedIDs, changed, err := tryReadStaticContainerInfo()
@@ -710,27 +710,27 @@ func (dc *DockerCenter) readStaticConfig(forceFlush bool) {
 	if forceFlush || changed {
 		containerMap := make(map[string]*DockerInfoDetail)
 		for _, info := range containerInfo {
-			dockerInfoDetail := dockerCenterInstance.CreateInfoDetail(info, envConfigPrefix, false)
+			dockerInfoDetail := containerCenterInstance.CreateInfoDetail(info, envConfigPrefix, false)
 			containerMap[info.ID] = dockerInfoDetail
 		}
-		dockerCenterInstance.updateContainers(containerMap)
+		containerCenterInstance.updateContainers(containerMap)
 	}
 
 	if len(removedIDs) > 0 {
 		for _, id := range removedIDs {
-			dockerCenterInstance.markRemove(id)
+			containerCenterInstance.markRemove(id)
 		}
 	}
 }
 
-func (dc *DockerCenter) flushStaticConfig() {
+func (dc *ContainerCenter) flushStaticConfig() {
 	for {
 		dc.readStaticConfig(false)
 		time.Sleep(time.Second)
 	}
 }
 
-func (dc *DockerCenter) setLastError(err error, msg string) {
+func (dc *ContainerCenter) setLastError(err error, msg string) {
 	dc.lastErrMu.Lock()
 	dc.lastErr = err
 	dc.lastErrMu.Unlock()
@@ -845,7 +845,7 @@ func isContainerEnvMatch(includeEnv map[string]string,
 	return true
 }
 
-func (dc *DockerCenter) getAllAcceptedInfo(
+func (dc *ContainerCenter) getAllAcceptedInfo(
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
 	includeLabelRegex map[string]*regexp.Regexp,
@@ -869,7 +869,7 @@ func (dc *DockerCenter) getAllAcceptedInfo(
 	return containerMap
 }
 
-func (dc *DockerCenter) getAllAcceptedInfoV2(
+func (dc *ContainerCenter) getAllAcceptedInfoV2(
 	fullList map[string]bool,
 	matchList map[string]*DockerInfoDetail,
 	includeLabel map[string]string,
@@ -929,7 +929,7 @@ func (dc *DockerCenter) getAllAcceptedInfoV2(
 	return newCount, delCount, matchAddedList, matchDeletedList
 }
 
-func (dc *DockerCenter) getDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeletedList []string) {
+func (dc *ContainerCenter) getDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeletedList []string) {
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
 	fullDeletedList = make([]string, 0)
@@ -949,7 +949,7 @@ func (dc *DockerCenter) getDiffContainers(fullList map[string]struct{}) (fullAdd
 	return fullAddedList, fullDeletedList
 }
 
-func (dc *DockerCenter) getAllSpecificInfo(filter func(*DockerInfoDetail) bool) (infoList []*DockerInfoDetail) {
+func (dc *ContainerCenter) getAllSpecificInfo(filter func(*DockerInfoDetail) bool) (infoList []*DockerInfoDetail) {
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
 	for _, info := range dc.containerMap {
@@ -960,7 +960,7 @@ func (dc *DockerCenter) getAllSpecificInfo(filter func(*DockerInfoDetail) bool) 
 	return infoList
 }
 
-func (dc *DockerCenter) processAllContainerInfo(processor func(*DockerInfoDetail)) {
+func (dc *ContainerCenter) processAllContainerInfo(processor func(*DockerInfoDetail)) {
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
 	for _, info := range dc.containerMap {
@@ -968,22 +968,22 @@ func (dc *DockerCenter) processAllContainerInfo(processor func(*DockerInfoDetail
 	}
 }
 
-func (dc *DockerCenter) getContainerDetail(id string) (containerDetail *DockerInfoDetail, ok bool) {
+func (dc *ContainerCenter) getContainerDetail(id string) (containerDetail *DockerInfoDetail, ok bool) {
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
 	containerDetail, ok = dc.containerMap[id]
 	return
 }
 
-func (dc *DockerCenter) getLastUpdateMapTime() int64 {
+func (dc *ContainerCenter) getLastUpdateMapTime() int64 {
 	return atomic.LoadInt64(&dc.lastUpdateMapTime)
 }
 
-func (dc *DockerCenter) refreshLastUpdateMapTime() {
+func (dc *ContainerCenter) refreshLastUpdateMapTime() {
 	atomic.StoreInt64(&dc.lastUpdateMapTime, time.Now().UnixNano())
 }
 
-func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDetail) {
+func (dc *ContainerCenter) updateContainers(containerMap map[string]*DockerInfoDetail) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	for key, container := range dc.containerMap {
@@ -1007,7 +1007,7 @@ func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDeta
 	dc.refreshLastUpdateMapTime()
 }
 
-func (dc *DockerCenter) mergeK8sInfo() {
+func (dc *ContainerCenter) mergeK8sInfo() {
 	k8sInfoMap := make(map[string][]*K8SInfo)
 	for _, container := range dc.containerMap {
 		if container.K8SInfo == nil {
@@ -1031,7 +1031,7 @@ func (dc *DockerCenter) mergeK8sInfo() {
 	}
 }
 
-func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) {
+func (dc *ContainerCenter) updateContainer(id string, container *DockerInfoDetail) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	if container.K8SInfo != nil {
@@ -1053,7 +1053,7 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	dc.refreshLastUpdateMapTime()
 }
 
-func (dc *DockerCenter) fetchAll() error {
+func (dc *ContainerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
 	containers, err := dc.client.ContainerList(context.Background(), types.ContainerListOptions{All: true})
@@ -1085,7 +1085,7 @@ func (dc *DockerCenter) fetchAll() error {
 	return nil
 }
 
-func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
+func (dc *ContainerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
 	containerDetail, err := dc.client.ContainerInspect(context.Background(), containerID)
@@ -1120,7 +1120,7 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 
 // We mark container removed if it is exited or its metadata cannot be accessed
 // e.g. cannot docker inspect / crictl inspect it.
-func (dc *DockerCenter) markRemove(containerID string) {
+func (dc *ContainerCenter) markRemove(containerID string) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	if container, ok := dc.containerMap[containerID]; ok {
@@ -1136,7 +1136,7 @@ func (dc *DockerCenter) markRemove(containerID string) {
 	}
 }
 
-func (dc *DockerCenter) cleanTimeoutContainer() {
+func (dc *ContainerCenter) cleanTimeoutContainer() {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	hasDelete := false
@@ -1156,7 +1156,7 @@ func (dc *DockerCenter) cleanTimeoutContainer() {
 	}
 }
 
-func (dc *DockerCenter) sweepCache() {
+func (dc *ContainerCenter) sweepCache() {
 	// clear unuseful cache
 	usedImageIDSet := make(map[string]bool)
 	dc.lock.RLock()
@@ -1175,7 +1175,7 @@ func (dc *DockerCenter) sweepCache() {
 	dc.imageLock.Unlock()
 }
 
-func dockerCenterRecover() {
+func containerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
@@ -1183,7 +1183,7 @@ func dockerCenterRecover() {
 	}
 }
 
-func (dc *DockerCenter) initClient() error {
+func (dc *ContainerCenter) initClient() error {
 	var err error
 	// do not CreateDockerClient multi times
 	if dc.client == nil {
@@ -1195,9 +1195,9 @@ func (dc *DockerCenter) initClient() error {
 	return nil
 }
 
-func (dc *DockerCenter) eventListener() {
+func (dc *ContainerCenter) eventListener() {
 	errorCount := 0
-	defer dockerCenterRecover()
+	defer containerCenterRecover()
 	timer := time.NewTimer(EventListenerTimeout)
 	var err error
 	for {

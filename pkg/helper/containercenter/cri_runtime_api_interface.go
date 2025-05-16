@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"google.golang.org/grpc"
 )
 
@@ -39,11 +40,15 @@ const (
 	MountPropagationPropagationBidirectional   CriMountPropagation = 2
 )
 
-type CriVersionResponse struct {
+type CriVersionInfo struct {
 	Version           string
 	RuntimeName       string
 	RuntimeVersion    string
 	RuntimeAPIVersion string
+}
+
+type CriVersionResponse struct {
+	CriVersionInfo
 }
 
 type CriContainerMetadata struct {
@@ -140,16 +145,16 @@ type CriPodSandboxStatusResponse struct {
 }
 
 type RuntimeService interface {
-	Version(ctx context.Context) (CriVersionResponse, error)
-	ListContainers(ctx context.Context) (CriListContainersResponse, error)
-	ContainerStatus(ctx context.Context, containerID string, verbose bool) (CriContainerStatusResponse, error)
-	ListPodSandbox(ctx context.Context) (CriListPodSandboxResponse, error)
-	PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (CriPodSandboxStatusResponse, error)
+	Version(ctx context.Context) (*CriVersionResponse, error)
+	ListContainers(ctx context.Context) (*CriListContainersResponse, error)
+	ContainerStatus(ctx context.Context, containerID string, verbose bool) (*CriContainerStatusResponse, error)
+	ListPodSandbox(ctx context.Context) (*CriListPodSandboxResponse, error)
+	PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (*CriPodSandboxStatusResponse, error)
 }
 
 type RuntimeServiceClient struct {
 	service RuntimeService
-	info    CriVersionResponse
+	info    CriVersionInfo
 	conn    *grpc.ClientConn
 }
 
@@ -169,15 +174,17 @@ func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSiz
 	client := &RuntimeServiceClient{
 		conn: conn,
 	}
-	// Try v1alpha2 first
-	client.service = newCRIRuntimeServiceV1Alpha2Adapter(conn)
+	// Try v1 first
+	client.service = newCRIRuntimeServiceV1Adapter(conn)
 	if client.checkVersion(ctx) == nil {
+		logger.Info(ctx, "Init cri client success, cri info", client.info)
 		return client, nil
 	}
 
-	// Fallback to v1
-	client.service = newCRIRuntimeServiceV1Adapter(conn)
+	// Fallback to v1alpha2
+	client.service = newCRIRuntimeServiceV1Alpha2Adapter(conn)
 	if client.checkVersion(ctx) == nil {
+		logger.Info(ctx, "Init cri client success, cri info", client.info)
 		return client, nil
 	}
 
@@ -186,45 +193,45 @@ func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSiz
 	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) Version(ctx context.Context) (CriVersionResponse, error) {
+func (c *RuntimeServiceClient) Version(ctx context.Context) (*CriVersionResponse, error) {
 	if c.service != nil {
 		return c.service.Version(ctx)
 	}
-	return CriVersionResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return &CriVersionResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ListContainers(ctx context.Context) (CriListContainersResponse, error) {
+func (c *RuntimeServiceClient) ListContainers(ctx context.Context) (*CriListContainersResponse, error) {
 	if c.service != nil {
 		return c.service.ListContainers(ctx)
 	}
-	return CriListContainersResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return &CriListContainersResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ContainerStatus(ctx context.Context, containerID string, verbose bool) (CriContainerStatusResponse, error) {
+func (c *RuntimeServiceClient) ContainerStatus(ctx context.Context, containerID string, verbose bool) (*CriContainerStatusResponse, error) {
 	if c.service != nil {
 		return c.service.ContainerStatus(ctx, containerID, verbose)
 	}
-	return CriContainerStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return &CriContainerStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) ListPodSandbox(ctx context.Context) (CriListPodSandboxResponse, error) {
+func (c *RuntimeServiceClient) ListPodSandbox(ctx context.Context) (*CriListPodSandboxResponse, error) {
 	if c.service != nil {
 		return c.service.ListPodSandbox(ctx)
 	}
-	return CriListPodSandboxResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return &CriListPodSandboxResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (CriPodSandboxStatusResponse, error) {
+func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID string, verbose bool) (*CriPodSandboxStatusResponse, error) {
 	if c.service != nil {
 		return c.service.PodSandboxStatus(ctx, sandboxID, verbose)
 	}
-	return CriPodSandboxStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
+	return &CriPodSandboxStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
 func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
 	versionResp, err := c.service.Version(ctx)
 	if err == nil {
-		c.info = versionResp
+		c.info = versionResp.CriVersionInfo
 	}
 	return err
 }

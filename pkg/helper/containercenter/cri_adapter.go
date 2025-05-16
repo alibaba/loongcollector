@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	maxMsgSize = 1024 * 1024 * 16
+	maxMsgSize            = 1024 * 1024 * 16
+	defaultContextTimeout = time.Second * 10
 )
 
 var criRuntimeWrapper *CRIRuntimeWrapper
@@ -49,10 +50,10 @@ type innerContainerInfo struct {
 }
 
 type CRIRuntimeWrapper struct {
-	dockerCenter *DockerCenter
-	nativeClient *containerd.Client
-	client       *RuntimeServiceClient
-	runtimeInfo  CriVersionResponse
+	containerCenter *ContainerCenter
+	nativeClient    *containerd.Client
+	client          *RuntimeServiceClient
+	runtimeInfo     CriVersionInfo
 
 	containersLock sync.Mutex
 
@@ -74,19 +75,19 @@ func IsCRIRuntimeValid() bool {
 
 	client, err := NewRuntimeServiceClient(time.Minute, maxMsgSize)
 	if err != nil {
-		logger.Debug(context.Background(), "NewRuntimeServiceClient", containerdUnixSocket, "failed", err)
+		logger.Warning(context.Background(), "NewRuntimeServiceClient", containerdUnixSocket, "failed", err)
 		return false
 	}
 	defer client.Close()
 
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	defer cancel()
 
 	containerResp, err := client.ListContainers(ctx)
 	return err == nil && len(containerResp.Containers) != 0
 }
 
-func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
+func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper, error) {
 	ok := IsCRIRuntimeValid()
 	if !ok {
 		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
@@ -111,7 +112,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	return &CRIRuntimeWrapper{
-		dockerCenter:           dockerCenter,
+		containerCenter:        containerCenter,
 		client:                 client,
 		nativeClient:           containerdClient,
 		runtimeInfo:            client.info,
@@ -125,7 +126,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
 func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state CriContainerState, err error) {
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	status, err := cw.client.ContainerStatus(ctx, containerID, true)
 	cancel()
 	if err != nil {
@@ -236,7 +237,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	dockerContainer.HostnamePath = hostnamePath
 	dockerContainer.HostsPath = hostsPath
 
-	return cw.dockerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
+	return cw.containerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 
 func (cw *CRIRuntimeWrapper) fetchAll() error {
@@ -303,12 +304,12 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 		logger.Debugf(context.Background(), "Create container info, id:%v\tname:%v\tcreated:%v\tstatus:%v\tdetail:%+v",
 			dockerContainer.IDPrefix(), c.Metadata.Name, dockerContainer.ContainerInfo.Created, dockerContainer.Status(), c)
 	}
-	cw.dockerCenter.updateContainers(containerMap)
+	cw.containerCenter.updateContainers(containerMap)
 
 	// delete not running containers
 	for k := range cw.containers {
 		if running, ok := runningMap[k]; !ok || !running {
-			cw.dockerCenter.markRemove(k)
+			cw.containerCenter.markRemove(k)
 			delete(cw.containers, k)
 		}
 	}
@@ -384,7 +385,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 	for oldID, c := range cw.containers {
 		if _, ok := newContainers[oldID]; !ok || c.State == ContainerStateContainerExited {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
-			cw.dockerCenter.markRemove(oldID)
+			cw.containerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)
 		}
 	}
@@ -409,7 +410,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 	}
 
 	// cri场景下会拼接好k8s信息，然后再单个updateContainer
-	cw.dockerCenter.updateContainer(containerID, dockerContainer)
+	cw.containerCenter.updateContainer(containerID, dockerContainer)
 	cw.containerHistory[containerID] = true
 	cw.containers[containerID] = &innerContainerInfo{
 		status,
@@ -421,7 +422,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 }
 
 func (cw *CRIRuntimeWrapper) wrapperK8sInfoByID(sandboxID string, detail *DockerInfoDetail) {
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	status, err := cw.client.PodSandboxStatus(ctx, sandboxID, true)
 	cancel()
 	if err != nil {
@@ -449,11 +450,11 @@ func (cw *CRIRuntimeWrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]str
 func (cw *CRIRuntimeWrapper) sweepCache() {
 	// clear unuseful cache
 	usedCacheItem := make(map[string]bool)
-	cw.dockerCenter.lock.RLock()
-	for key := range cw.dockerCenter.containerMap {
+	cw.containerCenter.lock.RLock()
+	for key := range cw.containerCenter.containerMap {
 		usedCacheItem[key] = true
 	}
-	cw.dockerCenter.lock.RUnlock()
+	cw.containerCenter.lock.RUnlock()
 
 	cw.rootfsLock.Lock()
 	for key := range cw.rootfsCache {
