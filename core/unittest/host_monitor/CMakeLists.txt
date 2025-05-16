@@ -27,8 +27,12 @@ target_link_libraries(system_information_tools_unittest ${UT_BASE_TARGET})
 add_executable(cpu_collector_unittest CPUCollectorUnittest.cpp)
 target_link_libraries(cpu_collector_unittest ${UT_BASE_TARGET})
 
+add_executable(metric_calculate_unittest MetricCalculateUnittest.cpp)
+target_link_libraries(metric_calculate_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(process_entity_collector_unittest)
 gtest_discover_tests(host_monitor_input_runner_unittest)
 gtest_discover_tests(system_information_tools_unittest)
 gtest_discover_tests(cpu_collector_unittest)
+gtest_discover_tests(metric_calculate_unittest)
