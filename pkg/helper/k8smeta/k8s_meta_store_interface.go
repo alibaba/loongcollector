@@ -30,6 +30,6 @@ func panicRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "skywalking v2 runtime panic error", err, "stack", string(trace))
+		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "k8s meta panic error", err, "stack", string(trace))
 	}
 }

@@ -132,6 +132,7 @@ func (m *MetaManager) IsReady() bool {
 func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
 	if cache, ok := m.cacheMap[resourceType]; ok {
 		cache.RegisterSendFunc(configName, func(events []*K8sMetaEvent) {
+			defer panicRecover()
 			sendFunc(events)
 			m.registerLock.RLock()
 			for _, linkType := range m.linkRegisterMap[configName] {
