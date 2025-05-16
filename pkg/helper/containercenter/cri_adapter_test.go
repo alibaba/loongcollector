@@ -15,7 +15,7 @@
 //go:build linux
 // +build linux
 
-package helper
+package containercenter
 
 import (
 	"testing"
@@ -27,12 +27,12 @@ import (
 
 func TestLookupContainerRootfsAbsDir(t *testing.T) {
 	crirt := &CRIRuntimeWrapper{
-		dockerCenter:   nil,
-		client:         nil,
-		runtimeVersion: nil,
-		containers:     make(map[string]*innerContainerInfo),
-		stopCh:         make(<-chan struct{}),
-		rootfsCache:    make(map[string]string),
+		containerCenter: nil,
+		client:          nil,
+		runtimeInfo:     CriVersionInfo{},
+		containers:      make(map[string]*innerContainerInfo),
+		stopCh:          make(<-chan struct{}),
+		rootfsCache:     make(map[string]string),
 	}
 
 	container := types.ContainerJSON{

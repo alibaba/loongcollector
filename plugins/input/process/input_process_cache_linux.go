@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/procfs"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -42,7 +43,7 @@ type processCacheLinux struct {
 }
 
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
-	fs, err := procfs.NewFS(helper.GetMountedFilePath(procfs.DefaultMountPoint))
+	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
 		logger.Error(context.Background(), "OPEN_PROCFS_ALARM", "error", err)
 		return nil, err

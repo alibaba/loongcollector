@@ -27,7 +27,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -83,7 +83,7 @@ type stdoutSyner struct {
 	ExternalEnvTag      map[string]string
 	ExternalK8sLabelTag map[string]string
 
-	info                 *helper.DockerInfoDetail
+	info                 *containercenter.DockerInfoDetail
 	client               *docker.Client
 	startCheckPoint      string
 	lock                 sync.Mutex
@@ -224,7 +224,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 		ss.lock.Lock()
 		if len(ss.startCheckPoint) > 0 {
 			var err error
-			if cpTime, err = time.Parse(helper.DockerTimeFormat, ss.startCheckPoint); err != nil {
+			if cpTime, err = time.Parse(containercenter.DockerTimeFormat, ss.startCheckPoint); err != nil {
 				logger.Warning(ss.context.GetRuntimeContext(), "CHECKPOINT_ALARM", "docker stdout raw parse start time error", ss.startCheckPoint,
 					"id", ss.info.IDPrefix(),
 					"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status())
@@ -237,7 +237,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 		if cpTime.IsZero() {
 			// if first start, skip 10 second
 			cpTime = time.Now().Add(time.Second * time.Duration(-10))
-			logger.Info(ss.context.GetRuntimeContext(), "docker stdout raw first read since", cpTime.Format(helper.DockerTimeFormat),
+			logger.Info(ss.context.GetRuntimeContext(), "docker stdout raw first read since", cpTime.Format(containercenter.DockerTimeFormat),
 				"id", ss.info.IDPrefix(),
 				"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status())
 		}
@@ -245,7 +245,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 		options := types.ContainerLogsOptions{
 			ShowStdout: ss.stdout,
 			ShowStderr: ss.stderr,
-			Since:      cpTime.Format(helper.DockerTimeFormat),
+			Since:      cpTime.Format(containercenter.DockerTimeFormat),
 			Timestamps: true,
 			Follow:     true,
 		}
@@ -358,7 +358,7 @@ type ServiceDockerStdout struct {
 	ExcludeLabelRegex map[string]*regexp.Regexp
 	IncludeEnvRegex   map[string]*regexp.Regexp
 	ExcludeEnvRegex   map[string]*regexp.Regexp
-	K8sFilter         *helper.K8SFilter
+	K8sFilter         *containercenter.K8SFilter
 
 	synerMap         map[string]*stdoutSyner
 	client           *docker.Client
@@ -371,15 +371,15 @@ type ServiceDockerStdout struct {
 
 func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.context = context
-	helper.ContainerCenterInit()
+	containercenter.Init()
 	sds.synerMap = make(map[string]*stdoutSyner)
 
 	var err error
-	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
+	sds.IncludeEnv, sds.IncludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
-	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeEnv)
+	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 	}
@@ -397,15 +397,15 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	} else {
 		sds.ExcludeLabel = sds.ExcludeContainerLabel
 	}
-	sds.IncludeLabel, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeLabel)
+	sds.IncludeLabel, sds.IncludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.IncludeLabel)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
+	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeLabel)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
-	sds.K8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
+	sds.K8sFilter, err = containercenter.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
 
 	return 0, err
 }
@@ -422,7 +422,7 @@ func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
 
 func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
 	var err error
-	dockerInfos := helper.GetContainerByAcceptedInfo(
+	dockerInfos := containercenter.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
 		sds.IncludeEnv, sds.ExcludeEnv,
@@ -511,7 +511,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 	sds.stdoutCheckPoint = sds.GetCheckPoint()
 
 	var err error
-	if sds.client, err = helper.CreateDockerClient(); err != nil {
+	if sds.client, err = containercenter.CreateDockerClient(); err != nil {
 		logger.Error(sds.context.GetRuntimeContext(), "DOCKER_CLIENT_ALARM", "create docker client error", err)
 		return err
 	}

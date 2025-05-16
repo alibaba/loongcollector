@@ -25,6 +25,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -82,7 +83,7 @@ type Jmx struct {
 	excludeContainerLabelRegex map[string]*regexp.Regexp
 	includeEnvRegex            map[string]*regexp.Regexp
 	excludeEnvRegex            map[string]*regexp.Regexp
-	k8sFilter                  *helper.K8SFilter
+	k8sFilter                  *containercenter.K8SFilter
 	context                    pipeline.Context
 	stopChan                   chan struct{}
 	instances                  map[string]*InstanceInner
@@ -116,23 +117,23 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	GetJmxFetchManager(m.jvmHome).ConfigJavaHome(m.JDKPath)
 	if m.DiscoveryMode {
 		var err error
-		m.IncludeEnv, m.includeEnvRegex, err = helper.SplitRegexFromMap(m.IncludeEnv)
+		m.IncludeEnv, m.includeEnvRegex, err = containercenter.SplitRegexFromMap(m.IncludeEnv)
 		if err != nil {
 			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 		}
-		m.ExcludeEnv, m.excludeEnvRegex, err = helper.SplitRegexFromMap(m.ExcludeEnv)
+		m.ExcludeEnv, m.excludeEnvRegex, err = containercenter.SplitRegexFromMap(m.ExcludeEnv)
 		if err != nil {
 			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 		}
-		m.IncludeContainerLabel, m.includeContainerLabelRegex, err = helper.SplitRegexFromMap(m.IncludeContainerLabel)
+		m.IncludeContainerLabel, m.includeContainerLabelRegex, err = containercenter.SplitRegexFromMap(m.IncludeContainerLabel)
 		if err != nil {
 			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 		}
-		m.ExcludeContainerLabel, m.excludeContainerLabelRegex, err = helper.SplitRegexFromMap(m.ExcludeContainerLabel)
+		m.ExcludeContainerLabel, m.excludeContainerLabelRegex, err = containercenter.SplitRegexFromMap(m.ExcludeContainerLabel)
 		if err != nil {
 			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 		}
-		m.k8sFilter, err = helper.CreateK8SFilter(m.K8sNamespaceRegex, m.K8sPodRegex, m.K8sContainerRegex, m.IncludeK8sLabel, m.ExcludeK8sLabel)
+		m.k8sFilter, err = containercenter.CreateK8SFilter(m.K8sNamespaceRegex, m.K8sPodRegex, m.K8sContainerRegex, m.IncludeK8sLabel, m.ExcludeK8sLabel)
 		if err != nil {
 			logger.Warning(m.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init k8s filter error", err)
 		}
@@ -191,7 +192,7 @@ func (m *Jmx) UpdateContainerCfg() {
 	for s := range m.instances {
 		delete(m.instances, s)
 	}
-	containers := helper.GetContainerByAcceptedInfo(m.IncludeContainerLabel, m.ExcludeContainerLabel,
+	containers := containercenter.GetContainerByAcceptedInfo(m.IncludeContainerLabel, m.ExcludeContainerLabel,
 		m.includeContainerLabelRegex, m.excludeContainerLabelRegex, m.IncludeEnv, m.ExcludeEnv,
 		m.includeEnvRegex, m.excludeEnvRegex, m.k8sFilter)
 	for _, detail := range containers {

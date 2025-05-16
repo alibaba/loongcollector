@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -32,7 +32,7 @@ var FetchAllInterval = time.Second * time.Duration(300)
 // failed continuously. By default, 20 times of FetchAllInterval.
 // current incremental discovery does not refresh container's lastUpdateTime, so this value must be greater than FetchAllInterval
 var fetchAllSuccessTimeout = FetchAllInterval * 20
-var DockerCenterTimeout = time.Second * time.Duration(30)
+var ContainerCenterTimeout = time.Second * time.Duration(30)
 var MaxFetchOneTriggerPerSecond int32 = 200
 
 type ContainerDiscoverManager struct {
@@ -98,24 +98,24 @@ func (c *ContainerDiscoverManager) FetchOne(containerID string) error {
 		}
 	}
 	if c.enableDockerDiscover {
-		err = dockerCenterInstance.fetchOne(containerID, true)
+		err = containerCenterInstance.fetchOne(containerID, true)
 		logger.Debug(context.Background(), "discover manager docker fetch one status", err == nil)
 	}
 	return err
 }
 
 func (c *ContainerDiscoverManager) fetchDocker() error {
-	if dockerCenterInstance == nil {
+	if containerCenterInstance == nil {
 		return nil
 	}
-	return dockerCenterInstance.fetchAll()
+	return containerCenterInstance.fetchAll()
 }
 
 func (c *ContainerDiscoverManager) fetchStatic() {
-	if dockerCenterInstance == nil {
+	if containerCenterInstance == nil {
 		return
 	}
-	dockerCenterInstance.readStaticConfig(true)
+	containerCenterInstance.readStaticConfig(true)
 }
 
 func (c *ContainerDiscoverManager) fetchCRI() error {
@@ -132,11 +132,11 @@ func (c *ContainerDiscoverManager) StartSyncContainers() {
 	}
 	if c.enableStaticDiscover {
 		logger.Debug(context.Background(), "discover manager start sync containers goroutine", "static")
-		go dockerCenterInstance.flushStaticConfig()
+		go containerCenterInstance.flushStaticConfig()
 	}
 	if c.enableDockerDiscover {
 		logger.Debug(context.Background(), "discover manager start sync containers goroutine", "docker")
-		go dockerCenterInstance.eventListener()
+		go containerCenterInstance.eventListener()
 	}
 }
 
@@ -145,8 +145,8 @@ func (c *ContainerDiscoverManager) Clean() {
 		criRuntimeWrapper.sweepCache()
 		logger.Debug(context.Background(), "discover manager clean", "cri")
 	}
-	if dockerCenterInstance != nil {
-		dockerCenterInstance.sweepCache()
+	if containerCenterInstance != nil {
+		containerCenterInstance.sweepCache()
 		logger.Debug(context.Background(), "discover manager clean", "docker")
 	}
 }
@@ -160,18 +160,15 @@ func (c *ContainerDiscoverManager) LogAlarm(err error, msg string) {
 }
 
 func (c *ContainerDiscoverManager) Init() bool {
-	defer dockerCenterRecover()
+	defer containerCenterRecover()
 
 	// discover which runtime is valid
-	if IsCRIRuntimeValid(containerdUnixSocket) {
-		var err error
-		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
-		if err != nil {
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
-			criRuntimeWrapper = nil
-		} else {
-			logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
-		}
+	if wrapper, err := NewCRIRuntimeWrapper(containerCenterInstance); err != nil {
+		logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		criRuntimeWrapper = nil
+	} else {
+		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+		criRuntimeWrapper = wrapper
 	}
 	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
 		if !ok {
@@ -182,7 +179,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 		logger.Warning(context.Background(), "check docker mount path error", err.Error())
 	}
 	c.enableCRIDiscover = criRuntimeWrapper != nil
-	c.enableDockerDiscover = dockerCenterInstance.initClient() == nil
+	c.enableDockerDiscover = containerCenterInstance.initClient() == nil
 	c.enableStaticDiscover = isStaticContainerInfoEnabled()
 	discoverdRuntime := c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
 	if !discoverdRuntime {
@@ -229,15 +226,15 @@ func (c *ContainerDiscoverManager) Init() bool {
 	}
 	logger.Info(context.Background(), "init docker center, fecth all success timeout", fetchAllSuccessTimeout.String())
 	{
-		timeoutSec := int(DockerCenterTimeout.Seconds())
+		timeoutSec := int(ContainerCenterTimeout.Seconds())
 		if err := util.InitFromEnvInt("DOCKER_CLIENT_REQUEST_TIMEOUT", &timeoutSec, timeoutSec); err != nil {
 			c.LogAlarm(err, "initialize env DOCKER_CLIENT_REQUEST_TIMEOUT error")
 		}
 		if timeoutSec > 0 {
-			DockerCenterTimeout = time.Duration(timeoutSec) * time.Second
+			ContainerCenterTimeout = time.Duration(timeoutSec) * time.Second
 		}
 	}
-	logger.Info(context.Background(), "init docker center, client request timeout", DockerCenterTimeout.String())
+	logger.Info(context.Background(), "init docker center, client request timeout", ContainerCenterTimeout.String())
 	{
 		count := int(MaxFetchOneTriggerPerSecond)
 		if err := util.InitFromEnvInt("CONTAINER_FETCH_ONE_MAX_COUNT_PER_SECOND", &count, count); err != nil {
@@ -271,12 +268,12 @@ func (c *ContainerDiscoverManager) Init() bool {
 
 func (c *ContainerDiscoverManager) TimerFetch() {
 	timerFetch := func() {
-		defer dockerCenterRecover()
+		defer containerCenterRecover()
 		lastFetchAllTime := time.Now()
 		for {
 			time.Sleep(time.Duration(10) * time.Second)
 			logger.Debug(context.Background(), "container clean timeout container info", "start")
-			dockerCenterInstance.cleanTimeoutContainer()
+			containerCenterInstance.cleanTimeoutContainer()
 			logger.Debug(context.Background(), "container clean timeout container info", "done")
 			if time.Since(lastFetchAllTime) >= FetchAllInterval {
 				logger.Info(context.Background(), "container fetch all", "start")
