@@ -88,7 +88,7 @@ jobs:
       - name: Set custom submodule URL and fetch
         run: |
           SUBMODULE_PATH="core/_thirdparty/coolbpf"
-          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
           git submodule update --init
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
@@ -129,3 +129,11 @@ jobs:
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
+
+  actions-timeline:
+    needs: [result]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2

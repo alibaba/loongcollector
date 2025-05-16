@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package selfmonitor
 
 import (
 	"fmt"
@@ -20,16 +20,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 func Test_MetricVectorWithEmptyLabel(t *testing.T) {
 	v := NewCumulativeCounterMetricVector("test", nil, nil)
-	v.WithLabels(pipeline.Label{Key: "test_label", Value: "test_value"}).Add(1)
+	v.WithLabels(LabelPair{Key: "test_label", Value: "test_value"}).Add(1)
 
 	v.WithLabels().Add(1)
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, 1, len(collectedMetrics))
@@ -44,10 +42,10 @@ func Test_MetricVectorWithEmptyLabel(t *testing.T) {
 
 func Test_MetricVectorWithConstLabel(t *testing.T) {
 	v := NewCumulativeCounterMetricVector("test", map[string]string{"host": "host1", "plugin_id": "2"}, nil)
-	v.WithLabels(pipeline.Label{Key: "test_label", Value: "test_value"}).Add(1)
+	v.WithLabels(LabelPair{Key: "test_label", Value: "test_value"}).Add(1)
 
 	v.WithLabels().Add(2)
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, 1, len(collectedMetrics))
@@ -74,14 +72,14 @@ func Test_CounterMetricVectorWithDynamicLabel(t *testing.T) {
 		[]string{"label1", "label2", "label3", "label5"},
 	)
 
-	v.WithLabels(pipeline.Label{Key: "label4", Value: "value4"}).Add(1)
+	v.WithLabels(LabelPair{Key: "label4", Value: "value4"}).Add(1)
 	v.WithLabels().Add(-1)
 	seriesCount := 500
 	for i := 0; i < seriesCount; i++ {
-		v.WithLabels(pipeline.Label{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Add(int64(i))
+		v.WithLabels(LabelPair{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Add(int64(i))
 	}
 
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, seriesCount+1, len(collectedMetrics))
@@ -122,14 +120,14 @@ func Test_AverageMetricVectorWithDynamicLabel(t *testing.T) {
 		[]string{"label1", "label2", "label3", "label5"},
 	)
 
-	v.WithLabels(pipeline.Label{Key: "label4", Value: "value4"}).Add(1)
+	v.WithLabels(LabelPair{Key: "label4", Value: "value4"}).Add(1)
 	v.WithLabels().Add(-1)
 	seriesCount := 500
 	for i := 0; i < seriesCount; i++ {
-		v.WithLabels(pipeline.Label{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Add(int64(i))
+		v.WithLabels(LabelPair{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Add(int64(i))
 	}
 
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, seriesCount+1, len(collectedMetrics))
@@ -172,15 +170,15 @@ func Test_LatencyMetricVectorWithDynamicLabel(t *testing.T) {
 		[]string{"label1", "label2", "label3", "label5"},
 	)
 
-	v.WithLabels(pipeline.Label{Key: "label4", Value: "value4"}).Observe(0)
+	v.WithLabels(LabelPair{Key: "label4", Value: "value4"}).Observe(0)
 	seriesCount := 500
 
 	v.WithLabels().Observe(float64(seriesCount * 2 * 1000))
 	for i := 0; i < seriesCount; i++ {
-		v.WithLabels(pipeline.Label{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Observe(float64(i * 1000))
+		v.WithLabels(LabelPair{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Observe(float64(i * 1000))
 	}
 
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, seriesCount+1, len(collectedMetrics))
@@ -208,7 +206,7 @@ func Test_LatencyMetricVectorWithDynamicLabel(t *testing.T) {
 		valueAsIndex := 0 // int(latency.Collect().Value / 1000)
 		metricName := func() string {
 			for k, v := range records {
-				if k == pipeline.SelfMetricNameKey {
+				if k == SelfMetricNameKey {
 					return v
 				}
 			}
@@ -238,15 +236,15 @@ func Test_GaugeMetricVectorWithDynamicLabel(t *testing.T) {
 		[]string{"label1", "label2", "label3", "label5"},
 	)
 
-	v.WithLabels(pipeline.Label{Key: "label4", Value: "value4"}).Set(0)
+	v.WithLabels(LabelPair{Key: "label4", Value: "value4"}).Set(0)
 	seriesCount := 500
 	v.WithLabels().Set(float64(seriesCount * 2 * 1000))
 
 	for i := 0; i < seriesCount; i++ {
-		v.WithLabels(pipeline.Label{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Set(float64(i))
+		v.WithLabels(LabelPair{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Set(float64(i))
 	}
 
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, seriesCount+1, len(collectedMetrics))
@@ -289,16 +287,16 @@ func Test_StrMetricVectorWithDynamicLabel(t *testing.T) {
 		[]string{"label1", "label2", "label3", "label5"},
 	)
 
-	v.WithLabels(pipeline.Label{Key: "label4", Value: "value4"}).Set("string")
+	v.WithLabels(LabelPair{Key: "label4", Value: "value4"}).Set("string")
 	seriesCount := 500
 
 	v.WithLabels().Set(strconv.Itoa(seriesCount * 2 * 1000))
 
 	for i := 0; i < seriesCount; i++ {
-		v.WithLabels(pipeline.Label{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Set(strconv.Itoa(i))
+		v.WithLabels(LabelPair{Key: "label1", Value: fmt.Sprintf("value_%d", i)}).Set(strconv.Itoa(i))
 	}
 
-	collector, ok := v.(pipeline.MetricCollector)
+	collector, ok := v.(MetricCollector)
 	assert.True(t, ok)
 	collectedMetrics := collector.Collect()
 	assert.Equal(t, seriesCount+1, len(collectedMetrics))
@@ -336,7 +334,7 @@ func Test_StrMetricVectorWithDynamicLabel(t *testing.T) {
 }
 
 func Test_NewCounterMetricAndRegister(t *testing.T) {
-	metricsRecord := &pipeline.MetricsRecord{Context: nil}
+	metricsRecord := &MetricsRecord{}
 	counter := NewCumulativeCounterMetricAndRegister(metricsRecord, "test_counter")
 	counter.Add(1)
 	value := counter.Collect()

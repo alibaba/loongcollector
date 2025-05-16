@@ -18,8 +18,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -94,9 +94,9 @@ func GetAgentStat() []map[string]string {
 	// key is the metric key in runtime/metrics, value is agent's metric key
 	metricNames := map[string]string{
 		// mem. Memory occupied by live objects and dead objects that have not yet been marked free by the garbage collector.
-		"/memory/classes/heap/objects:bytes": helper.MetricAgentMemoryGo,
+		"/memory/classes/heap/objects:bytes": selfmonitor.MetricAgentMemoryGo,
 		// go routines cnt. Count of live goroutines.
-		"/sched/goroutines:goroutines": helper.MetricAgentGoRoutinesTotal,
+		"/sched/goroutines:goroutines": selfmonitor.MetricAgentGoRoutinesTotal,
 	}
 
 	// metrics to read from runtime/metrics

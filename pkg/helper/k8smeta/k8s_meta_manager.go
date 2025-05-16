@@ -14,9 +14,8 @@ import (
 	controllerConfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 var metaManager *MetaManager
@@ -54,15 +53,15 @@ type MetaManager struct {
 
 	// self metrics
 	projectNames       map[string]int
-	metricRecord       pipeline.MetricsRecord
-	addEventCount      pipeline.CounterMetric
-	updateEventCount   pipeline.CounterMetric
-	deleteEventCount   pipeline.CounterMetric
-	cacheResourceGauge pipeline.GaugeMetric
-	queueSizeGauge     pipeline.GaugeMetric
-	httpRequestCount   pipeline.CounterMetric
-	httpAvgDelayMs     pipeline.CounterMetric
-	httpMaxDelayMs     pipeline.GaugeMetric
+	metricRecord       selfmonitor.MetricsRecord
+	addEventCount      selfmonitor.CounterMetric
+	updateEventCount   selfmonitor.CounterMetric
+	deleteEventCount   selfmonitor.CounterMetric
+	cacheResourceGauge selfmonitor.GaugeMetric
+	queueSizeGauge     selfmonitor.GaugeMetric
+	httpRequestCount   selfmonitor.CounterMetric
+	httpAvgDelayMs     selfmonitor.CounterMetric
+	httpMaxDelayMs     selfmonitor.GaugeMetric
 }
 
 func GetMetaManagerInstance() *MetaManager {
@@ -100,15 +99,15 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	}
 	m.clientset = clientset
 
-	m.metricRecord = pipeline.MetricsRecord{}
-	m.addEventCount = helper.NewCounterMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaAddEventTotal)
-	m.updateEventCount = helper.NewCounterMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaUpdateEventTotal)
-	m.deleteEventCount = helper.NewCounterMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaDeleteEventTotal)
-	m.cacheResourceGauge = helper.NewGaugeMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaCacheSize)
-	m.queueSizeGauge = helper.NewGaugeMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaQueueSize)
-	m.httpRequestCount = helper.NewCounterMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaHTTPRequestTotal)
-	m.httpAvgDelayMs = helper.NewAverageMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaHTTPAvgDelayMs)
-	m.httpMaxDelayMs = helper.NewMaxMetricAndRegister(&m.metricRecord, helper.MetricRunnerK8sMetaHTTPMaxDelayMs)
+	m.metricRecord = selfmonitor.MetricsRecord{}
+	m.addEventCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaAddEventTotal)
+	m.updateEventCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaUpdateEventTotal)
+	m.deleteEventCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaDeleteEventTotal)
+	m.cacheResourceGauge = selfmonitor.NewGaugeMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaCacheSize)
+	m.queueSizeGauge = selfmonitor.NewGaugeMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaQueueSize)
+	m.httpRequestCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPRequestTotal)
+	m.httpAvgDelayMs = selfmonitor.NewAverageMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPAvgDelayMs)
+	m.httpMaxDelayMs = selfmonitor.NewMaxMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPMaxDelayMs)
 
 	go func() {
 		startTime := time.Now()
@@ -133,6 +132,7 @@ func (m *MetaManager) IsReady() bool {
 func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
 	if cache, ok := m.cacheMap[resourceType]; ok {
 		cache.RegisterSendFunc(configName, func(events []*K8sMetaEvent) {
+			defer panicRecover()
 			sendFunc(events)
 			m.registerLock.RLock()
 			for _, linkType := range m.linkRegisterMap[configName] {
@@ -205,21 +205,21 @@ func GetMetaManagerMetrics() []map[string]string {
 		projectName = append(projectName, name)
 	}
 	manager.registerLock.RUnlock()
-	manager.metricRecord.Labels = []pipeline.Label{
+	manager.metricRecord.Labels = []selfmonitor.LabelPair{
 		{
-			Key:   helper.MetricLabelKeyMetricCategory,
-			Value: helper.MetricLabelValueMetricCategoryRunner,
+			Key:   selfmonitor.MetricLabelKeyMetricCategory,
+			Value: selfmonitor.MetricLabelValueMetricCategoryRunner,
 		},
 		{
-			Key:   helper.MetricLabelKeyClusterID,
+			Key:   selfmonitor.MetricLabelKeyClusterID,
 			Value: *flags.ClusterID,
 		},
 		{
-			Key:   helper.MetricLabelKeyRunnerName,
-			Value: helper.MetricLabelValueRunnerNameK8sMeta,
+			Key:   selfmonitor.MetricLabelKeyRunnerName,
+			Value: selfmonitor.MetricLabelValueRunnerNameK8sMeta,
 		},
 		{
-			Key:   helper.MetricLabelKeyProject,
+			Key:   selfmonitor.MetricLabelKeyProject,
 			Value: strings.Join(projectName, " "),
 		},
 	}

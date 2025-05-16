@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package selfmonitor
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"reflect"
@@ -526,7 +525,7 @@ func TestNewCounterMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want pipeline.CounterMetric
+		want CounterMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -546,7 +545,7 @@ func TestNewAverageMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want pipeline.CounterMetric
+		want CounterMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -566,7 +565,7 @@ func TestNewStringMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want pipeline.StringMetric
+		want StringMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -586,7 +585,7 @@ func TestNewLatencyMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want pipeline.LatencyMetric
+		want LatencyMetric
 	}{
 		// TODO: Add test cases.
 	}

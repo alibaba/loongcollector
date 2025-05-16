@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
-
-import "github.com/alibaba/ilogtail/pkg/pipeline"
+package selfmonitor
 
 //////////////////////////////////////////////////////////////////////////
 // plugin
@@ -107,19 +105,3 @@ const (
 const (
 	PluginPairsPerLogTotal = "pairs_per_log_total"
 )
-
-func GetPluginCommonLabels(context pipeline.Context, pluginMeta *pipeline.PluginMeta) []pipeline.LabelPair {
-	labels := make([]pipeline.LabelPair, 0)
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyMetricCategory, Value: MetricLabelValueMetricCategoryPlugin})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyProject, Value: context.GetProject()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyLogstore, Value: context.GetLogstore()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPipelineName, Value: context.GetConfigName()})
-
-	if len(pluginMeta.PluginID) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginID, Value: pluginMeta.PluginID})
-	}
-	if len(pluginMeta.PluginType) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginType, Value: pluginMeta.PluginType})
-	}
-	return labels
-}

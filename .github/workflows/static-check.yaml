@@ -109,3 +109,11 @@ jobs:
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
+
+  actions-timeline:
+    needs: [result]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2

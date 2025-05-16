@@ -17,23 +17,23 @@ package pluginmanager
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorWrapperV2 struct {
 	ProcessorWrapper
 	Processor pipeline.ProcessorV2
 
-	inEventGroupsTotal  pipeline.CounterMetric
-	outEventGroupsTotal pipeline.CounterMetric
+	inEventGroupsTotal  selfmonitor.CounterMetric
+	outEventGroupsTotal selfmonitor.CounterMetric
 }
 
 func (wrapper *ProcessorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
-	wrapper.inEventGroupsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginInEventGroupsTotal)
-	wrapper.outEventGroupsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginOutEventGroupsTotal)
+	wrapper.inEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginInEventGroupsTotal)
+	wrapper.outEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
 
 	return wrapper.Processor.Init(wrapper.Config.Context)
 }

@@ -209,7 +209,11 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storage_class_name", obj.Spec.StorageClassName)
 		log.Contents.Add("persistent_volume_reclaim_policy", string(obj.Spec.PersistentVolumeReclaimPolicy))
-		log.Contents.Add("volume_mode", string(*obj.Spec.VolumeMode))
+		if obj.Spec.VolumeMode != nil {
+			log.Contents.Add("volume_mode", string(*obj.Spec.VolumeMode))
+		} else {
+			log.Contents.Add("volume_mode", "")
+		}
 		log.Contents.Add("capacity", obj.Spec.Capacity.Storage().String())
 		log.Contents.Add("fsType", obj.Spec.CSI.FSType)
 		return []models.PipelineEvent{log}
