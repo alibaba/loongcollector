@@ -33,6 +33,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -99,10 +100,10 @@ type InputDockerFile struct {
 	context           pipeline.Context
 	lastClearTime     time.Time
 	updateEmptyFlag   bool
-	avgInstanceMetric pipeline.CounterMetric
-	addMetric         pipeline.CounterMetric
-	updateMetric      pipeline.CounterMetric
-	deleteMetric      pipeline.CounterMetric
+	avgInstanceMetric selfmonitor.CounterMetric
+	addMetric         selfmonitor.CounterMetric
+	updateMetric      selfmonitor.CounterMetric
+	deleteMetric      selfmonitor.CounterMetric
 	lastUpdateTime    int64
 
 	// Last return of GetAllAcceptedInfoV2
@@ -165,10 +166,10 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.updateEmptyFlag = true
 
 	metricsRecord := idf.context.GetMetricRecord()
-	idf.avgInstanceMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.MetricPluginContainerTotal)
-	idf.addMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginAddContainerTotal)
-	idf.deleteMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginRemoveContainerTotal)
-	idf.updateMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginUpdateContainerTotal)
+	idf.avgInstanceMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.MetricPluginContainerTotal)
+	idf.addMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginAddContainerTotal)
+	idf.deleteMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginRemoveContainerTotal)
+	idf.updateMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginUpdateContainerTotal)
 
 	var err error
 	idf.IncludeEnv, idf.IncludeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)

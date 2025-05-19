@@ -21,10 +21,10 @@ import (
 
 	"github.com/dlclark/regexp2"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorStringReplace struct {
@@ -36,7 +36,7 @@ type ProcessorStringReplace struct {
 
 	re            *regexp2.Regexp
 	context       pipeline.Context
-	logPairMetric pipeline.CounterMetric
+	logPairMetric selfmonitor.CounterMetric
 }
 
 const (
@@ -75,7 +75,7 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.logPairMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.PluginPairsPerLogTotal)
+	p.logPairMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.PluginPairsPerLogTotal)
 	return nil
 }
 

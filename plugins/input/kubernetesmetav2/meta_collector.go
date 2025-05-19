@@ -464,3 +464,17 @@ func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 func isEntity(resourceType string) bool {
 	return !strings.Contains(resourceType, k8smeta.LINK_SPLIT_CHARACTER)
 }
+
+func safeGetInt32String(pointer *int32) string {
+	if pointer == nil {
+		return ""
+	}
+	return strconv.FormatInt(int64(*pointer), 10)
+}
+
+func safeGetBoolString(pointer *bool) string {
+	if pointer == nil {
+		return ""
+	}
+	return strconv.FormatBool(*pointer)
+}

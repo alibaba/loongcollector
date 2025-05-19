@@ -20,8 +20,16 @@ func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, m
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("reclaim_policy", string(*obj.ReclaimPolicy))
-		log.Contents.Add("volume_binding_mode", string(*obj.VolumeBindingMode))
+		if obj.ReclaimPolicy != nil {
+			log.Contents.Add("reclaim_policy", string(*obj.ReclaimPolicy))
+		} else {
+			log.Contents.Add("reclaim_policy", "")
+		}
+		if obj.VolumeBindingMode != nil {
+			log.Contents.Add("volume_binding_mode", string(*obj.VolumeBindingMode))
+		} else {
+			log.Contents.Add("volume_binding_mode", "")
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil

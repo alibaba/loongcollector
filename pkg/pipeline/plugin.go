@@ -14,6 +14,8 @@
 
 package pipeline
 
+import "github.com/alibaba/ilogtail/pkg/selfmonitor"
+
 // logtail plugin type define
 const (
 	MetricInputType  = iota
@@ -26,7 +28,7 @@ const (
 type PluginContext struct {
 	ID           string
 	Priority     int
-	MetricRecord *MetricsRecord
+	MetricRecord *selfmonitor.MetricsRecord
 }
 
 type PluginMeta struct {
@@ -81,4 +83,20 @@ var Extensions = map[string]ExtensionCreator{}
 
 func AddExtensionCreator(name string, creator ExtensionCreator) {
 	Extensions[name] = creator
+}
+
+func GetPluginCommonLabels(context Context, pluginMeta *PluginMeta) []selfmonitor.LabelPair {
+	labels := make([]selfmonitor.LabelPair, 0)
+	labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyMetricCategory, Value: selfmonitor.MetricLabelValueMetricCategoryPlugin})
+	labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyProject, Value: context.GetProject()})
+	labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyLogstore, Value: context.GetLogstore()})
+	labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyPipelineName, Value: context.GetConfigName()})
+
+	if len(pluginMeta.PluginID) > 0 {
+		labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyPluginID, Value: pluginMeta.PluginID})
+	}
+	if len(pluginMeta.PluginType) > 0 {
+		labels = append(labels, selfmonitor.LabelPair{Key: selfmonitor.MetricLabelKeyPluginType, Value: pluginMeta.PluginType})
+	}
+	return labels
 }

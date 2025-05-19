@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/go-mysql-org/go-mysql/canal"
@@ -158,14 +158,14 @@ type ServiceCanal struct {
 	lastErrorCount     int
 	lastErrorChan      chan error
 
-	rotateCounter     pipeline.CounterMetric
-	syncCounter       pipeline.CounterMetric
-	ddlCounter        pipeline.CounterMetric
-	rowCounter        pipeline.CounterMetric
-	xgidCounter       pipeline.CounterMetric
-	checkpointCounter pipeline.CounterMetric
-	lastBinLogMetric  pipeline.StringMetric
-	lastGTIDMetric    pipeline.StringMetric
+	rotateCounter     selfmonitor.CounterMetric
+	syncCounter       selfmonitor.CounterMetric
+	ddlCounter        selfmonitor.CounterMetric
+	rowCounter        selfmonitor.CounterMetric
+	xgidCounter       selfmonitor.CounterMetric
+	checkpointCounter selfmonitor.CounterMetric
+	lastBinLogMetric  selfmonitor.StringMetric
+	lastGTIDMetric    selfmonitor.StringMetric
 }
 
 func (sc *ServiceCanal) Init(context pipeline.Context) (int, error) {
@@ -195,14 +195,14 @@ func (sc *ServiceCanal) Init(context pipeline.Context) (int, error) {
 	sc.lastErrorChan = make(chan error, 1)
 
 	metricsRecord := context.GetMetricRecord()
-	sc.rotateCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogRotate)
-	sc.syncCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogSync)
-	sc.ddlCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogDdl)
-	sc.rowCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogRow)
-	sc.xgidCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogXgid)
-	sc.checkpointCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogCheckpoint)
-	sc.lastBinLogMetric = helper.NewStringMetricAndRegister(metricsRecord, helper.MetricPluginBinlogFilename)
-	sc.lastGTIDMetric = helper.NewStringMetricAndRegister(metricsRecord, helper.MetricPluginBinlogGtid)
+	sc.rotateCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogRotate)
+	sc.syncCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogSync)
+	sc.ddlCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogDdl)
+	sc.rowCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogRow)
+	sc.xgidCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogXgid)
+	sc.checkpointCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogCheckpoint)
+	sc.lastBinLogMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogFilename)
+	sc.lastGTIDMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogGtid)
 
 	return 0, nil
 }
