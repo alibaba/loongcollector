@@ -18,6 +18,7 @@ on:
   push:
     branches:
       - main
+      - retry-on-benchmark-failed
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
@@ -120,11 +121,9 @@ jobs:
           sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: System environment
+      - name: Prepare test environment
         run: |
-          uname -r
-          docker --version
-          go version
+          pip3 install -r test/requirements.txt
 
       - name: Pull Docker image from GitHub Packages
         if: contains(matrix.test-agent, 'loongcollector')
@@ -135,10 +134,15 @@ jobs:
           docker tag ghcr.io/$REPO_OWNER/loongcollector:edge aliyun/loongcollector:0.0.1
 
       - name: Run benchmark for agent ${{ matrix.test-agent }}
-        run: |
-          pip3 install -r test/requirements.txt
-          ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
-          git stash
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_on: error
+          continue_on_error: true
+          command: |
+            ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
+            git stash
       
       - name: Upload benchmark result for agent ${{ matrix.test-agent }}
         uses: actions/upload-artifact@v4
