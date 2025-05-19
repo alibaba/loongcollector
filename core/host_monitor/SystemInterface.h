@@ -27,7 +27,10 @@
 #include <utility>
 #include <vector>
 
+#include "common/Flags.h"
 #include "common/ProcParser.h"
+
+DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 500);
 
 namespace logtail {
 
@@ -123,7 +126,12 @@ public:
     bool GetProcessListInformation(ProcessListInformation& processListInfo);
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
 
-    SystemInterface() = default;
+    explicit SystemInterface(std::chrono::milliseconds ttl
+                             = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
+        : mSystemInformationCache(),
+          mCPUInformationCache(ttl),
+          mProcessListInformationCache(ttl),
+          mProcessInformationCache(ttl) {}
     virtual ~SystemInterface() = default;
 
 private:
@@ -138,6 +146,11 @@ private:
     virtual bool GetCPUInformationOnce(CPUInformation& cpuInfo) = 0;
     virtual bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) = 0;
     virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
+
+    SystemInformation mSystemInformationCache;
+    SystemInformationCache<CPUInformation> mCPUInformationCache;
+    SystemInformationCache<ProcessListInformation> mProcessListInformationCache;
+    SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

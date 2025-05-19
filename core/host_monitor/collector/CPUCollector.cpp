@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "system_interface/Constants.h"
-#include "system_interface/SystemInterface.h"
+#include "host_monitor/Constants.h"
+#include "host_monitor/SystemInterface.h"
 
 namespace logtail {
 

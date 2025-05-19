@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "system_interface/SystemInterface.h"
+#include "host_monitor/SystemInterface.h"
 
 #include <chrono>
 #include <mutex>
@@ -25,13 +25,11 @@
 #include "common/Flags.h"
 #include "logger/Logger.h"
 #ifdef __linux__
-#include "system_interface/LinuxSystemInterface.h"
+#include "host_monitor/LinuxSystemInterface.h"
 #endif
 #ifdef APSARA_UNIT_TEST_MAIN
-#include "unittest/system_interface/MockSystemInterface.h"
+#include "unittest/host_monitor/MockSystemInterface.h"
 #endif
-
-DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 500);
 
 namespace logtail {
 
@@ -48,13 +46,12 @@ SystemInterface* SystemInterface::GetInstance() {
 
 bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
     // SystemInformation is static and will not be changed. So cache will never be expired.
-    static SystemInformation infoCache;
-    if (infoCache.collectTime.time_since_epoch().count() > 0) {
-        systemInfo = infoCache;
+    if (mSystemInformationCache.collectTime.time_since_epoch().count() > 0) {
+        systemInfo = mSystemInformationCache;
         return true;
     }
-    if (GetSystemInformationOnce(infoCache)) {
-        systemInfo = infoCache;
+    if (GetSystemInformationOnce(mSystemInformationCache)) {
+        systemInfo = mSystemInformationCache;
         return true;
     }
     return false;
@@ -62,10 +59,8 @@ bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
 
 bool SystemInterface::GetCPUInformation(CPUInformation& cpuInfo) {
     const std::string errorType = "cpu";
-    static SystemInformationCache<CPUInformation> cache(
-        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
     return MemoizedCall(
-        cache,
+        mCPUInformationCache,
         [this](BaseInformation& info) { return this->GetCPUInformationOnce(static_cast<CPUInformation&>(info)); },
         cpuInfo,
         errorType);
@@ -73,10 +68,8 @@ bool SystemInterface::GetCPUInformation(CPUInformation& cpuInfo) {
 
 bool SystemInterface::GetProcessListInformation(ProcessListInformation& processListInfo) {
     const std::string errorType = "process list";
-    static SystemInformationCache<ProcessListInformation> cache(
-        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
     return MemoizedCall(
-        cache,
+        mProcessListInformationCache,
         [this](BaseInformation& info) {
             return this->GetProcessListInformationOnce(static_cast<ProcessListInformation&>(info));
         },
@@ -86,10 +79,8 @@ bool SystemInterface::GetProcessListInformation(ProcessListInformation& processL
 
 bool SystemInterface::GetProcessInformation(pid_t pid, ProcessInformation& processInfo) {
     const std::string errorType = "process";
-    static SystemInformationCache<ProcessInformation, pid_t> cache(
-        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
     return MemoizedCall(
-        cache,
+        mProcessInformationCache,
         [this](BaseInformation& info, pid_t pid) {
             return this->GetProcessInformationOnce(pid, static_cast<ProcessInformation&>(info));
         },

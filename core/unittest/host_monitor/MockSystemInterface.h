@@ -16,7 +16,7 @@
 
 #include <thread>
 
-#include "system_interface/SystemInterface.h"
+#include "host_monitor/SystemInterface.h"
 
 namespace logtail {
 

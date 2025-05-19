@@ -128,7 +128,7 @@ set(SUB_DIRECTORIES_LIST
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         parser
-        host_monitor host_monitor/collector system_interface
+        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)

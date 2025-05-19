@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "system_interface/LinuxSystemInterface.h"
+#include "host_monitor/LinuxSystemInterface.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -24,8 +24,8 @@ using namespace std::chrono;
 
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
+#include "host_monitor/Constants.h"
 #include "logger/Logger.h"
-#include "system_interface/Constants.h"
 
 namespace logtail {
 

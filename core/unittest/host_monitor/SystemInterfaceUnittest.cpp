@@ -17,9 +17,9 @@
 #include <thread>
 
 #include "common/Flags.h"
-#include "system_interface/SystemInterface.h"
+#include "host_monitor/SystemInterface.h"
 #include "unittest/Unittest.h"
-#include "unittest/system_interface/MockSystemInterface.h"
+#include "unittest/host_monitor/MockSystemInterface.h"
 
 using namespace std;
 

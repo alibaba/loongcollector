@@ -14,8 +14,8 @@
 
 #include <fstream>
 
-#include "system_interface/Constants.h"
-#include "system_interface/LinuxSystemInterface.h"
+#include "host_monitor/Constants.h"
+#include "host_monitor/LinuxSystemInterface.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

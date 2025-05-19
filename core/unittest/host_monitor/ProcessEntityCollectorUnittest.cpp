@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "common/ProcParser.h"
+#include "host_monitor/Constants.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
-#include "system_interface/Constants.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

@@ -17,7 +17,7 @@
 #pragma once
 
 #include "common/ProcParser.h"
-#include "system_interface/SystemInterface.h"
+#include "host_monitor/SystemInterface.h"
 
 namespace logtail {
 class LinuxSystemInterface : public SystemInterface {

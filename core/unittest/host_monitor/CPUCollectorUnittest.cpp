@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "models/MetricEvent.h"
-#include "system_interface/Constants.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
