@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/math"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -58,7 +58,7 @@ func (p *pluginv1Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.FlusherPlugins = make([]*FlusherWrapperV1, 0)
 	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
 	p.LogsChan = make(chan *pipeline.LogWithContext, inputQueueSize)
-	p.LogGroupsChan = make(chan *protocol.LogGroup, helper.Max(flushQueueSize, p.FlushOutStore.Len()))
+	p.LogGroupsChan = make(chan *protocol.LogGroup, math.Max(flushQueueSize, p.FlushOutStore.Len()))
 	p.FlushOutStore.Write(p.LogGroupsChan)
 	return nil
 }

@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package selfmonitor
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -110,7 +109,7 @@ func TestStrMetricV2_Set(t *testing.T) {
 }
 
 func TestDelta(t *testing.T) {
-	ms := newMetricVector("test", pipeline.CounterType, nil, nil)
+	ms := newMetricVector("test", CounterType, nil, nil)
 	delta := newDeltaCounter(ms, nil)
 
 	for i := 0; i < 1000; i++ {

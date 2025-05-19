@@ -1,7 +1,6 @@
 package kubernetesmetav2
 
 import (
-	"strconv"
 	"time"
 
 	batch "k8s.io/api/batch/v1" //nolint:typecheck
@@ -32,9 +31,9 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 			containerInfos = append(containerInfos, containerInfo)
 		}
 		log.Contents.Add("containers", m.processEntityJSONArray(containerInfos))
-		log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
-		log.Contents.Add("backoff_limit", strconv.FormatInt(int64(*obj.Spec.BackoffLimit), 10))
-		log.Contents.Add("completion", strconv.FormatInt(int64(*obj.Spec.Completions), 10))
+		log.Contents.Add("suspend", safeGetBoolString(obj.Spec.Suspend))
+		log.Contents.Add("backoff_limit", safeGetInt32String(obj.Spec.BackoffLimit))
+		log.Contents.Add("completion", safeGetInt32String(obj.Spec.Completions))
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -53,7 +52,7 @@ func (m *metaCollector) processCronJobEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		log.Contents.Add("schedule", obj.Spec.Schedule)
-		log.Contents.Add("suspend", strconv.FormatBool(*obj.Spec.Suspend))
+		log.Contents.Add("suspend", safeGetBoolString(obj.Spec.Suspend))
 		return []models.PipelineEvent{log}
 	}
 	return nil
