@@ -139,6 +139,7 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: |
+            set -ue
             ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
             git stash
       
