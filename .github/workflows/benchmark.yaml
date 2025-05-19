@@ -28,53 +28,53 @@ on:
       - 'CHANGELOG.md'
 
 jobs:
-  Build-LoongCollector-Linux:
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - arch: amd64
-            runner: [self-hosted, Linux, X64]
-          - arch: arm64
-            runner: [self-hosted, Linux, ARM64]
-      fail-fast: false
-    permissions:
-      contents: write
-      packages: write
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
+  # Build-LoongCollector-Linux:
+  #   runs-on: ${{ matrix.runner }}
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - arch: amd64
+  #           runner: [self-hosted, Linux, X64]
+  #         - arch: arm64
+  #           runner: [self-hosted, Linux, ARM64]
+  #     fail-fast: false
+  #   permissions:
+  #     contents: write
+  #     packages: write
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: false
   
-      - name: Set custom submodule URL and fetch
-        run: |
-          SUBMODULE_PATH="core/_thirdparty/coolbpf"
-          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
-          git submodule update --init
-          cd $SUBMODULE_PATH
-          echo "Current commit: $(git rev-parse HEAD)"
+  #     - name: Set custom submodule URL and fetch
+  #       run: |
+  #         SUBMODULE_PATH="core/_thirdparty/coolbpf"
+  #         git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+  #         git submodule update --init
+  #         cd $SUBMODULE_PATH
+  #         echo "Current commit: $(git rev-parse HEAD)"
 
-      - name: Build linux/${{ matrix.arch }} image
-        run: |
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker build --tag ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }} \
-              --file ./docker/Dockerfile_edge_linux .
-          docker push ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }}
+  #     - name: Build linux/${{ matrix.arch }} image
+  #       run: |
+  #         REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+  #         docker build --tag ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }} \
+  #             --file ./docker/Dockerfile_edge_linux .
+  #         docker push ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }}
 
-  Build-LoongCollector-Image:
-    runs-on: ubuntu-latest
-    needs: [ Build-LoongCollector-Linux ]
-    steps:
-      - name: Create and push manifest
-        run: |
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker manifest create ghcr.io/$REPO_OWNER/loongcollector:edge \
-            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-amd64 \
-            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
-          docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
+  # Build-LoongCollector-Image:
+  #   runs-on: ubuntu-latest
+  #   needs: [ Build-LoongCollector-Linux ]
+  #   steps:
+  #     - name: Create and push manifest
+  #       run: |
+  #         REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+  #         docker manifest create ghcr.io/$REPO_OWNER/loongcollector:edge \
+  #           --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-amd64 \
+  #           --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
+  #         docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
 
   Benchmark:
     runs-on: ${{ matrix.runner }}
@@ -99,7 +99,7 @@ jobs:
     permissions:
       contents: write
       packages: read
-    needs: [ Build-LoongCollector-Image ]
+    # needs: [ Build-LoongCollector-Image ]
     steps:
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
@@ -139,7 +139,6 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           retry_on: error
-          continue_on_error: true
           command: |
             ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
             git stash
