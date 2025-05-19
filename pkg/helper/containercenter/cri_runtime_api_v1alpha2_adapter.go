@@ -88,41 +88,42 @@ func (a *RuntimeServiceV1Alpha2Adapter) ContainerStatus(ctx context.Context, con
 		return &CriContainerStatusResponse{}, err
 	}
 
-	status := &CriContainerStatus{
-		ID:          rawStatus.Status.Id,
-		Metadata:    &CriContainerMetadata{},
-		State:       CriContainerState(rawStatus.Status.State),
-		CreatedAt:   rawStatus.Status.CreatedAt,
-		StartedAt:   rawStatus.Status.StartedAt,
-		FinishedAt:  rawStatus.Status.FinishedAt,
-		ExitCode:    rawStatus.Status.ExitCode,
-		Image:       &CriImageSpec{},
-		ImageRef:    rawStatus.Status.ImageRef,
-		Reason:      rawStatus.Status.Reason,
-		Message:     rawStatus.Status.Message,
-		Labels:      rawStatus.Status.Labels,
-		Annotations: rawStatus.Status.Annotations,
-		Mounts:      []*CriMount{},
-		LogPath:     rawStatus.Status.LogPath,
-	}
-	if rawStatus.Status.Metadata != nil {
-		status.Metadata.Name = rawStatus.Status.Metadata.Name
-		status.Metadata.Attempt = rawStatus.Status.Metadata.Attempt
-	}
-	if rawStatus.Status.Image != nil {
-		status.Image.Image = rawStatus.Status.Image.Image
-		status.Image.Annotations = rawStatus.Status.Image.Annotations
-	}
-	if rawStatus.Status.Mounts != nil {
-		for _, rawMount := range rawStatus.Status.Mounts {
-			status.Mounts = append(status.Mounts, &CriMount{
-				ContainerPath:  rawMount.ContainerPath,
-				HostPath:       rawMount.HostPath,
-				Readonly:       rawMount.Readonly,
-				SelinuxRelabel: rawMount.SelinuxRelabel,
-				Propagation:    CriMountPropagation(rawMount.Propagation),
-			})
+	status := &CriContainerStatus{}
+	if rawStatus.Status != nil {
+		status.ID = rawStatus.Status.Id
+		status.Metadata = &CriContainerMetadata{}
+		if rawStatus.Status.Metadata != nil {
+			status.Metadata.Name = rawStatus.Status.Metadata.Name
+			status.Metadata.Attempt = rawStatus.Status.Metadata.Attempt
 		}
+		status.State = CriContainerState(rawStatus.Status.State)
+		status.CreatedAt = rawStatus.Status.CreatedAt
+		status.StartedAt = rawStatus.Status.StartedAt
+		status.FinishedAt = rawStatus.Status.FinishedAt
+		status.ExitCode = rawStatus.Status.ExitCode
+		status.Image = &CriImageSpec{}
+		if rawStatus.Status.Image != nil {
+			status.Image.Image = rawStatus.Status.Image.Image
+			status.Image.Annotations = rawStatus.Status.Image.Annotations
+		}
+		status.ImageRef = rawStatus.Status.ImageRef
+		status.Reason = rawStatus.Status.Reason
+		status.Message = rawStatus.Status.Message
+		status.Labels = rawStatus.Status.Labels
+		status.Annotations = rawStatus.Status.Annotations
+		status.Mounts = []*CriMount{}
+		if rawStatus.Status.Mounts != nil {
+			for _, rawMount := range rawStatus.Status.Mounts {
+				status.Mounts = append(status.Mounts, &CriMount{
+					ContainerPath:  rawMount.ContainerPath,
+					HostPath:       rawMount.HostPath,
+					Readonly:       rawMount.Readonly,
+					SelinuxRelabel: rawMount.SelinuxRelabel,
+					Propagation:    CriMountPropagation(rawMount.Propagation),
+				})
+			}
+		}
+		status.LogPath = rawStatus.Status.LogPath
 	}
 
 	return &CriContainerStatusResponse{

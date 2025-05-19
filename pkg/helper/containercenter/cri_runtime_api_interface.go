@@ -177,14 +177,14 @@ func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSiz
 	}
 	// Try v1 first
 	client.service = newCRIRuntimeServiceV1Adapter(conn)
-	if client.checkVersion(ctx) == nil {
+	if client.getVersion(ctx) == nil {
 		logger.Info(ctx, "Init cri client v1 success, cri info", client.info)
 		return client, nil
 	}
 
 	// Fallback to v1alpha2
 	client.service = newCRIRuntimeServiceV1Alpha2Adapter(conn)
-	if client.checkVersion(ctx) == nil {
+	if client.getVersion(ctx) == nil {
 		logger.Info(ctx, "Init cri client v1alpha2 success, cri info", client.info)
 		return client, nil
 	}
@@ -229,7 +229,7 @@ func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID s
 	return &CriPodSandboxStatusResponse{}, fmt.Errorf("invalid RuntimeServiceClient")
 }
 
-func (c *RuntimeServiceClient) checkVersion(ctx context.Context) error {
+func (c *RuntimeServiceClient) getVersion(ctx context.Context) error {
 	versionResp, err := c.service.Version(ctx)
 	if err == nil {
 		c.info = versionResp.CriVersionInfo

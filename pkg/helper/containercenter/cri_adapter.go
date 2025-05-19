@@ -17,6 +17,7 @@ package containercenter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -67,35 +68,27 @@ type CRIRuntimeWrapper struct {
 	listContainerStartTime int64 // in nanosecond
 }
 
-func IsCRIRuntimeValid() bool {
-	// Verify containerd.sock cri valid.
+func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper, error) {
 	if fi, err := os.Stat(containerdUnixSocket); err != nil || fi.IsDir() {
-		return false
+		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
 	}
 
-	client, err := NewRuntimeServiceClient(time.Minute, maxMsgSize)
+	client, err := NewRuntimeServiceClient(defaultContextTimeout, maxMsgSize)
 	if err != nil {
-		logger.Warning(context.Background(), "NewRuntimeServiceClient", containerdUnixSocket, "failed", err)
-		return false
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
+		return nil, err
 	}
-	defer client.Close()
 
 	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	defer cancel()
 
 	containerResp, err := client.ListContainers(ctx)
-	return err == nil && len(containerResp.Containers) != 0
-}
-
-func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper, error) {
-	ok := IsCRIRuntimeValid()
-	if !ok {
-		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
-	}
-
-	client, err := NewRuntimeServiceClient(time.Second*10, maxMsgSize)
 	if err != nil {
-		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "List containers from cri-runtime failed: %v", err)
+		return nil, err
+	} else if len(containerResp.Containers) == 0 {
+		err = errors.New("remote cri-runtime has no container")
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Remote cri-runtime is invalid: %v", err)
 		return nil, err
 	}
 
