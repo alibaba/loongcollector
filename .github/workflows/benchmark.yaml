@@ -138,7 +138,6 @@ jobs:
         with:
           timeout_minutes: 10
           max_attempts: 3
-          retry_on: error
           command: |
             ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
             git stash
