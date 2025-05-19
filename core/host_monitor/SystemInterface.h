@@ -30,7 +30,7 @@
 #include "common/Flags.h"
 #include "common/ProcParser.h"
 
-DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 500);
+DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 
 namespace logtail {
 
