@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "collection_pipeline/CollectionPipelineContext.h"
 #include "apm/Types.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
 
 namespace logtail::apm {
 
@@ -37,12 +37,10 @@ public:
 
     /**
      * DoAttach is used to write APP META to rc file
-     * and it will report attach status
      */
-    void DoAttach(const CollectionPipelineContext* ctx, uint32_t pluginIndex, AttachConfig& config, int pid);
+    bool DoAttach(AttachConfig& config, int pid) {}
 
 private:
-
 };
 
-}
+} // namespace logtail::apm

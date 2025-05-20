@@ -403,6 +403,17 @@ macro(link_uuid target_name)
     endif ()
 endmacro()
 
+# archive
+macro(link_archive target_name)
+    if (archive_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${archive_${LINK_OPTION_SUFFIX}}")
+    elseif (ANDROID)
+        target_link_libraries(${target_name} "${archive_${LIBRARY_DIR_SUFFIX}}/libarchive.a")
+    elseif (UNIX)
+        target_link_libraries(${target_name} archive)
+    endif ()
+endmacro()
+
 macro(link_spl target_name)
     logtail_define(spl_${target_name} "" "")
 

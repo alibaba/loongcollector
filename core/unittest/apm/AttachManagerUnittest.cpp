@@ -12,27 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/ArchiveHelper.h"
+#include "apm/AttachManager.h"
 #include "unittest/Unittest.h"
 
-namespace logtail {
+namespace logtail::apm {
 
-class ArchiveHelperUnittest : public ::testing::Test {
+class AttachManagerUnittest : public testing::Test {
 public:
-    void TestExtract();
+    void TestInit() {}
+
+private:
+    AttachManager mMgr;
 };
 
-void ArchiveHelperUnittest::TestExtract() {
-    // test zip
-    ArchiveHelper archiveHelper("./AliyunJavaAgent.zip", ".");
-    bool res = archiveHelper.Extract();
-    APSARA_TEST_TRUE(res);
+UNIT_TEST_CASE(AttachManagerUnittest, TestInit);
 
-    // test gzip2
-}
+} // namespace logtail::apm
 
-UNIT_TEST_CASE(ArchiveHelperUnittest, TestExtract);
-
-} // namespace logtail
 
 UNIT_TEST_MAIN

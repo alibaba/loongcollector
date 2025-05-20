@@ -30,14 +30,17 @@ public:
 
     virtual ~PackageManager() = default;
 
-    void Init();
+    void Init() {}
 
-    bool CheckAndDownloadAPMAgent(APMLanguage lang, const std::string& version);
+    bool InstallExecHook();
+    bool UpdateExecHook();
+    bool UninstallExecHook();
+
+    // download and un-zip to target path ...
+    bool PrepareAPMAgent(APMLanguage lang, const std::string& version);
 
 private:
-
-    void downloadAPMAgent();
-
+    bool downloadFromOss(const std::string& url, const std::string& output, bool& changed);
 };
 
-}
+} // namespace logtail::apm

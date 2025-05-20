@@ -13,10 +13,13 @@
 // limitations under the License.
 
 #include "common/ArchiveHelper.h"
-#include "logger/Logger.h"
+
 #include <archive.h>
 #include <archive_entry.h>
+
 #include <filesystem>
+
+#include "logger/Logger.h"
 
 namespace logtail {
 
@@ -33,7 +36,6 @@ ArchiveHelper::ArchiveHelper(const std::string& archivePath, const std::string& 
 }
 
 bool ArchiveHelper::Extract() {
-
     if (!fs::exists(mArchivePath)) {
         LOG_ERROR(sLogger, ("archive file does not exists", mArchivePath));
         return false;
@@ -84,6 +86,7 @@ bool ArchiveHelper::Extract() {
 
         fclose(out);
     }
+    return true;
 }
 
 ArchiveHelper::ArchivePtr ArchiveHelper::createArchiveReader() {
@@ -106,4 +109,4 @@ ArchiveHelper::ArchivePtr ArchiveHelper::createArchiveReader() {
     return ArchivePtr(a);
 }
 
-}
+} // namespace logtail

@@ -23,14 +23,13 @@
 #include <mutex>
 #include <variant>
 
+#include "apm/AttachManager.h"
+#include "apm/PackageManager.h"
+#include "apm/Types.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/ProcParser.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
-#include "apm/Types.h"
-#include "common/ProcParser.h"
-#include "apm/AttachManager.h"
-#include "apm/HookManager.h"
-#include "apm/PackageManager.h"
 
 namespace logtail::apm {
 
@@ -59,16 +58,9 @@ public:
 
 private:
     int findPidsByRule(MatchRule& rule, std::vector<int>& pids);
-    /**
-     * 这个是否需要？
-     * 控制台中是否只需要通过 UModel 数据来获取 ECS 上的进程即可？
-     */
-    // std::vector<Proc> listAllProcess();
 
     AttachManager mAttachMgr;
-    HookManager mHookMgr;
     PackageManager mPackageMgr;
 };
 
-}
-
+} // namespace logtail::apm
