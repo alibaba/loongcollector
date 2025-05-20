@@ -202,7 +202,7 @@ func (m *metaCollector) Stop() error {
 	return nil
 }
 
-func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) (bool, string)  {
+func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) (bool, string) {
 	if strings.ToLower(resourceType) == "namespace" && serviceK8sMeta.Namespace && serviceK8sMeta.Cluster2Namespace != "" {
 		return true, serviceK8sMeta.Cluster2Namespace
 	}
@@ -241,7 +241,7 @@ func (m *metaCollector) handleAddOrUpdate(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Update")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) 
+			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
 			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly {
 				link := m.generateEntityClusterLink(log, relationType)
 				m.send(link, true)
@@ -255,7 +255,7 @@ func (m *metaCollector) handleDelete(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Expire")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) 
+			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
 			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly {
 				link := m.generateEntityClusterLink(log, relationType)
 				m.send(link, true)
@@ -419,9 +419,9 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
 	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
-	if relationType!="" {
+	if relationType != "" {
 		log.Contents.Add(entityLinkRelationTypeFieldName, relationType)
-	}else{
+	} else {
 		log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
 	}
 	log.Contents.Add(entityMethodFieldName, content.Get(entityMethodFieldName))
