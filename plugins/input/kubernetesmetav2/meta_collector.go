@@ -241,9 +241,9 @@ func (m *metaCollector) handleAddOrUpdate(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Update")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
-			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly {
-				link := m.generateEntityClusterLink(log, relationType)
+			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
+				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
 			}
 		}
@@ -255,9 +255,9 @@ func (m *metaCollector) handleDelete(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Expire")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			canClusterLinkDirectly, relationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
-			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly {
-				link := m.generateEntityClusterLink(log, relationType)
+			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
+				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
 			}
 		}
@@ -409,7 +409,7 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	return log
 }
 
-func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEvent, relationType string) models.PipelineEvent {
+func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEvent, linkRelationType string) models.PipelineEvent {
 	content := entityEvent.(*models.Log).Contents
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
@@ -419,11 +419,7 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
 	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
-	if relationType != "" {
-		log.Contents.Add(entityLinkRelationTypeFieldName, relationType)
-	} else {
-		log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
-	}
+	log.Contents.Add(entityLinkRelationTypeFieldName, linkRelationType)
 	log.Contents.Add(entityMethodFieldName, content.Get(entityMethodFieldName))
 
 	log.Contents.Add(entityFirstObservedTimeFieldName, content.Get(entityFirstObservedTimeFieldName))
