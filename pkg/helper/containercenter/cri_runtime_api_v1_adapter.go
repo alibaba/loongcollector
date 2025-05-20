@@ -35,12 +35,10 @@ func (a *RuntimeServiceV1Adapter) Version(ctx context.Context) (*CriVersionRespo
 		return &CriVersionResponse{}, err
 	}
 	return &CriVersionResponse{
-		CriVersionInfo{
-			resp.Version,
-			resp.RuntimeName,
-			resp.RuntimeVersion,
-			resp.RuntimeApiVersion,
-		},
+		resp.Version,
+		resp.RuntimeName,
+		resp.RuntimeVersion,
+		resp.RuntimeApiVersion,
 	}, nil
 }
 

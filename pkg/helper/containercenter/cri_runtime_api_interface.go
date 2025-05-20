@@ -49,7 +49,10 @@ type CriVersionInfo struct {
 }
 
 type CriVersionResponse struct {
-	CriVersionInfo
+	Version           string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	RuntimeName       string `protobuf:"bytes,2,opt,name=runtime_name,proto3" json:"runtime_name,omitempty"`
+	RuntimeVersion    string `protobuf:"bytes,3,opt,name=runtime_version,proto3" json:"runtime_version,omitempty"`
+	RuntimeAPIVersion string `protobuf:"bytes,4,opt,name=runtime_api_version,proto3" json:"runtime_api_version,omitempty"`
 }
 
 type CriContainerMetadata struct {
@@ -159,15 +162,20 @@ type RuntimeServiceClient struct {
 	conn    *grpc.ClientConn
 }
 
+var ( // for mock
+	getAddressAndDialer = GetAddressAndDialer
+	grpcDialContext     = grpc.DialContext
+)
+
 func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSize int) (*RuntimeServiceClient, error) {
-	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
+	addr, dailer, err := getAddressAndDialer(containerdUnixSocket)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := getContextWithTimeout(contextTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallRecvMsgSize)))
+	conn, err := grpcDialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallRecvMsgSize)))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +240,12 @@ func (c *RuntimeServiceClient) PodSandboxStatus(ctx context.Context, sandboxID s
 func (c *RuntimeServiceClient) getVersion(ctx context.Context) error {
 	versionResp, err := c.service.Version(ctx)
 	if err == nil {
-		c.info = versionResp.CriVersionInfo
+		c.info = CriVersionInfo{
+			versionResp.Version,
+			versionResp.RuntimeName,
+			versionResp.RuntimeVersion,
+			versionResp.RuntimeAPIVersion,
+		}
 	}
 	return err
 }
