@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -46,13 +46,13 @@ type DockerInfoDetailWithFilteredEnvAndLabel struct {
 }
 
 func GetContainersLastUpdateTime() int64 {
-	return getDockerCenterInstance().getLastUpdateMapTime()
+	return getContainerCenterInstance().getLastUpdateMapTime()
 }
 
 // GetContainerMeta get a thread safe container meta struct.
 func GetContainerMeta(containerID string) *ContainerMeta {
 	getFunc := func() *ContainerMeta {
-		instance := getDockerCenterInstance()
+		instance := getContainerCenterInstance()
 		instance.lock.RLock()
 		defer instance.lock.RUnlock()
 		detail, ok := instance.containerMap[containerID]
@@ -103,11 +103,11 @@ func GetContainerMeta(containerID string) *ContainerMeta {
 }
 
 func ProcessContainerAllInfo(processor func(*DockerInfoDetail)) {
-	getDockerCenterInstance().processAllContainerInfo(processor)
+	getContainerCenterInstance().processAllContainerInfo(processor)
 }
 
 func GetContainerBySpecificInfo(filter func(*DockerInfoDetail) bool) (infoList []*DockerInfoDetail) {
-	return getDockerCenterInstance().getAllSpecificInfo(filter)
+	return getContainerCenterInstance().getAllSpecificInfo(filter)
 }
 
 // GetContainerByAcceptedInfo gathers all info of containers that match the input parameters.
@@ -127,7 +127,7 @@ func GetContainerByAcceptedInfo(
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
 ) map[string]*DockerInfoDetail {
-	return getDockerCenterInstance().getAllAcceptedInfo(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
+	return getContainerCenterInstance().getAllAcceptedInfo(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
 }
 
 // GetContainerByAcceptedInfoV2 works like GetContainerByAcceptedInfo, but uses less CPU.
@@ -162,13 +162,13 @@ func GetContainerByAcceptedInfoV2(
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
 ) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
-	return getDockerCenterInstance().getAllAcceptedInfoV2(
+	return getContainerCenterInstance().getAllAcceptedInfoV2(
 		fullList, matchList, includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
 
 }
 
 func GetDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeletedList []string) {
-	return getDockerCenterInstance().getDiffContainers(fullList)
+	return getContainerCenterInstance().getDiffContainers(fullList)
 }
 
 // SplitRegexFromMap extract regex from user config
@@ -209,31 +209,31 @@ func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
 }
 
 func RegisterDockerEventListener(c chan events.Message) {
-	getDockerCenterInstance().registerEventListener(c)
+	getContainerCenterInstance().registerEventListener(c)
 }
 
 func UnRegisterDockerEventListener(c chan events.Message) {
-	getDockerCenterInstance().unRegisterEventListener(c)
+	getContainerCenterInstance().unRegisterEventListener(c)
 }
 
-func ContainerCenterInit() {
-	getDockerCenterInstance()
+func Init() {
+	getContainerCenterInstance()
 }
 
 func CreateContainerInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
-	return getDockerCenterInstance().CreateInfoDetail(info, envConfigPrefix, selfConfigFlag)
+	return getContainerCenterInstance().CreateInfoDetail(info, envConfigPrefix, selfConfigFlag)
 }
 
 // for test
 func GetContainerMap() map[string]*DockerInfoDetail {
-	instance := getDockerCenterInstance()
+	instance := getContainerCenterInstance()
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 	return instance.containerMap
 }
 
 func GetAllContainerToRecord(envSet, labelSet, k8sLabelSet map[string]struct{}, containerIds map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {
-	instance := getDockerCenterInstance()
+	instance := getContainerCenterInstance()
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 	result := make([]*DockerInfoDetailWithFilteredEnvAndLabel, 0)
@@ -254,7 +254,7 @@ func GetAllContainerToRecord(envSet, labelSet, k8sLabelSet map[string]struct{}, 
 }
 
 func GetAllContainerIncludeEnvAndLabelToRecord(envSet, labelSet, k8sLabelSet, diffEnvSet, diffLabelSet, diffK8sLabelSet map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {
-	instance := getDockerCenterInstance()
+	instance := getContainerCenterInstance()
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 	result := make([]*DockerInfoDetailWithFilteredEnvAndLabel, 0)

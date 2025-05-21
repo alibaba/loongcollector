@@ -15,7 +15,7 @@
 //go:build !windows
 // +build !windows
 
-package helper
+package containercenter
 
 import (
 	"fmt"
@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -747,12 +748,12 @@ func TestTryReadStaticContainerInfo(t *testing.T) {
 }
 
 func TestLoadStaticContainerConfig(t *testing.T) {
-	resetDockerCenter()
+	resetContainerCenter()
 	defer os.Remove("./static_container.json")
 	defer os.Unsetenv(staticContainerInfoPathEnvKey)
 	os.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
-	instance := getDockerCenterInstance()
+	instance := getContainerCenterInstance()
 	allInfo := instance.containerMap
 	require.Equal(t, 1, len(allInfo))
 	for id, info := range allInfo {
@@ -762,12 +763,12 @@ func TestLoadStaticContainerConfig(t *testing.T) {
 }
 
 func TestLoadStaticContainerConfigTwice(t *testing.T) {
-	resetDockerCenter()
+	resetContainerCenter()
 	defer os.Remove("./static_container.json")
 	defer os.Unsetenv(staticContainerInfoPathEnvKey)
 	os.WriteFile("./static_container.json", []byte(staticECIConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
-	instance := getDockerCenterInstance()
+	instance := getContainerCenterInstance()
 	allInfo := instance.containerMap
 	require.Equal(t, 8, len(allInfo))
 	for _, info := range allInfo {
@@ -777,7 +778,7 @@ func TestLoadStaticContainerConfigTwice(t *testing.T) {
 	os.Remove("./static_container.json")
 	os.WriteFile("./static_container.json", []byte(staticECIConfig2), os.ModePerm)
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(defaultContextTimeout)
 
 	allInfo = instance.containerMap
 	require.Equal(t, 8, len(allInfo))
@@ -789,8 +790,8 @@ func TestLoadStaticContainerConfigTwice(t *testing.T) {
 func checkSameDevInode(t *testing.T, oldname, newname string) {
 	logNameStat, _ := os.Stat(oldname)
 	logStat0, _ := os.Stat(newname)
-	logNameOSStat := GetOSState(logNameStat)
-	logOSStat0 := GetOSState(logStat0)
+	logNameOSStat := helper.GetOSState(logNameStat)
+	logOSStat0 := helper.GetOSState(logStat0)
 	if logOSStat0.Device != logNameOSStat.Device ||
 		logOSStat0.Inode != logNameOSStat.Inode ||
 		logOSStat0.ModifyTime != logNameOSStat.ModifyTime ||
