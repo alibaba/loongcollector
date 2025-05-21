@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2024 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,38 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-<<<<<<<< HEAD:test/tools/generate.go
-package tools
-========
 //go:build !linux && !windows
 // +build !linux,!windows
 
 package containercenter
->>>>>>>> eaadb586 (support cri v1 (#2191)):pkg/helper/containercenter/cri_helper_others.go
 
 import (
-	"os"
-	"path/filepath"
-
-	"github.com/alibaba/ilogtail/test/config"
-
-	"gopkg.in/yaml.v3"
+	"net"
+	"time"
 )
 
-func GenerateManual(examplePath, docPath string) error {
-	return genernateExample(examplePath)
+var containerdUnixSocket = "/run/containerd/containerd.sock"
 
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
+func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+	return "", dial, nil
 }
 
-func genernateExample(path string) error {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	_ = os.Remove(abs)
-	bytes, err := yaml.Marshal(config.DemoCase)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(abs, bytes, 0600)
+func dial(addr string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", addr, timeout)
 }

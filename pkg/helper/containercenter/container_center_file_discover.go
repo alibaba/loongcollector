@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -45,7 +46,7 @@ var staticDockerContainers []types.ContainerJSON
 var staticDockerContainerError error
 var staticDockerContainerLock sync.Mutex
 var loadStaticContainerOnce sync.Once
-var staticDockerContainerLastStat StateOS
+var staticDockerContainerLastStat helper.StateOS
 var staticDockerContainerFile string
 var staticDockerContainerLastBody string
 
@@ -259,7 +260,7 @@ func tryReadStaticContainerInfo() ([]types.ContainerJSON, []string, bool, error)
 			stat, err := os.Stat(staticDockerContainerFile)
 			staticDockerContainers, _, statusChanged, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, nil, stat)
 			if err == nil {
-				staticDockerContainerLastStat = GetOSState(stat)
+				staticDockerContainerLastStat = helper.GetOSState(stat)
 			}
 			// not used yet
 			// if containerType := os.Getenv(staticContainerType); containerType == staticContainerTypeContainerD {
@@ -292,7 +293,7 @@ func tryReadStaticContainerInfo() ([]types.ContainerJSON, []string, bool, error)
 		return staticDockerContainers, nil, statusChanged, err
 	}
 
-	osStat := GetOSState(stat)
+	osStat := helper.GetOSState(stat)
 	if !osStat.IsChange(staticDockerContainerLastStat) && staticDockerContainerError == nil {
 		return staticDockerContainers, nil, statusChanged, nil
 	}

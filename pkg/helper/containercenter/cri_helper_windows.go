@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2024 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-// +build linux
+//go:build windows
+// +build windows
 
-package helper
+package containercenter
 
 import (
-	"context"
-	"fmt"
+	"net"
+	"time"
 
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
+	winio "github.com/Microsoft/go-winio"
 )
 
-func ContainerProcessAlive(pid int) bool {
-	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
-	exist, err := util.PathExists(procStatPath)
-	if err != nil {
-		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
-	} else if !exist {
-		return false
-	}
-	return true
+var containerdUnixSocket = `\\.\pipe\containerd-containerd`
+
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
+func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+	return endpoint, dial, nil
+}
+
+func dial(addr string, timeout time.Duration) (net.Conn, error) {
+	return winio.DialPipe(addr, &timeout)
 }

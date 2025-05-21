@@ -162,7 +162,7 @@ require (
 	github.com/containernetworking/cni v1.1.1 // indirect
 	github.com/containernetworking/plugins v1.1.1 // indirect
 	github.com/containers/ocicrypt v1.1.3 // indirect
-	github.com/coreos/go-systemd/v22 v22.4.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
