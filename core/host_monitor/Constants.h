@@ -24,4 +24,11 @@ extern std::filesystem::path PROCESS_DIR;
 const extern std::filesystem::path PROCESS_STAT;
 const extern int64_t SYSTEM_HERTZ;
 
+#ifdef __ENTERPRISE__
+const extern std::string DEFAULT_INSTANCE_ID_LABEL;
+const extern std::string DEFAULT_USER_ID_LABEL;
+#else
+const extern std::string DEFAULT_HOST_IP_LABEL;
+#endif
+
 } // namespace logtail
