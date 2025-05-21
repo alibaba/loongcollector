@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MetricEvent.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "models/MetricEvent.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -23,7 +23,6 @@ using namespace std;
 namespace logtail {
 class CPUCollectorUnittest : public testing::Test {
 public:
-    void TestGetHostSystemCPUStat() const;
     void TestCollect() const;
 
 protected:
@@ -38,57 +37,6 @@ protected:
         PROCESS_DIR = ".";
     }
 };
-
-void CPUCollectorUnittest::TestGetHostSystemCPUStat() const {
-    auto collector = CPUCollector();
-    auto cpus = vector<CPUStat>();
-    APSARA_TEST_TRUE(collector.GetHostSystemCPUStat(cpus));
-    APSARA_TEST_EQUAL_FATAL(4, cpus.size());
-    APSARA_TEST_EQUAL_FATAL(-1, cpus[0].index);
-    APSARA_TEST_EQUAL_FATAL(1195061569, cpus[0].user);
-    APSARA_TEST_EQUAL_FATAL(1728645, cpus[0].nice);
-    APSARA_TEST_EQUAL_FATAL(418424132, cpus[0].system);
-    APSARA_TEST_EQUAL_FATAL(203670447952, cpus[0].idle);
-    APSARA_TEST_EQUAL_FATAL(14723544, cpus[0].iowait);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[0].irq);
-    APSARA_TEST_EQUAL_FATAL(773400, cpus[0].softirq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[0].steal);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[0].guest);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[0].guestNice);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[1].index);
-    APSARA_TEST_EQUAL_FATAL(14708487, cpus[1].user);
-    APSARA_TEST_EQUAL_FATAL(14216, cpus[1].nice);
-    APSARA_TEST_EQUAL_FATAL(4613031, cpus[1].system);
-    APSARA_TEST_EQUAL_FATAL(2108180843, cpus[1].idle);
-    APSARA_TEST_EQUAL_FATAL(57199, cpus[1].iowait);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[1].irq);
-    APSARA_TEST_EQUAL_FATAL(424744, cpus[1].softirq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[1].steal);
-    APSARA_TEST_EQUAL_FATAL(1, cpus[1].guest);
-    APSARA_TEST_EQUAL_FATAL(2, cpus[1].guestNice);
-    APSARA_TEST_EQUAL_FATAL(1, cpus[2].index);
-    APSARA_TEST_EQUAL_FATAL(14708487, cpus[2].user);
-    APSARA_TEST_EQUAL_FATAL(14216, cpus[2].nice);
-    APSARA_TEST_EQUAL_FATAL(4613031, cpus[2].system);
-    APSARA_TEST_EQUAL_FATAL(2108180843, cpus[2].idle);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].iowait);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].irq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].softirq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].steal);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].guest);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[2].guestNice);
-    APSARA_TEST_EQUAL_FATAL(3, cpus[3].index);
-    APSARA_TEST_EQUAL_FATAL(14708487, cpus[3].user);
-    APSARA_TEST_EQUAL_FATAL(14216, cpus[3].nice);
-    APSARA_TEST_EQUAL_FATAL(4613031, cpus[3].system);
-    APSARA_TEST_EQUAL_FATAL(2108180843, cpus[3].idle);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].iowait);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].irq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].softirq);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].steal);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].guest);
-    APSARA_TEST_EQUAL_FATAL(0, cpus[3].guestNice);
-}
 
 void CPUCollectorUnittest::TestCollect() const {
     auto collector = CPUCollector();
@@ -164,7 +112,6 @@ void CPUCollectorUnittest::TestCollect() const {
     }
 }
 
-UNIT_TEST_CASE(CPUCollectorUnittest, TestGetHostSystemCPUStat);
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollect);
 
 } // namespace logtail

@@ -18,14 +18,8 @@
 
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
-
-#include "MetricValue.h"
-#include "common/StringTools.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/SystemInformationTools.h"
-#include "logger/Logger.h"
+#include "host_monitor/SystemInterface.h"
 
 namespace logtail {
 
@@ -37,8 +31,8 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     if (group == nullptr) {
         return false;
     }
-    std::vector<CPUStat> cpus;
-    if (!GetHostSystemCPUStat(cpus)) {
+    CPUInformation cpuInfo;
+    if (!SystemInterface::GetInstance()->GetCPUInformation(cpuInfo)) {
         return false;
     }
     const time_t now = time(nullptr);
@@ -58,7 +52,7 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         {"node_cpu_guest_seconds_total", "user", &CPUStat::guest},
         {"node_cpu_guest_seconds_total", "nice", &CPUStat::guestNice},
     };
-    for (const auto& cpu : cpus) {
+    for (const auto& cpu : cpuInfo.stats) {
         if (cpu.index == -1) {
             continue;
         }
@@ -75,64 +69,6 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         }
     }
     return true;
-}
-
-bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
-    std::vector<std::string> cpuLines;
-    std::string errorMessage;
-    if (!GetHostSystemStat(cpuLines, errorMessage)) {
-        if (mValidState) {
-            LOG_WARNING(sLogger, ("failed to get system cpu", "invalid CPU collector")("error msg", errorMessage));
-            mValidState = false;
-        }
-        return false;
-    }
-    mValidState = true;
-    // cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0
-    // cpu0 14708487 14216 4613031 2108180843 57199 0 424744 0 0 0
-    // ...
-    cpus.clear();
-    cpus.reserve(cpuLines.size());
-    for (auto const& line : cpuLines) {
-        std::vector<std::string> cpuMetric;
-        boost::split(cpuMetric, line, boost::is_any_of(" "), boost::token_compress_on);
-        if (cpuMetric.size() > 0 && cpuMetric[0].substr(0, 3) == "cpu") {
-            CPUStat cpuStat{};
-            if (cpuMetric[0] == "cpu") {
-                cpuStat.index = -1;
-            } else {
-                if (!StringTo(cpuMetric[0].substr(3), cpuStat.index)) {
-                    LOG_ERROR(sLogger, ("failed to parse cpu index", "skip")("wrong cpu index", cpuMetric[0]));
-                    continue;
-                }
-            }
-            cpuStat.user = ParseMetric(cpuMetric, EnumCpuKey::user);
-            cpuStat.nice = ParseMetric(cpuMetric, EnumCpuKey::nice);
-            cpuStat.system = ParseMetric(cpuMetric, EnumCpuKey::system);
-            cpuStat.idle = ParseMetric(cpuMetric, EnumCpuKey::idle);
-            cpuStat.iowait = ParseMetric(cpuMetric, EnumCpuKey::iowait);
-            cpuStat.irq = ParseMetric(cpuMetric, EnumCpuKey::irq);
-            cpuStat.softirq = ParseMetric(cpuMetric, EnumCpuKey::softirq);
-            cpuStat.steal = ParseMetric(cpuMetric, EnumCpuKey::steal);
-            cpuStat.guest = ParseMetric(cpuMetric, EnumCpuKey::guest);
-            cpuStat.guestNice = ParseMetric(cpuMetric, EnumCpuKey::guest_nice);
-            cpus.push_back(cpuStat);
-        }
-    }
-    return true;
-}
-
-double CPUCollector::ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const {
-    if (cpuMetric.size() <= static_cast<size_t>(key)) {
-        return 0.0;
-    }
-    double value = 0.0;
-    if (!StringTo(cpuMetric[static_cast<size_t>(key)], value)) {
-        LOG_WARNING(
-            sLogger,
-            ("failed to parse cpu metric", static_cast<size_t>(key))("value", cpuMetric[static_cast<size_t>(key)]));
-    }
-    return value;
 }
 
 } // namespace logtail
