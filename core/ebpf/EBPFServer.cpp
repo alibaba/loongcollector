@@ -180,10 +180,13 @@ void EBPFServer::Init() {
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
         std::move(dynamicLabels));
 
-    mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
-    mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
-    mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
-    mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+    auto pollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+    auto lossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+    auto processCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+    auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+    auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
+    auto retryableEventCacheSize = mRef.CreateIntGauge(
+        METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE); // TODO: shoud be shared across network connection retry
 
     mEBPFAdapter->Init();
 
@@ -191,10 +194,12 @@ void EBPFServer::Init() {
                                                                  mHostName,
                                                                  mHostPathPrefix,
                                                                  mDataEventQueue,
-                                                                 mPollProcessEventsTotal,
-                                                                 mLossProcessEventsTotal,
-                                                                 mProcessCacheMissTotal,
-                                                                 mProcessCacheSize);
+                                                                 pollProcessEventsTotal,
+                                                                 lossProcessEventsTotal,
+                                                                 processCacheMissTotal,
+                                                                 processCacheSize,
+                                                                 processDataMapSize,
+                                                                 retryableEventCacheSize);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);

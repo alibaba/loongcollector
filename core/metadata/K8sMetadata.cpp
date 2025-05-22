@@ -20,8 +20,10 @@
 
 #include <chrono>
 #include <future>
+#include <memory>
 #include <thread>
 
+#include "ContainerInfo.h"
 #include "app_config/AppConfig.h"
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
@@ -439,8 +441,10 @@ std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByContainerIdFromCache(const Str
         return nullptr;
     }
     auto cid = std::string(containerId);
-    if (mContainerCache.contains(cid)) {
-        return mContainerCache.get(cid);
+    std::shared_ptr<K8sPodInfo> info;
+    bool isValid = mContainerCache.tryGetCopy(cid, info);
+    if (isValid) {
+        return info;
     }
     return nullptr;
 }
@@ -450,8 +454,10 @@ std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& 
         return nullptr;
     }
     auto ip = std::string(ipv);
-    if (mIpCache.contains(ip)) {
-        return mIpCache.get(ip);
+    std::shared_ptr<K8sPodInfo> info;
+    bool isValid = mIpCache.tryGetCopy(ip, info);
+    if (isValid) {
+        return info;
     }
     return nullptr;
 }

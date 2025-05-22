@@ -12,34 +12,151 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <charconv>
+#include "common/ProcParser.h"
+
 #include <climits>
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 
-#include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 #include <string_view>
-
-#include "FileSystemUtil.h"
-#include "StringView.h"
-#include "common/TimeUtil.h"
 #if defined(__linux__)
 #include <pwd.h>
 #endif
 
-#include "Logger.h"
-#include "ProcParser.h"
+#include "common/EncodingUtil.h"
+#include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
+#include "common/TimeUtil.h"
+#include "logger/Logger.h"
 
 namespace logtail {
+
+/* Decode rawArgs to readable args string
+ * @param rawArgs: \0 separated arg buffer, e.g. arg1\0arg 2\0arg"3"
+ * @return: decoded args string, e.g. arg1 "arg 2" arg\"3\"
+ */
+std::string DecodeArgs(StringView& rawArgs) {
+    std::string args;
+    if (rawArgs.empty()) {
+        return args;
+    }
+    args.reserve(rawArgs.size() * 2);
+    StringViewSplitter splitter(rawArgs, kNullSv);
+    bool first = true;
+    for (auto field : splitter) {
+        if (first) {
+            first = false;
+        } else {
+            args += " ";
+        }
+        if (field.find(' ') != std::string::npos || field.find('\t') != std::string::npos
+            || field.find('\n') != std::string::npos) {
+            args += "\"";
+            for (char c : field) {
+                if (c == '"' || c == '\\') {
+                    args += '\\'; // Escape the character
+                }
+                if (c == '\n') {
+                    args += "\\n";
+                } else if (c == '\t') {
+                    args += "\\t";
+                } else {
+                    args += c;
+                }
+            }
+            args += "\"";
+        } else {
+            args.append(field.data(), field.size());
+        }
+    }
+    return args;
+}
+
+static constexpr std::array kCapabilityStrings = {std::string_view("CAP_CHOWN"),
+                                                  std::string_view("DAC_OVERRIDE"),
+                                                  std::string_view("CAP_DAC_READ_SEARCH"),
+                                                  std::string_view("CAP_FOWNER"),
+                                                  std::string_view("CAP_FSETID"),
+                                                  std::string_view("CAP_KILL"),
+                                                  std::string_view("CAP_SETGID"),
+                                                  std::string_view("CAP_SETUID"),
+                                                  std::string_view("CAP_SETPCAP"),
+                                                  std::string_view("CAP_LINUX_IMMUTABLE"),
+                                                  std::string_view("CAP_NET_BIND_SERVICE"),
+                                                  std::string_view("CAP_NET_BROADCAST"),
+                                                  std::string_view("CAP_NET_ADMIN"),
+                                                  std::string_view("CAP_NET_RAW"),
+                                                  std::string_view("CAP_IPC_LOCK"),
+                                                  std::string_view("CAP_IPC_OWNER"),
+                                                  std::string_view("CAP_SYS_MODULE"),
+                                                  std::string_view("CAP_SYS_RAWIO"),
+                                                  std::string_view("CAP_SYS_CHROOT"),
+                                                  std::string_view("CAP_SYS_PTRACE"),
+                                                  std::string_view("CAP_SYS_PACCT"),
+                                                  std::string_view("CAP_SYS_ADMIN"),
+                                                  std::string_view("CAP_SYS_BOOT"),
+                                                  std::string_view("CAP_SYS_NICE"),
+                                                  std::string_view("CAP_SYS_RESOURCE"),
+                                                  std::string_view("CAP_SYS_TIME"),
+                                                  std::string_view("CAP_SYS_TTY_CONFIG"),
+                                                  std::string_view("CAP_MKNOD"),
+                                                  std::string_view("CAP_LEASE"),
+                                                  std::string_view("CAP_AUDIT_WRITE"),
+                                                  std::string_view("CAP_AUDIT_CONTROL"),
+                                                  std::string_view("CAP_SETFCAP"),
+                                                  std::string_view("CAP_MAC_OVERRIDE"),
+                                                  std::string_view("CAP_MAC_ADMIN"),
+                                                  std::string_view("CAP_SYSLOG"),
+                                                  std::string_view("CAP_WAKE_ALARM"),
+                                                  std::string_view("CAP_BLOCK_SUSPEND"),
+                                                  std::string_view("CAP_AUDIT_READ"),
+                                                  std::string_view("CAP_PERFMON"),
+                                                  std::string_view("CAP_BPF"),
+                                                  std::string_view("CAP_CHECKPOINT_RESTORE")};
+
+StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb) {
+    if (capInt == 0) {
+        return StringView("");
+    }
+
+    size_t capLen = 0;
+    for (uint64_t i = 0; i < kCapabilityStrings.size(); ++i) {
+        if ((1ULL << i) & capInt) {
+            if (capLen != 0) {
+                ++capLen;
+            }
+            capLen += kCapabilityStrings[i].size();
+        }
+    }
+
+    auto result = sb.AllocateStringBuffer(capLen);
+    for (uint64_t i = 0; i < kCapabilityStrings.size(); ++i) {
+        if ((1ULL << i) & capInt) {
+            if (result.size != 0) {
+                memcpy(result.data + result.size, " ", 1);
+                ++result.size;
+            }
+            memcpy(result.data + result.size, kCapabilityStrings[i].data(), kCapabilityStrings[i].size());
+            result.size += kCapabilityStrings[i].size();
+        }
+    }
+
+    return {result.data, result.size};
+}
+
+std::string GenerateExecId(const std::string& hostname, uint32_t pid, uint64_t ktime) {
+    // /proc/sys/kernel/pid_max is usually 7 digits 4194304
+    // nano timestamp is usually 19 digits
+    std::string execid;
+    execid.reserve(hostname.size() + 1 + 19 + 1 + 7);
+    execid.assign(hostname).append(":").append(std::to_string(ktime)).append(":").append(std::to_string(pid));
+    return Base64Enconde(execid);
+}
 
 std::filesystem::path ProcParser::procPidPath(uint32_t pid, const std::string& subpath) const {
     return mProcPath / std::to_string(pid) / subpath;
@@ -222,24 +339,21 @@ int ProcParser::LookupContainerId(const StringView& cgroupline, bool bpfSource, 
 int ProcParser::GetContainerId(const std::string& cgroupPath, std::string& containerId) {
     std::string content;
     if (FileReadResult::kOK != ReadFileContent(cgroupPath, content)) {
-        LOG_DEBUG(sLogger, ("Failed to read cgroup file", cgroupPath));
+        LOG_WARNING(sLogger, ("Failed to read cgroup file", cgroupPath));
         containerId.clear();
         return -1;
     }
 
     StringViewSplitter splitter(content, "\n");
     for (const auto& line : splitter) {
-        LOG_DEBUG(sLogger, ("cgroup line", line.to_string()));
         StringView containerIdView;
         int offset = LookupContainerId(line, false, containerIdView);
         if (offset >= 0) {
-            LOG_DEBUG(sLogger, ("Found container ID using lookup", containerIdView)("offset", offset));
             containerId = containerIdView.to_string();
             return offset;
         }
     }
 
-    LOG_DEBUG(sLogger, ("No valid container ID found in cgroup file", cgroupPath));
     containerId.clear();
     return -1;
 }
@@ -288,7 +402,7 @@ std::string ProcParser::GetUserNameByUid(uid_t uid) {
 
     int ret = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
     if (ret == 0 && result) {
-        if (sUserNameCache.size() > 10000) { // If we have too many entries, reset the cache.
+        if (sUserNameCache.size() > 8192) { // If we have too many entries, reset the cache.
             sUserNameCache.clear();
         }
         sUserNameCache[uid] = pwd.pw_name;
@@ -359,12 +473,11 @@ std::tuple<std::string, std::string> ProcParser::ProcsFilename(const std::string
 }
 
 bool ProcParser::ReadProcessStat(pid_t pid, ProcessStat& ps) const {
-    LOG_DEBUG(sLogger, ("read process stat", pid));
     auto processStat = mProcPath / std::to_string(pid) / "stat";
 
     std::string line;
     if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
-        LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
+        LOG_WARNING(sLogger, ("read process stat", "fail")("file", processStat));
         return false;
     }
     return ParseProcessStat(pid, line, ps);
@@ -379,7 +492,7 @@ bool ProcParser::ParseProcessStat(pid_t pid, const std::string& line, ProcessSta
     auto nameStartPos = line.find_first_of('(');
     auto nameEndPos = line.find_last_of(')');
     if (nameStartPos == std::string::npos || nameEndPos == std::string::npos || nameStartPos >= nameEndPos) {
-        LOG_ERROR(sLogger, ("can't find process name", pid)("stat", line));
+        LOG_WARNING(sLogger, ("can't find process name", pid)("stat", line));
         return false;
     }
     nameStartPos++; // 跳过左括号
@@ -399,7 +512,7 @@ bool ProcParser::ParseProcessStat(pid_t pid, const std::string& line, ProcessSta
     constexpr const EnumProcessStat offset = EnumProcessStat::state; // 跳过pid, comm
     constexpr const int minCount = EnumProcessStat::processor - offset + 1; // 37
     if (words.size() < minCount) {
-        LOG_ERROR(sLogger, ("unexpected item count", pid)("stat", line));
+        LOG_WARNING(sLogger, ("unexpected item count", pid)("stat", line));
         return false;
     }
 
@@ -458,12 +571,11 @@ bool ProcParser::ParseProcessStat(pid_t pid, const std::string& line, ProcessSta
 
 // 读取 /proc/<pid>/status 文件
 bool ProcParser::ReadProcessStatus(pid_t pid, ProcessStatus& ps) const {
-    LOG_DEBUG(sLogger, ("read process status", pid));
     auto processStatus = mProcPath / std::to_string(pid) / "status";
 
     std::string content;
     if (FileReadResult::kOK != ReadFileContent(processStatus.string(), content)) {
-        LOG_ERROR(sLogger, ("read process status", "fail")("file", processStatus));
+        LOG_WARNING(sLogger, ("read process status", "fail")("file", processStatus));
         return false;
     }
     return ParseProcessStatus(pid, content, ps);

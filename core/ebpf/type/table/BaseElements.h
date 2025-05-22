@@ -58,6 +58,14 @@ inline constexpr DataElement kPodName = {
     "",
 };
 
+inline constexpr DataElement kContainerName = {
+    "k8s_container_name",
+    "k8s_container_name", // metric
+    "k8s.container.name", // span
+    "k8s.container.name", // log, inside pod
+    "",
+};
+
 inline constexpr DataElement kPodIp = {
     "pod_ip",
     "podIp", // metric
@@ -321,6 +329,22 @@ inline constexpr DataElement kContainerId = {
     "local container id",
 };
 
+inline constexpr DataElement kLocalContainerName = {
+    "container_name",
+    "", // metric
+    "container.name", // span
+    "container.name", // log
+    "local container name",
+};
+
+inline constexpr DataElement kContainerImageName = {
+    "container_image_name",
+    "", // metric
+    "container.image.name", // span
+    "container.image.name", // log
+    "container image name",
+};
+
 // for processes
 inline constexpr DataElement kProcessId = {
     "process_pid",
@@ -521,7 +545,6 @@ inline constexpr DataElement kParentContainerId = {
     "parent.container.id", // log
     "local parent container id",
 };
-
 
 // for network
 inline constexpr DataElement kSaddr = {

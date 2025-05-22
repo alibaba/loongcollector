@@ -15,6 +15,8 @@
  */
 
 #pragma once
+#include <string_view>
+
 #include "boost/utility/string_view.hpp"
 
 namespace logtail {
@@ -23,5 +25,15 @@ namespace logtail {
 using StringView = boost::string_view;
 
 inline constexpr StringView kEmptyStringView("");
+
+struct StringViewHash {
+    size_t operator()(const StringView& k) const {
+        return std::hash<std::string_view>()(std::string_view(k.data(), k.size()));
+    }
+};
+
+struct StringViewEqual {
+    bool operator()(const StringView& lhs, const StringView& rhs) const { return lhs == rhs; }
+};
 
 } // namespace logtail
