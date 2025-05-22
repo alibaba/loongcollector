@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-<<<<<<<< HEAD:test/tools/generate.go
 package tools
-========
-//go:build !linux && !windows
-// +build !linux,!windows
-
-package containercenter
->>>>>>>> eaadb586 (support cri v1 (#2191)):pkg/helper/containercenter/cri_helper_others.go
 
 import (
 	"os"
