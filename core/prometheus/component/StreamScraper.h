@@ -30,12 +30,13 @@ public:
     void SetAutoMetricMeta(double scrapeDurationSeconds, bool upState, const std::string& scrapeState);
 
     size_t mRawSize = 0;
+    size_t mSendSize = 0;
     static size_t mMaxSampleLength;
     uint64_t mStreamIndex = 0;
 
 private:
     void AddEvent(const char* line, size_t len);
-    void PushEventGroup(PipelineEventGroup&&) const;
+    bool PushEventGroup(PipelineEventGroup&&) const;
     void SetTargetLabels(PipelineEventGroup& eGroup) const;
     std::string GetId();
 

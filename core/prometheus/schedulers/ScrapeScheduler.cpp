@@ -72,7 +72,8 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     auto* streamScraper = response.GetBody<prom::StreamScraper>();
 
     mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL, response.GetStatusCode());
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.GetStatusCode(), streamScraper->mRawSize);
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.GetStatusCode(), streamScraper->mSendSize);
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_IN_SIZE_BYTES, response.GetStatusCode(), streamScraper->mRawSize);
     mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.GetStatusCode(), scrapeDurationMilliSeconds);
 
     const auto& networkStatus = response.GetNetworkStatus();
@@ -231,6 +232,7 @@ void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
     static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys
         = {{METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
            {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+           {METRIC_PLUGIN_IN_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
            {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER}};
 
     mSelfMonitor->InitMetricManager(sScrapeMetricKeys, labels);
