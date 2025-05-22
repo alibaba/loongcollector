@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -31,6 +29,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -192,7 +191,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		cli, err := helper.CreateDockerClient()
+		cli, err := containercenter.CreateDockerClient()
 		if err != nil {
 			return nil, err
 		}
