@@ -120,7 +120,8 @@
 | `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md)          | 社区<br>[kl7sn](https://github.com/kl7sn)           | 将采集到的数据输出到 ClickHouse。                                                    |
 | `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf)       | 将采集到的数据输出到 ElasticSearch。                                                 |
 | `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md)                            | 社区<br>[abingcbc](https://github.com/abingcbc)     | 将采集到的数据输出到 Loki。                                                          |
-| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md)          | 社区<br>                                            | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
+| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md)          | 社区<br>[aiops1900](https://github.com/aiops1900)   | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
+| `flusher_s3`<br>[Prometheus](flusher/extended/flusher-s3.md)          | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311)   | 将采集到的数据，经过处理后，发送到AWS S3存档。 |
 
 ## 扩展
 
