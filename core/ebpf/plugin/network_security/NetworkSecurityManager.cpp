@@ -101,9 +101,10 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 
 NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                                               std::unique_ptr<ThreadPool>& threadPool,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(base, eBPFAdapter, queue, metricManager),
+    : AbstractManager(base, eBPFAdapter, threadPool, queue, metricManager),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {

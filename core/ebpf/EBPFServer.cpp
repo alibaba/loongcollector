@@ -284,7 +284,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -293,7 +293,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -302,7 +302,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -311,7 +311,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         // case PluginType::FILE_SECURITY: {
         //     if (!pluginMgr) {
         //         pluginMgr
-        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
+        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue,
         //             metricManager);
         //         UpdatePluginManager(type, pluginMgr);
         //     }

@@ -71,7 +71,7 @@ private:
     CounterPtr mRequestMetaServerTotal;
     CounterPtr mRequestMetaServerFailedTotal;
 
-    void ProcessBatch();
+    void processBatch();
 
     mutable std::mutex mStateMux;
     std::unordered_set<std::string> mPendingKeys; // 增加上限
@@ -188,7 +188,7 @@ struct K8sMetadataHttpRequest : public AsynHttpRequest {
         return mValidator();
     };
 
-    void OnSendDone(HttpResponse& response) {
+    void OnSendDone(HttpResponse& response) override {
         std::vector<std::string> podIps;
         bool status = K8sMetadata::GetInstance().HandleResponse(response, mInfoType, podIps);
         if (!status) {

@@ -17,6 +17,7 @@
 #include <atomic>
 #include <queue>
 #include <vector>
+#include <unordered_map>
 
 #include "ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -52,9 +53,10 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+           std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricManager) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue, metricManager);
+        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, threadPool, queue, metricManager);
     }
 
     NetworkObserverManager() = delete;
@@ -62,6 +64,7 @@ public:
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                           std::unique_ptr<ThreadPool>& threadPool,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
 
@@ -119,6 +122,9 @@ public:
     bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                       const std::shared_ptr<ScheduleConfig>& config) override;
 
+    bool AddOrUpdateApp(std::vector<std::shared_ptr<WorkloadSelector>>& selectors, std::shared_ptr<AppDetail>& appDetail);
+    bool RemoveApp(std::vector<std::shared_ptr<WorkloadSelector>>& selectors);
+
 private:
     void processRecord(const std::shared_ptr<AbstractRecord>& record);
     void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
@@ -130,6 +136,8 @@ private:
     void runInThread();
 
     bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
+
+    void executeTimerTask(JobType type, const std::chrono::steady_clock::time_point& execTime);
 
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
@@ -196,6 +204,12 @@ private:
 
     ReadWriteLock mLogAggLock;
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
+
+    // workload to app
+    std::unordered_map<std::string, std::shared_ptr<AppDetail>> mCid2AppDetails;
+
+    // namespace/workloadKind/workloadName to app
+    std::unordered_map<std::string, std::shared_ptr<AppDetail>> mWorkload2AppDetails;
 
     std::string mClusterId;
     std::string mAppId;

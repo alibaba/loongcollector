@@ -37,15 +37,17 @@ public:
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                           std::unique_ptr<ThreadPool>& threadPool,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+           std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, threadPool, queue, metricMgr);
     }
 
     ~ProcessSecurityManager() = default;

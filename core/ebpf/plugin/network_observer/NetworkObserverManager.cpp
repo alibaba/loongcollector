@@ -117,9 +117,10 @@ enum {
 
 NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                                               std::unique_ptr<ThreadPool>& threadPool,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                                const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
+    : AbstractManager(processCacheManager, eBPFAdapter, threadPool, queue, metricManager),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, const std::shared_ptr<AbstractRecord>& o) {
@@ -1337,6 +1338,7 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
     std::vector<std::string> expiredContainerIds;
     std::unordered_set<std::string> currentCids;
 
+    // podCidVec includes current pods running in the host ...
     for (const auto& cid : podCidVec) {
         auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
         if (!podInfo || podInfo->mAppId == "") {
@@ -1365,20 +1367,10 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
     UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
 }
 
-bool NetworkObserverManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                                          const std::shared_ptr<ScheduleConfig>& config) {
-    auto* noConfig = static_cast<NetworkObserverScheduleConfig*>(config.get());
-    if (noConfig == nullptr) {
-        LOG_WARNING(sLogger, ("config is null", ""));
-        return false;
-    }
+void NetworkObserverManager::executeTimerTask(JobType jobType, const std::chrono::steady_clock::time_point& execTime) {
+    LOG_DEBUG(sLogger, ("exec schedule task", magic_enum::enum_name(jobType)));
 
-    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
-
-    LOG_DEBUG(sLogger, ("exec schedule task", magic_enum::enum_name(noConfig->mJobType)));
-
-    switch (noConfig->mJobType) {
+    switch (jobType) {
         case JobType::METRIC_AGG: {
             ConsumeNetMetricAggregateTree(execTime);
             ConsumeMetricAggregateTree(execTime);
@@ -1397,10 +1389,28 @@ bool NetworkObserverManager::ScheduleNext(const std::chrono::steady_clock::time_
             break;
         }
         default: {
-            LOG_ERROR(sLogger, ("skip schedule, unknown job type", magic_enum::enum_name(noConfig->mJobType)));
-            return false;
+            LOG_ERROR(sLogger, ("skip schedule, unknown job type", magic_enum::enum_name(jobType)));
+            return;
         }
     }
+}
+
+bool NetworkObserverManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+                                          const std::shared_ptr<ScheduleConfig>& config) {
+    auto* noConfig = static_cast<NetworkObserverScheduleConfig*>(config.get());
+    if (noConfig == nullptr) {
+        LOG_WARNING(sLogger, ("config is null", ""));
+        return false;
+    }
+
+    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
+    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
+
+    LOG_DEBUG(sLogger, ("add schedule task to thread pool", magic_enum::enum_name(noConfig->mJobType)));
+
+    mThreadPool->Add([this, noConfig, execTime]() {
+        this->executeTimerTask(noConfig->mJobType, execTime);
+    });
 
     return true;
 }

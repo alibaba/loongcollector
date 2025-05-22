@@ -32,9 +32,9 @@
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"
+#include "common/ThreadPool.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class EnvManager {
 public:
@@ -143,10 +143,12 @@ private:
 
     FrequencyManager mFrequencyMgr;
 
+    std::unique_ptr<ThreadPool> mThreadPool;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+

@@ -26,22 +26,22 @@ namespace logtail {
 
 const std::string InputNetworkObserver::sName = "input_network_observer";
 
-bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputNetworkObserver::Init(const Json::Value& config, Json::Value&) {
     ebpf::EBPFServer::GetInstance()->Init();
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE)) {
         return false;
     }
-    std::string prev_pipeline_name
+    std::string prevPipelineName
         = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    std::string pipeline_name = mContext->GetConfigName();
-    if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
+    std::string pipelineName = mContext->GetConfigName();
+    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
         LOG_WARNING(sLogger,
-                    ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prev_pipeline_name)("curr pipeline",
-                                                                                                        pipeline_name));
+                    ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prevPipelineName)("curr pipeline",
+                                                                                                        pipelineName));
         return false;
     }
 
-    static const std::unordered_map<std::string, MetricType> metricKeys = {
+    static const std::unordered_map<std::string, MetricType> kMetricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
@@ -58,7 +58,7 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
     };
 
     mPluginMetricPtr = std::make_shared<PluginMetricManager>(
-        GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+        GetMetricsRecordRef().GetLabels(), kMetricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 
