@@ -23,6 +23,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -211,24 +212,27 @@ void HostMonitorInputRunner::PushNextTimerEvent(const std::chrono::steady_clock:
 void HostMonitorInputRunner::AddHostLabels(PipelineEventGroup& group) {
 #ifdef __ENTERPRISE__
     auto userID = group.GetSourceBuffer()->CopyString(EnterpriseConfigProvider::GetInstance()->GetAliuidSet());
-#else
-    auto hostIP = group.GetSourceBuffer()->CopyString(LoongCollectorMonitor::mIpAddr);
-#endif
     for (auto& e : group.MutableEvents()) {
         if (!e.Is<MetricEvent>()) {
             continue;
         }
         auto& metricEvent = e.Cast<MetricEvent>();
-#ifdef __ENTERPRISE__
         const auto* entity = InstanceIdentity::Instance()->GetEntity();
         if (entity != nullptr) {
             metricEvent.SetTagNoCopy(DEFAULT_INSTANCE_ID_LABEL, entity->GetHostID());
         }
         metricEvent.SetTagNoCopy(DEFAULT_USER_ID_LABEL, StringView(userID.data, userID.size));
-#else
-        metricEvent.SetTagNoCopy(DEFAULT_HOST_IP_LABEL, StringView(hostIP.data, hostIP.size));
-#endif
     }
+#else
+    auto hostIP = group.GetSourceBuffer()->CopyString(LoongCollectorMonitor::mIpAddr);
+    for (auto& e : group.MutableEvents()) {
+        if (!e.Is<MetricEvent>()) {
+            continue;
+        }
+        auto& metricEvent = e.Cast<MetricEvent>();
+        metricEvent.SetTagNoCopy(DEFAULT_HOST_IP_LABEL, StringView(hostIP.data, hostIP.size));
+    }
+#endif
 }
 
 } // namespace logtail
