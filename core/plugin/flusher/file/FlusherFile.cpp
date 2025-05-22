@@ -49,7 +49,13 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
 
     // create file writer
     auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
+    // TODO: windows
+    // upgrade spdlog version.
+#if defined(_MSC_VER)
+    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles);
+#else
     auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+#endif
     mFileWriter
         = std::make_shared<spdlog::async_logger>(sName, fileSink, threadPool, spdlog::async_overflow_policy::block);
     mFileWriter->set_pattern("%v");

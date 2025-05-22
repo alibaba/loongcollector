@@ -32,9 +32,11 @@ endforeach()
 
 add_library(${PROVIDER_BASE_TARGET} STATIC ${LIB_SOURCE_FILES})
 # message(STATUS "PROVIDER SOURCE FILES: ${LIB_SOURCE_FILES}")
-target_compile_options(${PROVIDER_BASE_TARGET} PRIVATE -fPIC -Werror)
 
 foreach(DIR_NAME IN LISTS PROVIDER_SUB_DIRECTORIES_LIST)
     target_include_directories(${PROVIDER_BASE_TARGET} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../${DIR_NAME})
 endforeach()
-add_dependencies(${PROVIDER_BASE_TARGET} install_coolbpf)
+if (LINUX)
+    target_compile_options(${PROVIDER_BASE_TARGET} PRIVATE -fPIC -Werror)
+    add_dependencies(${PROVIDER_BASE_TARGET} install_coolbpf)
+endif()

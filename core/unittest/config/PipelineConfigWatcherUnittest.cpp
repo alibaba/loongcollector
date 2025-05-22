@@ -1529,10 +1529,14 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     }
 }
 
+// TODO: windows
+// windows no singletion plugin now.
+#if !defined(_MSC_VER)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadAddedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadModifiedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadRemovedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadUnchangedSingletonConfig)
+#endif
 
 } // namespace logtail
 

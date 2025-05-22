@@ -16,8 +16,6 @@
 
 #include <unordered_map>
 
-#include "ebpf/type/table/BaseElements.h"
-
 using namespace std;
 
 namespace logtail {

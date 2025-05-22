@@ -82,11 +82,18 @@ elseif (MSVC)
     add_definitions(-DNOMINMAX)
     add_definitions(-DTARGETLIBS=Psapi.lib)
     add_definitions(-DPSAPI_VERSION=1)
+    # remove WinSock1
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /MP /Zi")
+    # /DEBUG will generate many "pdb not found" warnings.
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /MP")
+    add_compile_options("/std:c++17")
+    # for cross-platform, soure file all are utf8
+    add_compile_options("/utf-8")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif ()
 
 # To be compatible with low version Linux.
@@ -125,15 +132,16 @@ set(SUB_DIRECTORIES_LIST
         runner runner/sink/http
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
-        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         parser
-        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
+        host_monitor host_monitor/collector
+        )
 elseif(MSVC)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
@@ -234,7 +242,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
-    add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    if (LINUX)
+        add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    endif()
 endif()
 
 # Logtail UT.

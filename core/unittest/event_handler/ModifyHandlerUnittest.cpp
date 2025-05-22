@@ -30,6 +30,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -76,6 +77,11 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+#if defined(_MSC_VER)
+        std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
+#else
+        std::string jsonLogPath = logPath;
+#endif
         // new pipeline
         configStr = R"(
             {
@@ -84,7 +90,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPath + R"("
+            + jsonLogPath + R"("
                         ]
                     }
                 ],
@@ -176,30 +182,33 @@ private:
 
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
+#if defined(_MSC_VER)
+        std::string PATH_SEPARATOR = JsonEscapeDirPath(PATH_SEPARATOR);
+#endif
         std::string containerStr = R"(
-        {
-            "ID": ")"
+            {
+                "ID": ")"
             + containerID + R"(",
-            "Mounts": [
-                {
-                    "Source": ")"
+                "Mounts": [
+                    {
+                        "Source": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-                    "Destination" : ")"
+                        "Destination" : ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"("
-                }
-            ],
-            "UpperDir": ")"
+                    }
+                ],
+                "UpperDir": ")"
             + gRootDir + R"(",
-            "LogPath": ")"
+                "LogPath": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-            "MetaDatas": [
-                "_container_name_",
-                "test-container"
-            ],
-            "Path": ")"
+                "MetaDatas": [
+                    "_container_name_",
+                    "test-container"
+                ],
+                "Path": ")"
             + gRootDir + PATH_SEPARATOR + gLogName + R"("
-        }
-    )";
+            }
+        )";
         Json::Value containerJson;
         APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
         APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
@@ -218,10 +227,11 @@ private:
 std::string ModifyHandlerUnittest::gRootDir;
 std::string ModifyHandlerUnittest::gLogName;
 
+
+#if defined(__linux__)
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase2);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase3);
@@ -229,6 +239,8 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartC
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase5);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
+#endif
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));

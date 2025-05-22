@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <atomic>
-#include <future>
+#include <ctime>
+
+#include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <string>
