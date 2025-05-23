@@ -91,7 +91,7 @@ std::shared_ptr<ProcessCacheValue> ProcessSyncRetryableEvent::procToProcessCache
         // event.process.auid = proc.auid;
         // event.process.flags = proc.flags;
         // event.process.cmdline = proc.cmdline;
-        // event.kube.docker = proc.container_id;
+        cacheValue->SetContentNoCopy<kContainerId>(proc.container_id);
     }
     return cacheValue;
 }

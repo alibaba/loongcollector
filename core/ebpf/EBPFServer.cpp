@@ -476,7 +476,7 @@ void EBPFServer::PollPerfBuffers() {
 
 std::shared_ptr<AbstractManager> EBPFServer::GetPluginManager(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
-    if (type == PluginType::MAX) {
+    if (type >= PluginType::MAX) {
         return nullptr;
     }
     return mPlugins[static_cast<int>(type)];
@@ -484,17 +484,18 @@ std::shared_ptr<AbstractManager> EBPFServer::GetPluginManager(PluginType type) {
 
 void EBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
     std::lock_guard<std::mutex> lk(mMtx);
-    if (type == PluginType::MAX) {
+    if (type >= PluginType::MAX) {
         return;
     }
     mPlugins[static_cast<int>(type)] = mgr;
 }
 
 void EBPFServer::HandlerEvents() {
-    std::vector<std::shared_ptr<CommonEvent>> items(1024);
+    std::array<std::shared_ptr<CommonEvent>, 4096> items;
     while (mRunning) {
         // consume queue
-        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
+        size_t count
+            = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         LOG_DEBUG(sLogger, ("get data events, number", count));
         // handle ....
         if (count == 0) {
@@ -503,17 +504,22 @@ void EBPFServer::HandlerEvents() {
 
         for (size_t i = 0; i < count; i++) {
             auto event = items[i];
+            if (!event) {
+                LOG_ERROR(sLogger, ("Encountered null event in DataEventQueue at index", i));
+                continue;
+            }
             auto pluginType = event->GetPluginType();
             auto plugin = GetPluginManager(pluginType);
-            if (plugin) {
+            if (plugin && plugin->IsRunning()) {
                 // handle event and put into aggregator ...
                 plugin->HandleEvent(event);
             }
         }
 
-        // handle
-        items.clear();
-        items.resize(1024);
+        // clear
+        for (size_t i = 0; i < count; i++) {
+            items[i].reset();
+        }
     }
 }
 

@@ -18,14 +18,8 @@
 #include <coolbpf/security/data_msg.h>
 #include <cstddef>
 
-#include <deque>
 #include <mutex>
-
-#include "common/StringView.h"
-#include "common/memory/SourceBuffer.h"
-#include "ebpf/plugin/ProcessCacheValue.h"
-#include "ebpf/type/table/ProcessTable.h"
-#include "ebpf/type/table/StaticDataRow.h"
+#include <unordered_map>
 
 namespace logtail::ebpf {
 

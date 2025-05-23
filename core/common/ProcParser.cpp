@@ -40,7 +40,7 @@ namespace logtail {
  * @param rawArgs: \0 separated arg buffer, e.g. arg1\0arg 2\0arg"3"
  * @return: decoded args string, e.g. arg1 "arg 2" arg\"3\"
  */
-std::string DecodeArgs(StringView& rawArgs) {
+std::string DecodeArgs(const StringView& rawArgs) {
     std::string args;
     if (rawArgs.empty()) {
         return args;
@@ -328,7 +328,7 @@ int ProcParser::LookupContainerId(const StringView& cgroupline, bool bpfSource, 
     if (isValidContainerId(potentialId, bpfSource)) {
         containerId = potentialId;
         if (containerId.size() != kContainerIdLength) {
-            containerId.substr(0, kBpfContainerIdLength);
+            containerId = containerId.substr(0, kBpfContainerIdLength);
         }
         return containerId.data() - lastSegment.data();
     }

@@ -32,7 +32,7 @@ namespace logtail {
 // TODO use definations in bpf_process_event_type.h
 #define DOCKER_ID_LENGTH 128
 
-std::string DecodeArgs(StringView& rawArgs);
+std::string DecodeArgs(const StringView& rawArgs);
 StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb);
 std::string GenerateExecId(const std::string& hostname, uint32_t pid, uint64_t ktime);
 

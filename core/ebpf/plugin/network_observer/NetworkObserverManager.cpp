@@ -1549,7 +1549,7 @@ void NetworkObserverManager::ConsumeRecords() {
         } else {
             mConsumerFreqMgr.Reset(now);
         }
-        size_t count = mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
+        size_t count = mRollbackQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         LOG_DEBUG(sLogger, ("get records:", count));
         // handle ....
         if (count == 0) {

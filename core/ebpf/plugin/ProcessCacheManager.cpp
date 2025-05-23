@@ -127,7 +127,7 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapt
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          CounterPtr pollEventsTotal,
                                          CounterPtr lossEventsTotal,
-                                         CounterPtr cacheMissTotal,
+                                         CounterPtr processCacheMissTotal,
                                          IntGaugePtr processCacheSize,
                                          IntGaugePtr processDataMapSize,
                                          IntGaugePtr retryableEventCacheSize)
@@ -140,7 +140,7 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapt
       mCommonEventQueue(queue),
       mPollProcessEventsTotal(std::move(pollEventsTotal)),
       mLossProcessEventsTotal(std::move(lossEventsTotal)),
-      mProcessCacheMissTotal(std::move(cacheMissTotal)),
+      mProcessCacheMissTotal(std::move(processCacheMissTotal)),
       mProcessCacheSize(std::move(processCacheSize)),
       mProcessDataMapSize(std::move(processDataMapSize)),
       mRetryableEventCacheSize(std::move(retryableEventCacheSize)) {

@@ -242,9 +242,7 @@ bool ProcessExecveRetryableEvent::fillProcessDataFields(const msg_execve_event& 
     cacheValue.SetContent<kArguments>(DecodeArgs(args));
     // Post handle binary
     if (filename.size()) {
-        if (filename[0] == '/') {
-            ;
-        } else if (!cwd.empty()) {
+        if (filename[0] != '/' && !cwd.empty()) {
             // argsdata is not used anymore, as args and cwd has already been SetContent
             argsdata.reserve(cwd.size() + 1 + filename.size());
             if (cwd.back() != '/') {
@@ -321,7 +319,7 @@ bool ProcessExecveRetryableEvent::flushEvent() {
     }
     if (!mCommonEventQueue.enqueue(std::move(mProcessEvent))) {
         LOG_ERROR(sLogger,
-                  ("event", "Failed to enqueue process clone event")("pid", mProcessEvent->mPid)(
+                  ("event", "Failed to enqueue process execve event")("pid", mProcessEvent->mPid)(
                       "ktime", mProcessEvent->mKtime));
         return false;
     }
@@ -335,7 +333,7 @@ void ProcessExecveRetryableEvent::cleanupCloneParent() {
     ProcessCleanupRetryableEvent cleanupEvent(mRetryLeft, mCleanupKey, mProcessCache);
     LOG_DEBUG(
         sLogger,
-        ("pid", mProcessCacheValue->Get<kProcessId>())("ktime", mProcessCacheValue->Get<kKtime>())("event", "evecve")(
+        ("pid", mProcessCacheValue->Get<kProcessId>())("ktime", mProcessCacheValue->Get<kKtime>())("event", "execve")(
             "action", "create cleanupEvent")("cleanpid", mCleanupKey.pid)("cleanktime", mCleanupKey.time));
     if (cleanupEvent.HandleMessage()) {
         return;

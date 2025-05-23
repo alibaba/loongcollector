@@ -46,7 +46,7 @@ public:
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         CounterPtr pollEventsTotal,
                         CounterPtr lossEventsTotal,
-                        CounterPtr cacheMissTotal,
+                        CounterPtr processCacheMissTotal,
                         IntGaugePtr processCacheSize,
                         IntGaugePtr processDataMapSize,
                         IntGaugePtr processEventCacheSize);

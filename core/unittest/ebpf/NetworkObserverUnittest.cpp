@@ -238,7 +238,7 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     free(dataEvent);
 
     std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
-    size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+    size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
     APSARA_TEST_EQUAL(count, 1UL);
     APSARA_TEST_TRUE(items[0] != nullptr);
 

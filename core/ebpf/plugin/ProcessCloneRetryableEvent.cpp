@@ -166,7 +166,7 @@ bool ProcessCloneRetryableEvent::OnRetry() {
     if (!IsTaskCompleted(kAttachContainerMeta) && attachContainerMeta(true)) {
         CompleteTask(kAttachContainerMeta);
     }
-    if (!IsTaskCompleted(kAttachK8sPodMeta) && attachK8sPodMeta(false)) {
+    if (!IsTaskCompleted(kAttachK8sPodMeta) && attachK8sPodMeta(true)) {
         CompleteTask(kAttachK8sPodMeta);
     }
     if (AreAllPreviousTasksCompleted(kFlushEvent) && flushEvent()) {

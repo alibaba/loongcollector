@@ -14,13 +14,12 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
+#include <algorithm>
 #include <iterator>
 #include <mutex>
 
 #include "ProcessCacheValue.h"
-#include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
-#include "type/table/ProcessTable.h"
 
 namespace logtail {
 
@@ -129,7 +128,7 @@ void ProcessCache::ForceShrink() {
             cacheToRemove.emplace_back(kv.second->RefCount(), kv.first);
         }
     }
-    std::sort(cacheToRemove.begin(), cacheToRemove.end(), std::greater<>());
+    std::sort(cacheToRemove.begin(), cacheToRemove.end());
     cacheToRemove.resize(std::min(1UL, mCache.size() / 4));
     {
         std::lock_guard<std::mutex> lock(mCacheMutex);

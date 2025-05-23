@@ -17,16 +17,10 @@
 
 #include <coolbpf/security/data_msg.h>
 
-#include <deque>
 #include <mutex>
-#include <utility>
 
-#include "common/StringView.h"
-#include "common/memory/SourceBuffer.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessDataMap.h"
-#include "ebpf/type/table/ProcessTable.h"
-#include "ebpf/type/table/StaticDataRow.h"
 
 namespace logtail {
 

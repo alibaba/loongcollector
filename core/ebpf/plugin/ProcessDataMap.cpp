@@ -14,11 +14,7 @@
 
 #include "ebpf/plugin/ProcessDataMap.h"
 
-#include <ratio>
-
-#include "ebpf/type/table/DataTable.h"
 #include "logger/Logger.h"
-#include "type/table/ProcessTable.h"
 
 namespace logtail::ebpf {
 
@@ -88,7 +84,8 @@ std::string ProcessDataMap::DataGetAndRemove(const data_event_desc* desc) {
         mDataMap.erase(res);
     }
     if (data.size() != desc->size - desc->leftover) {
-        // TODO: 这里需要研究一下，是不是可能乱序，在两次data之间出现execve事件
+        // TODO: Need to investigate whether out-of-order execution might occur, with an execve event happening between
+        // two data events.
         LOG_WARNING(sLogger, ("size bad! data size", data.size())("expect", desc->size - desc->leftover));
         return "";
     }
