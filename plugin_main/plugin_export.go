@@ -26,7 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -247,7 +247,7 @@ func CtlCmd(configName string, cmdID int, cmdDetail string) {
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	logger.InitLogger()
-	meta := helper.GetContainerMeta(containerID)
+	meta := containercenter.GetContainerMeta(containerID)
 	if meta == nil {
 		logger.Debug(context.Background(), "get meta", "")
 		return nil

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
@@ -51,8 +51,8 @@ fe00::2	ip6-allrouters
 172.20.4.5	nginx-5fd7568b67-4sh8c
 `
 
-func resetDockerCenter() {
-	dockerCenterInstance = nil
+func resetContainerCenter() {
+	containerCenterInstance = nil
 	onceDocker = sync.Once{}
 
 }
@@ -78,8 +78,8 @@ func TestGetIpByHost_2(t *testing.T) {
 }
 
 func TestGetAllAcceptedInfoV2(t *testing.T) {
-	resetDockerCenter()
-	dc := getDockerCenterInstance()
+	resetContainerCenter()
+	dc := getContainerCenterInstance()
 
 	newContainer := func(id string) *DockerInfoDetail {
 		return dc.CreateInfoDetail(types.ContainerJSON{
@@ -377,13 +377,13 @@ func (m *ContainerHelperMock) ContainerProcessAlive(pid int) bool {
 	return args.Get(0).(bool)
 }
 
-func TestDockerCenterEvents(t *testing.T) {
-	dockerCenterInstance = &DockerCenter{}
-	dockerCenterInstance.imageCache = make(map[string]string)
-	dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+func TestContainerCenterEvents(t *testing.T) {
+	containerCenterInstance = &ContainerCenter{}
+	containerCenterInstance.imageCache = make(map[string]string)
+	containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
 
 	mockClient := DockerClientMock{}
-	dockerCenterInstance.client = &mockClient
+	containerCenterInstance.client = &mockClient
 
 	containerHelper := ContainerHelperMock{}
 
@@ -393,7 +393,7 @@ func TestDockerCenterEvents(t *testing.T) {
 
 	mockClient.On("Events", mock.Anything, mock.Anything).Return(eventChan, errChan)
 
-	go dockerCenterInstance.eventListener()
+	go containerCenterInstance.eventListener()
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Once()
 	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(types.ContainerJSON{
@@ -410,7 +410,7 @@ func TestDockerCenterEvents(t *testing.T) {
 	eventChan <- events.Message{ID: "event1", Status: "rename"}
 
 	time.Sleep(5 * time.Second)
-	containerLen := len(dockerCenterInstance.containerMap)
+	containerLen := len(containerCenterInstance.containerMap)
 	assert.Equal(t, 1, containerLen)
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Once()
@@ -430,17 +430,17 @@ func TestDockerCenterEvents(t *testing.T) {
 	// 设置期望
 	close(eventChan)
 
-	containerLen = len(dockerCenterInstance.containerMap)
+	containerLen = len(containerCenterInstance.containerMap)
 	assert.Equal(t, 1, containerLen)
 }
 
-func TestDockerCenterFetchAll(t *testing.T) {
-	dockerCenterInstance = &DockerCenter{}
-	dockerCenterInstance.imageCache = make(map[string]string)
-	dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+func TestContainerCenterFetchAll(t *testing.T) {
+	containerCenterInstance = &ContainerCenter{}
+	containerCenterInstance.imageCache = make(map[string]string)
+	containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
 
 	mockClient := DockerClientMock{}
-	dockerCenterInstance.client = &mockClient
+	containerCenterInstance.client = &mockClient
 
 	containerHelper := ContainerHelperMock{}
 
@@ -477,10 +477,10 @@ func TestDockerCenterFetchAll(t *testing.T) {
 	// one failed inspect
 	mockClient.On("ContainerInspect", mock.Anything, "id3").Return(types.ContainerJSON{}, errors.New("id3 not exist")).Times(3)
 
-	err := dockerCenterInstance.fetchAll()
+	err := containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
 
-	containerLen := len(dockerCenterInstance.containerMap)
+	containerLen := len(containerCenterInstance.containerMap)
 	assert.Equal(t, 2, containerLen)
 
 	mockContainerListResult2 := []types.Container{
@@ -512,20 +512,20 @@ func TestDockerCenterFetchAll(t *testing.T) {
 		},
 	}, nil).Once()
 
-	err = dockerCenterInstance.fetchAll()
+	err = containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
 
-	containerLen = len(dockerCenterInstance.containerMap)
+	containerLen = len(containerCenterInstance.containerMap)
 	assert.Equal(t, 4, containerLen)
 }
 
-func TestDockerCenterFetchAllAndOne(t *testing.T) {
-	dockerCenterInstance = &DockerCenter{}
-	dockerCenterInstance.imageCache = make(map[string]string)
-	dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+func TestContainerCenterFetchAllAndOne(t *testing.T) {
+	containerCenterInstance = &ContainerCenter{}
+	containerCenterInstance.imageCache = make(map[string]string)
+	containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
 
 	mockClient := DockerClientMock{}
-	dockerCenterInstance.client = &mockClient
+	containerCenterInstance.client = &mockClient
 
 	containerHelper := ContainerHelperMock{}
 
@@ -559,20 +559,20 @@ func TestDockerCenterFetchAllAndOne(t *testing.T) {
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Times(2)
 
-	err := dockerCenterInstance.fetchAll()
+	err := containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
 
-	dockerCenterInstance.markRemove("id1")
-	dockerCenterInstance.markRemove("id2")
+	containerCenterInstance.markRemove("id1")
+	containerCenterInstance.markRemove("id2")
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Times(2)
-	err = dockerCenterInstance.fetchAll()
+	err = containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
 
-	containerLen := len(dockerCenterInstance.containerMap)
+	containerLen := len(containerCenterInstance.containerMap)
 	assert.Equal(t, 2, containerLen)
 
-	for _, container := range dockerCenterInstance.containerMap {
+	for _, container := range containerCenterInstance.containerMap {
 		assert.Equal(t, true, container.deleteFlag)
 	}
 }

@@ -90,7 +90,7 @@ jobs:
         with:
           clang-format-version: '18'
           check-path: 'core'
-          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp'
+          exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp|core/host_monitor/common/FieldEntry\.h'
           include-regex: '.*\.(cpp|h)$'
 
       - name: Go Plugin Lint

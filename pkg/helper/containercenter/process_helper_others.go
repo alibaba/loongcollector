@@ -15,7 +15,7 @@
 //go:build !linux
 // +build !linux
 
-package helper
+package containercenter
 
 func ContainerProcessAlive(pid int) bool {
 	return true

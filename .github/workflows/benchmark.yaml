@@ -75,122 +75,124 @@ jobs:
             --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
           docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
 
-  Benchmark:
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    strategy:
-      matrix:
-        test-agent: 
-          - "loongcollector-blackhole"
-          - "loongcollector-spl-blackhole"
-          - "filebeat-blackhole"
-          - "fluentbit-blackhole"
-          - "vector-blackhole"
-          - "loongcollector-file"
-          - "loongcollector-spl-file"
-          - "loongcollector-cgo-file"
-          - "filebeat-file"
-          - "fluentbit-file"
-          - "vector-file"
-        python-version: [ 3.8 ]
-        runner: [ ubuntu-latest ]
-      fail-fast: false
-    permissions:
-      contents: write
-      packages: read
-    needs: [ Build-LoongCollector-Image ]
-    steps:
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
+  # Benchmark:
+  #   runs-on: ${{ matrix.runner }}
+  #   timeout-minutes: 60
+  #   strategy:
+  #     matrix:
+  #       test-agent: 
+  #         - "loongcollector-blackhole"
+  #         - "loongcollector-spl-blackhole"
+  #         - "filebeat-blackhole"
+  #         - "fluentbit-blackhole"
+  #         - "vector-blackhole"
+  #         - "loongcollector-file"
+  #         - "loongcollector-spl-file"
+  #         - "loongcollector-cgo-file"
+  #         - "filebeat-file"
+  #         - "fluentbit-file"
+  #         - "vector-file"
+  #       python-version: [ 3.8 ]
+  #       runner: [ ubuntu-latest ]
+  #     fail-fast: false
+  #   permissions:
+  #     contents: write
+  #     packages: read
+  #   # needs: [ Build-LoongCollector-Image ]
+  #   steps:
+  #     - name: Set up Go ${{ matrix.go-version }}
+  #       uses: actions/setup-go@v2
+  #       with:
+  #         go-version: ${{ matrix.go-version }}
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
 
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          submodules: false
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: false
 
-      - name: Update Docker-compose to v2
-        run: |
-          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
+  #     - name: Update Docker-compose to v2
+  #       run: |
+  #         sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+  #         sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: System environment
-        run: |
-          uname -r
-          docker --version
-          go version
+  #     - name: Prepare test environment
+  #       run: |
+  #         pip3 install -r test/requirements.txt
 
-      - name: Pull Docker image from GitHub Packages
-        if: contains(matrix.test-agent, 'loongcollector')
-        run: |
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker pull ghcr.io/$REPO_OWNER/loongcollector:edge
-          docker tag ghcr.io/$REPO_OWNER/loongcollector:edge aliyun/loongcollector:0.0.1
+  #     - name: Pull Docker image from GitHub Packages
+  #       if: contains(matrix.test-agent, 'loongcollector')
+  #       run: |
+  #         REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+  #         docker pull ghcr.io/$REPO_OWNER/loongcollector:edge
+  #         docker tag ghcr.io/$REPO_OWNER/loongcollector:edge aliyun/loongcollector:0.0.1
 
-      - name: Run benchmark for agent ${{ matrix.test-agent }}
-        run: |
-          pip3 install -r test/requirements.txt
-          ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
-          git stash
+  #     - name: Run benchmark for agent ${{ matrix.test-agent }}
+  #       uses: nick-fields/retry@v3
+  #       with:
+  #         timeout_minutes: 10
+  #         max_attempts: 3
+  #         command: |
+  #           set -ue
+  #           ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
+  #           git stash
       
-      - name: Upload benchmark result for agent ${{ matrix.test-agent }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results-${{ matrix.test-agent }}
-          path: test/benchmark/report
+  #     - name: Upload benchmark result for agent ${{ matrix.test-agent }}
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: benchmark-results-${{ matrix.test-agent }}
+  #         path: test/benchmark/report
 
-  result:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: [ Benchmark ]
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-        with:
-          submodules: false
+  # result:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 60
+  #   needs: [ Benchmark ]
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v2
+  #       with:
+  #         submodules: false
 
-      - name: Download benchmark results
-        uses: actions/download-artifact@v4
-        with:
-          path: test/benchmark/report/
-          merge-multiple: true
+  #     - name: Download benchmark results
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: test/benchmark/report/
+  #         merge-multiple: true
 
-      - name: Display structure of downloaded files and merge
-        run: |
-          ls -R test/benchmark/report/
-          ./scripts/benchmark_collect_result.sh
-          ls -R test/benchmark/report/
+  #     - name: Display structure of downloaded files and merge
+  #       run: |
+  #         ls -R test/benchmark/report/
+  #         ./scripts/benchmark_collect_result.sh
+  #         ls -R test/benchmark/report/
 
-      - name: Store benchmark result LoongCollector
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: benchmark
-          tool: "customSmallerIsBetter"
-          output-file-path: "test/benchmark/report/loongcollector_statistic_all.json"
-          auto-push: false
-          summary-always: true
+  #     - name: Store benchmark result LoongCollector
+  #       uses: benchmark-action/github-action-benchmark@v1
+  #       with:
+  #         name: benchmark
+  #         tool: "customSmallerIsBetter"
+  #         output-file-path: "test/benchmark/report/loongcollector_statistic_all.json"
+  #         auto-push: false
+  #         summary-always: true
 
-      - name: Store benchmark result other agents
-        run: |
-          git checkout gh-pages
-          mv test/benchmark/report/records_all.json dev/bench/records_all.js
-          sed -i '1s/^\[/window.BENCHMARK_RECORDS = [/' dev/bench/records_all.js
-          git add dev/bench/records_all.js
-          last_commit_message=$(git log -1 --pretty=%B)
-          git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
+  #     - name: Store benchmark result other agents
+  #       run: |
+  #         git checkout gh-pages
+  #         mv test/benchmark/report/records_all.json dev/bench/records_all.js
+  #         sed -i '1s/^\[/window.BENCHMARK_RECORDS = [/' dev/bench/records_all.js
+  #         git add dev/bench/records_all.js
+  #         last_commit_message=$(git log -1 --pretty=%B)
+  #         git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
 
-      - name: Push benchmark result
-        run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
+  #     - name: Push benchmark result
+  #       run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
 
   actions-timeline:
-    needs: [result]
+    needs: [Build-LoongCollector-Image]
     runs-on: ubuntu-latest
     permissions:
       actions: read

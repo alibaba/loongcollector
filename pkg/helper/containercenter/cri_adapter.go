@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package containercenter
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,32 +30,31 @@ import (
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"google.golang.org/grpc"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 const (
-	kubeRuntimeAPIVersion = "0.1.0"
 	maxMsgSize            = 1024 * 1024 * 16
+	defaultContextTimeout = time.Second * 10
 )
 
 var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIRuntimeWrapper wrapper for containerd client
 type innerContainerInfo struct {
-	State  cri.ContainerState
+	State  CriContainerState
 	Pid    int
 	Name   string
 	Status string
 }
+
 type CRIRuntimeWrapper struct {
-	dockerCenter   *DockerCenter
-	nativeClient   *containerd.Client
-	client         cri.RuntimeServiceClient
-	runtimeVersion *cri.VersionResponse
+	containerCenter *ContainerCenter
+	nativeClient    *containerd.Client
+	client          *RuntimeServiceClient
+	runtimeInfo     CriVersionInfo
 
 	containersLock sync.Mutex
 
@@ -69,107 +68,27 @@ type CRIRuntimeWrapper struct {
 	listContainerStartTime int64 // in nanosecond
 }
 
-func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
-	// Verify containerd.sock cri valid.
-	if fi, err := os.Stat(criRuntimeEndpoint); err == nil && !fi.IsDir() {
-		if IsCRIStatusValid(criRuntimeEndpoint) {
-			return true
-		}
-	}
-	return false
-}
-
-func IsCRIStatusValid(criRuntimeEndpoint string) bool {
-	addr, dailer, err := GetAddressAndDialer(criRuntimeEndpoint)
-	if err != nil {
-		return false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*16)))
-	if err != nil {
-		logger.Debug(context.Background(), "Dial", addr, "failed", err)
-		return false
-	}
-	// must close，otherwise connections will leak and case mem increase
-	defer conn.Close()
-	client := cri.NewRuntimeServiceClient(conn)
-	// check cri status
-	_, err = client.Status(ctx, &cri.StatusRequest{})
-	if err != nil {
-		logger.Debug(context.Background(), "Status failed", err)
-		return false
-	}
-	// check running containers
-	var containersResp *cri.ListContainersResponse
-	containersResp, err = client.ListContainers(ctx, &cri.ListContainersRequest{Filter: nil})
-	if err == nil {
-		logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
-		return containersResp.Containers != nil
-	}
-	logger.Debug(context.Background(), "ListContainers failed", err)
-	return false
-}
-
-func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
-	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
-		fallbackEndpoint := fallbackProtocol + "://" + endpoint
-		protocol, addr, err = parseEndpoint(fallbackEndpoint)
-		if err == nil {
-			logger.Infof(context.Background(), "Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
-		}
-	}
-	return
-}
-
-func parseEndpoint(endpoint string) (string, string, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", "", err
+func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper, error) {
+	if fi, err := os.Stat(containerdUnixSocket); err != nil || fi.IsDir() {
+		return nil, fmt.Errorf("cri runtime endpoint %s is not valid", containerdUnixSocket)
 	}
 
-	switch u.Scheme {
-	case "tcp":
-		return "tcp", u.Host, nil
-
-	case "unix":
-		return "unix", u.Path, nil
-
-	case "":
-		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
-
-	default:
-		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
-	}
-}
-
-func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
-	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if err != nil {
-		return nil, err
-	}
-	return cri.NewRuntimeServiceClient(conn), nil
-}
-
-// NewCRIRuntimeWrapper ...
-func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
-	client, err := newRuntimeServiceClient()
+	client, err := NewRuntimeServiceClient(defaultContextTimeout, maxMsgSize)
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
 	}
 
-	runtimeVersion, err := getCRIRuntimeVersion(client)
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+	defer cancel()
+
+	containerResp, err := client.ListContainers(ctx)
 	if err != nil {
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "List containers from cri-runtime failed: %v", err)
+		return nil, err
+	} else if len(containerResp.Containers) == 0 {
+		err = errors.New("remote cri-runtime has no container")
+		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Remote cri-runtime is invalid: %v", err)
 		return nil, err
 	}
 
@@ -186,10 +105,10 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	return &CRIRuntimeWrapper{
-		dockerCenter:           dockerCenter,
+		containerCenter:        containerCenter,
 		client:                 client,
 		nativeClient:           containerdClient,
-		runtimeVersion:         runtimeVersion,
+		runtimeInfo:            client.info,
 		containers:             make(map[string]*innerContainerInfo),
 		containerHistory:       make(map[string]bool),
 		stopCh:                 make(<-chan struct{}),
@@ -199,20 +118,17 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 }
 
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
-func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state cri.ContainerState, err error) {
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
-	status, err := cw.client.ContainerStatus(ctx, &cri.ContainerStatusRequest{
-		ContainerId: containerID,
-		Verbose:     true,
-	})
+func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state CriContainerState, err error) {
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+	status, err := cw.client.ContainerStatus(ctx, containerID, true)
 	cancel()
 	if err != nil {
-		return nil, "", cri.ContainerState_CONTAINER_UNKNOWN, err
+		return nil, "", ContainerStateContainerUnknown, err
 	}
 
 	var ci containerdcriserver.ContainerInfo
 	foundInfo := false
-	if statusinfo := status.GetInfo(); statusinfo != nil {
+	if statusinfo := status.Info; statusinfo != nil {
 		if info, ok := statusinfo["info"]; ok {
 			foundInfo = true
 			ci, err = parseContainerInfo(info)
@@ -224,37 +140,39 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 
 	if !foundInfo {
 		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
-		return nil, "", cri.ContainerState_CONTAINER_UNKNOWN, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
+		return nil, "", ContainerStateContainerUnknown, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 	}
 
-	labels := status.GetStatus().GetLabels()
+	labels := status.Status.Labels
 	if labels == nil {
 		labels = map[string]string{}
 	}
 
-	image := status.GetStatus().GetImage().GetImage()
-	if image == "" {
-		image = status.GetStatus().GetImageRef()
+	var image string
+	if status.Status.Image != nil && status.Status.Image.Image != "" {
+		image = status.Status.Image.Image
+	} else {
+		image = status.Status.ImageRef
 	}
 
 	// Judge Container Liveness by Pid
 	state = status.Status.State
 	stateStatus := ContainerStatusExited
-	if state == cri.ContainerState_CONTAINER_RUNNING && ContainerProcessAlive(int(ci.Pid)) {
+	if state == ContainerStateContainerRunning && ContainerProcessAlive(int(ci.Pid)) {
 		stateStatus = ContainerStatusRunning
 	}
 	dockerContainer := types.ContainerJSON{
 		ContainerJSONBase: &types.ContainerJSONBase{
 			ID:      containerID,
-			Created: time.Unix(0, status.GetStatus().CreatedAt).Format(time.RFC3339Nano),
-			LogPath: status.GetStatus().GetLogPath(),
+			Created: time.Unix(0, status.Status.CreatedAt).Format(time.RFC3339Nano),
+			LogPath: status.Status.LogPath,
 			State: &types.ContainerState{
 				Status: stateStatus,
 				Pid:    int(ci.Pid),
 			},
 			HostConfig: &container.HostConfig{
 				VolumeDriver: ci.Snapshotter,
-				Runtime:      cw.runtimeVersion.RuntimeName,
+				Runtime:      cw.runtimeInfo.RuntimeName,
 				LogConfig: container.LogConfig{
 					Type: "json-file",
 				},
@@ -266,8 +184,8 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 		},
 	}
 
-	if status.GetStatus().GetMetadata() != nil {
-		dockerContainer.Name = status.GetStatus().GetMetadata().GetName()
+	if status.Status.Metadata != nil {
+		dockerContainer.Name = status.Status.Metadata.Name
 	}
 
 	if ci.RuntimeSpec != nil && ci.RuntimeSpec.Process != nil {
@@ -312,7 +230,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	dockerContainer.HostnamePath = hostnamePath
 	dockerContainer.HostsPath = hostsPath
 
-	return cw.dockerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
+	return cw.containerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 
 func (cw *CRIRuntimeWrapper) fetchAll() error {
@@ -323,17 +241,17 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	defer cw.containersLock.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	containersResp, err := cw.client.ListContainers(ctx, &cri.ListContainersRequest{})
+	containersResp, err := cw.client.ListContainers(ctx)
 	if err != nil {
 		return err
 	}
-	sandboxResp, err := cw.client.ListPodSandbox(ctx, &cri.ListPodSandboxRequest{Filter: nil})
+	sandboxResp, err := cw.client.ListPodSandbox(ctx)
 	if err != nil {
 		return err
 	}
-	sandboxMap := make(map[string]*cri.PodSandbox, len(sandboxResp.Items))
+	sandboxMap := make(map[string]*CriPodSandbox, len(sandboxResp.Items))
 	for _, item := range sandboxResp.Items {
-		sandboxMap[item.Id] = item
+		sandboxMap[item.ID] = item
 	}
 
 	allContainerMap := make(map[string]bool)           // all listable containers
@@ -341,17 +259,17 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	containerMap := make(map[string]*DockerInfoDetail) // pid exists
 	for i, c := range containersResp.Containers {
 		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, c)
-		allContainerMap[c.GetId()] = true
+		allContainerMap[c.ID] = true
 		switch c.State {
-		case cri.ContainerState_CONTAINER_RUNNING:
-			runningMap[c.GetId()] = true
-		case cri.ContainerState_CONTAINER_EXITED:
-			runningMap[c.GetId()] = false
+		case ContainerStateContainerRunning:
+			runningMap[c.ID] = true
+		case ContainerStateContainerExited:
+			runningMap[c.ID] = false
 		default:
 			continue
 		}
 
-		dockerContainer, _, _, err := cw.createContainerInfo(c.GetId())
+		dockerContainer, _, _, err := cw.createContainerInfo(c.ID)
 		if err != nil {
 			logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
 			continue
@@ -363,28 +281,28 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 		if dockerContainer.Status() != ContainerStatusRunning {
 			continue
 		}
-		cw.containers[c.GetId()] = &innerContainerInfo{
+		cw.containers[c.ID] = &innerContainerInfo{
 			State:  c.State,
 			Pid:    dockerContainer.ContainerInfo.State.Pid,
 			Name:   dockerContainer.ContainerInfo.Name,
 			Status: dockerContainer.Status(),
 		}
-		cw.containerHistory[c.GetId()] = true
-		containerMap[c.GetId()] = dockerContainer
+		cw.containerHistory[c.ID] = true
+		containerMap[c.ID] = dockerContainer
 
 		// append the pod labels to the k8s info.
-		if sandbox, ok := sandboxMap[c.PodSandboxId]; ok {
-			cw.wrapperK8sInfoByLabels(sandbox.GetLabels(), dockerContainer)
+		if sandbox, ok := sandboxMap[c.PodSandboxID]; ok {
+			cw.wrapperK8sInfoByLabels(sandbox.Labels, dockerContainer)
 		}
 		logger.Debugf(context.Background(), "Create container info, id:%v\tname:%v\tcreated:%v\tstatus:%v\tdetail:%+v",
 			dockerContainer.IDPrefix(), c.Metadata.Name, dockerContainer.ContainerInfo.Created, dockerContainer.Status(), c)
 	}
-	cw.dockerCenter.updateContainers(containerMap)
+	cw.containerCenter.updateContainers(containerMap)
 
 	// delete not running containers
 	for k := range cw.containers {
 		if running, ok := runningMap[k]; !ok || !running {
-			cw.dockerCenter.markRemove(k)
+			cw.containerCenter.markRemove(k)
 			delete(cw.containers, k)
 		}
 	}
@@ -404,6 +322,7 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 	for {
 		select {
 		case <-cw.stopCh:
+			cw.client.Close()
 			ticker.Stop()
 			return
 		case <-ticker.C:
@@ -420,21 +339,21 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 	ctx, cancel := getContextWithTimeout(time.Second * 20)
 	defer cancel()
 	logger.Debug(context.Background(), "cri sync containers", "begin")
-	containersResp, err := cw.client.ListContainers(ctx, &cri.ListContainersRequest{})
+	containersResp, err := cw.client.ListContainers(ctx)
 	if err != nil {
 		return err
 	}
 
-	newContainers := map[string]*cri.Container{}
+	newContainers := map[string]*CriContainer{}
 	for i, c := range containersResp.Containers {
 		// https://github.com/containerd/containerd/blob/main/pkg/cri/store/container/status.go
 		// We only care RUNNING and EXITED
 		// This is only an early prune, accurate status must be detected by ContainerProcessAlive
-		if c.State != cri.ContainerState_CONTAINER_RUNNING &&
-			(c.State != cri.ContainerState_CONTAINER_EXITED || c.GetCreatedAt() < cw.listContainerStartTime) {
+		if c.State != ContainerStateContainerRunning &&
+			(c.State != ContainerStateContainerExited || c.CreatedAt < cw.listContainerStartTime) {
 			continue
 		}
-		id := containersResp.Containers[i].GetId()
+		id := containersResp.Containers[i].ID
 		newContainers[id] = containersResp.Containers[i]
 		oldInfo, ok := cw.containers[id]
 		_, inHistory := cw.containerHistory[id]
@@ -443,7 +362,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 			if oldInfo.Status == ContainerStatusRunning && ContainerProcessAlive(oldInfo.Pid) {
 				status = ContainerStatusRunning
 			}
-			if oldInfo.State != cri.ContainerState_CONTAINER_RUNNING || // not running
+			if oldInfo.State != ContainerStateContainerRunning || // not running
 				(oldInfo.State == c.State && oldInfo.Name == c.Metadata.Name && oldInfo.Status == status) { // no state change
 				continue
 			}
@@ -457,9 +376,9 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 
 	// delete container
 	for oldID, c := range cw.containers {
-		if _, ok := newContainers[oldID]; !ok || c.State == cri.ContainerState_CONTAINER_EXITED {
+		if _, ok := newContainers[oldID]; !ok || c.State == ContainerStateContainerExited {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
-			cw.dockerCenter.markRemove(oldID)
+			cw.containerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)
 		}
 	}
@@ -484,7 +403,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 	}
 
 	// cri场景下会拼接好k8s信息，然后再单个updateContainer
-	cw.dockerCenter.updateContainer(containerID, dockerContainer)
+	cw.containerCenter.updateContainer(containerID, dockerContainer)
 	cw.containerHistory[containerID] = true
 	cw.containers[containerID] = &innerContainerInfo{
 		status,
@@ -496,17 +415,14 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 }
 
 func (cw *CRIRuntimeWrapper) wrapperK8sInfoByID(sandboxID string, detail *DockerInfoDetail) {
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
-	status, err := cw.client.PodSandboxStatus(ctx, &cri.PodSandboxStatusRequest{
-		PodSandboxId: sandboxID,
-		Verbose:      true,
-	})
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+	status, err := cw.client.PodSandboxStatus(ctx, sandboxID, true)
 	cancel()
 	if err != nil {
 		logger.Debug(context.Background(), "fetchone cannot read k8s info from sandbox, sandboxID", sandboxID)
 		return
 	}
-	cw.wrapperK8sInfoByLabels(status.GetStatus().GetLabels(), detail)
+	cw.wrapperK8sInfoByLabels(status.Status.Labels, detail)
 }
 
 func (cw *CRIRuntimeWrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]string, detail *DockerInfoDetail) {
@@ -527,11 +443,11 @@ func (cw *CRIRuntimeWrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]str
 func (cw *CRIRuntimeWrapper) sweepCache() {
 	// clear unuseful cache
 	usedCacheItem := make(map[string]bool)
-	cw.dockerCenter.lock.RLock()
-	for key := range cw.dockerCenter.containerMap {
+	cw.containerCenter.lock.RLock()
+	for key := range cw.containerCenter.containerMap {
 		usedCacheItem[key] = true
 	}
-	cw.dockerCenter.lock.RUnlock()
+	cw.containerCenter.lock.RUnlock()
 
 	cw.rootfsLock.Lock()
 	for key := range cw.rootfsCache {
@@ -544,12 +460,6 @@ func (cw *CRIRuntimeWrapper) sweepCache() {
 
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), timeout)
-}
-
-func getCRIRuntimeVersion(client cri.RuntimeServiceClient) (*cri.VersionResponse, error) {
-	ctx, cancel := getContextWithTimeout(time.Second * 10)
-	defer cancel()
-	return client.Version(ctx, &cri.VersionRequest{Version: kubeRuntimeAPIVersion})
 }
 
 func parseContainerInfo(data string) (containerdcriserver.ContainerInfo, error) {
