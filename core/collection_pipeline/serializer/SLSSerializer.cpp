@@ -15,6 +15,7 @@
 #include "collection_pipeline/serializer/SLSSerializer.h"
 
 #include <array>
+#include <vector>
 
 #include "json/json.h"
 
@@ -22,6 +23,7 @@
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
 #include "constants/SpanConstants.h"
+#include "models/MetricValue.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"
 
@@ -98,7 +100,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
 
     // caculate serialized logGroup size first, where some critical results can be cached
     vector<size_t> logSZ(group.mEvents.size());
-    vector<pair<string, size_t>> metricEventContentCache(group.mEvents.size());
+    vector<pair<vector<string>, size_t>> metricEventContentCache(group.mEvents.size());
     vector<array<string, 6>> spanEventContentCache(group.mEvents.size());
     size_t logGroupSZ = 0;
     switch (eventType) {
@@ -126,7 +128,38 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                     continue;
                 }
                 if (e.Is<UntypedSingleValue>()) {
-                    metricEventContentCache[i].first = to_string(e.GetValue<UntypedSingleValue>()->mValue);
+                    metricEventContentCache[i].first.push_back(to_string(e.GetValue<UntypedSingleValue>()->mValue));
+                    metricEventContentCache[i].second = GetMetricLabelSize(e);
+                    size_t contentSZ = 0;
+                    contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_NAME.size(), e.GetName().size());
+                    contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_VALUE.size(),
+                                                   metricEventContentCache[i].first[0].size());
+                    contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(),
+                                                   e.GetTimestampNanosecond() ? 19U : 10U);
+                    contentSZ
+                        += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].second);
+                    logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
+                } else if (e.Is<UntypedMultiDoubleValues>()) {
+                    if (e.GetValue<UntypedMultiDoubleValues>()->ValuesSize() == 0) {
+                        LOG_WARNING(sLogger,
+                                    ("metric event multi value is empty",
+                                     "discard event")("config", mFlusher->GetContext().GetConfigName()));
+                        continue;
+                    }
+                    size_t contentSZ = 0;
+                    contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(),
+                                                   e.GetTimestampNanosecond() ? 19U : 10U);
+                    for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
+                        // the tag of multi value is serialized in the content
+                        contentSZ += GetLogContentSize(it->first.size(), it->second.size());
+                    }
+                    const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
+                    for (auto it = multiValue->ValuesBegin(); it != multiValue->ValuesEnd(); ++it) {
+                        string valueStr = to_string(it->second.Value);
+                        metricEventContentCache[i].first.push_back(valueStr); // value
+                        contentSZ += GetLogContentSize(it->first.size(), valueStr.size());
+                    }
+                    logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
                 } else {
                     // untyped multi value is not supported
                     LOG_WARNING(sLogger,
@@ -134,16 +167,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                                                                                mFlusher->GetContext().GetConfigName()));
                     continue;
                 }
-                metricEventContentCache[i].second = GetMetricLabelSize(e);
-
-                size_t contentSZ = 0;
-                contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_NAME.size(), e.GetName().size());
-                contentSZ
-                    += GetLogContentSize(METRIC_RESERVED_KEY_VALUE.size(), metricEventContentCache[i].first.size());
-                contentSZ
-                    += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(), e.GetTimestampNanosecond() ? 19U : 10U);
-                contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].second);
-                logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
             }
             break;
         }
@@ -245,16 +268,39 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         case PipelineEvent::Type::METRIC:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 auto& e = group.mEvents[i].Cast<MetricEvent>();
-                if (!e.Is<UntypedSingleValue>() || e.GetTimestamp() < 1e9) {
+                if (e.GetTimestamp() < 1e9) {
                     continue;
                 }
-                serializer.StartToAddLog(logSZ[i]);
-                serializer.AddLogTime(e.GetTimestamp());
-                e.SortTags();
-                serializer.AddLogContentMetricLabel(e, metricEventContentCache[i].second);
-                serializer.AddLogContentMetricTimeNano(e);
-                serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);
-                serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
+                if (e.Is<UntypedSingleValue>()) {
+                    if (metricEventContentCache[i].first.empty()) {
+                        continue;
+                    }
+                    serializer.StartToAddLog(logSZ[i]);
+                    serializer.AddLogTime(e.GetTimestamp());
+                    e.SortTags();
+                    serializer.AddLogContentMetricLabel(e, metricEventContentCache[i].second);
+                    serializer.AddLogContentMetricTimeNano(e);
+                    serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first[0]);
+                    serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
+                } else if (e.Is<UntypedMultiDoubleValues>()) {
+                    const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
+                    if (metricEventContentCache[i].first.size() != multiValue->ValuesSize()) {
+                        continue;
+                    }
+                    serializer.StartToAddLog(logSZ[i]);
+                    serializer.AddLogTime(e.GetTimestamp());
+                    serializer.AddLogContentMetricTimeNano(e);
+                    for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
+                        serializer.AddLogContent(it->first, it->second);
+                    }
+                    size_t currentValueIdx = 0;
+                    for (auto it = multiValue->ValuesBegin(); it != multiValue->ValuesEnd(); ++it) {
+                        serializer.AddLogContent(it->first, metricEventContentCache[i].first[currentValueIdx]);
+                        ++currentValueIdx;
+                    }
+                } else {
+                    continue;
+                }
             }
             break;
         case PipelineEvent::Type::SPAN:
