@@ -112,6 +112,7 @@ void ProcessCache::ClearExpiredCache() {
         }
     }
     if (nextQueueSize > 0) {
+        mCacheExpireQueueProcessing.resize(nextQueueSize);
         mCacheExpireQueue.insert(mCacheExpireQueue.end(),
                                  std::make_move_iterator(mCacheExpireQueueProcessing.begin()),
                                  std::make_move_iterator(mCacheExpireQueueProcessing.end()));

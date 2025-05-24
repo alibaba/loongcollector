@@ -352,7 +352,7 @@ bool ProcessExecveRetryableEvent::OnRetry() {
     if (!IsTaskCompleted(kAttachK8sPodMeta) && attachK8sPodMeta(false)) {
         CompleteTask(kAttachK8sPodMeta);
     }
-    if (AreAllPreviousTasksCompleted(kFlushEvent) && flushEvent()) {
+    if (AreAllPreviousTasksCompleted(kFlushEvent) && !IsTaskCompleted(kFlushEvent) && flushEvent()) {
         CompleteTask(kFlushEvent);
     }
     if (AreAllPreviousTasksCompleted(kDone)) {

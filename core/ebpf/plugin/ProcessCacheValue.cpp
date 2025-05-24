@@ -15,18 +15,11 @@
 #include "ebpf/plugin/ProcessCacheValue.h"
 
 namespace logtail {
-
-// avoid infinite execve to cause memory leak
-static constexpr int kMaxProcessCacheValueSourceBufferReuse = 100;
 ProcessCacheValue* ProcessCacheValue::CloneContents() {
     auto* newValue = new ProcessCacheValue();
-    if (GetSourceBuffer().use_count() < kMaxProcessCacheValueSourceBufferReuse) {
-        newValue->mContents = mContents;
-    } else {
-        for (size_t i = 0; i < mContents.Size(); ++i) {
-            StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
-            newValue->mContents[i] = {cp.data, cp.size};
-        }
+    for (size_t i = 0; i < mContents.Size(); ++i) {
+        StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
+        newValue->mContents[i] = {cp.data, cp.size};
     }
     return newValue;
 }

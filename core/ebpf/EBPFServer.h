@@ -105,7 +105,7 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                              const PluginMetricManagerPtr& metricManager);
-    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mDataEventQueue(4096) {}
+    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mCommonEventQueue(4096) {}
 
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
@@ -131,7 +131,7 @@ private:
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mCommonEventQueue;
 
     std::future<void> mPoller;
     std::future<void> mHandler;

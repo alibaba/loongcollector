@@ -64,6 +64,8 @@ public:
     void TestProcessEventCloneExecveExitOutOfOrder2();
     void TestProcessEventExecveExitOutOfOrder2();
 
+    void TestProcessEventCloneExecveExitExitOutOfOrder();
+
     void TestFinalizeProcessTags();
 
 private:
@@ -974,6 +976,175 @@ void ProcessCacheManagerUnittest::TestFinalizeProcessTags() {
     APSARA_TEST_EQUAL(sharedEvent->GetContent(kParentBinary.LogKey()), StringView("test_binary_parent"));
 }
 
+/*
+ * Before daemon and app exit
+ * Lineage:      ┌------┐ ┌-----------┐ ┌-----------------------------┐
+ * CallChain: (init)   (sh) -clone- (daemon) -clone- (app) -execve- (app)
+ * RefCnt:       2       2             2               0              1
+ * After daemon and app exit
+ * Lineage:      ┌------┐ ┌------------┐ ┌-----------------------------┐
+ * CallChain: (init)   (sh) -clone- (daemon) -clone- (app) -execve- (app)
+ * RefCnt:       2       1             0               0              0
+ */
+void ProcessCacheManagerUnittest::TestProcessEventCloneExecveExitExitOutOfOrder() {
+    mWrapper.mProcessCacheManager->MarkProcessEventFlushStatus(true);
+    std::vector<EventVariant> rawEvents;
+    data_event_id initProcKey{1, 0};
+    auto initProc = std::make_shared<ProcessCacheValue>();
+    initProc->SetContent<kProcessId>(initProcKey.pid);
+    initProc->SetContent<kKtime>(initProcKey.time);
+    mWrapper.mProcessCacheManager->mProcessCache.AddCache(initProcKey, initProc);
+    // sprawn processes
+    msg_execve_event shExecveEvent = CreateStubExecveEvent();
+    shExecveEvent.common.ktime = 20;
+    shExecveEvent.process.pid = 2;
+    shExecveEvent.process.ktime = 20;
+    shExecveEvent.parent.pid = initProcKey.pid;
+    shExecveEvent.parent.ktime = initProcKey.time;
+    constexpr char shBinary[] = "/usr/bin/sh";
+    memcpy(shExecveEvent.buffer + SIZEOF_EVENT, shBinary, sizeof(shBinary));
+    shExecveEvent.process.size = sizeof(shBinary) + SIZEOF_EVENT;
+    shExecveEvent.process.flags |= EVENT_CLONE;
+
+    msg_clone_event daemonCloneEvent{};
+    daemonCloneEvent.common.op = MSG_OP_CLONE;
+    daemonCloneEvent.common.ktime = 30;
+    daemonCloneEvent.tgid = 3;
+    daemonCloneEvent.ktime = 30;
+    daemonCloneEvent.parent.pid = shExecveEvent.process.pid;
+    daemonCloneEvent.parent.ktime = shExecveEvent.process.ktime;
+
+    msg_clone_event appCloneEvent{};
+    appCloneEvent.common.op = MSG_OP_CLONE;
+    appCloneEvent.common.ktime = 40;
+    appCloneEvent.tgid = 4;
+    appCloneEvent.ktime = 40;
+    appCloneEvent.parent.pid = daemonCloneEvent.tgid;
+    appCloneEvent.parent.ktime = daemonCloneEvent.ktime;
+
+    msg_execve_event appExecveEvent = CreateStubExecveEvent();
+    appExecveEvent.common.ktime = 41;
+    appExecveEvent.process.pid = 4;
+    appExecveEvent.process.ktime = 41;
+    appExecveEvent.parent.pid = daemonCloneEvent.tgid;
+    appExecveEvent.parent.ktime = daemonCloneEvent.ktime;
+    appExecveEvent.cleanup_key.pid = appCloneEvent.tgid;
+    appExecveEvent.cleanup_key.ktime = appCloneEvent.ktime;
+    constexpr char appBinary[] = "/usr/local/bin/app";
+    memcpy(appExecveEvent.buffer + SIZEOF_EVENT, appBinary, sizeof(appBinary));
+    appExecveEvent.process.size = sizeof(appBinary) + SIZEOF_EVENT;
+    appExecveEvent.process.flags |= EVENT_CLONE;
+
+    // daemon exit
+    msg_exit daemonExitEvent{};
+    daemonExitEvent.common.op = MSG_OP_EXIT;
+    daemonExitEvent.common.ktime = 60;
+    daemonExitEvent.current.pid = daemonCloneEvent.tgid;
+    daemonExitEvent.current.ktime = daemonCloneEvent.ktime;
+    daemonExitEvent.info.code = -1;
+    daemonExitEvent.info.tid = 3;
+
+    // app exit
+    msg_exit appExitEvent{};
+    appExitEvent.common.op = MSG_OP_EXIT;
+    appExitEvent.common.ktime = 60;
+    appExitEvent.current.pid = appExecveEvent.process.pid;
+    appExitEvent.current.ktime = appExecveEvent.process.ktime;
+    appExitEvent.info.code = -1;
+    appExitEvent.info.tid = 3;
+
+    rawEvents.emplace_back(shExecveEvent);
+    rawEvents.emplace_back(appCloneEvent);
+    rawEvents.emplace_back(appExecveEvent);
+    rawEvents.emplace_back(daemonCloneEvent);
+    rawEvents.emplace_back(appExitEvent);
+    rawEvents.emplace_back(daemonExitEvent);
+    ConsumeKernelProcessEvents(mWrapper.mProcessCacheManager.get(), rawEvents); // retry for an extra round
+    // shExecveEvent is done
+    // appCloneEvent cannot find parent
+    // appExecveEvent write cache but cannot inc ref parent
+    // daemonCloneEvent is done
+    // appExitEvent is done, will dec app and daemon ref to 0
+    // daemonExitEvent is done, will dec daemon ref to -1
+    auto daemonProc = mWrapper.mProcessCacheManager->mProcessCache.Lookup(
+        data_event_id{daemonCloneEvent.tgid, daemonCloneEvent.ktime});
+    APSARA_TEST_TRUE_FATAL(daemonProc != nullptr);
+    APSARA_TEST_EQUAL((*daemonProc).Get<kBinary>().to_string(), shBinary);
+    APSARA_TEST_EQUAL((*daemonProc).mPPid, shExecveEvent.process.pid);
+    APSARA_TEST_EQUAL((*daemonProc).mPKtime, shExecveEvent.process.ktime);
+    APSARA_TEST_EQUAL(daemonProc->mRefCount, -1);
+
+    auto appProc = mWrapper.mProcessCacheManager->mProcessCache.Lookup(
+        data_event_id{appExecveEvent.process.pid, appExecveEvent.process.ktime});
+    APSARA_TEST_TRUE_FATAL(appProc != nullptr);
+    APSARA_TEST_EQUAL((*appProc).Get<kBinary>().to_string(), appBinary);
+    APSARA_TEST_EQUAL((*appProc).mPPid, daemonCloneEvent.tgid);
+    APSARA_TEST_EQUAL((*appProc).mPKtime, daemonCloneEvent.ktime);
+    APSARA_TEST_EQUAL(appProc->mRefCount, 0);
+
+    ConsumeKernelProcessEvents(mWrapper.mProcessCacheManager.get(), rawEvents);
+    // appCloneEvent is done, will recover daemon ref to 0
+    // appExecveEvent is done
+
+    // check output events
+    std::array<std::shared_ptr<CommonEvent>, 10> items{};
+    size_t eventCount = mWrapper.mEventQueue.try_dequeue_bulk(items.data(), items.size());
+    APSARA_TEST_EQUAL_FATAL(6UL, eventCount);
+
+    std::unordered_set<ProcessEvent, ProcessEventHash, ProcessEventEqual> expectedEvents{
+        {shExecveEvent.process.pid,
+         shExecveEvent.process.ktime,
+         KernelEventType::PROCESS_EXECVE_EVENT,
+         shExecveEvent.common.ktime},
+        {daemonCloneEvent.tgid,
+         daemonCloneEvent.ktime,
+         KernelEventType::PROCESS_CLONE_EVENT,
+         daemonCloneEvent.common.ktime},
+        {appCloneEvent.tgid, appCloneEvent.ktime, KernelEventType::PROCESS_CLONE_EVENT, appCloneEvent.common.ktime},
+        {appExecveEvent.process.pid,
+         appExecveEvent.process.ktime,
+         KernelEventType::PROCESS_EXECVE_EVENT,
+         appExecveEvent.common.ktime},
+        {daemonExitEvent.current.pid,
+         daemonExitEvent.current.ktime,
+         KernelEventType::PROCESS_EXIT_EVENT,
+         daemonExitEvent.common.ktime},
+        {appExitEvent.current.pid,
+         appExitEvent.current.ktime,
+         KernelEventType::PROCESS_EXIT_EVENT,
+         appExitEvent.common.ktime}};
+
+    for (size_t i = 0; i < eventCount; ++i) {
+        auto event = static_cast<ProcessEvent&>(*items[i]);
+        auto it = expectedEvents.find(event);
+
+        APSARA_TEST_NOT_EQUAL_FATAL(expectedEvents.end(), it);
+        APSARA_TEST_EQUAL_FATAL(event.mTimestamp, it->mTimestamp);
+    }
+
+    // zero ref processes should be cleared
+    mWrapper.mProcessCacheManager->mProcessCache.ClearExpiredCache();
+    mWrapper.mProcessCacheManager->mProcessCache.ClearExpiredCache();
+
+    APSARA_TEST_EQUAL_FATAL(2UL, mWrapper.mProcessCacheManager->mProcessCache.Size());
+    APSARA_TEST_EQUAL(nullptr,
+                      mWrapper.mProcessCacheManager->mProcessCache
+                          .Lookup(data_event_id{daemonCloneEvent.tgid, daemonCloneEvent.ktime})
+                          .get());
+    APSARA_TEST_EQUAL(
+        nullptr,
+        mWrapper.mProcessCacheManager->mProcessCache.Lookup(data_event_id{appCloneEvent.tgid, appCloneEvent.ktime})
+            .get());
+
+    auto shProc = mWrapper.mProcessCacheManager->mProcessCache.Lookup(
+        data_event_id{shExecveEvent.process.pid, shExecveEvent.process.ktime});
+    APSARA_TEST_TRUE_FATAL(shProc != nullptr);
+    APSARA_TEST_EQUAL((*shProc).Get<kBinary>().to_string(), shBinary);
+    APSARA_TEST_EQUAL(shProc->mRefCount, 1);
+
+    APSARA_TEST_EQUAL(initProc->mRefCount, 2);
+}
+
 // void ProcessCacheManagerUnittest::TestPollPerfBuffers() {
 //     // 初始化ProcessCacheManager
 //     APSARA_TEST_TRUE(mProcessCacheManager->Init());
@@ -992,6 +1163,7 @@ UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcessEventCloneExecveExitOutOf
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcessEventExecveExitOutOfOrder);
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcessEventCloneExecveExitOutOfOrder2);
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcessEventExecveExitOutOfOrder2);
+UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestProcessEventCloneExecveExitExitOutOfOrder);
 UNIT_TEST_CASE(ProcessCacheManagerUnittest, TestFinalizeProcessTags);
 
 UNIT_TEST_MAIN

@@ -169,7 +169,7 @@ bool ProcessCloneRetryableEvent::OnRetry() {
     if (!IsTaskCompleted(kAttachK8sPodMeta) && attachK8sPodMeta(true)) {
         CompleteTask(kAttachK8sPodMeta);
     }
-    if (AreAllPreviousTasksCompleted(kFlushEvent) && flushEvent()) {
+    if (AreAllPreviousTasksCompleted(kFlushEvent) && !IsTaskCompleted(kFlushEvent) && flushEvent()) {
         CompleteTask(kFlushEvent);
     }
     if (AreAllPreviousTasksCompleted(kDone)) {

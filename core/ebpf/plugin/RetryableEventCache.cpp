@@ -61,6 +61,7 @@ void RetryableEventCache::HandleEvents() {
         }
     }
     if (nextRetryItemCount > 0) {
+        mEventProcessing.resize(nextRetryItemCount);
         std::lock_guard<std::mutex> lock(mMutex);
         mEventQueue.insert(mEventQueue.end(),
                            std::make_move_iterator(mEventProcessing.begin()),

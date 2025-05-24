@@ -47,7 +47,7 @@ bool ProcessCleanupRetryableEvent::decrementRef() {
     }
     // dec self ref count
     mProcessCache.DecRef(mKey, mProcessCacheValue);
-    LOG_DEBUG(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef"));
+    LOG_DEBUG(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef self"));
     return true;
 }
 
@@ -71,7 +71,7 @@ void ProcessCleanupRetryableEvent::OnDrop() {
     if (mProcessCacheValue && !IsTaskCompleted(kDecrementRef)) {
         // dec self ref count
         mProcessCache.DecRef(mKey, mProcessCacheValue);
-        LOG_DEBUG(sLogger, ("push cleanup event. DecRef pid", mKey.pid)("ktime", mKey.time));
+        LOG_DEBUG(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef self"));
     }
 }
 

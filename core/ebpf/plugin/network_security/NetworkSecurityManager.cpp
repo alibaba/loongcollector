@@ -152,7 +152,6 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
             return false;
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
-            LOG_DEBUG(sLogger, ("step", "enter for each"));
             auto sharedEvent = sharedEventGroup.CreateLogEvent();
             bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
             if (!hit) {

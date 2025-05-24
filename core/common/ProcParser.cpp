@@ -425,7 +425,7 @@ uint32_t ProcParser::GetPIDNsInode(uint32_t pid, const std::string& nsStr) const
     std::error_code ec;
     std::string netStr = std::filesystem::read_symlink(netns, ec).string();
     if (ec) {
-        LOG_WARNING(sLogger, ("namespace", netns)("error", ec.message()));
+        LOG_DEBUG(sLogger, ("namespace", netns)("error", ec.message()));
         return 0;
     }
 

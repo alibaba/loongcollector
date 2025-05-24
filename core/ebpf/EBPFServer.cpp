@@ -193,7 +193,7 @@ void EBPFServer::Init() {
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
                                                                  mHostPathPrefix,
-                                                                 mDataEventQueue,
+                                                                 mCommonEventQueue,
                                                                  pollProcessEventsTotal,
                                                                  lossProcessEventsTotal,
                                                                  processCacheMissTotal,
@@ -289,7 +289,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -298,7 +298,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -307,7 +307,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -495,15 +495,14 @@ void EBPFServer::HandlerEvents() {
     while (mRunning) {
         // consume queue
         size_t count
-            = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
-        LOG_DEBUG(sLogger, ("get data events, number", count));
+            = mCommonEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         // handle ....
         if (count == 0) {
             continue;
         }
 
         for (size_t i = 0; i < count; i++) {
-            auto event = items[i];
+            auto& event = items[i];
             if (!event) {
                 LOG_ERROR(sLogger, ("Encountered null event in DataEventQueue at index", i));
                 continue;

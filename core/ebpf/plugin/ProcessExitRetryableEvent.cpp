@@ -127,8 +127,9 @@ bool ProcessExitRetryableEvent::decrementRef() {
                 "action", "DecRef parent")("ppid", mProcessCacheValue->mPPid)("pktime", mProcessCacheValue->mPKtime));
     }
     mProcessCache.DecRef({mRawEvent->current.pid, mRawEvent->current.ktime}, mProcessCacheValue);
-    LOG_DEBUG(sLogger,
-              ("pid", mRawEvent->current.pid)("ktime", mRawEvent->current.ktime)("event", "exit")("action", "DecRef"));
+    LOG_DEBUG(
+        sLogger,
+        ("pid", mRawEvent->current.pid)("ktime", mRawEvent->current.ktime)("event", "exit")("action", "DecRef self"));
     return true;
 }
 
@@ -146,7 +147,7 @@ bool ProcessExitRetryableEvent::OnRetry() {
     if (!IsTaskCompleted(kAttachK8sPodMeta) && attachK8sPodMeta(true)) {
         CompleteTask(kAttachK8sPodMeta);
     }
-    if (AreAllPreviousTasksCompleted(kFlushEvent) && flushEvent()) {
+    if (AreAllPreviousTasksCompleted(kFlushEvent) && !IsTaskCompleted(kFlushEvent) && flushEvent()) {
         CompleteTask(kFlushEvent);
     }
 
@@ -161,12 +162,15 @@ bool ProcessExitRetryableEvent::OnRetry() {
 
 void ProcessExitRetryableEvent::OnDrop() {
     if (mProcessCacheValue) {
-        flushEvent();
+        if (!IsTaskCompleted(kFlushEvent)) {
+            flushEvent();
+        }
         if (!IsTaskCompleted(kDecrementRef)) {
             // dec self ref
             mProcessCache.DecRef({mRawEvent->current.pid, mRawEvent->current.ktime}, mProcessCacheValue);
             LOG_DEBUG(sLogger,
-                      ("push exit event. DecRef pid", mRawEvent->current.pid)("ktime", mRawEvent->current.ktime));
+                      ("pid", mRawEvent->current.pid)("ktime", mRawEvent->current.ktime)("event", "exit")(
+                          "action", "DecRef self"));
         }
     }
 }
