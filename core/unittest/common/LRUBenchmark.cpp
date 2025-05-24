@@ -57,7 +57,7 @@ void LRUBenchmark::TestReadWrite(int readIterations) {
         }
         for (int i = 0; i < readIterations; ++i) {
             for (const auto& kv : mKVs) {
-                cache.get(kv.first);
+                cache.getRef(kv.first);
             }
         }
         auto end = std::chrono::high_resolution_clock::now();

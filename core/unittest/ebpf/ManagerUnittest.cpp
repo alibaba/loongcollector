@@ -39,8 +39,28 @@ protected:
     void SetUp() override {
         Timer::GetInstance()->Init();
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
-        mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
+        DynamicMetricLabels dynamicLabels;
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            mRef,
+            MetricCategory::METRIC_CATEGORY_RUNNER,
+            {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
+            std::move(dynamicLabels));
+        auto pollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+        auto lossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+        auto processCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+        auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+        auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
+        auto retryableEventCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
+                                                                     "test_host",
+                                                                     "/",
+                                                                     mEventQueue,
+                                                                     pollProcessEventsTotal,
+                                                                     lossProcessEventsTotal,
+                                                                     processCacheMissTotal,
+                                                                     processCacheSize,
+                                                                     processDataMapSize,
+                                                                     retryableEventCacheSize);
     }
 
     void TearDown() override { Timer::GetInstance()->Stop(); }
@@ -63,6 +83,7 @@ protected:
 
 protected:
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
+    MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
@@ -312,10 +333,10 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     execveEvent->mPKtime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->mProcessCache.AddCache(key, std::move(execveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(key, execveEvent);
     auto pExecveEvent = std::make_shared<ProcessCacheValue>();
     data_event_id pkey{2345, 6789};
-    mProcessCacheManager->mProcessCache.AddCache(pkey, std::move(pExecveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();
@@ -354,10 +375,10 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     execveEvent->mPKtime = 6789;
 
     // 测试缓存更新
-    mProcessCacheManager->mProcessCache.AddCache(key, std::move(execveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(key, execveEvent);
     auto pExecveEvent = std::make_shared<ProcessCacheValue>();
     data_event_id pkey{2345, 6789};
-    mProcessCacheManager->mProcessCache.AddCache(pkey, std::move(pExecveEvent));
+    mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
     auto execTime = std::chrono::steady_clock::now();

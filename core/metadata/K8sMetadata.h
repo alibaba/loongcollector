@@ -114,8 +114,8 @@ private:
 
 public:
     static K8sMetadata& GetInstance() {
-        static K8sMetadata instance(1024, 1024, 1024);
-        return instance;
+        static K8sMetadata sInstance(1024, 1024, 1024);
+        return sInstance;
     }
     ~K8sMetadata();
 

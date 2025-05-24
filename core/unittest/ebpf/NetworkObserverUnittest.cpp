@@ -53,8 +53,28 @@ protected:
         AsynCurlRunner::GetInstance()->Stop();
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
         mEBPFAdapter->Init();
-        mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
+        DynamicMetricLabels dynamicLabels;
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            mRef,
+            MetricCategory::METRIC_CATEGORY_RUNNER,
+            {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
+            std::move(dynamicLabels));
+        auto pollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+        auto lossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+        auto processCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+        auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+        auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
+        auto retryableEventCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
+                                                                     "test_host",
+                                                                     "/",
+                                                                     mEventQueue,
+                                                                     pollProcessEventsTotal,
+                                                                     lossProcessEventsTotal,
+                                                                     processCacheMissTotal,
+                                                                     processCacheSize,
+                                                                     processDataMapSize,
+                                                                     retryableEventCacheSize);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
         EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
@@ -73,6 +93,7 @@ private:
     }
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
+    MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::shared_ptr<NetworkObserverManager> mManager;
@@ -217,7 +238,8 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     free(dataEvent);
 
     std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
-    size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
+    size_t count
+        = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
     APSARA_TEST_EQUAL(count, 1UL);
     APSARA_TEST_TRUE(items[0] != nullptr);
 
@@ -608,16 +630,16 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
         K8sMetadata::GetInstance().mContainerCache.insert(cid, CreatePodInfo(cid));
     }
     mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
-    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
-    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 0);
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4UL);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 0UL);
 
     mManager->HandleHostMetadataUpdate({"2", "3", "4", "5"});
-    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 1); // only add "5"
-    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 1); // delete "1"
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 1UL); // only add "5"
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 1UL); // delete "1"
 
     mManager->HandleHostMetadataUpdate({"4", "5", "6"});
-    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 0);
-    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 0UL);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2UL); // delete "2" "3"
 }
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {

@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 LoongCollector Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include <string>
-
-#include "common/memory/SourceBuffer.h"
+#include "ebpf/plugin/ProcessCacheValue.h"
 
 namespace logtail {
+ProcessCacheValue* ProcessCacheValue::CloneContents() {
+    auto* newValue = new ProcessCacheValue();
+    for (size_t i = 0; i < mContents.Size(); ++i) {
+        StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
+        newValue->mContents[i] = {cp.data, cp.size};
+    }
+    return newValue;
+}
 
-StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb);
 } // namespace logtail

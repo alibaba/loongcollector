@@ -33,6 +33,7 @@ GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=loongcollector
 LDFLAGS="${GO_LDFLAGS:-}"' -X "github.com/alibaba/ilogtail/pkg/config.BaseVersion='$VERSION'"'
 BUILD_FLAG=${BUILD_FLAG:-}
+# BUILD_FLAG='"-gcflags=all=-N -l"' # disable optimization and inlining for debuggablity
 BUILD_TAGS=${BUILD_TAGS:-}
 
 os

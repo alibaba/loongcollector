@@ -132,7 +132,7 @@
 
 //         std::vector<std::shared_ptr<int>> items(3);
 //         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-//         auto count = outputQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(500));
+//         auto count = outputQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(500));
 //         APSARA_TEST_EQUAL(count, 3);
 //     }
 

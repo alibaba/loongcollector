@@ -254,6 +254,7 @@ public:
 
     static int ExecPluginCmd(const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen);
 
+    K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
     void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
