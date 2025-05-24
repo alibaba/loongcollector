@@ -155,7 +155,7 @@ std::string GenerateExecId(const std::string& hostname, uint32_t pid, uint64_t k
     std::string execid;
     execid.reserve(hostname.size() + 1 + 19 + 1 + 7);
     execid.assign(hostname).append(":").append(std::to_string(ktime)).append(":").append(std::to_string(pid));
-    return Base64Enconde(execid);
+    return Base64Encode(execid);
 }
 
 std::filesystem::path ProcParser::procPidPath(uint32_t pid, const std::string& subpath) const {
@@ -285,6 +285,7 @@ bool ProcParser::isValidContainerId(const StringView& id, bool bpfSource) {
     return true;
 }
 
+// bpfSource only returns last part of cgroupline and may not contain complete containerid
 // The implementation may not be compatible with sysbox
 int ProcParser::LookupContainerId(const StringView& cgroupline, bool bpfSource, StringView& containerId) {
     if (bpfSource) {

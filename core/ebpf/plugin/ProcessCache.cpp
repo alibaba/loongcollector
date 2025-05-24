@@ -130,7 +130,7 @@ void ProcessCache::ForceShrink() {
         }
     }
     std::sort(cacheToRemove.begin(), cacheToRemove.end());
-    cacheToRemove.resize(std::min(1UL, mCache.size() / 4));
+    cacheToRemove.resize(std::max(1UL, mCache.size() / 4));
     {
         std::lock_guard<std::mutex> lock(mCacheMutex);
         for (const auto& [refCount, key] : cacheToRemove) {
