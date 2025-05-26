@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "spdlog/spdlog.h"
+#include "spdlog/async.h"
+#include "spdlog/sinks/rotating_file_sink.h"
 
 #include "collection_pipeline/batch/Batcher.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
@@ -39,6 +41,8 @@ public:
 private:
     bool SerializeAndPush(PipelineEventGroup&& group);
 
+    std::shared_ptr<spdlog::details::thread_pool> mThreadPool;
+    std::shared_ptr<spdlog::sinks::rotating_file_sink<std::mutex>> mFileSink;
     std::shared_ptr<spdlog::logger> mFileWriter;
     std::string mFilePath;
     uint32_t mMaxFileSize = 1024 * 1024 * 10;
