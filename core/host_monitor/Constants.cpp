@@ -23,6 +23,8 @@ namespace logtail {
 std::filesystem::path PROCESS_DIR = "/proc";
 const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";
+std::filesystem::path PROCESS_MEMINFO = "meminfo";
+std::filesystem::path PROCESS_MTRR = "mtrr";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail
