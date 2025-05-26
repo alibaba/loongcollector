@@ -14,9 +14,6 @@
 
 #include "plugin/flusher/file/FlusherFile.h"
 
-#include "spdlog/async.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
 using namespace std;
@@ -48,10 +45,10 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
     GetMandatoryUIntParam(config, "MaxFiles", mMaxFiles, errorMsg);
 
     // create file writer
-    auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
-    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+    mThreadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
+    mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
     mFileWriter
-        = std::make_shared<spdlog::async_logger>(sName, fileSink, threadPool, spdlog::async_overflow_policy::block);
+        = std::make_shared<spdlog::async_logger>(sName, mFileSink, mThreadPool, spdlog::async_overflow_policy::block);
     mFileWriter->set_pattern("%v");
 
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
