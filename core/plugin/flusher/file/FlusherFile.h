@@ -18,9 +18,9 @@
 
 #include <vector>
 
-#include "spdlog/spdlog.h"
 #include "spdlog/async.h"
 #include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/spdlog.h"
 
 #include "collection_pipeline/batch/Batcher.h"
 #include "collection_pipeline/plugin/interface/Flusher.h"
