@@ -126,7 +126,7 @@ private:
     std::filesystem::path mHostPathPrefix;
 
     EnvManager mEnvMgr;
-    MetricsRecordRef mRef;
+    mutable MetricsRecordRef mMetricsRecordRef;
 
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;

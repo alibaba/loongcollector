@@ -39,6 +39,7 @@ public:
 private:
     bool SerializeAndPush(PipelineEventGroup&& group);
 
+    std::shared_ptr<spdlog::details::thread_pool> mThreadPool;
     std::shared_ptr<spdlog::logger> mFileWriter;
     std::string mFilePath;
     uint32_t mMaxFileSize = 1024 * 1024 * 10;
