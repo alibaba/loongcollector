@@ -18,7 +18,7 @@ on:
   push:
     branches:
       - main
-      - fix-flusher-files
+      - fix-flusher-file
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
