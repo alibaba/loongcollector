@@ -98,7 +98,7 @@ jobs:
   #   permissions:
   #     contents: write
   #     packages: read
-  #   # needs: [ Build-LoongCollector-Image ]
+  #   needs: [ Build-LoongCollector-Image ]
   #   steps:
   #     - name: Set up Go ${{ matrix.go-version }}
   #       uses: actions/setup-go@v2

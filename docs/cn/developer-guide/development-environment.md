@@ -164,7 +164,7 @@ cmake -DBUILD_LOGTAIL_UT=ON ..
 
 ```bash
 cp -a ./core/build/loongcollector ./output
-cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
+cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output
 ```
 
 最终组装的`./output`目录的结构如下
