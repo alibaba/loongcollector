@@ -467,7 +467,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Logstore": "test_logstore",
             "Region": "test_region",
             "Endpoint": "test_region.log.aliyuncs.com",
-            "TelemetryType": "multivalue_metrics"
+            "TelemetryType": "metrics_multivalue"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));

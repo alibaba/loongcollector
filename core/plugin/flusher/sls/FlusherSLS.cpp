@@ -313,8 +313,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         // TelemetryType set to metrics
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
-    } else if (telemetryType == "multivalue_metrics") {
-        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_MULTIVALUE_METRICS;
+    } else if (telemetryType == "metrics_multivalue") {
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE;
     } else if (telemetryType == "arms_agentinfo") {
         mSubpath = APM_AGENTINFOS_URL;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
@@ -339,7 +339,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // Logstore
     if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS
-        || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_MULTIVALUE_METRICS) {
+        || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE) {
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -509,7 +509,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                        strategy,
                        !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
                            && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
-                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_MULTIVALUE_METRICS)) {
+                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE)) {
         // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
         // enable group batch
         return false;
@@ -674,7 +674,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 
     switch (mTelemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
-        case sls_logs::SLS_TELEMETRY_TYPE_MULTIVALUE_METRICS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
