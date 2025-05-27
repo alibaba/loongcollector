@@ -31,6 +31,7 @@
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "common/version.h"
@@ -81,6 +82,7 @@ Application::Application() : mStartTime(time(nullptr)) {
 }
 
 void Application::Init() {
+    TimeKeeper::GetInstance();
     // change working dir to ./${ILOGTAIL_VERSION}/
     string processExecutionDir = GetProcessExecutionDir();
     AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
@@ -378,7 +380,7 @@ void Application::Exit() {
     FlusherSLS::RecycleResourceIfNotUsed();
 
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
-
+    TimeKeeper::GetInstance()->Stop();
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif

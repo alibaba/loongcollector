@@ -80,13 +80,13 @@ private:
     std::atomic_bool mRunFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
+    std::filesystem::path mHostPathPrefix;
+    ProcParser mProcParser;
     ProcessCache mProcessCache;
     ProcessDataMap mProcessDataMap;
     RetryableEventCache mRetryableEventCache;
 
-    ProcParser mProcParser;
     std::string mHostName;
-    std::filesystem::path mHostPathPrefix;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
 
     CounterPtr mPollProcessEventsTotal;

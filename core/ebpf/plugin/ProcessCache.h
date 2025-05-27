@@ -19,6 +19,7 @@
 
 #include <mutex>
 
+#include "common/ProcParser.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessDataMap.h"
 
@@ -26,7 +27,7 @@ namespace logtail {
 
 class ProcessCache {
 public:
-    explicit ProcessCache(size_t maxCacheSize);
+    explicit ProcessCache(size_t maxCacheSize, ProcParser& procParser);
 
     // thread-safe
     bool Contains(const data_event_id& key) const;
@@ -59,6 +60,7 @@ private:
     // NOT thread-safe, only single write call, no contention with read
     void enqueueExpiredEntry(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
 
+    ProcParser mProcParser;
     using ExecveEventMap = std::
         unordered_map<data_event_id, std::shared_ptr<ProcessCacheValue>, ebpf::DataEventIdHash, ebpf::DataEventIdEqual>;
     mutable std::mutex mCacheMutex;
@@ -72,6 +74,8 @@ private:
     std::mutex mCacheExpireQueueMutex;
     std::vector<ExitedEntry> mCacheExpireQueue;
     std::vector<ExitedEntry> mCacheExpireQueueProcessing;
+
+    int64_t mLastForceShrinkTimeSec = 0;
 };
 
 } // namespace logtail

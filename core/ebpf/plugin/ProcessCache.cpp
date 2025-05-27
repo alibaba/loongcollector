@@ -15,15 +15,17 @@
 #include "ebpf/plugin/ProcessCache.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iterator>
 #include <mutex>
 
 #include "ProcessCacheValue.h"
+#include "common/TimeKeeper.h"
 #include "logger/Logger.h"
 
 namespace logtail {
 
-ProcessCache::ProcessCache(size_t maxCacheSize) {
+ProcessCache::ProcessCache(size_t maxCacheSize, ProcParser& procParser) : mProcParser(procParser) {
     mCache.reserve(maxCacheSize);
 }
 
@@ -121,23 +123,27 @@ void ProcessCache::ClearExpiredCache() {
 }
 
 void ProcessCache::ForceShrink() {
-    std::vector<std::pair<int, data_event_id>> cacheToRemove;
-    cacheToRemove.reserve(mCache.size());
-    {
-        std::lock_guard<std::mutex> lock(mCacheMutex);
-        for (const auto& kv : mCache) {
-            cacheToRemove.emplace_back(kv.second->RefCount(), kv.first);
-        }
+    if (mLastForceShrinkTimeSec < TimeKeeper::GetInstance()->NowSec() - 120) {
+        return;
     }
-    std::sort(cacheToRemove.begin(), cacheToRemove.end());
-    cacheToRemove.resize(std::max(1UL, mCache.size() / 4));
+    auto validProcs = mProcParser.GetAllPids();
+    auto minKtime = TimeKeeper::GetInstance()->KtimeNs()
+        - std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::minutes(2)).count();
+    std::vector<data_event_id> cacheToRemove;
+    cacheToRemove.reserve(mCache.size() - validProcs.size());
     {
         std::lock_guard<std::mutex> lock(mCacheMutex);
-        for (const auto& [refCount, key] : cacheToRemove) {
+        for (const auto& [k, v] : mCache) {
+            if (validProcs.count(k.pid) == 0U && minKtime > time_t(k.time)) {
+                cacheToRemove.emplace_back(k);
+            }
+        }
+        for (const auto& key : cacheToRemove) {
             mCache.erase(key);
-            LOG_DEBUG(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
+            LOG_ERROR(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
         }
     }
+    mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec();
 }
 
 void ProcessCache::PrintDebugInfo() {

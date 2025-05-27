@@ -132,11 +132,11 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapt
                                          IntGaugePtr processDataMapSize,
                                          IntGaugePtr retryableEventCacheSize)
     : mEBPFAdapter(eBPFAdapter),
-      mProcessCache(INT32_FLAG(max_ebpf_process_cache_size)),
-      mProcessDataMap(INT32_FLAG(max_ebpf_max_process_data_map_size)),
-      mProcParser(hostPathPrefix),
-      mHostName(hostName),
       mHostPathPrefix(hostPathPrefix),
+      mProcParser(hostPathPrefix),
+      mProcessCache(INT32_FLAG(max_ebpf_process_cache_size), mProcParser),
+      mProcessDataMap(INT32_FLAG(max_ebpf_max_process_data_map_size)),
+      mHostName(hostName),
       mCommonEventQueue(queue),
       mPollProcessEventsTotal(std::move(pollEventsTotal)),
       mLossProcessEventsTotal(std::move(lossEventsTotal)),
@@ -377,11 +377,15 @@ int ProcessCacheManager::syncAllProc() {
 
 std::vector<std::shared_ptr<Proc>> ProcessCacheManager::listRunningProcs() {
     std::vector<std::shared_ptr<Proc>> processes;
-    for (const auto& entry : std::filesystem::directory_iterator(mHostPathPrefix / "proc")) {
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(mHostPathPrefix / "proc", ec)) {
+        if (ec) {
+            continue;
+        }
         if (!entry.is_directory()) {
             continue;
         }
-        std::string dirName = entry.path().filename().string();
+        const std::string& dirName = entry.path().filename().string();
         int32_t pid = 0;
         if (!StringTo(dirName, pid)) {
             continue;

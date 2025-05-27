@@ -25,6 +25,7 @@
 namespace logtail::ebpf {
 
 bool ProcessSyncRetryableEvent::HandleMessage() {
+    LOG_ERROR(sLogger, ("pid", mRawEvent.pid)("ktime", mRawEvent.ktime)("event", "sync")("action", "HandleMessage"));
     mProcessCacheValue = procToProcessCacheValue(mRawEvent);
 
     if (incrementParentRef()) {

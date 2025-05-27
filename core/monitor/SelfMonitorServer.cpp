@@ -31,8 +31,8 @@ SelfMonitorServer::SelfMonitorServer() {
 }
 
 SelfMonitorServer* SelfMonitorServer::GetInstance() {
-    static SelfMonitorServer* ptr = new SelfMonitorServer();
-    return ptr;
+    static SelfMonitorServer* sPtr = new SelfMonitorServer();
+    return sPtr;
 }
 
 void SelfMonitorServer::Init() {
@@ -153,8 +153,9 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE) {
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mPluginSourceMetricsRule);
         }
-        if (shouldSkip)
+        if (shouldSkip) {
             continue;
+        }
 
         if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
             mSelfMonitorMetricEventMap[event.mKey].Merge(event);

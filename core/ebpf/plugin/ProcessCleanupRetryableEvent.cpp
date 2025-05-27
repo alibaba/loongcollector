@@ -14,11 +14,13 @@
 
 #include "ebpf/plugin/ProcessCleanupRetryableEvent.h"
 
+#include "Logger.h"
 #include "security/data_msg.h"
 
 namespace logtail::ebpf {
 
 bool ProcessCleanupRetryableEvent::HandleMessage() {
+    LOG_ERROR(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "HandleMessage"));
     mProcessCacheValue = mProcessCache.Lookup(mKey);
     if (!mProcessCacheValue) {
         return false;

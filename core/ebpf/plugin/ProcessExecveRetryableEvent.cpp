@@ -27,6 +27,9 @@
 namespace logtail::ebpf {
 
 bool ProcessExecveRetryableEvent::HandleMessage() {
+    LOG_ERROR(sLogger,
+              ("pid", mRawEvent->process.pid)("ktime", mRawEvent->process.ktime)("event", "execve")("action",
+                                                                                                    "HandleMessage"));
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     fillProcessPlainFields(*mRawEvent, *cacheValue);
 

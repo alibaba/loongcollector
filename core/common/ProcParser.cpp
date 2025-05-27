@@ -415,6 +415,27 @@ std::string ProcParser::GetUserNameByUid(uid_t uid) {
 #endif
 }
 
+std::unordered_set<int> ProcParser::GetAllPids() {
+    std::unordered_set<int> pids;
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(mProcPath, ec)) {
+        if (ec) {
+            continue;
+        }
+        if (!entry.is_directory()) {
+            continue;
+        }
+        const std::string& dirName = entry.path().filename().string();
+        int32_t pid = 0;
+        if (!StringTo(dirName, pid)) {
+            continue;
+        }
+        pids.insert(pid);
+    }
+
+    return pids;
+}
+
 int64_t ProcParser::GetStatsKtime(ProcessStat& procStat) const {
     return procStat.startTicks * kNanoPerSeconds / GetTicksPerSecond();
 }

@@ -14,6 +14,12 @@
 
 #include "ebpf/plugin/ProcessDataMap.h"
 
+#include <cstdint>
+#include <ctime>
+
+#include <chrono>
+
+#include "TimeKeeper.h"
 #include "logger/Logger.h"
 
 namespace logtail::ebpf {
@@ -33,7 +39,13 @@ void ProcessDataMap::DataAdd(msg_data* dataPtr) {
     }
     size_t size = dataPtr->common.size - kDataArgOffset;
     if (size <= MSG_DATA_ARG_LEN) {
-        // std::vector<uint64_t> key = {dataPtr->id.pid, dataPtr->id.time};
+        time_t ktimeUpperBound = TimeKeeper::GetInstance()->KtimeNs()
+            + std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(10)).count();
+        if (time_t(dataPtr->id.time) > ktimeUpperBound) {
+            LOG_ERROR(sLogger,
+                      ("pid", dataPtr->id.pid)("ktime", dataPtr->id.time)(
+                          "nowKtime", TimeKeeper::GetInstance()->KtimeNs())("error", "ktime is a future time"));
+        }
         std::lock_guard<std::mutex> lk(mDataMapMutex);
         auto res = mDataMap.find(dataPtr->id);
         if (res != mDataMap.end()) {
@@ -50,7 +62,7 @@ void ProcessDataMap::DataAdd(msg_data* dataPtr) {
                 && mLastClearTime
                     < std::chrono::system_clock::now() - std::chrono::nanoseconds(kMaxCacheExpiredTimeoutNs)) {
                 LOG_WARNING(sLogger, ("data map size exceed limit", mMaxSize)("size", mDataMap.size()));
-                clearExpiredData(dataPtr->id.time);
+                clearExpiredData(std::min(time_t(dataPtr->id.time), ktimeUpperBound));
                 mLastClearTime = std::chrono::system_clock::now();
             }
             if (mDataMap.size() >= mMaxSize) {

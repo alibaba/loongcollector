@@ -18,6 +18,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "common/StringView.h"
@@ -231,6 +232,8 @@ public:
     std::tuple<std::string, std::string> ProcsFilename(const std::string& args);
 
     std::string GetUserNameByUid(uid_t uid);
+
+    std::unordered_set<int> GetAllPids();
 
 private:
     std::filesystem::path procPidPath(uint32_t pid, const std::string& subpath) const;

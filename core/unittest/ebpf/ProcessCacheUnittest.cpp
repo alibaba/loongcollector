@@ -78,7 +78,7 @@ UNIT_TEST_CASE(ProcessCacheValueUnittest, TestCloneContentsExcessive);
 UNIT_TEST_CASE(ProcessCacheValueUnittest, TestSetContent);
 
 class ProcessCacheUnittest : public ::testing::Test {
-    ProcessCacheUnittest() : mProcessCache(16) {}
+    ProcessCacheUnittest() : mProcParser("/"), mProcessCache(16, mProcParser) {}
 
 protected:
     void TestAddCache();
@@ -86,6 +86,7 @@ protected:
     void TestClearExpiredCache();
 
 private:
+    ProcParser mProcParser;
     ProcessCache mProcessCache;
 };
 

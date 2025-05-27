@@ -14,14 +14,6 @@
 
 #include "plugin/flusher/file/FlusherFile.h"
 
-<<<<<<< HEAD
-#include <cstddef>
-
-#include "spdlog/async.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-
-    =======
->>>>>>> main
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
     using namespace std;
@@ -31,8 +23,8 @@ namespace logtail {
 const string FlusherFile::sName = "flusher_file";
 
 bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    static uint32_t cnt = 0;
-    GenerateQueueKey(to_string(++cnt));
+    static uint32_t sCnt = 0;
+    GenerateQueueKey(to_string(++sCnt));
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
 
     string errorMsg;
@@ -89,7 +81,7 @@ bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
         if (!serializedData.empty() && serializedData.back() == '\n') {
             serializedData.pop_back();
         }
-        mFileWriter->info(std::move(serializedData));
+        mFileWriter->info(serializedData);
         mFileWriter->flush();
     } else {
         LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
