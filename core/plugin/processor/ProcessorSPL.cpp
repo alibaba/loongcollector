@@ -18,6 +18,7 @@
 
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
@@ -117,6 +118,14 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
 
     PipelineStats pipelineStats;
     ResultCode result = mSPLPipelinePtr->Execute(std::move(logGroup), logGroupList, pipelineStats, mContext);
+
+    // if __time__ is 0, set it to now time
+    EventsContainer& events = logGroup.MutableEvents();
+    for (auto & e : events) {
+        if (e->GetTimestamp() == 0) {
+            e->SetTimestamp(GetCurrentLogtailTime().tv_sec);
+        }
+    }
 
     if (result != ResultCode::OK) {
         ADD_COUNTER(mSplExcuteErrorCount, 1);
