@@ -55,6 +55,10 @@ func HandleTrace(w http.ResponseWriter, req *http.Request) {
 	DumpTraceInfo()
 }
 
+func HandleStack(w http.ResponseWriter, req *http.Request) {
+	DumpAllGoroutineStacks()
+}
+
 // HandleCPU dump the CPU info in 30 seconds.
 func HandleCPU(w http.ResponseWriter, req *http.Request) {
 	DumpCPUInfo(30)
@@ -158,6 +162,26 @@ func DumpTraceInfo() {
 	defer trace.Stop()
 }
 
+// 获取所有 Goroutine 的堆栈信息并写入到文件
+func DumpAllGoroutineStacks() {
+	// 创建一个文件用于存储堆栈信息
+	file, err := os.Create("stack.out")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	// 创建缓冲区以存储堆栈信息
+	buf := make([]byte, 10<<20)           // 10MB 缓冲区(目前测试下来，4000+协程，堆栈4MB左右)
+	stackSize := runtime.Stack(buf, true) // 获取 Goroutine 的堆栈信息
+
+	// 将堆栈信息写入到文件
+	_, err = file.Write(buf[:stackSize])
+	if err != nil {
+		return
+	}
+}
+
 // DumpMemInfo dump the mem profile info after the given seconds.
 func DumpMemInfo(seconds int) {
 	time.Sleep((time.Duration)(seconds) * time.Second)
@@ -186,6 +210,7 @@ func InitHTTPServer() {
 			handlers["/cpu180"] = &handler{handlerFunc: HandleCPU180, description: "dump cpu info, 180 seconds"}
 			handlers["/forcegc"] = &handler{handlerFunc: HandleForceGC, description: "force gc"}
 			handlers["/trace"] = &handler{handlerFunc: HandleTrace, description: "dump trace info"}
+			handlers["/stack"] = &handler{handlerFunc: HandleStack, description: "dump stack info"}
 			runtime.SetBlockProfileRate(1)
 			if *flags.AutoProfile {
 				go DumpCPUInfo(100)
