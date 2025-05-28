@@ -119,11 +119,13 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
     PipelineStats pipelineStats;
     ResultCode result = mSPLPipelinePtr->Execute(std::move(logGroup), logGroupList, pipelineStats, mContext);
 
-    // if __time__ is 0, set it to now time
-    EventsContainer& events = logGroup.MutableEvents();
-    for (auto & e : events) {
-        if (e->GetTimestamp() == 0) {
-            e->SetTimestamp(GetCurrentLogtailTime().tv_sec);
+    for (auto & g: logGroupList) {
+        EventsContainer& events = g.MutableEvents();
+        for (auto & e : events) {
+            // parse time fail in spl
+            if (e->GetTimestamp() == 0 || e->GetTimestamp() == 4294967295) {
+                e->SetTimestamp(GetCurrentLogtailTime().tv_sec);
+            }
         }
     }
 
