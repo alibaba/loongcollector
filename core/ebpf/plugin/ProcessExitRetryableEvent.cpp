@@ -168,6 +168,9 @@ void ProcessExitRetryableEvent::OnDrop() {
         if (!IsTaskCompleted(kFlushEvent)) {
             flushEvent();
         }
+        if (!IsTaskCompleted(kDecrementRef) && decrementRef()) {
+            CompleteTask(kDecrementRef);
+        }
         if (!IsTaskCompleted(kDecrementRef)) {
             // dec self ref
             mProcessCache.DecRef({mRawEvent->current.pid, mRawEvent->current.ktime}, mProcessCacheValue);
