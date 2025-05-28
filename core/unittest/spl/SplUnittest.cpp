@@ -654,7 +654,8 @@ $ds2;
 
 void SplUnittest::TestZeroTime() {
     // make config
-    Json::Value config = GetCastConfig(R"(* | parse-json content | extend ts=date_parse(time, '%Y-%m-%dT%H:%i:%S')| extend __time__=cast(to_unixtime(ts) as INTEGER)-28800| project-away ts| project-away content)");
+    Json::Value config = GetCastConfig(
+        R"(* | parse-json content | extend ts=date_parse(time, '%Y-%m-%dT%H:%i:%S')| extend __time__=cast(to_unixtime(ts) as INTEGER)-28800| project-away ts| project-away content)");
 
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
