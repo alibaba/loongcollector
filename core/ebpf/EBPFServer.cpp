@@ -308,14 +308,14 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     // step2: call init function
     switch (type) {
         case PluginType::PROCESS_SECURITY: {
-            auto pluginMgr = ProcessSecurityManager::Create(
+            pluginMgr = ProcessSecurityManager::Create(
                 mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
             UpdatePluginManager(type, pluginMgr);
             break;
         }
 
         case PluginType::NETWORK_OBSERVE: {
-            auto pluginMgr = NetworkObserverManager::Create(
+            pluginMgr = NetworkObserverManager::Create(
                 mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
             UpdatePluginManager(type, pluginMgr);
             
@@ -327,7 +327,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         }
 
         case PluginType::NETWORK_SECURITY: {
-            auto pluginMgr = NetworkSecurityManager::Create(
+            pluginMgr = NetworkSecurityManager::Create(
                     mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
             UpdatePluginManager(type, pluginMgr);
             break;

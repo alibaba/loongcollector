@@ -91,8 +91,8 @@ void TableUnittest::TestCompileOperations() {
     static_assert(eq, "static check pass ... ");
 
     StaticDataRow<&kConnTrackerTable> tb;
-    tb.Set<kAppId>(StringView("hhh"));
-    APSARA_TEST_EQUAL(tb.Get<kAppId>(), "hhh");
+    tb.Set<kRemoteIp>(StringView("hhh"));
+    APSARA_TEST_EQUAL(tb.Get<kRemoteIp>(), "hhh");
 }
 
 // 注册新增的测试用例

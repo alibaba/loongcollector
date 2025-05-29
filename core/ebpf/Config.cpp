@@ -266,6 +266,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
         }
         selectorVec.push_back(item);
     }
+    thisObserverNetworkOption.mSelectors = std::move(selectorVec);
 
     // // EnableEvent (Optional)
     // if (!GetOptionalBoolParam(probeConfig, "EnableLog", thisObserverNetworkOption.mEnableLog, errorMsg)) {
