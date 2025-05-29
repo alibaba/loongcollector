@@ -212,7 +212,8 @@ public:
 const std::string TaskMock::sName = "task_mock";
 
 void LoadPluginMock() {
-    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
+    PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputMock>());
+    PluginRegistry::GetInstance()->RegisterOnetimeInputCreator(new StaticInputCreator<InputMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorInnerMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());

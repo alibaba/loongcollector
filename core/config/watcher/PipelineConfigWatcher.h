@@ -32,6 +32,7 @@ class TaskPipelineManager;
 struct PipelineConfigWithDiffInfo {
     CollectionConfig config;
     ConfigDiffEnum diffEnum;
+
     PipelineConfigWithDiffInfo(CollectionConfig&& config, ConfigDiffEnum diffEnum)
         : config(std::move(config)), diffEnum(diffEnum) {}
 };
@@ -66,17 +67,19 @@ private:
                          std::unordered_set<std::string>& configSet,
                          SingletonConfigCache& singletonCache);
     bool CheckAddedConfig(const std::string& configName,
+                          const std::filesystem::path& filepath,
                           std::unique_ptr<Json::Value>&& configDetail,
                           CollectionConfigDiff& pDiff,
                           TaskConfigDiff& tDiff,
                           SingletonConfigCache& singletonCache);
     bool CheckModifiedConfig(const std::string& configName,
+                             const std::filesystem::path& filepath,
                              std::unique_ptr<Json::Value>&& configDetail,
                              CollectionConfigDiff& pDiff,
                              TaskConfigDiff& tDiff,
                              SingletonConfigCache& singletonCache);
     bool CheckUnchangedConfig(const std::string& configName,
-                              const std::filesystem::path& path,
+                              const std::filesystem::path& filepath,
                               CollectionConfigDiff& pDiff,
                               SingletonConfigCache& singletonCache);
     void PushPipelineConfig(CollectionConfig&& config,
@@ -89,7 +92,7 @@ private:
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class PipelineConfigWatcherUnittest;
+    friend class SingletonInputCollectionConfigUpdateUnittest;
 #endif
 };
 
