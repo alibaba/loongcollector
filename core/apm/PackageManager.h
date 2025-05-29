@@ -32,12 +32,16 @@ public:
 
     void Init() {}
 
-    bool InstallExecHook();
+
     bool UpdateExecHook();
     bool UninstallExecHook();
 
     // download and un-zip to target path ...
-    bool PrepareAPMAgent(APMLanguage lang, const std::string& version);
+    bool PrepareAPMAgent(APMLanguage lang, const std::string& version, std::string& agentJarPath);
+
+    bool InstallExecHook();
+
+    // TODO update latest APM Agent ...
 
 private:
     bool downloadFromOss(const std::string& url, const std::string& output, bool& changed);

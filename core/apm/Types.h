@@ -18,6 +18,9 @@
 
 #include <string>
 #include <vector>
+#include <memory>
+
+#include "json/json.h"
 
 namespace logtail::apm {
 
@@ -48,7 +51,11 @@ struct AttachConfig {
     std::string mAppName;
     std::string mAppId;
     std::string mAgentVersion;
+    std::string mServiceId;
+    std::string mWorkspace;
     std::vector<MatchRule> mMatchRules;
 };
+
+bool InitObserverNetworkOption(const Json::Value& config, std::unique_ptr<AttachConfig>& attachConfig);
 
 }

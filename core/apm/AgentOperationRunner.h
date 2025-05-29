@@ -30,6 +30,7 @@
 #include "common/ProcParser.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
+#include "common/ThreadPool.h"
 
 namespace logtail::apm {
 
@@ -54,13 +55,14 @@ public:
     [[nodiscard]] bool HasRegisteredPlugins() const override;
     void EventGC() override {}
 
-    bool DoAttach(const CollectionPipelineContext* ctx, uint32_t pluginIndex, AttachConfig& config);
+    bool DoAttach(AttachConfig& config);
 
 private:
     int findPidsByRule(MatchRule& rule, std::vector<int>& pids);
 
     AttachManager mAttachMgr;
     PackageManager mPackageMgr;
+    std::unique_ptr<ThreadPool> mThreadPool;
 };
 
 } // namespace logtail::apm

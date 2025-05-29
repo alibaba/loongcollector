@@ -38,9 +38,12 @@ public:
     /**
      * DoAttach is used to write APP META to rc file
      */
-    bool DoAttach(AttachConfig& config, int pid) {}
+    bool DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config, int pid);
+
+    bool DoDetach(AttachConfig& config, int pid);
 
 private:
+
 };
 
 } // namespace logtail::apm

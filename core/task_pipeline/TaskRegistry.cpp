@@ -14,12 +14,14 @@
 
 #include "task_pipeline/TaskRegistry.h"
 
+#include "plugin/input/InputApmAgentInject.h"
+
 using namespace std;
 
 namespace logtail {
 
 void TaskRegistry::LoadPlugins() {
-    // RegisterCreator(TaskMock::sName, []() { return make_unique<TaskMock>(); });
+    RegisterCreator(ApmAgentInjectTask::sName, []() { return make_unique<ApmAgentInjectTask>(); });
 }
 
 void TaskRegistry::UnloadPlugins() {

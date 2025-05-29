@@ -25,6 +25,7 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#include "magic_enum.hpp"
 
 namespace logtail::apm {
 
@@ -48,17 +49,19 @@ std::string getWorkingPath() {
 
 // write to /etc/ld.so.preload
 bool PackageManager::InstallExecHook() {
+    // step1. prepare shared lib dir ...
     bool res = initSharedLibraryDir();
     if (!res) {
         // send alarm
         return false;
     }
 
-    // download ...
+    // TODO step2. download ...
 
     auto workingPath = getWorkingPath();
     auto execHookEntry = workingPath.append("/").append(kDefaultExecHookName);
 
+    // step3. write to /etc/ld.so.preload
     if (!std::filesystem::exists(kDefaultPreloadConfigFile)) {
         std::ofstream configFile(kDefaultPreloadConfigFile);
         if (!configFile) {
@@ -118,8 +121,14 @@ bool PackageManager::downloadFromOss(const std::string& url, const std::string& 
     return true;
 }
 
-bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& version) {
-    return false;
+bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& version, std::string& agentJarPath) {
+    if (lang != APMLanguage::kJava) {
+        LOG_WARNING(sLogger, ("language not supported", magic_enum::enum_name(lang)));
+        return false;
+    }
+
+    // download from oss ...
+    return true;
 }
 
 } // namespace logtail::apm

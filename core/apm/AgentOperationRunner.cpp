@@ -22,8 +22,7 @@
 namespace logtail::apm {
 
 void AgentOperationRunner::Init() {
-    // do load ...
-    // mHookMgr.LoadExecHook();
+    mThreadPool = std::make_unique<ThreadPool>(1);
 }
 
 void AgentOperationRunner::Stop() {
@@ -33,20 +32,21 @@ bool AgentOperationRunner::HasRegisteredPlugins() const {
     return true;
 }
 
-bool AgentOperationRunner::DoAttach(const CollectionPipelineContext* ctx, uint32_t pluginIndex, AttachConfig& config) {
+bool AgentOperationRunner::DoAttach(AttachConfig& config) {
     // re-try queue
     // store in map ...
 
     bool res = false;
     // async prepare ...
-    res = mPackageMgr.CheckAndDownloadAPMAgent(config.mLanguage, config.mAgentVersion);
+    std::string agentPath;
+    res = mPackageMgr.PrepareAPMAgent(config.mLanguage, config.mAgentVersion, agentPath);
     if (!res) {
         // TODO @qianlu.kk send alarm ...
         return false;
     }
 
     // setup exec-hook
-    // mHookMgr.LoadExecHook();
+    res = mPackageMgr.InstallExecHook();
     if (!res) {
         // TODO @qianlu.kk send alarm ...
         return false;
@@ -58,6 +58,7 @@ bool AgentOperationRunner::DoAttach(const CollectionPipelineContext* ctx, uint32
         if (ret) {
             // failed to find pids ...
             LOG_WARNING(sLogger, ("failed to find pids for rule", ""));
+            // TODO @qianlu.kk send alarm ...
             continue;
         }
         if (pids.empty()) {
@@ -66,7 +67,7 @@ bool AgentOperationRunner::DoAttach(const CollectionPipelineContext* ctx, uint32
         }
 
         for (int pid : pids) {
-            bool res = mAttachMgr.DoAttach(config, pid);
+            bool res = mAttachMgr.DoAttach(rule, agentPath, config, pid);
             if (!res) {
                 // TODO @qianlu.kk send alarm ...
             }
