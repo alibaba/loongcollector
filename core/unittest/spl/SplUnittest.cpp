@@ -42,6 +42,7 @@ public:
 
     void TestTag();
     // void TestMultiParse();
+    void TestZeroTime();
 };
 
 // APSARA_UNIT_TEST_CASE(SplUnittest, TestInit, 8);
@@ -52,6 +53,7 @@ APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexParse, 3);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexCSV, 4);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestRegexKV, 5);
 APSARA_UNIT_TEST_CASE(SplUnittest, TestTag, 6);
+APSARA_UNIT_TEST_CASE(SplUnittest, TestZeroTime, 7);
 // APSARA_UNIT_TEST_CASE(SplUnittest, TestMultiParse, 7);
 
 PluginInstance::PluginMeta getPluginMeta() {
@@ -554,7 +556,6 @@ void SplUnittest::TestTag() {
     return;
 }
 
-
 /*
 void SplUnittest::TestMultiParse() {
     // make config
@@ -650,6 +651,72 @@ $ds2;
     return;
 }
 */
+
+void SplUnittest::TestZeroTime() {
+    // make config
+    Json::Value config = GetCastConfig(
+        R"(* | parse-json content | extend ts=date_parse(time, '%Y-%m-%dT%H:%i:%S')| extend __time__=cast(to_unixtime(ts) as INTEGER)-28800| project-away ts| project-away content)");
+
+    // make events
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"a1\":\"bbbb\",\"c\":\"d\",\"time\":\"2025-05-28T22:07:54\"}"
+                },
+                "timestamp" : 1234567890,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "{\"a1\":\"cccc\",\"c\":\"d\",\"time\":\"2025-05-28 22:07:54\"}"
+                },
+                "timestamp" : 1234567890,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ],
+        "tags" : {
+            "test": "time_parse"
+        }
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    std::vector<PipelineEventGroup> logGroupList;
+    logGroupList.emplace_back(std::move(eventGroup));
+    // run function
+    ProcessorSPL& processor = *(new ProcessorSPL);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+
+    time_t nowTime = GetCurrentLogtailTime().tv_sec;
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    processor.Process(logGroupList);
+
+    APSARA_TEST_EQUAL(logGroupList.size(), 1);
+    if (logGroupList.size() == 1) {
+        auto& logGroup = logGroupList[0];
+        APSARA_TEST_EQUAL(logGroup.GetEvents().size(), 2);
+        {
+            const auto& log = logGroup.GetEvents()[0];
+            APSARA_TEST_EQUAL(1748441274, log->GetTimestamp());
+        }
+        {
+            const auto& log = logGroup.GetEvents()[1];
+            APSARA_TEST_NOT_EQUAL(1748441274, log->GetTimestamp());
+            APSARA_TEST_NOT_EQUAL(0, log->GetTimestamp());
+            APSARA_TEST_NOT_EQUAL(std::numeric_limits<uint32_t>::max(), log->GetTimestamp());
+            APSARA_TEST_TRUE(log->GetTimestamp() - nowTime <= 1);
+        }
+        // std::string outJson = logGroup.ToJsonString();
+        // std::cout << "outJson: " << outJson << std::endl;
+    }
+}
 
 
 } // namespace logtail
