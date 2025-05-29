@@ -270,9 +270,6 @@ private:
             while ((i < to + 1) && j < requests.size()) {
                 auto content = requests[j].mData;
                 auto actualLogstore = static_cast<FlusherSLS*>(requests[j].mFlusher)->mLogstore;
-                LOG_INFO(sLogger,
-                         ("verify data", "checking request")("i", i)("j", j)("content", content)("logstore", logstore)(
-                             "actual logstore", actualLogstore));
                 if (actualLogstore != logstore) {
                     ++j;
                     continue;
