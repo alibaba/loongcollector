@@ -3,10 +3,10 @@ package kubernetesmetav2
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	storage "k8s.io/api/storage/v1" //nolint:typecheck
 
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestProcessEmptyStorageClass(t *testing.T) {

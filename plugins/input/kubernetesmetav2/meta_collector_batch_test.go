@@ -3,10 +3,10 @@ package kubernetesmetav2
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	batch "k8s.io/api/batch/v1" //nolint:typecheck
 
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestProcessEmptyJob(t *testing.T) {

@@ -3,10 +3,10 @@ package kubernetesmetav2
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	app "k8s.io/api/apps/v1" //nolint:typecheck
 
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestProcessEmptyDeployment(t *testing.T) {
