@@ -358,9 +358,9 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                RawDataType dataType,
                                const string& body,
                                size_t rawSize,
-                               const std::string& subpath) {
+                               const std::string& subpath,
+                               map<string, string>& header) {
     string query;
-    map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  type,

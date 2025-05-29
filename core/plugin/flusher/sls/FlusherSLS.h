@@ -35,6 +35,7 @@
 #include "models/PipelineEventGroup.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
+#include "common/CmsIdUtil.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
@@ -80,6 +81,8 @@ public:
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
     std::string GetSubpath() const { return mSubpath; }
+
+    std::string GetWorkspace() const { return mWorkspace; }
 
     std::string mProject;
     std::string mLogstore;
@@ -139,6 +142,7 @@ private:
                                                                  const std::string& subPath) const;
 
     std::string mSubpath;
+    std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;

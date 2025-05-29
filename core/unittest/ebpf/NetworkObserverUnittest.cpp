@@ -51,12 +51,13 @@ protected:
     void SetUp() override {
         Timer::GetInstance()->Init();
         AsynCurlRunner::GetInstance()->Stop();
+        mThreadPool = std::make_unique<ThreadPool>(1);
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
         mEBPFAdapter->Init();
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
             mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
-        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
         EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
     }
 
@@ -69,11 +70,12 @@ protected:
 
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+        return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     }
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
+    std::unique_ptr<ThreadPool> mThreadPool;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::shared_ptr<NetworkObserverManager> mManager;
 };

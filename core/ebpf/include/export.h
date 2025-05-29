@@ -22,39 +22,37 @@ using PerfBufferSampleHandler = void (*)(void* ctx, int cpu, void* data, uint32_
 using PerfBufferLostHandler = void (*)(void* ctx, int cpu, unsigned long long cnt);
 using eBPFLogHandler = int (*)(int16_t level, const char* format, va_list args);
 
-
 struct WorkloadSelector {
     std::string mWorkloadName;
     std::string mWorkloadKind;
     std::string mNamespace;
 };
 
-struct AppDetail {
-    std::string mAppName;
-    std::string mAppId;
-    std::string mWorkspace;
-    std::string mServiceId;
-};
-
-struct ObserverNetworkOption {
-    std::vector<std::string> mEnableProtocols;
-    bool mDisableProtocolParse = false;
-    bool mDisableConnStats = false;
-    bool mEnableConnTrackerDump = false;
+struct L7Config {
+    bool mEnable = false;
     bool mEnableSpan = false;
     bool mEnableMetric = false;
     bool mEnableLog = false;
     double mSampleRate = 0.01;
-    int mMaxConnections = 5000;
-    std::string mAppId; // optional
-    std::string mAppName; // optional
-    std::string mHostName; // optional
-    std::string mHostIp; // optional
-    std::vector<std::string> mEnableCids;
-    std::vector<std::string> mDisableCids;
-    std::string mMeterHandlerType;
-    std::string mSpanHandlerType;
+    // std::vector<std::string> mEnableProtocols;
+};
 
+struct L4Config {
+    bool mEnable = false;
+    // int mMaxConnections = 5000;
+};
+
+struct ApmConfig {
+    std::string mWorkspace;
+    std::string mAppName;
+    std::string mAppId; // optional, if not configured by backend, we need calculate it ...
+    std::string mServiceId;
+};
+
+struct ObserverNetworkOption {
+    L7Config mL7Config;
+    L4Config mL4Config;
+    ApmConfig mApmConfig;
     std::vector<WorkloadSelector> mSelectors;
 };
 

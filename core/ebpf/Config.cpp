@@ -51,8 +51,22 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                     const CollectionPipelineContext* mContext,
                                     const std::string& sName) {
     std::string errorMsg;
-    // EnableEvent (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "EnableLog", thisObserverNetworkOption.mEnableLog, errorMsg)) {
+
+    // ==== l7 config
+    if (!IsValidMap(probeConfig, "L7Config", errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    Json::Value l7Config;
+    l7Config = probeConfig["L7Config"];
+    // Enable (Optional)
+    if (!GetOptionalBoolParam(l7Config, "Enable", thisObserverNetworkOption.mL7Config.mEnable, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -63,7 +77,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // EnableSpan (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "EnableSpan", thisObserverNetworkOption.mEnableSpan, errorMsg)) {
+    if (!GetOptionalBoolParam(l7Config, "EnableSpan", thisObserverNetworkOption.mL7Config.mEnableSpan, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -74,7 +88,18 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // EnableMetric (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "EnableMetric", thisObserverNetworkOption.mEnableMetric, errorMsg)) {
+    if (!GetOptionalBoolParam(l7Config, "EnableMetric", thisObserverNetworkOption.mL7Config.mEnableMetric, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+    // EnableLog (Optional)
+    if (!GetOptionalBoolParam(l7Config, "EnableLog", thisObserverNetworkOption.mL7Config.mEnableLog, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -85,7 +110,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // SampleRate (Optional)
-    if (!GetOptionalDoubleParam(probeConfig, "SampleRate", thisObserverNetworkOption.mSampleRate, errorMsg)) {
+    if (!GetOptionalDoubleParam(l7Config, "SampleRate", thisObserverNetworkOption.mL7Config.mSampleRate, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -95,9 +120,33 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-    // EnableMetric (Optional)
-    if (!GetOptionalListParam<std::string>(
-            probeConfig, "EnableCids", thisObserverNetworkOption.mEnableCids, errorMsg)) {
+    // EnableProtocols (Optional)
+    // if (!GetOptionalListParam(probeConfig, "EnableProtocols", thisObserverNetworkOption.mL7Config.mEnableProtocols, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+
+    // ==== l4 config
+    if (!IsValidMap(probeConfig, "L4Config", errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    Json::Value l4Config;
+    l4Config = probeConfig["L4Config"];
+    // Enable (Optional)
+    if (!GetOptionalBoolParam(l4Config, "Enable", thisObserverNetworkOption.mL4Config.mEnable, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -108,8 +157,21 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
 
-    // EnableProtocols (Optional)
-    if (!GetOptionalListParam(probeConfig, "EnableProtocols", thisObserverNetworkOption.mEnableProtocols, errorMsg)) {
+    // ==== app config
+    if (!IsValidMap(probeConfig, "ApmConfig", errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    Json::Value appConfig;
+    appConfig = probeConfig["ApmConfig"];
+    // Workspace (Optional)
+    if (!GetOptionalStringParam(appConfig, "Workspace", thisObserverNetworkOption.mApmConfig.mWorkspace, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -119,44 +181,198 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-    // EnableProtocols (Optional)
-    if (!GetOptionalBoolParam(
-            probeConfig, "DisableProtocolParse", thisObserverNetworkOption.mDisableProtocolParse, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              false,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
+    // AppName (Optional)
+    if (!GetOptionalStringParam(appConfig, "AppName", thisObserverNetworkOption.mApmConfig.mAppName, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
     }
-    // DisableConnStats (Optional)
-    if (!GetOptionalBoolParam(probeConfig, "DisableConnStats", thisObserverNetworkOption.mDisableConnStats, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              false,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
+
+    // AppId (Optional)
+    if (!GetOptionalStringParam(appConfig, "AppId", thisObserverNetworkOption.mApmConfig.mAppId, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
     }
-    // EnableConnTrackerDump (Optional)
-    if (!GetOptionalBoolParam(
-            probeConfig, "EnableConnTrackerDump", thisObserverNetworkOption.mEnableConnTrackerDump, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              false,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
+
+    // ServiceId (Optional)
+    if (!GetOptionalStringParam(appConfig, "ServiceId", thisObserverNetworkOption.mApmConfig.mServiceId, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
     }
+
+    // ==== workload selectors
+    if (!IsValidList(probeConfig, "WorkloadSelectors", errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    Json::Value selectors;
+    selectors = probeConfig["WorkloadSelectors"];
+    std::vector<WorkloadSelector> selectorVec;
+    for (const auto& selector : selectors) {
+        // AppId (Optional)
+        WorkloadSelector item;
+        if (!GetOptionalStringParam(selector, "Namespace", item.mNamespace, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                mContext->GetAlarm(),
+                                errorMsg,
+                                sName,
+                                mContext->GetConfigName(),
+                                mContext->GetProjectName(),
+                                mContext->GetLogstoreName(),
+                                mContext->GetRegion());
+        }
+        if (!GetOptionalStringParam(selector, "WorkloadName", item.mWorkloadName, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                mContext->GetAlarm(),
+                                errorMsg,
+                                sName,
+                                mContext->GetConfigName(),
+                                mContext->GetProjectName(),
+                                mContext->GetLogstoreName(),
+                                mContext->GetRegion());
+        }
+        if (!GetOptionalStringParam(selector, "WorkloadKind", item.mWorkloadKind, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                mContext->GetAlarm(),
+                                errorMsg,
+                                sName,
+                                mContext->GetConfigName(),
+                                mContext->GetProjectName(),
+                                mContext->GetLogstoreName(),
+                                mContext->GetRegion());
+        }
+        selectorVec.push_back(item);
+    }
+
+    // // EnableEvent (Optional)
+    // if (!GetOptionalBoolParam(probeConfig, "EnableLog", thisObserverNetworkOption.mEnableLog, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+    // // EnableSpan (Optional)
+    // if (!GetOptionalBoolParam(probeConfig, "EnableSpan", thisObserverNetworkOption.mEnableSpan, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+    // // EnableMetric (Optional)
+    // if (!GetOptionalBoolParam(probeConfig, "EnableMetric", thisObserverNetworkOption.mEnableMetric, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+    // // SampleRate (Optional)
+    // if (!GetOptionalDoubleParam(probeConfig, "SampleRate", thisObserverNetworkOption.mSampleRate, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+    // // EnableMetric (Optional)
+    // if (!GetOptionalListParam<std::string>(
+    //         probeConfig, "EnableCids", thisObserverNetworkOption.mEnableCids, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+
+    // // EnableProtocols (Optional)
+    // if (!GetOptionalListParam(probeConfig, "EnableProtocols", thisObserverNetworkOption.mEnableProtocols, errorMsg)) {
+    //     PARAM_WARNING_IGNORE(mContext->GetLogger(),
+    //                          mContext->GetAlarm(),
+    //                          errorMsg,
+    //                          sName,
+    //                          mContext->GetConfigName(),
+    //                          mContext->GetProjectName(),
+    //                          mContext->GetLogstoreName(),
+    //                          mContext->GetRegion());
+    // }
+    // // EnableProtocols (Optional)
+    // if (!GetOptionalBoolParam(
+    //         probeConfig, "DisableProtocolParse", thisObserverNetworkOption.mDisableProtocolParse, errorMsg)) {
+    //     PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+    //                           mContext->GetAlarm(),
+    //                           errorMsg,
+    //                           false,
+    //                           sName,
+    //                           mContext->GetConfigName(),
+    //                           mContext->GetProjectName(),
+    //                           mContext->GetLogstoreName(),
+    //                           mContext->GetRegion());
+    // }
+    // // DisableConnStats (Optional)
+    // if (!GetOptionalBoolParam(probeConfig, "DisableConnStats", thisObserverNetworkOption.mDisableConnStats, errorMsg)) {
+    //     PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+    //                           mContext->GetAlarm(),
+    //                           errorMsg,
+    //                           false,
+    //                           sName,
+    //                           mContext->GetConfigName(),
+    //                           mContext->GetProjectName(),
+    //                           mContext->GetLogstoreName(),
+    //                           mContext->GetRegion());
+    // }
+    // // EnableConnTrackerDump (Optional)
+    // if (!GetOptionalBoolParam(
+    //         probeConfig, "EnableConnTrackerDump", thisObserverNetworkOption.mEnableConnTrackerDump, errorMsg)) {
+    //     PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+    //                           mContext->GetAlarm(),
+    //                           errorMsg,
+    //                           false,
+    //                           sName,
+    //                           mContext->GetConfigName(),
+    //                           mContext->GetProjectName(),
+    //                           mContext->GetLogstoreName(),
+    //                           mContext->GetRegion());
+    // }
     return true;
 }
 

@@ -809,6 +809,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
     bufferMeta.set_subpath(flusher->GetSubpath());
+    bufferMeta.set_workspace(flusher->GetWorkspace());
 #ifdef __ENTERPRISE__
     bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
 #endif
@@ -939,7 +940,10 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                        bufferMeta.rawsize());
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:{
+            std::map<std::string, std::string> headers;
+            headers.insert({CMS_HEADER_WORKSPACE, bufferMeta.workspace()});
+            headers.insert({APM_HEADER_PROJECT, bufferMeta.project()});
             return PostAPMBackendLogs(accessKeyId,
                                       accessKeySecret,
                                       type,
@@ -951,7 +955,9 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       dataType,
                                       logData,
                                       bufferMeta.rawsize(),
-                                      bufferMeta.subpath());
+                                      bufferMeta.subpath(),
+                                      headers);
+        }
         default: {
             // should not happen
             LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));

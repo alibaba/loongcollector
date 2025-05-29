@@ -61,6 +61,14 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
+    [[nodiscard]] size_t GetWorkloadKey() const {
+        return mWorkloadKey;
+    }
+
+    // [[nodiscard]] const std::shared_ptr<AppDetail>& GetAppInfo() const {
+    //     return mAppInfo;
+    // }
+
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
     [[nodiscard]] ConnId GetConnId() const { return mConnId; };
@@ -201,6 +209,9 @@ private:
     std::atomic<Flag> mMetaFlags = 0;
 
     StaticDataRow<&kConnTrackerTable> mTags;
+
+    // std::shared_ptr<AppDetail> mAppInfo;
+    size_t mWorkloadKey = 0;
 
     std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;

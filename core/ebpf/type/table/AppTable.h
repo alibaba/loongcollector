@@ -64,6 +64,8 @@ inline constexpr DataElement kAppMetricsElements[] = {
     kAppId, // pid
     kIp, // server ip
     kAppName, // service
+    kWorkspace, // workspace
+    kArmsServiceId, // serviceId
 
     kNamespace,
     kWorkloadKind,

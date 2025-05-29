@@ -138,7 +138,8 @@ SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
                                RawDataType dataType,
                                const std::string& body,
                                size_t rawSize,
-                               const std::string& subpath);
+                               const std::string& subpath,
+                               std::map<std::string, std::string>& header);
 SLSResponse PutWebTracking(const std::string& host,
                            bool httpsFlag,
                            const std::string& logstore,

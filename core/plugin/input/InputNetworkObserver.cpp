@@ -31,15 +31,6 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value&) {
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_OBSERVE)) {
         return false;
     }
-    std::string prevPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    std::string pipelineName = mContext->GetConfigName();
-    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
-        LOG_WARNING(sLogger,
-                    ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prevPipelineName)("curr pipeline",
-                                                                                                        pipelineName));
-        return false;
-    }
 
     static const std::unordered_map<std::string, MetricType> kMetricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
@@ -73,8 +64,10 @@ bool InputNetworkObserver::Start() {
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
-                                                       logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        // TODO @qianlu.kk
+        // ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+        //                                                logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        // just remove config ...
         return true;
     }
     return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),

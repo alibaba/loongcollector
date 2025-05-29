@@ -57,6 +57,14 @@ public:
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent>& event) = 0;
 
+    virtual bool SupportRegisterMultiConfig() { return false; }
+
+    virtual int AddOrUpdateConfig(const CollectionPipelineContext*, uint32_t, const std::variant<SecurityOptions*, ObserverNetworkOption*>&) { return 1; }
+
+    virtual int RemoveConfig(const std::string&) { return 1; }
+
+    virtual int RegisteredConfigCount() { return 1; }
+
     virtual int PollPerfBuffer() {
         int zero = 0;
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
