@@ -29,6 +29,7 @@
 #include "collection_pipeline/plugin/interface/Processor.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/StringView.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "task_pipeline/Task.h"
 #include "task_pipeline/TaskRegistry.h"
@@ -86,13 +87,27 @@ private:
 
 const std::string InputMock::sName = "input_mock";
 
+const std::string PROCESSOR_MOCK_LOCAL_CONTENT_KEY = "processor_mock_local_content_key";
+const std::string PROCESSOR_MOCK_LOCAL_CONTENT_VALUE = "processor_mock_local_content_value";
+
 class ProcessorMock : public Processor {
 public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override { return true; }
+    bool Init(const Json::Value& config) override {
+        mLocalContentKey = PROCESSOR_MOCK_LOCAL_CONTENT_KEY;
+        mLocalContentValue = PROCESSOR_MOCK_LOCAL_CONTENT_VALUE;
+        return true;
+    }
     void Process(PipelineEventGroup& logGroup) override {
+        for (auto& e : logGroup.MutableEvents()) {
+            if (e.Is<LogEvent>()) {
+                auto& logEvent = e.Cast<LogEvent>();
+                logEvent.SetContentNoCopy(StringView(mLocalContentKey.data(), mLocalContentKey.size()),
+                                          StringView(mLocalContentValue.data(), mLocalContentValue.size()));
+            }
+        }
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -108,6 +123,8 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
 
     std::atomic_bool mBlockFlag = false;
+    std::string mLocalContentKey;
+    std::string mLocalContentValue;
 };
 
 const std::string ProcessorMock::sName = "processor_mock";

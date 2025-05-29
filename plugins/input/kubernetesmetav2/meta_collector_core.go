@@ -62,13 +62,31 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Contents.Add("pod_name", obj.Name)
 				containerLog.Contents.Add("pod_namespace", obj.Namespace)
 				containerLog.Contents.Add("image", container.Image)
-				containerLog.Contents.Add("cpu_request", container.Resources.Requests.Cpu().String())
-				containerLog.Contents.Add("cpu_limit", container.Resources.Limits.Cpu().String())
-				containerLog.Contents.Add("memory_request", container.Resources.Requests.Memory().String())
-				containerLog.Contents.Add("memory_limit", container.Resources.Limits.Memory().String())
+				if container.Resources.Requests != nil && container.Resources.Requests.Cpu() != nil {
+					containerLog.Contents.Add("cpu_request", container.Resources.Requests.Cpu().String())
+				} else {
+					containerLog.Contents.Add("cpu_request", "")
+				}
+				if container.Resources.Limits != nil && container.Resources.Limits.Cpu() != nil {
+					containerLog.Contents.Add("cpu_limit", container.Resources.Limits.Cpu().String())
+				} else {
+					containerLog.Contents.Add("cpu_limit", "")
+				}
+				if container.Resources.Requests != nil && container.Resources.Requests.Memory() != nil {
+					containerLog.Contents.Add("memory_request", container.Resources.Requests.Memory().String())
+				} else {
+					containerLog.Contents.Add("memory_request", "")
+				}
+				if container.Resources.Limits != nil && container.Resources.Limits.Memory() != nil {
+					containerLog.Contents.Add("memory_limit", container.Resources.Limits.Memory().String())
+				} else {
+					containerLog.Contents.Add("memory_limit", "")
+				}
 				ports := make([]int32, 0)
-				for _, port := range container.Ports {
-					ports = append(ports, port.ContainerPort)
+				if container.Ports != nil {
+					for _, port := range container.Ports {
+						ports = append(ports, port.ContainerPort)
+					}
 				}
 				portsStr, _ := json.Marshal(ports)
 				if len(ports) == 0 {
@@ -76,12 +94,14 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				}
 				containerLog.Contents.Add("container_ports", string(portsStr))
 				volumes := make([]map[string]string, 0)
-				for _, volume := range container.VolumeMounts {
-					volumeInfo := map[string]string{
-						"volumeMountName": volume.Name,
-						"volumeMountPath": volume.MountPath,
+				if container.VolumeMounts != nil {
+					for _, volume := range container.VolumeMounts {
+						volumeInfo := map[string]string{
+							"volumeMountName": volume.Name,
+							"volumeMountPath": volume.MountPath,
+						}
+						volumes = append(volumes, volumeInfo)
 					}
-					volumes = append(volumes, volumeInfo)
 				}
 				containerLog.Contents.Add("volumes", m.processEntityJSONArray(volumes))
 				result = append(result, containerLog)
@@ -214,8 +234,16 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 		} else {
 			log.Contents.Add("volume_mode", "")
 		}
-		log.Contents.Add("capacity", obj.Spec.Capacity.Storage().String())
-		log.Contents.Add("fsType", obj.Spec.CSI.FSType)
+		if obj.Spec.Capacity != nil && obj.Spec.Capacity.Storage() != nil {
+			log.Contents.Add("capacity", obj.Spec.Capacity.Storage().String())
+		} else {
+			log.Contents.Add("capacity", "")
+		}
+		if obj.Spec.CSI != nil {
+			log.Contents.Add("fsType", obj.Spec.CSI.FSType)
+		} else {
+			log.Contents.Add("fsType", "")
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
