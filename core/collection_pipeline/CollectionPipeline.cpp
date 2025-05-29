@@ -24,7 +24,6 @@
 
 #include "json/value.h"
 
-#include "Logger.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -34,6 +33,7 @@
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
