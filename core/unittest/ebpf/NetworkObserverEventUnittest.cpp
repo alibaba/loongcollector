@@ -15,8 +15,7 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "unittest/Unittest.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class NetworkObserverEventUnittest : public ::testing::Test {
 public:
@@ -304,7 +303,7 @@ UNIT_TEST_CASE(NetworkObserverEventUnittest, TestHttpRecordTimestamps);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestHttpRecordStatus);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestAbstractNetRecord);
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+
 
 UNIT_TEST_MAIN

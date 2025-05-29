@@ -278,7 +278,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     if (pluginMgr) {
         // update scenario ...
         if (pluginMgr->SupportRegisterMultiConfig()) {
-            return pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, options) == 0;
+            return pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) == 0;
         }
         // do update
         int res = pluginMgr->Update(options);
@@ -323,7 +323,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             if (status) {
                 return false;
             }
-            return pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, options) == 0;
+            return pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) == 0;
         }
 
         case PluginType::NETWORK_SECURITY: {

@@ -658,7 +658,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
                 // eventGroup.SetTagNoCopy(kAppId.MetricKey(), group->mTags.Get<kAppId>());
                 // eventGroup.SetTagNoCopy(kAppName.MetricKey(), group->mTags.Get<kAppName>());
-                eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kPodIp>()); // pod ip
+                eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kPodName>()); // pod name
                 init = true;
             }
@@ -806,8 +806,6 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
         eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
 
-        bool needPush = false;
-
         bool init = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
@@ -943,7 +941,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
         ADD_COUNTER(mPushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        if (needPush) {
+        if (init) {
             std::lock_guard lk(mContextMutex);
             if (this->mPipelineCtx == nullptr) {
                 return true;
@@ -1137,7 +1135,7 @@ int GuessContainerIdOffset() {
 
 int NetworkObserverManager::Update(
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    auto* opt = std::get<ObserverNetworkOption*>(options);
+    // auto* opt = std::get<ObserverNetworkOption*>(options);
 
     // diff opt
     // if (mPreviousOpt) {
