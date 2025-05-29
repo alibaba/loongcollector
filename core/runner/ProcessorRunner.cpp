@@ -137,6 +137,8 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
         vector<PipelineEventGroup> eventGroupList;
         eventGroupList.emplace_back(std::move(item->mEventGroup));
+        // TODO: use old pipeline input index to find inner processor in new pipeline, maybe cause some issues when
+        // there are multiple inputs
         pipeline->Process(eventGroupList, item->mInputIndex);
 
         if (pipeline->IsFlushingThroughGoPipeline()) {

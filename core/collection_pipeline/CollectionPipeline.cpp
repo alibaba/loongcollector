@@ -24,6 +24,7 @@
 
 #include "json/value.h"
 
+#include "Logger.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -396,6 +397,18 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
         for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
             p->Process(logGroupList);
         }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("input index out of range", "skip inner processing")(
+                        "reason", "may be caused by input delete but there are still data belong to it")(
+                        "input index", inputIndex)("config", mName));
+        GetContext().GetAlarm().SendAlarm(
+            LOGTAIL_CONFIG_ALARM,
+            "input delete but there are still data belong to it, may cause processing wrong",
+            GetContext().GetRegion(),
+            GetContext().GetProjectName(),
+            GetContext().GetConfigName(),
+            GetContext().GetLogstoreName());
     }
     for (auto& p : mPipelineInnerProcessorLine) {
         p->Process(logGroupList);
