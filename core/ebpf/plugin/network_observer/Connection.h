@@ -50,6 +50,16 @@ public:
     uint64_t mSendBytes = 0;
 };
 
+inline size_t
+GenerateWorkloadKey(const std::string& ns, const std::string& workloadKind, const std::string& workloadName) {
+    std::hash<std::string> hasher;
+    size_t res = 0;
+    AttrHashCombine(res, hasher(ns));
+    AttrHashCombine(res, hasher(workloadKind));
+    AttrHashCombine(res, hasher(workloadName));
+    return res;
+}
+
 class Connection {
 public:
     ~Connection() {}
@@ -61,13 +71,9 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
-    [[nodiscard]] size_t GetWorkloadKey() const {
-        return mWorkloadKey;
-    }
+    [[nodiscard]] size_t GetWorkloadKey() const { return mWorkloadKey; }
 
-    // [[nodiscard]] const std::shared_ptr<AppDetail>& GetAppInfo() const {
-    //     return mAppInfo;
-    // }
+    [[nodiscard]] size_t GetPeerWorkloadKey() const { return mPeerWorkloadKey; }
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
@@ -212,6 +218,7 @@ private:
 
     // std::shared_ptr<AppDetail> mAppInfo;
     size_t mWorkloadKey = 0;
+    size_t mPeerWorkloadKey = 0;
 
     std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;

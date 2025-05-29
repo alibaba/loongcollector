@@ -21,14 +21,14 @@ namespace logtail::ebpf {
 
 inline constexpr DataElement kConnTrackerElements[] = {
     kHostName,
-    kAppName,
-    kAppId,
+    // kAppName,
+    // kAppId,
     kPodName,
     kPodIp,
     kNamespace,
     kWorkloadKind,
     kWorkloadName,
-    kPeerAppName,
+    // kPeerAppName,
     kPeerPodName,
     kPeerPodIp,
     kPeerNamespace,

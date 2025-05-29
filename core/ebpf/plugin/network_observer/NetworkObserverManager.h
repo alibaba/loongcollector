@@ -16,9 +16,9 @@
 
 #include <atomic>
 #include <queue>
-#include <vector>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
+#include <vector>
 
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -61,7 +61,8 @@ public:
            std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricManager) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, threadPool, queue, metricManager);
+        return std::make_shared<NetworkObserverManager>(
+            processCacheManager, eBPFAdapter, threadPool, queue, metricManager);
     }
 
     NetworkObserverManager() = delete;
@@ -77,13 +78,14 @@ public:
 
     int Destroy() override;
 
-    bool HasRegisteredConfigs() const {
-        return mWorkloadConfigs.size();
-    }
+    bool HasRegisteredConfigs() const { return mWorkloadConfigs.size(); }
 
     bool SupportRegisterMultiConfig() override { return true; }
 
-    int AddOrUpdateConfig(const CollectionPipelineContext*, uint32_t, const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
 
     int RemoveConfig(const std::string&) override;
 
@@ -136,21 +138,27 @@ public:
                       const std::shared_ptr<ScheduleConfig>& config) override;
 
 private:
-    std::shared_ptr<AppDetail> getAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
+    std::shared_ptr<AppDetail>
+    getAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
     std::shared_ptr<AppDetail> getAppConfig(size_t workloadKey);
     std::shared_ptr<AppDetail> getAppConfig(const std::shared_ptr<Connection>& conn);
 
-    std::array<size_t, 1> generateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 1> generateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> generateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> generateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&);
-
-    size_t generateWorkloadKey(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
+    std::array<size_t, 1> generateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&,
+                                                const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 1> generateAggKeyForLog(const std::shared_ptr<AbstractRecord>&,
+                                               const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&,
+                                                     const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&,
+                                                     const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
     void processRecord(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record,
+                            const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record,
+                             const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record,
+                               const std::shared_ptr<logtail::ebpf::AppDetail>&);
     void handleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
 
     void runInThread();

@@ -19,32 +19,32 @@ extern "C" {
 }
 #include <cstddef>
 
+#include <atomic>
 #include <map>
 #include <string>
 #include <vector>
-#include <atomic>
 
-#include "common/Lock.h"
+#include "collection_pipeline/queue/QueueKey.h"
 #include "common/HashUtil.h"
+#include "common/Lock.h"
 #include "ebpf/include/export.h"
 #include "ebpf/util/sampler/Sampler.h"
-#include "collection_pipeline/queue/QueueKey.h"
 
 namespace logtail::ebpf {
 
 class AppDetail {
 public:
-    explicit AppDetail(ObserverNetworkOption* opt) 
+    explicit AppDetail(ObserverNetworkOption* opt)
         : mAppName(opt->mApmConfig.mAppName),
-        mAppId(opt->mApmConfig.mAppId),
-        mWorkspace(opt->mApmConfig.mWorkspace),
-        mServiceId(opt->mApmConfig.mServiceId),
-        mEnableL7(opt->mL7Config.mEnable),
-        mEnableLog(opt->mL7Config.mEnableLog),
-        mEnableSpan(opt->mL7Config.mEnableSpan),
-        mEnableMetric(opt->mL7Config.mEnableMetric),
-        mEnableL4(opt->mL4Config.mEnable),
-        mSampleRate(opt->mL7Config.mSampleRate) {
+          mAppId(opt->mApmConfig.mAppId),
+          mWorkspace(opt->mApmConfig.mWorkspace),
+          mServiceId(opt->mApmConfig.mServiceId),
+          mEnableL7(opt->mL7Config.mEnable),
+          mEnableLog(opt->mL7Config.mEnableLog),
+          mEnableSpan(opt->mL7Config.mEnableSpan),
+          mEnableMetric(opt->mL7Config.mEnableMetric),
+          mEnableL4(opt->mL4Config.mEnable),
+          mSampleRate(opt->mL7Config.mSampleRate) {
         // init mSampler
         if (mSampleRate < 0) {
             // LOG_WARNING(sLogger,
@@ -55,26 +55,33 @@ public:
         }
         // LOG_INFO(sLogger, ("sample rate", mSampleRate));
         mSampler = std::make_shared<HashRatioSampler>(mSampleRate);
+        std::hash<std::string> hasher;
+        AttrHashCombine(mAppHash, hasher(mAppName));
+        AttrHashCombine(mAppHash, hasher(mAppId));
+        AttrHashCombine(mAppHash, hasher(mWorkspace));
+        AttrHashCombine(mAppHash, hasher(mServiceId));
     }
-    
+
     std::string mAppName;
     std::string mAppId;
     std::string mWorkspace;
     std::string mServiceId;
-    
+
     bool mEnableL7;
     bool mEnableLog;
     bool mEnableSpan;
     bool mEnableMetric;
     bool mEnableL4;
-    
+
     // sampler ...
     double mSampleRate;
     std::shared_ptr<Sampler> mSampler;
-    // plugin queue key ... 
+    // plugin queue key ...
     std::string mConfigName;
     QueueKey mQueueKey = 0;
     uint32_t mPluginIndex = -1;
+
+    size_t mAppHash;
 };
 
 struct CaseInsensitiveLess {

@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "common/Lock.h"
+#include "common/ThreadPool.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
@@ -35,7 +36,6 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-#include "common/ThreadPool.h"
 
 namespace logtail::ebpf {
 
@@ -59,7 +59,12 @@ public:
 
     virtual bool SupportRegisterMultiConfig() { return false; }
 
-    virtual int AddOrUpdateConfig(const CollectionPipelineContext*, uint32_t, const std::variant<SecurityOptions*, ObserverNetworkOption*>&) { return 1; }
+    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
+                                  uint32_t,
+                                  const PluginMetricManagerPtr&,
+                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+        return 1;
+    }
 
     virtual int RemoveConfig(const std::string&) { return 1; }
 
