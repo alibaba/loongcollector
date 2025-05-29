@@ -21,6 +21,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+const emptyJsonObject = "{}"
+
 type metaCollector struct {
 	serviceK8sMeta *ServiceK8sMeta
 	collector      pipeline.Collector
@@ -302,12 +304,12 @@ func (m *metaCollector) processEntityLinkCommonPart(logContents models.LogConten
 
 func (m *metaCollector) processEntityJSONObject(obj interface{}) string {
 	if obj == nil {
-		return "{}"
+		return emptyJsonObject
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
 		logger.Error(context.Background(), "PROCESS_ENTITY_JSON_OBJECT_FAIL", "process entity json object fail", err)
-		return "{}"
+		return emptyJsonObject
 	}
 	return string(objStr)
 }
