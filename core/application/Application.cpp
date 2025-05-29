@@ -269,9 +269,6 @@ void Application::Start() { // GCOVR_EXCL_START
     }
 
     time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
-#ifndef LOGTAIL_NO_TC_MALLOC
-    time_t lastTcmallocReleaseMemTime = 0;
-#endif
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -293,9 +290,9 @@ void Application::Start() { // GCOVR_EXCL_START
             lastConfigCheckTime = curTime;
         }
 #ifndef LOGTAIL_NO_TC_MALLOC
-        if (curTime - lastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
+        if (curTime - gLastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
             MallocExtension::instance()->ReleaseFreeMemory();
-            lastTcmallocReleaseMemTime = curTime;
+            gLastTcmallocReleaseMemTime = curTime;
         }
 #endif
         if (curTime - lastQueueGCTime >= INT32_FLAG(queue_check_gc_interval_sec)) {

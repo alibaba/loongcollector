@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "Logger.h"
 #include "common/ProcParser.h"
+#include "logger/Logger.h"
 #include "metadata/ContainerMetadata.h"
 #include "metadata/K8sMetadata.h"
 #include "security/data_msg.h"

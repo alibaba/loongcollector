@@ -46,7 +46,18 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
 
     // create file writer
     mThreadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
-    mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+    try {
+        mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+    } catch (const spdlog::spdlog_ex& e) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           e.what(),
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
     mFileWriter
         = std::make_shared<spdlog::async_logger>(sName, mFileSink, mThreadPool, spdlog::async_overflow_policy::block);
     mFileWriter->set_pattern("%v");

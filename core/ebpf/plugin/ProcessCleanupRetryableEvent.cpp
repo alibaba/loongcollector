@@ -14,7 +14,7 @@
 
 #include "ebpf/plugin/ProcessCleanupRetryableEvent.h"
 
-#include "Logger.h"
+#include "logger/Logger.h"
 #include "security/data_msg.h"
 
 namespace logtail::ebpf {

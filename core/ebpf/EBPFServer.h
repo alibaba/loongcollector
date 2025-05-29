@@ -104,7 +104,7 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                              const PluginMetricManagerPtr& metricManager);
-    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mCommonEventQueue(4096) {}
+    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mCommonEventQueue(8192) {}
 
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);

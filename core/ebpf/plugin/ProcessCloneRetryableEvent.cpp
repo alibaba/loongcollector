@@ -16,9 +16,9 @@
 
 #include <memory>
 
-#include "Logger.h"
 #include "ProcessEvent.h"
 #include "common/ProcParser.h"
+#include "logger/Logger.h"
 #include "metadata/ContainerMetadata.h"
 #include "metadata/K8sMetadata.h"
 #include "security/bpf_process_event_type.h"
@@ -142,10 +142,11 @@ bool ProcessCloneRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    if (!mCommonEventQueue.enqueue(std::move(mProcessEvent))) {
+    if (!mCommonEventQueue.try_enqueue(std::move(mProcessEvent))) {
         LOG_ERROR(
             sLogger,
             ("event", "Failed to enqueue process clone event")("pid", mRawEvent->tgid)("ktime", mRawEvent->ktime));
+        // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }
     return true;

@@ -16,10 +16,10 @@
 
 #include <memory>
 
-#include "BaseElements.h"
-#include "Logger.h"
 #include "common/StringTools.h"
 #include "ebpf/plugin/ProcessCleanupRetryableEvent.h"
+#include "ebpf/type/table/BaseElements.h"
+#include "logger/Logger.h"
 #include "metadata/ContainerMetadata.h"
 #include "metadata/K8sMetadata.h"
 #include "security/data_msg.h"
@@ -320,10 +320,11 @@ bool ProcessExecveRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    if (!mCommonEventQueue.enqueue(std::move(mProcessEvent))) {
+    if (!mCommonEventQueue.try_enqueue(std::move(mProcessEvent))) {
         LOG_ERROR(sLogger,
                   ("event", "Failed to enqueue process execve event")("pid", mProcessEvent->mPid)(
                       "ktime", mProcessEvent->mKtime));
+        // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }
     return true;

@@ -107,10 +107,11 @@ bool ProcessExitRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    if (!mCommonEventQueue.enqueue(std::move(mProcessExitEvent))) {
+    if (!mCommonEventQueue.try_enqueue(std::move(mProcessExitEvent))) {
         LOG_ERROR(sLogger,
                   ("event", "Failed to enqueue process clone event")("pid", mRawEvent->current.pid)(
                       "ktime", mRawEvent->current.ktime));
+        // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }
     return true;
