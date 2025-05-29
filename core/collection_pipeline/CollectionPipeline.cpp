@@ -392,8 +392,10 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     ADD_COUNTER(mProcessorsInGroupsTotal, logGroupList.size())
 
     auto before = chrono::system_clock::now();
-    for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
-        p->Process(logGroupList);
+    if (inputIndex < mInputs.size()) {
+        for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
+            p->Process(logGroupList);
+        }
     }
     for (auto& p : mPipelineInnerProcessorLine) {
         p->Process(logGroupList);
