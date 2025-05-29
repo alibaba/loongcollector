@@ -27,7 +27,7 @@
 namespace logtail::ebpf {
 
 bool ProcessCloneRetryableEvent::HandleMessage() {
-    LOG_ERROR(sLogger,
+    LOG_DEBUG(sLogger,
               ("pid", mRawEvent->tgid)("ktime", mRawEvent->ktime)("event", "clone")("action", "HandleMessage"));
     if (mFlushProcessEvent) {
         mProcessEvent = std::make_shared<ProcessEvent>(static_cast<uint32_t>(mRawEvent->tgid),

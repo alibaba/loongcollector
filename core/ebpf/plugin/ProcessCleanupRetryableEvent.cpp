@@ -20,7 +20,7 @@
 namespace logtail::ebpf {
 
 bool ProcessCleanupRetryableEvent::HandleMessage() {
-    LOG_ERROR(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "HandleMessage"));
+    LOG_DEBUG(sLogger, ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "HandleMessage"));
     mProcessCacheValue = mProcessCache.Lookup(mKey);
     if (!mProcessCacheValue) {
         return false;

@@ -16,13 +16,13 @@
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
-    using namespace std;
+using namespace std;
 
 namespace logtail {
 
 const string FlusherFile::sName = "flusher_file";
 
-bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) {
     static uint32_t sCnt = 0;
     GenerateQueueKey(to_string(++sCnt));
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
@@ -60,7 +60,7 @@ bool FlusherFile::Send(PipelineEventGroup&& g) {
     return SerializeAndPush(std::move(g));
 }
 
-bool FlusherFile::Flush(size_t key) {
+bool FlusherFile::Flush([[maybe_unused]] size_t key) {
     return true;
 }
 

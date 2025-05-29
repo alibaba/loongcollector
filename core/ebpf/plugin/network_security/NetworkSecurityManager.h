@@ -16,16 +16,11 @@
 
 #include <coolbpf/security/type.h>
 
-#include <atomic>
-#include <condition_variable>
-#include <mutex>
-#include <thread>
-
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/NetworkEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
 namespace logtail::ebpf {
 

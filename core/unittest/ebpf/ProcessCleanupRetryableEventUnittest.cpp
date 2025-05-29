@@ -12,24 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include <gtest/gtest.h>
 
-#include <algorithm>
-#include <memory>
-#include <string>
-#include <unordered_map>
-
-#include "ProcParser.h"
-#include "common/memory/SourceBuffer.h"
-#include "ebpf/EBPFAdapter.h"
-#include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/ProcessEvent.h"
-#include "models/PipelineEventGroup.h"
-#include "security/bpf_process_event_type.h"
-#include "type/table/BaseElements.h"
+#include "ebpf/plugin/ProcessCleanupRetryableEvent.h"
 #include "unittest/Unittest.h"
-#include "unittest/ebpf/ProcFsStub.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;

@@ -16,24 +16,11 @@
 
 #pragma once
 
-#include <atomic>
-#include <future>
-#include <iostream>
 #include <mutex>
-#include <string>
-
-#include "json/json.h"
 
 #include "ContainerInfo.h"
-#include "app_config/AppConfig.h"
-#include "common/Flags.h"
 #include "common/LRUCache.h"
-#include "common/Lock.h"
-#include "common/NetworkUtil.h"
 #include "common/StringView.h"
-#include "common/http/HttpRequest.h"
-#include "monitor/metric_models/MetricRecord.h"
-#include "monitor/metric_models/MetricTypes.h"
 
 namespace logtail {
 

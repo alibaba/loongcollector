@@ -28,7 +28,6 @@
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"

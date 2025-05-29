@@ -15,10 +15,8 @@
 #pragma once
 
 #include <atomic>
-#include <queue>
 #include <vector>
 
-#include "ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
@@ -26,6 +24,7 @@
 #include "ebpf/plugin/network_observer/ConnectionManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/AggregateTree.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 

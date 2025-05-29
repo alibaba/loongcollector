@@ -37,7 +37,6 @@
 #include "ebpf/plugin/ProcessExecveRetryableEvent.h"
 #include "ebpf/plugin/ProcessExitRetryableEvent.h"
 #include "logger/Logger.h"
-#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "type/table/BaseElements.h"
 #include "util/FrequencyManager.h"
 

@@ -16,7 +16,6 @@
 
 #include <future>
 #include <string>
-#include <vector>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
@@ -252,20 +251,19 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const PluginMetricManagerPtr& metricManager) {
     std::string prevPipelineName = CheckLoadedPipelineName(type);
     if (prevPipelineName == pipelineName) {
-        LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
         auto pluginMgr = GetPluginManager(type);
         if (pluginMgr) {
             int res = pluginMgr->Update(options);
-            LOG_WARNING(sLogger, ("update plugin for type", magic_enum::enum_name(type))("res", res));
             if (res) {
+                LOG_WARNING(sLogger, ("update plugin failed, type", magic_enum::enum_name(type))("res", res));
                 return false;
             }
             res = pluginMgr->Resume(options);
             if (res) {
+                LOG_WARNING(sLogger, ("resume plugin failed, type", magic_enum::enum_name(type))("res", res));
                 return false;
             }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-            LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type))("res", res));
             return true;
         }
         LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));

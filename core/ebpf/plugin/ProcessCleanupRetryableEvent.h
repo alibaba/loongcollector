@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "coolbpf/security/bpf_process_event_type.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/RetryableEvent.h"

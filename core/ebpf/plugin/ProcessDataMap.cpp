@@ -14,7 +14,6 @@
 
 #include "ebpf/plugin/ProcessDataMap.h"
 
-#include <cstdint>
 #include <ctime>
 
 #include <chrono>
@@ -96,9 +95,9 @@ std::string ProcessDataMap::DataGetAndRemove(const data_event_desc* desc) {
         mDataMap.erase(res);
     }
     if (data.size() != desc->size - desc->leftover) {
-        // TODO: Need to investigate whether out-of-order execution might occur, with an execve event happening between
-        // two data events.
-        LOG_WARNING(sLogger, ("size bad! data size", data.size())("expect", desc->size - desc->leftover));
+        LOG_WARNING(sLogger,
+                    ("size bad! data size", data.size())("expect", desc->size - desc->leftover)("pid", desc->id.pid)(
+                        "desc->size", desc->size)("desc->leftover", desc->leftover));
         return "";
     }
     return data;

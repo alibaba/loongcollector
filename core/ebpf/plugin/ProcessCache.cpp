@@ -14,7 +14,6 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
-#include <algorithm>
 #include <chrono>
 #include <iterator>
 #include <mutex>
@@ -59,7 +58,7 @@ void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCac
     mCache.emplace(key, value);
 }
 
-void ProcessCache::IncRef(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
+void ProcessCache::IncRef([[maybe_unused]] const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
     if (value) {
         value->IncRef();
     }

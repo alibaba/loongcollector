@@ -16,22 +16,17 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 #include "CommonDataEvent.h"
 #include "Flags.h"
-#include "MetricConstants.h"
-#include "MetricRecord.h"
 #include "ProcParser.h"
 #include "common/memory/SourceBuffer.h"
-#include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/ProcessEvent.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/MetricManager.h"
 #include "security/bpf_process_event_type.h"
 #include "security/data_msg.h"
 #include "security/msg_type.h"

@@ -24,7 +24,7 @@
 namespace logtail::ebpf {
 
 bool ProcessExitRetryableEvent::HandleMessage() {
-    LOG_ERROR(sLogger,
+    LOG_DEBUG(sLogger,
               ("pid", mRawEvent->current.pid)("ktime", mRawEvent->current.ktime)("event", "execve")("action",
                                                                                                     "HandleMessage"));
     if (mFlushProcessEvent) {

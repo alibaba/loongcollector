@@ -19,7 +19,6 @@
 #include <string>
 
 #include "collection_pipeline/plugin/interface/Input.h"
-#include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
