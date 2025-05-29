@@ -710,7 +710,7 @@ void SplUnittest::TestZeroTime() {
             const auto& log = logGroup.GetEvents()[1];
             APSARA_TEST_NOT_EQUAL(1748441274, log->GetTimestamp());
             APSARA_TEST_NOT_EQUAL(0, log->GetTimestamp());
-            APSARA_TEST_NOT_EQUAL(4294967295, log->GetTimestamp());
+            APSARA_TEST_NOT_EQUAL(std::numeric_limits<uint32_t>::max(), log->GetTimestamp());
             APSARA_TEST_TRUE(log->GetTimestamp() - nowTime <= 1);
         }
         // std::string outJson = logGroup.ToJsonString();
