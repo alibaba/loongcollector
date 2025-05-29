@@ -146,7 +146,7 @@ void PluginRegistry::LoadStaticPlugins() {
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
-        RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+        RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), false);
     }
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
