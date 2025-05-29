@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "common/Lock.h"
+#include "common/ThreadPool.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
@@ -45,6 +46,7 @@ public:
     AbstractManager() = delete;
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                              const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                             std::unique_ptr<ThreadPool>& threadPool,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                              const PluginMetricManagerPtr& metricManager);
     virtual ~AbstractManager();
@@ -54,6 +56,19 @@ public:
     virtual int Destroy() = 0;
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent>& event) = 0;
+
+    virtual bool SupportRegisterMultiConfig() { return false; }
+
+    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
+                                  uint32_t,
+                                  const PluginMetricManagerPtr&,
+                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+        return 1;
+    }
+
+    virtual int RemoveConfig(const std::string&) { return 1; }
+
+    virtual int RegisteredConfigCount() { return 1; }
 
     virtual int PollPerfBuffer() {
         int zero = 0;
@@ -127,6 +142,7 @@ protected:
     std::atomic<bool> mFlag = false;
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
+    std::unique_ptr<ThreadPool>& mThreadPool;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     PluginMetricManagerPtr mMetricMgr;
 

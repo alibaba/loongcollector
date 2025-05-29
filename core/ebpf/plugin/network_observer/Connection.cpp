@@ -188,18 +188,16 @@ void Connection::updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         workloadKind[0] = std::toupper(workloadKind[0]); // upper case
     }
 
-    mTags.Set<kAppId>(pod->mAppId);
-    mTags.Set<kAppName>(pod->mAppName);
     mTags.Set<kPodName>(pod->mPodName);
     mTags.Set<kPodIp>(pod->mPodIp);
     mTags.Set<kWorkloadName>(pod->mWorkloadName);
     mTags.Set<kWorkloadKind>(workloadKind);
     mTags.Set<kNamespace>(pod->mNamespace);
     mTags.Set<kHostName>(pod->mPodName);
+    mWorkloadKey = GenerateWorkloadKey(pod->mNamespace, pod->mWorkloadKind, pod->mWorkloadName);
 }
 
 void Connection::updatePeerPodMetaForExternal() {
-    mTags.SetNoCopy<kPeerAppName>(kExternalStr);
     mTags.SetNoCopy<kPeerPodName>(kExternalStr);
     mTags.SetNoCopy<kPeerPodIp>(kExternalStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kExternalStr);
@@ -214,7 +212,6 @@ void Connection::updatePeerPodMetaForExternal() {
 }
 
 void Connection::updatePeerPodMetaForLocalhost() {
-    mTags.SetNoCopy<kPeerAppName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerPodName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerPodIp>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kLocalhostStr);
@@ -226,8 +223,6 @@ void Connection::updatePeerPodMetaForLocalhost() {
 }
 
 void Connection::updateSelfPodMetaForUnknown() {
-    mTags.SetNoCopy<kAppName>(kUnknownStr);
-    mTags.SetNoCopy<kAppId>(kUnknownStr);
     mTags.SetNoCopy<kPodIp>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadName>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadKind>(kUnknownStr);
@@ -246,13 +241,13 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : kUnknownStr);
     mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : kUnknownStr);
     mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : kUnknownStr);
     mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : kUnknownStr);
     mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : kUnknownStr);
     mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : kUnknownStr);
     mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : kUnknownStr);
+    mPeerWorkloadKey = GenerateWorkloadKey(pod->mNamespace, pod->mWorkloadKind, pod->mWorkloadName);
 
     // set destId and endpoint ...
     if (mRole == IsClient) {

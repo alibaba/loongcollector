@@ -37,6 +37,7 @@ public:
 
     NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                           std::unique_ptr<ThreadPool>& threadPool,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
     ~NetworkSecurityManager() override {}
@@ -44,9 +45,10 @@ public:
     static std::shared_ptr<NetworkSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+           std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, threadPool, queue, metricMgr);
     }
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;

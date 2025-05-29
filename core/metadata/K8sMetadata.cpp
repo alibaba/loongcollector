@@ -130,7 +130,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     if (mEnable) {
         mFlag = true;
         mNetDetector = std::thread(&K8sMetadata::DetectNetwork, this);
-        mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
+        mQueryThread = std::thread(&K8sMetadata::processBatch, this);
     }
 }
 
@@ -528,7 +528,7 @@ void K8sMetadata::DetectNetwork() {
     LOG_INFO(sLogger, ("stop k8smetadata network detector", ""));
 }
 
-void K8sMetadata::ProcessBatch() {
+void K8sMetadata::processBatch() {
     auto batchProcessor = [this](auto&& processFunc,
                                  std::vector<std::string>& srcItems,
                                  std::vector<std::string>& pendingItems,

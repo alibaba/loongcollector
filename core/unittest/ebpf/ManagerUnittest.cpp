@@ -39,6 +39,7 @@ protected:
     void SetUp() override {
         Timer::GetInstance()->Init();
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
+        mThreadPool = std::make_unique<ThreadPool>(1);
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
             mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
     }
@@ -64,11 +65,12 @@ protected:
 protected:
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
+    std::unique_ptr<ThreadPool> mThreadPool;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
 };
 
 void ManagerUnittest::TestProcessSecurityManagerBasic() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
 
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
@@ -85,7 +87,7 @@ void ManagerUnittest::TestProcessSecurityManagerBasic() {
 }
 
 void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -149,7 +151,7 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
 
 void ManagerUnittest::TestManagerConcurrency() {
     auto processManager
-        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     // auto fileManager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue,
     // nullptr);
 
@@ -183,7 +185,7 @@ void ManagerUnittest::TestManagerConcurrency() {
 }
 
 void ManagerUnittest::TestManagerErrorHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
 
     auto event = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 0);
     APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
@@ -200,7 +202,7 @@ void ManagerUnittest::TestManagerErrorHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerBasic() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
 
     // 测试初始化
     SecurityOptions options;
@@ -220,7 +222,7 @@ void ManagerUnittest::TestNetworkSecurityManagerBasic() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -276,7 +278,7 @@ void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
@@ -325,7 +327,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
 }
 
 void ManagerUnittest::TestProcessSecurityManagerAggregation() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
+    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
     SecurityOptions options;
     manager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 

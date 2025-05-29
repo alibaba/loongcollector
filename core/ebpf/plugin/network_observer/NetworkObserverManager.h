@@ -16,9 +16,11 @@
 
 #include <atomic>
 #include <queue>
+#include <set>
+#include <unordered_map>
 #include <vector>
 
-#include "ProcParser.h"
+#include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
@@ -31,6 +33,10 @@
 
 
 namespace logtail::ebpf {
+
+class AppManager {
+public:
+};
 
 enum class JobType {
     METRIC_AGG,
@@ -52,22 +58,38 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+           std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricManager) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue, metricManager);
+        return std::make_shared<NetworkObserverManager>(
+            processCacheManager, eBPFAdapter, threadPool, queue, metricManager);
     }
 
     NetworkObserverManager() = delete;
-    ~NetworkObserverManager() override { LOG_INFO(sLogger, ("begin destruct plugin", "network_observer")); }
+    ~NetworkObserverManager() override {}
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                           std::unique_ptr<ThreadPool>& threadPool,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
     int Destroy() override;
+
+    bool HasRegisteredConfigs() const { return mWorkloadConfigs.size(); }
+
+    bool SupportRegisterMultiConfig() override { return true; }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
+
+    int RegisteredConfigCount() override { return mWorkloads.size(); }
 
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
@@ -84,10 +106,6 @@ public:
     void PollBufferWrapper();
     void ConsumeRecords();
 
-    std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> GenerateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&);
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -120,16 +138,34 @@ public:
                       const std::shared_ptr<ScheduleConfig>& config) override;
 
 private:
-    void processRecord(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
+    std::shared_ptr<AppDetail>
+    getAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
+    std::shared_ptr<AppDetail> getAppConfig(size_t workloadKey);
+    std::shared_ptr<AppDetail> getAppConfig(const std::shared_ptr<Connection>& conn);
 
+    std::array<size_t, 1> generateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&,
+                                                const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 1> generateAggKeyForLog(const std::shared_ptr<AbstractRecord>&,
+                                               const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&,
+                                                     const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&,
+                                                     const std::shared_ptr<logtail::ebpf::AppDetail>&);
+
+    void processRecord(const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record,
+                            const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record,
+                             const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record,
+                               const std::shared_ptr<logtail::ebpf::AppDetail>&);
     void handleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
 
     void runInThread();
 
     bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
+
+    void executeTimerTask(JobType type, const std::chrono::steady_clock::time_point& execTime);
 
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
@@ -159,9 +195,6 @@ private:
     CounterPtr mPushMetricsTotal;
     CounterPtr mPushMetricGroupTotal;
 
-    mutable ReadWriteLock mSamplerLock;
-    std::shared_ptr<Sampler> mSampler;
-
     // store parsed records
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRollbackQueue;
     std::deque<std::shared_ptr<AbstractRecord>> mRollbackRecords;
@@ -171,17 +204,10 @@ private:
 
     std::thread mRecordConsume;
 
-    std::atomic_bool mEnableSpan = false;
-    std::atomic_bool mEnableLog = false;
-    std::atomic_bool mEnableMetric = false;
-
     FrequencyManager mPollKernelFreqMgr;
     FrequencyManager mConsumerFreqMgr;
 
-    std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
-
     int mCidOffset = -1;
-    std::unordered_set<std::string> mEnabledCids;
 
     ReadWriteLock mAppAggLock;
     SIZETAggTreeWithSourceBuffer<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
@@ -197,11 +223,16 @@ private:
     ReadWriteLock mLogAggLock;
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
+    // namespace/workloadKind/workloadName hash combine to app
+    ReadWriteLock mAppConfigLock;
+    // workloadKey ==> appDetail
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mWorkloadConfigs;
+    // configName ==> workloadKeys
+    std::unordered_map<std::string, std::vector<size_t>> mWorkloads;
+    // workloadKey ==> containerIds
+    std::unordered_map<size_t, std::set<std::string>> mWorkloadContainers;
+
     std::string mClusterId;
-    std::string mAppId;
-    std::string mAppName;
-    std::string mHostName;
-    std::string mHostIp;
 
     template <typename T, typename Func>
     void compareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {

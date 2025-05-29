@@ -21,10 +21,12 @@
 namespace logtail::ebpf {
 AbstractManager::AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheMgr,
                                  const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                                 std::unique_ptr<ThreadPool>& threadPool,
                                  moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                  const PluginMetricManagerPtr& metricManager)
     : mProcessCacheManager(processCacheMgr),
       mEBPFAdapter(eBPFAdapter),
+      mThreadPool(threadPool),
       mCommonEventQueue(queue),
       mMetricMgr(metricManager) {
     if (!mMetricMgr) {

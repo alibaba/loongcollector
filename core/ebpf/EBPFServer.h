@@ -32,9 +32,9 @@
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"
+#include "common/ThreadPool.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class EnvManager {
 public:
@@ -69,7 +69,7 @@ public:
 
     void Stop() override;
 
-    std::string CheckLoadedPipelineName(PluginType type);
+    // std::string CheckLoadedPipelineName(PluginType type);
 
     void UpdatePipelineName(PluginType type, const std::string& name, const std::string& project);
 
@@ -98,6 +98,18 @@ public:
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
     void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
 
+    // template<PluginType T>
+    // std::shared_ptr<AbstractManager> GetPluginMgr() {
+    //     static_assert(T != PluginType::MAX, "MAX is not a valid plugin type");
+    //     return mPlugins[static_cast<int>(T)];
+    // }
+
+    // template<PluginType T>
+    // void UpdatePluginMgr(std::shared_ptr<AbstractManager>& mgr) {
+    //     static_assert(T != PluginType::MAX, "MAX is not a valid plugin type");
+    //     mPlugins[static_cast<int>(T)] = mgr;
+    // }
+
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,
@@ -113,7 +125,7 @@ private:
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
 
     mutable std::mutex mMtx;
-    std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};
+    // std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};
     std::array<std::string, static_cast<size_t>(PluginType::MAX)> mPluginProject = {};
     std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
 
@@ -143,10 +155,12 @@ private:
 
     FrequencyManager mFrequencyMgr;
 
+    std::unique_ptr<ThreadPool> mThreadPool;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+
