@@ -16,40 +16,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include "host_monitor/collector/BaseCollector.h"
 
 namespace logtail {
-
-// man proc: https://man7.org/linux/man-pages/man5/proc.5.html
-// search key: /proc/stat
-enum class EnumCpuKey : int {
-    user = 1,
-    nice,
-    system,
-    idle,
-    iowait, // since Linux 2.5.41
-    irq, // since Linux 2.6.0
-    softirq, // since Linux 2.6.0
-    steal, // since Linux 2.6.11
-    guest, // since Linux 2.6.24
-    guest_nice, // since Linux 2.6.33
-};
-
-struct CPUStat {
-    int32_t index; // -1 means total cpu
-    double user;
-    double nice;
-    double system;
-    double idle;
-    double iowait;
-    double irq;
-    double softirq;
-    double steal;
-    double guest;
-    double guestNice;
-};
 
 class CPUCollector : public BaseCollector {
 public:
@@ -59,10 +28,6 @@ public:
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
-
-private:
-    bool GetHostSystemCPUStat(std::vector<CPUStat>& cpus);
-    double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const;
 };
 
 } // namespace logtail
