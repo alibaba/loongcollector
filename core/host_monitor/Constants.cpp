@@ -24,4 +24,11 @@ std::filesystem::path PROCESS_DIR = "/proc";
 const std::filesystem::path PROCESS_STAT = "stat";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
+#ifdef __ENTERPRISE__
+const std::string DEFAULT_INSTANCE_ID_LABEL = "instance_id";
+const std::string DEFAULT_USER_ID_LABEL = "user_id";
+#else
+const std::string DEFAULT_HOST_IP_LABEL = "host_ip";
+#endif
+
 } // namespace logtail
