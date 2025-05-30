@@ -80,7 +80,7 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
     std::vector<std::string> cpuLines;
     std::string errorMessage;
-    if (!GetHostSystemStat(cpuLines, errorMessage)) {
+    if (!GetHostSystemStatWithPath(cpuLines, errorMessage, PROCESS_DIR / PROCESS_STAT)) {
         if (mValidState) {
             LOG_WARNING(sLogger, ("failed to get system cpu", "invalid CPU collector")("error msg", errorMessage));
             mValidState = false;
