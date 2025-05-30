@@ -52,7 +52,7 @@ func BenchmarkV2Encode(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			for _, groupEvents := range groupEventsSlice {
-				p.EncodeV2(groupEvents)
+				p.EncodeV2(groupEvents, nil)
 			}
 		}
 	})
@@ -62,7 +62,7 @@ func BenchmarkV2Encode(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			p.EncodeBatchV2(groupEventsSlice)
+			p.EncodeBatchV2(groupEventsSlice, nil)
 		}
 	})
 	assert.Equal(b, want, groupEventsSlice)
@@ -82,12 +82,13 @@ func TestV2Encode_ShouldReturnNoError_GivenNormalDataOfPipelineGroupEvents(t *te
 
 	// when
 	// then
-	data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+	data1, varValues1, err1 := p.EncodeBatchV2(groupEventsSlice1, nil)
 	assert.NoError(t, err1)
-	data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+	data2, varValues2, err2 := p.EncodeBatchV2(groupEventsSlice2, nil)
 	assert.NoError(t, err2)
 
 	assert.Equal(t, len(data2), len(data1))
+	assert.Equal(t, len(varValues2), len(varValues1))
 }
 
 // 场景：V2 Encode接口功能测试（异常数据，非全nil或0值）
@@ -108,25 +109,27 @@ func TestV2Encode_ShouldReturnError_GivenAbNormalDataOfPipelineGroupEvents(t *te
 	// then
 	t.Run("Test EncodeV2 with abnormal data input", func(t *testing.T) {
 		for i, groupEvents := range groupEventsSlice1 {
-			data1, err1 := p.EncodeV2(groupEvents)
-			data2, err2 := p.EncodeV2(groupEventsSlice2[i])
+			data1, varValues1, err1 := p.EncodeV2(groupEvents, nil)
+			data2, varValues2, err2 := p.EncodeV2(groupEventsSlice2[i], nil)
 			if err1 != nil {
 				assert.Error(t, err2)
 				assert.Equal(t, err1, err2)
 			} else {
 				assert.NoError(t, err2)
 				assert.Equal(t, len(data2), len(data1))
+				assert.Equal(t, len(varValues1), len(varValues2))
 			}
 		}
 	})
 
 	t.Run("Test EncodeBatchV2 with abnormal data input", func(t *testing.T) {
-		data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+		data1, varValues1, err1 := p.EncodeBatchV2(groupEventsSlice1, nil)
 		assert.NoError(t, err1)
-		data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+		data2, varValues2, err2 := p.EncodeBatchV2(groupEventsSlice2, nil)
 		assert.NoError(t, err2)
 
 		assert.Equal(t, len(data2), len(data1))
+		assert.Equal(t, len(varValues1), len(varValues2))
 	})
 }
 
@@ -154,17 +157,19 @@ func TestV2Encode_ShouldReturnError_GivenNilOrZeroDataOfPipelineGroupEvents(t *t
 	// then
 	t.Run("Test EncodeV2 with nil or zero data input", func(t *testing.T) {
 		for _, input := range nilOrZeroGroupEventsSlices {
-			data, err := p.EncodeV2(input)
+			data, varValues, err := p.EncodeV2(input, nil)
 			assert.Error(t, err)
 			assert.Nil(t, data)
+			assert.Nil(t, varValues)
 		}
 	})
 
 	t.Run("Test EncodeBatchV2 with nil or zero data input", func(t *testing.T) {
 		for _, input := range nilOrZeroGroupEventsSlicesEx {
-			data, err := p.EncodeBatchV2(input)
+			data, varValues, err := p.EncodeBatchV2(input, nil)
 			assert.Error(t, err)
 			assert.Nil(t, data)
+			assert.Nil(t, varValues)
 		}
 	})
 }
@@ -186,12 +191,13 @@ func TestEncoderBatchV2_ShouldReturnNoErrorAndEqualData_GivenNormalDataOfDataOfP
 
 	// when
 	// then
-	data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+	data1, varValues1, err1 := p.EncodeBatchV2(groupEventsSlice1, nil)
 	assert.NoError(t, err1)
-	data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+	data2, varValues2, err2 := p.EncodeBatchV2(groupEventsSlice2, nil)
 	assert.NoError(t, err2)
 
 	assert.Equal(t, data2, data1)
+	assert.Equal(t, varValues2, varValues1)
 }
 
 // 场景：V2 Encode接口功能测试
@@ -211,7 +217,7 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 	n := seriesLimit
 	wantGroupEventsSlice := genPipelineGroupEventsSliceSingleTag(n)
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeBatchV2(wantGroupEventsSlice)
+	data, varValues, err := p.EncodeBatchV2(wantGroupEventsSlice, nil)
 	assert.NoError(t, err)
 
 	// when
@@ -219,6 +225,7 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 	gotGroupEventsSlice, err := DecodeBatchV2(data)
 	assert.NoError(t, err)
 	assert.Equal(t, wantGroupEventsSlice, gotGroupEventsSlice)
+	assert.LessOrEqual(t, len(varValues), len(data))
 }
 
 // 场景：V2 Encode接口功能测试
@@ -241,7 +248,7 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 	wantGroupEventsSlice := genPipelineGroupEventsSliceSingleTag(n)
 	assert.Equal(t, n, len(wantGroupEventsSlice))
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeBatchV2(wantGroupEventsSlice)
+	data, _, err := p.EncodeBatchV2(wantGroupEventsSlice, nil)
 	assert.NoError(t, err)
 	expectedLen := func(limit, length int) int {
 		// make sure limit > 0 && length > 0
