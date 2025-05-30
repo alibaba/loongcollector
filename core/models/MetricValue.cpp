@@ -64,7 +64,7 @@ std::map<StringView, UntypedMultiDoubleValue>::const_iterator UntypedMultiDouble
     return mValues.end();
 }
 
-size_t UntypedMultiDoubleValues::ValusSize() const {
+size_t UntypedMultiDoubleValues::ValuesSize() const {
     return mValues.size();
 }
 

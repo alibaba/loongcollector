@@ -914,6 +914,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     switch (telemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             return PostLogStoreLogs(accessKeyId,
                                     accessKeySecret,
                                     type,
