@@ -44,7 +44,7 @@ public:
     // TODO update latest APM Agent ...
 
 private:
-    bool downloadFromOss(const std::string& url, const std::string& output, bool& changed);
+    bool downloadFromOss(const std::string& url, const std::string& dir, const std::string& filename, bool& changed);
 };
 
 } // namespace logtail::apm
