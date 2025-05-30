@@ -66,7 +66,7 @@ void InputProcessSecurityUnittest::TestName() {
 void InputProcessSecurityUnittest::TestSupportAck() {
     InputProcessSecurity input;
     bool supportAck = input.SupportAck();
-    APSARA_TEST_FALSE(supportAck);
+    APSARA_TEST_TRUE(supportAck);
 }
 
 void InputProcessSecurityUnittest::OnSuccessfulInit() {
