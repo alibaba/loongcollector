@@ -4,11 +4,11 @@
 
 ## 进程结构
 
-LoongCollector 为了支持插件系统，引入了 libPluginAdaptor 和 libPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 LoongCollector 之间的关系如下：<br />
+LoongCollector 为了支持插件系统，引入了 libGoPluginAdaptor 和 libGoPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 LoongCollector 之间的关系如下：<br />
 LoongCollector 动态依赖于这两个动态库（即 binary 中不依赖），在初始化时，LoongCollector 会尝试使用动态库接口（如 dlopen）动态加载它们，获取所需的符号。<br />
 Adaptor 充当一个中间层，LoongCollector 和 base 均依赖它，LoongCollector 向 adaptor 注册回调，adpator 将这些回调记录下来以接口的形式暴露给 base 使用。<br />
 Base 是插件系统的主体，它包含插件系统所必须的采集、处理、聚合以及输出（向 LoongCollector 递交可以视为其中一种）等功能。<br />
-因此，完整的 LoongCollector 包含loongcollector 、libPluginAdaptor.so 和 libPluginBase.so 3个二进制文件。
+因此，完整的 LoongCollector 包含loongcollector 、libGoPluginAdaptor.so 和 libGoPluginBase.so 3个二进制文件。
 
 ![image.png](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png)
 
@@ -50,9 +50,9 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 $ gcc --version
 gcc (GCC) 9.3.1 20200408 (Red Hat 9.3.1-2)
 $ go version
-go version go1.16.15 linux/amd64
+go version go1.19.10 linux/amd64
 $ git --version
-git version 2.29.3
+git version 2.46.2
 ```
 
 C++核心的编译依赖在/opt/logtail/deps/目录下，该路径是CMakeLists.txt的DEFAULT_DEPS_ROOT（可以查看./core/dependencies.cmake找到修改路径的变量）。
@@ -174,7 +174,9 @@ cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output
 ├── loongcollector (主程序）
 ├── libPluginAdapter.so（插件接口）
 ├── libPluginBase.h
-└── libPluginBase.so (插件lib）
+├── libPluginBase.so (插件lib）
+├── libeBPFDriver.so
+└── libcoolbpf.so.1.0.0
 ```
 
 ## 直接使用镜像编译  <a name="VsYKL"></a>
@@ -231,13 +233,13 @@ docker run -it --name docker_loongcollector -v /:/logtail_host:ro -v /var/run:/v
 
 ```bash
 # 将开发机上编译的so scp到container所在node上
-scp libPluginBase.so <user>@<node>:/home/<user>
+scp libGoPluginBase.so <user>@<node>:/home/<user>
 ```
 
 主机的根路径在 LoongCollector 容器中位于/logtail_host，找到对应目录进行copy即可。
 
 ```bash
-cp /logtail_host/home/<user>/libPluginBase.so /usr/local/loongcollector
+cp /logtail_host/home/<user>/libGoPluginBase.so /usr/local/loongcollector
 ```
 
 ## 常见问题

@@ -16,7 +16,6 @@
 
 #include <future>
 #include <string>
-#include <vector>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
@@ -175,26 +174,31 @@ void EBPFServer::Init() {
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mRef,
+        mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
         std::move(dynamicLabels));
 
-    mPollProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
-    mLossProcessEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
-    mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
-    mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+    auto pollProcessEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL);
+    auto lossProcessEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL);
+    auto processCacheMissTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
+    auto processCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
+    auto processDataMapSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
+    auto retryableEventCacheSize = mMetricsRecordRef.CreateIntGauge(
+        METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE); // TODO: shoud be shared across network connection retry
 
     mEBPFAdapter->Init();
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
                                                                  mHostPathPrefix,
-                                                                 mDataEventQueue,
-                                                                 mPollProcessEventsTotal,
-                                                                 mLossProcessEventsTotal,
-                                                                 mProcessCacheMissTotal,
-                                                                 mProcessCacheSize);
+                                                                 mCommonEventQueue,
+                                                                 pollProcessEventsTotal,
+                                                                 lossProcessEventsTotal,
+                                                                 processCacheMissTotal,
+                                                                 processCacheSize,
+                                                                 processDataMapSize,
+                                                                 retryableEventCacheSize);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -247,20 +251,19 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const PluginMetricManagerPtr& metricManager) {
     std::string prevPipelineName = CheckLoadedPipelineName(type);
     if (prevPipelineName == pipelineName) {
-        LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
         auto pluginMgr = GetPluginManager(type);
         if (pluginMgr) {
             int res = pluginMgr->Update(options);
-            LOG_WARNING(sLogger, ("update plugin for type", magic_enum::enum_name(type))("res", res));
             if (res) {
+                LOG_WARNING(sLogger, ("update plugin failed, type", magic_enum::enum_name(type))("res", res));
                 return false;
             }
             res = pluginMgr->Resume(options);
             if (res) {
+                LOG_WARNING(sLogger, ("resume plugin failed, type", magic_enum::enum_name(type))("res", res));
                 return false;
             }
             pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-            LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type))("res", res));
             return true;
         }
         LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
@@ -284,7 +287,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::PROCESS_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -293,7 +296,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_OBSERVE: {
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -302,7 +305,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mDataEventQueue, metricManager);
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
                 UpdatePluginManager(type, pluginMgr);
             }
             break;
@@ -471,7 +474,7 @@ void EBPFServer::PollPerfBuffers() {
 
 std::shared_ptr<AbstractManager> EBPFServer::GetPluginManager(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
-    if (type == PluginType::MAX) {
+    if (type >= PluginType::MAX) {
         return nullptr;
     }
     return mPlugins[static_cast<int>(type)];
@@ -479,36 +482,41 @@ std::shared_ptr<AbstractManager> EBPFServer::GetPluginManager(PluginType type) {
 
 void EBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
     std::lock_guard<std::mutex> lk(mMtx);
-    if (type == PluginType::MAX) {
+    if (type >= PluginType::MAX) {
         return;
     }
     mPlugins[static_cast<int>(type)] = mgr;
 }
 
 void EBPFServer::HandlerEvents() {
-    std::vector<std::shared_ptr<CommonEvent>> items(1024);
+    std::array<std::shared_ptr<CommonEvent>, 4096> items;
     while (mRunning) {
         // consume queue
-        size_t count = mDataEventQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
-        LOG_DEBUG(sLogger, ("get data events, number", count));
+        size_t count
+            = mCommonEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         // handle ....
         if (count == 0) {
             continue;
         }
 
         for (size_t i = 0; i < count; i++) {
-            auto event = items[i];
+            auto& event = items[i];
+            if (!event) {
+                LOG_ERROR(sLogger, ("Encountered null event in DataEventQueue at index", i));
+                continue;
+            }
             auto pluginType = event->GetPluginType();
             auto plugin = GetPluginManager(pluginType);
-            if (plugin) {
+            if (plugin && plugin->IsRunning()) {
                 // handle event and put into aggregator ...
                 plugin->HandleEvent(event);
             }
         }
 
-        // handle
-        items.clear();
-        items.resize(1024);
+        // clear
+        for (size_t i = 0; i < count; i++) {
+            items[i].reset();
+        }
     }
 }
 

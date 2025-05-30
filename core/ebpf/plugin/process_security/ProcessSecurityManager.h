@@ -23,6 +23,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
 namespace logtail {
 namespace ebpf {
@@ -52,7 +53,7 @@ public:
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int Destroy() override;
 
-    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
+    PluginType GetPluginType() override { return PluginType::PROCESS_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
@@ -71,7 +72,6 @@ public:
 
     int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
-        LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0;
     }
 

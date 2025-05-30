@@ -141,18 +141,9 @@ public:
 
     bool tryGetCopy(const Key& kIn, Value& vOut) {
         Guard g(lock_);
-        Value tmp;
-        if (!tryGetRef_nolock(kIn, tmp)) {
-            return false;
-        }
-        vOut = tmp;
-        return true;
-    }
-
-    bool tryGetRef(const Key& kIn, Value& vOut) {
-        Guard g(lock_);
         return tryGetRef_nolock(kIn, vOut);
     }
+
     /**
      *	The const reference returned here is only
      *    guaranteed to be valid till the next insert/delete
