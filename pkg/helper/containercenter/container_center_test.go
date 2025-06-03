@@ -576,3 +576,13 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 		assert.Equal(t, true, container.deleteFlag)
 	}
 }
+
+func TestInitClientMutiTime(t *testing.T) {
+	containerCenterInstance = &ContainerCenter{}
+	err := containerCenterInstance.initClient()
+	assert.NotNil(t, err)
+	assert.Nil(t, containerCenterInstance.client)
+	err = containerCenterInstance.initClient()
+	assert.NotNil(t, err)
+	assert.Nil(t, containerCenterInstance.client)
+}

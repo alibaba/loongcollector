@@ -1188,6 +1188,7 @@ func (dc *ContainerCenter) initClient() error {
 	// do not CreateDockerClient multi times
 	if dc.client == nil {
 		if dc.client, err = CreateDockerClient(); err != nil {
+			dc.client = nil
 			dc.setLastError(err, "init docker client from env error")
 			return err
 		}
