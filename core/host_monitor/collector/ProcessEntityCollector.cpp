@@ -285,7 +285,7 @@ int64_t ProcessEntityCollector::GetHostSystemBootTime() {
     int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     std::vector<std::string> lines = {};
     std::string errorMessage;
-    if (!GetHostSystemStat(lines, errorMessage)) {
+    if (!GetHostSystemStatWithPath(lines, errorMessage, PROCESS_DIR / PROCESS_STAT)) {
         LOG_WARNING(sLogger, ("failed to get system boot time", "use current time instead")("error msg", errorMessage));
         return currentSeconds;
     }
