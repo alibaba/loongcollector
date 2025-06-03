@@ -315,6 +315,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     } else if (telemetryType == "metrics_multivalue") {
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE;
+    } else if (telemetryType == "metrics_host") {
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST;
     } else if (telemetryType == "arms_agentinfo") {
         mSubpath = APM_AGENTINFOS_URL;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
@@ -504,12 +506,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
-    if (!mBatcher.Init(itr ? *itr : Json::Value(),
-                       this,
-                       strategy,
-                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
-                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
-                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE)) {
+    if (!mBatcher.Init(itr ? *itr : Json::Value(), this, strategy, ShouldGroupBatch())) {
         // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
         // enable group batch
         return false;
@@ -676,6 +673,9 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            break;
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST:
+            req = CreatePostHostMetricsRequest(accessKeyId, accessKeySecret, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
             req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
@@ -1219,6 +1219,36 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                         CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const string& accessKeyId,
+                                                                     const string& accessKeySecret,
+                                                                     SLSClientManager::AuthType type,
+                                                                     SLSSenderQueueItem* item) const {
+    string path, query;
+    map<string, string> header;
+    PreparePostHostMetricsRequest(accessKeyId,
+                                  accessKeySecret,
+                                  type,
+                                  CompressTypeToString(mCompressor->GetCompressType()),
+                                  item->mType,
+                                  item->mData,
+                                  item->mRawSize,
+                                  path,
+                                  header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        query,
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1,
+                                        CurlSocket(INT32_FLAG(sls_request_dscp)));
+}
+
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
                                                                          const string& accessKeySecret,
                                                                          SLSClientManager::AuthType type,
@@ -1286,6 +1316,13 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
                                         CurlSocket(INT32_FLAG(sls_request_dscp)));
+}
+
+bool FlusherSLS::ShouldGroupBatch() {
+    return !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
+        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
+        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE
+        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST;
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

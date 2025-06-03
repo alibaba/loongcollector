@@ -338,6 +338,25 @@ void SLSEventGroupSerializer::SerializeLogEvent(LogGroupSerializer& serializer,
     }
 }
 
+// SingleValue Metric
+// event: {"labels": {"label1": "value1", "label2": "value2"}, "value": 123}
+// result:
+//   __time__: 1234567890
+//   content: 
+//      __label__: label1#$#value1|label2#$#value2
+//      __time_nano__: 1234567890
+//      __name__: value
+//      __value__: 123
+// MultiValue Metric
+// event: {"labels": {"label1": "value1", "label2": "value2"}, "values": {"value1": 123, "value2": 456}}
+// result:
+//   __time__: 1234567890
+//   content:
+//      __time_nano__: 1234567890
+//      label1: value1
+//      label2: value2
+//      value1: 123
+//      value2: 456
 void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serializer,
                                                    BatchedEvents& group,
                                                    std::vector<MetricEventContentCacheItem>& metricEventContentCache,
