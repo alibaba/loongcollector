@@ -128,6 +128,10 @@ private:
                                                                    const std::string& accessKeySecret,
                                                                    SLSClientManager::AuthType type,
                                                                    SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostHostMetricsRequest(const std::string& accessKeyId,
+                                                                  const std::string& accessKeySecret,
+                                                                  SLSClientManager::AuthType type,
+                                                                  SLSSenderQueueItem* item) const;
     std::unique_ptr<HttpSinkRequest> CreatePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
@@ -137,6 +141,7 @@ private:
                                                                  SLSClientManager::AuthType type,
                                                                  SLSSenderQueueItem* item,
                                                                  const std::string& subPath) const;
+    bool ShouldGroupBatch();
 
     std::string mSubpath;
 
