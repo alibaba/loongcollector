@@ -950,7 +950,6 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       host,
                                       httpsFlag,
                                       bufferMeta.project(),
-                                      bufferMeta.logstore(),
                                       GetSLSCompressTypeString(bufferMeta.compresstype()),
                                       dataType,
                                       logData,

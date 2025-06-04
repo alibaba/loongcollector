@@ -138,8 +138,7 @@ private:
     std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
                                                                  const std::string& accessKeySecret,
                                                                  SLSClientManager::AuthType type,
-                                                                 SLSSenderQueueItem* item,
-                                                                 const std::string& subPath) const;
+                                                                 SLSSenderQueueItem* item) const;
 
     std::string mSubpath;
     std::string mWorkspace;

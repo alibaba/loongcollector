@@ -242,13 +242,11 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   const string& host,
                                   bool isHostIp,
                                   const string& project,
-                                  const string& logstore,
                                   const string& compressType,
                                   RawDataType dataType,
                                   const string& body,
                                   size_t rawSize,
                                   const string& path,
-                                  string& query,
                                   map<string, string>& header) {
     if (isHostIp) {
         header[HOST] = project + "." + host;
@@ -353,27 +351,23 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                const string& host,
                                bool httpsFlag,
                                const string& project,
-                               const string& logstore,
                                const string& compressType,
                                RawDataType dataType,
                                const string& body,
                                size_t rawSize,
                                const std::string& subpath,
                                map<string, string>& header) {
-    string query;
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  type,
                                  host,
                                  false, // sync request always uses vip
                                  project,
-                                 logstore,
                                  compressType,
                                  dataType,
                                  body,
                                  rawSize,
                                  subpath,
-                                 query,
                                  header);
     HttpResponse response;
     SendHttpRequest(
