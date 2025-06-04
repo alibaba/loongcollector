@@ -28,13 +28,13 @@ bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optional
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY)) {
         return false;
     }
-    std::string prev_pipeline_name
+    std::string prevPipelineName
         = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
-    std::string pipeline_name = mContext->GetConfigName();
-    if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
+    std::string pipelineName = mContext->GetConfigName();
+    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
         LOG_WARNING(sLogger,
-                    ("pipeline already loaded",
-                     "PROCESS_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+                    ("pipeline already loaded", "PROCESS_SECURITY")("prev pipeline", prevPipelineName)("curr pipeline",
+                                                                                                       pipelineName));
         return false;
     }
 

@@ -68,7 +68,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/AthenZ/athenz](https://pkg.go.dev/github.com/AthenZ/athenz?tab=licenses)
 - [github.com/ardielle/ardielle-go](https://pkg.go.dev/github.com/ardielle/ardielle-go?tab=licenses)
 - [github.com/linkedin/goavro](https://pkg.go.dev/github.com/linkedin/goavro?tab=licenses)
-- [google.golang.org/genproto](https://pkg.go.dev/google.golang.org/genproto?tab=licenses)
 - [google.golang.org/grpc](https://pkg.go.dev/google.golang.org/grpc?tab=licenses)
 - [gopkg.in/square/go-jose.v2](https://pkg.go.dev/gopkg.in/square/go-jose.v2?tab=licenses)
 - [gopkg.in/yaml.v2](https://pkg.go.dev/gopkg.in/yaml.v2?tab=licenses)
@@ -92,7 +91,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/go-openapi/jsonpointer](https://pkg.go.dev/github.com/go-openapi/jsonpointer?tab=licenses)
 - [github.com/go-openapi/jsonreference](https://pkg.go.dev/github.com/go-openapi/jsonreference?tab=licenses)
 - [github.com/go-openapi/swag](https://pkg.go.dev/github.com/go-openapi/swag?tab=licenses)
-- [github.com/google/gnostic](https://pkg.go.dev/github.com/google/gnostic?tab=licenses)
 - [github.com/grafana/loki-client-go](https://pkg.go.dev/github.com/grafana/loki-client-go?tab=licenses)
 - [github.com/mwitkow/go-conntrack](https://pkg.go.dev/github.com/mwitkow/go-conntrack?tab=licenses)
 - [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
@@ -103,6 +101,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
+- [github.com/google/gnostic-models](https://pkg.go.dev/github.com/google/gnostic-models?tab=licenses)
+- [github.com/mxk/go-flowrate](https://pkg.go.dev/github.com/mxk/go-flowrate?tab=licenses)
+- [google.golang.org/genproto/googleapis/rpc](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc?tab=licenses)
 
 ## BSD licenses
 

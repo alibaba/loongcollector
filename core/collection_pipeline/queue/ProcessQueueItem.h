@@ -28,7 +28,6 @@ class CollectionPipeline;
 
 struct ProcessQueueItem {
     PipelineEventGroup mEventGroup;
-    std::shared_ptr<CollectionPipeline> mPipeline; // not null only during pipeline update
     size_t mInputIndex = 0; // index of the input in the pipeline
     std::chrono::system_clock::time_point mEnqueTime;
 

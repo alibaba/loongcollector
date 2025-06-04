@@ -72,7 +72,6 @@ protected:
     unique_ptr<ProcessQueueItem> GenerateProcessItem(shared_ptr<CollectionPipeline> pipeline) const {
         PipelineEventGroup eventGroup(make_shared<SourceBuffer>());
         auto item = make_unique<ProcessQueueItem>(std::move(eventGroup), 0);
-        item->mPipeline = pipeline;
         return item;
     }
 

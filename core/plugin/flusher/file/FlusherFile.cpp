@@ -14,9 +14,6 @@
 
 #include "plugin/flusher/file/FlusherFile.h"
 
-#include "spdlog/async.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-
 #include "collection_pipeline/queue/SenderQueueManager.h"
 
 using namespace std;
@@ -25,9 +22,9 @@ namespace logtail {
 
 const string FlusherFile::sName = "flusher_file";
 
-bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    static uint32_t cnt = 0;
-    GenerateQueueKey(to_string(++cnt));
+bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) {
+    static uint32_t sCnt = 0;
+    GenerateQueueKey(to_string(++sCnt));
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
 
     string errorMsg;
@@ -52,12 +49,23 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
     // TODO: windows
     // upgrade spdlog version.
 #if defined(_MSC_VER)
-    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles);
+    try {
+        mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles);
 #else
-    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+        mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
 #endif
+    } catch (const spdlog::spdlog_ex& e) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           e.what(),
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
     mFileWriter
-        = std::make_shared<spdlog::async_logger>(sName, fileSink, threadPool, spdlog::async_overflow_policy::block);
+        = std::make_shared<spdlog::async_logger>(sName, mFileSink, mThreadPool, spdlog::async_overflow_policy::block);
     mFileWriter->set_pattern("%v");
 
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
@@ -69,7 +77,7 @@ bool FlusherFile::Send(PipelineEventGroup&& g) {
     return SerializeAndPush(std::move(g));
 }
 
-bool FlusherFile::Flush(size_t key) {
+bool FlusherFile::Flush([[maybe_unused]] size_t key) {
     return true;
 }
 
@@ -90,7 +98,7 @@ bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
         if (!serializedData.empty() && serializedData.back() == '\n') {
             serializedData.pop_back();
         }
-        mFileWriter->info(std::move(serializedData));
+        mFileWriter->info(serializedData);
         mFileWriter->flush();
     } else {
         LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));

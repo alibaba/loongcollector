@@ -92,7 +92,7 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
                                               event->sport,
                                               event->dport,
                                               event->net_ns);
-    mCommonEventQueue.enqueue(std::move(evt));
+    mCommonEventQueue.try_enqueue(std::move(evt));
     LOG_DEBUG(sLogger,
               ("[record_network_event] pid", event->key.pid)("ktime", event->key.ktime)("saddr", event->saddr)(
                   "daddr", event->daddr)("sport", event->sport)("dport", event->dport));
@@ -152,7 +152,6 @@ bool NetworkSecurityManager::ConsumeAggregateTree(const std::chrono::steady_cloc
             return false;
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
-            LOG_DEBUG(sLogger, ("step", "enter for each"));
             auto sharedEvent = sharedEventGroup.CreateLogEvent();
             bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
             if (!hit) {

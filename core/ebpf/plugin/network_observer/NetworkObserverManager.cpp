@@ -1538,7 +1538,7 @@ void NetworkObserverManager::processRecord(const std::shared_ptr<AbstractRecord>
 }
 
 void NetworkObserverManager::ConsumeRecords() {
-    std::vector<std::shared_ptr<AbstractRecord>> items(4096);
+    std::array<std::shared_ptr<AbstractRecord>, 4096> items;
     while (mFlag) {
         // poll event from
         auto now = std::chrono::steady_clock::now();
@@ -1549,7 +1549,8 @@ void NetworkObserverManager::ConsumeRecords() {
         } else {
             mConsumerFreqMgr.Reset(now);
         }
-        size_t count = mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 4096, std::chrono::milliseconds(200));
+        size_t count
+            = mRollbackQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         LOG_DEBUG(sLogger, ("get records:", count));
         // handle ....
         if (count == 0) {
@@ -1557,11 +1558,18 @@ void NetworkObserverManager::ConsumeRecords() {
         }
 
         for (size_t i = 0; i < count; i++) {
-            processRecord(items[i]);
+            auto& event = items[i];
+            if (!event) {
+                LOG_ERROR(sLogger, ("Encountered null event in RollbackQueue at index", i));
+                continue;
+            }
+            processRecord(event);
         }
 
-        items.clear();
-        items.resize(4096);
+        // clear
+        for (size_t i = 0; i < count; i++) {
+            items[i].reset();
+        }
     }
 }
 

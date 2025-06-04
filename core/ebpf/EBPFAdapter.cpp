@@ -17,10 +17,8 @@
 #include <memory>
 #include <string>
 
-#include "app_config/AppConfig.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/magic_enum.hpp"
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
@@ -94,10 +92,6 @@ EBPFAdapter::~EBPFAdapter() {
         // stop plugin
         StopPlugin(static_cast<PluginType>(i));
     }
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    return;
-#endif
 }
 
 void EBPFAdapter::Init() {
@@ -251,7 +245,7 @@ bool EBPFAdapter::dynamicLibSuccess() {
 
 bool EBPFAdapter::CheckPluginRunning(PluginType pluginType) {
     if (!loadDynamicLib(mDriverLibName)) {
-        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", int(pluginType)));
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", magic_enum::enum_name(pluginType)));
         return false;
     }
 
@@ -300,7 +294,8 @@ int32_t EBPFAdapter::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, i
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, poll perf buffer func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger,
+                  ("failed to load dynamic lib, poll perf buffer func ptr is null", magic_enum::enum_name(pluginType)));
         return -1;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -318,7 +313,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
     }
 
     // plugin not started ...
-    LOG_INFO(sLogger, ("begin to start plugin, type", int(pluginType)));
+    LOG_INFO(sLogger, ("begin to start plugin, type", magic_enum::enum_name(pluginType)));
     if (conf->mPluginType == PluginType::NETWORK_OBSERVE) {
         auto* nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
         if (nconf) {
@@ -337,7 +332,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
 
     void* f = mFuncs[(int)ebpf_func::EBPF_START_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, init func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -353,14 +348,14 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
 
 bool EBPFAdapter::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(pluginType)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
+        LOG_ERROR(sLogger, ("plugin not started, type", magic_enum::enum_name(pluginType)));
         return false;
     }
 
-    LOG_INFO(sLogger, ("begin to resume plugin, type", int(pluginType)));
+    LOG_INFO(sLogger, ("begin to resume plugin, type", magic_enum::enum_name(pluginType)));
     void* f = mFuncs[(int)ebpf_func::EBPF_RESUME_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -374,14 +369,14 @@ bool EBPFAdapter::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConf
 
 bool EBPFAdapter::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
     if (!CheckPluginRunning(pluginType)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", int(pluginType)));
+        LOG_ERROR(sLogger, ("plugin not started, type", magic_enum::enum_name(pluginType)));
         return false;
     }
 
-    LOG_INFO(sLogger, ("begin to update plugin, type", int(pluginType)));
+    LOG_INFO(sLogger, ("begin to update plugin, type", magic_enum::enum_name(pluginType)));
     void* f = mFuncs[(int)ebpf_func::EBPF_UPDATE_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, update func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -395,12 +390,12 @@ bool EBPFAdapter::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConf
 
 bool EBPFAdapter::SuspendPlugin(PluginType pluginType) {
     if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(pluginType)));
+        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", magic_enum::enum_name(pluginType)));
         return false;
     }
     void* f = mFuncs[(int)ebpf_func::EBPF_SUSPEND_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -415,7 +410,7 @@ bool EBPFAdapter::SuspendPlugin(PluginType pluginType) {
 
 bool EBPFAdapter::StopPlugin(PluginType pluginType) {
     if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));
+        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", magic_enum::enum_name(pluginType)));
         return true;
     }
 
@@ -423,7 +418,7 @@ bool EBPFAdapter::StopPlugin(PluginType pluginType) {
     config->mPluginType = pluginType;
     void* f = mFuncs[(int)ebpf_func::EBPF_STOP_PLUGIN];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", int(pluginType)));
+        LOG_ERROR(sLogger, ("failed to load dynamic lib, stop func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -440,13 +435,15 @@ bool EBPFAdapter::StopPlugin(PluginType pluginType) {
 bool EBPFAdapter::BPFMapUpdateElem(
     PluginType pluginType, const std::string& map_name, void* key, void* value, uint64_t flag) {
     if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(pluginType)));
+        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", magic_enum::enum_name(pluginType)));
         return true;
     }
 
     void* f = mFuncs[(int)ebpf_func::EBPF_MAP_UPDATE_ELEM];
     if (!f) {
-        LOG_ERROR(sLogger, ("failed to load dynamic lib, update bpf map elem func ptr is null", int(pluginType)));
+        LOG_ERROR(
+            sLogger,
+            ("failed to load dynamic lib, update bpf map elem func ptr is null", magic_enum::enum_name(pluginType)));
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN

@@ -668,11 +668,11 @@ func getContainerCenterInstance() *ContainerCenter {
 		}
 		containerCenterInstance.imageCache = make(map[string]string)
 		containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+		containerFindingManager = NewContainerDiscoverManager()
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
 			retryCount := 0
-			containerFindingManager = NewContainerDiscoverManager()
 			for {
 				if containerFindingManager.Init() {
 					break

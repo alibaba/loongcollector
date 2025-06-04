@@ -31,6 +31,7 @@
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "common/version.h"
@@ -87,6 +88,7 @@ Application::Application() : mStartTime(time(nullptr)) {
 }
 
 void Application::Init() {
+    TimeKeeper::GetInstance();
     // change working dir to ./${ILOGTAIL_VERSION}/
     string processExecutionDir = GetProcessExecutionDir();
     AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
@@ -273,9 +275,6 @@ void Application::Start() { // GCOVR_EXCL_START
     }
 
     time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
-#ifndef LOGTAIL_NO_TC_MALLOC
-    time_t lastTcmallocReleaseMemTime = 0;
-#endif
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -297,9 +296,9 @@ void Application::Start() { // GCOVR_EXCL_START
             lastConfigCheckTime = curTime;
         }
 #ifndef LOGTAIL_NO_TC_MALLOC
-        if (curTime - lastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
+        if (curTime - gLastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
             MallocExtension::instance()->ReleaseFreeMemory();
-            lastTcmallocReleaseMemTime = curTime;
+            gLastTcmallocReleaseMemTime = curTime;
         }
 #endif
         if (curTime - lastQueueGCTime >= INT32_FLAG(queue_check_gc_interval_sec)) {
@@ -385,6 +384,7 @@ void Application::Exit() {
 
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
 
+    TimeKeeper::GetInstance()->Stop();
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif

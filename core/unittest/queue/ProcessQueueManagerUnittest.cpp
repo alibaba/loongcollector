@@ -384,7 +384,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
 
         sProcessQueueManager->DisablePop("test_config_1", false);
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline1, p1->mPipeline);
 
         auto item2 = GenerateItem();
         auto p2 = item2.get();
@@ -395,8 +394,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
 
         sProcessQueueManager->DisablePop("test_config_1", false);
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline1, p1->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p2->mPipeline);
 
         auto item3 = GenerateItem();
         auto p3 = item3.get();
@@ -404,9 +401,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
 
         sProcessQueueManager->DisablePop("test_config_1", true);
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline1, p1->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p2->mPipeline);
-        APSARA_TEST_EQUAL(nullptr, p3->mPipeline);
 
         sProcessQueueManager->EnablePop("test_config_1");
         APSARA_TEST_TRUE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
@@ -423,8 +417,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         sProcessQueueManager->DisablePop("test_config_2", false);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPop);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline2, p1->mPipeline);
-        APSARA_TEST_EQUAL(pipeline2, p2->mPipeline);
 
         auto item3 = GenerateItem();
         auto p3 = item3.get();
@@ -440,10 +432,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         sProcessQueueManager->DisablePop("test_config_2", false);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPop);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline2, p1->mPipeline);
-        APSARA_TEST_EQUAL(pipeline2, p2->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p3->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p4->mPipeline);
 
         auto item5 = GenerateItem();
         auto p5 = item5.get();
@@ -456,12 +444,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         sProcessQueueManager->DisablePop("test_config_2", true);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPop);
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
-        APSARA_TEST_EQUAL(pipeline2, p1->mPipeline);
-        APSARA_TEST_EQUAL(pipeline2, p2->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p3->mPipeline);
-        APSARA_TEST_EQUAL(pipeline3, p4->mPipeline);
-        APSARA_TEST_EQUAL(nullptr, p5->mPipeline);
-        APSARA_TEST_EQUAL(nullptr, p6->mPipeline);
 
         sProcessQueueManager->EnablePop("test_config_2");
         APSARA_TEST_TRUE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPop);
