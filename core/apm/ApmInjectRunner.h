@@ -34,21 +34,21 @@
 
 namespace logtail::apm {
 
-class AgentOperationRunner : public InputRunner {
+class ApmInjectRunner : public InputRunner {
 public:
-    static AgentOperationRunner* GetInstance() {
-        static AgentOperationRunner sInstance;
+    static ApmInjectRunner* GetInstance() {
+        static ApmInjectRunner sInstance;
         return &sInstance;
     }
 
-    AgentOperationRunner(const AgentOperationRunner&) = delete;
-    AgentOperationRunner(AgentOperationRunner&&) = delete;
-    AgentOperationRunner& operator=(const AgentOperationRunner&) = delete;
-    AgentOperationRunner& operator=(AgentOperationRunner&&) = delete;
+    ApmInjectRunner(const ApmInjectRunner&) = delete;
+    ApmInjectRunner(ApmInjectRunner&&) = delete;
+    ApmInjectRunner& operator=(const ApmInjectRunner&) = delete;
+    ApmInjectRunner& operator=(ApmInjectRunner&&) = delete;
 
-    explicit AgentOperationRunner() = default;
+    explicit ApmInjectRunner() = default;
 
-    virtual ~AgentOperationRunner() = default;
+    virtual ~ApmInjectRunner() = default;
 
     void Init() override;
     void Stop() override;

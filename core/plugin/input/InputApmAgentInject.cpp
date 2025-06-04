@@ -15,14 +15,14 @@
  */
 
 #include "plugin/input/InputApmAgentInject.h"
-#include "apm/AgentOperationRunner.h"
+#include "apm/ApmInjectRunner.h"
 
 namespace logtail {
 
 const std::string ApmAgentInjectTask::sName = "apm_agent_inject";
 
 bool ApmAgentInjectTask::Init(const Json::Value& config) {
-    apm::AgentOperationRunner::GetInstance()->Init();
+    apm::ApmInjectRunner::GetInstance()->Init();
     // parse config ...
     
 

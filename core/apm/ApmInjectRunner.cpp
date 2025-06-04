@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-#include "apm/AgentOperationRunner.h"
+#include "apm/ApmInjectRunner.h"
 
 #include "apm/Types.h"
 #include "logger/Logger.h"
 
 namespace logtail::apm {
 
-void AgentOperationRunner::Init() {
+void ApmInjectRunner::Init() {
     mThreadPool = std::make_unique<ThreadPool>(1);
 }
 
-void AgentOperationRunner::Stop() {
+void ApmInjectRunner::Stop() {
 }
 
-bool AgentOperationRunner::HasRegisteredPlugins() const {
+bool ApmInjectRunner::HasRegisteredPlugins() const {
     return true;
 }
 
-bool AgentOperationRunner::DoAttach(AttachConfig& config) {
+bool ApmInjectRunner::DoAttach(AttachConfig& config) {
     // re-try queue
     // store in map ...
 
@@ -76,7 +76,7 @@ bool AgentOperationRunner::DoAttach(AttachConfig& config) {
     return true;
 }
 
-int AgentOperationRunner::findPidsByRule(MatchRule& rule, std::vector<int>& pids) {
+int ApmInjectRunner::findPidsByRule(MatchRule& rule, std::vector<int>& pids) {
     switch (rule.mRuleType) {
         case RuleType::kCwd: {
             /* code */
@@ -89,7 +89,7 @@ int AgentOperationRunner::findPidsByRule(MatchRule& rule, std::vector<int>& pids
     return 0;
 }
 
-// std::vector<Proc> AgentOperationRunner::listAllProcess() {}
+// std::vector<Proc> ApmInjectRunner::listAllProcess() {}
 
 
 } // namespace logtail::apm
