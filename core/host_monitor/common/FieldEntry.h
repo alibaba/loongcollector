@@ -33,4 +33,4 @@ public:
 };
 
 // 字段定义宏
-#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS>(#FIELD, &CLASS::FIELD)
+#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS, decltype(CLASS::FIELD)>(#FIELD, &CLASS::FIELD)
