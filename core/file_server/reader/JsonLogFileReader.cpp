@@ -85,7 +85,8 @@ bool JsonLogFileReader::FindJsonMatch(
 
     int32_t braceCount = 0;
     bool inQuote = false;
-    for (; idx < size; ++idx) {
+    idx++;
+    for (; idx < size; idx++) {
         switch (buffer[idx]) {
             case '{':
                 if (!inQuote)
