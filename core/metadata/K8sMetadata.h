@@ -17,9 +17,10 @@
 #pragma once
 
 #include <ctime>
+
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
-#include <atomic>
 #include <mutex>
 #include <string>
 #include <unordered_set>

@@ -48,8 +48,8 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
     auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
     // TODO: windows
     // upgrade spdlog version.
-#if defined(_MSC_VER)
     try {
+#if defined(_MSC_VER)
         mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles);
 #else
         mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
