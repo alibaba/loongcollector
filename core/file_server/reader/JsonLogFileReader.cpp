@@ -42,8 +42,12 @@ int32_t JsonLogFileReader::RemoveLastIncompleteLog(char* buffer,
             endIdx = pos - buffer;
         }
         // advance if json is valid or impossible to be valid
-        beginIdx = endIdx + 1;
         buffer[endIdx] = '\0';
+        if (endIdx < size) {
+            beginIdx = endIdx + 1;
+        } else {
+            beginIdx = size;
+        }
     } while (beginIdx < size);
     readBytes = beginIdx;
 
@@ -85,8 +89,7 @@ bool JsonLogFileReader::FindJsonMatch(
 
     int32_t braceCount = 0;
     bool inQuote = false;
-    idx++;
-    for (; idx < size; idx++) {
+    for (; idx < size; ++idx) {
         switch (buffer[idx]) {
             case '{':
                 if (!inQuote)
