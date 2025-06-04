@@ -16,6 +16,7 @@
 
 #include "host_monitor/SystemInformationTools.h"
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -30,14 +31,14 @@ using namespace std::chrono;
 
 namespace logtail {
 
-bool GetHostSystemStat(vector<string>& lines, string& errorMessage) {
+bool GetHostSystemStatWithPath(vector<string>& lines, string& errorMessage, filesystem::path PROC_DIR) {
     errorMessage.clear();
-    if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
-        errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_STAT).string();
+    if (!CheckExistance(PROC_DIR)) {
+        errorMessage = "file does not exist: " + PROC_DIR.string();
         return false;
     }
 
-    int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, lines, true, &errorMessage);
+    int ret = GetFileLines(PROC_DIR, lines, true, &errorMessage);
     if (ret != 0 || lines.empty()) {
         return false;
     }
