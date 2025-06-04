@@ -45,7 +45,7 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
     GetMandatoryUIntParam(config, "MaxFiles", mMaxFiles, errorMsg);
 
     // create file writer
-    auto threadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
+    mThreadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
     // TODO: windows
     // upgrade spdlog version.
     try {
