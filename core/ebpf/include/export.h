@@ -34,8 +34,6 @@ struct ObserverNetworkOption {
     int mMaxConnections = 5000;
     std::string mAppId; // optional
     std::string mAppName; // optional
-    std::string mHostName; // optional
-    std::string mHostIp; // optional
     std::vector<std::string> mEnableCids;
     std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;

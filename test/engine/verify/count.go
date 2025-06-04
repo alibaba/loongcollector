@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -115,7 +116,7 @@ func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
-func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*protocol.LogGroup) error) (context.Context, error) {
+func MetricCheck(ctx context.Context, expect int, duration int64, ge bool, checker func([]*protocol.LogGroup) error) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var groups []*protocol.LogGroup
@@ -125,16 +126,36 @@ func MetricCheck(ctx context.Context, expect int, duration int64, checker func([
 		func() error {
 			count = 0
 			currTime := time.Now().Unix()
+			startTime := int32(currTime - duration)
+			if duration <= 0 {
+				val := ctx.Value(config.StartTimeContextKey)
+				if val == nil {
+					return fmt.Errorf("no start time and duration le 0")
+				}
+				startTime = val.(int32)
+			}
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), startTime)
+
 			lastScrapeTime := int32(currTime - duration)
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), lastScrapeTime)
 			if err != nil {
-				return err
+				if strings.Contains(err.Error(), "no log") {
+					groups = []*protocol.LogGroup{}
+				} else {
+					return err
+				}
 			}
 			for _, group := range groups {
 				count += len(group.Logs)
 			}
-			if count < expect {
-				return fmt.Errorf("metric count not match, expect %d, got %d, from %d", expect, count, lastScrapeTime)
+			if ge {
+				if count < expect {
+					return fmt.Errorf("metric count less than expect, expect %d, got %d, from %d", expect, count, startTime)
+				}
+			} else {
+				if count >= expect {
+					return fmt.Errorf("metric count greate equal than expect, expect %d, got %d, from %d", expect, count, startTime)
+				}
 			}
 			if expect == 0 {
 				return fmt.Errorf("metric count is 0")
@@ -158,13 +179,19 @@ func MetricCheck(ctx context.Context, expect int, duration int64, checker func([
 }
 
 func MetricCount(ctx context.Context, expect int, duration int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, true, func(groups []*protocol.LogGroup) error {
+		return nil
+	})
+}
+
+func MetricCountLess(ctx context.Context, expect int, duration int64) (context.Context, error) {
+	return MetricCheck(ctx, expect, duration, false, func(groups []*protocol.LogGroup) error {
 		return nil
 	})
 }
 
 func MetricCountAndValueCompare(ctx context.Context, expect int, duration int64, minValue int64, maxValue int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, true, func(groups []*protocol.LogGroup) error {
 		lessCount := 0
 		greaterCount := 0
 		for _, group := range groups {
@@ -193,7 +220,7 @@ func MetricCountAndValueCompare(ctx context.Context, expect int, duration int64,
 }
 
 func MetricCountAndValueEqual(ctx context.Context, expect int, duration int64, expectValue int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, true, func(groups []*protocol.LogGroup) error {
 		notEqualCount := 0
 		for _, group := range groups {
 			for _, log := range group.Logs {
