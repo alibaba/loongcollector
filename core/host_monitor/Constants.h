@@ -27,6 +27,10 @@ const extern std::filesystem::path PROCESS_STAT;
 const extern std::filesystem::path PROCESS_LOADAVG;
 extern std::filesystem::path PROCESS_MEMINFO;
 extern std::filesystem::path PROCESS_MTRR;
+
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT;
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
+const extern std::filesystem::path PROCESS_NET_DEV;
 const extern int64_t SYSTEM_HERTZ;
 
 #ifdef __ENTERPRISE__

@@ -25,6 +25,9 @@ const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";
 std::filesystem::path PROCESS_MEMINFO = "meminfo";
 std::filesystem::path PROCESS_MTRR = "mtrr";
+const std::filesystem::path PROCESS_NET_SOCKSTAT = "net/sockstat";
+const std::filesystem::path PROCESS_NET_SOCKSTAT6 = "net/sockstat6";
+const std::filesystem::path PROCESS_NET_DEV = "net/dev";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail
