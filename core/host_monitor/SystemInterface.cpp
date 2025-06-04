@@ -114,6 +114,28 @@ bool SystemInterface::GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNum
         errorType);
 }
 
+bool SystemInterface::GetTCPStatInformation(TCPStatInformation& tcpStatInfo) {
+    const std::string errorType = "TCP stat";
+    return MemoizedCall(
+        mTCPStatInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetTCPStatInformationOnce(static_cast<TCPStatInformation&>(info));
+        },
+        tcpStatInfo,
+        errorType);
+}
+
+bool SystemInterface::GetNetRateInformation(NetRateInformation& netRateInfo) {
+    const std::string errorType = "Net rate";
+    return MemoizedCall(
+        mNetRateInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetNetRateInformationOnce(static_cast<NetRateInformation&>(info));
+        },
+        netRateInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {

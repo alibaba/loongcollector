@@ -17,6 +17,7 @@
 #include "host_monitor/LinuxSystemInterface.h"
 
 #include <chrono>
+#include <iostream>
 
 using namespace std;
 using namespace std::chrono;
@@ -66,6 +67,192 @@ bool GetHostLoadavg(vector<string>& lines, string& errorMessage) {
     }
 
     int ret = GetFileLines(PROCESS_DIR / PROCESS_LOADAVG, lines, true, &errorMessage);
+    if (ret != 0 || lines.empty()) {
+        return false;
+    }
+    return true;
+}
+bool ReadSocketStat(const std::filesystem::path& path, int& tcp) {
+    tcp = 0;
+    if (!path.empty()) {
+        std::vector<std::string> sockstatLines;
+        std::string errorMessage;
+        if (!CheckExistance(path)) {
+            errorMessage = "file does not exist: " + (path).string();
+            return false;
+        }
+
+        if (GetFileLines(path, sockstatLines, true, &errorMessage) != 0 || sockstatLines.empty()) {
+            return false;
+        }
+
+        for (auto const& line : sockstatLines) {
+            std::vector<std::string> metrics;
+            boost::split(metrics, line, boost::is_any_of(" "), boost::token_compress_on);
+            std::string key = metrics.front();
+            boost::algorithm::trim(key);
+            if (metrics.size() >= 9 && (key == "TCP:" || key == "TCP6:")) {
+                tcp += std::stoi(metrics[6]); // tw
+                tcp += std::stoi(metrics[8]); // alloc
+            }
+        }
+    }
+    return true;
+}
+
+bool ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
+    static uint32_t sequence_number = 1;
+    int fd;
+    // struct inet_diag_msg *r;
+    // 使用netlink socket与内核通信
+    fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
+    if (fd < 0) {
+        LOG_WARNING(sLogger,
+                    ("ReadNetLink, socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG) failed, error msg: ",
+                     std::string(strerror(errno))));
+        close(fd);
+        return false;
+    }
+
+
+    // 存在多个netlink socket时，必须单独bind,并通过nl_pid来区分
+    struct sockaddr_nl nladdr_bind {};
+    memset(&nladdr_bind, 0, sizeof(nladdr_bind));
+    nladdr_bind.nl_family = AF_NETLINK;
+    nladdr_bind.nl_pad = 0;
+    nladdr_bind.nl_pid = getpid();
+    nladdr_bind.nl_groups = 0;
+    if (bind(fd, (struct sockaddr*)&nladdr_bind, sizeof(nladdr_bind))) {
+        LOG_WARNING(sLogger, ("ReadNetLink, bind netlink socket failed, error msg: ", std::string(strerror(errno))));
+        close(fd);
+        return false;
+    }
+    struct sockaddr_nl nladdr {};
+    memset(&nladdr, 0, sizeof(nladdr));
+    nladdr.nl_family = AF_NETLINK;
+    struct NetLinkRequest req {};
+    memset(&req, 0, sizeof(req));
+    req.nlh.nlmsg_len = sizeof(req);
+    req.nlh.nlmsg_type = TCPDIAG_GETSOCK;
+    req.nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
+    // sendto kernel
+    req.nlh.nlmsg_pid = getpid();
+    req.nlh.nlmsg_seq = ++sequence_number;
+    req.r.idiag_family = AF_INET;
+    req.r.idiag_states = 0xfff;
+    req.r.idiag_ext = 0;
+    struct iovec iov {};
+    memset(&iov, 0, sizeof(iov));
+    iov.iov_base = &req;
+    iov.iov_len = sizeof(req);
+    struct msghdr msg {};
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_name = (void*)&nladdr;
+    msg.msg_namelen = sizeof(nladdr);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    if (sendmsg(fd, &msg, 0) < 0) {
+        LOG_WARNING(sLogger, ("ReadNetLink, sendmsg(2) failed, error msg: ", std::string(strerror(errno))));
+        close(fd);
+        return false;
+    }
+    char buf[8192];
+    iov.iov_base = buf;
+    iov.iov_len = sizeof(buf);
+    while (true) {
+        // struct nlmsghdr *h;
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_name = (void*)&nladdr;
+        msg.msg_namelen = sizeof(nladdr);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        ssize_t status = recvmsg(fd, (struct msghdr*)&msg, 0);
+        if (status < 0) {
+            if (errno == EINTR || errno == EAGAIN) {
+                continue;
+            }
+            LOG_WARNING(sLogger, ("ReadNetLink, recvmsg(2) failed, error msg: ", std::string(strerror(errno))));
+            close(fd);
+            return false;
+        } else if (status == 0) {
+            LOG_WARNING(sLogger,
+                        ("ReadNetLink, Unexpected zero-sized  reply from netlink socket. error msg: ",
+                         std::string(strerror(errno))));
+            close(fd);
+            return true;
+        }
+
+        // h = (struct nlmsghdr *) buf;
+        for (auto h = (struct nlmsghdr*)buf; NLMSG_OK(h, status); h = NLMSG_NEXT(h, status)) {
+            if (h->nlmsg_seq != sequence_number) {
+                // sequence_number is not equal
+                // h = NLMSG_NEXT(h, status);
+                continue;
+            }
+
+            if (h->nlmsg_type == NLMSG_DONE) {
+                close(fd);
+                return true;
+            } else if (h->nlmsg_type == NLMSG_ERROR) {
+                if (h->nlmsg_len < NLMSG_LENGTH(sizeof(struct nlmsgerr))) {
+                    LOG_WARNING(sLogger, ("ReadNetLink ", "message truncated"));
+                } else {
+                    auto msg_error = (struct nlmsgerr*)NLMSG_DATA(h);
+                    LOG_WARNING(sLogger, ("ReadNetLink, Received error, error msg: ", msg_error));
+                }
+                close(fd);
+                return false;
+            }
+            auto r = (struct inet_diag_msg*)NLMSG_DATA(h);
+            /*This code does not(need to) distinguish between IPv4 and IPv6.*/
+            if (r->idiag_state > TCP_CLOSING || r->idiag_state < TCP_ESTABLISHED) {
+                // Ignoring connection with unknown state
+                continue;
+            }
+            tcpStateCount[r->idiag_state]++;
+            // h = NLMSG_NEXT(h, status);
+        }
+    }
+    close(fd);
+    return true;
+}
+
+bool GetNetStateByNetLink(NetState& netState) {
+    std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
+    if (ReadNetLink(tcpStateCount) == false) {
+        return false;
+    }
+    int tcp = 0, tcpSocketStat = 0;
+
+    if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT, tcp)) {
+        tcpSocketStat += tcp;
+    }
+    if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, tcp)) {
+        tcpSocketStat += tcp;
+    }
+
+    int total = 0;
+    for (int i = TCP_ESTABLISHED; i <= TCP_CLOSING; i++) {
+        if (i == TCP_SYN_SENT || i == TCP_SYN_RECV) {
+            total += tcpStateCount[i];
+        }
+        netState.tcpStates[i] = tcpStateCount[i];
+    }
+    // 设置为-1表示没有采集
+    netState.tcpStates[TCP_TOTAL] = total + tcpSocketStat;
+    netState.tcpStates[TCP_NON_ESTABLISHED] = netState.tcpStates[TCP_TOTAL] - netState.tcpStates[TCP_ESTABLISHED];
+    return true;
+}
+
+bool GetHostNetDev(vector<string>& lines, string& errorMessage) {
+    errorMessage.clear();
+    if (!CheckExistance(PROCESS_DIR / PROCESS_NET_DEV)) {
+        errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_NET_DEV).string();
+        return false;
+    }
+
+    int ret = GetFileLines(PROCESS_DIR / PROCESS_NET_DEV, lines, true, &errorMessage);
     if (ret != 0 || lines.empty()) {
         return false;
     }
@@ -218,6 +405,68 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
 bool LinuxSystemInterface::GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) {
     cpuCoreNumInfo.cpuCoreNum = std::thread::hardware_concurrency();
     cpuCoreNumInfo.cpuCoreNum = cpuCoreNumInfo.cpuCoreNum < 1 ? 1 : cpuCoreNumInfo.cpuCoreNum;
+    return true;
+}
+
+bool LinuxSystemInterface::GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) {
+    NetState netState;
+
+    bool ret = false;
+
+    ret = GetNetStateByNetLink(netState);
+
+    if (ret) {
+        tcpStatInfo.stat.tcpEstablished = (netState.tcpStates[TCP_ESTABLISHED]);
+        tcpStatInfo.stat.tcpListen = (netState.tcpStates[TCP_LISTEN]);
+        tcpStatInfo.stat.tcpTotal = (netState.tcpStates[TCP_TOTAL]);
+        tcpStatInfo.stat.tcpNonEstablished = (netState.tcpStates[TCP_NON_ESTABLISHED]);
+    }
+
+    return ret;
+}
+
+bool LinuxSystemInterface::GetNetRateInformationOnce(NetRateInformation& netRateInfo) {
+    //  /proc/net/dev
+    std::vector<std::string> netDevLines = {};
+    std::string errorMessage;
+    bool ret = GetHostNetDev(netDevLines, errorMessage);
+    if (!ret || netDevLines.empty()) {
+        return false;
+    }
+
+    for (size_t i = 2; i < netDevLines.size(); ++i) {
+        auto pos = netDevLines[i].find_first_of(':');
+        std::string devCounterStr = netDevLines[i].substr(pos + 1);
+        std::string devName = netDevLines[i].substr(0, pos);
+        std::vector<std::string> netDevMetric;
+        boost::algorithm::trim(devCounterStr);
+        boost::split(netDevMetric, devCounterStr, boost::is_any_of(" "), boost::token_compress_on);
+
+        if (netDevMetric.size() >= 16) {
+            NetInterfaceMetric information;
+            int index = 0;
+            boost::algorithm::trim(devName);
+            information.name = devName;
+            information.rxBytes = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.rxPackets = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.rxErrors = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.rxDropped = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.rxOverruns = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.rxFrame = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            // skip compressed multicast
+            index += 2;
+            information.txBytes = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txPackets = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txErrors = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txDropped = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txOverruns = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txCollisions = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+            information.txCarrier = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
+
+            information.speed = -1;
+            netRateInfo.metrics.push_back(information);
+        }
+    }
     return true;
 }
 
