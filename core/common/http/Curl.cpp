@@ -15,9 +15,13 @@
 #include "common/http/Curl.h"
 
 #include <cstdint>
+#if !defined(_MSC_VER)
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#else
+#include <winsock2.h>
+#endif
 
 #include <map>
 #include <string>
@@ -107,7 +111,7 @@ static size_t header_write_callback(char* buffer,
 static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
     auto* socket = static_cast<CurlSocket*>(socketData);
     if (socket->mTOS.has_value()) {
-        setsockopt(fd, IPPROTO_IP, IP_TOS, &socket->mTOS, sizeof(socket->mTOS));
+        setsockopt(fd, IPPROTO_IP, IP_TOS, (const char*)&(socket->mTOS.value()), sizeof(socket->mTOS.value()));
     }
     return 0;
 }

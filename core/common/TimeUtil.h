@@ -97,7 +97,9 @@ bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffs
 
 std::string NumberToDigitString(uint32_t number, uint8_t length);
 
+#if defined(__linux__)
 long GetTicksPerSecond();
+#endif
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic();
 

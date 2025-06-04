@@ -288,6 +288,7 @@ protected:
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
     friend class ModifyHandlerUnittest;
+    friend class PipelineUpdateUnittest;
 
     void CleanEnviroments();
     int32_t GetInotifyWatcherCount();

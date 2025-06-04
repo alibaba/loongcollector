@@ -85,7 +85,17 @@ private:
 };
 
 template <>
-bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
-                                                              const PipelineEventPtr& e);
+inline bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
+                                                                     const PipelineEventPtr& e) {
+    if (e.Is<MetricEvent>()) {
+        // It is necessary to flush, if the event timestamp and the batch creation time differ by more than 300 seconds.
+        // The 300 seconds is to avoid frequent batching to reduce the flusher traffic, because metrics such as cAdvisor
+        // has out-of-order situations.
+        return time(nullptr) - status.GetCreateTime() > mTimeoutSecs
+            || abs(status.GetCreateTime() - e->GetTimestamp()) > 300;
+    }
+    return time(nullptr) - status.GetCreateTime() > mTimeoutSecs
+        || status.GetCreateTimeMinute() != e->GetTimestamp() / 60;
+}
 
 } // namespace logtail
