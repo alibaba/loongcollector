@@ -285,18 +285,6 @@ FlusherSLS::FlusherSLS() : mRegion(GetDefaultRegion()) {
 bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     string errorMsg;
 
-    // Project
-    if (!GetMandatoryStringParam(config, "Project", mProject, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
-    }
-
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
@@ -337,6 +325,20 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetProjectName(),
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
+    }
+
+    // Project
+    if (mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST) {
+        if (!GetMandatoryStringParam(config, "Project", mProject, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        }
     }
 
     // Logstore
@@ -665,7 +667,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         return false;
     }
 #else
-    static string host = mProject + "." + mEndpoint;
+    static string host = mProject.empty() ? mEndpoint : mProject + "." + mEndpoint;
     data->mCurrentHost = host;
 #endif
 
