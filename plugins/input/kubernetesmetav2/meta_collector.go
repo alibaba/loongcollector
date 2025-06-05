@@ -13,7 +13,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -379,12 +378,10 @@ func (m *metaCollector) sendInBackground() {
 			return
 		}
 		if time.Since(lastSendClusterTime) > time.Duration(m.serviceK8sMeta.Interval)*time.Second {
-			// send cluster entity if in infra domain
-			if m.serviceK8sMeta.domain == infraDomain {
-				clusterEntity := m.generateClusterEntity()
-				m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
-				lastSendClusterTime = time.Now()
-			}
+
+			clusterEntity := m.generateClusterEntity()
+			m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
+			lastSendClusterTime = time.Now()
 		}
 	}
 }
@@ -401,13 +398,15 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	log.Timestamp = uint64(time.Now().Unix())
 	log.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityIDFieldName, m.genKey("", "", ""))
+	log.Contents.Add(entityIDFieldName, m.genKey("cluster", "", ""))
 	log.Contents.Add(entityMethodFieldName, "Update")
 	log.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
 	log.Contents.Add(entityLastObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
 	log.Contents.Add(entityKeepAliveSecondsFieldName, strconv.FormatInt(int64(m.serviceK8sMeta.Interval*2), 10))
 	log.Contents.Add(entityCategoryFieldName, defaultEntityCategory)
 	log.Contents.Add(entityClusterIDFieldName, m.serviceK8sMeta.clusterID)
+	log.Contents.Add(entityClusterNameFieldName, m.serviceK8sMeta.clusterName)
+	log.Contents.Add(entityClusterRegionFieldName, m.serviceK8sMeta.clusterRegion)
 	return log
 }
 
@@ -417,7 +416,7 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log.Contents = models.NewLogContents()
 	log.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey("", "", ""))
+	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey("cluster", "", "")) // e.g c1e86abc378fe43ff93e4e636537c436fcluster
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
 	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
@@ -434,13 +433,7 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 
 func (m *metaCollector) genEntityTypeKey(kind string) string {
 	// assert domain is initialized
-	if kind == "" {
-		return m.serviceK8sMeta.domain + ".k8s"
-	}
-	if kind == clusterTypeName && m.serviceK8sMeta.domain == acsDomain {
-		return m.serviceK8sMeta.domain + "." + *flags.ClusterType + "." + clusterTypeName
-	}
-	return m.serviceK8sMeta.domain + ".k8s." + strings.ToLower(kind)
+	return m.serviceK8sMeta.domain + "." + strings.ToLower(kind)
 }
 
 func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
