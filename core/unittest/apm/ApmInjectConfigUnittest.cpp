@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "apm/Types.h"
 #include "common/JsonUtil.h"
 #include "unittest/Unittest.h"
-
-#include <string>
 
 namespace logtail::apm {
 

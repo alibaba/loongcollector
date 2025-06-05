@@ -16,11 +16,11 @@
 
 #include "apm/ApmInjectRunner.h"
 
+#include <filesystem>
+
 #include "MachineInfoUtil.h"
 #include "apm/Types.h"
 #include "logger/Logger.h"
-
-#include <filesystem>
 
 namespace logtail::apm {
 
@@ -57,14 +57,41 @@ bool ApmInjectRunner::HasRegisteredPlugins() const {
     return true;
 }
 
-bool ApmInjectRunner::DoAttach(const TaskPipelineContext* ctx, AttachConfig& config) {
-    // re-try queue
-    // store in map ...
+void ApmInjectRunner::injectApmAgentInner() {
+    // if task is failed and is retryable, re-submit ...
+
+    // else just return and send alarm ...
+
+}
+void ApmInjectRunner::removeApmAgentInner() {
+    // if task is failed and is retryable, re-submit ...
+
+    // else just return and send alarm ...
+}
+
+bool ApmInjectRunner::RemoveApmAgent(const TaskPipelineContext* ctx) {
+    const auto& it = mAttachConfigs.find(ctx->GetConfigName());
+    if (it == mAttachConfigs.end()) {
+        LOG_DEBUG(sLogger, ("inject config does not exist", ctx->GetConfigName()));
+        return true;
+    }
+
+    mDeletedConfigs.emplace_back(ctx->GetConfigName(), std::move(it->second));
+    mAttachConfigs.erase(it);
+    return true;
+}
+
+bool ApmInjectRunner::InjectApmAgent(const TaskPipelineContext* ctx, std::unique_ptr<AttachConfig>&& conf) {
+    std::unique_ptr<AttachContext> attachContext = std::make_unique<AttachContext>(std::move(conf));
+    mAttachConfigs.emplace(ctx->GetConfigName(), attachContext);
+
+    // submit to thread pool
 
     bool res = false;
     // async prepare ...
     fs::path agentPath;
-    res = mPackageMgr.PrepareAPMAgent(config.mLanguage, config.mAppId, std::string(mEcsMeta.GetRegionID()), config.mAgentVersion, agentPath);
+    res = mPackageMgr.PrepareAPMAgent(
+        attachContext->mAttachConfig->mLanguage, attachContext->mAttachConfig->mAppId, std::string(mEcsMeta.GetRegionID()), attachContext->mAttachConfig->mAgentVersion, agentPath);
     if (!res) {
         // TODO @qianlu.kk send alarm ...
         return false;
@@ -77,8 +104,8 @@ bool ApmInjectRunner::DoAttach(const TaskPipelineContext* ctx, AttachConfig& con
         return false;
     }
 
-    for (auto& rule : config.mMatchRules) {
-        bool res = mAttachMgr.DoAttach(rule, agentPath, config);
+    for (auto& rule : attachContext->mAttachConfig->mMatchRules) {
+        bool res = mAttachMgr.DoAttach(rule, agentPath, attachContext);
         if (!res) {
             // TODO @qianlu.kk send alarm ...
         }

@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include "apm/Types.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
-#include <filesystem>
 
 namespace logtail::apm {
 
@@ -39,17 +40,17 @@ public:
     /**
      * DoAttach is used to write APP META to rc file
      */
-    bool DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config);
+    bool DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config);
 
     // bool DoDetach(AttachConfig& config, int pid);
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class AttachManagerUnittest;
 #endif
 private:
-    int prepareRuntimeConfig(const std::filesystem::path& cwd, 
-                           const std::string& agentJarPath,
-                           const std::string& licenseKey,
-                           const std::string& appName);
+    int prepareRuntimeConfig(const std::filesystem::path& cwd,
+                             const std::string& agentJarPath,
+                             const std::string& licenseKey,
+                             const std::string& appName);
 };
 
 } // namespace logtail::apm

@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
+#include "apm/AttachManager.h"
+
+#include <cstdio>
+#include <cstdlib>
+
 #include <filesystem>
 #include <fstream>
 #include <string>
-#include <cstdlib>
-#include <cstdio>
 
-#include "apm/AttachManager.h"
-#include "logger/Logger.h"
 #include "common/StringTools.h"
+#include "logger/Logger.h"
 
 namespace logtail::apm {
 
@@ -42,9 +44,8 @@ const std::string kRuntimeConfigTemplate = R"(
 -Darms.agent.env=ECS_AUTO
 )";
 
-std::string BuildRuntimeConfig(const std::string& agentJarPath, 
-                               const std::string& licenseKey, 
-                               const std::string& appName) {
+std::string
+BuildRuntimeConfig(const std::string& agentJarPath, const std::string& licenseKey, const std::string& appName) {
     std::string content = kRuntimeConfigTemplate;
     ReplaceString(content, kPlaceholderAgentPath, agentJarPath);
     ReplaceString(content, kPlaceholderLicenseKey, licenseKey);
@@ -52,14 +53,14 @@ std::string BuildRuntimeConfig(const std::string& agentJarPath,
     return content;
 }
 
-int AttachManager::prepareRuntimeConfig(const fs::path& cwd, 
-                           const std::string& agentJarPath,
-                           const std::string& licenseKey,
-                           const std::string& appName) {
+int AttachManager::prepareRuntimeConfig(const fs::path& cwd,
+                                        const std::string& agentJarPath,
+                                        const std::string& licenseKey,
+                                        const std::string& appName) {
     auto configPath = cwd / kRuntimeConfigFile;
-    
+
     std::string newContent = BuildRuntimeConfig(agentJarPath, licenseKey, appName);
-    
+
     if (!fs::exists(configPath)) {
         std::ofstream outFile(configPath, std::ios::out | std::ios::trunc);
         if (!outFile) {
@@ -78,7 +79,7 @@ int AttachManager::prepareRuntimeConfig(const fs::path& cwd,
         std::ostringstream buffer;
         buffer << inFile.rdbuf();
         oldContent = buffer.str();
-        
+
         if (newContent != oldContent) {
             std::ofstream outFile(configPath, std::ios::out | std::ios::trunc);
             if (!outFile) {
@@ -117,16 +118,16 @@ bool CheckProcessInjected(const fs::path& cwd, int pid) {
         LOG_WARNING(sLogger, ("failed to read PID file for pid", pid));
         return false;
     }
-    
+
     std::ostringstream buffer;
     buffer << inFile.rdbuf();
     std::string content = buffer.str();
-    
+
     return content.find(pidStr) != std::string::npos;
 }
 
-bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config) {
-    return prepareRuntimeConfig(rule.mVal, agentPath, config.mLicenseKey, config.mAppName) == 0;
+bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config) {
+    return prepareRuntimeConfig(rule.mVal, agentPath, config->mAttachConfig->mLicenseKey, config->mAttachConfig->mAppName) == 0;
 }
 
-}
+} // namespace logtail::apm

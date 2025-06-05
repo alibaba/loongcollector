@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
-#include <string>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <string>
 
 #include "apm/PackageManager.h"
 #include "apm/Types.h"
@@ -29,10 +29,10 @@ public:
     void SetUp() override {
         mPackageManager = std::make_unique<PackageManager>();
         mPackageManager->Init();
-        
+
         mTestDir = std::filesystem::temp_directory_path() / "ilogtail_test";
         std::filesystem::create_directories(mTestDir);
-        
+
         // 创建测试用的 ld.so.preload 文件
         mPreloadFile = mTestDir / "ld.so.preload";
         std::ofstream preloadFile(mPreloadFile);
@@ -66,13 +66,17 @@ public:
 
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/AliyunJavaAgent.zip"));
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/current/AliyunJavaAgent.zip"));
-        APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/current/AliyunJavaAgent/aliyun-java-agent.jar"));
+        APSARA_TEST_TRUE(
+            std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/current/AliyunJavaAgent/aliyun-java-agent.jar"));
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/current/AliyunJavaAgent/version"));
 
         // manifest
-        APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/.AliyunJavaAgent.zip.manifest"));
-        APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/.AliyunJavaAgent.zip.manifest"));
-        APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/AliyunJavaAgent/aliyun-java-agent.jar"));
+        APSARA_TEST_TRUE(
+            std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/.AliyunJavaAgent.zip.manifest"));
+        APSARA_TEST_TRUE(
+            std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/.AliyunJavaAgent.zip.manifest"));
+        APSARA_TEST_TRUE(
+            std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/AliyunJavaAgent/aliyun-java-agent.jar"));
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/AliyunJavaAgent/version"));
     }
 
@@ -80,11 +84,10 @@ public:
         // 测试安装 exec hook
         bool result = mPackageManager->InstallExecHook("cn-heyuan");
         APSARA_TEST_TRUE(result);
-        
+
         // 验证 ld.so.preload 文件是否被正确更新
         std::ifstream preloadFile("/etc/ld.so.preload");
-        std::string content((std::istreambuf_iterator<char>(preloadFile)),
-                            std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(preloadFile)), std::istreambuf_iterator<char>());
         APSARA_TEST_TRUE(content.find("libexec-hook.so") != std::string::npos);
     }
 
@@ -92,7 +95,7 @@ public:
         // // 先安装
         // bool installResult = mPackageManager->InstallExecHook("cn-heyuan");
         // APSARA_TEST_TRUE(installResult);
-        
+
         // // 测试更新
         // bool updateResult = mPackageManager->UpdateExecHook();
         // APSARA_TEST_TRUE(updateResult);
@@ -102,7 +105,7 @@ public:
         // // 先安装
         // bool installResult = mPackageManager->InstallExecHook("cn-heyuan");
         // APSARA_TEST_TRUE(installResult);
-        
+
         // // 测试卸载
         // bool uninstallResult = mPackageManager->UninstallExecHook();
         // APSARA_TEST_TRUE(uninstallResult);
@@ -141,32 +144,30 @@ public:
         std::ofstream preloadFile(mPreloadFile);
         preloadFile << "/usr/lib/other.so\n";
         preloadFile.close();
-        
+
         // 测试安装
         bool result = mPackageManager->InstallExecHook("cn-heyuan");
         APSARA_TEST_TRUE(result);
-        
+
         // 验证文件内容是否正确追加
         std::ifstream updatedPreloadFile(mPreloadFile);
-        std::string content((std::istreambuf_iterator<char>(updatedPreloadFile)),
-                            std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(updatedPreloadFile)), std::istreambuf_iterator<char>());
         APSARA_TEST_TRUE(content.find("/usr/lib/other.so") != std::string::npos);
         APSARA_TEST_TRUE(content.find("libexec-hook.so") != std::string::npos);
     }
 
     void InstallExecHookWithNoPermission() {
         // 设置文件为只读
-        std::filesystem::permissions(mPreloadFile, 
-                                std::filesystem::perms::owner_read,
-                                std::filesystem::perm_options::replace);
-        
+        std::filesystem::permissions(
+            mPreloadFile, std::filesystem::perms::owner_read, std::filesystem::perm_options::replace);
+
         // 测试安装
         APSARA_TEST_FALSE(mPackageManager->InstallExecHook("cn-heyuan"));
-        
+
         // 恢复权限
-        std::filesystem::permissions(mPreloadFile, 
-                                std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
-                                std::filesystem::perm_options::replace);
+        std::filesystem::permissions(mPreloadFile,
+                                     std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                     std::filesystem::perm_options::replace);
     }
 
 private:

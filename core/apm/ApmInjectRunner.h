@@ -22,17 +22,17 @@
 #include <memory>
 #include <mutex>
 #include <variant>
+#include <unordered_map>
 
 #include "apm/AttachManager.h"
 #include "apm/PackageManager.h"
 #include "apm/Types.h"
-#include "task_pipeline/TaskPipelineContext.h"
+#include "common/MachineInfoUtil.h"
 #include "common/ProcParser.h"
+#include "common/ThreadPool.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
-#include "common/ThreadPool.h"
 #include "task_pipeline/TaskPipelineContext.h"
-#include "common/MachineInfoUtil.h"
 
 namespace logtail::apm {
 
@@ -57,17 +57,23 @@ public:
     [[nodiscard]] bool HasRegisteredPlugins() const override;
     void EventGC() override {}
 
-    bool DoAttach(const TaskPipelineContext* ctx, AttachConfig& config);
+    bool InjectApmAgent(const TaskPipelineContext* ctx, std::unique_ptr<AttachConfig>&& config);
+    bool RemoveApmAgent(const TaskPipelineContext* ctx);
 
 private:
-
     // pipeline name ==> AttachConfig
+
+    void injectApmAgentInner();
+    void removeApmAgentInner();
 
     AttachManager mAttachMgr;
     PackageManager mPackageMgr;
     std::unique_ptr<ThreadPool> mThreadPool;
     std::atomic_bool mStarted = false;
     ECSMeta mEcsMeta;
+
+    std::unordered_map<std::string, std::unique_ptr<AttachContext>> mAttachConfigs;
+    std::vector<std::pair<std::string, std::unique_ptr<AttachContext>>> mDeletedConfigs;
 };
 
 } // namespace logtail::apm

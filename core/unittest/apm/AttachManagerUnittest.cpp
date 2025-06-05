@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "apm/AttachManager.h"
-#include "unittest/Unittest.h"
 #include "logger/Logger.h"
+#include "unittest/Unittest.h"
 
 namespace logtail::apm {
 
@@ -33,16 +33,19 @@ public:
     }
     void TestInit() {}
     void TestPrepareRuntimeInfo() {
-        mMgr.prepareRuntimeConfig(mTestCwdDir, "/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar", "test-license-key", "test-app-name");
+        mMgr.prepareRuntimeConfig(mTestCwdDir,
+                                  "/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar",
+                                  "test-license-key",
+                                  "test-app-name");
         fs::path rc = mTestCwdDir / ".arms.rc";
         APSARA_TEST_TRUE(fs::exists(rc));
         std::ifstream rcFile(rc);
-        std::string content((std::istreambuf_iterator<char>(rcFile)),
-                            std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(rcFile)), std::istreambuf_iterator<char>());
         LOG_INFO(sLogger, ("content", content));
         APSARA_TEST_TRUE(content.find("test-license-key") != std::string::npos);
         APSARA_TEST_TRUE(content.find("test-app-name") != std::string::npos);
-        APSARA_TEST_TRUE(content.find("/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar") != std::string::npos);
+        APSARA_TEST_TRUE(content.find("/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar")
+                         != std::string::npos);
     }
 
 private:

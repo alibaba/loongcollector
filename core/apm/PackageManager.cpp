@@ -19,17 +19,17 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
-#include <string>
 #include <regex>
+#include <string>
 #include <tuple>
 
+#include "common/ArchiveHelper.h"
+#include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 #include "magic_enum.hpp"
-#include "common/StringTools.h"
-#include "common/ArchiveHelper.h"
 
 namespace logtail::apm {
 
@@ -49,7 +49,8 @@ const fs::path kJavaAgentBootstrapFile = "aliyun-java-agent.jar";
 
 // Constants
 const std::string kDefaultArmsOssPublicEndpointPattern = "arms-apm-${REGION_ID}.oss-${REGION_ID}.aliyuncs.com";
-const std::string kDefaultArmsOssInternalEndpointPattern = "arms-apm-${REGION_ID}.oss-${REGION_ID}-internal.aliyuncs.com";
+const std::string kDefaultArmsOssInternalEndpointPattern
+    = "arms-apm-${REGION_ID}.oss-${REGION_ID}-internal.aliyuncs.com";
 const std::string kArmsJavaAgentFilename = "AliyunJavaAgent.zip";
 const std::string kArmsPythonAgentFilename = "aliyun-python-agent.tar.gz";
 const std::string kManifestExt = ".manifest";
@@ -65,7 +66,11 @@ std::string GetManifestFile(const std::string& filename) {
 }
 
 // Read manifest file
-bool ReadManifest(const std::string& dir, const std::string& filename, std::string& lastUrl, std::string& lastEtag, std::string& lastModified) {
+bool ReadManifest(const std::string& dir,
+                  const std::string& filename,
+                  std::string& lastUrl,
+                  std::string& lastEtag,
+                  std::string& lastModified) {
     std::string manifestFile = GetManifestFile(filename);
     fs::path manifestPath = fs::path(dir) / manifestFile;
     if (!fs::exists(manifestPath) || !fs::is_regular_file(manifestPath)) {
@@ -89,7 +94,11 @@ bool ReadManifest(const std::string& dir, const std::string& filename, std::stri
 }
 
 // Write manifest file
-int DumpManifest(const std::string& dir, const std::string& filename, const std::string& url, const std::string& etag, const std::string& lastModified) {
+int DumpManifest(const std::string& dir,
+                 const std::string& filename,
+                 const std::string& url,
+                 const std::string& etag,
+                 const std::string& lastModified) {
     std::string manifestFile = GetManifestFile(filename);
     fs::path manifestPath = fs::path(dir) / manifestFile;
     LOG_INFO(sLogger, ("dir", dir)("fileName", filename)("url", url)("etag", etag)("lastModified", lastModified));
@@ -102,7 +111,7 @@ int DumpManifest(const std::string& dir, const std::string& filename, const std:
     out << "Etag: " << etag << "\n";
     out << "LastModified: " << lastModified << "\n";
     out.close();
-    
+
     return 0;
 }
 
@@ -155,13 +164,12 @@ bool PackageManager::PrepareExecHook(const std::string& region) {
         LOG_WARNING(sLogger, ("failed to download from oss", kDefaultExecHookName));
         return false;
     }
-    
+
     if (changed || !fs::exists(kSysSharedLibraryPath / kDefaultExecHookName)) {
         // 步骤1: 设置源文件权限为 644 (owner: read/write, group/other: read)
-        fs::permissions(kDefaultExecHookDownloadDir / kDefaultExecHookName, 
-            fs::perms::owner_read | fs::perms::owner_write |
-            fs::perms::group_read | fs::perms::others_read,
-            fs::perm_options::replace);
+        fs::permissions(kDefaultExecHookDownloadDir / kDefaultExecHookName,
+                        fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::others_read,
+                        fs::perm_options::replace);
 
         // 步骤2: 删除目标路径（文件或目录）
         if (fs::exists(kSysSharedLibraryPath / kDefaultExecHookName)) {
@@ -174,7 +182,9 @@ bool PackageManager::PrepareExecHook(const std::string& region) {
         }
 
         // 步骤3: 复制文件到工作路径
-        fs::copy(kDefaultExecHookDownloadDir / kDefaultExecHookName, kSysSharedLibraryPath / kDefaultExecHookName, fs::copy_options::overwrite_existing);
+        fs::copy(kDefaultExecHookDownloadDir / kDefaultExecHookName,
+                 kSysSharedLibraryPath / kDefaultExecHookName,
+                 fs::copy_options::overwrite_existing);
     }
     LOG_INFO(sLogger, ("exec hook is ready", ""));
     return true;
@@ -248,14 +258,19 @@ int ClearDirectory(const fs::path& dirPath) {
     }
 }
 
-bool PackageManager::downloadFromOss(const std::string& url, const std::string& dir, const std::string& filename, bool& changed) {
+bool PackageManager::downloadFromOss(const std::string& url,
+                                     const std::string& dir,
+                                     const std::string& filename,
+                                     bool& changed) {
     changed = false;
     std::string lastUrl;
     std::string lastEtag;
     std::string lastModified;
     bool res = ReadManifest(dir, filename, lastUrl, lastEtag, lastModified);
-    LOG_DEBUG(sLogger, ("ReadManifest res", res)("dir", dir)("fileName", filename)("url", lastUrl)("etag", lastEtag)("lastModified", lastModified));
-    
+    LOG_DEBUG(sLogger,
+              ("ReadManifest res",
+               res)("dir", dir)("fileName", filename)("url", lastUrl)("etag", lastEtag)("lastModified", lastModified));
+
     // url changed ...
     if (url != lastUrl) {
         // std::string manifestFile = GetManifestFile(filename);
@@ -276,13 +291,13 @@ bool PackageManager::downloadFromOss(const std::string& url, const std::string& 
         return false;
     }
     HttpResponse response((void*)file,
-                     [](void* pf) {
-                         FILE* file = static_cast<FILE*>(pf);
-                         fclose(file);
-                     },
-                     [](char* ptr, size_t size, size_t nmemb, void* stream) {
-                         return fwrite((void*)ptr, size, nmemb, (FILE*)stream);
-                     });
+                          [](void* pf) {
+                              FILE* file = static_cast<FILE*>(pf);
+                              fclose(file);
+                          },
+                          [](char* ptr, size_t size, size_t nmemb, void* stream) {
+                              return fwrite((void*)ptr, size, nmemb, (FILE*)stream);
+                          });
 
     std::map<std::string, std::string> headers;
     if (lastEtag.size()) {
@@ -291,8 +306,7 @@ bool PackageManager::downloadFromOss(const std::string& url, const std::string& 
     if (lastModified.size()) {
         headers.insert({"If-Modified-Since", lastModified});
     }
-    request = std::make_unique<HttpRequest>(
-        "GET", true, url, 443, "", "", headers, "", 10, 3, true);
+    request = std::make_unique<HttpRequest>("GET", true, url, 443, "", "", headers, "", 10, 3, true);
     bool success = SendHttpRequest(std::move(request), response);
     if (!success) {
         return false;
@@ -312,10 +326,10 @@ bool PackageManager::downloadFromOss(const std::string& url, const std::string& 
         std::string lastModified;
         auto it = response.GetHeader().find("Etag");
         if (it != response.GetHeader().end()) {
-            // not found 
+            // not found
             etag = it->second;
         }
-        
+
         it = response.GetHeader().find("Last-Modified");
         if (it != response.GetHeader().end()) {
             // not found
@@ -326,12 +340,14 @@ bool PackageManager::downloadFromOss(const std::string& url, const std::string& 
         return DumpManifest(dir, filename, url, etag, lastModified) == 0;
     }
 
-    LOG_WARNING(sLogger, ("failed to download, statusCode", response.GetStatusCode())("filename", filename)("url", url));
+    LOG_WARNING(sLogger,
+                ("failed to download, statusCode", response.GetStatusCode())("filename", filename)("url", url));
 
     return false;
 }
 
-std::string PackageManager::GetApmAgentDownloadUrl(APMLanguage lang, const std::string& region, const std::string& version) {
+std::string
+PackageManager::GetApmAgentDownloadUrl(APMLanguage lang, const std::string& region, const std::string& version) {
     auto endpoint = GetArmsOssDefaultEndpoint(region, false);
 
     if (version.size() && version != "latest") {
@@ -340,22 +356,24 @@ std::string PackageManager::GetApmAgentDownloadUrl(APMLanguage lang, const std::
     }
 
     endpoint += '/';
-    switch (lang)
-    {
-    case APMLanguage::kJava:
-        endpoint += kArmsJavaAgentFilename;
-        break;
-    case APMLanguage::kPython:
-        endpoint += kArmsPythonAgentFilename;
-        break;
-    default:
-        break;
+    switch (lang) {
+        case APMLanguage::kJava:
+            endpoint += kArmsJavaAgentFilename;
+            break;
+        case APMLanguage::kPython:
+            endpoint += kArmsPythonAgentFilename;
+            break;
+        default:
+            break;
     }
     return endpoint;
-
 }
 
-bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& appId, const std::string& region, const std::string& version, fs::path& outBootstrapPath) {
+bool PackageManager::PrepareAPMAgent(APMLanguage lang,
+                                     const std::string& appId,
+                                     const std::string& region,
+                                     const std::string& version,
+                                     fs::path& outBootstrapPath) {
     if (lang != APMLanguage::kJava) {
         LOG_WARNING(sLogger, ("language not supported", magic_enum::enum_name(lang)));
         return false;
@@ -388,16 +406,19 @@ bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& appId,
         return false;
     }
 
-    if (changed || !fs::exists(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kJavaAgentSubpath/ kJavaAgentBootstrapFile)) {
+    if (changed
+        || !fs::exists(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kJavaAgentSubpath
+                       / kJavaAgentBootstrapFile)) {
         // unzip
-        ArchiveHelper helper(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kArmsJavaAgentFilename, kDefaultJavaAgentDir / appId / kLatestAgentSubpath);
+        ArchiveHelper helper(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kArmsJavaAgentFilename,
+                             kDefaultJavaAgentDir / appId / kLatestAgentSubpath);
         status = helper.Extract();
         if (!status) {
             LOG_WARNING(sLogger, ("failed to unzip agent from oss", kArmsJavaAgentFilename));
             return false;
         }
 
-        // clean current dir 
+        // clean current dir
         int ret = ClearDirectory(kDefaultJavaAgentDir / appId / kCurrentAgentSubpath);
         if (ret) {
             LOG_WARNING(sLogger, ("Failed to clear current dir, ret", ret));
@@ -405,14 +426,17 @@ bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& appId,
 
         // copy latest to current dir ...
         try {
-            fs::copy(kDefaultJavaAgentDir / appId / kLatestAgentSubpath, kDefaultJavaAgentDir / appId / kCurrentAgentSubpath, fs::copy_options::recursive);
+            fs::copy(kDefaultJavaAgentDir / appId / kLatestAgentSubpath,
+                     kDefaultJavaAgentDir / appId / kCurrentAgentSubpath,
+                     fs::copy_options::recursive);
         } catch (const fs::filesystem_error& e) {
             LOG_WARNING(sLogger, ("failed to copy latest dir to current dir, e", e.what()));
             return false;
         }
     }
 
-    outBootstrapPath = kDefaultJavaAgentDir / appId / kCurrentAgentSubpath / kJavaAgentSubpath / kJavaAgentBootstrapFile;
+    outBootstrapPath
+        = kDefaultJavaAgentDir / appId / kCurrentAgentSubpath / kJavaAgentSubpath / kJavaAgentBootstrapFile;
 
     return true;
 }

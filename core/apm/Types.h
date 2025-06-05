@@ -16,21 +16,17 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "json/json.h"
+
 #include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail::apm {
 
-enum class APMLanguage {
-    kJava,
-    kPython,
-    kGolang,
-    kMax
-};
+enum class APMLanguage { kJava, kPython, kGolang, kMax };
 
 enum class RuleOperation {
     kEq,
@@ -60,6 +56,23 @@ struct AttachConfig {
     std::vector<MatchRule> mMatchRules;
 };
 
-bool InitApmAttachOption(const TaskPipelineContext* ctx, const Json::Value& config, std::unique_ptr<AttachConfig>& attachConfig, const std::string& inputType);
+enum class ApmAttachStatus {
+    kInProgress,
+    kSucceed,
+    kFailed,
+    kNeedRetry,
+    kUnknown,
+};
 
-}
+struct AttachContext {
+    explicit AttachContext(std::unique_ptr<AttachConfig>&& config) : mAttachConfig(std::move(config)) {}
+    std::unique_ptr<AttachConfig> mAttachConfig;
+    ApmAttachStatus mStatus = ApmAttachStatus::kInProgress;
+};
+
+bool InitApmAttachOption(const TaskPipelineContext* ctx,
+                         const Json::Value& config,
+                         std::unique_ptr<AttachConfig>& attachConfig,
+                         const std::string& inputType);
+
+} // namespace logtail::apm
