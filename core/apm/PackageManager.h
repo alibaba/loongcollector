@@ -17,6 +17,8 @@
 
 #include "apm/Types.h"
 
+#include <filesystem>
+
 namespace logtail::apm {
 
 class PackageManager {
@@ -36,15 +38,22 @@ public:
     bool UpdateExecHook();
     bool UninstallExecHook();
 
+    std::string GetApmAgentDownloadUrl(APMLanguage lang, const std::string& region, const std::string& version);
+
     // download and un-zip to target path ...
-    bool PrepareAPMAgent(APMLanguage lang, const std::string& region, const std::string& version);
+    bool PrepareAPMAgent(APMLanguage lang, const std::string& pid, const std::string& region, const std::string& version, std::filesystem::path& outBootstrapPath);
 
-    bool InstallExecHook();
+    bool InstallExecHook(const std::string& region);
 
-    // TODO update latest APM Agent ...
+    bool PrepareExecHook(const std::string& region);
+
+    // TODO uninstall logic ...
+
+    // TODO update latest agent logic ...
 
 private:
     bool downloadFromOss(const std::string& url, const std::string& dir, const std::string& filename, bool& changed);
+    
 };
 
 } // namespace logtail::apm

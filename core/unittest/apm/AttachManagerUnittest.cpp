@@ -14,30 +14,43 @@
 
 #include "apm/AttachManager.h"
 #include "unittest/Unittest.h"
+#include "logger/Logger.h"
 
 namespace logtail::apm {
 
+namespace fs = std::filesystem;
+
 class AttachManagerUnittest : public testing::Test {
 public:
+    void SetUp() override {
+        mTestCwdDir = std::filesystem::temp_directory_path() / "loongcollector_test" / "cwd";
+        std::filesystem::create_directories(mTestCwdDir);
+    }
+
+    void TearDown() override {
+        // 清理临时测试目录
+        std::filesystem::remove_all(mTestCwdDir);
+    }
     void TestInit() {}
-    void TestDownloadJavaAgent() {}
-    void TestDownloadPythonAgent() {}
-    void TestDownloadHookLib() {}
-    void TestLoadHookLib() {}
-    void TestAttachJavaAgent() {}
-    void TestMatchProcesses() {}
+    void TestPrepareRuntimeInfo() {
+        mMgr.prepareRuntimeConfig(mTestCwdDir, "/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar", "test-license-key", "test-app-name");
+        fs::path rc = mTestCwdDir / ".arms.rc";
+        APSARA_TEST_TRUE(fs::exists(rc));
+        std::ifstream rcFile(rc);
+        std::string content((std::istreambuf_iterator<char>(rcFile)),
+                            std::istreambuf_iterator<char>());
+        LOG_INFO(sLogger, ("content", content));
+        APSARA_TEST_TRUE(content.find("test-license-key") != std::string::npos);
+        APSARA_TEST_TRUE(content.find("test-app-name") != std::string::npos);
+        APSARA_TEST_TRUE(content.find("/opt/.arms/apm-java-agent/AliyunJavaAgent/aliyun-java-agent.jar") != std::string::npos);
+    }
 
 private:
     AttachManager mMgr;
+    std::filesystem::path mTestCwdDir;
 };
 
-UNIT_TEST_CASE(AttachManagerUnittest, TestInit);
-UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadJavaAgent);
-UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadPythonAgent);
-UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadHookLib);
-UNIT_TEST_CASE(AttachManagerUnittest, TestLoadHookLib);
-UNIT_TEST_CASE(AttachManagerUnittest, TestAttachJavaAgent);
-UNIT_TEST_CASE(AttachManagerUnittest, TestMatchProcesses);
+UNIT_TEST_CASE(AttachManagerUnittest, TestPrepareRuntimeInfo);
 
 } // namespace logtail::apm
 

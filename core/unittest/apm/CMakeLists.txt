@@ -10,3 +10,5 @@ function(add_unittest target_name source_file)
 endfunction()
 
 add_unittest(attach_manager_unittest AttachManagerUnittest.cpp)
+add_unittest(package_manager_unittest PackageManagerUnittest.cpp)
+add_unittest(apm_inject_config_unittest ApmInjectConfigUnittest.cpp)

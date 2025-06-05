@@ -28,8 +28,9 @@ namespace logtail::apm {
 
 namespace fs = std::filesystem;
 
-const std::string kRuntimeConfigFile = ".arms.rc";
-const std::string kRuntimePidFile = ".arms.pid";
+const fs::path kRuntimeConfigFile = ".arms.rc";
+const fs::path kRuntimePidFile = ".arms.pid";
+
 const std::string kPlaceholderLicenseKey = "${licenseKey}";
 const std::string kPlaceholderAgentPath = "${path_to_agent_bootstrap}";
 const std::string kPlaceholderAppName = "${appName}";
@@ -51,11 +52,10 @@ std::string BuildRuntimeConfig(const std::string& agentJarPath,
     return content;
 }
 
-int PrepareRuntimeConfig(const fs::path& cwd, 
+int AttachManager::prepareRuntimeConfig(const fs::path& cwd, 
                            const std::string& agentJarPath,
                            const std::string& licenseKey,
-                           const std::string& appName,
-                           int pid) {
+                           const std::string& appName) {
     auto configPath = cwd / kRuntimeConfigFile;
     
     std::string newContent = BuildRuntimeConfig(agentJarPath, licenseKey, appName);
@@ -67,7 +67,7 @@ int PrepareRuntimeConfig(const fs::path& cwd,
             return 1;
         }
         outFile << newContent;
-        LOG_INFO(sLogger, ("runtime config file created for pid", pid)("configPath", configPath));
+        LOG_INFO(sLogger, ("runtime config file created for cwd", cwd)("configPath", configPath));
     } else {
         std::string oldContent;
         std::ifstream inFile(configPath);
@@ -86,7 +86,7 @@ int PrepareRuntimeConfig(const fs::path& cwd,
                 return 1;
             }
             outFile << newContent;
-            LOG_INFO(sLogger, ("runtime config file updated for pid", pid)("configPath", configPath));
+            LOG_INFO(sLogger, ("runtime config file updated for cwd", cwd)("configPath", configPath));
         }
     }
     return 0;
@@ -111,7 +111,7 @@ bool CheckProcessInjected(const fs::path& cwd, int pid) {
         return false;
     }
 
-    std::string pidStr = std::to_string(pid);
+    std::string pidStr = ToString<int>(pid);
     std::ifstream inFile(pidFilePath);
     if (!inFile) {
         LOG_WARNING(sLogger, ("failed to read PID file for pid", pid));
@@ -125,8 +125,8 @@ bool CheckProcessInjected(const fs::path& cwd, int pid) {
     return content.find(pidStr) != std::string::npos;
 }
 
-bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config, int pid) {
-    return PrepareRuntimeConfig(rule.mVal, agentPath, config.mLicenseKey, config.mAppName, pid) == 0;
+bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config) {
+    return prepareRuntimeConfig(rule.mVal, agentPath, config.mLicenseKey, config.mAppName) == 0;
 }
 
 }

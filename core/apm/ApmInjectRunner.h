@@ -60,7 +60,6 @@ public:
     bool DoAttach(const TaskPipelineContext* ctx, AttachConfig& config);
 
 private:
-    int findPidsByRule(MatchRule& rule, std::vector<int>& pids);
 
     // pipeline name ==> AttachConfig
 

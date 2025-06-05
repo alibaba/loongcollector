@@ -20,7 +20,11 @@
 #include "apm/Types.h"
 #include "logger/Logger.h"
 
+#include <filesystem>
+
 namespace logtail::apm {
+
+namespace fs = std::filesystem;
 
 void ApmInjectRunner::Init() {
     if (mStarted) {
@@ -59,55 +63,27 @@ bool ApmInjectRunner::DoAttach(const TaskPipelineContext* ctx, AttachConfig& con
 
     bool res = false;
     // async prepare ...
-    std::string agentPath;
-    res = mPackageMgr.PrepareAPMAgent(config.mLanguage, config.mAgentVersion, agentPath);
+    fs::path agentPath;
+    res = mPackageMgr.PrepareAPMAgent(config.mLanguage, config.mAppId, std::string(mEcsMeta.GetRegionID()), config.mAgentVersion, agentPath);
     if (!res) {
         // TODO @qianlu.kk send alarm ...
         return false;
     }
 
     // setup exec-hook
-    res = mPackageMgr.InstallExecHook();
+    res = mPackageMgr.InstallExecHook(std::string(mEcsMeta.GetRegionID()));
     if (!res) {
         // TODO @qianlu.kk send alarm ...
         return false;
     }
 
     for (auto& rule : config.mMatchRules) {
-        std::vector<int> pids;
-        int ret = findPidsByRule(rule, pids);
-        if (ret) {
-            // failed to find pids ...
-            LOG_WARNING(sLogger, ("failed to find pids for rule", ""));
+        bool res = mAttachMgr.DoAttach(rule, agentPath, config);
+        if (!res) {
             // TODO @qianlu.kk send alarm ...
-            continue;
-        }
-        if (pids.empty()) {
-            // do we need report ??
-            continue;
-        }
-
-        for (int pid : pids) {
-            bool res = mAttachMgr.DoAttach(rule, agentPath, config, pid);
-            if (!res) {
-                // TODO @qianlu.kk send alarm ...
-            }
         }
     }
     return true;
-}
-
-int ApmInjectRunner::findPidsByRule(MatchRule& rule, std::vector<int>& pids) {
-    switch (rule.mRuleType) {
-        case RuleType::kCwd: {
-            /* code */
-            break;
-        }
-        default:
-            break;
-    }
-
-    return 0;
 }
 
 // std::vector<Proc> ApmInjectRunner::listAllProcess() {}

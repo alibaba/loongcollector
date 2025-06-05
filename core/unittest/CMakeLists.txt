@@ -26,6 +26,7 @@ if (MSVC)
 endif ()
 
 macro(add_core_subdir)
+    add_subdirectory(apm)
     add_subdirectory(app_config)
     add_subdirectory(batch)
     add_subdirectory(checkpoint)
