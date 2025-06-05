@@ -211,17 +211,16 @@ void HostMonitorInputRunner::PushNextTimerEvent(const std::chrono::steady_clock:
 
 void HostMonitorInputRunner::AddHostLabels(PipelineEventGroup& group) {
 #ifdef __ENTERPRISE__
-    auto userID = group.GetSourceBuffer()->CopyString(EnterpriseConfigProvider::GetInstance()->GetAliuidSet());
+    const auto* entity = InstanceIdentity::Instance()->GetEntity();
     for (auto& e : group.MutableEvents()) {
         if (!e.Is<MetricEvent>()) {
             continue;
         }
         auto& metricEvent = e.Cast<MetricEvent>();
-        const auto* entity = InstanceIdentity::Instance()->GetEntity();
         if (entity != nullptr) {
             metricEvent.SetTagNoCopy(DEFAULT_INSTANCE_ID_LABEL, entity->GetHostID());
+            metricEvent.SetTagNoCopy(DEFAULT_USER_ID_LABEL, entity->GetEcsUserID());
         }
-        metricEvent.SetTagNoCopy(DEFAULT_USER_ID_LABEL, StringView(userID.data, userID.size));
     }
 #else
     auto hostIP = group.GetSourceBuffer()->CopyString(LoongCollectorMonitor::mIpAddr);

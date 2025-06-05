@@ -18,6 +18,8 @@
 
 #include <filesystem>
 
+#include "common/StringView.h"
+
 namespace logtail {
 
 extern std::filesystem::path PROCESS_DIR;
@@ -25,10 +27,10 @@ const extern std::filesystem::path PROCESS_STAT;
 const extern int64_t SYSTEM_HERTZ;
 
 #ifdef __ENTERPRISE__
-const extern std::string DEFAULT_INSTANCE_ID_LABEL;
-const extern std::string DEFAULT_USER_ID_LABEL;
+inline constexpr StringView DEFAULT_INSTANCE_ID_LABEL = "instance_id";
+inline constexpr StringView DEFAULT_USER_ID_LABEL = "user_id";
 #else
-const extern std::string DEFAULT_HOST_IP_LABEL;
+inline constexpr StringView DEFAULT_HOST_IP_LABEL = "host_ip";
 #endif
 
 } // namespace logtail
