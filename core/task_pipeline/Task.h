@@ -22,6 +22,7 @@
 
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
+#include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail {
 
@@ -29,12 +30,16 @@ class Task {
 public:
     virtual ~Task() {}
 
+    [[nodiscard]] TaskPipelineContext& GetContext() const { return *mContext; }
+    void SetContext(TaskPipelineContext& context) { mContext = &context; }
+
     virtual const std::string& Name() const = 0;
     virtual bool Init(const Json::Value& config) = 0;
     virtual void Start() = 0;
     virtual void Stop(bool isRemoving) = 0;
 
 protected:
+    TaskPipelineContext* mContext;
     Logger::logger mLogger = sLogger;
     AlarmManager* mAlarm = AlarmManager::GetInstance();
 };

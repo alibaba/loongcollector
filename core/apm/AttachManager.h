@@ -40,7 +40,7 @@ public:
      */
     bool DoAttach(MatchRule& rule, const std::string& agentPath, AttachConfig& config, int pid);
 
-    bool DoDetach(AttachConfig& config, int pid);
+    // bool DoDetach(AttachConfig& config, int pid);
 
 private:
 

@@ -28,6 +28,7 @@
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 #include "magic_enum.hpp"
+#include "common/StringTools.h"
 
 namespace logtail::apm {
 
@@ -37,6 +38,7 @@ const char* kDefaultExecHookDir = "/opt/.arms/lib/exec-hook";
 const char* kDefaultExecHookName = "libexec-hook.so";
 const char* kDefaultSoFullPath = "/opt/.arms/lib/exec-hook/libexec-hook.so";
 const char* kDefaultPreloadConfigFile = "/etc/ld.so.preload";
+const char* kDefaultJavaAgentDir = "/opt/.arms/apm-java-agent";
 
 // Constants
 const std::string kDefaultArmsOssPublicEndpointPattern = "https://arms-apm-${REGION_ID}.oss-${REGION_ID}.aliyuncs.com";
@@ -44,8 +46,9 @@ const std::string kDefaultArmsOssInternalEndpointPattern = "https://arms-apm-${R
 const std::string kManifestExt = ".manifest";
 const char kHiddenFilePrefix = '.';
 const int kDefaultDownloadTimeout = 30; // seconds
+const std::string kPlaceHolderRegionId = "${REGION_ID}";
 
-std::regex pattern(R"(Url: (.+)\nEtag: (.+)\nLastModified: (.+))");
+std::regex gPattern(R"(Url: (.+)\nEtag: (.+)\nLastModified: (.+))");
 
 // Read manifest file
 bool ReadManifest(const std::string& dir, const std::string& filename, std::string& lastUrl, std::string& lastEtag, std::string& lastModified) {
@@ -61,9 +64,8 @@ bool ReadManifest(const std::string& dir, const std::string& filename, std::stri
     std::string content = buffer.str();
     file.close();
 
-    std::regex pattern(R"(Url: (.+)\nEtag: (.+)\nLastModified: (.+))");
     std::smatch matches;
-    if (std::regex_search(content, matches, pattern) && matches.size() == 4) {
+    if (std::regex_search(content, matches, gPattern) && matches.size() == 4) {
         lastUrl = matches[1].str();
         lastEtag = matches[2].str();
         lastModified = matches[3].str();
@@ -119,6 +121,7 @@ bool InitSharedLibraryDir() {
             return false;
         }
     }
+    return true;
 }
 
 std::string GetWorkingPath() {
@@ -168,48 +171,116 @@ bool PackageManager::InstallExecHook() {
     return true;
 }
 
+int ClearDirectory(const std::string& dirPath) {
+    try {
+        for (const auto& entry : fs::directory_iterator(dirPath)) {
+            if (fs::is_regular_file(entry)) {
+                fs::remove(entry.path());
+            } else if (fs::is_directory(entry)) {
+                fs::remove_all(entry.path());
+            }
+        }
+        return 0;
+    } catch (const fs::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("Failed to clear directory: ", std::string(e.what())));
+        return 1;
+    }
+}
+
 bool PackageManager::downloadFromOss(const std::string& url, const std::string& dir, const std::string& filename, bool& changed) {
-    std::string lastUrl, lastEtag, lastModified;
+    std::string lastUrl;
+    std::string lastEtag;
+    std::string lastModified;
     bool res = ReadManifest(dir, filename, lastUrl, lastEtag, lastModified);
     LOG_DEBUG(sLogger, ("ReadManifest res", res)("dir", dir)("fileName", filename)("url", lastUrl)("etag", lastEtag)("lastModified", lastModified));
+    
+    // url changed ...
+    if (url != lastUrl) {
+        std::string manifestFile = GetManifestFile(filename);
+        int ret = ClearDirectory(dir);
+        if (ret) {
+            LOG_ERROR(sLogger, ("Failed to clean dir: ", dir));
+            // do we need send alarm ???
+        }
+    }
+
+    std::string savedPath = fs::path(dir) / filename;
 
     std::unique_ptr<HttpRequest> request;
 
-    // FILE* file = fopen(output.c_str(), "wb");
-    // HttpResponse res((void*)file,
-    //                  [](void* pf) {
-    //                      FILE* file = static_cast<FILE*>(pf);
-    //                      fclose(file);
-    //                  },
-    //                  [](char* ptr, size_t size, size_t nmemb, void* stream) {
-    //                      return fwrite((void*)ptr, size, nmemb, (FILE*)stream);
-    //                  });
+    FILE* file = fopen(savedPath.c_str(), "wb");
+    HttpResponse response((void*)file,
+                     [](void* pf) {
+                         FILE* file = static_cast<FILE*>(pf);
+                         fclose(file);
+                     },
+                     [](char* ptr, size_t size, size_t nmemb, void* stream) {
+                         return fwrite((void*)ptr, size, nmemb, (FILE*)stream);
+                     });
 
-    // request = std::make_unique<HttpRequest>(
-    //     "GET", true, url, 443, "", "", std::map<std::string, std::string>(), "", 10, 3, true);
-    // bool success = SendHttpRequest(std::move(request), res);
-    // if (!success) {
-    //     return false;
-    // }
+    std::map<std::string, std::string> headers;
+    if (lastEtag.size()) {
+        headers.insert({"If-None-Match", lastEtag});
+    }
+    if (lastModified.size()) {
+        headers.insert({"If-Modified-Since", lastModified});
+    }
+    request = std::make_unique<HttpRequest>(
+        "GET", true, url, 443, "", "", headers, "", 10, 3, true);
+    bool success = SendHttpRequest(std::move(request), response);
+    if (!success) {
+        return false;
+    }
 
-    // // get signature and md5
-    // // or manifest
-    // // auto headers = res.GetHeader();
+    // get signature and md5
+    // or manifest
+    // auto headers = res.GetHeader();
+    if (response.GetStatusCode() == 304) {
+        LOG_DEBUG(sLogger, ("not modified", ""));
+        return true;
+    }
 
-    // if (res.GetStatusCode() < 200 || res.GetStatusCode() >= 300) {
-    //     return false;
-    // }
+    if (response.GetStatusCode() == 200) {
+        // dump manifest
+        std::string etag;
+        std::string lastModified;
+        auto it = response.GetHeader().find("Etag");
+        if (it != response.GetHeader().end()) {
+            // not found 
+            etag = it->second;
+        }
+        
+        it = response.GetHeader().find("Last-Modified");
+        if (it != response.GetHeader().end()) {
+            // not found
+            lastModified = it->second;
+        }
+        lastModified = it->second;
+        return DumpManifest(dir, filename, url, etag, lastModified) == 0;
+    }
 
-    return true;
+    LOG_WARNING(sLogger, ("failed to download, statusCode", response.GetStatusCode())("filename", filename)("url", url));
+
+    return false;
 }
 
-bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& version, std::string& agentJarPath) {
+std::string GetArmsJavaAgentDownloadUrl(const std::string& region, const std::string& version) {
+    auto endpoint = GetArmsOssDefaultEndpoint(region, true);
+    ReplaceString(endpoint, kPlaceHolderRegionId, region);
+    return endpoint;
+
+}
+
+bool PackageManager::PrepareAPMAgent(APMLanguage lang, const std::string& region, const std::string& version) {
     if (lang != APMLanguage::kJava) {
         LOG_WARNING(sLogger, ("language not supported", magic_enum::enum_name(lang)));
         return false;
     }
 
     // download from oss ...
+    auto url = GetArmsJavaAgentDownloadUrl(region, version);
+    bool changed = false;
+    downloadFromOss(url, kDefaultJavaAgentDir, "", changed);
     return true;
 }
 

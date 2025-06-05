@@ -37,7 +37,7 @@ public:
     bool UninstallExecHook();
 
     // download and un-zip to target path ...
-    bool PrepareAPMAgent(APMLanguage lang, const std::string& version, std::string& agentJarPath);
+    bool PrepareAPMAgent(APMLanguage lang, const std::string& region, const std::string& version);
 
     bool InstallExecHook();
 

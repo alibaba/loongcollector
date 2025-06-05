@@ -22,6 +22,7 @@
 
 #include "apm/AttachManager.h"
 #include "logger/Logger.h"
+#include "common/StringTools.h"
 
 namespace logtail::apm {
 
@@ -29,6 +30,10 @@ namespace fs = std::filesystem;
 
 const std::string kRuntimeConfigFile = ".arms.rc";
 const std::string kRuntimePidFile = ".arms.pid";
+const std::string kPlaceholderLicenseKey = "${licenseKey}";
+const std::string kPlaceholderAgentPath = "${path_to_agent_bootstrap}";
+const std::string kPlaceholderAppName = "${appName}";
+
 const std::string kRuntimeConfigTemplate = R"(
 -javaagent:${path_to_agent_bootstrap}
 -Darms.licenseKey=${licenseKey}
@@ -36,23 +41,13 @@ const std::string kRuntimeConfigTemplate = R"(
 -Darms.agent.env=ECS_AUTO
 )";
 
-
-std::string ReplaceAll(std::string str, const std::string& from, const std::string& to) {
-    size_t startPos = 0;
-    while ((startPos = str.find(from, startPos)) != std::string::npos) {
-        str.replace(startPos, from.length(), to);
-        startPos += to.length();
-    }
-    return str;
-}
-
 std::string BuildRuntimeConfig(const std::string& agentJarPath, 
                                const std::string& licenseKey, 
                                const std::string& appName) {
     std::string content = kRuntimeConfigTemplate;
-    content = ReplaceAll(content, "${path_to_agent_bootstrap}", agentJarPath);
-    content = ReplaceAll(content, "${licenseKey}", licenseKey);
-    content = ReplaceAll(content, "${appName}", appName);
+    ReplaceString(content, kPlaceholderAgentPath, agentJarPath);
+    ReplaceString(content, kPlaceholderLicenseKey, licenseKey);
+    ReplaceString(content, kPlaceholderAppName, appName);
     return content;
 }
 

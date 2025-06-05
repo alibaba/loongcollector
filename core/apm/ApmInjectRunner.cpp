@@ -16,23 +16,44 @@
 
 #include "apm/ApmInjectRunner.h"
 
+#include "MachineInfoUtil.h"
 #include "apm/Types.h"
 #include "logger/Logger.h"
 
 namespace logtail::apm {
 
 void ApmInjectRunner::Init() {
+    if (mStarted) {
+        return;
+    }
     mThreadPool = std::make_unique<ThreadPool>(1);
+    mThreadPool->Start();
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (!FetchECSMeta(mEcsMeta)) {
+        LOG_WARNING(sLogger, ("failed to fetch ecs meta", ""));
+    }
+#endif
+    mStarted = true;
 }
 
 void ApmInjectRunner::Stop() {
+    if (!mStarted) {
+        return;
+    }
+    std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
+    if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {
+        LOG_ERROR(sLogger, ("apm inject runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
+    } else {
+        LOG_INFO(sLogger, ("apm inject runner", "stop successfully"));
+    }
+    mStarted = false;
 }
 
 bool ApmInjectRunner::HasRegisteredPlugins() const {
     return true;
 }
 
-bool ApmInjectRunner::DoAttach(AttachConfig& config) {
+bool ApmInjectRunner::DoAttach(const TaskPipelineContext* ctx, AttachConfig& config) {
     // re-try queue
     // store in map ...
 

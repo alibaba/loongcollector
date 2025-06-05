@@ -20,12 +20,24 @@ namespace logtail::apm {
 class AttachManagerUnittest : public testing::Test {
 public:
     void TestInit() {}
+    void TestDownloadJavaAgent() {}
+    void TestDownloadPythonAgent() {}
+    void TestDownloadHookLib() {}
+    void TestLoadHookLib() {}
+    void TestAttachJavaAgent() {}
+    void TestMatchProcesses() {}
 
 private:
     AttachManager mMgr;
 };
 
 UNIT_TEST_CASE(AttachManagerUnittest, TestInit);
+UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadJavaAgent);
+UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadPythonAgent);
+UNIT_TEST_CASE(AttachManagerUnittest, TestDownloadHookLib);
+UNIT_TEST_CASE(AttachManagerUnittest, TestLoadHookLib);
+UNIT_TEST_CASE(AttachManagerUnittest, TestAttachJavaAgent);
+UNIT_TEST_CASE(AttachManagerUnittest, TestMatchProcesses);
 
 } // namespace logtail::apm
 

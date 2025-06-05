@@ -26,11 +26,13 @@
 #include "apm/AttachManager.h"
 #include "apm/PackageManager.h"
 #include "apm/Types.h"
-#include "collection_pipeline/CollectionPipelineContext.h"
+#include "task_pipeline/TaskPipelineContext.h"
 #include "common/ProcParser.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
 #include "common/ThreadPool.h"
+#include "task_pipeline/TaskPipelineContext.h"
+#include "common/MachineInfoUtil.h"
 
 namespace logtail::apm {
 
@@ -55,14 +57,18 @@ public:
     [[nodiscard]] bool HasRegisteredPlugins() const override;
     void EventGC() override {}
 
-    bool DoAttach(AttachConfig& config);
+    bool DoAttach(const TaskPipelineContext* ctx, AttachConfig& config);
 
 private:
     int findPidsByRule(MatchRule& rule, std::vector<int>& pids);
 
+    // pipeline name ==> AttachConfig
+
     AttachManager mAttachMgr;
     PackageManager mPackageMgr;
     std::unique_ptr<ThreadPool> mThreadPool;
+    std::atomic_bool mStarted = false;
+    ECSMeta mEcsMeta;
 };
 
 } // namespace logtail::apm

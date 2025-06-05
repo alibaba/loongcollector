@@ -21,26 +21,30 @@
 #include <memory>
 
 #include "json/json.h"
+#include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail::apm {
 
-enum APMLanguage {
+enum class APMLanguage {
     kJava,
     kPython,
     kGolang,
+    kMax
 };
 
-enum Operation {
+enum class RuleOperation {
     kEq,
+    kMax,
 };
 
-enum RuleType {
+enum class RuleType {
     kCwd,
+    kMax,
 };
 
 struct MatchRule {
     RuleType mRuleType;
-    Operation mOperation;
+    RuleOperation mOperation;
     std::string mVal;
 };
 
@@ -56,6 +60,6 @@ struct AttachConfig {
     std::vector<MatchRule> mMatchRules;
 };
 
-bool InitObserverNetworkOption(const Json::Value& config, std::unique_ptr<AttachConfig>& attachConfig);
+bool InitApmAttachOption(const TaskPipelineContext* ctx, const Json::Value& config, std::unique_ptr<AttachConfig>& attachConfig, const std::string& inputType);
 
 }
