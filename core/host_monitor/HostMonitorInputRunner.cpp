@@ -23,17 +23,28 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
+#include "common/MachineInfoUtil.h"
+#include "common/StringView.h"
 #include "common/timer/Timer.h"
+#include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
+#include "models/MetricEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/Monitor.h"
 #include "runner/ProcessorRunner.h"
+
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 DEFINE_FLAG_INT32(host_monitor_thread_pool_size, "host monitor thread pool size", 3);
 
@@ -170,6 +181,7 @@ void HostMonitorInputRunner::ScheduleOnce(const std::chrono::steady_clock::time_
                 sLogger,
                 ("host monitor", "collect data")("collector", config.mCollectorName)("size", group.GetEvents().size()));
             if (group.GetEvents().size() > 0) {
+                AddHostLabels(group);
                 bool result = ProcessorRunner::GetInstance()->PushQueue(
                     config.mProcessQueueKey, config.mInputIndex, std::move(group));
                 if (!result) {
@@ -195,6 +207,31 @@ void HostMonitorInputRunner::PushNextTimerEvent(const std::chrono::steady_clock:
     }
     auto event = std::make_unique<HostMonitorTimerEvent>(nextExecTime, config);
     Timer::GetInstance()->PushEvent(std::move(event));
+}
+
+void HostMonitorInputRunner::AddHostLabels(PipelineEventGroup& group) {
+#ifdef __ENTERPRISE__
+    const auto* entity = InstanceIdentity::Instance()->GetEntity();
+    for (auto& e : group.MutableEvents()) {
+        if (!e.Is<MetricEvent>()) {
+            continue;
+        }
+        auto& metricEvent = e.Cast<MetricEvent>();
+        if (entity != nullptr) {
+            metricEvent.SetTagNoCopy(DEFAULT_INSTANCE_ID_LABEL, entity->GetHostID());
+            metricEvent.SetTagNoCopy(DEFAULT_USER_ID_LABEL, entity->GetEcsUserID());
+        }
+    }
+#else
+    auto hostIP = group.GetSourceBuffer()->CopyString(LoongCollectorMonitor::mIpAddr);
+    for (auto& e : group.MutableEvents()) {
+        if (!e.Is<MetricEvent>()) {
+            continue;
+        }
+        auto& metricEvent = e.Cast<MetricEvent>();
+        metricEvent.SetTagNoCopy(DEFAULT_HOST_IP_LABEL, StringView(hostIP.data, hostIP.size));
+    }
+#endif
 }
 
 } // namespace logtail
