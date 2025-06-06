@@ -20,6 +20,7 @@
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/ProcessCollector.h"
 
 namespace logtail {
 
@@ -69,6 +70,21 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     }
     if (enableCPU) {
         mCollectors.push_back(CPUCollector::sName);
+    }
+
+    bool enableProcess = true;
+    if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableProcess) {
+        mCollectors.push_back(ProcessCollector::sName);
     }
     return true;
 }
