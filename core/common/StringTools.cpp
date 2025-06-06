@@ -366,4 +366,54 @@ bool IsInt(const char* sz) {
     return ok;
 }
 
+template<typename UnaryPredicate>
+std::string trimCopy(const std::string &str, UnaryPredicate pred, bool left, bool right) {
+    size_t end = str.size();
+    size_t st = 0;
+    const char *val = str.data();
+
+    if (left) {
+        while (st < end && pred(val[st])) {
+            st++;
+        }
+    }
+    if (right) {
+        while (st < end && pred(val[end - 1])) {
+            end--;
+        }
+    }
+    return (0 < st || end < str.size()) ? str.substr(st, end - st) : str;
+}
+
+std::string Trim(const std::string &str, const std::string &trimCharacters, bool trimLeft, bool trimRight) {
+    return trimCopy(str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
+}
+
+std::vector<std::string> split(const std::string &src, const std::string &delim, const SplitOpt &opt) {
+    std::vector<std::string> result;
+    if (src.empty() || delim.empty()) {
+        if (!src.empty()) {
+            result = {src};
+        }
+    } else {
+        auto pushToResult = [&](std::string tmp) {
+            if (opt.bTrim) {
+                tmp = TrimSpace(tmp); 
+            }
+            if (opt.enableEmptyLine || !tmp.empty()) {
+                result.push_back(tmp);
+            }
+        };
+        size_t index, pre_index = 0;
+        while ((index = src.find_first_of(delim, pre_index)) != std::string::npos) {
+            pushToResult(src.substr(pre_index, index - pre_index));
+            pre_index = index + 1;
+        }
+        if (pre_index < src.size()) {
+            pushToResult(src.substr(pre_index));
+        }
+    }
+    return result;
+}
+
 } // namespace logtail
