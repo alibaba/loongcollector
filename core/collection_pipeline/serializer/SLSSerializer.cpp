@@ -21,6 +21,7 @@
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
+#include "common/Logger.h"
 #include "common/compression/CompressType.h"
 #include "constants/SpanConstants.h"
 #include "models/MetricValue.h"
@@ -342,7 +343,7 @@ void SLSEventGroupSerializer::SerializeLogEvent(LogGroupSerializer& serializer,
 // event: {"labels": {"label1": "value1", "label2": "value2"}, "value": 123}
 // result:
 //   __time__: 1234567890
-//   content: 
+//   content:
 //      __label__: label1#$#value1|label2#$#value2
 //      __time_nano__: 1234567890
 //      __name__: value
@@ -368,6 +369,9 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
         }
         if (e.Is<UntypedSingleValue>()) {
             if (metricEventContentCache[i].mMetricEventContentCache.empty()) {
+                LOG_ERROR(sLogger,
+                          ("metric event single value size mismatch", "should never happen")(
+                              "config", mFlusher->GetContext().GetConfigName())("expected", 1)("actual", 0));
                 continue;
             }
             serializer.StartToAddLog(logSZ[i]);
@@ -380,6 +384,10 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
             if (metricEventContentCache[i].mMetricEventContentCache.size() != multiValue->ValuesSize()) {
+                LOG_ERROR(sLogger,
+                          ("metric event multi value size mismatch", "should never happen")(
+                              "config", mFlusher->GetContext().GetConfigName())("expected", multiValue->ValuesSize())(
+                              "actual", metricEventContentCache[i].mMetricEventContentCache.size()));
                 continue;
             }
             serializer.StartToAddLog(logSZ[i]);
