@@ -42,8 +42,12 @@ int32_t JsonLogFileReader::RemoveLastIncompleteLog(char* buffer,
             endIdx = pos - buffer;
         }
         // advance if json is valid or impossible to be valid
-        beginIdx = endIdx + 1;
         buffer[endIdx] = '\0';
+        if (endIdx < size) {
+            beginIdx = endIdx + 1;
+        } else {
+            beginIdx = size;
+        }
     } while (beginIdx < size);
     readBytes = beginIdx;
 
