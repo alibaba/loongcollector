@@ -248,7 +248,6 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             string res, errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(
                 CreateBatchedMultiValueMetricEvents(false, 0, false, false, true, true), res, errorMsg));
-            std::cout << errorMsg << std::endl;
             sls_logs::LogGroup logGroup;
             APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 

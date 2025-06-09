@@ -141,7 +141,8 @@ private:
                                                                  SLSClientManager::AuthType type,
                                                                  SLSSenderQueueItem* item,
                                                                  const std::string& subPath) const;
-    bool ShouldGroupBatch();
+    bool IsRawSLSTelemetryType() const;
+    bool IsMetricsTelemetryType() const;
 
     std::string mSubpath;
 

@@ -340,8 +340,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // Logstore
-    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS
-        || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE) {
+    if (IsRawSLSTelemetryType()) {
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -506,7 +505,10 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
-    if (!mBatcher.Init(itr ? *itr : Json::Value(), this, strategy, ShouldGroupBatch())) {
+    if (!mBatcher.Init(itr ? *itr : Json::Value(),
+                       this,
+                       strategy,
+                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty() && IsMetricsTelemetryType())) {
         // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
         // enable group batch
         return false;
@@ -1318,9 +1320,13 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
-bool FlusherSLS::ShouldGroupBatch() {
-    return !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
-        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
+bool FlusherSLS::IsRawSLSTelemetryType() const {
+    return mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS
+        || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE;
+}
+
+bool FlusherSLS::IsMetricsTelemetryType() const {
+    return mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
         && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE
         && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST;
 }
