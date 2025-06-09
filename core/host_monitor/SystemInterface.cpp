@@ -18,11 +18,13 @@
 
 #include <chrono>
 #include <mutex>
-#include <thread>
 #include <tuple>
 #include <utility>
 
+#include "boost/type_index.hpp"
+
 #include "common/Flags.h"
+#include "common/TimeKeeper.h"
 #include "logger/Logger.h"
 #ifdef __linux__
 #include "host_monitor/LinuxSystemInterface.h"
@@ -31,7 +33,7 @@
 #include "unittest/host_monitor/MockSystemInterface.h"
 #endif
 
-DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 500);
+DEFINE_FLAG_INT32(system_interface_default_cache_ttl, "system interface default cache ttl, ms", 1000);
 
 namespace logtail {
 
@@ -48,7 +50,7 @@ SystemInterface* SystemInterface::GetInstance() {
 
 bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
     // SystemInformation is static and will not be changed. So cache will never be expired.
-    if (mSystemInformationCache.collectTime.time_since_epoch().count() > 0) {
+    if (mSystemInformationCache.collectTimeMs > 0) {
         systemInfo = mSystemInformationCache;
         return true;
     }
@@ -94,8 +96,7 @@ bool SystemInterface::GetProcessInformation(pid_t pid, ProcessInformation& proce
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {
-    if (cache.GetWithTimeout(
-            info, std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}, args...)) {
+    if (cache.GetWithTimeout(info, INT32_FLAG(system_interface_default_cache_ttl), args...)) {
         return true;
     }
     bool status = std::forward<F>(func)(info, args...);
@@ -110,36 +111,40 @@ bool SystemInterface::MemoizedCall(
 
 template <typename InfoT, typename... Args>
 bool SystemInterface::SystemInformationCache<InfoT, Args...>::GetWithTimeout(InfoT& info,
-                                                                             std::chrono::milliseconds timeout,
+                                                                             int64_t timeout,
                                                                              Args... args) {
-    constexpr auto interval = std::chrono::milliseconds{10};
-    auto getStartTime = std::chrono::steady_clock::now();
-    while (true) {
-        auto now = std::chrono::steady_clock::now();
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            auto it = mCache.find(std::make_tuple(args...));
-            if (it != mCache.end()) {
-                if (now - it->second.first.collectTime < mTTL) {
-                    info = it->second.first; // copy to avoid external modify
-                    return true;
-                }
-                if (!it->second.second) {
-                    // the cache is stale and no thread is updating, will update by this thread
-                    it->second.second.store(true);
-                    return false;
-                }
-            } else {
-                // no data in cache, directly update
-                mCache[std::make_tuple(args...)] = std::make_pair(InfoT{}, true);
-                return false;
-            }
+    auto now = TimeKeeper::GetInstance()->NowMs();
+    std::unique_lock<std::mutex> lock(mMutex);
+    auto it = mCache.find(std::make_tuple(args...));
+    if (it != mCache.end()) {
+        if (now - it->second.first.collectTimeMs < mTTL) {
+            info = it->second.first; // copy to avoid external modify
+            return true;
         }
-        // the cache is stale and other threads is updating, wait for it
-        std::this_thread::sleep_for(interval);
-        if (now - getStartTime > timeout) {
+        if (!it->second.second) {
+            // the cache is stale and no thread is updating, will update by this thread
+            it->second.second.store(true);
             return false;
         }
+    } else {
+        // no data in cache, directly update
+        mCache[std::make_tuple(args...)] = std::make_pair(InfoT{}, true);
+        return false;
+    }
+    // the cache is stale and other threads is updating, wait for it
+    auto status
+        = mConditionVariable.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout));
+    if (status == std::cv_status::timeout) {
+        LOG_ERROR(sLogger,
+                  ("system information update", "too slow")("type", boost::typeindex::type_id<InfoT>().pretty_name()));
+        return false; // timeout
+    }
+    // query again
+    now = TimeKeeper::GetInstance()->NowMs();
+    it = mCache.find(std::make_tuple(args...));
+    if (it != mCache.end() && now - it->second.first.collectTimeMs < mTTL) {
+        info = it->second.first; // copy to avoid external modify
+        return true;
     }
     return false;
 }
@@ -148,20 +153,65 @@ template <typename InfoT, typename... Args>
 bool SystemInterface::SystemInformationCache<InfoT, Args...>::Set(InfoT& info, Args... args) {
     std::lock_guard<std::mutex> lock(mMutex);
     mCache[std::make_tuple(args...)] = std::make_pair(info, false);
+    mConditionVariable.notify_all();
     return true;
 }
 
 template <typename InfoT, typename... Args>
 bool SystemInterface::SystemInformationCache<InfoT, Args...>::GC() {
     std::lock_guard<std::mutex> lock(mMutex);
-    auto now = std::chrono::steady_clock::now();
+    auto now = TimeKeeper::GetInstance()->NowMs();
     for (auto it = mCache.begin(); it != mCache.end();) {
-        if (now - it->second.first.collectTime > mTTL) {
+        if (now - it->second.first.collectTimeMs > mTTL) {
             it = mCache.erase(it);
         } else {
             ++it;
         }
     }
+    return true;
+}
+
+template <typename InfoT>
+bool SystemInterface::SystemInformationCache<InfoT>::GetWithTimeout(InfoT& info, int64_t timeout) {
+    auto now = TimeKeeper::GetInstance()->NowMs();
+    std::unique_lock<std::mutex> lock(mMutex);
+    if (mCache.first.collectTimeMs > 0 && now - mCache.first.collectTimeMs < mTTL) {
+        info = mCache.first; // copy to avoid external modify
+        return true;
+    }
+    if (!mCache.second) {
+        // the cache is stale and no thread is updating, will update by this thread
+        mCache.second.store(true);
+        return false;
+    }
+    // the cache is stale and other threads is updating, wait for it
+    auto status
+        = mConditionVariable.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout));
+    if (status == std::cv_status::timeout) {
+        LOG_ERROR(sLogger,
+                  ("system information update", "too slow")("type", boost::typeindex::type_id<InfoT>().pretty_name()));
+        return false; // timeout
+    }
+    // query again
+    now = TimeKeeper::GetInstance()->NowMs();
+    if (now - mCache.first.collectTimeMs < mTTL) {
+        info = mCache.first; // copy to avoid external modify
+        return true;
+    }
+    return false;
+}
+
+template <typename InfoT>
+bool SystemInterface::SystemInformationCache<InfoT>::Set(InfoT& info) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mCache = std::make_pair(info, false);
+    mConditionVariable.notify_all();
+    return true;
+}
+
+template <typename InfoT>
+bool SystemInterface::SystemInformationCache<InfoT>::GC() {
+    // no need to GC for single cache
     return true;
 }
 

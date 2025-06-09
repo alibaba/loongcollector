@@ -16,6 +16,7 @@
 
 #include <thread>
 
+#include "common/TimeKeeper.h"
 #include "host_monitor/SystemInterface.h"
 
 namespace logtail {
@@ -25,6 +26,7 @@ struct MockInformation : public BaseInformation {
 };
 
 template class SystemInterface::template SystemInformationCache<MockInformation>;
+template class SystemInterface::template SystemInformationCache<MockInformation, int>;
 
 class MockSystemInterface : public SystemInterface {
 public:
@@ -36,7 +38,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemInfo.collectTime = std::chrono::steady_clock::now();
+        systemInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
         ++mMockCalledCount;
         return true;
     }
@@ -45,7 +47,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuInfo.collectTime = std::chrono::steady_clock::now();
+        cpuInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
         ++mMockCalledCount;
         return true;
     }
@@ -54,7 +56,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processListInfo.collectTime = std::chrono::steady_clock::now();
+        processListInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
         ++mMockCalledCount;
         return true;
     }
@@ -63,13 +65,17 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processInfo.collectTime = std::chrono::steady_clock::now();
+        processInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
         ++mMockCalledCount;
         return true;
     }
 
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class SystemInterfaceUnittest;
+#endif
 };
 
 } // namespace logtail

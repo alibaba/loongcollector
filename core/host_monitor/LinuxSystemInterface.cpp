@@ -24,6 +24,7 @@ using namespace std::chrono;
 
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeKeeper.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
 
@@ -72,9 +73,10 @@ bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInf
                             ("failed to get system boot time", "use current time instead")("error msg", cpuMetric[1]));
                 return false;
             }
+            break;
         }
     }
-    systemInfo.collectTime = steady_clock::now();
+    systemInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
     return true;
 }
 
@@ -115,7 +117,7 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
             cpuInfo.stats.push_back(cpuStat);
         }
     }
-    cpuInfo.collectTime = steady_clock::now();
+    cpuInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
     return true;
 }
 
@@ -126,8 +128,16 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
         return false;
     }
 
-    for (const auto& dirEntry :
-         std::filesystem::directory_iterator{PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied}) {
+    std::error_code ec;
+    for (auto it = std::filesystem::directory_iterator(
+             PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
+         it != std::filesystem::directory_iterator();
+         ++it) {
+        if (ec) {
+            LOG_ERROR(sLogger, ("failed to iterate process directory", PROCESS_DIR)("error", ec.message()));
+            return false;
+        }
+        const auto& dirEntry = *it;
         std::string dirName = dirEntry.path().filename().string();
         if (IsInt(dirName)) {
             pid_t pid{};
@@ -138,7 +148,7 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
             }
         }
     }
-    processListInfo.collectTime = steady_clock::now();
+    processListInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
     return true;
 }
 
@@ -150,7 +160,7 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
         return false;
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
-    processInfo.collectTime = steady_clock::now();
+    processInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
     return true;
 }
 
