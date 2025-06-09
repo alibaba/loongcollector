@@ -8,7 +8,7 @@ const (
 	entityMethodFieldName        = "__method__"
 	entityClusterIDFieldName     = "cluster_id"
 	entityClusterNameFieldName   = "cluster_name"
-	entityClusterRegionFieldName = "region"
+	entityClusterRegionFieldName = "region_id"
 	entityKindFieldName          = "kind"
 	entityNameFieldName          = "name"
 	entityCreationTimeFieldName  = "create_time"
