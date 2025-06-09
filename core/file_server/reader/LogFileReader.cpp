@@ -1570,7 +1570,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         int64_t lastReadPos = GetLastReadPos();
         nbytes = READ_BYTE
             ? ReadFile(mLogFileOp, stringMemory.data + lastCacheSize, READ_BYTE, lastReadPos, &truncateInfo)
-            : 0UL;
+            : (size_t)0;
         stringBuffer = stringMemory.data;
         bool allowRollback = true;
         // Only when there is no new log and not try rollback, then force read
@@ -1700,7 +1700,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         TruncateInfo* truncateInfo = nullptr;
         lastReadPos = GetLastReadPos();
         readCharCount
-            = READ_BYTE ? ReadFile(mLogFileOp, gbkBuffer + lastCacheSize, READ_BYTE, lastReadPos, &truncateInfo) : 0UL;
+            = READ_BYTE ? ReadFile(mLogFileOp, gbkBuffer + lastCacheSize, READ_BYTE, lastReadPos, &truncateInfo) : (size_t)0;
         // Only when there is no new log and not try rollback, then force read
         if (!tryRollback && readCharCount == 0) {
             allowRollback = false;

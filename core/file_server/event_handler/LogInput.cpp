@@ -380,9 +380,9 @@ void LogInput::ProcessLoop() {
         Event* ev = PopEventQueue();
         if (ev != NULL) {
             ++mEventProcessCount;
-            if (mIdleFlag)
+            if (mIdleFlag) {
                 delete ev;
-            else
+            } else
                 ProcessEvent(dispatcher, ev);
         } else {
             unique_lock<mutex> lock(mFeedbackMux);
