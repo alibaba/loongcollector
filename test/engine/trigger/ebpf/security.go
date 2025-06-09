@@ -132,7 +132,7 @@ func ExecuteShellScriptParallel(ctx context.Context, commandCnt int, tempFileNam
 		go func() {
 			result, err := setup.Env.ExecOnSource(ctx, command)
 			if err != nil {
-				logger.Error(context.Background(), "ASYNC_EXEC_FAILED", "message", fmt.Sprintf("Error executing command asynchronously: %w", err))
+				logger.Error(ctx, "ASYNC_EXEC_FAILED", "error", err, "message", "Error executing command asynchronously")
 				errChan <- fmt.Errorf("async exec failed: %w", err)
 				return
 			}
