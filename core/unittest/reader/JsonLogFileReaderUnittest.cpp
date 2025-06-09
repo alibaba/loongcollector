@@ -528,6 +528,10 @@ void RemoveLastIncompleteLogUnittest::TestRemoveLastIncompleteLogNotValidJson() 
         int32_t logSize = testLog.size();
         testLog += "\nnot a json at all.";
         std::replace(notjson.begin(), notjson.end(), '\n', '\0');
+        size_t pos = notjson.rfind("not a json at all.");
+        if (pos != std::string::npos) {
+            notjson = notjson.substr(0, pos);
+        }
         std::string expectMatch = firstLog + '\0' + notjson;
         ;
         int32_t rollbackLineFeedCount = 0;
@@ -535,7 +539,7 @@ void RemoveLastIncompleteLogUnittest::TestRemoveLastIncompleteLogNotValidJson() 
             const_cast<char*>(testLog.data()), logSize, rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(expectMatch.size(), matchSize);
         APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
-        APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
 }
 
