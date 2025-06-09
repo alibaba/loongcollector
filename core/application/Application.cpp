@@ -60,7 +60,6 @@
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
 #elif defined(_MSC_VER)
-#include "common/WindowsDaemonUtil.h"
 #include "direct.h"
 #endif
 #else
@@ -385,9 +384,9 @@ void Application::Exit() {
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
 
     TimeKeeper::GetInstance()->Stop();
-#if defined(__ENTERPRISE__) && defined(_MSC_VER)
-    ReleaseWindowsSignalObject();
-#endif
+// #if defined(_MSC_VER)
+//     ReleaseWindowsSignalObject();
+// #endif
     LOG_INFO(sLogger, ("exit", "bye!"));
     exit(0);
 }
