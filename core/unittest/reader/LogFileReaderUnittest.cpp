@@ -913,8 +913,6 @@ void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    std::cerr << '"' << logbuf.rawBuffer.size() << '"' << std::endl;
-    std::cerr << '"' << logbuf.rawBuffer << '"' << std::endl;
     APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
 }
 

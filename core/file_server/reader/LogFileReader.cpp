@@ -616,7 +616,6 @@ void LogFileReader::SetReadFromBeginning() {
 
 int32_t LogFileReader::ParseTime(const char* buffer, const std::string& timeFormat) {
     struct tm tm {};
-    memset(&tm, 0, sizeof(tm));
     long nanosecond = 0;
     int nanosecondLength = 0;
     const char* result = strptime_ns(buffer, timeFormat.c_str(), &tm, &nanosecond, &nanosecondLength);
