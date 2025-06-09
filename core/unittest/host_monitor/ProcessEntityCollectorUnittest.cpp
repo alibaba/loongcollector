@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thread>
+
+#include "common/Flags.h"
 #include "common/ProcParser.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
+
+DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 
 namespace logtail {
 
@@ -66,6 +71,8 @@ void ProcessEntityCollectorUnittest::TestGetSortProcessByCpu() const {
 
 void ProcessEntityCollectorUnittest::TestGetSortProcessByCpuFail() const {
     PROCESS_DIR = "/not_found_dir";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
     auto collector = ProcessEntityCollector();
     auto processes = vector<ExtendedProcessStatPtr>();
     collector.GetSortedProcess(processes, 3); // fist time will be ignored
@@ -107,6 +114,8 @@ void ProcessEntityCollectorUnittest::TestGetProcessStat() const {
 
 void ProcessEntityCollectorUnittest::TestGetProcessStatFail() const {
     PROCESS_DIR = "/not_found_dir";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
     auto collector = ProcessEntityCollector();
     auto pid = 1;
     bool isFirstCollect = false;
