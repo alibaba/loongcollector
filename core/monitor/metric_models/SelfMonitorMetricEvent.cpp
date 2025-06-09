@@ -29,9 +29,7 @@ const string METRIC_GO_KEY_LABELS = "labels";
 const string METRIC_GO_KEY_COUNTERS = "counters";
 const string METRIC_GO_KEY_GAUGES = "gauges";
 
-SelfMonitorMetricEvent::SelfMonitorMetricEvent(MetricsRecord* metricRecord) {
-    // category
-    mCategory = metricRecord->GetCategory();
+SelfMonitorMetricEvent::SelfMonitorMetricEvent(MetricsRecord* metricRecord) : mCategory(metricRecord->GetCategory()) {
     // labels
     for (auto item = metricRecord->GetLabels()->begin(); item != metricRecord->GetLabels()->end(); ++item) {
         pair<string, string> pair = *item;
@@ -44,24 +42,26 @@ SelfMonitorMetricEvent::SelfMonitorMetricEvent(MetricsRecord* metricRecord) {
         mLabels[pair.first] = value;
     }
     // counters
-    for (auto& item : metricRecord->GetCounters()) {
+    for (const auto& item : metricRecord->GetCounters()) {
         mCounters[item->GetName()] = item->GetValue();
     }
-    for (auto& item : metricRecord->GetTimeCounters()) {
+    for (const auto& item : metricRecord->GetTimeCounters()) {
         mCounters[item->GetName()] = item->GetValue();
     }
     // gauges
-    for (auto& item : metricRecord->GetIntGauges()) {
+    for (const auto& item : metricRecord->GetIntGauges()) {
         mGauges[item->GetName()] = item->GetValue();
     }
-    for (auto& item : metricRecord->GetDoubleGauges()) {
+    for (const auto& item : metricRecord->GetDoubleGauges()) {
         mGauges[item->GetName()] = item->GetValue();
     }
     CreateKey();
 }
 
 SelfMonitorMetricEvent::SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord) {
-    Json::Value labels, counters, gauges;
+    Json::Value labels;
+    Json::Value counters;
+    Json::Value gauges;
     string errMsg;
     ParseJsonTable(metricRecord.at(METRIC_GO_KEY_LABELS), labels, errMsg);
     if (!errMsg.empty()) {
@@ -120,7 +120,7 @@ SelfMonitorMetricEvent::SelfMonitorMetricEvent(const std::map<std::string, std::
 
 void SelfMonitorMetricEvent::CreateKey() {
     string key = "category:" + mCategory;
-    for (auto label : mLabels) {
+    for (const auto& label : mLabels) {
         key += (";" + label.first + ":" + label.second);
     }
     mKey = HashString(key);
@@ -138,10 +138,11 @@ void SelfMonitorMetricEvent::Merge(const SelfMonitorMetricEvent& event) {
         mIntervalsSinceLastSend = 0;
     }
     for (auto counter = event.mCounters.begin(); counter != event.mCounters.end(); counter++) {
-        if (mCounters.find(counter->first) != mCounters.end())
+        if (mCounters.find(counter->first) != mCounters.end()) {
             mCounters[counter->first] += counter->second;
-        else
+        } else {
             mCounters[counter->first] = counter->second;
+        }
     }
     for (auto gauge = event.mGauges.begin(); gauge != event.mGauges.end(); gauge++) {
         mGauges[gauge->first] = gauge->second;

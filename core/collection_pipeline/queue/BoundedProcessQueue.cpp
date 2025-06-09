@@ -72,14 +72,6 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void BoundedProcessQueue::SetPipelineForItems(const std::shared_ptr<CollectionPipeline>& p) const {
-    for (auto& item : mQueue) {
-        if (!item->mPipeline) {
-            item->mPipeline = p;
-        }
-    }
-}
-
 void BoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
     mUpStreamFeedbacks.clear();
     for (auto& item : feedbacks) {

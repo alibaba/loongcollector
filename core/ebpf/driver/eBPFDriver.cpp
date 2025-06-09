@@ -351,10 +351,10 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                      "process security: DynamicAttachBPFObject success\n");
             break;
         }
-        default:
+        default: {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[start plugin] unknown plugin type, please check. \n");
-            break;
+        }
     }
     gPluginStatus[int(arg->mPluginType)] = true;
     return 0;
@@ -438,10 +438,13 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
                      "network security: DynamicAttachBPFObject success\n");
             break;
         }
-        default:
+        case logtail::ebpf::PluginType::PROCESS_SECURITY: {
+            break;
+        }
+        default: {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[resume plugin] unknown plugin type, please check. \n");
-            break;
+        }
     }
     gPluginStatus[int(arg->mPluginType)] = true;
     return 0;
@@ -607,10 +610,10 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
         //     DeletePerfBuffers(pluginType);
         //     break;
         // }
-        default:
+        default: {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[stop plugin] unknown plugin type, please check. \n");
-            break;
+        }
     }
     return 0;
 }
@@ -648,11 +651,13 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
         //     }
         //     break;
         // }
-        case logtail::ebpf::PluginType::PROCESS_SECURITY:
-        default:
+        case logtail::ebpf::PluginType::PROCESS_SECURITY: {
+            break;
+        }
+        default: {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[suspend plugin] unknown plugin type, please check. \n");
-            break;
+        }
     }
     return 0;
 }

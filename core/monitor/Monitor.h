@@ -34,6 +34,9 @@ class LogGroup;
 }
 
 namespace logtail {
+#ifndef LOGTAIL_NO_TC_MALLOC
+extern time_t gLastTcmallocReleaseMemTime;
+#endif
 
 struct CpuStat {
 #if defined(__linux__)

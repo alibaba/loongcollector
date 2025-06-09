@@ -206,3 +206,101 @@ func TestProcessPodServiceLink(t *testing.T) {
 	log := collector.processPodServiceLink(objWrapper, "create")
 	assert.NotNilf(t, log, "log should not be nil")
 }
+
+func TestProcessEmptyPod(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.Pod{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processPodEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyService(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.Service{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processServiceEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyNode(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.Node{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processNodeEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyConfigMap(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.ConfigMap{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processConfigMapEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyNamespace(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.Namespace{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processNamespaceEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyPersistentVolume(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.PersistentVolume{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processPersistentVolumeEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}
+
+func TestProcessEmptyPersistentVolumeClaim(t *testing.T) {
+	data := k8smeta.ObjectWrapper{
+		Raw: &v1.PersistentVolumeClaim{},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	events := collector.processPersistentVolumeClaimEntity(&data, "Update")
+	assert.NotNil(t, events)
+	assert.Len(t, events, 1)
+}

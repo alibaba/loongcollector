@@ -63,6 +63,9 @@ string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
 string LoongCollectorMonitor::mStartTime;
+#ifndef LOGTAIL_NO_TC_MALLOC
+time_t gLastTcmallocReleaseMemTime = 0;
+#endif
 
 inline void CpuStat::Reset() {
 #if defined(__linux__)
@@ -201,6 +204,9 @@ void LogtailMonitor::Monitor() {
                 if (1 == mMemStat.mViolateNum) {
                     LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
                     LogInput::GetInstance()->SetForceClearFlag(true);
+#ifndef LOGTAIL_NO_TC_MALLOC
+                    gLastTcmallocReleaseMemTime = 0;
+#endif
                 }
                 // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
                 // or memory exceeds limit) // is greater or equal than limits (

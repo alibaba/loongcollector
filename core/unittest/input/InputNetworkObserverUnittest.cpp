@@ -67,7 +67,7 @@ void InputNetworkObserverUnittest::TestName() {
 void InputNetworkObserverUnittest::TestSupportAck() {
     InputNetworkObserver input;
     bool supportAck = input.SupportAck();
-    APSARA_TEST_FALSE(supportAck);
+    APSARA_TEST_TRUE(supportAck);
 }
 
 void InputNetworkObserverUnittest::OnSuccessfulInit() {
