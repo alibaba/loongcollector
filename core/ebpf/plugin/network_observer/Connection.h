@@ -182,7 +182,6 @@ private:
 
     using Flag = unsigned int;
 
-
     static constexpr Flag kSFlagL4MetaAttached = 0b0001; // Flags[0]
     static constexpr Flag kSFlagSelfMetaAttached = 0b0010; // Flags[1]
     static constexpr Flag kSFlagPeerMetaAttached = 0b0100; // Flags[2]

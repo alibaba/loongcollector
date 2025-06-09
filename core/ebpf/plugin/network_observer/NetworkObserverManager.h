@@ -78,7 +78,10 @@ public:
 
     int Destroy() override;
 
-    bool HasRegisteredConfigs() const { return mWorkloadConfigs.size(); }
+    bool HasRegisteredConfigs() const {
+        ReadLock lk(mAppConfigLock);
+        return mWorkloadConfigs.size();
+    }
 
     bool SupportRegisterMultiConfig() override { return true; }
 
@@ -89,7 +92,10 @@ public:
 
     int RemoveConfig(const std::string&) override;
 
-    int RegisteredConfigCount() override { return mWorkloads.size(); }
+    int RegisteredConfigCount() override {
+        ReadLock lk(mAppConfigLock);
+        return mWorkloads.size();
+    }
 
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
@@ -141,6 +147,7 @@ private:
     std::shared_ptr<AppDetail>
     getAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
     std::shared_ptr<AppDetail> getAppConfig(size_t workloadKey);
+    std::shared_ptr<AppDetail> getAppConfig(const StringView& containerId);
     std::shared_ptr<AppDetail> getAppConfig(const std::shared_ptr<Connection>& conn);
 
     std::array<size_t, 1> generateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&,
@@ -224,13 +231,19 @@ private:
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
 
     // namespace/workloadKind/workloadName hash combine to app
-    ReadWriteLock mAppConfigLock;
+    mutable ReadWriteLock mAppConfigLock;
     // workloadKey ==> appDetail
+    // mWorkloadConfigs used in control plane
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mWorkloadConfigs;
+    // containerId ==> appDetail or we need to store containerId to workloadKey??
+    // mContainerConfigs used in data plane
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs;
     // configName ==> workloadKeys
-    std::unordered_map<std::string, std::vector<size_t>> mWorkloads;
+    std::unordered_map<std::string, std::set<size_t>> mWorkloads;
     // workloadKey ==> containerIds
     std::unordered_map<size_t, std::set<std::string>> mWorkloadContainers;
+
+    std::shared_ptr<Sampler> mSampler;
 
     std::string mClusterId;
 

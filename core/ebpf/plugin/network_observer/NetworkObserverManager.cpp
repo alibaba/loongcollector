@@ -38,6 +38,7 @@ extern "C" {
 
 DEFINE_FLAG_INT32(ebpf_networkobserver_max_connections, "maximum connections", 5000);
 DEFINE_FLAG_STRING(ebpf_networkobserver_enable_protocols, "enable application protocols, split by comma", "HTTP");
+DEFINE_FLAG_DOUBLE(ebpf_networkobserver_default_sample_rate, "ebpf network observer default sample rate", 1.0);
 
 namespace logtail::ebpf {
 
@@ -644,12 +645,12 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
             if (group == nullptr || group->mConnection == nullptr) {
                 return;
             }
-            const auto& appInfo = getAppConfig(group->mConnection);
-            if (appInfo == nullptr || appInfo->mAppId.empty()) {
-                return;
-            }
 
             if (!init) {
+                const auto& appInfo = getAppConfig(group->mConnection);
+                if (appInfo == nullptr || appInfo->mAppId.empty()) {
+                    return;
+                }
                 queueKey = appInfo->mQueueKey;
                 pluginIdx = appInfo->mPluginIndex;
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppId.MetricKey(), appInfo->mAppId);
@@ -816,12 +817,12 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
             if (group->mConnection == nullptr) {
                 return;
             }
-            const auto& appInfo = getAppConfig(group->mConnection);
-            if (appInfo == nullptr || appInfo->mAppId.empty()) {
-                return;
-            }
 
             if (!init) {
+                const auto& appInfo = getAppConfig(group->mConnection);
+                if (appInfo == nullptr || appInfo->mAppId.empty()) {
+                    return;
+                }
                 queueKey = appInfo->mQueueKey;
                 pluginIdx = appInfo->mPluginIndex;
 
@@ -1015,12 +1016,12 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
                 }
                 const auto& ct = record->GetConnection();
                 const auto& ctAttrs = ct->GetConnTrackerAttrs();
-                const auto& appInfo = getAppConfig(ct);
-                if (appInfo == nullptr || appInfo->mAppId.empty()) {
-                    return;
-                }
 
                 if (!init) {
+                    const auto& appInfo = getAppConfig(ct);
+                    if (appInfo == nullptr || appInfo->mAppId.empty()) {
+                        return;
+                    }
                     queueKey = appInfo->mQueueKey;
                     pluginIdx = appInfo->mPluginIndex;
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppId.SpanKey(), appInfo->mAppId);
@@ -1135,46 +1136,6 @@ int GuessContainerIdOffset() {
 
 int NetworkObserverManager::Update(
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    // auto* opt = std::get<ObserverNetworkOption*>(options);
-
-    // diff opt
-    // if (mPreviousOpt) {
-    // compareAndUpdate("EnableLog", mPreviousOpt->mEnableLog, opt->mEnableLog, [this](bool oldValue, bool newValue) {
-    //     this->mEnableLog = newValue;
-    // });
-    // compareAndUpdate("EnableMetric", mPreviousOpt->mEnableMetric, opt->mEnableMetric, [this](bool, bool newValue) {
-    //     this->mEnableMetric = newValue;
-    // });
-    // compareAndUpdate("EnableSpan", mPreviousOpt->mEnableSpan, opt->mEnableSpan, [this](bool, bool newValue) {
-    //     this->mEnableSpan = newValue;
-    // });
-    // compareAndUpdate("SampleRate", mPreviousOpt->mSampleRate, opt->mSampleRate, [this](double, double newValue) {
-    //     if (newValue < 0) {
-    //         LOG_WARNING(sLogger, ("invalid sample rate, must between [0, 1], use default 0.01, given", newValue));
-    //         newValue = 0;
-    //     } else if (newValue >= 1) {
-    //         newValue = 1.0;
-    //     }
-    //     WriteLock lk(mSamplerLock);
-    //     mSampler = std::make_shared<HashRatioSampler>(newValue);
-    // });
-    // compareAndUpdate("EnableProtocols",
-    //                  mPreviousOpt->mEnableProtocols,
-    //                  opt->mEnableProtocols,
-    //                  [this](const std::vector<std::string>& oldValue, const std::vector<std::string>& newValue) {
-    //                      this->updateParsers(newValue, oldValue);
-    //                  });
-    // compareAndUpdate("MaxConnections",
-    //                  mPreviousOpt->mMaxConnections,
-    //                  opt->mMaxConnections,
-    //                  [this](const int&, const int& newValue) {
-    //                      this->mConnectionManager->UpdateMaxConnectionThreshold(newValue);
-    //                  });
-    // }
-
-    // update previous opt
-    // mPreviousOpt = std::make_unique<ObserverNetworkOption>(*opt);
-
     return 0;
 }
 
@@ -1198,19 +1159,55 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     appConfig->mQueueKey = ctx->GetProcessQueueKey();
     appConfig->mPluginIndex = index;
     appConfig->mConfigName = ctx->GetConfigName();
-    std::vector<size_t> workloadKeys;
-    workloadKeys.reserve(option->mSelectors.size());
+    std::set<size_t> currentWorkloadKeys;
 
     WriteLock lk(mAppConfigLock);
+    const auto& workloads = mWorkloads.find(ctx->GetConfigName());
     for (const auto& selector : option->mSelectors) {
         auto workloadKey = GenerateWorkloadKey(selector.mNamespace, selector.mWorkloadKind, selector.mWorkloadName);
-        workloadKeys.push_back(workloadKey);
+        currentWorkloadKeys.insert(workloadKey);
         // add or update config ...
         mWorkloadConfigs.insert({workloadKey, appConfig});
     }
 
-    // update
-    mWorkloads.insert({ctx->GetConfigName(), workloadKeys});
+    if (workloads == mWorkloads.end()) {
+        // new
+        mWorkloads.insert({ctx->GetConfigName(), currentWorkloadKeys});
+        // TODO @qianlu.kk init self monitor ...
+        return 0;
+    }
+
+    // check expire ...
+    std::vector<std::string> expiredCids;
+    for (auto it = workloads->second.begin(); it != workloads->second.end();) {
+        // old workload key
+        if (currentWorkloadKeys.count(*it)) {
+            ++it;
+            continue;
+        }
+
+        // expired workload key
+        mWorkloadConfigs.erase(*it); // clean mWorkloadConfigs
+        const auto& iterator = mWorkloadContainers.find(*it);
+        if (iterator != mWorkloadContainers.end()) {
+            for (const auto& cid : iterator->second) {
+                expiredCids.push_back(cid);
+                std::hash<std::string> hasher;
+                size_t cidKey = 0;
+                AttrHashCombine(cidKey, hasher(cid));
+                mContainerConfigs.erase(cidKey);
+            }
+        }
+        mWorkloadContainers.erase(*it); // clean mWorkloadContainers
+        it = workloads->second.erase(it); // remove int current
+    }
+    for (size_t key : currentWorkloadKeys) {
+        if (!workloads->second.count(key)) {
+            workloads->second.insert(key);
+        }
+    }
+
+    UpdateWhitelists({}, std::move(expiredCids));
 
     // TODO
     if (mMetricMgr) {
@@ -1259,11 +1256,10 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
         return 0;
     }
 
-    mWorkloads.erase(configName);
-
     std::vector<std::string> disableCids;
-    std::vector<size_t>& workloadKeys = it->second;
+    std::set<size_t>& workloadKeys = it->second;
     for (size_t key : workloadKeys) {
+        mWorkloadConfigs.erase(key);
         const auto& it2 = mWorkloadContainers.find(key);
         if (it2 == mWorkloadContainers.end()) { // no containers ...
             continue;
@@ -1271,11 +1267,16 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
 
         for (const auto& cid : it2->second) {
             disableCids.push_back(cid);
+            std::hash<std::string> hasher;
+            size_t key = 0;
+            AttrHashCombine(key, hasher(cid));
+            mContainerConfigs.erase(key);
         }
-
-        mWorkloadConfigs.erase(key);
         mWorkloadContainers.erase(key);
     }
+
+    mWorkloads.erase(configName);
+
 #ifdef APSARA_UNIT_TEST_MAIN
     return 0;
 #endif
@@ -1302,6 +1303,16 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     mPollKernelFreqMgr.SetPeriod(std::chrono::milliseconds(200));
     mConsumerFreqMgr.SetPeriod(std::chrono::milliseconds(300));
+
+    double sampleRate = 1.0;
+    // init default sampler
+    if (DOUBLE_FLAG(ebpf_networkobserver_default_sample_rate) < 0) {
+        sampleRate = 0;
+    } else if (DOUBLE_FLAG(ebpf_networkobserver_default_sample_rate) >= 1) {
+        sampleRate = 1.0;
+    }
+    LOG_DEBUG(sLogger, ("init default sample rate", sampleRate));
+    mSampler = std::make_shared<HashRatioSampler>(sampleRate);
 
     mCidOffset = GuessContainerIdOffset();
 
@@ -1448,8 +1459,25 @@ std::shared_ptr<AppDetail> NetworkObserverManager::getAppConfig(size_t workloadK
     return nullptr;
 }
 
+std::shared_ptr<AppDetail> NetworkObserverManager::getAppConfig(const StringView& containerId) {
+    if (containerId.empty()) {
+        return nullptr;
+    }
+    std::hash<std::string_view> hasher;
+    size_t key = 0;
+    AttrHashCombine(key, hasher(containerId.data()));
+    {
+        ReadLock lk(mAppConfigLock);
+        const auto& it = mContainerConfigs.find(key);
+        if (it != mContainerConfigs.end()) {
+            return it->second;
+        }
+    }
+    return nullptr;
+}
+
 std::shared_ptr<AppDetail> NetworkObserverManager::getAppConfig(const std::shared_ptr<Connection>& conn) {
-    return getAppConfig(conn->GetWorkloadKey());
+    return getAppConfig(conn->GetContainerId());
 }
 
 void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
@@ -1469,10 +1497,16 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
             continue;
         }
 
+        std::hash<std::string> hasher;
+        size_t key = 0;
+        AttrHashCombine(key, hasher(cid));
+
         currentWorkloadCids[workloadKey].insert(cid);
         auto& enableCids = mWorkloadContainers[workloadKey];
         if (!enableCids.count(cid)) {
             newContainerIds.push_back(cid);
+            // if not enabled before, insert ...
+            mContainerConfigs[key] = appConfig;
         }
 
         LOG_DEBUG(sLogger,
@@ -1482,12 +1516,19 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
 
     for (auto& it : mWorkloadContainers) {
         const auto& key = it.first;
-        for (const auto& cid : it.second) {
-            if (!currentWorkloadCids[key].count(cid)) {
-                expiredContainerIds.push_back(cid);
+        // loop old containerIds to clean some expired containerIds
+        for (const auto& oldContainerId : it.second) {
+            if (currentWorkloadCids[key].count(oldContainerId)) {
+                continue;
             }
+            // expired
+            expiredContainerIds.push_back(oldContainerId);
+            std::hash<std::string> hasher;
+            size_t cidKey = 0;
+            AttrHashCombine(cidKey, hasher(oldContainerId));
+            mContainerConfigs.erase(cidKey);
         }
-        it.second = currentWorkloadCids[key];
+        it.second = std::move(currentWorkloadCids[key]);
     }
 
     UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
@@ -1777,15 +1818,17 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
 
     LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
     const auto& appInfo = getAppConfig(conn);
-    if (appInfo == nullptr) {
-        LOG_WARNING(sLogger, ("app info is null", "skip receive data event"));
-        return;
+    auto sampler = mSampler;
+    if (appInfo != nullptr) {
+        sampler = appInfo->mSampler;
+    } else {
+        LOG_DEBUG(sLogger, ("cannot get app config", "use default sampler ..."));
     }
 
     // ReadLock lk(mSamplerLock);
     // atomic shared_ptr
     std::vector<std::shared_ptr<AbstractRecord>> records
-        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appInfo->mSampler);
+        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, sampler);
 
     if (records.empty()) {
         return;

@@ -135,7 +135,7 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
     auto limiter = iter->second.lock();
     if (!limiter) {
         limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
-                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
     }
     return limiter;
@@ -153,7 +153,7 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     auto limiter = iter->second.lock();
     if (!limiter) {
         limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
-                                                    AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
     }
     return limiter;
@@ -300,13 +300,13 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     // Workspace
     if (!GetOptionalStringParam(config, "Workspace", mWorkspace, errorMsg)) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
-                            mContext->GetAlarm(),
-                            errorMsg,
-                            sName,
-                            mContext->GetConfigName(),
-                            mContext->GetProjectName(),
-                            mContext->GetLogstoreName(),
-                            mContext->GetRegion());
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
     }
 
     // TelemetryType
@@ -352,14 +352,14 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              "logs",
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
+                                  mContext->GetAlarm(),
+                                  errorMsg,
+                                  "logs",
+                                  sName,
+                                  mContext->GetConfigName(),
+                                  mContext->GetProjectName(),
+                                  mContext->GetLogstoreName(),
+                                  mContext->GetRegion());
         }
     }
 
@@ -1284,7 +1284,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         httpsFlag,
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
-                                        subPath,
+                                        mSubpath,
                                         "",
                                         header,
                                         item->mData,

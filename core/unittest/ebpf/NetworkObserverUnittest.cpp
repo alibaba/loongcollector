@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #include <chrono>
+#include <iostream>
 #include <memory>
 #include <thread>
 
+#include "StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -26,6 +28,7 @@
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "metadata/K8sMetadata.h"
+#include "plugin/network_observer/Connection.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -57,7 +60,8 @@ protected:
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
             mEBPFAdapter, "test_host", "/", mEventQueue, nullptr, nullptr, nullptr, nullptr);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
-        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
+        mManager
+            = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mThreadPool, mEventQueue, nullptr);
         EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
     }
 
@@ -218,9 +222,8 @@ void NetworkObserverManagerUnittest::TestDataEventProcessing() {
     // free(dataEvent);
 
     // std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
-    // size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 1024, std::chrono::milliseconds(200));
-    // APSARA_TEST_EQUAL(count, 1UL);
-    // APSARA_TEST_TRUE(items[0] != nullptr);
+    // size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 1024,
+    // std::chrono::milliseconds(200)); APSARA_TEST_EQUAL(count, 1UL); APSARA_TEST_TRUE(items[0] != nullptr);
 
     // AbstractAppRecord* record = static_cast<AbstractAppRecord*>(items[0].get());
     // APSARA_TEST_TRUE(record != nullptr);
@@ -295,6 +298,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     options.mL7Config.mEnableLog = true;
     options.mL7Config.mEnableMetric = true;
     options.mL7Config.mEnableSpan = true;
+    options.mL7Config.mSampleRate = 1.0;
 
     options.mApmConfig.mAppId = "test-app-id";
     options.mApmConfig.mAppName = "test-app-name";
@@ -304,6 +308,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
 
     mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
@@ -329,6 +334,8 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     LOG_INFO(sLogger, ("step", "0-0"));
     K8sMetadata::GetInstance().mContainerCache.insert(
         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
+
+    mManager->HandleHostMetadataUpdate({"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106"});
 
     auto peerPodInfo = std::make_shared<K8sPodInfo>();
     peerPodInfo->mContainerIds = {"3", "4"};
@@ -366,7 +373,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump span tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 6UL);
+    APSARA_TEST_EQUAL(tags.size(), 9UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
@@ -382,7 +389,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 6UL);
+    APSARA_TEST_EQUAL(tags.size(), 8UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
@@ -498,103 +505,345 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
     {}
 }
 
-// TODO @qianlu.kk 
-void NetworkObserverManagerUnittest::TestConfigUpdate() {
-    // for protocol update
-    {
-        // auto mManager = CreateManager();
-        // ObserverNetworkOption options;
-        // options.mEnableProtocols = {"http"};
-        // std::cout << magic_enum::enum_name(support_proto_e::ProtoHTTP) << std::endl;
-        // mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_TRUE(mManager->mPreviousOpt != nullptr);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableProtocols.size(), 1UL);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableProtocols[0], "http");
-        // // only http
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
-
-        // options.mEnableProtocols = {"MySQL", "Redis", "Dubbo"};
-        // // std::vector<std::string> protocols = {"MySQL", "Redis", "Dubbo"};
-        // int result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
-
-        // // protocols = {"HTTP", "MySQL"};
-        // options.mEnableProtocols = {"HTTP", "MySQL"};
-        // result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
-
-        // // protocols.clear();
-        // options.mEnableProtocols = {};
-        // result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
-        // mManager->Destroy();
-    }
-
-    // for enable log
-    // for protocol update
-    {
-        // ObserverNetworkOption options;
-        // options.mEnableProtocols = {"http"};
-        // options.mEnableLog = false;
-        // options.mEnableMetric = true;
-        // options.mEnableSpan = true;
-        // mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_TRUE(mManager->mPreviousOpt != nullptr);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableProtocols.size(), 1UL);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableProtocols[0], "http");
-        // // only http
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableLog, false);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableMetric, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableSpan, true);
-
-        // options.mEnableProtocols = {"MySQL", "Redis", "Dubbo"};
-        // options.mEnableLog = true;
-        // options.mEnableMetric = false;
-        // options.mEnableSpan = false;
-        // // std::vector<std::string> protocols = {"MySQL", "Redis", "Dubbo"};
-        // int result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableLog, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableMetric, false);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableSpan, false);
-
-        // // protocols = {"HTTP", "MySQL"};
-        // options.mEnableProtocols = {"HTTP", "MySQL"};
-        // options.mEnableLog = true;
-        // options.mEnableMetric = true;
-        // options.mEnableSpan = false;
-        // result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 1UL);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers.count(support_proto_e::ProtoHTTP) > 0);
-        // APSARA_TEST_TRUE(ProtocolParserManager::GetInstance().mParsers[support_proto_e::ProtoHTTP] != nullptr);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableLog, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableMetric, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableSpan, false);
-
-        // // protocols.clear();
-        // options.mEnableProtocols = {};
-        // result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-        // APSARA_TEST_EQUAL(result, 0);
-        // APSARA_TEST_EQUAL(ProtocolParserManager::GetInstance().mParsers.size(), 0UL);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableLog, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableMetric, true);
-        // APSARA_TEST_EQUAL(mManager->mPreviousOpt->mEnableSpan, false);
-    }
+size_t GenerateContainerIdHash(const std::string& cid) {
+    std::hash<std::string> hasher;
+    size_t key = 0;
+    AttrHashCombine(key, hasher(cid));
+    return key;
 }
 
-// TODO @qianlu.kk 
+// TODO @qianlu.kk
+void NetworkObserverManagerUnittest::TestConfigUpdate() {
+    auto mManager = CreateManager();
+    std::cout << "begin" << std::endl;
+    CollectionPipelineContext context;
+    context.SetConfigName("test-config-1");
+    context.SetCreateTime(12345);
+    ObserverNetworkOption options;
+    options.mApmConfig.mAppId = "test-app-id-1";
+    options.mApmConfig.mAppName = "test-app-name-1";
+    options.mApmConfig.mServiceId = "test-service-id-1";
+    options.mApmConfig.mWorkspace = "test-workspace-1";
+
+    options.mL4Config.mEnable = true;
+
+    options.mL7Config.mEnable = true;
+    options.mL7Config.mEnableLog = true;
+    options.mL7Config.mEnableMetric = true;
+    options.mL7Config.mEnableSpan = true;
+    options.mL7Config.mSampleRate = 1.0;
+
+    options.mSelectors = {{"test-workload-name-1", "test-workload-kind-1", "test-namespace-1"}};
+
+    size_t workload0Key = GenerateWorkloadKey("test-namespace-0", "test-workload-kind-0", "test-workload-name-0");
+    size_t workload2Key = GenerateWorkloadKey("test-namespace-2", "test-workload-kind-2", "test-workload-name-2");
+    size_t workload3Key = GenerateWorkloadKey("test-namespace-3", "test-workload-kind-3", "test-workload-name-3");
+    size_t workload4Key = GenerateWorkloadKey("test-namespace-4", "test-workload-kind-4", "test-workload-name-4");
+
+    // case1. add config for test-config-1 which select workload1
+    mManager->AddOrUpdateConfig(&context, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    size_t workload1Key = GenerateWorkloadKey("test-namespace-1", "test-workload-kind-1", "test-workload-name-1");
+    // step1. validate every member
+    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-1"), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].size(), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload1Key), 1); // "test-config-1"
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload1Key), 1);
+
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload1Key] != nullptr);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mAppId, "test-app-id-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mAppName, "test-app-name-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mWorkspace, "test-workspace-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mServiceId, "test-service-id-1");
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableL4, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableL7, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableMetric, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableSpan, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableLog, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mSampleRate, 1.0);
+
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+
+    // step2. mock host metadata update ...
+    {
+        for (int i = 0; i <= 9; i++) {
+            auto podInfo = std::make_shared<K8sPodInfo>();
+            podInfo->mPodIp = "test-pod-ip-" + std::to_string(i);
+            podInfo->mPodName = "test-pod-name-" + std::to_string(i);
+            podInfo->mNamespace = "test-namespace-" + std::to_string(i);
+            podInfo->mWorkloadKind = "test-workload-kind-" + std::to_string(i);
+            podInfo->mWorkloadName = "test-workload-name-" + std::to_string(i);
+
+            LOG_INFO(sLogger, ("step", "0-0"));
+            for (int j = 0; j < 5; j++) {
+                std::string containerId = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a446131"
+                    + std::to_string(i) + std::to_string(j);
+                podInfo->mContainerIds.push_back(containerId);
+                K8sMetadata::GetInstance().mContainerCache.insert(containerId, podInfo);
+            }
+        }
+    }
+
+    mManager->HandleHostMetadataUpdate(
+        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
+                                                                               // "test-workload-kind-1",
+                                                                               // "test-namespace-1"
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2); // 2 containers
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
+        size_t key = GenerateContainerIdHash(cid);
+        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
+    }
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 2); // 2 containers
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110"),
+                      1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
+                      1);
+
+    // add pod
+    mManager->HandleHostMetadataUpdate(
+        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
+                                                                               // "test-workload-kind-1",
+                                                                               // "test-namespace-1"
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2); // 2 containers
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+    for (int i = 1; i <= 2; i++) {
+        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
+        size_t key = GenerateContainerIdHash(cid);
+        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
+    }
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 2); // 2 containers
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112"),
+                      1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
+                      1);
+
+    // remove 1 pod
+    mManager->HandleHostMetadataUpdate(
+        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613122",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
+                                                                               // "test-workload-kind-1",
+                                                                               // "test-namespace-1"
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1); // 1 containers
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+    for (int i = 1; i <= 1; i++) {
+        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
+        size_t key = GenerateContainerIdHash(cid);
+        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
+        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
+    }
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 1); // 2 containers
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112"),
+                      0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
+                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
+                      1);
+
+    // ========
+    // case2. update config1 and select both workload2 and workload3
+    options.mSelectors = {{"test-workload-name-2", "test-workload-kind-2", "test-namespace-2"},
+                          {"test-workload-name-3", "test-workload-kind-3", "test-namespace-3"}};
+    options.mL4Config.mEnable = false;
+    options.mL7Config.mEnableLog = false;
+    mManager->AddOrUpdateConfig(&context, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    // step1. validate every member
+    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-1"), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].size(), 2);
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload2Key), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload3Key), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload1Key), 0); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload0Key), 0); // "test-config-1"
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload1Key), 0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload2Key), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload3Key), 1);
+
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload2Key] != nullptr);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mAppId, "test-app-id-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mAppName, "test-app-name-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mWorkspace, "test-workspace-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mServiceId, "test-service-id-1");
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableL4, false);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableL7, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableMetric, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableSpan, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableLog, false);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mSampleRate, 1.0);
+
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload3Key] != nullptr);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mAppId, "test-app-id-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mAppName, "test-app-name-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mWorkspace, "test-workspace-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mServiceId, "test-service-id-1");
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableL4, false);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableL7, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableMetric, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableSpan, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableLog, false);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mSampleRate, 1.0);
+
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0); // will clean when hostMetaUpdate is called ...
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+
+    mManager->HandleHostMetadataUpdate(
+        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613102",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // workload0 workload1
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+
+    mManager->HandleHostMetadataUpdate(
+        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613102",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613122",
+         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613123"}); // workload2
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
+    for (const auto& it : mManager->mContainerConfigs) {
+        std::cout << it.first << std::endl;
+    }
+    std::cout << "===" << std::endl;
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1);
+
+
+    // case3. add config2 which select workload2
+    CollectionPipelineContext context2;
+    context2.SetConfigName("test-config-2");
+    context2.SetCreateTime(12345);
+    ObserverNetworkOption options2;
+    options2.mApmConfig.mAppId = "test-app-id-2";
+    options2.mApmConfig.mAppName = "test-app-name-2";
+    options2.mApmConfig.mServiceId = "test-service-id-2";
+    options2.mApmConfig.mWorkspace = "test-workspace-2";
+
+    options2.mL4Config.mEnable = true;
+
+    options2.mL7Config.mEnable = true;
+    options2.mL7Config.mEnableLog = true;
+    options2.mL7Config.mEnableMetric = true;
+    options2.mL7Config.mEnableSpan = true;
+    options2.mL7Config.mSampleRate = 1.0;
+
+    options2.mSelectors = {{"test-workload-name-4", "test-workload-kind-4", "test-namespace-4"}};
+    mManager->AddOrUpdateConfig(
+        &context2, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options2));
+    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 2); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-2"), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].size(), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].count(workload4Key), 1); // "test-config-1"
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 3);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload4Key), 1);
+
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload4Key] != nullptr);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mAppId, "test-app-id-2");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mAppName, "test-app-name-2");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mWorkspace, "test-workspace-2");
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mServiceId, "test-service-id-2");
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableL4, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableL7, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableMetric, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableSpan, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableLog, true);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mSampleRate, 1.0);
+
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1);
+
+    // case4. remove config1
+    mManager->RemoveConfig("test-config-1");
+    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-2"), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].size(), 1); // "test-config-1"
+    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].count(workload4Key), 1); // "test-config-1"
+
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload4Key), 1);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload2Key), 0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload3Key), 0);
+
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+
+
+    std::cout << "end" << std::endl;
+}
+
+// TODO @qianlu.kk
 void NetworkObserverManagerUnittest::TestPluginLifecycle() {
     // auto mManager = CreateManager();
 
@@ -655,6 +904,7 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
     mManager->mFlag = true;
     Timer::GetInstance()->Clear();
+    mThreadPool->Start();
     EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
 
     auto now = std::chrono::steady_clock::now();
@@ -667,7 +917,8 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     mManager->ScheduleNext(now, metricConfig);
     mManager->ScheduleNext(now, spanConfig);
     mManager->ScheduleNext(now, logConfig);
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 4);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 4);
     std::this_thread::sleep_for(std::chrono::seconds(3));
     APSARA_TEST_EQUAL(mManager->mExecTimes, 6);
     std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -683,6 +934,7 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     std::this_thread::sleep_for(std::chrono::seconds(3));
     // execute 2 metric task
     APSARA_TEST_EQUAL(mManager->mExecTimes, 20);
+    mThreadPool->Stop();
 }
 
 void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {

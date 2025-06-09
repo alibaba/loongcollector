@@ -908,7 +908,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -969,7 +969,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1030,7 +1030,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);

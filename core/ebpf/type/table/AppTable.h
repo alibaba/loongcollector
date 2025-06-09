@@ -23,6 +23,11 @@ inline constexpr DataElement kConnTrackerElements[] = {
     kHostName,
     // kAppName,
     // kAppId,
+    // kAppId, // pid
+    // kIp, // server ip
+    // kAppName, // service
+    // kWorkspace, // workspace
+    // kArmsServiceId, // serviceId
     kPodName,
     kPodIp,
     kNamespace,

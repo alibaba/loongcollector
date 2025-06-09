@@ -81,7 +81,7 @@ public:
     QueueKey mQueueKey = 0;
     uint32_t mPluginIndex = -1;
 
-    size_t mAppHash;
+    size_t mAppHash = 0UL;
 };
 
 struct CaseInsensitiveLess {
