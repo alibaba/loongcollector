@@ -20,9 +20,11 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
+#include "common/LogFileOperator.h"
 #include "common/Thread.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
+
 #if defined(_MSC_VER)
 #include "windows.h"
 #endif
@@ -68,41 +70,24 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
                                                                          const std::string& filePath) {
     fsutil::PathStat buf;
     if (fsutil::PathStat::stat(filePath.c_str(), buf)) {
+        LogFileOperator op;
+        op.Open(filePath.c_str());
+        if (op.IsOpen() == false) {
+            LOG_ERROR(sLogger, ("fail to open file", filePath));
+            return nullptr;
+        }
+
+        char firstLine[1025];
+        int nbytes = op.Pread(firstLine, 1, 1024, 0);
+        op.Close();
+        if (nbytes < 0) {
+            LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
+            return nullptr;
+        }
+        firstLine[nbytes] = '\0';
+
         uint64_t fileSignatureHash = 0;
         uint32_t fileSignatureSize = 0;
-        char firstLine[1025];
-
-#if !defined(_MSC_VER)
-        int fd = open(filePath.c_str(), O_RDONLY);
-        // Check if the file handle is opened successfully.
-        if (fd == -1) {
-            LOG_ERROR(sLogger, ("fail to open file", filePath));
-            return nullptr;
-        }
-        int nbytes = pread(fd, firstLine, 1024, 0);
-        close(fd);
-        if (nbytes < 0) {
-            LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
-            return nullptr;
-        }
-#else
-        // TODO: windows
-        // need fopen with "rb"?
-        std::FILE* file = std::fopen(filePath.c_str(), "r");
-        // Check if the file handle is opened successfully.
-        if (file == nullptr) {
-            LOG_ERROR(sLogger, ("fail to open file", filePath));
-            return nullptr;
-        }
-        int nbytes = std::fread(firstLine, sizeof(char), 1024, file);
-        std::fclose(file);
-        if (nbytes < 0) {
-            LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
-            return nullptr;
-        }
-#endif
-
-        firstLine[nbytes] = '\0';
         CheckAndUpdateSignature(std::string(firstLine), fileSignatureHash, fileSignatureSize);
         AdhocFileCheckpointPtr fileCheckpoint
             = std::make_shared<AdhocFileCheckpoint>(filePath, // file path
@@ -189,11 +174,7 @@ void AdhocCheckpointManager::LoadAdhocCheckpoint() {
 
 std::string AdhocCheckpointManager::GetJobCheckpointPath(const std::string& jobName) {
     std::string path = GetAdhocCheckpointDirPath();
-#if defined(__linux__)
-    path += "/" + jobName;
-#elif defined(_MSC_VER)
-    path += "\\" + jobName;
-#endif
+    path += PATH_SEPARATOR + jobName;
     return path;
 }
 

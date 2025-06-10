@@ -1699,8 +1699,9 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         }
         TruncateInfo* truncateInfo = nullptr;
         lastReadPos = GetLastReadPos();
-        readCharCount
-            = READ_BYTE ? ReadFile(mLogFileOp, gbkBuffer + lastCacheSize, READ_BYTE, lastReadPos, &truncateInfo) : (size_t)0;
+        readCharCount = READ_BYTE
+            ? ReadFile(mLogFileOp, gbkBuffer + lastCacheSize, READ_BYTE, lastReadPos, &truncateInfo)
+            : (size_t)0;
         // Only when there is no new log and not try rollback, then force read
         if (!tryRollback && readCharCount == 0) {
             allowRollback = false;

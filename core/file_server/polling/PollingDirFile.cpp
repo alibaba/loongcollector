@@ -368,11 +368,8 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         int64_t nsec = 0;
         statBuf.GetLastWriteTime(sec, nsec);
         auto curTime = time(nullptr);
-#if defined(_MSC_VER)
-        LOG_DEBUG(sLogger, ("PollingNormalConfigPath", srcPath + "\\" + obj)("curTime", curTime)("writeTime", sec));
-#else
-        LOG_DEBUG(sLogger, ("PollingNormalConfigPath", srcPath + "/" + obj)("curTime", curTime)("writeTime", sec));
-#endif
+        LOG_DEBUG(sLogger,
+                  ("PollingNormalConfigPath", srcPath + PATH_SEPARATOR + obj)("curTime", curTime)("writeTime", sec));
         if (curTime - sec > INT32_FLAG(timeout_interval)) {
             return false;
         }

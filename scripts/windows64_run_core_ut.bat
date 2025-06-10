@@ -26,7 +26,7 @@ goto begin
 :end
 
 set LOONCOLLECTOR_SRC_PATH=%P1Path%
-set TARGET_ARTIFACT_PATH=%LOONCOLLECTOR_SRC_PATH%\core\build\unittest
+set TARGET_ARTIFACT_PATH=%LOONCOLLECTOR_SRC_PATH%core\build\unittest
 
 cd %TARGET_ARTIFACT_PATH%
 echo unittest dir: %TARGET_ARTIFACT_PATH% 
