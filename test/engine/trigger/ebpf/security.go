@@ -15,10 +15,12 @@ package ebpf
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/test/engine/setup"
 	"github.com/alibaba/ilogtail/test/engine/trigger"
 )
@@ -44,6 +46,119 @@ func execveCommands(ctx context.Context, commandCnt int) error {
 		}
 	}
 	return nil
+}
+
+func ExecveCommandsParallel(ctx context.Context, commandCnt int, command string) (context.Context, error) {
+	time.Sleep(5 * time.Second)
+
+	errChan := make(chan error, commandCnt)
+	for i := 0; i < commandCnt; i++ {
+		go func() {
+			_, err := setup.Env.ExecOnSource(ctx, command)
+			if err != nil {
+				logger.Error(ctx, "ASYNC_EXEC_FAILED", "error", err, "message", "Error executing command asynchronously")
+				errChan <- fmt.Errorf("async exec failed: %w", err)
+				return
+			}
+		}()
+	}
+
+	const maxWaitTime = 1 * time.Second
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return ctx, fmt.Errorf("some async shell script executions failed: %w", err)
+		}
+	case <-time.After(maxWaitTime):
+		return ctx, nil
+	}
+
+	return ctx, nil
+}
+
+func ExecveCommandsSerial(ctx context.Context, commandCnt int, command string) (context.Context, error) {
+	time.Sleep(5 * time.Second)
+	for i := 0; i < commandCnt; i++ {
+		_, err := setup.Env.ExecOnSource(ctx, command)
+		if err != nil {
+			return ctx, err
+		}
+	}
+	return ctx, nil
+}
+
+func isValidFilename(name string) bool {
+	return name != "" && !strings.ContainsAny(name, "/\\")
+}
+
+func CreateShellScript(ctx context.Context, tempFileName, content string) (context.Context, error) {
+	if !isValidFilename(tempFileName) {
+		return ctx, fmt.Errorf("invalid temp file name: %s", tempFileName)
+	}
+
+	command := fmt.Sprintf(`cat << 'SCRIPT_END' > %s.sh
+%s
+SCRIPT_END`, tempFileName, content)
+	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
+		return ctx, err
+	}
+
+	command = fmt.Sprintf(`chmod +x %s.sh`, tempFileName)
+	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
+func ExecuteShellScriptSerial(ctx context.Context, commandCnt int, tempFileName string) (context.Context, error) {
+	time.Sleep(5 * time.Second)
+	command := fmt.Sprintf(`./%s.sh`, tempFileName)
+	for i := 0; i < commandCnt; i++ {
+		result, err := setup.Env.ExecOnSource(ctx, command)
+		if err != nil {
+			return ctx, err
+		}
+		logger.Debug(ctx, "Shell Script output", "result", result)
+	}
+	return ctx, nil
+}
+
+func ExecuteShellScriptParallel(ctx context.Context, commandCnt int, tempFileName string) (context.Context, error) {
+	time.Sleep(5 * time.Second)
+	command := fmt.Sprintf(`./%s.sh`, tempFileName)
+
+	errChan := make(chan error, commandCnt)
+	for i := 0; i < commandCnt; i++ {
+		go func() {
+			result, err := setup.Env.ExecOnSource(ctx, command)
+			if err != nil {
+				logger.Error(ctx, "ASYNC_EXEC_FAILED", "error", err, "message", "Error executing command asynchronously")
+				errChan <- fmt.Errorf("async exec failed: %w", err)
+				return
+			}
+			logger.Debug(ctx, "Shell Script output", "result", result)
+		}()
+	}
+
+	const maxWaitTime = 1 * time.Second
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return ctx, fmt.Errorf("some async shell script executions failed: %w", err)
+		}
+	case <-time.After(maxWaitTime):
+		return ctx, nil
+	}
+
+	return ctx, nil
+}
+
+func RemoveShellScript(ctx context.Context, tempFileName string) (context.Context, error) {
+	command := fmt.Sprintf(`rm %s.sh`, tempFileName)
+	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
+		return ctx, err
+	}
+	return ctx, nil
 }
 
 /*
