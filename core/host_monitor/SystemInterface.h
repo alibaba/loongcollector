@@ -36,7 +36,7 @@ DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 namespace logtail {
 
 struct BaseInformation {
-    int64_t collectTimeMs;
+    std::chrono::steady_clock::time_point collectTime;
 };
 
 struct SystemInformation : public BaseInformation {
@@ -100,8 +100,8 @@ public:
     template <typename InfoT, typename... Args>
     class SystemInformationCache {
     public:
-        SystemInformationCache(int64_t ttl) : mTTL(ttl) {}
-        bool GetWithTimeout(InfoT& info, int64_t timeout, Args... args);
+        SystemInformationCache(std::chrono::milliseconds ttl) : mTTL(ttl) {}
+        bool GetWithTimeout(InfoT& info, std::chrono::milliseconds timeout, Args... args);
         bool Set(InfoT& info, Args... args);
         bool GC();
 
@@ -109,7 +109,7 @@ public:
         std::mutex mMutex;
         std::unordered_map<std::tuple<Args...>, std::pair<InfoT, std::atomic_bool>, TupleHash> mCache;
         std::condition_variable mConditionVariable;
-        int64_t mTTL;
+        std::chrono::milliseconds mTTL;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -119,8 +119,8 @@ public:
     template <typename InfoT>
     class SystemInformationCache<InfoT> {
     public:
-        SystemInformationCache(int64_t ttl) : mTTL(ttl) {}
-        bool GetWithTimeout(InfoT& info, int64_t timeout);
+        SystemInformationCache(std::chrono::milliseconds ttl) : mTTL(ttl) {}
+        bool GetWithTimeout(InfoT& info, std::chrono::milliseconds timeout);
         bool Set(InfoT& info);
         bool GC();
 
@@ -128,7 +128,7 @@ public:
         std::mutex mMutex;
         std::pair<InfoT, std::atomic_bool> mCache;
         std::condition_variable mConditionVariable;
-        int64_t mTTL;
+        std::chrono::milliseconds mTTL;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -147,7 +147,8 @@ public:
     bool GetProcessListInformation(ProcessListInformation& processListInfo);
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
 
-    explicit SystemInterface(int64_t ttl = INT32_FLAG(system_interface_default_cache_ttl))
+    explicit SystemInterface(std::chrono::milliseconds ttl
+                             = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
         : mSystemInformationCache(),
           mCPUInformationCache(ttl),
           mProcessListInformationCache(ttl),

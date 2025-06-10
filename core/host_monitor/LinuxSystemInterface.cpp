@@ -16,6 +16,8 @@
 
 #include "host_monitor/LinuxSystemInterface.h"
 
+#include <chrono>
+
 using namespace std;
 using namespace std::chrono;
 
@@ -24,7 +26,6 @@ using namespace std::chrono;
 
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
-#include "common/TimeKeeper.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
 
@@ -76,7 +77,7 @@ bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInf
             break;
         }
     }
-    systemInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+    systemInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -117,7 +118,7 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
             cpuInfo.stats.push_back(cpuStat);
         }
     }
-    cpuInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+    cpuInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -148,7 +149,7 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
             }
         }
     }
-    processListInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+    processListInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -160,7 +161,7 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
         return false;
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
-    processInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+    processInfo.collectTime = steady_clock::now();
     return true;
 }
 

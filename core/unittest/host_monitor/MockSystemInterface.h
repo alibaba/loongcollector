@@ -16,7 +16,6 @@
 
 #include <thread>
 
-#include "common/TimeKeeper.h"
 #include "host_monitor/SystemInterface.h"
 
 namespace logtail {
@@ -38,7 +37,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+        systemInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -47,7 +46,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+        cpuInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -56,7 +55,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processListInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+        processListInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -65,7 +64,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processInfo.collectTimeMs = TimeKeeper::GetInstance()->NowMs();
+        processInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
