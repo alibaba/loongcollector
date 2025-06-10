@@ -35,7 +35,6 @@
 #include "models/PipelineEventGroup.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
-#include "common/CmsIdUtil.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif

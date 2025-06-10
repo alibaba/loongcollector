@@ -597,9 +597,6 @@ static constexpr std::array kSNetStateStrings = {StringView("UNKNOWN"),
                                                  StringView("TCP_NEW_SYN_RECV"),
                                                  StringView("TCP_MAX_STATES")};
 
-static constexpr StringView kDefaultNetAppName = "__default_app_name__";
-static constexpr StringView kDefaultNetAppId = "__default_app_id__";
-
 bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
     if (!this->mFlag || this->mSuspendFlag) {
         return false;
@@ -1210,7 +1207,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     UpdateWhitelists({}, std::move(expiredCids));
 
     // TODO
-    if (mMetricMgr) {
+    if (metricMgr) {
         // init metrics
         MetricLabels connectionNumLabels = {{METRIC_LABEL_KEY_EVENT_SOURCE, METRIC_LABEL_VALUE_EVENT_SOURCE_EBPF}};
         auto ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(connectionNumLabels);
@@ -1879,14 +1876,6 @@ int NetworkObserverManager::Destroy() {
 #endif
     LOG_INFO(sLogger, ("destroy stage", "destroy connection manager"));
     mConnectionManager.reset(nullptr);
-    LOG_INFO(sLogger, ("destroy stage", "destroy sampler"));
-    // {
-    //     WriteLock lk(mSamplerLock);
-    //     mSampler.reset();
-    // }
-
-    // mEnabledCids.clear();
-    // mPreviousOpt.reset(nullptr);
 
     LOG_INFO(sLogger, ("destroy stage", "clear statistics"));
 

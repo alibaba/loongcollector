@@ -66,9 +66,9 @@ public:
         return 1;
     }
 
-    virtual int RemoveConfig(const std::string&) { return 1; }
+    virtual int RemoveConfig(const std::string&) { return 0; }
 
-    virtual int RegisteredConfigCount() { return 1; }
+    virtual int RegisteredConfigCount() { return 0; }
 
     virtual int PollPerfBuffer() {
         int zero = 0;

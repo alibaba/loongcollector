@@ -78,11 +78,6 @@ public:
 
     int Destroy() override;
 
-    bool HasRegisteredConfigs() const {
-        ReadLock lk(mAppConfigLock);
-        return mWorkloadConfigs.size();
-    }
-
     bool SupportRegisterMultiConfig() override { return true; }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,

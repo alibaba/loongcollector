@@ -37,9 +37,7 @@ DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
                   4019000000);
 
-DEFINE_FLAG_INT32(ebpf_server_workers_num,
-                  "the number of ebpf server worker threads, default is 1",
-                  1);
+DEFINE_FLAG_INT32(ebpf_server_workers_num, "the number of ebpf server worker threads, default is 1", 1);
 
 namespace logtail::ebpf {
 
@@ -221,24 +219,14 @@ void EBPFServer::Stop() {
         for (auto& mgr : mPlugins) {
             if (mgr) {
                 auto status = mgr->Destroy();
-                LOG_INFO(sLogger, ("force destroy plugin, type", magic_enum::enum_name(mgr->GetPluginType())) 
-                    ("status", status));
+                LOG_INFO(sLogger,
+                         ("force destroy plugin, type", magic_enum::enum_name(mgr->GetPluginType()))("status", status));
             }
         }
     }
     if (mProcessCacheManager) {
         mProcessCacheManager->Stop();
     }
-
-    // for (int i = 0; i < int(PluginType::MAX); i++) {
-    //     auto pipelineName = mLoadedPipeline[i];
-    //     if (pipelineName.size()) {
-    //         bool ret = DisablePlugin(pipelineName, static_cast<PluginType>(i));
-    //         LOG_INFO(sLogger,
-    //                  ("force stop plugin",
-    //                   magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", pipelineName)("ret", ret));
-    //     }
-    // }
 
     std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
     std::future_status s2 = mHandler.wait_for(std::chrono::seconds(1));
@@ -260,7 +248,8 @@ void EBPFServer::Stop() {
 
     std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
     if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {
-        LOG_ERROR(sLogger, ("eBPFRunner worker thread pool stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
+        LOG_ERROR(sLogger,
+                  ("eBPFRunner worker thread pool stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
     } else {
         LOG_INFO(sLogger, ("heBPFRunner worker thread pool", "stop successfully"));
     }
@@ -273,7 +262,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                                      const PluginMetricManagerPtr& metricManager) {
-    
     auto pluginMgr = GetPluginManager(type);
     if (pluginMgr) {
         // update scenario ...
@@ -318,7 +306,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             pluginMgr = NetworkObserverManager::Create(
                 mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
             UpdatePluginManager(type, pluginMgr);
-            
+
             int status = pluginMgr->Init(options);
             if (status) {
                 return false;
@@ -328,7 +316,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
         case PluginType::NETWORK_SECURITY: {
             pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
+                mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
             UpdatePluginManager(type, pluginMgr);
             break;
         }
@@ -343,7 +331,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         //     break;
         // }
         default:
-            LOG_ERROR(sLogger, ("unknown pluginType", magic_enum::enum_name(type)) ("pipelineName", pipelineName));
+            LOG_ERROR(sLogger, ("unknown pluginType", magic_enum::enum_name(type))("pipelineName", pipelineName));
             return false;
     }
 
@@ -359,14 +347,8 @@ bool EBPFServer::HasRegisteredPlugins() const {
         }
     }
     if (std::any_of(mPlugins.begin(), mPlugins.end(), [](auto x) { return x; })) {
-        
         return true;
     }
-    // for (const auto& pipeline : mLoadedPipeline) {
-    //     if (!pipeline.empty()) {
-    //         return true;
-    //     }
-    // }
     return false;
 }
 
@@ -399,24 +381,23 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     if (!IsSupportedEnv(type)) {
         return true;
     }
-    // std::string prevPipeline = CheckLoadedPipelineName(type);
-    // if (prevPipeline == pipelineName) {
-    //     UpdatePipelineName(type, "", "");
-    // } else {
-    //     LOG_WARNING(
-    //         sLogger,
-    //         ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
-    //     return true;
-    // }
 
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipelineName));
     auto pluginManager = GetPluginManager(type);
     if (pluginManager && pluginManager->IsExists()) {
-        if (pluginManager->SupportRegisterMultiConfig()) {
-            return pluginManager->RemoveConfig(pipelineName) == 0;
+        int ret = pluginManager->RemoveConfig(pipelineName);
+        if (ret) {
+            LOG_ERROR(sLogger, ("failed to remove config for", magic_enum::enum_name(type))("pipeline", pipelineName));
+            return false;
+        }
+        if (pluginManager->RegisteredConfigCount() > 0) {
+            LOG_INFO(sLogger,
+                     ("multiple config, skip destroy plugin manager, just remove config for ",
+                      magic_enum::enum_name(type))("pipeline", pipelineName));
+            return true;
         }
         pluginManager->UpdateContext(nullptr, -1, -1);
-        int ret = pluginManager->Destroy();
+        ret = pluginManager->Destroy();
         if (ret == 0) {
             UpdatePluginManager(type, nullptr);
             // pluginManager->UpdateProcessCacheManager(nullptr); // deprecated ... TODO @qianlu.kk
@@ -438,11 +419,6 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     }
     return true;
 }
-
-// std::string EBPFServer::CheckLoadedPipelineName(PluginType type) {
-//     std::lock_guard<std::mutex> lk(mMtx);
-//     return mLoadedPipeline[int(type)];
-// }
 
 std::string EBPFServer::GetAllProjects() {
     std::lock_guard<std::mutex> lk(mMtx);
