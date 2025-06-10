@@ -1,8 +1,8 @@
 module github.com/alibaba/ilogtail
 
-go 1.21
+go 1.23
 
-toolchain go1.24.4
+toolchain go1.23.10
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.6.0
