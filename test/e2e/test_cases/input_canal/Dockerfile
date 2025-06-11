@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/golang:1.19
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/golang:1.23
 
 WORKDIR /src
 

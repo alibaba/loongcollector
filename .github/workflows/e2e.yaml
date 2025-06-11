@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19.10]
+        go-version: [1.23]
         runner: [ubuntu-latest]
       fail-fast: true
     steps:
