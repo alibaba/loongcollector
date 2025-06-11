@@ -17,7 +17,7 @@
 #include "common/StringTools.h"
 #include "unittest/Unittest.h"
 
-namespace logtail {
+using namespace logtail;
 extern std::vector<std::string> GetTopicNames(const boost::regex& regex);
 
 class StringToolsUnittest : public ::testing::Test {};
@@ -275,7 +275,59 @@ TEST_F(StringToolsUnittest, TestExtractTopics) {
     }
 }
 
-} // namespace logtail
+TEST_F(StringToolsUnittest, TestLtrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Ltrim(v1));
+
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Ltrim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView("33"), Ltrim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44 "), Ltrim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView("55 "), Ltrim(v5));
+}
+
+TEST_F(StringToolsUnittest, TestRtrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Rtrim(v1));
+
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Rtrim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView(" 33"), Rtrim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44"), Rtrim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView(" 55"), Rtrim(v5));
+}
+
+TEST_F(StringToolsUnittest, TestTrim) {
+    StringView v1 = "";
+    APSARA_TEST_EQUAL(StringView(""), Trim(v1));
+
+    StringView v2 = "2 2";
+    APSARA_TEST_EQUAL(StringView("2 2"), Trim(v2));
+
+    StringView v3 = " 33";
+    APSARA_TEST_EQUAL(StringView("33"), Trim(v3));
+
+    StringView v4 = "44 ";
+    APSARA_TEST_EQUAL(StringView("44"), Trim(v4));
+
+    StringView v5 = " 55 ";
+    APSARA_TEST_EQUAL(StringView("55"), Trim(v5));
+
+    StringView v6("\0ss\0", 4);
+    APSARA_TEST_EQUAL(StringView("ss"), Trim(v6, kNullSv));
+}
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

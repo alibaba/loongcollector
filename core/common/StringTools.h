@@ -152,4 +152,22 @@ void RemoveFilePathTrailingSlash(std::string& path);
 int fnmatch(const char* pattern, const char* dirPath, int flag);
 #endif
 
+// trim from start (returns a new string_view)
+static inline StringView Ltrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_prefix(std::min(s.find_first_not_of(blank), s.size()));
+    return s;
+}
+// trim from end (returns a new string_view)
+static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    s.remove_suffix(std::min(s.size() - s.find_last_not_of(blank) - 1, s.size()));
+    return s;
+}
+
+// trim from both ends (returns a new string_view)
+static inline StringView Trim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    return Ltrim(Rtrim(s, blank), blank);
+}
+
+static constexpr StringView kNullSv("\0", 1);
+
 } // namespace logtail

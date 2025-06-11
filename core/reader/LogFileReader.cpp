@@ -1011,6 +1011,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         BlockedEventManager::GetInstance()->UpdateBlockEvent(
             GetLogstoreKey(), GetConfigName(), *event, mDevInode, time(NULL) + mReaderConfig.first->mFlushTimeoutSecs);
     }
+    logBuffer.rawBuffer = Trim(logBuffer.rawBuffer, kNullSv);
     return moreData;
 }
 
