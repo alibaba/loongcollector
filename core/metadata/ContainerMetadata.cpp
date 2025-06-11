@@ -16,7 +16,9 @@
 
 #include "metadata/ContainerMetadata.h"
 
-#include "go_pipeline/LogtailPlugin.h"
+#include "common/Flags.h"
+
+DEFINE_FLAG_BOOL(disable_container_meta, "disable container metadata", true);
 
 namespace logtail {
 
@@ -24,24 +26,14 @@ ContainerMetadata::ContainerMetadata(size_t cidCacheSize) : mContainerCache(cidC
 }
 
 bool ContainerMetadata::Enable() {
-    return LogtailPlugin::GetInstance()->IsPluginOpened();
+    return !BOOL_FLAG(disable_container_meta);
 }
-std::shared_ptr<ContainerMeta> ContainerMetadata::GetInfoByContainerId(const StringView& containerId) {
+
+std::shared_ptr<ContainerMeta> ContainerMetadata::GetInfoByContainerId(const StringView&) {
     if (!Enable()) {
         return nullptr;
     }
-    std::shared_ptr<ContainerMeta> containerInfo;
-    bool isValid = mContainerCache.tryGetCopy(containerId, containerInfo);
-    if (isValid) {
-        return containerInfo;
-    }
-    K8sContainerMeta meta = LogtailPlugin::GetInstance()->GetContainerMeta(containerId);
-    containerInfo = std::make_shared<ContainerMeta>();
-    containerInfo->mContainerId = containerId.to_string();
-    containerInfo->mContainerName = meta.ContainerName;
-    containerInfo->mImageName = meta.Image;
-    mContainerCache.insert(containerInfo->mContainerId, containerInfo);
-    return containerInfo;
+    return nullptr;
 }
 
 } // namespace logtail
