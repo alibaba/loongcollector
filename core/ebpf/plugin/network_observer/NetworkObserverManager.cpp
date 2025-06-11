@@ -550,10 +550,6 @@ bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_c
         mLogEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init && needPush) {
-            std::lock_guard lk(mContextMutex);
-            if (this->mPipelineCtx == nullptr) {
-                return true;
-            }
             auto eventSize = eventGroup.GetEvents().size();
             ADD_COUNTER(mPushLogsTotal, eventSize);
             ADD_COUNTER(mPushLogGroupTotal, 1);
@@ -741,10 +737,6 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
         ADD_COUNTER(mPushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        std::lock_guard lk(mContextMutex);
-        if (this->mPipelineCtx == nullptr) {
-            return true;
-        }
         auto eventSize = eventGroup.GetEvents().size();
         ADD_COUNTER(mPushMetricsTotal, eventSize);
         ADD_COUNTER(mPushMetricGroupTotal, 1);
@@ -940,10 +932,6 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init) {
-            std::lock_guard lk(mContextMutex);
-            if (this->mPipelineCtx == nullptr) {
-                return true;
-            }
             auto eventSize = eventGroup.GetEvents().size();
             ADD_COUNTER(mPushMetricsTotal, eventSize);
             ADD_COUNTER(mPushMetricGroupTotal, 1);
@@ -1085,10 +1073,6 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_
         mSpanEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init && needPush) {
-            std::lock_guard lk(mContextMutex);
-            if (this->mPipelineCtx == nullptr) {
-                return true;
-            }
             auto eventSize = eventGroup.GetEvents().size();
             ADD_COUNTER(mPushSpansTotal, eventSize);
             ADD_COUNTER(mPushSpanGroupTotal, 1);
@@ -1483,49 +1467,53 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
     // std::unordered_set<std::string> currentCids;
     std::unordered_map<size_t, std::set<std::string>> currentWorkloadCids;
 
-    // podCidVec includes current pods running in the host ...
-    for (const auto& cid : podCidVec) {
-        auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
-        size_t workloadKey = GenerateWorkloadKey(podInfo->mNamespace, podInfo->mWorkloadKind, podInfo->mWorkloadName);
-        // check if in selectors ...
-        auto appConfig = getAppConfig(workloadKey);
-        if (appConfig == nullptr || appConfig->mAppName.empty()) {
-            // no app info ...
-            continue;
-        }
-
-        std::hash<std::string> hasher;
-        size_t key = 0;
-        AttrHashCombine(key, hasher(cid));
-
-        currentWorkloadCids[workloadKey].insert(cid);
-        auto& enableCids = mWorkloadContainers[workloadKey];
-        if (!enableCids.count(cid)) {
-            newContainerIds.push_back(cid);
-            // if not enabled before, insert ...
-            mContainerConfigs[key] = appConfig;
-        }
-
-        LOG_DEBUG(sLogger,
-                  ("appId", appConfig->mAppId)("appName", appConfig->mAppName)("podIp", podInfo->mPodIp)(
-                      "podName", podInfo->mPodName)("containerId", cid));
-    }
-
-    for (auto& it : mWorkloadContainers) {
-        const auto& key = it.first;
-        // loop old containerIds to clean some expired containerIds
-        for (const auto& oldContainerId : it.second) {
-            if (currentWorkloadCids[key].count(oldContainerId)) {
+    {
+        WriteLock lk(mAppConfigLock);
+        // podCidVec includes current pods running in the host ...
+        for (const auto& cid : podCidVec) {
+            auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
+            size_t workloadKey
+                = GenerateWorkloadKey(podInfo->mNamespace, podInfo->mWorkloadKind, podInfo->mWorkloadName);
+            // check if in selectors ...
+            auto appConfig = getAppConfig(workloadKey);
+            if (appConfig == nullptr || appConfig->mAppName.empty()) {
+                // no app info ...
                 continue;
             }
-            // expired
-            expiredContainerIds.push_back(oldContainerId);
+
             std::hash<std::string> hasher;
-            size_t cidKey = 0;
-            AttrHashCombine(cidKey, hasher(oldContainerId));
-            mContainerConfigs.erase(cidKey);
+            size_t key = 0;
+            AttrHashCombine(key, hasher(cid));
+
+            currentWorkloadCids[workloadKey].insert(cid);
+            auto& enableCids = mWorkloadContainers[workloadKey];
+            if (!enableCids.count(cid)) {
+                newContainerIds.push_back(cid);
+                // if not enabled before, insert ...
+                mContainerConfigs[key] = appConfig;
+            }
+
+            LOG_DEBUG(sLogger,
+                      ("appId", appConfig->mAppId)("appName", appConfig->mAppName)("podIp", podInfo->mPodIp)(
+                          "podName", podInfo->mPodName)("containerId", cid));
         }
-        it.second = std::move(currentWorkloadCids[key]);
+
+        for (auto& it : mWorkloadContainers) {
+            const auto& key = it.first;
+            // loop old containerIds to clean some expired containerIds
+            for (const auto& oldContainerId : it.second) {
+                if (currentWorkloadCids[key].count(oldContainerId)) {
+                    continue;
+                }
+                // expired
+                expiredContainerIds.push_back(oldContainerId);
+                std::hash<std::string> hasher;
+                size_t cidKey = 0;
+                AttrHashCombine(cidKey, hasher(oldContainerId));
+                mContainerConfigs.erase(cidKey);
+            }
+            it.second = std::move(currentWorkloadCids[key]);
+        }
     }
 
     UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
