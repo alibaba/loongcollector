@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <fstream>
 
 #include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
-#include "common/memory/SourceBuffer.h"
 #include "file_server/FileServer.h"
+#include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 
-namespace logtail {
+using namespace logtail;
 
 class LogFileReaderUnittest : public ::testing::Test {
 public:
@@ -75,6 +74,8 @@ public:
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
+
+protected:
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     FileTagOptions fileTagOpts;
@@ -821,7 +822,124 @@ void LogFileReaderCheckpointUnittest::TestDumpMetaToMem() {
     }
 }
 
-} // namespace logtail
+class LogFileReaderHoleUnittest : public ::testing::Test {
+public:
+    void TestReadLogHoleInTheMiddle();
+    void TestReadLogHoleOnTheLeft();
+    void TestReadLogJsonHoleOnTheRight();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderHoleUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::CUSTOM;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    const std::string mConfigName = "##1.0##project-0$config-0";
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+    FileDiscoveryConfig mConfig;
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string LogFileReaderHoleUnittest::gRootDir;
+std::string LogFileReaderHoleUnittest::gLogName;
+std::string LogFileReaderHoleUnittest::gLogPath;
+
+void LogFileReaderHoleUnittest::TestReadLogHoleInTheMiddle() {
+    std::string content = "a sample " + std::string(1024, '\0') + " log";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == content);
+}
+
+void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
+    std::string content = std::string(1024, '\0') + "a sample log";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+}
+
+void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
+    std::string content = "a sample log" + std::string(LogFileReader::BUFFER_SIZE, '\0');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+    mMultilineOpts.mMode = MultilineOptions::Mode::JSON;
+
+    JsonLogFileReader reader(gRootDir,
+                             gLogName,
+                             DevInode(),
+                             std::make_pair(&mReaderOpts, &mCtx),
+                             std::make_pair(&mMultilineOpts, &mCtx),
+                             std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(reader.ReadLog(logbuf, &event1)); // true means has more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+}
+
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

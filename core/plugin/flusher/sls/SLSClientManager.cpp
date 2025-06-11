@@ -196,6 +196,42 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
     header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
 }
 
+void PreparePostHostMetricsRequest(const string& accessKeyId,
+                                   const string& accessKeySecret,
+                                   SLSClientManager::AuthType type,
+                                   const string& compressType,
+                                   RawDataType dataType,
+                                   const string& body,
+                                   size_t rawSize,
+                                   string& path,
+                                   map<string, string>& header) {
+    path = HOSTMETRICS;
+
+    header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
+    header[DATE] = GetDateString();
+    header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
+    header[CONTENT_LENGTH] = to_string(body.size());
+    header[CONTENT_MD5] = CalcMD5(body);
+    header[X_LOG_APIVERSION] = LOG_API_VERSION;
+    header[X_LOG_SIGNATUREMETHOD] = HMAC_SHA1;
+    if (!compressType.empty()) {
+        header[X_LOG_COMPRESSTYPE] = compressType;
+    }
+    if (dataType == RawDataType::EVENT_GROUP) {
+        header[X_LOG_BODYRAWSIZE] = to_string(rawSize);
+    } else {
+        header[X_LOG_BODYRAWSIZE] = to_string(body.size());
+        header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
+    }
+    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+        header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    }
+
+    map<string, string> parameterList;
+    string signature = GetUrlSignature(HTTP_POST, path, header, parameterList, body, accessKeySecret);
+    header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
+}
+
 void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
                                        const string& accessKeySecret,
                                        SLSClientManager::AuthType type,

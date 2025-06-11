@@ -95,6 +95,7 @@ private:
 
     void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
                             const HostMonitorTimerEvent::CollectConfig& config);
+    void AddHostLabels(PipelineEventGroup& group);
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
