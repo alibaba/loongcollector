@@ -96,8 +96,8 @@ public:
     }
 #endif
 
-#if defined(_MSC_VER)
     static std::string JsonEscapeDirPath(const std::string& path) {
+#if defined(_MSC_VER)
         std::string jsonPath = "";
         for (auto& c : path) {
             if (c == '\\') {
@@ -107,8 +107,10 @@ public:
             }
         }
         return jsonPath;
-    }
+#else
+        return path;
 #endif
+    }
 };
 
 } // namespace logtail

@@ -77,11 +77,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
-#if defined(_MSC_VER)
         std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
-#else
-        std::string jsonLogPath = logPath;
-#endif
         // new pipeline
         configStr = R"(
             {
@@ -182,9 +178,6 @@ private:
 
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
-#if defined(_MSC_VER)
-        std::string PATH_SEPARATOR = UnitTestHelper::JsonEscapeDirPath(PATH_SEPARATOR);
-#endif
         std::string containerStr = R"(
             {
                 "ID": ")"
@@ -192,21 +185,21 @@ private:
                 "Mounts": [
                     {
                         "Source": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
                         "Destination" : ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
                     }
                 ],
                 "UpperDir": ")"
-            + gRootDir + R"(",
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir) + R"(",
                 "LogPath": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
                 "MetaDatas": [
                     "_container_name_",
                     "test-container"
                 ],
                 "Path": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
             }
         )";
         Json::Value containerJson;

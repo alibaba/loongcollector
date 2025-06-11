@@ -77,11 +77,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
-#if defined(_MSC_VER)
         std::string jsonLogPathDir = UnitTestHelper::JsonEscapeDirPath(logPathDir);
-#else
-        std::string jsonLogPathDir = logPathDir;
-#endif
         // new pipeline
         configStr = R"(
             {
