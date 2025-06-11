@@ -17,8 +17,11 @@
 #include "common/StringTools.h"
 #include "unittest/Unittest.h"
 
+namespace logtail {
+extern std::vector<std::string> logtailGetTopicNames(const boost::regex& regex);
+}
+
 using namespace logtail;
-extern std::vector<std::string> GetTopicNames(const boost::regex& regex);
 
 class StringToolsUnittest : public ::testing::Test {};
 
