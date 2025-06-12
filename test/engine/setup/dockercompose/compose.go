@@ -278,9 +278,7 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 // getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
-	f, _ := os.Create(config.CoverageFile)
-	_ = f.Close()
-	str := fmt.Sprintf(template, config.CoverageFile, config.FlusherFile, config.ConfigDir)
+	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir)
 	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
 		panic(err)
 	}
