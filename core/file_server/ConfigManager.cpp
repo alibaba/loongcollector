@@ -1099,7 +1099,7 @@ void ConfigManager::LoadDockerConfig() {
         // cmd 解析json
         Json::Value jsonParams;
         std::string errorMsg;
-        if (params.size() < 5UL || !ParseJsonTable(params, jsonParams, errorMsg)) {
+        if (params.size() < (size_t)5 || !ParseJsonTable(params, jsonParams, errorMsg)) {
             LOG_ERROR(sLogger, ("invalid docker container params", params)("errorMsg", errorMsg));
             continue;
         }

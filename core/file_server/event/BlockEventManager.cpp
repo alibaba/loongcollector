@@ -21,6 +21,11 @@
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 
+#if defined(_MSC_VER)
+// GetObject is a preprocessor definition in "windows.h"
+#undef GetObject
+#endif
+
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
 using namespace std;

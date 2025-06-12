@@ -354,7 +354,7 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
             LOG_ERROR(sLogger, ("open file error", filename)("error", errorStr));
             return false;
         }
-        usleep(5000);
+        std::this_thread::sleep_for(std::chrono::microseconds(5000));
     }
     fseek(fin, 0, SEEK_END);
     auto const currentSize = ftell(fin);
@@ -576,7 +576,8 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                             "endpoint", host)("projectName", bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 }
-                                usleep(INT32_FLAG(send_retry_sleep_interval));
+                                std::this_thread::sleep_for(
+                                    std::chrono::microseconds(INT32_FLAG(send_retry_sleep_interval)));
                                 break;
                             case SEND_QUOTA_EXCEED:
                                 AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
@@ -594,10 +595,12 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
                                             "endpoint", host)("projectName", bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
-                                usleep(INT32_FLAG(quota_exceed_wait_interval));
+                                std::this_thread::sleep_for(
+                                    std::chrono::microseconds(INT32_FLAG(quota_exceed_wait_interval)));
                                 break;
                             case SEND_UNAUTHORIZED:
-                                usleep(INT32_FLAG(unauthorized_wait_interval));
+                                std::this_thread::sleep_for(
+                                    std::chrono::microseconds(INT32_FLAG(unauthorized_wait_interval)));
                                 break;
                             default:
                                 sendResult = true;

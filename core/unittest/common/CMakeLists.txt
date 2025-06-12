@@ -17,8 +17,7 @@ project(common_unittest)
 
 add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
         FileSystemUtilUnittest.h
-        DevInodeUnittest.h
-        TimeUtilUnittest.h)
+        DevInodeUnittest.h)
 target_link_libraries(common_simple_utils_unittest ${UT_BASE_TARGET})
 
 add_executable(common_logfileoperator_unittest LogFileOperatorUnittest.cpp)
@@ -57,8 +56,10 @@ target_link_libraries(timer_unittest ${UT_BASE_TARGET})
 add_executable(curl_unittest http/CurlUnittest.cpp)
 target_link_libraries(curl_unittest ${UT_BASE_TARGET})
 
-add_executable(proc_parser_unittest ProcParserUnittest.cpp)
-target_link_libraries(proc_parser_unittest ${UT_BASE_TARGET})
+if (LINUX)
+    add_executable(proc_parser_unittest ProcParserUnittest.cpp)
+    target_link_libraries(proc_parser_unittest ${UT_BASE_TARGET})
+endif()
 
 add_executable(network_util_unittest NetworkUtilUnittest.cpp)
 target_link_libraries(network_util_unittest ${UT_BASE_TARGET})
@@ -81,8 +82,9 @@ gtest_discover_tests(safe_queue_unittest)
 gtest_discover_tests(http_request_timer_event_unittest)
 gtest_discover_tests(timer_unittest)
 gtest_discover_tests(curl_unittest)
-gtest_discover_tests(proc_parser_unittest)
-gtest_discover_tests(proc_parser_unittest)
+if (LINUX)
+    gtest_discover_tests(proc_parser_unittest)
+endif()
 gtest_discover_tests(network_util_unittest)
 gtest_discover_tests(lru_benchmark)
 gtest_discover_tests(timekeeper_benchmark)

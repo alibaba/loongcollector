@@ -1530,7 +1530,7 @@ void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
 
     Json::Value metrics = MakeConfigJson();
     Json::Value& cfg = *metrics["metrics"].begin();
-    cfg["log_path"] = kRootPath + (wildcard ? "\\" + kDirPrefix + "*" : "");
+    cfg["log_path"] = kRootPath + (wildcard ? PATH_SEPARATOR + kDirPrefix + "*" : "");
     cfg["file_pattern"] = "*" + kFileExt;
     if (enable) {
         cfg["advanced"]["enable_root_path_collection"] = true;
@@ -1542,7 +1542,7 @@ void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
                "GitlabRunner", "Elevation", "P*",      "S*",           "D*",           "C*"};
         Json::Value& dirBlacklist = cfg["advanced"]["blacklist"]["dir_blacklist"];
         for (auto& p : kBlacklistedDirs) {
-            dirBlacklist.append(kRootPath + "\\" + p);
+            dirBlacklist.append(kRootPath + PATH_SEPARATOR + p);
         }
     }
     WriteMetrics(metrics);
@@ -1553,10 +1553,10 @@ void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
     sleep(INT32_FLAG(dirfile_check_interval_ms) / 1000 * 2);
 
     // Subdirectories: d1, d2, d3, d3/d4, d3/d4/d5/d6, 2 files in each directory.
-    directories = std::vector<bfs::path>{bfs::path(kRootPath + "\\"),
-                                         bfs::path(kRootPath + "\\") / bfs::path(kDirPrefix + "1"),
-                                         bfs::path(kRootPath + "\\") / bfs::path(kDirPrefix + "2"),
-                                         bfs::path(kRootPath + "\\") / bfs::path(kDirPrefix + "3")};
+    directories = std::vector<bfs::path>{bfs::path(kRootPath + PATH_SEPARATOR),
+                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "1"),
+                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "2"),
+                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "3")};
     {
         bfs::path p = directories.back();
         for (size_t idx = 4; idx <= 6; ++idx) {
@@ -1574,7 +1574,7 @@ void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
     for (int round = 0; round < 10; ++round) {
         for (auto& d : directories) {
             auto name = d.filename().string();
-            if (name == "\\") {
+            if (name == PATH_SEPARATOR) {
                 name.clear();
             }
             std::ofstream((d / (name + "0" + kFileExt)).string()) << "round " << round << "0" << std::endl;
@@ -1634,7 +1634,7 @@ void PollingUnittest::TestPollingWindowsRootPathNew() {
     for (size_t idx = 0; idx < directories.size() - 1; ++idx) {
         const auto& d = directories[idx];
         auto name = d.filename().string();
-        if (name == "\\") {
+        if (name == PATH_SEPARATOR) {
             name.clear();
         }
         auto dir = name.empty() ? kRootPath : d.string();
@@ -1692,7 +1692,7 @@ void PollingUnittest::TestPollingWindowsWildcardRootPathNew() {
     for (size_t idx = 1; idx < directories.size(); ++idx) {
         const auto& d = directories[idx];
         auto name = d.filename().string();
-        if (name == "\\") {
+        if (name == PATH_SEPARATOR) {
             name.clear();
         }
         auto dir = name.empty() ? kRootPath : d.string();

@@ -28,6 +28,27 @@ using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);
 
+#if defined(_MSC_VER)
+const char* Basepath = "\\basepath";
+const char* Basepath0 = "\\basepath0";
+const char* Basepath1Log = "\\basepath1\\log";
+const char* Basepath01 = "\\basepath0\\1";
+const char* BasepathDir = "\\basepath\\";
+const char* Basepath0Dir = "\\basepath0\\";
+const char* Basepath1LogDir = "\\basepath1\\log\\";
+const char* Basepath01Dir = "\\basepath0\\1\\";
+#else
+const char* Basepath = "/basepath";
+const char* Basepath0 = "/basepath0";
+const char* Basepath1Log = "/basepath1/log";
+const char* Basepath01 = "/basepath0/1";
+const char* BasepathDir = "/basepath/";
+const char* Basepath0Dir = "/basepath0/";
+const char* Basepath1LogDir = "/basepath1/log/";
+const char* Basepath01Dir = "/basepath0/1/";
+#endif
+
+
 namespace logtail {
 class MockHandler : public EventHandler {
 public:
@@ -49,9 +70,9 @@ protected:
         for (int i = 0; i < 10; ++i) {
             std::string dir;
             if (i < 4) {
-                dir = std::string("/basepath0/") + std::to_string(i);
+                dir = std::string(Basepath0Dir) + std::to_string(i);
             } else {
-                dir = std::string("/basepath1/log/") + std::to_string(i);
+                dir = std::string(Basepath1LogDir) + std::to_string(i);
             }
             DirInfo* dirInfo = new DirInfo(dir, i, false, &mHandlers[i]);
             EventDispatcher::GetInstance()->AddOneToOneMapEntry(dirInfo, i);
@@ -75,31 +96,31 @@ public:
     void TestFindAllSubDirAndHandler() {
         LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
         // Case: prefix of a dir name, should find nothing
-        std::string baseDir = "/basepath";
+        std::string baseDir = Basepath;
         std::vector<std::pair<std::string, EventHandler*> > subdirs;
         subdirs = EventDispatcher::GetInstance()->FindAllSubDirAndHandler(baseDir);
         APSARA_TEST_TRUE_FATAL(subdirs.empty());
 
         // Case: match parent dir name, should find subdirs
-        baseDir = "/basepath0";
+        baseDir = Basepath0;
         subdirs.clear();
         subdirs = EventDispatcher::GetInstance()->FindAllSubDirAndHandler(baseDir);
         APSARA_TEST_EQUAL_FATAL(subdirs.size(), 4UL);
 
         // Case: parent dir name with ending /, should fail
-        baseDir = "/basepath0/";
+        baseDir = Basepath0Dir;
         subdirs.clear();
         subdirs = EventDispatcher::GetInstance()->FindAllSubDirAndHandler(baseDir);
         APSARA_TEST_EQUAL_FATAL(subdirs.size(), 0UL);
 
         // Case: match lv2 parent dir name, should find subdirs
-        baseDir = "/basepath1/log";
+        baseDir = Basepath1Log;
         subdirs.clear();
         subdirs = EventDispatcher::GetInstance()->FindAllSubDirAndHandler(baseDir);
         APSARA_TEST_EQUAL_FATAL(subdirs.size(), 6UL);
 
         // Case: match whole dir name, should find itself
-        baseDir = "/basepath0/1";
+        baseDir = Basepath01;
         subdirs.clear();
         subdirs = EventDispatcher::GetInstance()->FindAllSubDirAndHandler(baseDir);
         APSARA_TEST_EQUAL_FATAL(subdirs.size(), 1UL);
@@ -107,14 +128,14 @@ public:
 
     void TestUnregisterAllDir() {
         LOG_INFO(sLogger, ("TestUnregisterAllDir() begin", time(NULL)));
-        std::string baseDir = "/basepath0";
+        std::string baseDir = Basepath0;
         EventDispatcher::GetInstance()->UnregisterAllDir(baseDir);
         APSARA_TEST_EQUAL_FATAL(mTimeOutHandler->handle_count, 4);
     }
 
     void TestStopAllDir() {
         LOG_INFO(sLogger, ("TestStopAllDir() begin", time(NULL)));
-        std::string baseDir = "/basepath0";
+        std::string baseDir = Basepath0;
         EventDispatcher::GetInstance()->StopAllDir(baseDir, "");
         for (size_t i = 0; i < 10; ++i) {
             if (i < 4) {

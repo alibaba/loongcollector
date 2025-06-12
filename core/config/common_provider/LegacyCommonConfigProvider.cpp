@@ -102,7 +102,7 @@ void LegacyCommonConfigProvider::Stop() {
 
 void LegacyCommonConfigProvider::CheckUpdateThread() {
     LOG_INFO(sLogger, ("legacy common config provider", "started"));
-    usleep((rand() % 10) * 100 * 1000);
+    std::this_thread::sleep_for(std::chrono::microseconds((rand() % 10) * 100 * 1000));
     int32_t lastCheckTime = 0;
     unique_lock<mutex> lock(mThreadRunningMux);
     while (mIsThreadRunning) {
@@ -308,12 +308,14 @@ void LegacyCommonConfigProvider::UpdateRemoteConfig(
                     }
                 }
                 mConfigNameVersionMap[checkResult.name()] = checkResult.new_version();
-                ofstream fout(tmpFilePath);
-                if (!fout) {
-                    LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
-                    continue;
+                {
+                    ofstream fout(tmpFilePath);
+                    if (!fout) {
+                        LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
+                        continue;
+                    }
+                    fout << configDetail;
                 }
-                fout << configDetail;
 
                 error_code ec;
                 filesystem::rename(tmpFilePath, filePath, ec);

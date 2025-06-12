@@ -96,6 +96,7 @@ private:
     friend class ExactlyOnceQueueManagerUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
+    friend class CreateModifyHandlerUnittest;
 #endif
 };
 

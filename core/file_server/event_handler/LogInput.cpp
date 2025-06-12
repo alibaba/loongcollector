@@ -380,16 +380,16 @@ void LogInput::ProcessLoop() {
         Event* ev = PopEventQueue();
         if (ev != NULL) {
             ++mEventProcessCount;
-            if (mIdleFlag)
+            if (mIdleFlag) {
                 delete ev;
-            else
+            } else
                 ProcessEvent(dispatcher, ev);
         } else {
             unique_lock<mutex> lock(mFeedbackMux);
             mFeedbackCV.wait_for(lock, chrono::microseconds(INT32_FLAG(log_input_thread_wait_interval)));
         }
-
-        if (mIdleFlag)
+        // check exiting
+        if (mIdleFlag && !Application::GetInstance()->IsExiting())
             continue;
 
         curTime = time(NULL);

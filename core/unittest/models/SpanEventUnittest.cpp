@@ -180,7 +180,7 @@ void SpanEventUnittest::TestScopeTag() {
 }
 
 void SpanEventUnittest::TestSize() {
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(SpanEvent::Kind) + sizeof(uint64_t) + sizeof(uint64_t)
+    size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(SpanEvent::Kind) + sizeof(uint64_t) + sizeof(uint64_t)
         + sizeof(SpanEvent::StatusCode) + sizeof(vector<SpanEvent::InnerEvent>) + sizeof(vector<SpanEvent::SpanLink>)
         + sizeof(map<StringView, StringView>) + sizeof(map<StringView, StringView>);
 
@@ -343,7 +343,7 @@ void SpanEventUnittest::TestToJson() {
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
 
-    APSARA_TEST_TRUE(eventJson == res);
+    APSARA_TEST_TRUE(eventJson.toStyledString() == res.toStyledString());
 }
 
 void SpanEventUnittest::TestFromJson() {
@@ -522,7 +522,7 @@ void InnerEventUnittest::TestToJson() {
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
 
-    APSARA_TEST_TRUE(eventJson == res);
+    APSARA_TEST_TRUE(eventJson.toStyledString() == res.toStyledString());
 }
 
 void InnerEventUnittest::TestFromJson() {
