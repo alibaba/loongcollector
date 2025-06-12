@@ -14,7 +14,9 @@
 
 #include "Log.h"
 
+namespace {
 logtail::ebpf::eBPFLogHandler log_fn = nullptr;
+} // namespace
 
 void set_log_handler(logtail::ebpf::eBPFLogHandler fn) {
     if (log_fn == nullptr) {
@@ -31,4 +33,12 @@ void ebpf_log(logtail::ebpf::eBPFLogType level, const char* format, ...) {
     va_start(args, format);
     (void)log_fn(int16_t(level), format, args);
     va_end(args);
+}
+
+int libbpf_printf(enum libbpf_print_level level, const char* format, va_list args) {
+    if (log_fn == nullptr) {
+        return -1;
+    }
+    (void)log_fn(int16_t(level), format, args);
+    return 0;
 }

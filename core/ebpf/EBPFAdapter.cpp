@@ -19,6 +19,8 @@
 #include <memory>
 #include <string>
 
+#include "spdlog/common.h"
+
 #include "common/RuntimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/driver/eBPFDriver.h"
@@ -129,16 +131,16 @@ void EBPFAdapter::Init() {
         buffer[sizeof(buffer) - 1] = '\0';
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
-                LOG_WARNING(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::warn, "{}", buffer);
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
-                LOG_INFO(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::info, "{}", buffer);
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
-                LOG_DEBUG(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::debug, "{}", buffer);
                 break;
             default:
-                LOG_INFO(sLogger, ("module", "eBPFDriver")("level", int(level))("msg", buffer));
+                sLogger->log(spdlog::level::info, "{}", buffer);
                 break;
         }
         return 0;
