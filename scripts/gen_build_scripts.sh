@@ -85,7 +85,7 @@ EOF
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s GoPluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL=${BUILD_LOGTAIL} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS}" >>$BUILD_SCRIPT_FILE
-  elif [ $CATEGORY = "all" || $CATEGORY = "e2e" ]; then
+  elif [[ $CATEGORY = "all" || $CATEGORY = "e2e" ]]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   fi
 }
