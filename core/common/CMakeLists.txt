@@ -29,6 +29,8 @@ elseif (LINUX)
     # needed by observer
     file(GLOB PICOHTTPPARSER_SOURCE_FILES protocol/picohttpparser/*.c protocol/picohttpparser/*.h)
     list(APPEND LIB_SOURCE_FILES ${PICOHTTPPARSER_SOURCE_FILES})
+    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/WindowsDaemonUtil.h)
+    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/WindowsDaemonUtil.cpp)
 endif ()
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
     file(GLOB XX_HASH_SOURCE_FILES xxhash/*.c xxhash/*.h)

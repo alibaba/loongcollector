@@ -85,36 +85,29 @@ make plugin_local # 每次更新插件代码后从这里开始
 - 安装Visual Studio Community Edition，推荐2017版本
 - 安装golang
 - 安装MinGW(根据windows机器位数选择对应版本)
-- 下载相应位数的C++ boost库，安装
-  - [boost_1_68_0-msvc-14.1-64.exe](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/boost_1_68_0-msvc-14.1-64.exe)
-  - [boost_1_68_0-msvc-14.1-32.exe](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/boost_1_68_0-msvc-14.1-32.exe)
 - 下载相应位数的ilogtail-deps编译依赖，解压
-  - [64位依赖](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.windows-x64.zip)
-  - [32位依赖](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.windows-386.zip)
+  - [64位依赖](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/2.0/ilogtail-deps.windows-x64-2.0-version.zip)
 
 ### 修改编译脚本
 
-将ilogtail/scripts/windows64_build.bat(windows32_build.bat)脚本中的的BOOST_ROOT、ILOGTAIL_DEPS_PATH、CMAKE_BIN、DEVENV_BIN、MINGW_PATH五个环境变量值替换成编译机器上实际的路径
+将ilogtail/scripts/windows64_build.bat(windows32_build.bat)脚本中的的ILOGTAIL_DEPS_PATH、CMAKE_BIN、DEVENV_BIN、MINGW_PATH四个环境变量值替换成编译机器上实际的路径
 
 ``` bat
-set ILOGTAIL_PLUGIN_SRC_PATH=%P1Path%
-REM Change to where boost_1_68_0 locates
-set BOOST_ROOT=C:\workspace\boost_1_68_0
-REM Change to where ilogtail-deps.windows-x64 locates, path seperator must be /
-set ILOGTAIL_DEPS_PATH=C:/workspace/ilogtail-deps.windows-x64
+REM Change to where ilogtail-deps.windows-x64 locates
+set ILOGTAIL_DEPS_PATH=D:\workspace\ilogtail-deps.windows-x64-2.0-version
 REM Change to where cmake locates
-set CMAKE_BIN=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake
+set CMAKE_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake"
 REM Change to where devenv locates
-set DEVENV_BIN=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com
+set DEVENV_BIN="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com"
 REM Change to where mingw locates
-set MINGW_PATH=C:\workspace\mingw64\bin
+set MINGW_PATH=C:\local\mingw64\bin
 ```
 
 ### 执行编译脚本
 
 cd 到ilogtail/scripts目录下，执行windows64_build.bat(windows32_build.bat)脚本，等待约6分钟，完成编译。
 编译产物列表：
-
+ilogtail/output目录下:
 - ilogtail.exe (主程序)
 - PluginAdapter.dll (插件接口)
 - PluginBase.dll (插件lib)

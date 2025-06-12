@@ -16,11 +16,11 @@
 
 #include <fstream>
 
+#include "unittest/Unittest.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "file_server/FileServer.h"
 #include "reader/JsonLogFileReader.h"
-#include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 

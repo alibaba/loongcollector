@@ -16,12 +16,12 @@
 #include <string>
 #include <vector>
 
+#include "unittest/Unittest.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/Config.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseTimestampNative.h"
-#include "unittest/Unittest.h"
 
 using namespace logtail;
 
@@ -38,7 +38,9 @@ public:
     void TestProcessRegularFormatFailed();
     void TestProcessHistoryDiscard();
     void TestProcessEventPreciseTimestampLegacy();
+#if !defined(_MSC_VER)
     void TestCheckTime();
+#endif
 
     PipelineContext mContext;
 };
@@ -50,7 +52,9 @@ UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessNoYearFormat);
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessRegularFormatFailed);
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessHistoryDiscard);
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessEventPreciseTimestampLegacy);
+#if !defined(_MSC_VER)
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestCheckTime);
+#endif
 
 bool CheckTimeFormatV2(const std::string& timeValue, const std::string& timeFormat) {
     LogtailTime logTime = {0, 0};
@@ -64,6 +68,7 @@ bool CheckTimeFormatV2(const std::string& timeValue, const std::string& timeForm
     return true;
 }
 
+#if !defined(_MSC_VER)
 bool CheckTimeFormatV1(const std::string& timeValue, const std::string& timeFormat) {
     struct tm tm;
 
@@ -73,7 +78,9 @@ bool CheckTimeFormatV1(const std::string& timeValue, const std::string& timeForm
         return true;
     }
 }
+#endif
 
+#if !defined(_MSC_VER)
 void ProcessorParseTimestampNativeUnittest::TestCheckTime() {
     std::string timeValue;
     std::string timeFormat;
@@ -286,6 +293,7 @@ void ProcessorParseTimestampNativeUnittest::TestCheckTime() {
     APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
     APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
 }
+#endif
 
 void ProcessorParseTimestampNativeUnittest::TestInit() {
     // make config

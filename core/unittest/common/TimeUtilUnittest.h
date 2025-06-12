@@ -28,16 +28,20 @@ int DeduceYear(const struct tm* tm, const struct tm* currentTm);
 class TimeUtilUnittest : public ::testing::Test {
 public:
     void TestDeduceYear();
+#if !defined(_MSC_VER)
     void TestStrptime();
     void TestNativeStrptimeFormat();
     void TestStrptimeNanosecond();
+#endif
     void TestGetPreciseTimestampFromLogtailTime();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
+#if !defined(_MSC_VER)
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
+#endif
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
 
 void TimeUtilUnittest::TestDeduceYear() {
@@ -68,6 +72,7 @@ void TimeUtilUnittest::TestDeduceYear() {
     }
 }
 
+#if !defined(_MSC_VER)
 void TimeUtilUnittest::TestStrptime() {
     struct Case {
         std::string buf;
@@ -159,6 +164,7 @@ void TimeUtilUnittest::TestStrptimeNanosecond() {
         EXPECT_EQ(nanosecond, c.expectedNanosecond) << "FAILED: " + c.buf1;
     }
 }
+#endif
 
 void TimeUtilUnittest::TestGetPreciseTimestampFromLogtailTime() {
     PreciseTimestampConfig preciseTimestampConfig;
