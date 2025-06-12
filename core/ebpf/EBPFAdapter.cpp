@@ -14,6 +14,8 @@
 
 #include "ebpf/EBPFAdapter.h"
 
+#include <cstdlib>
+
 #include <memory>
 #include <string>
 
@@ -96,7 +98,7 @@ EBPFAdapter::~EBPFAdapter() {
 
 void EBPFAdapter::Init() {
     mBinaryPath = GetProcessExecutionDir();
-    mFullLibName = "lib" + mDriverLibName + ".so";
+    setenv("SYSAK_WORK_PATH", mBinaryPath.c_str(), 1);
     for (auto& x : mRunning) {
         x = false;
     }
