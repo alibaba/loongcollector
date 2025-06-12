@@ -154,7 +154,7 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
@@ -208,7 +208,7 @@ bool EBPFAdapter::loadCoolBPF() {
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf, path", mBinaryPath)("error", loadErr));
@@ -249,7 +249,7 @@ bool EBPFAdapter::dynamicLibSuccess() {
 
 bool EBPFAdapter::CheckPluginRunning(PluginType pluginType) {
     if (!loadDynamicLib(mDriverLibName)) {
-        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", magic_enum::enum_name(pluginType)));
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
         return false;
     }
 

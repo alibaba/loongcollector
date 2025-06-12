@@ -25,5 +25,5 @@ int libbpf_printf(enum libbpf_print_level level, const char* format, va_list arg
 
 #define EBPF_LOG(level, format, ...) \
     do { \
-        ebpf_log(level, "file:%s\tline:%d\t" format, __FILE__, __LINE__, ##__VA_ARGS__); \
+        ebpf_log(level, "%s:%d\t" format, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
