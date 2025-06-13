@@ -228,7 +228,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	}
 	dockerContainer.HostnamePath = hostnamePath
 	dockerContainer.HostsPath = hostsPath
-	formatConttainerJSONPath(&dockerContainer, true)
+	formatContainerJSONPath(&dockerContainer)
 	return cw.containerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 

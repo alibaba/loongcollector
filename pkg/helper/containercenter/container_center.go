@@ -653,8 +653,9 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 	return did
 }
 
-func formatConttainerJSONPath(info *types.ContainerJSON, formatStdoutLogPath bool) {
-	if formatStdoutLogPath {
+func formatContainerJSONPath(info *types.ContainerJSON) {
+	// for inner enterprise stdout scene, if path start with /.. , no format it
+	if !strings.HasPrefix(info.LogPath, "/..") {
 		info.LogPath = filepath.Clean(info.LogPath)
 	}
 	for i := range info.Mounts {
@@ -1086,7 +1087,7 @@ func (dc *ContainerCenter) fetchAll() error {
 			if !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 				continue
 			}
-			formatConttainerJSONPath(&containerDetail, true)
+			formatContainerJSONPath(&containerDetail)
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {
 			dc.setLastError(err, "inspect container error "+container.ID)

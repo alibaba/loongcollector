@@ -78,7 +78,7 @@ func TestGetIpByHost_2(t *testing.T) {
 	os.Remove(hostFileName)
 }
 
-func TestFormatConttainerJsonPath(t *testing.T) {
+func TestFormatContainerJSONPath(t *testing.T) {
 	testContainer1 := `{
 		"ID": "111",
 		"Name": "container1",
@@ -126,11 +126,30 @@ func TestFormatConttainerJsonPath(t *testing.T) {
 	container1 := types.ContainerJSON{}
 	err := json.Unmarshal([]byte(testContainer1), &container1)
 	require.NoError(t, err)
-	formatConttainerJSONPath(&container1, true)
+	formatContainerJSONPath(&container1)
 	require.Equal(t, "/var/log/pods/prod_podTest_podUidTest/container1/0.log", container1.LogPath)
 	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Source)
 	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Destination)
 	require.Equal(t, "/var/lib/docker/overlay2/XX/diff", container1.GraphDriver.Data["UpperDir"])
+
+	testContainer2 := `{
+		"ID": "111",
+		"Name": "container1",
+		"Image": "image1",
+		"LogPath": "/../var/log/pods/prod_podTest_podUidTest/container1/0.log",
+		"Labels": {
+				"io.kubernetes.container.name": "container1",
+				"io.kubernetes.pod.name": "podTest",
+				"io.kubernetes.pod.namespace": "prod",
+				"io.kubernetes.pod.uid": "podUidTest"
+		},
+		"LogType": "json-file"
+}`
+	container2 := types.ContainerJSON{}
+	err = json.Unmarshal([]byte(testContainer2), &container2)
+	require.NoError(t, err)
+	formatContainerJSONPath(&container2)
+	require.Equal(t, "/../var/log/pods/prod_podTest_podUidTest/container1/0.log", container2.LogPath)
 }
 
 func TestGetAllAcceptedInfoV2(t *testing.T) {
