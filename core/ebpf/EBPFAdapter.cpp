@@ -106,7 +106,7 @@ void EBPFAdapter::Init() {
     }
 
     mLogPrinter = [](int16_t level, const char* format, va_list args) -> int {
-        eBPFLogType printLevel = (eBPFLogType)level;
+        auto printLevel = (eBPFLogType)level;
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
                 if (!SHOULD_LOG_WARNING(sLogger)) {
@@ -121,7 +121,7 @@ void EBPFAdapter::Init() {
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
                 [[fallthrough]];
             default:
-                if (!SHOULD_LOG_INFO(sLogger)) {
+                if (!SHOULD_LOG_ERROR(sLogger)) {
                     return 0;
                 }
                 break;
@@ -140,7 +140,7 @@ void EBPFAdapter::Init() {
                 sLogger->log(spdlog::level::debug, "{}", buffer);
                 break;
             default:
-                sLogger->log(spdlog::level::info, "{}", buffer);
+                sLogger->log(spdlog::level::err, "{}", buffer);
                 break;
         }
         return 0;
@@ -322,7 +322,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         auto* nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
         if (nconf) {
             nconf->mSo = mBinaryPath + "libcoolbpf.so.1.0.0";
-            nconf->mLogHandler = mLogPrinter;
+            nconf->mLogHandler = mLogPrinter; // TODO: unneccessary
             nconf->mUpcaOffset
                 = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)];
             nconf->mUprobeOffset

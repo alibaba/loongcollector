@@ -16,17 +16,13 @@
 
 #include "metadata/ContainerMetadata.h"
 
-#include "common/Flags.h"
-
-DEFINE_FLAG_BOOL(disable_container_meta, "disable container metadata", true);
-
 namespace logtail {
 
 ContainerMetadata::ContainerMetadata(size_t cidCacheSize) : mContainerCache(cidCacheSize, 20) {
 }
 
 bool ContainerMetadata::Enable() {
-    return !BOOL_FLAG(disable_container_meta);
+    return false;
 }
 
 std::shared_ptr<ContainerMeta> ContainerMetadata::GetInfoByContainerId(const StringView&) {

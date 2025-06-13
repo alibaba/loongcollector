@@ -161,7 +161,8 @@ bool ProcessCacheManager::Init() {
     mPoller = async(std::launch::async, &ProcessCacheManager::pollPerfBuffers, this);
     bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
-        LOG_ERROR(sLogger, ("failed to start process security plugin", ""));
+        LOG_ERROR(sLogger, ("start process security plugin", "failed"));
+        Stop();
         return false;
     }
     auto ret = syncAllProc(); // write process cache contention with pollPerfBuffers
