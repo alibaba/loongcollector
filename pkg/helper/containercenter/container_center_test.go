@@ -16,6 +16,7 @@ package containercenter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"sync"
@@ -75,6 +76,80 @@ func TestGetIpByHost_2(t *testing.T) {
 		t.Errorf("GetIpByHosts = %v, want %v", ip, "172.20.4.5")
 	}
 	os.Remove(hostFileName)
+}
+
+func TestFormatContainerJSONPath(t *testing.T) {
+	testContainer1 := `{
+		"ID": "111",
+		"Name": "container1",
+		"Image": "image1",
+		"LogPath": "///var/log/pods/prod_podTest_podUidTest/container1/0.log",
+		"Labels": {
+				"io.kubernetes.container.name": "container1",
+				"io.kubernetes.pod.name": "podTest",
+				"io.kubernetes.pod.namespace": "prod",
+				"io.kubernetes.pod.uid": "podUidTest"
+		},
+		"LogType": "json-file",
+		"Env": {
+				"KUBERNETES_PORT": "tcp://192.168.0.1:443",
+				"KUBERNETES_PORT_443_TCP": "tcp://192.168.0.1:443",
+				"KUBERNETES_PORT_443_TCP_ADDR": "192.168.0.1",
+				"KUBERNETES_PORT_443_TCP_PORT": "443",
+				"KUBERNETES_PORT_443_TCP_PROTO": "tcp",
+				"KUBERNETES_SERVICE_HOST": "10.244.197.20",
+				"KUBERNETES_SERVICE_PORT": "6443",
+				"KUBERNETES_SERVICE_PORT_HTTPS": "443"
+		},
+		"Mounts": [
+			{
+				"Source": "//home/admin/logs",
+				"Destination" : "//home/admin/logs",
+				"Driver" : "host"
+			}
+		],
+		"GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/XX/diff",
+                "MergedDir": "/var/lib/docker/overlay2/XX/merged",
+                "UpperDir": "/../var/lib/docker/overlay2/XX/diff",
+                "WorkDir": "/var/lib/docker/overlay2/XX/work"
+            },
+            "Name": "overlay2"
+        },
+		"Created": "2023-06-01T10:09:32.336427588+08:00",
+		"State": {
+				"Pid": 1001,
+				"Status": "running"
+		}
+}`
+	container1 := types.ContainerJSON{}
+	err := json.Unmarshal([]byte(testContainer1), &container1)
+	require.NoError(t, err)
+	formatContainerJSONPath(&container1)
+	require.Equal(t, "/var/log/pods/prod_podTest_podUidTest/container1/0.log", container1.LogPath)
+	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Source)
+	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Destination)
+	require.Equal(t, "/var/lib/docker/overlay2/XX/diff", container1.GraphDriver.Data["UpperDir"])
+
+	testContainer2 := `{
+		"ID": "111",
+		"Name": "container1",
+		"Image": "image1",
+		"LogPath": "/../var/log/pods/prod_podTest_podUidTest/container1/0.log",
+		"Labels": {
+				"io.kubernetes.container.name": "container1",
+				"io.kubernetes.pod.name": "podTest",
+				"io.kubernetes.pod.namespace": "prod",
+				"io.kubernetes.pod.uid": "podUidTest"
+		},
+		"LogType": "json-file"
+}`
+	container2 := types.ContainerJSON{}
+	err = json.Unmarshal([]byte(testContainer2), &container2)
+	require.NoError(t, err)
+	formatContainerJSONPath(&container2)
+	require.Equal(t, "/../var/log/pods/prod_podTest_podUidTest/container1/0.log", container2.LogPath)
 }
 
 func TestGetAllAcceptedInfoV2(t *testing.T) {
