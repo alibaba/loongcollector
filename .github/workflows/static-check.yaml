@@ -105,6 +105,11 @@ jobs:
         runner: [ubuntu]
       fail-fast: true
     steps:
+      - name: prepare ubuntu environment
+        run: |
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v4
         with:
