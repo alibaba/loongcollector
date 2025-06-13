@@ -14,8 +14,12 @@
 
 #include "ebpf/EBPFAdapter.h"
 
+#include <cstdlib>
+
 #include <memory>
 #include <string>
+
+#include "spdlog/common.h"
 
 #include "common/RuntimeUtil.h"
 #include "common/magic_enum.hpp"
@@ -96,13 +100,13 @@ EBPFAdapter::~EBPFAdapter() {
 
 void EBPFAdapter::Init() {
     mBinaryPath = GetProcessExecutionDir();
-    mFullLibName = "lib" + mDriverLibName + ".so";
+    setenv("SYSAK_WORK_PATH", mBinaryPath.c_str(), 1);
     for (auto& x : mRunning) {
         x = false;
     }
 
     mLogPrinter = [](int16_t level, const char* format, va_list args) -> int {
-        eBPFLogType printLevel = (eBPFLogType)level;
+        auto printLevel = (eBPFLogType)level;
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
                 if (!SHOULD_LOG_WARNING(sLogger)) {
@@ -117,7 +121,7 @@ void EBPFAdapter::Init() {
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
                 [[fallthrough]];
             default:
-                if (!SHOULD_LOG_INFO(sLogger)) {
+                if (!SHOULD_LOG_ERROR(sLogger)) {
                     return 0;
                 }
                 break;
@@ -127,16 +131,16 @@ void EBPFAdapter::Init() {
         buffer[sizeof(buffer) - 1] = '\0';
         switch (printLevel) {
             case eBPFLogType::NAMI_LOG_TYPE_WARN:
-                LOG_WARNING(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::warn, "{}", buffer);
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_INFO:
-                LOG_INFO(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::info, "{}", buffer);
                 break;
             case eBPFLogType::NAMI_LOG_TYPE_DEBUG:
-                LOG_DEBUG(sLogger, ("module", "eBPFDriver")("msg", buffer));
+                sLogger->log(spdlog::level::debug, "{}", buffer);
                 break;
             default:
-                LOG_INFO(sLogger, ("module", "eBPFDriver")("level", int(level))("msg", buffer));
+                sLogger->log(spdlog::level::err, "{}", buffer);
                 break;
         }
         return 0;
@@ -150,7 +154,7 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
@@ -204,7 +208,7 @@ bool EBPFAdapter::loadCoolBPF() {
     }
 
     std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
-    LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path:", mBinaryPath));
+    LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path", mBinaryPath));
     std::string loadErr;
     if (!tmp_lib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf, path", mBinaryPath)("error", loadErr));
@@ -245,7 +249,7 @@ bool EBPFAdapter::dynamicLibSuccess() {
 
 bool EBPFAdapter::CheckPluginRunning(PluginType pluginType) {
     if (!loadDynamicLib(mDriverLibName)) {
-        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type:", magic_enum::enum_name(pluginType)));
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
         return false;
     }
 
@@ -318,7 +322,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         auto* nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
         if (nconf) {
             nconf->mSo = mBinaryPath + "libcoolbpf.so.1.0.0";
-            nconf->mLogHandler = mLogPrinter;
+            nconf->mLogHandler = mLogPrinter; // TODO: unneccessary
             nconf->mUpcaOffset
                 = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)];
             nconf->mUprobeOffset

@@ -161,7 +161,8 @@ bool ProcessCacheManager::Init() {
     mPoller = async(std::launch::async, &ProcessCacheManager::pollPerfBuffers, this);
     bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
-        LOG_ERROR(sLogger, ("failed to start process security plugin", ""));
+        LOG_ERROR(sLogger, ("start process security plugin", "failed"));
+        Stop();
         return false;
     }
     auto ret = syncAllProc(); // write process cache contention with pollPerfBuffers
@@ -290,7 +291,7 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
     auto containerInfo = proc.LoadContainerInfo();
     if (containerInfo) {
         auto containerName = sb->CopyString(containerInfo->mContainerName);
-        logEvent.SetContentNoCopy(kLocalContainerName.LogKey(), StringView(containerName.data, containerName.size));
+        logEvent.SetContentNoCopy(kContainerName.LogKey(), StringView(containerName.data, containerName.size));
         auto imageName = sb->CopyString(containerInfo->mImageName);
         logEvent.SetContentNoCopy(kContainerImageName.LogKey(), StringView(imageName.data, imageName.size));
     }
@@ -304,8 +305,6 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
         logEvent.SetContentNoCopy(kNamespace.LogKey(), StringView(namespaceStr.data, namespaceStr.size));
         auto podName = sb->CopyString(podInfo->mPodName);
         logEvent.SetContentNoCopy(kPodName.LogKey(), StringView(podName.data, podName.size));
-        // auto containerName = sb->CopyString(podInfo->mContainerName);
-        // logEvent.SetContentNoCopy(kContainerName.LogKey(), StringView(containerName.data, containerName.size));
     }
 
     auto parentProcPtr = mProcessCache.Lookup({proc.mPPid, proc.mPKtime});
