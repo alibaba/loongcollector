@@ -27,6 +27,7 @@ function(add_unittest target_name source_file)
 endfunction()
 
 add_unittest(aggregator_unittest AggregatorUnittest.cpp)
+add_unittest(ebpf_adapter_unittest EBPFAdapterUnittest.cpp)
 add_unittest(ebpf_server_unittest EBPFServerUnittest.cpp)
 add_unittest(sampler_unittest SamplerUnittest.cpp)
 add_unittest(table_unittest TableUnittest.cpp)
@@ -50,6 +51,7 @@ add_unittest(process_sync_retryable_event_unittest ProcessSyncRetryableEventUnit
 add_unittest(retryable_event_unittest RetryableEventUnittest.cpp)
 
 add_driver_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
+add_driver_unittest(ebpf_driver_log_unittest EBPFDriverLogUnittest.cpp)
 add_driver_unittest(ebpf_driver_unittest eBPFDriverUnittest.cpp)
 add_driver_unittest(bpf_map_traits_unittest BPFMapTraitsUnittest.cpp)
 add_driver_unittest(bpf_wrapper_unittest BPFWrapperUnittest.cpp)

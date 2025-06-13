@@ -273,8 +273,12 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     UpdatePipelineName(type, pipelineName, ctx->GetProjectName());
 
     if (type != PluginType::NETWORK_OBSERVE) {
-        auto res = mProcessCacheManager->Init();
-        LOG_INFO(sLogger, ("ProcessCacheManager inited", res));
+        if (mProcessCacheManager->Init()) {
+            LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
+        } else {
+            LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
+            return false;
+        }
     }
 
     // step1: convert options to export type
