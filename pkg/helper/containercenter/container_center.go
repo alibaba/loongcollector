@@ -653,7 +653,7 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 	return did
 }
 
-func formatConttainerJsonPath(info *types.ContainerJSON, formatStdoutLogPath bool) {
+func formatConttainerJSONPath(info *types.ContainerJSON, formatStdoutLogPath bool) {
 	if formatStdoutLogPath {
 		info.LogPath = filepath.Clean(info.LogPath)
 	}
@@ -1086,7 +1086,7 @@ func (dc *ContainerCenter) fetchAll() error {
 			if !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 				continue
 			}
-			formatConttainerJsonPath(&containerDetail, true)
+			formatConttainerJSONPath(&containerDetail, true)
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {
 			dc.setLastError(err, "inspect container error "+container.ID)

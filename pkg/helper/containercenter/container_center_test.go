@@ -126,7 +126,7 @@ func TestFormatConttainerJsonPath(t *testing.T) {
 	container1 := types.ContainerJSON{}
 	err := json.Unmarshal([]byte(testContainer1), &container1)
 	require.NoError(t, err)
-	formatConttainerJsonPath(&container1, true)
+	formatConttainerJSONPath(&container1, true)
 	require.Equal(t, "/var/log/pods/prod_podTest_podUidTest/container1/0.log", container1.LogPath)
 	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Source)
 	require.Equal(t, "/home/admin/logs", container1.Mounts[0].Destination)
