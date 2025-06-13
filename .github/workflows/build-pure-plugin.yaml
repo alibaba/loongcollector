@@ -34,61 +34,13 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
-      # prepare ubuntu environment
-      - name: prepare ubuntu environment
-        if: matrix.runner == 'arc-runner-set-ilogtail'
-        run: |
-          sudo bash -c 'cat > /etc/apt/sources.list << EOL
-          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-
-          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          EOL'
-          sudo apt update
-          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
-
-      # Clean up space to prevent action from running out of disk space.
-      - name: Free disk space
-        if: matrix.runner == 'arc-runner-set-ilogtail'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
-      # prepare windows environment
-      # https://github.com/actions/virtual-environments/issues/2549
-      - name: add mingw32 to path
-        if: matrix.runner == 'windows-2019'
-        shell: bash
-        run: |
-          echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
-
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -97,17 +49,9 @@ jobs:
 
       - name: Build pure plugin
         run: make plugin_main
-
-  result:
-    runs-on: arc-runner-set-ilogtail
-    timeout-minutes: 60
-    needs: [BuildPurePlugin]
-    steps:
-      - name: Build Result
-        run: echo "Just to make the GitHub merge button green"
   
   actions-timeline:
-    needs: [result]
+    needs: [BuildPurePlugin]
     runs-on: ubuntu-latest
     permissions:
       actions: read

@@ -309,7 +309,7 @@ type MemoryPool struct {
 	Init     int64    `protobuf:"varint,2,opt,name=init,proto3" json:"init,omitempty"`
 	Max      int64    `protobuf:"varint,3,opt,name=max,proto3" json:"max,omitempty"`
 	Used     int64    `protobuf:"varint,4,opt,name=used,proto3" json:"used,omitempty"`
-	Commited int64    `protobuf:"varint,5,opt,name=commited,proto3" json:"commited,omitempty"`
+	Committed int64    `protobuf:"varint,5,opt,name=commited,proto3" json:"commited,omitempty"`
 }
 
 func (x *MemoryPool) Reset() {
@@ -374,7 +374,7 @@ func (x *MemoryPool) GetUsed() int64 {
 
 func (x *MemoryPool) GetCommited() int64 {
 	if x != nil {
-		return x.Commited
+		return x.Committed
 	}
 	return 0
 }

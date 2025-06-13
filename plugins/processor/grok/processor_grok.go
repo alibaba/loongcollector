@@ -370,8 +370,7 @@ type graph map[string][]string
 
 func reverseList(s []string) (r []string) {
 	for _, i := range s {
-		i := i
-		defer func() { r = append(r, i) }()
+		defer func() { r = append(r, i) }() // Go 1.22 开始支持在 for 循环中直接安全捕获循环变量（通过 range 变量隐式拷贝），不需要再拷贝。
 	}
 	return
 }

@@ -30,6 +30,32 @@ on:
       - 1.*
       - benchmark
 jobs:
+  LicensesCheck:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ${{ matrix.runner }}-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        runner: [ubuntu]
+      fail-fast: true
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.10
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check License Header
+        run: make check-license
+
+      - name: Check Dependencies Licences
+        run: make check-dependency-licenses
+
   StaticCheck:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
@@ -37,53 +63,23 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
         runner: [ubuntu]
       fail-fast: true
     steps:
-      # prepare ubuntu environment
       - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu'
         run: |
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
-      # Clean up space to prevent action from running out of disk space.
-      - name: Free disk space
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
-
-      - name: Copy Lib
-        if: matrix.runner == 'ubuntu'
-        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
-
-      - name: Check License Header
-        if: matrix.runner == 'ubuntu'
-        run: make check-license
-
-      - name: Check Dependencies Licences
-        if: matrix.runner == 'ubuntu'
-        run: make check-dependency-licenses
 
       - name: C++ Core Lint
         uses: jidicula/clang-format-action@v4.14.0
@@ -95,6 +91,34 @@ jobs:
 
       - name: Go Plugin Lint
         run: make lint
+  
+  UnitTestGo:
+    env:
+      RUNNER_ALLOW_RUNASROOT: 1
+    runs-on: ${{ matrix.runner }}-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        runner: [ubuntu]
+      fail-fast: true
+    steps:
+      - name: prepare ubuntu environment
+        run: |
+          sudo apt update
+          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.10
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Copy Lib
+        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
 
       - name: UnitTest
         run: sudo make unittest_plugin
@@ -102,16 +126,11 @@ jobs:
       - name: UnitTest PluginManager
         run: sudo make unittest_pluginmanager
 
-  result:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: [StaticCheck]
-    steps:
-      - name: Build Result
-        run: echo "Just to make the GitHub merge button green"
-
   actions-timeline:
-    needs: [result]
+    needs: 
+      - LicensesCheck
+      - StaticCheck
+      - UnitTestGo
     runs-on: ubuntu-latest
     permissions:
       actions: read

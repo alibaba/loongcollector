@@ -180,8 +180,6 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 // getLogtailpluginConfig find the docker compose configuration of the ilogtail.
 func (c *ComposeBenchmarkBooter) getAdvisorConfig(name string) map[string]interface{} {
 	cfg := make(map[string]interface{})
-	f, _ := os.Create(config.CoverageFile)
-	_ = f.Close()
 	if err := yaml.Unmarshal([]byte(fmt.Sprintf(cadvisorTemplate, name)), &cfg); err != nil {
 		panic(err)
 	}

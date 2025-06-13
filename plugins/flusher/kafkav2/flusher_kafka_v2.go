@@ -207,7 +207,7 @@ func NewFlusherKafka() *FlusherKafka {
 }
 func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
-	if k.Brokers == nil || len(k.Brokers) == 0 {
+	if len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
 		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
