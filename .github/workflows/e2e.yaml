@@ -34,7 +34,6 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.23.10]
         runner: [ubuntu-latest]
       fail-fast: true
     steps:
@@ -53,10 +52,10 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
         uses: actions/checkout@v4

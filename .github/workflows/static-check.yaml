@@ -37,14 +37,13 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.23.10]
         runner: [ubuntu]
       fail-fast: true
     steps:
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -64,7 +63,6 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.23.10]
         runner: [ubuntu]
       fail-fast: true
     steps:
@@ -73,10 +71,10 @@ jobs:
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -101,7 +99,6 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.23.10]
         runner: [ubuntu]
       fail-fast: true
     steps:
@@ -110,10 +107,10 @@ jobs:
           sudo apt update
           sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.23.10
 
       - name: Check out code
         uses: actions/checkout@v4
