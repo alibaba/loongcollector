@@ -112,6 +112,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/processor/split/string"
     - import: "github.com/alibaba/ilogtail/plugins/processor/stringreplace"
     - import: "github.com/alibaba/ilogtail/plugins/processor/strptime"
+    - import: "github.com/alibaba/ilogtail/plugins/processor/addfieldsv2"
   linux:
     - import: "github.com/alibaba/ilogtail/plugins/input/command"
     - import: "github.com/alibaba/ilogtail/plugins/input/gpu"
