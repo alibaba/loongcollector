@@ -33,9 +33,6 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
-
-private:
-    bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&);
     // TODO listen to config for multi protocol version
 
 #ifdef APSARA_UNIT_TEST_MAIN
