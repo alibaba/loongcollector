@@ -29,9 +29,6 @@ RUN wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolcha
     cd ../ && \
     rm -fr glibc-2.18*
 
-RUN yum install epel-release -y && yum install nodejs  npm -y
-# RUN curl -LsSf https://astral.sh/uv/install.sh | sh && /home/admin/.local/bin/uv python install 3.12
-
 # Create the user
 COPY .env /tmp/.env
 RUN source /tmp/.env && rm /tmp/.env; \
