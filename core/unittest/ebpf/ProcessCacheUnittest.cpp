@@ -14,6 +14,7 @@
 
 #include <memory>
 
+#include "ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "type/table/BaseElements.h"
 #include "unittest/Unittest.h"
@@ -77,12 +78,15 @@ UNIT_TEST_CASE(ProcessCacheValueUnittest, TestCloneContentsExcessive);
 UNIT_TEST_CASE(ProcessCacheValueUnittest, TestSetContent);
 
 class ProcessCacheUnittest : public ::testing::Test {
+    ProcessCacheUnittest() : mProcParser("/"), mProcessCache(16, mProcParser) {}
+
 protected:
     void TestAddCache();
     void TestRefCount();
     void TestClearExpiredCache();
 
 private:
+    ProcParser mProcParser;
     ProcessCache mProcessCache;
 };
 
@@ -98,7 +102,7 @@ void ProcessCacheUnittest::TestAddCache() {
     cacheValue->SetContent<kBinary>(StringView("test_binary"));
 
     // 测试缓存更新
-    mProcessCache.AddCache(key, std::move(cacheValue));
+    mProcessCache.AddCache(key, cacheValue);
 
     APSARA_TEST_TRUE(mProcessCache.Contains(key));
 
@@ -118,16 +122,16 @@ void ProcessCacheUnittest::TestRefCount() {
     cacheValue->SetContent<kKtime>(StringView("5678"));
     cacheValue->SetContent<kUid>(StringView("1000"));
     cacheValue->SetContent<kBinary>(StringView("test_binary"));
-    mProcessCache.AddCache(key, std::move(cacheValue));
+    mProcessCache.AddCache(key, cacheValue);
     cacheValue = mProcessCache.Lookup(key);
     APSARA_TEST_TRUE(cacheValue != nullptr);
 
     APSARA_TEST_EQUAL(1, cacheValue->mRefCount);
-    mProcessCache.IncRef(key);
+    mProcessCache.IncRef(key, cacheValue);
     APSARA_TEST_EQUAL(2, cacheValue->mRefCount);
-    mProcessCache.DecRef(key, 1234567890);
+    mProcessCache.DecRef(key, cacheValue);
     APSARA_TEST_EQUAL(1, cacheValue->mRefCount);
-    mProcessCache.DecRef(key, 1234567890);
+    mProcessCache.DecRef(key, cacheValue);
     APSARA_TEST_EQUAL(0, cacheValue->mRefCount);
 }
 
@@ -138,16 +142,33 @@ void ProcessCacheUnittest::TestClearExpiredCache() {
     cacheValue->SetContent<kKtime>(StringView("5678"));
     cacheValue->SetContent<kUid>(StringView("1000"));
     cacheValue->SetContent<kBinary>(StringView("test_binary"));
-    mProcessCache.AddCache(key, std::move(cacheValue));
+    mProcessCache.AddCache(key, cacheValue);
 
-    mProcessCache.DecRef(key, 1234567890);
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kInUse, cacheValue->LifeStage());
+    mProcessCache.DecRef(key, cacheValue);
     cacheValue = mProcessCache.Lookup(key);
     APSARA_TEST_TRUE(cacheValue != nullptr);
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeletePending, cacheValue->LifeStage());
     APSARA_TEST_EQUAL(0, cacheValue->mRefCount);
 
-    mProcessCache.ClearExpiredCache(1234567890 + kMaxCacheExpiredTimeout + 1);
+    mProcessCache.ClearExpiredCache();
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeleteReady, cacheValue->LifeStage());
+
+    mProcessCache.IncRef(key, cacheValue);
+    mProcessCache.DecRef(key, cacheValue);
     cacheValue = mProcessCache.Lookup(key);
-    APSARA_TEST_TRUE(cacheValue == nullptr);
+    APSARA_TEST_TRUE(cacheValue != nullptr);
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeletePending, cacheValue->LifeStage());
+    APSARA_TEST_EQUAL(0, cacheValue->mRefCount);
+
+    mProcessCache.ClearExpiredCache();
+    mProcessCache.ClearExpiredCache();
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeleted, cacheValue->LifeStage());
+    APSARA_TEST_TRUE(mProcessCache.Lookup(key) == nullptr);
+
+    mProcessCache.IncRef(key, cacheValue);
+    mProcessCache.DecRef(key, cacheValue);
+    APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeleted, cacheValue->LifeStage());
 }
 
 UNIT_TEST_CASE(ProcessCacheUnittest, TestAddCache);

@@ -14,26 +14,18 @@
 
 #pragma once
 
-#include <array>
 #include <atomic>
-#include <condition_variable>
-#include <queue>
-#include <set>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
-#include "ebpf/util/AggregateTree.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
@@ -104,7 +96,7 @@ public:
     virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
-            LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
+            LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));
             return 1;
         }
         return 0;

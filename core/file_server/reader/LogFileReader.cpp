@@ -120,7 +120,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
         }
         if (discoveryConfig.first->IsContainerDiscoveryEnabled()) {
             ContainerInfo* containerPath = discoveryConfig.first->GetContainerPathByLogPath(hostLogPathDir);
-            if (containerPath == NULL) {
+            if (containerPath == nullptr) {
                 LOG_ERROR(sLogger,
                           ("can not get container path by log path, base path",
                            discoveryConfig.first->GetBasePath())("host path", hostLogPathDir + "/" + hostLogPathFile));
@@ -194,17 +194,18 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
                              const FileTagConfig& tagConfig)
     : mHostLogPathDir(hostLogPathDir),
       mHostLogPathFile(hostLogPathFile),
+      mLastUpdateTime(time(NULL)),
       mDevInode(devInode),
+      mLastEventTime(mLastUpdateTime),
       mReaderConfig(readerConfig),
       mMultilineConfig(multilineConfig),
-      mTagConfig(tagConfig) {
+      mTagConfig(tagConfig),
+      mProject(readerConfig.second->GetProjectName()),
+      mLogstore(readerConfig.second->GetLogstoreName()),
+      mConfigName(readerConfig.second->GetConfigName()),
+      mRegion(readerConfig.second->GetRegion()) {
     mHostLogPath = PathJoin(hostLogPathDir, hostLogPathFile);
-    mLastUpdateTime = time(NULL);
-    mLastEventTime = mLastUpdateTime;
-    mProject = readerConfig.second->GetProjectName();
-    mLogstore = readerConfig.second->GetLogstoreName();
-    mConfigName = readerConfig.second->GetConfigName();
-    mRegion = readerConfig.second->GetRegion();
+
 
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = GetParser<RawTextParser>(0);
@@ -391,7 +392,7 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
 
     // Recover primary checkpoint from local if have.
     PrimaryCheckpointPB primaryCpt;
-    static auto sCptM = CheckpointManagerV2::GetInstance();
+    static auto* sCptM = CheckpointManagerV2::GetInstance();
     bool hasCheckpoint = sCptM->GetPB(primaryCptKey, primaryCpt);
     if (hasCheckpoint) {
         hasCheckpoint = validatePrimaryCheckpoint(primaryCpt);
@@ -614,13 +615,12 @@ void LogFileReader::SetReadFromBeginning() {
 }
 
 int32_t LogFileReader::ParseTime(const char* buffer, const std::string& timeFormat) {
-    struct tm tm;
-    memset(&tm, 0, sizeof(tm));
+    struct tm tm {};
     long nanosecond = 0;
-    int nanosecondLength;
+    int nanosecondLength = 0;
     const char* result = strptime_ns(buffer, timeFormat.c_str(), &tm, &nanosecond, &nanosecondLength);
     tm.tm_isdst = -1;
-    if (result != NULL) {
+    if (result != nullptr) {
         time_t logTime = mktime(&tm);
         return logTime;
     }
@@ -629,8 +629,9 @@ int32_t LogFileReader::ParseTime(const char* buffer, const std::string& timeForm
 
 bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
     mFirstWatched = false;
-    if (mLastFilePos != 0)
+    if (mLastFilePos != 0) {
         return false;
+    }
 
     // here we should NOT use mLogFileOp to open file, because LogFileReader may be created from checkpoint
     // we just want to set file pos, then a TEMPORARY object for LogFileOperator is needed here, not a class member
@@ -648,19 +649,18 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
                      "file signature", mLastFileSignatureHash)("file signature size",
                                                                mLastFileSignatureSize)("file size", mLastFileSize));
         auto error = GetErrno();
-        if (fsutil::Dir::IsENOENT(error))
+        if (fsutil::Dir::IsENOENT(error)) {
             return true;
-        else {
-            LOG_ERROR(sLogger, ("open log file fail", mHostLogPath)("errno", ErrnoToString(error)));
-            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                                   string("Failed to open log file: ") + mHostLogPath
-                                                       + "; errono:" + ErrnoToString(error),
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
-            return false;
         }
+        LOG_ERROR(sLogger, ("open log file fail", mHostLogPath)("errno", ErrnoToString(error)));
+        AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
+                                               string("Failed to open log file: ") + mHostLogPath
+                                                   + "; errono:" + ErrnoToString(error),
+                                               GetRegion(),
+                                               GetProject(),
+                                               GetConfigName(),
+                                               GetLogstore());
+        return false;
     }
 
     if (policy == BACKWARD_TO_FIXED_POS) {
@@ -701,7 +701,7 @@ void LogFileReader::checkContainerType(LogFileOperator& op) {
     char containerBOMBuffer[2] = {0};
     size_t readBOMByte = 1;
     int64_t filePos = 0;
-    TruncateInfo* truncateInfo = NULL;
+    TruncateInfo* truncateInfo = nullptr;
     ReadFile(op, containerBOMBuffer, readBOMByte, filePos, &truncateInfo);
     BaseLineParse* baseLineParsePtr = nullptr;
     if (containerBOMBuffer[0] == '{') {
@@ -766,7 +766,6 @@ void LogFileReader::FixLastFilePos(LogFileOperator& op, int64_t endOffset) {
                     "search start position", mLastFilePos)("search end position", mLastFilePos + readSizeReal));
 
     free(readBuf);
-    return;
 }
 
 std::string LogFileReader::GetTopicName(const std::string& topicConfig, const std::string& path) {
@@ -789,22 +788,22 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                     mTopicExtraTags.emplace_back(keys[0], values[0]);
                 }
                 return values[0];
-            } else {
-                for (size_t i = 0; i < matchedSize; ++i) {
-                    if (res.empty()) {
-                        res = values[i];
-                    } else {
-                        res = res + "_" + values[i];
-                    }
-                    mTopicExtraTags.emplace_back(keys[i], values[i]);
+            }
+            for (size_t i = 0; i < matchedSize; ++i) {
+                if (res.empty()) {
+                    res = values[i];
+                } else {
+                    res = res + "_" + values[i];
                 }
+                mTopicExtraTags.emplace_back(keys[i], values[i]);
             }
             return res;
         }
     }
 
     boost::match_results<const char*> what;
-    string res, exception;
+    string res;
+    string exception;
     // catch exception
     boost::regex topicRegex;
     try {
@@ -921,12 +920,12 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         }
         return false;
     }
-    if (AppConfig::GetInstance()->IsInputFlowControl())
+    if (AppConfig::GetInstance()->IsInputFlowControl()) {
         LogInput::GetInstance()->FlowControl();
-
-    if ((event == nullptr || !event->IsReaderFlushTimeout()) && mFirstWatched && (mLastFilePos == 0))
+    }
+    if ((event == nullptr || !event->IsReaderFlushTimeout()) && mFirstWatched && (mLastFilePos == 0)) {
         CheckForFirstOpen();
-
+    }
     // Init checkpoint for this read, new if no checkpoint to replay.
     if (mEOOption) {
         mEOOption->selectedCheckpoint = selectCheckpointToReplay();
@@ -948,7 +947,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         }
     }
     bool moreData = GetRawData(logBuffer, mLastFileSize, tryRollback);
-    if (!logBuffer.rawBuffer.empty() > 0) {
+    if (!logBuffer.rawBuffer.empty()) {
         if (mEOOption) {
             // This read was replayed by checkpoint, adjust mLastFilePos to skip hole.
             if (mEOOption->selectedCheckpoint->IsComplete()) {
@@ -977,6 +976,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         BlockedEventManager::GetInstance()->UpdateBlockEvent(
             GetQueueKey(), GetConfigName(), *event, mDevInode, time(NULL) + mReaderConfig.first->mFlushTimeoutSecs);
     }
+    logBuffer.rawBuffer = Trim(logBuffer.rawBuffer, kNullSv);
     return moreData;
 }
 
@@ -1039,7 +1039,7 @@ void LogFileReader::OnOpenFileError() {
 
 bool LogFileReader::UpdateFilePtr() {
     // move last update time before check IsValidToPush
-    mLastUpdateTime = time(NULL);
+    mLastUpdateTime = time(nullptr);
     if (mLogFileOp.IsOpen() == false) {
         // In several cases we should revert file deletion flag:
         // 1. File is appended after deletion. This happens when app is still logging, but a user deleted the log file.
@@ -1120,7 +1120,8 @@ bool LogFileReader::UpdateFilePtr() {
         if (mLogFileOp.IsOpen() == false) {
             OnOpenFileError();
             return false;
-        } else if (CheckDevInode()) {
+        }
+        if (CheckDevInode()) {
             // the mHostLogPath's dev inode equal to mDevInode, so real log path is mHostLogPath
             mRealLogPath = mHostLogPath;
             GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
@@ -1132,9 +1133,8 @@ bool LogFileReader::UpdateFilePtr() {
                     "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                     "last file position", mLastFilePos)("reader id", long(this)));
             return true;
-        } else {
-            mLogFileOp.Close();
         }
+        mLogFileOp.Close();
         LOG_INFO(sLogger,
                  ("open file failed, log file dev inode changed or file deleted ",
                   "prepare to delete reader")("project", GetProject())("logstore", GetLogstore())(
@@ -1241,14 +1241,13 @@ bool LogFileReader::CheckDevInode() {
                         ("get file info error, ", strerror(errno))("path", mHostLogPath)("fd", mLogFileOp.GetFd()));
         }
         return false;
-    } else {
-        DevInode devInode = statBuf.GetDevInode();
-        return devInode == mDevInode;
     }
+    DevInode devInode = statBuf.GetDevInode();
+    return devInode == mDevInode;
 }
 
 bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
-    mLastEventTime = time(NULL);
+    mLastEventTime = time(nullptr);
     int64_t endSize = mLogFileOp.GetFileSize();
     if (endSize < 0) {
         int lastErrNo = errno;
@@ -1310,7 +1309,8 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
                 updatePrimaryCheckpointSignature();
             }
             return false;
-        } else if (mEOOption && mEOOption->primaryCheckpoint.sig_size() != mLastFileSignatureSize) {
+        }
+        if (mEOOption && mEOOption->primaryCheckpoint.sig_size() != mLastFileSignatureSize) {
             updatePrimaryCheckpointSignature();
         }
     }
@@ -1355,10 +1355,8 @@ void LogFileReader::ResetTopic(const std::string& topicFormat) {
     if (lowerConfig == "none" || lowerConfig == "default" || lowerConfig == "global_topic"
         || lowerConfig == "group_topic" || lowerConfig == "customized") {
         return;
-    } else {
-        // only reset file's topic
-        mTopicName = GetTopicName(topicFormat, mHostLogPath);
-    }
+    } // only reset file's topic
+    mTopicName = GetTopicName(topicFormat, mHostLogPath);
 }
 
 void LogFileReader::SetReadBufferSize(int32_t bufSize) {
@@ -1407,17 +1405,17 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
     }
 
     bool moreData = false;
-    if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK)
+    if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK) {
         ReadGBK(logBuffer, fileSize, moreData, tryRollback);
-    else
+    } else {
         ReadUTF8(logBuffer, fileSize, moreData, tryRollback);
-
+    }
     int64_t delta = fileSize - mLastFilePos;
     if (delta > mReaderConfig.first->mReadDelayAlertThresholdBytes && !logBuffer.rawBuffer.empty()) {
-        int32_t curTime = time(NULL);
-        if (mReadDelayTime == 0)
+        int32_t curTime = time(nullptr);
+        if (mReadDelayTime == 0) {
             mReadDelayTime = curTime;
-        else if (curTime - mReadDelayTime >= INT32_FLAG(read_delay_alarm_duration)) {
+        } else if (curTime - mReadDelayTime >= INT32_FLAG(read_delay_alarm_duration)) {
             mReadDelayTime = curTime;
             LOG_WARNING(sLogger,
                         ("read log delay", mHostLogPath)("fall behind bytes",
@@ -1432,9 +1430,9 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
                 GetConfigName(),
                 GetLogstore());
         }
-    } else
+    } else {
         mReadDelayTime = 0;
-
+    }
     // if delta size > mReadDelaySkipBytes, force set file pos and send alarm
     if (mReaderConfig.first->mReadDelaySkipThresholdBytes > 0
         && delta > mReaderConfig.first->mReadDelaySkipThresholdBytes) {
@@ -1455,22 +1453,8 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
         mCache.clear();
     }
 
-    // if (mMarkOffsetFlag && logBuffer.rawBuffer.size() > 0) {
-    //     logBuffer.fileInfo.reset(new FileInfo(mLogFileOp.GetFd(), mDevInode));
-    //     FileInfoPtr& fileInfo = logBuffer.fileInfo;
-    //     fileInfo->filename = mIsFuseMode ? mFuseTrimedFilename : mHostLogPath;
-    //     fileInfo->offset = mLastFilePos - (int64_t)logBuffer.rawBuffer.size();
-    //     fileInfo->len = (int64_t)logBuffer.rawBuffer.size();
-    //     fileInfo->filePos = mLastFilePos;
-    //     fileInfo->readPos = GetLastReadPos();
-    //     fileInfo->fileSize = fileSize;
-    // }
-
-    // if (mIsFuseMode && logBuffer.rawBuffer.size() > 0)
-    //     UlogfsHandler::GetInstance()->Sparse(logBuffer.fileInfo.get());
-
     if (mContainerStopped) {
-        int32_t curTime = time(NULL);
+        int32_t curTime = time(nullptr);
         if (curTime - mContainerStoppedTime >= INT32_FLAG(logtail_alarm_interval)
             && curTime - mReadStoppedContainerAlarmTime >= INT32_FLAG(logtail_alarm_interval)) {
             mReadStoppedContainerAlarmTime = curTime;
@@ -1595,7 +1579,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
         }
         if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-            int32_t rollbackLineFeedCount;
+            int32_t rollbackLineFeedCount = 0;
             nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
         }
 
@@ -1603,7 +1587,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
                 nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
                 if (mReaderConfig.second->RequiringJsonReader()) {
-                    int32_t rollbackLineFeedCount;
+                    int32_t rollbackLineFeedCount = 0;
                     nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
                 }
                 LOG_WARNING(sLogger,
@@ -1654,9 +1638,11 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
 void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback) {
     std::unique_ptr<char[]> gbkMemory;
     char* gbkBuffer = nullptr;
-    size_t readCharCount = 0, originReadCount = 0;
+    size_t readCharCount = 0;
+    size_t originReadCount = 0;
     int64_t lastReadPos = 0;
-    bool logTooLongSplitFlag = false, fromCpt = false;
+    bool logTooLongSplitFlag = false;
+    bool fromCpt = false;
     bool allowRollback = true;
 
     logBuffer.readOffset = mLastFilePos;
@@ -1740,8 +1726,9 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
 
     vector<long> lineFeedPos = {-1}; // elements point to the last char of each line
     for (long idx = 0; idx < long(readCharCount - 1); ++idx) {
-        if (gbkBuffer[idx] == '\n')
+        if (gbkBuffer[idx] == '\n') {
             lineFeedPos.push_back(idx);
+        }
     }
     lineFeedPos.push_back(readCharCount - 1);
 
@@ -1773,7 +1760,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             resultCharCount = bakResultCharCount;
             rollbackLineFeedCount = 0;
             if (mReaderConfig.second->RequiringJsonReader()) {
-                int32_t rollbackLineFeedCount;
+                int32_t rollbackLineFeedCount = 0;
                 RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
             }
             // Cannot get the split position here, so just mark a flag and send alarm later
@@ -1828,36 +1815,12 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
 
 size_t
 LogFileReader::ReadFile(LogFileOperator& op, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo) {
-    if (buf == NULL || size == 0 || op.IsOpen() == false) {
+    if (buf == nullptr || size == 0 || op.IsOpen() == false) {
         LOG_WARNING(sLogger, ("invalid param", ""));
         return 0;
     }
 
     int nbytes = 0;
-    // if (mIsFuseMode) {
-    //     int64_t oriOffset = offset;
-    //     nbytes = op.SkipHoleRead(buf, 1, size, &offset);
-    //     if (nbytes < 0) {
-    //         LOG_ERROR(sLogger,
-    //                   ("SkipHoleRead fail to read log file",
-    //                    mHostLogPath)("mLastFilePos", mLastFilePos)("size", size)("offset", offset));
-    //         return 0;
-    //     }
-    //     if (oriOffset != offset && truncateInfo != NULL) {
-    //         *truncateInfo = new TruncateInfo(oriOffset, offset);
-    //         LOG_INFO(sLogger,
-    //                  ("read fuse file with a hole, size",
-    //                   offset - oriOffset)("filename", mHostLogPath)("dev", mDevInode.dev)("inode", mDevInode.inode));
-    //         AlarmManager::GetInstance()->SendAlarm(
-    //             FUSE_FILE_TRUNCATE_ALARM,
-    //             string("read fuse file with a hole, size: ") + ToString(offset - oriOffset) + " filename: "
-    //                 + mHostLogPath + " dev: " + ToString(mDevInode.dev) + " inode: " + ToString(mDevInode.inode),
-    //             GetRegion(),
-    //             GetProject(),
-    //             GetConfigName(),
-    //             GetLogstore());
-    //     }
-    // } else {
     nbytes = op.Pread(buf, 1, size, offset);
     if (nbytes < 0) {
         LOG_ERROR(sLogger,
@@ -1889,8 +1852,9 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
         char sigStr[1025];
         int readSize = logFileOp.Pread(sigStr, 1, 1024, 0);
         logFileOp.Close();
-        if (readSize < 0)
+        if (readSize < 0) {
             return FileCompareResult_Error;
+        }
         sigStr[readSize] = '\0';
         uint64_t sigHash = mLastFileSignatureHash;
         uint32_t sigSize = mLastFileSignatureSize;
@@ -1905,9 +1869,8 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
         }
         if ((int64_t)buf.GetFileSize() == mLastFilePos) {
             return FileCompareResult_SigSameSizeSame;
-        } else {
-            return FileCompareResult_SigSameSizeChange;
         }
+        return FileCompareResult_SigSameSizeChange;
     }
     logFileOp.Close();
     return FileCompareResult_Error;
@@ -1947,7 +1910,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     if (!allowRollback || size == 0) {
         return size;
     }
-    int32_t endPs; // the position of \n or \0
+    int32_t endPs = 0; // the position of \n or \0
     if (buffer[size - 1] == '\n') {
         endPs = size - 1;
     } else {
@@ -2043,41 +2006,38 @@ size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
             return size;
         }
         return size - 1;
-    } else {
-        // UTF8 encoding rules:
-        // 1. For single byte character, the top bit is 0.
-        // 2. For N (N > 1) bytes character, the top N bit of the first byte is 1. The first and second bits of the
-        // following bytes are 10.
-        while (endPs >= 0) {
-            char ch = buffer[endPs];
-            if ((ch & 0x80) == 0) { // 1 bytes character, 0x80 -> 10000000
-                n = 1;
-                break;
-            } else if ((ch & 0xE0) == 0xC0) { // 2 bytes character, 0xE0 -> 11100000, 0xC0 -> 11000000
-                n = 2;
-                break;
-            } else if ((ch & 0xF0) == 0xE0) { // 3 bytes character, 0xF0 -> 11110000, 0xE0 -> 11100000
-                n = 3;
-                break;
-            } else if ((ch & 0xF8) == 0xF0) { // 4 bytes character, 0xF8 -> 11111000, 0xF0 -> 11110000
-                n = 4;
-                break;
-            } else if ((ch & 0xFC) == 0xF8) { // 5 bytes character, 0xFC -> 11111100, 0xF8 -> 11111000
-                n = 5;
-                break;
-            } else if ((ch & 0xFE) == 0xFC) { // 6 bytes character, 0xFE -> 11111110, 0xFC -> 11111100
-                n = 6;
-                break;
-            }
-            endPs--;
-        }
-        if (endPs - 1 + n >= (int)size) {
-            return endPs;
-        } else {
-            return size;
-        }
     }
-    return 0;
+    // UTF8 encoding rules:
+    // 1. For single byte character, the top bit is 0.
+    // 2. For N (N > 1) bytes character, the top N bit of the first byte is 1. The first and second bits of the
+    // following bytes are 10.
+    while (endPs >= 0) {
+        char ch = buffer[endPs];
+        if ((ch & 0x80) == 0) { // 1 bytes character, 0x80 -> 10000000
+            n = 1;
+            break;
+        } else if ((ch & 0xE0) == 0xC0) { // 2 bytes character, 0xE0 -> 11100000, 0xC0 -> 11000000
+            n = 2;
+            break;
+        } else if ((ch & 0xF0) == 0xE0) { // 3 bytes character, 0xF0 -> 11110000, 0xE0 -> 11100000
+            n = 3;
+            break;
+        } else if ((ch & 0xF8) == 0xF0) { // 4 bytes character, 0xF8 -> 11111000, 0xF0 -> 11110000
+            n = 4;
+            break;
+        } else if ((ch & 0xFC) == 0xF8) { // 5 bytes character, 0xFC -> 11111100, 0xF8 -> 11111000
+            n = 5;
+            break;
+        } else if ((ch & 0xFE) == 0xFC) { // 6 bytes character, 0xFE -> 11111110, 0xFC -> 11111100
+            n = 6;
+            break;
+        }
+        endPs--;
+    }
+    if (endPs - 1 + n >= (int)size) {
+        return endPs;
+    }
+    return size;
 }
 
 std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
@@ -2103,18 +2063,6 @@ void LogFileReader::ReportMetrics(uint64_t readSize) {
 
 
 LogFileReader::~LogFileReader() {
-    // if (mLogBeginRegPtr != NULL) {
-    //     delete mLogBeginRegPtr;
-    //     mLogBeginRegPtr = NULL;
-    // }
-    // if (mLogContinueRegPtr != NULL) {
-    //     delete mLogContinueRegPtr;
-    //     mLogContinueRegPtr = NULL;
-    // }
-    // if (mLogEndRegPtr != NULL) {
-    //     delete mLogEndRegPtr;
-    //     mLogEndRegPtr = NULL;
-    // }
     LOG_INFO(sLogger,
              ("destruct the corresponding log reader, project", GetProject())("logstore", GetLogstore())(
                  "config", GetConfigName())("log reader queue name", mHostLogPath)(
@@ -2225,7 +2173,8 @@ bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
 
     if (doc.HasParseError()) {
         return false;
-    } else if (!doc.IsObject()) {
+    }
+    if (!doc.IsObject()) {
         return false;
     }
     auto it = doc.FindMember(ProcessorParseContainerLogNative::DOCKER_JSON_TIME.c_str());

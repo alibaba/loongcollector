@@ -2,8 +2,8 @@
 
 #include "json/json.h"
 
-#include "Logger.h"
 #include "common/StringTools.h"
+#include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"

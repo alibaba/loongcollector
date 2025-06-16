@@ -14,29 +14,18 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
-#include "ebpf/type/table/DataTable.h"
+#include <chrono>
+#include <iterator>
+#include <mutex>
+
+#include "ProcessCacheValue.h"
+#include "common/TimeKeeper.h"
 #include "logger/Logger.h"
-#include "type/table/ProcessTable.h"
 
 namespace logtail {
 
-// avoid infinite execve to cause memory leak
-static long kMaxProcessCacheValueSourceBufferReuse = 100;
-ProcessCacheValue* ProcessCacheValue::CloneContents() {
-    auto* newValue = new ProcessCacheValue();
-    if (GetSourceBuffer().use_count() < kMaxProcessCacheValueSourceBufferReuse) {
-        newValue->mContents = mContents;
-    } else {
-        for (size_t i = 0; i < mContents.Size(); ++i) {
-            StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
-            newValue->mContents[i] = {cp.data, cp.size};
-        }
-    }
-    return newValue;
-}
-
-ProcessCache::ProcessCache(size_t initCacheSize) {
-    mCache.reserve(initCacheSize);
+ProcessCache::ProcessCache(size_t maxCacheSize, ProcParser& procParser) : mProcParser(procParser) {
+    mCache.reserve(maxCacheSize);
 }
 
 bool ProcessCache::Contains(const data_event_id& key) const {
@@ -63,49 +52,97 @@ void ProcessCache::removeCache(const data_event_id& key) {
     mCache.erase(key);
 }
 
-void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCacheValue>&& value) {
+void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
     value->IncRef();
     std::lock_guard<std::mutex> lock(mCacheMutex);
-    mCache.emplace(key, std::move(value));
+    mCache.emplace(key, value);
 }
 
-void ProcessCache::IncRef(const data_event_id& key) {
-    auto v = Lookup(key);
-    if (v) {
-        v->IncRef();
+void ProcessCache::IncRef([[maybe_unused]] const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
+    if (value) {
+        value->IncRef();
     }
 }
 
-void ProcessCache::DecRef(const data_event_id& key, time_t curktime) {
-    auto v = Lookup(key);
-    if (v) {
-        if (v->DecRef() == 0) {
-            enqueueExpiredEntry(key, curktime);
+void ProcessCache::DecRef(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
+    if (value) {
+        if (value->DecRef() == 0 && value->LifeStage() != ProcessCacheValue::LifeStage::kDeleted) {
+            value->SetLifeStage(ProcessCacheValue::LifeStage::kDeletePending);
+            enqueueExpiredEntry(key, value);
         }
     }
 }
 
-void ProcessCache::enqueueExpiredEntry(const data_event_id& key, time_t curktime) {
-    mCacheExpireQueue.emplace_back(ExitedEntry{curktime, key});
+void ProcessCache::enqueueExpiredEntry(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
+    std::lock_guard<std::mutex> lock(mCacheExpireQueueMutex);
+    mCacheExpireQueue.push_back({key, value});
 }
 
-void ProcessCache::ClearCache() {
+void ProcessCache::Clear() {
     std::lock_guard<std::mutex> lock(mCacheMutex);
     mCache.clear();
 }
 
-
-void ProcessCache::ClearExpiredCache(time_t ktime) {
-    ktime -= kMaxCacheExpiredTimeout;
-    if (mCacheExpireQueue.empty() || mCacheExpireQueue.front().time > ktime) {
+void ProcessCache::ClearExpiredCache() {
+    {
+        std::lock_guard<std::mutex> lock(mCacheExpireQueueMutex);
+        mCacheExpireQueueProcessing.swap(mCacheExpireQueue);
+    }
+    if (mCacheExpireQueueProcessing.empty()) {
         return;
     }
-    while (!mCacheExpireQueue.empty() && mCacheExpireQueue.front().time <= ktime) {
-        auto& key = mCacheExpireQueue.front().key;
-        LOG_DEBUG(sLogger, ("[RecordExecveEvent][DUMP] clear expired cache pid", key.pid)("ktime", key.time));
-        removeCache(key);
-        mCacheExpireQueue.pop_front();
+    size_t nextQueueSize = 0;
+    for (auto& entry : mCacheExpireQueueProcessing) {
+        if (entry.value->LifeStage() == ProcessCacheValue::LifeStage::kDeleted) {
+            LOG_WARNING(sLogger, ("clear expired cache twice pid", entry.key.pid)("ktime", entry.key.time));
+            continue;
+        }
+        if (entry.value->RefCount() > 0) {
+            entry.value->SetLifeStage(ProcessCacheValue::LifeStage::kInUse);
+            continue;
+        }
+        if (entry.value->LifeStage() == ProcessCacheValue::LifeStage::kDeletePending) {
+            entry.value->SetLifeStage(ProcessCacheValue::LifeStage::kDeleteReady);
+            mCacheExpireQueueProcessing[nextQueueSize++] = entry;
+            continue;
+        }
+        if (entry.value->LifeStage() == ProcessCacheValue::LifeStage::kDeleteReady) {
+            entry.value->SetLifeStage(ProcessCacheValue::LifeStage::kDeleted);
+            LOG_DEBUG(sLogger, ("clear expired cache pid", entry.key.pid)("ktime", entry.key.time));
+            removeCache(entry.key);
+        }
     }
+    if (nextQueueSize > 0) {
+        mCacheExpireQueueProcessing.resize(nextQueueSize);
+        mCacheExpireQueue.insert(mCacheExpireQueue.end(),
+                                 std::make_move_iterator(mCacheExpireQueueProcessing.begin()),
+                                 std::make_move_iterator(mCacheExpireQueueProcessing.end()));
+    }
+    mCacheExpireQueueProcessing.clear();
+}
+
+void ProcessCache::ForceShrink() {
+    if (mLastForceShrinkTimeSec < TimeKeeper::GetInstance()->NowSec() - 120) {
+        return;
+    }
+    auto validProcs = mProcParser.GetAllPids();
+    auto minKtime = TimeKeeper::GetInstance()->KtimeNs()
+        - std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::minutes(2)).count();
+    std::vector<data_event_id> cacheToRemove;
+    cacheToRemove.reserve(mCache.size() - validProcs.size());
+    {
+        std::lock_guard<std::mutex> lock(mCacheMutex);
+        for (const auto& [k, v] : mCache) {
+            if (validProcs.count(k.pid) == 0U && minKtime > time_t(k.time)) {
+                cacheToRemove.emplace_back(k);
+            }
+        }
+        for (const auto& key : cacheToRemove) {
+            mCache.erase(key);
+            LOG_ERROR(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
+        }
+    }
+    mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec();
 }
 
 void ProcessCache::PrintDebugInfo() {
@@ -113,8 +150,7 @@ void ProcessCache::PrintDebugInfo() {
         LOG_ERROR(sLogger, ("[DUMP CACHE] pid", key.pid)("ktime", key.time));
     }
     for (const auto& entry : mCacheExpireQueue) {
-        LOG_ERROR(sLogger,
-                  ("[DUMP EXPIRE Q] pid", entry.key.pid)("ktime", entry.key.time)("enqueue ktime", entry.time));
+        LOG_ERROR(sLogger, ("[DUMP EXPIRE Q] pid", entry.key.pid)("ktime", entry.key.time));
     }
 }
 

@@ -21,6 +21,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+const emptyJSONObjectString = "{}"
+
 type metaCollector struct {
 	serviceK8sMeta *ServiceK8sMeta
 	collector      pipeline.Collector
@@ -202,20 +204,20 @@ func (m *metaCollector) Stop() error {
 	return nil
 }
 
-func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) bool {
+func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) (bool, string) {
 	if strings.ToLower(resourceType) == "namespace" && serviceK8sMeta.Namespace && serviceK8sMeta.Cluster2Namespace != "" {
-		return true
+		return true, serviceK8sMeta.Cluster2Namespace
 	}
 	if strings.ToLower(resourceType) == "node" && serviceK8sMeta.Node && serviceK8sMeta.Cluster2Node != "" {
-		return true
+		return true, serviceK8sMeta.Cluster2Node
 	}
 	if strings.ToLower(resourceType) == "persistentvolume" && serviceK8sMeta.PersistentVolume && serviceK8sMeta.Cluster2PersistentVolume != "" {
-		return true
+		return true, serviceK8sMeta.Cluster2PersistentVolume
 	}
 	if strings.ToLower(resourceType) == "storageclass" && serviceK8sMeta.StorageClass && serviceK8sMeta.Cluster2StorageClass != "" {
-		return true
+		return true, serviceK8sMeta.Cluster2StorageClass
 	}
-	return false
+	return false, ""
 }
 
 func (m *metaCollector) handleEvent(event []*k8smeta.K8sMetaEvent) {
@@ -241,8 +243,9 @@ func (m *metaCollector) handleAddOrUpdate(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Update")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) {
-				link := m.generateEntityClusterLink(log)
+			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
+				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
 			}
 		}
@@ -254,8 +257,9 @@ func (m *metaCollector) handleDelete(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Expire")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			if isEntity(event.Object.ResourceType) && canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta) {
-				link := m.generateEntityClusterLink(log)
+			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
+				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
 			}
 		}
@@ -300,12 +304,12 @@ func (m *metaCollector) processEntityLinkCommonPart(logContents models.LogConten
 
 func (m *metaCollector) processEntityJSONObject(obj interface{}) string {
 	if obj == nil {
-		return "{}"
+		return emptyJSONObjectString
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
 		logger.Error(context.Background(), "PROCESS_ENTITY_JSON_OBJECT_FAIL", "process entity json object fail", err)
-		return "{}"
+		return emptyJSONObjectString
 	}
 	return string(objStr)
 }
@@ -407,7 +411,7 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	return log
 }
 
-func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEvent) models.PipelineEvent {
+func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEvent, linkRelationType string) models.PipelineEvent {
 	content := entityEvent.(*models.Log).Contents
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
@@ -417,8 +421,7 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
 	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
-
-	log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
+	log.Contents.Add(entityLinkRelationTypeFieldName, linkRelationType)
 	log.Contents.Add(entityMethodFieldName, content.Get(entityMethodFieldName))
 
 	log.Contents.Add(entityFirstObservedTimeFieldName, content.Get(entityFirstObservedTimeFieldName))
@@ -463,4 +466,18 @@ func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 
 func isEntity(resourceType string) bool {
 	return !strings.Contains(resourceType, k8smeta.LINK_SPLIT_CHARACTER)
+}
+
+func safeGetInt32String(pointer *int32) string {
+	if pointer == nil {
+		return ""
+	}
+	return strconv.FormatInt(int64(*pointer), 10)
+}
+
+func safeGetBoolString(pointer *bool) string {
+	if pointer == nil {
+		return ""
+	}
+	return strconv.FormatBool(*pointer)
 }

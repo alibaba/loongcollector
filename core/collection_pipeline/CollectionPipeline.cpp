@@ -33,6 +33,7 @@
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
@@ -392,8 +393,22 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     ADD_COUNTER(mProcessorsInGroupsTotal, logGroupList.size())
 
     auto before = chrono::system_clock::now();
-    for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
-        p->Process(logGroupList);
+    if (inputIndex < mInputs.size()) {
+        for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
+            p->Process(logGroupList);
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("input index out of range", "skip inner processing")(
+                        "reason", "may be caused by input delete but there are still data belong to it")(
+                        "input index", inputIndex)("config", mName));
+        GetContext().GetAlarm().SendAlarm(
+            LOGTAIL_CONFIG_ALARM,
+            "input delete but there are still data belong to it, may cause processing wrong",
+            GetContext().GetRegion(),
+            GetContext().GetProjectName(),
+            GetContext().GetConfigName(),
+            GetContext().GetLogstoreName());
     }
     for (auto& p : mPipelineInnerProcessorLine) {
         p->Process(logGroupList);

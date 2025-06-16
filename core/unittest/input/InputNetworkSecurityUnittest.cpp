@@ -67,7 +67,7 @@ void InputNetworkSecurityUnittest::TestName() {
 void InputNetworkSecurityUnittest::TestSupportAck() {
     InputNetworkSecurity input;
     bool supportAck = input.SupportAck();
-    APSARA_TEST_FALSE(supportAck);
+    APSARA_TEST_TRUE(supportAck);
 }
 
 void InputNetworkSecurityUnittest::OnSuccessfulInit() {

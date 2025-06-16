@@ -22,8 +22,12 @@ func (m *metaCollector) processDeploymentEntity(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add("namespace", obj.Namespace)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Selector != nil {
+			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
+		} else {
+			log.Contents.Add("match_labels", emptyJSONObjectString)
+		}
+		log.Contents.Add("replicas", safeGetInt32String(obj.Spec.Replicas))
 		log.Contents.Add("ready_replicas", strconv.FormatInt(int64(obj.Status.ReadyReplicas), 10))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
@@ -52,7 +56,11 @@ func (m *metaCollector) processDaemonSetEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("namespace", obj.Namespace)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
+		if obj.Spec.Selector != nil {
+			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
+		} else {
+			log.Contents.Add("match_labels", emptyJSONObjectString)
+		}
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{
@@ -79,8 +87,12 @@ func (m *metaCollector) processStatefulSetEntity(data *k8smeta.ObjectWrapper, me
 		log.Contents.Add("namespace", obj.Namespace)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Selector != nil {
+			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
+		} else {
+			log.Contents.Add("match_labels", emptyJSONObjectString)
+		}
+		log.Contents.Add("replicas", safeGetInt32String(obj.Spec.Replicas))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{
@@ -107,8 +119,12 @@ func (m *metaCollector) processReplicaSetEntity(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add("namespace", obj.Namespace)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
-		log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
-		log.Contents.Add("replicas", strconv.FormatInt(int64(*obj.Spec.Replicas), 10))
+		if obj.Spec.Selector != nil {
+			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
+		} else {
+			log.Contents.Add("match_labels", emptyJSONObjectString)
+		}
+		log.Contents.Add("replicas", safeGetInt32String(obj.Spec.Replicas))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
 			containerInfo := map[string]string{

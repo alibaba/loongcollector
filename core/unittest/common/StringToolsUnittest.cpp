@@ -323,6 +323,9 @@ TEST_F(StringToolsUnittest, TestTrim) {
 
     StringView v5 = " 55 ";
     APSARA_TEST_EQUAL(StringView("55"), Trim(v5));
+
+    StringView v6("\0ss\0", 4);
+    APSARA_TEST_EQUAL(StringView("ss"), Trim(v6, kNullSv));
 }
 
 TEST_F(StringToolsUnittest, TestStringViewSplitterEmpty) {
