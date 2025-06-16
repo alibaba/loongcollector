@@ -15,24 +15,15 @@
  */
 
 #include "plugin/processor/inner/ProcessorParseSpanNative.h"
-#include <locale>
-
-#include "json/json.h"
-#include "json/reader.h"
-
 #include "Logger.h"
-#include "SpanEvent.h"
-#include "common/StringTools.h"
-#include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "models/RawEvent.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
-#include "google/protobuf/message.h"
-#include "protobuf/models/span_event.pb.h"
 
 using namespace std;
+
 namespace logtail {
 
 const string ProcessorParseSpanNative::sName = "processor_parse_span_native";
@@ -44,36 +35,29 @@ bool ProcessorParseSpanNative::Init(const Json::Value&) {
 
 void ProcessorParseSpanNative::Process(PipelineEventGroup& eventGroup) {
     // TODO support for multi schema version
-    EventsContainer& events = eventGroup.MutableEvents();
-    EventsContainer newEvents;
-    newEvents.reserve(events.size());
-
-    for (auto& e : events) {
-        ProcessEvent(e, newEvents, eventGroup);
+    const auto& e = eventGroup.GetEvents().at(0);
+    if (!IsSupportedEvent(e)) {
+        LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup[0] is not a RawEvent"));
+        return;
     }
-    events.swap(newEvents);
+    const auto& sourceEvent = e.Cast<RawEvent>();
+
+    std::string errMsg;
+    models::PipelineEventGroup peg;
+    if (peg.ParseFromString(sourceEvent.GetContent().data())) {
+        eventGroup.MutableEvents().clear();
+        TransferPBToPipelineEventGroup(peg, eventGroup, errMsg);
+    }
+
+    if (!errMsg.empty()) {
+        LOG_ERROR(sLogger, ("error transfer PB to PipelineEventGroup", errMsg));
+        eventGroup.MutableEvents().clear();
+        return;
+    }
 }
 
 bool ProcessorParseSpanNative::IsSupportedEvent(const PipelineEventPtr& event) const {
     return event.Is<RawEvent>();
-}
-
-bool ProcessorParseSpanNative::ProcessEvent(PipelineEventPtr& e,
-                                            EventsContainer& newEvents,
-                                            PipelineEventGroup& eventGroup) {
-    if (!IsSupportedEvent(e)) {
-        return false;
-    }
-    auto& sourceEvent = e.Cast<RawEvent>();
-
-    std::string errMsg;
-    std::unique_ptr<SpanEvent> spanEvent = eventGroup.CreateSpanEvent(true);
-    models::SpanEvent se;
-    if (se.ParseFromString(sourceEvent.GetContent().data())) {
-        TransferPBToSpanEvent(se, *spanEvent, errMsg);
-        newEvents.emplace_back(std::move(spanEvent), true, nullptr);
-    }
-    return true;
 }
 
 } // namespace logtail
