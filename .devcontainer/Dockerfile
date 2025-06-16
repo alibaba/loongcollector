@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.5
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.6
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
@@ -28,6 +28,9 @@ RUN wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolcha
     make install && \
     cd ../ && \
     rm -fr glibc-2.18*
+
+RUN yum install epel-release -y && yum install nodejs  npm -y
+# RUN curl -LsSf https://astral.sh/uv/install.sh | sh && /home/admin/.local/bin/uv python install 3.12
 
 # Create the user
 COPY .env /tmp/.env
