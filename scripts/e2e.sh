@@ -37,7 +37,6 @@ else
 fi
 
 if [ $? = 0 ]; then
-  sh "$ROOT_DIR"/scripts/e2e_coverage.sh "$TYPE"
   echo "========================================="
   echo "All testing cases are passed"
   echo "========================================="

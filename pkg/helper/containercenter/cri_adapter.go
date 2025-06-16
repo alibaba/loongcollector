@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -209,8 +208,8 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 				hostnamePath = mount.Source
 			}
 			dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
-				Source:      filepath.Clean(mount.Source),
-				Destination: filepath.Clean(mount.Destination),
+				Source:      mount.Source,
+				Destination: mount.Destination,
 				Driver:      mount.Type,
 			})
 		}
@@ -229,7 +228,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	}
 	dockerContainer.HostnamePath = hostnamePath
 	dockerContainer.HostsPath = hostsPath
-
+	formatContainerJSONPath(&dockerContainer)
 	return cw.containerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 

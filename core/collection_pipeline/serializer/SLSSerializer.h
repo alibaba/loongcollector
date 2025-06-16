@@ -20,8 +20,14 @@
 #include <vector>
 
 #include "collection_pipeline/serializer/Serializer.h"
+#include "protobuf/sls/LogGroupSerializer.h"
 
 namespace logtail {
+
+struct MetricEventContentCacheItem {
+    std::vector<std::string> mMetricEventContentCache;
+    size_t mLabelSize = 0;
+};
 
 class SLSEventGroupSerializer : public Serializer<BatchedEvents> {
 public:
@@ -29,6 +35,40 @@ public:
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
+
+    void CalculateLogEventSize(const BatchedEvents& group,
+                               size_t& logGroupSZ,
+                               std::vector<size_t>& logSZ,
+                               bool enableNs) const;
+    void CalculateMetricEventSize(const BatchedEvents& group,
+                                  size_t& logGroupSZ,
+                                  std::vector<MetricEventContentCacheItem>& metricEventContentCache,
+                                  std::vector<size_t>& logSZ) const;
+    void CalculateSpanEventSize(const BatchedEvents& group,
+                                size_t& logGroupSZ,
+                                std::vector<std::array<std::string, 6>>& spanEventContentCache,
+                                std::vector<size_t>& logSZ) const;
+    void CalculateRawEventSize(const BatchedEvents& group,
+                               size_t& logGroupSZ,
+                               std::vector<size_t>& logSZ,
+                               bool enableNs) const;
+
+    void SerializeLogEvent(LogGroupSerializer& serializer,
+                           const BatchedEvents& group,
+                           std::vector<size_t>& logSZ,
+                           bool enableNs) const;
+    void SerializeMetricEvent(LogGroupSerializer& serializer,
+                              BatchedEvents& group,
+                              std::vector<MetricEventContentCacheItem>& metricEventContentCache,
+                              std::vector<size_t>& logSZ) const;
+    void SerializeSpanEvent(LogGroupSerializer& serializer,
+                            const BatchedEvents& group,
+                            std::vector<std::array<std::string, 6>>& spanEventContentCache,
+                            std::vector<size_t>& logSZ) const;
+    void SerializeRawEvent(LogGroupSerializer& serializer,
+                           const BatchedEvents& group,
+                           std::vector<size_t>& logSZ,
+                           bool enableNs) const;
 };
 
 struct CompressedLogGroup {

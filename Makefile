@@ -74,7 +74,7 @@ DIST_FILE = $(DIST_DIR)/loongcollector-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
-	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.49.0
+	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.64.8
 	$(GO_ADDLICENSE) version || go install github.com/google/addlicense@latest
 
 .PHONY: clean
@@ -114,7 +114,7 @@ lint: clean tools
 lint-pkg: clean tools
 	cd pkg && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
-.PHONY: lint-test
+.PHONY: lint-e2e
 lint-e2e: clean tools
 	cd test && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
@@ -153,11 +153,6 @@ e2edocker: clean import_plugins
 	./scripts/gen_build_scripts.sh e2e "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
 	./scripts/docker_build.sh development "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 
-# provide a goc server for e2e testing
-.PHONY: gocdocker
-gocdocker: clean
-	./scripts/docker_build.sh goc "$(GENERATED_HOME)" latest goc-server false "$(DOCKER_BUILD_USE_BUILDKIT)"
-
 .PHONY: vendor
 vendor: clean import_plugins
 	rm -rf vendor
@@ -173,11 +168,11 @@ docs: clean build
 
 # e2e test
 .PHONY: e2e
-e2e: clean gocdocker e2edocker
+e2e: clean e2edocker
 	./scripts/e2e.sh e2e
 
 .PHONY: e2e-core
-e2e-core: clean gocdocker e2edocker
+e2e-core: clean e2edocker
 	./scripts/e2e.sh e2e core
 
 .PHONY: e2e-performance
@@ -185,7 +180,7 @@ e2e-performance: clean docker
 	./scripts/e2e.sh e2e performance
 
 .PHONY: unittest_e2e_engine
-unittest_e2e_engine: clean gocdocker
+unittest_e2e_engine: clean
 	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e|benchmark") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
 
 .PHONY: unittest_plugin

@@ -21,6 +21,7 @@ namespace logtail {
 const string LOGSTORES = "/logstores";
 const string METRICSTORES = "/prometheus";
 const string HEALTH = "/health";
+const string HOSTMETRICS = "/hostmetrics";
 
 const string APM_METRICS_URL = "/apm/metric/arms/v1/metric_log/metricstore-apm-metrics";
 const string APM_TRACES_URL = "/apm/trace/arms/v1/trace_log/logstore-tracing";
