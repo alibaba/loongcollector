@@ -412,7 +412,7 @@ macro(link_grpc target_name)
     find_package(protobuf REQUIRED PATHS /opt/logtail/deps/lib64/cmake/protobuf NO_DEFAULT_PATH)
     find_package(gRPC REQUIRED PATHS /opt/logtail/deps NO_DEFAULT_PATH)
     message("grpc lib" "${gRPC_LIBRARIES}")
-    target_link_libraries(${target_name} gRPC::grpc++ gRPC::gpr protobuf::libprotobuf utf8_range::utf8_range)
+    target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
 endmacro()
 
 macro(link_spl target_name)
