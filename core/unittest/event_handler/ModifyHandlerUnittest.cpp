@@ -151,7 +151,9 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        bfs::remove_all(gRootDir);
+        if (bfs::exists(gRootDir)) {
+            bfs::remove_all(gRootDir);
+        }
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -171,7 +173,7 @@ private:
     std::shared_ptr<ModifyHandler> mHandlerPtr;
 
     void writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app | ios_base::binary);
         writer << logContent;
         writer.close();
     }
@@ -419,6 +421,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.dev, devInode.dev);
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.inode, devInode.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
+    handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
 }
 
 void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase1() {

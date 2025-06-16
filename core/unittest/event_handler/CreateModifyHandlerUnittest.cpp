@@ -171,7 +171,7 @@ private:
     CreateHandler mCreateHandler;
 
     void writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app | ios_base::binary);
         writer << logContent;
         writer.close();
     }
