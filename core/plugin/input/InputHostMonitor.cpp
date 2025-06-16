@@ -22,6 +22,7 @@
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
+#include "host_monitor/collector/ProcessCollector.h"
 
 namespace logtail {
 
@@ -70,7 +71,7 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetRegion());
     }
     if (enableCPU) {
-        mCollectors.push_back(CPUCollector::sName);
+        // mCollectors.push_back(CPUCollector::sName);
     }
 
     // system load
@@ -104,9 +105,24 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     }
 
     if (enableMem) {
-        mCollectors.push_back(MemCollector::sName);
+        // mCollectors.push_back(MemCollector::sName);
     }
 
+    bool enableProcess = true;
+    if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableProcess) {
+        mCollectors.push_back(ProcessCollector::sName);
+    }
     return true;
 }
 

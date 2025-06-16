@@ -26,6 +26,20 @@ extern std::filesystem::path PROCESS_DIR;
 const extern std::filesystem::path PROCESS_STAT;
 const extern std::filesystem::path PROCESS_LOADAVG;
 const extern std::filesystem::path PROCESS_MEMINFO;
+
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT;
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
+const extern std::filesystem::path PROCESS_NET_DEV;
+const extern std::filesystem::path PROCESS_STATM;
+const extern std::filesystem::path PROCESS_FD;
+const extern std::filesystem::path PROCESS_CMDLINE;
+const extern std::filesystem::path PROCESS_EXE;
+const extern std::filesystem::path PROCESS_ROOT;
+const extern std::filesystem::path PROCESS_STATUS;
+const extern std::filesystem::path PROCESS_CWD;
+const extern std::filesystem::path PROCESS_UPTIME;
+const extern int EXECUTE_SUCCESS;
+const extern int EXECUTE_FAIL;
 const extern int64_t SYSTEM_HERTZ;
 
 #ifdef __ENTERPRISE__

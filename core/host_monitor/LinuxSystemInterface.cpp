@@ -23,6 +23,11 @@ using namespace std::chrono;
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <pwd.h>
+#include <grp.h>
+#include <filesystem>
+#include <boost/program_options.hpp>
+#include <iostream>
 
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
@@ -313,4 +318,163 @@ bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& memi
 }
 
 
+bool LinuxSystemInterface::GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) {
+    auto processCMDline = PROCESS_DIR / std::to_string(pid) / PROCESS_CMDLINE;
+    cmdline.cmdline.clear();
+
+    std::ifstream file(static_cast<std::string>(processCMDline));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open process cmdline file", "fail")("file", processCMDline));
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        cmdline.cmdline.push_back(line);
+    }
+
+    file.close();
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) { 
+    auto processStatm = PROCESS_DIR / std::to_string(pid) / PROCESS_STATM;
+    std::vector<std::string> processStatmString;
+    char* endptr;
+
+    std::ifstream file(static_cast<std::string>(processStatm));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open process statm file", "fail")("file", processStatm));
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        processStatmString.push_back(line);
+    }
+    file.close();
+
+    std::vector<std::string> processMemoryMetric;
+    if (!processStatmString.empty()) {
+        const std::string& input = processStatmString.front();
+        boost::algorithm::split(
+            processMemoryMetric,
+            input,
+            boost::is_any_of(" "),
+            boost::algorithm::token_compress_on
+        );
+    }
+
+    if (processMemoryMetric.size() < 3) {
+        return false;
+    }
+
+    long pagesize = sysconf(_SC_PAGESIZE); // 获取系统页大小
+    int index = 0;
+    processMemory.size = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
+    processMemory.size = processMemory.size * pagesize;
+    processMemory.resident = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10)); 
+    processMemory.resident = processMemory.resident * pagesize;
+    processMemory.share = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
+    processMemory.share = processMemory.share * pagesize;
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) {
+    auto processStatus = PROCESS_DIR / std::to_string(pid) / PROCESS_STATUS;
+    std::vector<std::string> processStatusString;
+    std::vector<std::string> metric;
+
+    std::ifstream file(static_cast<std::string>(processStatus));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open process status file", "fail")("file", processStatus));
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        processStatusString.push_back(line);
+    }
+    file.close();
+
+    ProcessCred cred{};
+
+    for (size_t i = 0; i < processStatusString.size(); ++i) {
+        boost::algorithm::split(
+            metric,
+            processStatusString[i],
+            boost::algorithm::is_any_of("\t"),
+            boost::algorithm::token_compress_on
+        );
+        if (metric.front() == "Name:") {
+            processCredName.name = metric[1];
+        }
+        if (metric.size() >= 3 && metric.front() == "Uid:") {
+            int index = 1;
+            cred.uid = static_cast<uint64_t>(std::stoull(metric[index++]));
+            cred.euid = static_cast<uint64_t>(std::stoull(metric[index]));
+        } else if (metric.size() >= 3 && metric.front() == "Gid:") {
+            int index = 1;
+            cred.gid = static_cast<uint64_t>(std::stoull(metric[index++]));
+            cred.egid = static_cast<uint64_t>(std::stoull(metric[index]));
+        }
+    }
+
+    passwd *pw = nullptr;
+    passwd pwbuffer;
+    char buffer[2048];
+    if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0) {
+        return EXECUTE_FAIL;
+    }
+    if (pw == nullptr) {
+        return EXECUTE_FAIL;
+    }
+    processCredName.user = pw->pw_name;
+
+    group *grp = nullptr;
+    group grpbuffer{};
+    char groupBuffer[2048];
+    if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp)) {
+        return EXECUTE_FAIL;
+    }
+
+    if (grp != nullptr && grp->gr_name != nullptr) {
+        processCredName.group = grp->gr_name;
+    }
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetExecutablePathOnce(pid_t pid, ProcessExecutePath &executePath) {
+    std::filesystem::path procExePath = PROCESS_DIR / std::to_string(pid) / PROCESS_EXE;
+    char buffer[4096];
+    ssize_t len = readlink(procExePath.c_str(), buffer, sizeof(buffer));
+    if (len < 0) {
+        executePath.path = "";
+        return true;
+    }
+    executePath.path.assign(buffer, len);
+    return true;
+}
+
+bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd &processFd) {
+    std::filesystem::path procFdPath = PROCESS_DIR / std::to_string(pid) / PROCESS_FD;
+
+    int count = 0;
+    for (const auto& dirEntry :
+         std::filesystem::directory_iterator{procFdPath, std::filesystem::directory_options::skip_permission_denied}) {
+        std::string filename = dirEntry.path().filename().string();
+        count++;
+    }
+
+    processFd.total = count;
+    processFd.exact = true;
+
+    return true;
+}
 } // namespace logtail

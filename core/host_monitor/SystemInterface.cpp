@@ -125,6 +125,65 @@ bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
         errorType);
 }
 
+bool SystemInterface::GetMTRRInformationString(MTRRInformationString& mtrrString) {
+    const std::string errorType = "mtrr";
+    return MemoizedCall(
+        mMTRRInformationCache,
+        [this](BaseInformation& info) { return this->GetMTRRInformationStringOnce(static_cast<MTRRInformationString&>(info)); },
+        mtrrString,
+        errorType);
+}
+
+bool SystemInterface::GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& processCmdlineString) {
+    const std::string errorType = "processCmdline";
+    return MemoizedCall(
+        mProcessCmdlineCache,
+        [this](BaseInformation& info, pid_t pid) { return this->GetProcessCmdlineStringOnce(pid, static_cast<ProcessCmdlineString&>(info)); },
+        processCmdlineString,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetPorcessStatm(pid_t pid, ProcessMemoryInformation &processMemory) {
+    const std::string errorType = "processStatm";
+    return MemoizedCall(
+        mProcessStatmCache,
+        [this](BaseInformation& info, pid_t pid) { return this->GetProcessStatmOnce(pid, static_cast<ProcessMemoryInformation&>(info)); },
+        processMemory,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetProcessCredNameObj(pid_t pid, ProcessCredName &credName) {
+    const std::string errorType = "processStatus";
+    return MemoizedCall(
+        mProcessStatusCache,
+        [this](BaseInformation& info, pid_t pid) { return this->GetProcessCredNameOnce(pid, static_cast<ProcessCredName&>(info)); },
+        credName,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetExecutablePathCache(pid_t pid, ProcessExecutePath &executePath) {
+    const std::string errorType = "executablePath";
+    return MemoizedCall(
+        mExecutePathCache,
+        [this](BaseInformation& info, pid_t pid) { return this->GetExecutablePathOnce(pid, static_cast<ProcessExecutePath&>(info)); },
+        executePath,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetProcessOpenFiles(pid_t pid, ProcessFd &processFd) { 
+    const std::string errorType = "processOpenFiles";
+    return MemoizedCall(
+        mProcessFdCache,
+        [this](BaseInformation& info, pid_t pid) { return this->GetProcessOpenFilesOnce(pid, static_cast<ProcessFd&>(info)); },
+        processFd,
+        errorType,
+        pid);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {
