@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "plugin/processor/inner/ProcessorParseSpanNative.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
@@ -26,15 +26,19 @@ using namespace std;
 
 namespace logtail {
 
-const string ProcessorParseSpanNative::sName = "processor_parse_span_native";
+const string ProcessorParseFromPBNative::sName = "processor_parse_from_pb_native";
 
 // only for inner processor
-bool ProcessorParseSpanNative::Init(const Json::Value&) {
+bool ProcessorParseFromPBNative::Init(const Json::Value&) {
     return true;
 }
 
-void ProcessorParseSpanNative::Process(PipelineEventGroup& eventGroup) {
+void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
     // TODO support for multi schema version
+    if (eventGroup.GetEvents().empty()) {
+        LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup is empty"));
+        return;
+    }
     const auto& e = eventGroup.GetEvents().at(0);
     if (!IsSupportedEvent(e)) {
         LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup[0] is not a RawEvent"));
@@ -47,6 +51,10 @@ void ProcessorParseSpanNative::Process(PipelineEventGroup& eventGroup) {
     if (peg.ParseFromString(sourceEvent.GetContent().data())) {
         eventGroup.MutableEvents().clear();
         TransferPBToPipelineEventGroup(peg, eventGroup, errMsg);
+    } else {
+        LOG_ERROR(sLogger, ("error transfer PB to PipelineEventGroup", "invalid protobuf data"));
+        eventGroup.MutableEvents().clear();
+        return;
     }
 
     if (!errMsg.empty()) {
@@ -56,7 +64,7 @@ void ProcessorParseSpanNative::Process(PipelineEventGroup& eventGroup) {
     }
 }
 
-bool ProcessorParseSpanNative::IsSupportedEvent(const PipelineEventPtr& event) const {
+bool ProcessorParseFromPBNative::IsSupportedEvent(const PipelineEventPtr& event) const {
     return event.Is<RawEvent>();
 }
 

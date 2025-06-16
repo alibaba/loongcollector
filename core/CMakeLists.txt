@@ -64,8 +64,8 @@ add_definitions(-DXXH_DISPATCH_AVX512=0)
 
 # Default C/CXX flags.
 if (UNIX)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE -msse4.2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE -msse4.2")
     if (NOT WITHOUTGDB)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -ggdb")
