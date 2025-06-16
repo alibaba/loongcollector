@@ -45,7 +45,6 @@ set(DEP_NAME_LIST
         rapidjson               # header-only
         gtest
         gmock
-        protobuf
         re2
         cityhash
         gflags
@@ -103,21 +102,6 @@ macro(link_gtest target_name)
     endif ()
 endmacro()
 
-# protobuf
-macro(link_protobuf target_name)
-    if (protobuf_${LINK_OPTION_SUFFIX})
-        target_link_libraries(${target_name} "${protobuf_${LINK_OPTION_SUFFIX}}")
-    elseif (UNIX)
-        target_link_libraries(${target_name} "${protobuf_${LIBRARY_DIR_SUFFIX}}/libprotobuf.a")
-    elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "libprotobufd"
-                optimized "libprotobuf")
-    endif ()
-    if (ANDROID)
-        target_link_libraries(${target_name} "log")
-    endif ()
-endmacro()
 logtail_define(protobuf_BIN "Absolute path to protoc" "${DEPS_BINARY_ROOT}/protoc")
 
 function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
@@ -125,6 +109,16 @@ function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
     execute_process(COMMAND ${protobuf_BIN} 
         --proto_path=${PROTO_PATH}
         --cpp_out=${OUTPUT_PATH}
+        ${PROTO_FILES})
+endfunction()
+
+function(compile_proto_grpc PROTO_PATH OUTPUT_PATH PROTO_FILES)
+    file(MAKE_DIRECTORY ${OUTPUT_PATH})
+    execute_process(COMMAND ${protobuf_BIN}  
+        --plugin=protoc-gen-grpc=${DEPS_BINARY_ROOT}/grpc_cpp_plugin
+        -I=${PROTO_PATH}
+        --cpp_out=${OUTPUT_PATH}
+        --grpc_out=${OUTPUT_PATH}
         ${PROTO_FILES})
 endfunction()
 
@@ -138,6 +132,13 @@ compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/../protobuf_public/models"
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/models"
     "log_event.proto;metric_event.proto;span_event.proto;pipeline_event_group.proto"
+)
+
+
+compile_proto_grpc(
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
+    "loongsuite.proto;"
 )
 
 compile_proto(
@@ -402,6 +403,16 @@ macro(link_uuid target_name)
     elseif (UNIX)
         target_link_libraries(${target_name} uuid)
     endif ()
+endmacro()
+
+# grpc
+macro(link_grpc target_name)
+    find_package(absl REQUIRED PATHS /opt/logtail/deps/lib64/cmake/absl NO_DEFAULT_PATH)
+    find_package(utf8_range REQUIRED PATHS /opt/logtail/deps/lib64/cmake/utf8_range NO_DEFAULT_PATH)
+    find_package(protobuf REQUIRED PATHS /opt/logtail/deps/lib64/cmake/protobuf NO_DEFAULT_PATH)
+    find_package(gRPC REQUIRED PATHS /opt/logtail/deps NO_DEFAULT_PATH)
+    message("grpc lib" "${gRPC_LIBRARIES}")
+    target_link_libraries(${target_name} gRPC::grpc++ gRPC::gpr protobuf::libprotobuf utf8_range::utf8_range)
 endmacro()
 
 macro(link_spl target_name)

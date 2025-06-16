@@ -14,6 +14,11 @@
 
 #include "application/Application.h"
 
+#include "json/value.h"
+
+#include "forward/GrpcRunner.h"
+#include "forward/loongsuite/LoongSuiteForwardService.h"
+
 #ifndef LOGTAIL_NO_TC_MALLOC
 #include "gperftools/malloc_extension.h"
 #endif
@@ -234,6 +239,9 @@ void Application::Start() { // GCOVR_EXCL_START
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     ProcessorRunner::GetInstance()->Init();
+    GrpcInputRunner::GetInstance()->Init();
+    GrpcInputRunner::GetInstance()->UpdateListenInput<LoongSuiteForwardServiceImpl>(
+        "test", "0.0.0.0:8080", Json::Value{});
 
     // flusher_sls resource should be explicitly initialized to allow internal metrics and alarms to be sent
     FlusherSLS::InitResource();
