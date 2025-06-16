@@ -864,7 +864,7 @@ private:
     CollectionPipelineContext mCtx;
     FileDiscoveryConfig mConfig;
     bool writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc);
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
         if (!writer) {
             return false;
         }
@@ -895,7 +895,7 @@ void LogFileReaderHoleUnittest::TestReadLogHoleInTheMiddle() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == content);
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, content);
 }
 
 void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
@@ -915,7 +915,7 @@ void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
 }
 
 void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
@@ -936,14 +936,14 @@ void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(reader.ReadLog(logbuf, &event1)); // true means has more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
 }
 
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
 
-}
+} // namespace logtail
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();
