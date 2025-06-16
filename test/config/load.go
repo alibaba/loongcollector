@@ -31,7 +31,6 @@ var (
 	ReportFile    string
 	PprofDir      string
 	ProfileFlag   bool
-	CoverageFile  string
 	FlusherFile   string
 	ConfigDir     string
 	LogDir        string
@@ -49,7 +48,6 @@ func Load(path string, profile bool) error {
 	root, _ := filepath.Abs(".")
 	reportDir := root + "/report/"
 	EngineLogFile = reportDir + CaseName + "_engine.log"
-	CoverageFile = reportDir + CaseName + "_coverage.out"
 	ReportFile = reportDir + CaseName + "_report.json"
 	PprofDir = reportDir + CaseName + "_pprof"
 	LogDir = reportDir + CaseName + "_log"

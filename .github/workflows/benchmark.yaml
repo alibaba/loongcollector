@@ -100,10 +100,10 @@ jobs:
   #     packages: read
   #   needs: [ Build-LoongCollector-Image ]
   #   steps:
-  #     - name: Set up Go ${{ matrix.go-version }}
-  #       uses: actions/setup-go@v2
+  #     - name: Set up Go
+  #       uses: actions/setup-go@v4
   #       with:
-  #         go-version: ${{ matrix.go-version }}
+  #         go-version: 1.23.10
 
   #     - name: Set up Python ${{ matrix.python-version }}
   #       uses: actions/setup-python@v5
