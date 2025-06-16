@@ -151,8 +151,13 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        if (bfs::exists(gRootDir)) {
-            bfs::remove_all(gRootDir);
+        for (int i = 0; i < 3; ++i) {
+            try {
+                bfs::remove_all(gRootDir);
+                break;
+            } catch (...) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
         }
         ProcessQueueManager::GetInstance()->Clear();
     }

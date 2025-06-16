@@ -18,6 +18,7 @@
 
 #include "json/json.h"
 
+#include "FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
@@ -229,11 +230,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-#if defined(_MSC_VER)
-    configJson["FilePaths"].append(Json::Value(filePath.string() + '\\'));
-#else
-    configJson["FilePaths"].append(Json::Value(filePath.string() + filesystem::path::preferred_separator));
-#endif
+    configJson["FilePaths"].append(Json::Value(filePath.string() + PATH_SEPARATOR));
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 }
