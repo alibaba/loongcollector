@@ -26,6 +26,7 @@
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
+#include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
 
@@ -198,10 +199,18 @@ namespace bfs = boost::filesystem;
 
 #define UNIT_TEST_CASE(suite, case) APSARA_UNIT_TEST_CASE(suite, case, 0)
 
+class GlobalEnvironment : public testing::Environment {
+public:
+    void SetUp() override { logtail::TimeKeeper::GetInstance(); }
+
+    void TearDown() override { logtail::TimeKeeper::GetInstance()->Stop(); }
+};
+
 #define UNIT_TEST_MAIN \
     int main(int argc, char** argv) { \
         logtail::Logger::Instance().InitGlobalLoggers(); \
         ::testing::InitGoogleTest(&argc, argv); \
+        ::testing::AddGlobalTestEnvironment(new GlobalEnvironment); \
         return RUN_ALL_TESTS(); \
     }
 

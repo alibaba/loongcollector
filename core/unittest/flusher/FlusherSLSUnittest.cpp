@@ -460,6 +460,24 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     SenderQueueManager::GetInstance()->Clear();
 
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "test_region",
+            "Endpoint": "test_region.log.aliyuncs.com",
+            "TelemetryType": "metrics_multivalue"
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
+    SenderQueueManager::GetInstance()->Clear();
+
     // apm
     std::vector<std::string> apmConfigStr = {R"(
         {

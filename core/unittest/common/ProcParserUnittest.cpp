@@ -25,12 +25,42 @@
 
 namespace logtail {
 
+class CapabilityUtilUnittest : public ::testing::Test {
+public:
+    void TestGetCapabilities();
+};
+
+void CapabilityUtilUnittest::TestGetCapabilities() {
+    // Test single capability
+    uint64_t singleCap = 1ULL << 0; // CAP_CHOWN
+    SourceBuffer sb;
+    APSARA_TEST_STREQ_FATAL(GetCapabilities(singleCap, sb).data(), "CAP_CHOWN");
+
+    // Test multiple capabilities
+    uint64_t multipleCaps = (1ULL << 0) | (1ULL << 1) | (1ULL << 7); // CAP_CHOWN, DAC_OVERRIDE, CAP_SETUID
+    auto result = GetCapabilities(multipleCaps, sb);
+    APSARA_TEST_STREQ_FATAL(result.data(), "CAP_CHOWN DAC_OVERRIDE CAP_SETUID");
+
+    // Test no capabilities
+    APSARA_TEST_STREQ_DESC(GetCapabilities(0, sb).data(), "", "No capabilities should return empty string");
+
+    // Test all capabilities
+    uint64_t allCaps = ~0ULL;
+    result = GetCapabilities(allCaps, sb);
+    APSARA_TEST_TRUE(result.find("CAP_CHOWN") != std::string::npos);
+    APSARA_TEST_TRUE(result.find("CAP_SYS_ADMIN") != std::string::npos);
+    APSARA_TEST_TRUE(result.find("CAP_CHECKPOINT_RESTORE") != std::string::npos); // the last capability
+}
+
+UNIT_TEST_CASE(CapabilityUtilUnittest, TestGetCapabilities);
+
 class ProcParserUnittest : public ::testing::Test {
 public:
     void TestGetPIDCmdline();
     void TestGetPIDComm();
     void TestGetPIDEnviron();
     void TestGetPIDCWD();
+    void TestLookupContainerId();
     void TestGetPIDDockerId();
     void TestGetPIDExePath();
     void TestGetLoginUid();
@@ -274,6 +304,15 @@ nonvoluntary_ctxt_switches:	5468)");
     APSARA_TEST_EQUAL(0x000001ffffffffffUL, ps.capEff); // 000001ffffffffff
 }
 
+void ProcParserUnittest::TestLookupContainerId() {
+    StringView cgroupLine = "8d86bfbc2357a258945d40fe65c1553fe5e316f5d57edd451f65fec7fed58615";
+    StringView containerId;
+    APSARA_TEST_EQUAL_FATAL(-1, ProcParser::LookupContainerId(cgroupLine, false, containerId));
+    APSARA_TEST_TRUE(containerId.empty());
+    APSARA_TEST_EQUAL_FATAL(0, ProcParser::LookupContainerId(cgroupLine, true, containerId));
+    APSARA_TEST_EQUAL_FATAL(cgroupLine, containerId);
+}
+
 void ProcParserUnittest::TestGetPIDDockerId() {
     const int testPid = 12345;
     // K8s containerd cgroup file
@@ -402,6 +441,7 @@ UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDCmdline);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDComm);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDEnviron);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDCWD);
+UNIT_TEST_CASE(ProcParserUnittest, TestLookupContainerId);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDDockerId);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetPIDExePath);
 UNIT_TEST_CASE(ProcParserUnittest, TestGetLoginUid);

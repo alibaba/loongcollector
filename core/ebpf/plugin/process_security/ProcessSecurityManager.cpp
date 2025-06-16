@@ -16,8 +16,10 @@
 
 #include <coolbpf/security/type.h>
 
+#include <chrono>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <utility>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
@@ -223,10 +225,18 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger,
-                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                            "[ProcessSecurityEvent] push queue failed!", ""));
+        int maxRetry = 5;
+        for (int retry = 0; retry < maxRetry; ++retry) {
+            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (retry == maxRetry - 1) {
+                LOG_WARNING(sLogger,
+                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                "[ProcessSecurityEvent] push queue failed!", ""));
+                // TODO: Alarm discard data
+            }
         }
     }
 

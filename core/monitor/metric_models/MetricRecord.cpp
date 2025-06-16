@@ -16,6 +16,8 @@
 
 #include "MetricRecord.h"
 
+#include <utility>
+
 namespace logtail {
 
 const std::string MetricCategory::METRIC_CATEGORY_UNKNOWN = "unknown";
@@ -27,7 +29,7 @@ const std::string MetricCategory::METRIC_CATEGORY_PLUGIN = "plugin";
 const std::string MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE = "plugin_source";
 
 MetricsRecord::MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
-    : mCategory(category), mLabels(labels), mDynamicLabels(dynamicLabels), mDeleted(false) {
+    : mCategory(category), mLabels(std::move(labels)), mDynamicLabels(std::move(dynamicLabels)), mDeleted(false) {
 }
 
 CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
@@ -91,7 +93,7 @@ const std::vector<DoubleGaugePtr>& MetricsRecord::GetDoubleGauges() const {
 }
 
 MetricsRecord* MetricsRecord::Collect() {
-    MetricsRecord* metrics = new MetricsRecord(mCategory, mLabels, mDynamicLabels);
+    auto* metrics = new MetricsRecord(mCategory, mLabels, mDynamicLabels);
     for (auto& item : mCounters) {
         CounterPtr newPtr(item->Collect());
         metrics->mCounters.emplace_back(newPtr);
@@ -167,7 +169,7 @@ void MetricsRecordRef::AddLabels(MetricLabels&& labels) {
 
 #ifdef APSARA_UNIT_TEST_MAIN
 bool MetricsRecordRef::HasLabel(const std::string& key, const std::string& value) const {
-    for (auto item : *(mMetrics->GetLabels())) {
+    for (const auto& item : *(mMetrics->GetLabels())) {
         if (item.first == key && item.second == value) {
             return true;
         }

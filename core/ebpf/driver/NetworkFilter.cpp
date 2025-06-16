@@ -379,7 +379,6 @@ int CreateNetworkFilterForCallname(
             return kErrDriverInvalidParam;
         }
         selector_filters kernelFilters{};
-        ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO, "filter not empty!\n");
 
         if (filter->mDestAddrList.size()) {
             SetDaddrFilter(wrapper, callNameIdx, kernelFilters, filter);

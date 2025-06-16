@@ -342,10 +342,8 @@ func (did *DockerInfoDetail) FindBestMatchedPath(pth string) (sourcePath, contai
 	var bestMatchedMounts types.MountPoint
 	for _, mount := range did.ContainerInfo.Mounts {
 		// logger.Debugf("container(%s-%s) mount: source-%s destination-%s", did.IDPrefix(), did.ContainerInfo.Name, mount.Source, mount.Destination)
-
-		dst := filepath.Clean(mount.Destination)
+		dst := mount.Destination
 		dstSize := len(dst)
-
 		if strings.HasPrefix(pth, dst) &&
 			(pthSize == dstSize || (pthSize > dstSize && isPathSeparator(pth[dstSize]))) &&
 			len(bestMatchedMounts.Destination) < dstSize {
@@ -621,10 +619,7 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 	if len(ip) > 0 {
 		containerNameTag["_container_ip_"] = ip
 	}
-	for i := range info.Mounts {
-		info.Mounts[i].Source = filepath.Clean(info.Mounts[i].Source)
-		info.Mounts[i].Destination = filepath.Clean(info.Mounts[i].Destination)
-	}
+
 	sortMounts := func(mounts []types.MountPoint) {
 		sort.Slice(mounts, func(i, j int) bool {
 			return mounts[i].Source < mounts[j].Source
@@ -658,6 +653,22 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 	return did
 }
 
+func formatContainerJSONPath(info *types.ContainerJSON) {
+	// for inner enterprise stdout scene, if path start with /.. , no format it
+	if !strings.HasPrefix(info.LogPath, "/..") {
+		info.LogPath = filepath.Clean(info.LogPath)
+	}
+	for i := range info.Mounts {
+		info.Mounts[i].Source = filepath.Clean(info.Mounts[i].Source)
+		info.Mounts[i].Destination = filepath.Clean(info.Mounts[i].Destination)
+	}
+	if info.GraphDriver.Data != nil {
+		if rootPath, ok := info.GraphDriver.Data["UpperDir"]; ok {
+			info.GraphDriver.Data["UpperDir"] = filepath.Clean(rootPath)
+		}
+	}
+}
+
 func getContainerCenterInstance() *ContainerCenter {
 	onceDocker.Do(func() {
 		logger.InitLogger()
@@ -668,11 +679,11 @@ func getContainerCenterInstance() *ContainerCenter {
 		}
 		containerCenterInstance.imageCache = make(map[string]string)
 		containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
+		containerFindingManager = NewContainerDiscoverManager()
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
 			retryCount := 0
-			containerFindingManager = NewContainerDiscoverManager()
 			for {
 				if containerFindingManager.Init() {
 					break
@@ -1076,6 +1087,7 @@ func (dc *ContainerCenter) fetchAll() error {
 			if !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 				continue
 			}
+			formatContainerJSONPath(&containerDetail)
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {
 			dc.setLastError(err, "inspect container error "+container.ID)
@@ -1188,6 +1200,7 @@ func (dc *ContainerCenter) initClient() error {
 	// do not CreateDockerClient multi times
 	if dc.client == nil {
 		if dc.client, err = CreateDockerClient(); err != nil {
+			dc.client = nil
 			dc.setLastError(err, "init docker client from env error")
 			return err
 		}

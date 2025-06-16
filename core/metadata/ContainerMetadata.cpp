@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,22 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include <string>
-#include <vector>
+#include "metadata/ContainerMetadata.h"
 
 namespace logtail {
 
-bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
+ContainerMetadata::ContainerMetadata(size_t cidCacheSize) : mContainerCache(cidCacheSize, 20) {
+}
+
+bool ContainerMetadata::Enable() {
+    return false;
+}
+
+std::shared_ptr<ContainerMeta> ContainerMetadata::GetInfoByContainerId(const StringView&) {
+    if (!Enable()) {
+        return nullptr;
+    }
+    return nullptr;
+}
 
 } // namespace logtail

@@ -60,14 +60,14 @@ target_link_libraries(curl_unittest ${UT_BASE_TARGET})
 add_executable(proc_parser_unittest ProcParserUnittest.cpp)
 target_link_libraries(proc_parser_unittest ${UT_BASE_TARGET})
 
-add_executable(capability_util_unittest CapabilityUtilUnittest.cpp)
-target_link_libraries(capability_util_unittest ${UT_BASE_TARGET})
-
 add_executable(network_util_unittest NetworkUtilUnittest.cpp)
 target_link_libraries(network_util_unittest ${UT_BASE_TARGET})
 
 add_executable(lru_benchmark LRUBenchmark.cpp)
 target_link_libraries(lru_benchmark ${UT_BASE_TARGET})
+
+add_executable(timekeeper_benchmark TimeKeeperBenchmark.cpp)
+target_link_libraries(timekeeper_benchmark ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(common_simple_utils_unittest)
@@ -83,6 +83,6 @@ gtest_discover_tests(timer_unittest)
 gtest_discover_tests(curl_unittest)
 gtest_discover_tests(proc_parser_unittest)
 gtest_discover_tests(proc_parser_unittest)
-gtest_discover_tests(capability_util_unittest)
 gtest_discover_tests(network_util_unittest)
 gtest_discover_tests(lru_benchmark)
+gtest_discover_tests(timekeeper_benchmark)
