@@ -15,6 +15,7 @@
 set -e
 
 TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
+TEST_PATTERN=${TEST_PATTERN:-"*"}  # 新增：测试文件匹配模式
 
 search_files() {
     for file in "$1"/*; do
@@ -23,7 +24,7 @@ search_files() {
             search_files "$file"
         elif [[ -f "$file" ]]; then
             unittest="${file##*_}"
-            if [ "$unittest" == "unittest" ]; then
+            if [ "$unittest" == "unittest" ] && [[ "${file##*/}" == $TEST_PATTERN ]]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${file##*/} Start **********"
                 cd ${file%/*}
                 ./${file##*/}

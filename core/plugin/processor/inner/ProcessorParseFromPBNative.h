@@ -23,7 +23,7 @@
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
-class ProcessorParseSpanNative : public Processor {
+class ProcessorParseFromPBNative : public Processor {
 public:
     static const std::string sName;
 

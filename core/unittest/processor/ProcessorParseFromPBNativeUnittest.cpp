@@ -14,62 +14,105 @@
  * limitations under the License.
  */
 
-#include "plugin/processor/inner/ProcessorParseSpanNative.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "models/PipelineEventGroup.h"
 #include "protobuf/models/span_event.pb.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
 
 namespace logtail {
 
-class ProcessorParseSpanNativeUnittest : public testing::Test {
+class ProcessorParseFromPBNativeUnittest : public testing::Test {
 public:
     void SetUp() override {}
 
     void TestInit();
     void TestProcessValidSpanData();
-    void TestProcessInvalidSpanData();
+    void TestProcessNonRawEvent();
+    void TestProcessInvalidProtobufData();
 
 private:
-    void generateHttpServerValidSpanData(PipelineEventGroup&);
-    void generateNoSQLValidSpanData(PipelineEventGroup&);
+    void generateValidSpanData(PipelineEventGroup&);
+    void generateInvalidSpanData(PipelineEventGroup&);
+    void assertValidSpanData(const EventsContainer&);
+
+    void generateHttpServerValidSpanData(logtail::models::PipelineEventGroup&);
+    void generateNoSQLValidSpanData(logtail::models::PipelineEventGroup&);
 
     void assertHttpServerValidSpanData(const PipelineEventPtr&);
     void assertNoSQLValidSpanData(const PipelineEventPtr&);
 };
 
-void ProcessorParseSpanNativeUnittest::TestInit() {
+void ProcessorParseFromPBNativeUnittest::TestInit() {
     Json::Value config;
-    ProcessorParseSpanNative processor;
+    ProcessorParseFromPBNative processor;
 
     // Init always returns true in current implementation
     APSARA_TEST_TRUE(processor.Init(config));
 }
 
-void ProcessorParseSpanNativeUnittest::TestProcessValidSpanData() {
-    ProcessorParseSpanNative processor;
+void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
+    ProcessorParseFromPBNative processor;
 
     // Prepare event group with raw span data
     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-    this->generateHttpServerValidSpanData(eventGroup);
-    this->generateNoSQLValidSpanData(eventGroup);
+    this->generateValidSpanData(eventGroup);
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)1, eventGroup.GetEvents().size());
     processor.Process(eventGroup);
 
     // Validate output
     APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
-    this->assertHttpServerValidSpanData(eventGroup.GetEvents()[0]);
-    this->assertNoSQLValidSpanData(eventGroup.GetEvents()[1]);
+    this->assertValidSpanData(eventGroup.GetEvents());
 }
 
-void ProcessorParseSpanNativeUnittest::TestProcessInvalidSpanData() {
-    // TODO
+void ProcessorParseFromPBNativeUnittest::TestProcessNonRawEvent() {
+    ProcessorParseFromPBNative processor;
+    
+    // Prepare event group with no raw event
+    PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
+    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+
+    // Process the event
+    processor.Process(invalidEventGroup);
+    
+    // Validate output
+    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
 }
 
-void ProcessorParseSpanNativeUnittest::generateHttpServerValidSpanData(PipelineEventGroup& eventGroup) {
+void ProcessorParseFromPBNativeUnittest::TestProcessInvalidProtobufData() {
+    ProcessorParseFromPBNative processor;
+
+    // Prepare event group with invalid protobuf data
+    PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
+    this->generateInvalidSpanData(invalidEventGroup);
+
+    // Process the event
+    APSARA_TEST_EQUAL((size_t)1, invalidEventGroup.GetEvents().size());
+    processor.Process(invalidEventGroup);
+
+    // Validate output
+    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+}
+
+void ProcessorParseFromPBNativeUnittest::generateValidSpanData(logtail::PipelineEventGroup& eventGroup) {
+    logtail::models::PipelineEventGroup pbEventGroup;
+    this->generateHttpServerValidSpanData(pbEventGroup);
+    this->generateNoSQLValidSpanData(pbEventGroup);
+    
+    eventGroup.AddRawEvent()->SetContent(pbEventGroup.SerializeAsString());
+}
+
+void ProcessorParseFromPBNativeUnittest::generateInvalidSpanData(logtail::PipelineEventGroup& eventGroup) {
+    logtail::models::PipelineEventGroup pbEventGroup;
+    
+    eventGroup.AddRawEvent()->SetContent("invalid_protobuf_data");
+}
+
+void ProcessorParseFromPBNativeUnittest::generateHttpServerValidSpanData(logtail::models::PipelineEventGroup& eventGroup) {
     models::SpanEvent pbSpan;
 
     pbSpan.set_traceid("cba78930fe0c2626bc60696a3453cc40");
@@ -103,10 +146,11 @@ void ProcessorParseSpanNativeUnittest::generateHttpServerValidSpanData(PipelineE
         (*pbSpan.mutable_scopetags())[tag.first] = tag.second;
     }
 
-    eventGroup.AddRawEvent()->SetContent(pbSpan.SerializeAsString());
+    auto* spanEvents = eventGroup.mutable_spans();
+    *spanEvents->add_events() = pbSpan;
 }
 
-void ProcessorParseSpanNativeUnittest::generateNoSQLValidSpanData(PipelineEventGroup& eventGroup) {
+void ProcessorParseFromPBNativeUnittest::generateNoSQLValidSpanData(logtail::models::PipelineEventGroup& eventGroup) {
     models::SpanEvent pbSpan;
 
     pbSpan.set_traceid("cba78930fe0c2626bc60696a3453cc40");
@@ -141,10 +185,17 @@ void ProcessorParseSpanNativeUnittest::generateNoSQLValidSpanData(PipelineEventG
         (*pbSpan.mutable_scopetags())[tag.first] = tag.second;
     }
     
-    eventGroup.AddRawEvent()->SetContent(pbSpan.SerializeAsString());
+    auto* spanEvents = eventGroup.mutable_spans();
+    *spanEvents->add_events() = pbSpan;
 }
 
-void ProcessorParseSpanNativeUnittest::assertHttpServerValidSpanData(const PipelineEventPtr& event) {
+void ProcessorParseFromPBNativeUnittest::assertValidSpanData(const EventsContainer& events) {
+    assertHttpServerValidSpanData(events[0]);
+    assertNoSQLValidSpanData(events[1]);
+}
+
+
+void ProcessorParseFromPBNativeUnittest::assertHttpServerValidSpanData(const PipelineEventPtr& event) {
     APSARA_TEST_TRUE(event.Is<SpanEvent>());
     const auto& spanEvent = event.Cast<SpanEvent>();
 
@@ -152,7 +203,7 @@ void ProcessorParseSpanNativeUnittest::assertHttpServerValidSpanData(const Pipel
     APSARA_TEST_EQUAL("4083239a6a2e704e", spanEvent.GetSpanId());
     APSARA_TEST_EQUAL("d42788c106b9c48e", spanEvent.GetParentSpanId());
     APSARA_TEST_EQUAL("/components/api/v1/http/success", spanEvent.GetName());
-    APSARA_TEST_EQUAL(SpanEvent::Kind::Client, spanEvent.GetKind());
+    APSARA_TEST_EQUAL(SpanEvent::Kind::Server, spanEvent.GetKind());
     APSARA_TEST_EQUAL(1748313835253000000ULL, spanEvent.GetStartTimeNs());
     APSARA_TEST_EQUAL(1748313840262969241ULL, spanEvent.GetEndTimeNs());
     APSARA_TEST_EQUAL(SpanEvent::StatusCode::Unset, spanEvent.GetStatus());
@@ -168,11 +219,11 @@ void ProcessorParseSpanNativeUnittest::assertHttpServerValidSpanData(const Pipel
 
     // Assert scope tags
     APSARA_TEST_EQUAL(2, spanEvent.ScopeTagsSize());
-    APSARA_TEST_EQUAL("1.28.0-alpha", spanEvent.GetTag("otel.scope.version"));
-    APSARA_TEST_EQUAL("io.opentelemetry.tomcat-8.0.15", spanEvent.GetTag("otel.scope.name"));
+    APSARA_TEST_EQUAL("1.28.0-alpha", spanEvent.GetScopeTag("otel.scope.version"));
+    APSARA_TEST_EQUAL("io.opentelemetry.tomcat-8.0.15", spanEvent.GetScopeTag("otel.scope.name"));
 }
 
-void ProcessorParseSpanNativeUnittest::assertNoSQLValidSpanData(const PipelineEventPtr& event) {
+void ProcessorParseFromPBNativeUnittest::assertNoSQLValidSpanData(const PipelineEventPtr& event) {
     APSARA_TEST_TRUE(event.Is<SpanEvent>());
     const auto& spanEvent = event.Cast<SpanEvent>();
 
@@ -197,13 +248,14 @@ void ProcessorParseSpanNativeUnittest::assertNoSQLValidSpanData(const PipelineEv
 
     // Assert scope tags
     APSARA_TEST_EQUAL(2, spanEvent.ScopeTagsSize());
-    APSARA_TEST_EQUAL("1.28.0-alpha", spanEvent.GetTag("otel.scope.version"));
-    APSARA_TEST_EQUAL("io.opentelemetry.lettuce-5.1", spanEvent.GetTag("otel.scope.name"));
+    APSARA_TEST_EQUAL("1.28.0-alpha", spanEvent.GetScopeTag("otel.scope.version"));
+    APSARA_TEST_EQUAL("io.opentelemetry.lettuce-5.1", spanEvent.GetScopeTag("otel.scope.name"));
 }
 
-UNIT_TEST_CASE(ProcessorParseSpanNativeUnittest, TestInit)
-UNIT_TEST_CASE(ProcessorParseSpanNativeUnittest, TestProcessValidSpanData)
-UNIT_TEST_CASE(ProcessorParseSpanNativeUnittest, TestProcessInvalidSpanData)
+UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestInit)
+UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessValidSpanData)
+UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessNonRawEvent)
+UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessInvalidProtobufData)
 
 } // namespace logtail
 
