@@ -15,49 +15,91 @@
 name: Benchmark
 
 on:
-  pull_request:
+  push:
     branches:
       - main
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
-      - 'docker/**'
       - 'k8s_template/**'
       - 'changes/**'
       - 'licenses/**'
       - 'CHANGELOG.md'
-    types:
-      - closed
 
 jobs:
-  CI:
-    if: github.event.pull_request.merged == true
+  Build-LoongCollector-Linux:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: [self-hosted, Linux, X64]
+          - arch: arm64
+            runner: [self-hosted, Linux, ARM64]
+      fail-fast: false
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+  
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/iLogtail/coolbpf-mirror.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build linux/${{ matrix.arch }} image
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+          docker build --tag ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }} \
+              --file ./docker/Dockerfile_edge_linux .
+          docker push ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }}
+
+  Build-LoongCollector-Image:
+    runs-on: ubuntu-latest
+    needs: [ Build-LoongCollector-Linux ]
+    steps:
+      - name: Create and push manifest
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+          docker manifest create ghcr.io/$REPO_OWNER/loongcollector:edge \
+            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-amd64 \
+            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
+          docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
+
+  Benchmark:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [ 1.19.10 ]
+        test-agent: 
+          - "loongcollector-blackhole"
+          - "loongcollector-spl-blackhole"
+          - "filebeat-blackhole"
+          - "fluentbit-blackhole"
+          - "vector-blackhole"
+          - "loongcollector-file"
+          - "loongcollector-spl-file"
+          - "loongcollector-cgo-file"
+          - "filebeat-file"
+          - "fluentbit-file"
+          - "vector-file"
         python-version: [ 3.8 ]
         runner: [ ubuntu-latest ]
-      fail-fast: true
+      fail-fast: false
     permissions:
       contents: write
+      packages: read
+    needs: [ Build-LoongCollector-Image ]
     steps:
-      # Clean up space to prevent action from running out of disk space.
-      - name: clean
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
-
-      - name: Check disk space
-        run: |
-          df -hT $PWD
-
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
@@ -69,9 +111,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
 
       - name: Update Docker-compose to v2
         run: |
@@ -84,24 +126,57 @@ jobs:
           docker --version
           go version
 
-      - name: Run benchmark
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          WITHOUTGDB: ON
+      - name: Pull Docker image from GitHub Packages
+        if: contains(matrix.test-agent, 'loongcollector')
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+          docker pull ghcr.io/$REPO_OWNER/loongcollector:edge
+          docker tag ghcr.io/$REPO_OWNER/loongcollector:edge aliyun/loongcollector:0.0.1
+
+      - name: Run benchmark for agent ${{ matrix.test-agent }}
         run: |
           pip3 install -r test/requirements.txt
-          make benchmark
+          ./scripts/e2e.sh benchmark performance "${{ matrix.test-agent }}"
           git stash
+      
+      - name: Upload benchmark result for agent ${{ matrix.test-agent }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ matrix.test-agent }}
+          path: test/benchmark/report
 
-      - name: Store benchmark result iLogtail
+  result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [ Benchmark ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          path: test/benchmark/report/
+          merge-multiple: true
+
+      - name: Display structure of downloaded files and merge
+        run: |
+          ls -R test/benchmark/report/
+          ./scripts/benchmark_collect_result.sh
+          ls -R test/benchmark/report/
+
+      - name: Store benchmark result LoongCollector
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: benchmark
           tool: "customSmallerIsBetter"
-          output-file-path: "test/benchmark/report/ilogtail_statistic_all.json"
+          output-file-path: "test/benchmark/report/loongcollector_statistic_all.json"
           auto-push: false
           summary-always: true
-      
+
       - name: Store benchmark result other agents
         run: |
           git checkout gh-pages
@@ -110,15 +185,14 @@ jobs:
           git add dev/bench/records_all.js
           last_commit_message=$(git log -1 --pretty=%B)
           git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
-      
-      - name: Push benchmark result
-        run: git push 'https://alibaba:${{ secrets.GITHUB_TOKEN }}@github.com/alibaba/ilogtail.git' gh-pages:gh-pages
 
-  result:
-    if: github.event.pull_request.merged == true
+      - name: Push benchmark result
+        run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
+
+  actions-timeline:
+    needs: [result]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: [ CI ]
+    permissions:
+      actions: read
     steps:
-      - name: Build Result
-        run: echo "Just to make the GitHub merge button green"
+      - uses: Kesin11/actions-timeline@v2

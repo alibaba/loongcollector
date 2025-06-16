@@ -48,8 +48,7 @@ def main():
 
     logger = logging.getLogger('log_generator')
     logger.setLevel(logging.INFO)
-    # 快速轮转来模拟比较极端的情况
-    handler = TimedRotatingFileHandler(args.path, when="s", interval=70, backupCount=3)
+    handler = TimedRotatingFileHandler(args.path, when="s", interval=600, backupCount=3)
     formatter = logging.Formatter('%(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)

@@ -210,7 +210,6 @@
 
 * [使用介绍](config-server/usage-instructions.md)
 * [通信协议](config-server/communication-protocol.md)
-* [开发指南](config-server/config-server-developer-guide.md)
 
 ## 社区活动 <a href="#events" id="event"></a>
 

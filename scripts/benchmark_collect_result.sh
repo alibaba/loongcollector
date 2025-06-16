@@ -3,8 +3,8 @@
 # Combine the statistic and records files from each benchmark run into a single file
 
 # Define the input files and the output file
-input_statistic_files=($(find test/benchmark/report -type f -name '*ilogtail_statistic.json'))
-output_statistic_file="test/benchmark/report/ilogtail_statistic_all.json"
+input_statistic_files=($(find test/benchmark/report -type f -name '*loongcollector*_statistic.json'))
+output_statistic_file="test/benchmark/report/loongcollector_statistic_all.json"
 
 # Start the output file with an opening square bracket
 rm -f "$output_statistic_file"

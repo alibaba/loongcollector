@@ -37,6 +37,16 @@ extern "C" {
 #include "NetworkFilter.h"
 #include "common/magic_enum.hpp"
 
+#ifdef ENABLE_COMPATIBLE_MODE
+extern "C" {
+#include <string.h>
+asm(".symver memcpy, memcpy@GLIBC_2.2.5");
+void* __wrap_memcpy(void* dest, const void* src, size_t n) {
+    return memcpy(dest, src, n);
+}
+}
+#endif
+
 int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     set_log_handler(fn);
     return 0;

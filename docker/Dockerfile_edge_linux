@@ -1,0 +1,47 @@
+#########################################################################################################################
+# Step 1: Build
+#########################################################################################################################
+FROM sls-opensource-registry.us-east-1.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.3 AS builder
+
+USER root
+WORKDIR /src
+COPY . .
+
+# build and make dist
+RUN sh ./scripts/build_edge_linux.sh && \
+    mkdir -p "dist/loongcollector-edge" && \
+    mkdir -p "dist/loongcollector-edge/conf/instance_config/local/" && \
+    mkdir -p "dist/loongcollector-edge/conf/continuous_pipeline_config/local/" && \
+    mkdir -p "dist/loongcollector-edge/data/checkpoint" && \
+    mkdir -p "dist/loongcollector-edge/log" && \
+    mkdir -p "dist/loongcollector-edge/run" && \
+    cp "LICENSE" "dist/loongcollector-edge" && \
+    cp "README.md" "dist/loongcollector-edge" && \
+    cp "scripts/loongcollector_control.sh" "dist/loongcollector-edge" && \
+    cp "core/build/loongcollector" "dist/loongcollector-edge" && \
+    cp "core/build/go_pipeline/libGoPluginAdapter.so" "dist/loongcollector-edge" && \
+    cp "output/libGoPluginBase.so" "dist/loongcollector-edge" && \
+    cp "example_config/start_with_docker/loongcollector_config.json" "dist/loongcollector-edge/conf/instance_config/local/" && \
+    if file "dist/loongcollector-edge/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "dist/loongcollector-edge"; fi &&\
+    strip "dist/loongcollector-edge/loongcollector" && \
+    strip "dist/loongcollector-edge/libGoPluginAdapter.so" && \
+    strip "dist/loongcollector-edge/libGoPluginBase.so" && \
+    chmod 755 "dist/loongcollector-edge/loongcollector"
+
+#########################################################################################################################
+# Step 2: Build image
+#########################################################################################################################
+FROM ubuntu:25.04
+
+ENV container=docker
+
+ARG TARGETPLATFORM
+
+WORKDIR /usr/local
+COPY --from=builder --chown=$(whoami) /src/dist/loongcollector-edge loongcollector
+
+WORKDIR /usr/local/loongcollector
+ENV HTTP_PROBE_PORT=7953 \
+    ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
+    docker_file_cache_path=checkpoint/docker_path_config.json
+CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

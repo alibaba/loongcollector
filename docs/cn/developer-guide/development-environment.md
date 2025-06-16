@@ -127,6 +127,7 @@ make plugin_local # 每次更新插件代码后从这里开始
 - 编译C++代码
 
 ```bash
+git submodule update --init # 初始化并更新所有子模块
 mkdir -p core/build # 若之前没有建过
 cd core/build
 cmake ..            # 若增删文件，修改CMakeLists.txt后需要重新执行
@@ -259,3 +260,24 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 ```
 
 若使用VS Code进行开发，请重新编译开发容器镜像。使用Shift + Command + P（Mac）或Ctrl + Shift + P（Win）打开命令面板，输入rebuild，选择`Dev-Containers: Rebuild Without Cache and Reopen in Container`。
+
+### 2. 更新代码后无法编译C++代码
+
+如果发生编译错误，如
+
+``` shell
+CMake Error at ebpf/driver/CMakeLists.txt:22 (add_subdirectory):
+  The source directory
+
+    /workspaces/loongcollector/core/_thirdparty/coolbpf
+
+  does not contain a CMakeLists.txt file.
+```
+
+这是因为新代码增加了coolbpf子模块依赖，请使用以下命令拉取：
+
+```bash
+git submodule update --init # 初始化并更新所有子模块
+```
+
+拉取后，重新执行cmake命令即可正常编译。
