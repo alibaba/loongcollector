@@ -158,7 +158,7 @@ func (f *FlusherClickHouse) Description() string {
 }
 
 func (f *FlusherClickHouse) Validate() error {
-	if f.Addresses == nil || len(f.Addresses) == 0 {
+	if len(f.Addresses) == 0 {
 		var err = fmt.Errorf("clickhouse addrs is nil")
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
 		return err
