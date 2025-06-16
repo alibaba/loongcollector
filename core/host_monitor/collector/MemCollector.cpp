@@ -25,7 +25,8 @@
 #include "MetricValue.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/SystemInformationTools.h"
+#include "host_monitor/SystemInterface.h"
+#include "host_monitor/LinuxSystemInterface.h"
 #include "logger/Logger.h"
 
 #define Diff(a, b)  a-b>0 ? a-b : 0;
@@ -50,7 +51,7 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     if (group == nullptr) {
         return false;
     }
-    
+
     MemoryInformation memStat;
     SwapInformation swapStat;
     if (!GetHostMeminfoStat(memStat, swapStat)) {
@@ -58,22 +59,16 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
 
     mCalculateMeminfo.AddValue(memStat);
-    mCalculateSwap.AddValue(swapStat);
-
     mCount++;
     if (mCount < mTotalCount) {
         return true;
     }
-
     MemoryInformation minMem,maxMem,avgMem,lastMem;
-    SwapInformation  minSwap,maxSwap,avgSwap,lastSwap;
 
     mCalculateMeminfo.Stat(maxMem, minMem, avgMem, &lastMem);
-    mCalculateSwap.Stat(maxSwap, minSwap, avgSwap, &lastSwap);
 
     mCount=0;
     mCalculateMeminfo.Reset();
-    mCalculateSwap.Reset();
     
     const time_t now = time(nullptr);
 
@@ -125,24 +120,20 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 }
 
 bool MemCollector::GetHostMeminfoStat(MemoryInformation& memStat, SwapInformation& swapStat) {
-    std::vector<std::string> loadLines;
-    std::string errorMessage;
+    MemoryInformationString meminfoStr;
 
-    if (!GetHostSystemStatWithPath(loadLines, errorMessage, PROCESS_DIR / PROCESS_MEMINFO)) {
-        if (mValidState) {
-            LOG_WARNING(sLogger, ("failed to get system load", "invalid System collector")("error msg", errorMessage));
-            mValidState = false;
-        }
+    if (!SystemInterface::GetInstance()->GetHostMeminfoStatString(meminfoStr)) {
         return false;
     }
 
     mValidState = true;
 
-    if (!GetMemoryStat(memStat, loadLines)) {
+    if (!GetMemoryStat(memStat, meminfoStr.meminfoString)) {
         return false;
     }
 
-    if (!GetSwapStat(swapStat, loadLines)) {
+    // Swap is not needed right now
+    if (!GetSwapStat(swapStat, meminfoStr.meminfoString)) {
         return false;
     }
 
@@ -250,18 +241,14 @@ void MemCollector::completeMemoryInformation(MemoryInformation &memInfo) {
 }
 
 bool MemCollector::GetMemoryRam(MemoryInformation &memInfo) {
-    std::vector<std::string> mtrrLines;
-    std::string errorMessage;
     uint64_t ram = 0;
-    if (!GetHostSystemStatWithPath(mtrrLines, errorMessage, PROCESS_DIR / PROCESS_MTRR)) {
-        if (mValidState) {
-            LOG_WARNING(sLogger, ("failed to get system memory mtrr", "invalid Memory collector")("error msg", errorMessage));
-            mValidState = false;
-        }
+    MTRRInformationString mtrrInfo;
+    
+    if (!SystemInterface::GetInstance()->GetMTRRInformationString(mtrrInfo)) {
         return false;
     }
 
-    ram = parseProcMtrr(mtrrLines);
+    ram = parseProcMtrr(mtrrInfo.mtrrString);
     memInfo.ram = ram;
 
     return true;
@@ -299,59 +286,7 @@ uint64_t MemCollector::parseProcMtrr(std::vector<std::string> &lines) {
 }
 
 int MemCollector::GetSwapPageInfo(SwapInformation& swap) {
-    std::vector<std::string> vmStatLines;
-    std::string errorMessage;
-
-    //初始化
-    swap.pageIn = swap.pageOut = -1;
-    
-    // 定义候选入口
-    auto procVmStat = [&](const std::string &vmLine) {
-        // kernel 2.6
-        std::vector<std::string> vmMetric = split(vmLine, ' ', true);
-
-        bool stop = false;
-        if (vmMetric.front() == "pswpin") {
-            swap.pageIn = std::stoi(vmMetric[1]);
-        } else if (vmMetric.front() == "pswpout") {
-            stop = true;
-            swap.pageOut = std::stoi(vmMetric[1]);
-        }
-        return stop;
-    };
-    auto procStat = [&](const std::string &statLine) {
-        // kernel 2.2、2.4
-        bool found = boost::algorithm::starts_with(statLine, "swap ");
-        if (found) {
-            std::vector<std::string> statMetric = split(statLine, ' ', true);
-
-            swap.pageIn = std::stoi(statMetric[1]);
-            swap.pageOut = std::stoi(statMetric[2]);
-        }
-        return found;
-    };
-
-    struct {
-        std::string file;
-        std::function<bool(const std::string &)> fnProc;
-    } candidates[] = {
-            // kernel 2.6
-            {"/proc/vmstat", procVmStat},
-            // kernel 2.2、2.4
-            {"/proc/stat",   procStat},
-    };
-    int ret = -1;
-    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]) && ret != 0; i++) {
-        std::vector<std::string> lines;
-        if (GetHostSystemStatWithPath(lines, errorMessage, candidates[i].file)) {
-            for (auto const &line: lines) {
-                if (candidates[i].fnProc(line)) {
-                    break;
-                }
-            }
-        }
-    }
-    return ret;
+    return 1;
 }
 
 } // namespace logtail

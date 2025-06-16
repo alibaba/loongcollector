@@ -131,6 +131,70 @@ struct TupleHash {
     }
 };
 
+struct MemoryInformationString : public BaseInformation {
+    std::vector<std::string> meminfoString;
+};
+
+struct MTRRInformationString : public BaseInformation {
+    std::vector<std::string> mtrrString;
+};
+
+struct MemoryInformation {
+    double ram = 0;
+    double total = 0;
+    double used = 0;
+    double free = 0;
+    double available = 0;
+    double actualUsed = 0;
+    double actualFree = 0;
+    double buffers = 0;
+    double cached = 0;
+    double usedPercent = 0.0;
+    double freePercent = 0.0;
+
+    static inline const FieldName<MemoryInformation> memStatMetas[] = {
+        FIELD_ENTRY(MemoryInformation, ram),
+        FIELD_ENTRY(MemoryInformation, total),
+        FIELD_ENTRY(MemoryInformation, used),
+        FIELD_ENTRY(MemoryInformation, free),
+        FIELD_ENTRY(MemoryInformation, available),
+        FIELD_ENTRY(MemoryInformation, actualUsed),
+        FIELD_ENTRY(MemoryInformation, actualFree),
+        FIELD_ENTRY(MemoryInformation, buffers),
+        FIELD_ENTRY(MemoryInformation, cached),
+        FIELD_ENTRY(MemoryInformation, usedPercent),
+        FIELD_ENTRY(MemoryInformation, freePercent),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<MemoryInformation>&)>& callback) {
+        for (const auto& field : memStatMetas) {
+            callback(field);
+        }
+    }
+};
+
+struct SwapInformation {
+    double total = 0;
+    double used = 0;
+    double free = 0;
+    double pageIn = 0;
+    double pageOut = 0;
+
+    static inline const FieldName<SwapInformation> swapStatMetas[] = {
+        FIELD_ENTRY(SwapInformation, total),
+        FIELD_ENTRY(SwapInformation, used),
+        FIELD_ENTRY(SwapInformation, used),
+        FIELD_ENTRY(SwapInformation, pageIn),
+        FIELD_ENTRY(SwapInformation, pageOut),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<SwapInformation>&)>& callback) {
+        for (const auto& field : swapStatMetas) {
+            callback(field);
+        }
+    }
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -184,6 +248,8 @@ public:
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
+    bool GetHostMeminfoStatString(MemoryInformationString& meminfoString);
+    bool GetMTRRInformationString(MTRRInformationString& mtrrString);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -192,7 +258,10 @@ public:
           mProcessListInformationCache(ttl),
           mProcessInformationCache(ttl),
           mSystemLoadInformationCache(ttl),
-          mCPUCoreNumInformationCache(ttl) {}
+          mCPUCoreNumInformationCache(ttl),
+          mMemInformationCache(ttl),
+          mMTRRInformationCache(ttl) {}
+
     virtual ~SystemInterface() = default;
 
 private:
@@ -209,6 +278,8 @@ private:
     virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
+    virtual bool GetMemoryInformationStringOnce(MemoryInformationString& meminfoStr) = 0;
+    virtual bool GetMTRRInformationStringOnce(MTRRInformationString& mtrrStr) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -216,6 +287,8 @@ private:
     SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
+    SystemInformationCache<MemoryInformationString> mMemInformationCache;
+    SystemInformationCache<MTRRInformationString> mMTRRInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

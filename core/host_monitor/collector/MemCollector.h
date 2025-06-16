@@ -20,71 +20,13 @@
 #include "host_monitor/collector/BaseCollector.h"
 #include "host_monitor/collector/MetricCalculate.h"
 #include "plugin/input/InputHostMonitor.h"
+#include "host_monitor/LinuxSystemInterface.h"
 
 namespace logtail {
 
 extern const uint32_t kMinInterval;
 extern const uint32_t kDefaultInterval;
 extern std::filesystem::path PROC_MEMINFO;
-
-// memory information in byte
-struct MemoryInformation {
-    double ram = 0;
-    double total = 0;
-    double used = 0;
-    double free = 0;
-    double available = 0;
-    double actualUsed = 0;
-    double actualFree = 0;
-    double buffers = 0;
-    double cached = 0;
-    double usedPercent = 0.0;
-    double freePercent = 0.0;
-
-    static inline const FieldName<MemoryInformation> memStatMetas[] = {
-        FIELD_ENTRY(MemoryInformation, ram),
-        FIELD_ENTRY(MemoryInformation, total),
-        FIELD_ENTRY(MemoryInformation, used),
-        FIELD_ENTRY(MemoryInformation, free),
-        FIELD_ENTRY(MemoryInformation, available),
-        FIELD_ENTRY(MemoryInformation, actualUsed),
-        FIELD_ENTRY(MemoryInformation, actualFree),
-        FIELD_ENTRY(MemoryInformation, buffers),
-        FIELD_ENTRY(MemoryInformation, cached),
-        FIELD_ENTRY(MemoryInformation, usedPercent),
-        FIELD_ENTRY(MemoryInformation, freePercent),
-    };
-
-    static void enumerate(const std::function<void(const FieldName<MemoryInformation>&)>& callback) {
-        for (const auto& field : memStatMetas) {
-            callback(field);
-        }
-    }
-};
-
-struct SwapInformation {
-    double total = 0;
-    double used = 0;
-    double free = 0;
-    double pageIn = 0;
-    double pageOut = 0;
-
-    static inline const FieldName<SwapInformation> swapStatMetas[] = {
-        FIELD_ENTRY(SwapInformation, total),
-        FIELD_ENTRY(SwapInformation, used),
-        FIELD_ENTRY(SwapInformation, used),
-        FIELD_ENTRY(SwapInformation, pageIn),
-        FIELD_ENTRY(SwapInformation, pageOut),
-    };
-
-    static void enumerate(const std::function<void(const FieldName<SwapInformation>&)>& callback) {
-        for (const auto& field : swapStatMetas) {
-            callback(field);
-        }
-    }
-};
-
-
 
 class MemCollector : public BaseCollector {
 public:

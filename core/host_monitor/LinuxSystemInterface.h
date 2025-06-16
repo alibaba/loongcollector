@@ -39,6 +39,8 @@ private:
     bool GetCPUInformationOnce(CPUInformation& cpuInfo) override;
     bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) override;
     bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) override;
+    bool GetMemoryInformationStringOnce(MemoryInformationString& meminfoStr) override;
+    bool GetMTRRInformationStringOnce(MTRRInformationString& mtrrStr) override;
 
     bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
