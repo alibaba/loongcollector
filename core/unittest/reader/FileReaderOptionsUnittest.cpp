@@ -17,11 +17,11 @@
 
 #include <json/json.h>
 
+#include "unittest/Unittest.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "pipeline/PipelineContext.h"
 #include "reader/FileReaderOptions.h"
-#include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_tail_limit_kb);
 DECLARE_FLAG_INT32(default_reader_flush_timeout);

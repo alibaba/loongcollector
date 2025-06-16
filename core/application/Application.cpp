@@ -56,6 +56,10 @@
 #else
 #include "config/provider/CommonConfigProvider.h"
 #endif
+#if defined(_MSC_VER)
+#include "direct.h"
+#include "common/WindowsDaemonUtil.h"
+#endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
