@@ -26,7 +26,7 @@
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 
-using namespace logtail;
+namespace logtail {
 
 class LogFileReaderUnittest : public ::testing::Test {
 public:
@@ -942,6 +942,8 @@ void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
+
+}
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

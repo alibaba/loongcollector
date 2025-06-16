@@ -711,6 +711,7 @@ private:
     friend class ForceReadUnittest;
     friend class FileTagUnittest;
     friend class CreateModifyHandlerUnittest;
+    friend class LogFileReaderHoleUnittest;
 
 protected:
     void UpdateReaderManual();

@@ -30,7 +30,7 @@ on:
       - 1.*
 
 jobs:
-  CI:
+  BuildCoreWindows:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -40,17 +40,19 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+
       - name: Build Binary
         env:
           BUILD_LOGTAIL_UT: ON
         run: scripts/windows64_build.bat
+
       - name: Run UT
         run: scripts/windows64_run_core_ut.bat
 
-  result:
-    runs-on: Windows
-    timeout-minutes: 60
-    needs: [CI]
+  actions-timeline:
+    needs: [BuildCoreWindows]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
     steps:
-      - name: Build Result
-        run: echo "Just to make the GitHub merge button green"
+      - uses: Kesin11/actions-timeline@v2
