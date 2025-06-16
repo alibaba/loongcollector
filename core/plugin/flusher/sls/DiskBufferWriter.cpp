@@ -28,6 +28,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
@@ -354,7 +355,7 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
             LOG_ERROR(sLogger, ("open file error", filename)("error", errorStr));
             return false;
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(5000));
+        usleep(5000);
     }
     fseek(fin, 0, SEEK_END);
     auto const currentSize = ftell(fin);

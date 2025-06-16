@@ -23,6 +23,7 @@
 
 #include "MemoryBarrier.h"
 #include "Semaphore.h"
+#include "TimeUtil.h"
 
 namespace logtail {
 
@@ -72,7 +73,7 @@ public:
             if (TryPushItem(item)) {
                 return;
             }
-            std::this_thread::sleep_for(std::chrono::microseconds(this->SLEEP_TIME));
+            usleep(this->SLEEP_TIME);
         }
     }
 
@@ -104,7 +105,7 @@ public:
             if (TryPopItem(item)) {
                 return;
             }
-            std::this_thread::sleep_for(std::chrono::microseconds(this->SLEEP_TIME));
+            usleep(this->SLEEP_TIME);
         }
     }
 

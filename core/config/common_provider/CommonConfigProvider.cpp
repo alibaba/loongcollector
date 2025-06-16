@@ -24,6 +24,7 @@
 #include "application/Application.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "common/YamlUtil.h"
 #include "common/http/Constant.h"
@@ -175,7 +176,7 @@ void CommonConfigProvider::LoadConfigFile() {
 
 void CommonConfigProvider::CheckUpdateThread() {
     LOG_INFO(sLogger, (sName, "started"));
-    std::this_thread::sleep_for(std::chrono::microseconds((rand() % 10) * 100 * 1000));
+    usleep((rand() % 10) * 100 * 1000);
     int32_t lastCheckTime = time(NULL);
     unique_lock<mutex> lock(mThreadRunningMux);
     while (mIsThreadRunning) {

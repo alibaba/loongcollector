@@ -122,7 +122,7 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
             LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(10 * 1000));
+        usleep(10 * 1000);
     }
 }
 

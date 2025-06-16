@@ -9,6 +9,7 @@
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
@@ -206,15 +207,13 @@ private:
 
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
 
         // write testFile1 for the 1st time
         generateLog(testFile1);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile1stWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -235,8 +234,7 @@ private:
         generateLog(testFile1);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile2ndWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -255,8 +253,7 @@ private:
         generateLog(testFile2);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile3rdWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -300,15 +297,13 @@ public:
 
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
 
         // generate log for testFile1 for the 1st time
         generateLog(testFile);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile));
 
         // Dump and load checkpoint
