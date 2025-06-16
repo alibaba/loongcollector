@@ -351,6 +351,11 @@ func (m *metaCollector) sendInBackground() {
 		group.Events = group.Events[:0]
 	}
 	lastSendClusterTime := time.Now()
+	
+	//send cluster entity as soon as k8s meta started
+	clusterEntity := m.generateClusterEntity()
+	m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
+
 	for {
 		select {
 		case e := <-m.entityBuffer:
