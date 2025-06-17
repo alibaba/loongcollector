@@ -15,7 +15,7 @@
  */
 
 #include <stdlib.h>
-#if !defined(_MSC_VER)
+#if defined(__linux__)
 #include <sys/errno.h>
 #include <sys/utsname.h>
 #endif

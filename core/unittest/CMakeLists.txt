@@ -28,6 +28,7 @@ if (MSVC)
 endif ()
 
 macro(add_core_subdir)
+    add_subdirectory(app_config)
     add_subdirectory(batch)
     add_subdirectory(checkpoint)
     add_subdirectory(common)
@@ -60,9 +61,6 @@ macro(add_core_subdir)
         add_subdirectory(shennong)
     endif()
     if (LINUX)
-        # TODO: windows
-        # has some ebpf flags, remove this flags on windows to cover AppConfig.
-        add_subdirectory(app_config)
         add_subdirectory(ebpf)
         add_subdirectory(host_monitor)
         add_subdirectory(prometheus)

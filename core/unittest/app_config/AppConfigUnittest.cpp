@@ -19,6 +19,20 @@
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
+DECLARE_FLAG_BOOL(logtail_mode);
+DECLARE_FLAG_STRING(host_path_blacklist);
+DECLARE_FLAG_DOUBLE(default_machine_cpu_usage_threshold);
+#ifdef _MSC_VER
+// define flags for test, because these flags in ebpf are not defined in windows
+DEFINE_FLAG_INT32(ebpf_receive_event_chan_cap, "ebpf receive kernel event queue size", 4096);
+DEFINE_FLAG_BOOL(ebpf_admin_config_debug_mode, "ebpf admin config debug mode", false);
+DEFINE_FLAG_STRING(ebpf_admin_config_log_level, "ebpf admin config log level", "warn");
+DEFINE_FLAG_BOOL(ebpf_admin_config_push_all_span, "if admin config push all span", false);
+DEFINE_FLAG_INT32(ebpf_aggregation_config_agg_window_second, "ebpf data aggregation window time", 15);
+DEFINE_FLAG_STRING(ebpf_converage_config_strategy, "ebpf converage strategy", "combine");
+DEFINE_FLAG_STRING(ebpf_sample_config_strategy, "ebpf sample strategy", "fixedRate");
+DEFINE_FLAG_DOUBLE(ebpf_sample_config_config_rate, "ebpf sample rate", 0.01);
+#else
 DECLARE_FLAG_INT32(ebpf_receive_event_chan_cap);
 DECLARE_FLAG_BOOL(ebpf_admin_config_debug_mode);
 DECLARE_FLAG_STRING(ebpf_admin_config_log_level);
@@ -27,9 +41,7 @@ DECLARE_FLAG_INT32(ebpf_aggregation_config_agg_window_second);
 DECLARE_FLAG_STRING(ebpf_converage_config_strategy);
 DECLARE_FLAG_STRING(ebpf_sample_config_strategy);
 DECLARE_FLAG_DOUBLE(ebpf_sample_config_config_rate);
-DECLARE_FLAG_BOOL(logtail_mode);
-DECLARE_FLAG_STRING(host_path_blacklist);
-DECLARE_FLAG_DOUBLE(default_machine_cpu_usage_threshold);
+#endif
 
 namespace logtail {
 
@@ -137,7 +149,7 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
                     "debug_mode": true,
                     "log_level": "error",
                     "push_all_span": true
-                },
+                }
             }
         }
     )";
