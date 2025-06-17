@@ -67,6 +67,7 @@ go env -w GOPROXY="https://goproxy.cn,direct"
 set GOARCH=amd64
 set GOFLAGS=-buildvcs=false
 set CGO_ENABLED=1
+set LINK="/ignore:4099 /ignore:C4100"
 
 set PATH=%DEVENV_BIN%;%MINGW_PATH%;%PATH%
 

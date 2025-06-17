@@ -54,10 +54,6 @@ protected:
         logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "ForceReadUnittest";
         utf8File = "utf8.txt";
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        // in windows, git clone may convert LF to CRLF.
-        // set "rb" to avoid fread ignore CR.
-        // TODO: windows
-        // ModifyHandler should convert CRLF to LF?
         std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;

@@ -30,6 +30,11 @@ namespace logtail {
 class ProcessorParseApsaraNativeUnittest : public ::testing::Test {
 public:
     void SetUp() override {
+#ifdef _MSC_VER
+        _putenv_s("TZ", "UTC");
+#else
+        setenv("TZ", "UTC", 1);
+#endif
         mContext.SetConfigName("project##config_0");
         BOOL_FLAG(ilogtail_discard_old_data) = false;
     }
@@ -51,9 +56,6 @@ public:
 };
 
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestInit);
-// TODO: windows
-// need implement windwos Strptime.
-#if !defined(_MSC_VER)
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessWholeLine);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessWholeLinePart);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessKeyOverwritten);
@@ -65,7 +67,6 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestMultipleLines);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventMicrosecondUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraEasyReadLogTimeParser);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraLogLineParser);
-#endif
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};

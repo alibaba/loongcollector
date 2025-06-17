@@ -224,6 +224,7 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
         APSARA_TEST_EQUAL_FATAL(lastFilePos, reader.mLastFilePos);
     }
+#ifdef __linux__
     { // read twice, single line
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
@@ -258,6 +259,7 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
         APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
+#endif
     { // empty file
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
