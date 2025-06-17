@@ -29,6 +29,7 @@
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -70,7 +71,7 @@ protected:
     void SetUp() override {
         bfs::create_directories(gRootDir);
         // create a file for reader
-        std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
+        std::string logPath = UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName);
         writeLog(logPath, "a sample log\n");
 
         // init pipeline and config
@@ -198,9 +199,7 @@ void CreateModifyHandlerUnittest::TestHandleContainerStoppedEvent() {
 std::string CreateModifyHandlerUnittest::gRootDir;
 std::string CreateModifyHandlerUnittest::gLogName;
 
-#if defined(__linux__)
 UNIT_TEST_CASE(CreateModifyHandlerUnittest, TestHandleContainerStoppedEvent);
-#endif
 } // end of namespace logtail
 
 int main(int argc, char** argv) {

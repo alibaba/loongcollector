@@ -570,7 +570,6 @@ private:
     const std::string LOG_UNMATCH = "unmatch log";
 };
 
-#if defined(__linux__)
 UNIT_TEST_CASE(ContainerdTextRemoveLastIncompleteLogMultilineUnittest, TestRemoveLastIncompleteLogWithBeginEnd);
 UNIT_TEST_CASE(ContainerdTextRemoveLastIncompleteLogMultilineUnittest, TestRemoveLastIncompleteLogWithBegin);
 UNIT_TEST_CASE(ContainerdTextRemoveLastIncompleteLogMultilineUnittest, TestRemoveLastIncompleteLogWithEnd);
@@ -1339,7 +1338,6 @@ void DockerJsonRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncomplet
         }
     }
 }
-#endif
 } // namespace logtail
 
 UNIT_TEST_MAIN

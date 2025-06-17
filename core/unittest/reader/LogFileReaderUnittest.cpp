@@ -82,8 +82,7 @@ protected:
     CollectionPipelineContext ctx;
 };
 
-// TODO: windows
-// UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadUTF8);
 
 std::string LogFileReaderUnittest::logPathDir;
@@ -648,7 +647,6 @@ void LogMultiBytesUnittest::TestAlignLastCharacterUTF8() {
                                     std::make_pair(&fileTagOpts, &ctx));
         std::string expectedLog = "为可观测场景而";
         std::string testLog = expectedLog + "生";
-
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size());
         APSARA_TEST_EQUAL_FATAL(expectedLog.size(), result);
     }

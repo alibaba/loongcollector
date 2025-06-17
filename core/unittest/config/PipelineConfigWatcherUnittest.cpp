@@ -81,7 +81,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_network_observer"
+                    "Type": "input_internal_alarms"
                 }
             ],
             "flushers": [
@@ -98,7 +98,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_network_observer"
+                    "Type": "input_internal_alarms"
                 }
             ],
             "flushers": [
@@ -115,7 +115,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_network_observer"
+                    "Type": "input_internal_alarms"
                 }
             ],
             "processors": [],
@@ -133,7 +133,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_network_observer"
+                    "Type": "input_internal_alarms"
                 }
             ],
             "processors": [],
@@ -151,7 +151,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_process_security"
+                    "Type": "input_internal_metrics"
                 }
             ],
             "flushers": [
@@ -168,7 +168,7 @@ private:
             "valid": true,
             "inputs": [
                 {
-                    "Type": "input_process_security"
+                    "Type": "input_internal_metrics"
                 }
             ],
             "processors": [],
@@ -1529,14 +1529,10 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
     }
 }
 
-// TODO: windows
-// windows no singletion plugin now.
-#if !defined(_MSC_VER)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadAddedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadModifiedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadRemovedSingletonConfig)
 UNIT_TEST_CASE(PipelineConfigWatcherUnittest, TestLoadUnchangedSingletonConfig)
-#endif
 
 } // namespace logtail
 
