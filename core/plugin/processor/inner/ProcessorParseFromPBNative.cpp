@@ -16,10 +16,11 @@
 
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 
-#include "Logger.h"
+#include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "models/RawEvent.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 
@@ -31,38 +32,42 @@ const string ProcessorParseFromPBNative::sName = "processor_parse_from_pb_native
 
 // only for inner processor
 bool ProcessorParseFromPBNative::Init(const Json::Value&) {
-    // no config for this processor for now
+    mOutFailedEventGroupsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL);
+    mOutSuccessfulEventGroupsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL);
     return true;
 }
 
 void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
     if (eventGroup.GetEvents().empty()) {
-        LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup is empty"));
+        LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup is empty"));
         return;
     }
     const auto& e = eventGroup.GetEvents().at(0);
     if (!IsSupportedEvent(e)) {
-        LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup[0] is not a RawEvent"));
+        LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup[0] is not a RawEvent"));
         return;
     }
     const auto& sourceEvent = e.Cast<RawEvent>();
 
     std::string errMsg;
-    models::PipelineEventGroup peg;
-    if (peg.ParseFromString(sourceEvent.GetContent().data())) {
+    models::PipelineEventGroup pbGroup;
+    
+    if (pbGroup.ParseFromString(sourceEvent.GetContent().data())) {
         eventGroup.MutableEvents().clear();
-        TransferPBToPipelineEventGroup(peg, eventGroup, errMsg);
+        TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg);
     } else {
-        LOG_ERROR(sLogger, ("error transfer PB to PipelineEventGroup", "invalid protobuf data"));
         eventGroup.MutableEvents().clear();
+        ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
         return;
     }
 
     if (!errMsg.empty()) {
-        LOG_ERROR(sLogger, ("error transfer PB to PipelineEventGroup", errMsg));
+        LOG_WARNING(sLogger, ("error transfer PB to PipelineEventGroup", errMsg));
+        ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
         eventGroup.MutableEvents().clear();
         return;
     }
+    ADD_COUNTER(mOutSuccessfulEventGroupsTotal, 1)
 }
 
 bool ProcessorParseFromPBNative::IsSupportedEvent(const PipelineEventPtr& event) const {

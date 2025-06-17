@@ -33,6 +33,14 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
+
+private:
+    CounterPtr mOutFailedEventGroupsTotal;
+    CounterPtr mOutSuccessfulEventGroupsTotal;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class ProcessorParseFromPBNativeUnittest;
+#endif
 };
 
 } // namespace logtail

@@ -26,7 +26,9 @@ namespace logtail {
 
 class ProcessorParseFromPBNativeUnittest : public testing::Test {
 public:
-    void SetUp() override {}
+    void SetUp() override {
+        mContext.SetConfigName("project##config_0");
+    }
 
     void TestInit();
     void TestProcessValidSpanData();
@@ -43,18 +45,25 @@ private:
 
     void assertHttpServerValidSpanData(const PipelineEventPtr&);
     void assertNoSQLValidSpanData(const PipelineEventPtr&);
+
+    CollectionPipelineContext mContext;
 };
 
 void ProcessorParseFromPBNativeUnittest::TestInit() {
     Json::Value config;
     ProcessorParseFromPBNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorParseFromPBNative::sName, "1");
 
-    // Init always returns true in current implementation
+    // Init should return true with valid context and metrics
     APSARA_TEST_TRUE(processor.Init(config));
 }
 
 void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
     ProcessorParseFromPBNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorParseFromPBNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(Json::Value()));
 
     // Prepare event group with raw span data
     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
@@ -67,10 +76,16 @@ void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
     // Validate output
     APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
     this->assertValidSpanData(eventGroup.GetEvents());
+
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mOutSuccessfulEventGroupsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
 }
 
 void ProcessorParseFromPBNativeUnittest::TestProcessNonRawEvent() {
     ProcessorParseFromPBNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorParseFromPBNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(Json::Value()));
 
     // Prepare event group with no raw event
     PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
@@ -81,10 +96,15 @@ void ProcessorParseFromPBNativeUnittest::TestProcessNonRawEvent() {
 
     // Validate output
     APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
 }
 
 void ProcessorParseFromPBNativeUnittest::TestProcessInvalidProtobufData() {
     ProcessorParseFromPBNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorParseFromPBNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(Json::Value()));
 
     // Prepare event group with invalid protobuf data
     PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
@@ -96,6 +116,8 @@ void ProcessorParseFromPBNativeUnittest::TestProcessInvalidProtobufData() {
 
     // Validate output
     APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mOutFailedEventGroupsTotal->GetValue());
 }
 
 void ProcessorParseFromPBNativeUnittest::generateValidSpanData(logtail::PipelineEventGroup& eventGroup) {
