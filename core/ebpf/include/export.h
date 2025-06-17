@@ -34,7 +34,6 @@ struct L7Config {
     bool mEnableMetric = false;
     bool mEnableLog = false;
     double mSampleRate = 0.01;
-    // std::vector<std::string> mEnableProtocols;
 };
 
 struct L4Config {

@@ -77,6 +77,12 @@ const string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL = "poll_process_events
 const string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL = "loss_process_events_total";
 const string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL = "process_cache_miss_total";
 const string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE = "process_cache_size";
+const string METRIC_RUNNER_EBPF_POLL_NETWORK_OBSERVER_EVENTS_TOTAL = "poll_network_observer_events_total";
+const string METRIC_RUNNER_EBPF_LOSS_NETWORK_OBSERVER_EVENTS_TOTAL = "loss_network_observer_events_total";
+const string METRIC_RUNNER_EBPF_NETWORK_OBSERVER_CONNECTION_NUM = "connection_num";
+const string METRIC_RUNNER_EBPF_META_ATTACH_SUCCESS_TOTAL = "meta_attach_success_total";
+const string METRIC_RUNNER_EBPF_META_ATTACH_FAILED_TOTAL = "meta_attach_failed_total";
+const string METRIC_RUNNER_EBPF_META_ATTACH_ROLLBACK_TOTAL = "meta_attach_rollback_total";
 
 /**********************************************************
  *   k8s metadata

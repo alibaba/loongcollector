@@ -29,12 +29,19 @@ extern "C" {
 #include "common/Lock.h"
 #include "ebpf/include/export.h"
 #include "ebpf/util/sampler/Sampler.h"
+#include "monitor/metric_models/MetricTypes.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
 
 class AppDetail {
 public:
-    explicit AppDetail(ObserverNetworkOption* opt)
+    AppDetail(const AppDetail&) = default;
+    AppDetail(AppDetail&&) = delete;
+    AppDetail& operator=(const AppDetail&) = delete;
+    AppDetail& operator=(AppDetail&&) = delete;
+
+    explicit AppDetail(ObserverNetworkOption* opt, const PluginMetricManagerPtr& metricMgr = nullptr)
         : mAppName(opt->mApmConfig.mAppName),
           mAppId(opt->mApmConfig.mAppId),
           mWorkspace(opt->mApmConfig.mWorkspace),
@@ -44,7 +51,8 @@ public:
           mEnableSpan(opt->mL7Config.mEnableSpan),
           mEnableMetric(opt->mL7Config.mEnableMetric),
           mEnableL4(opt->mL4Config.mEnable),
-          mSampleRate(opt->mL7Config.mSampleRate) {
+          mSampleRate(opt->mL7Config.mSampleRate),
+          mMetricMgr(metricMgr) {
         // init mSampler
         if (mSampleRate < 0) {
             // LOG_WARNING(sLogger,
@@ -60,6 +68,35 @@ public:
         AttrHashCombine(mAppHash, hasher(mAppId));
         AttrHashCombine(mAppHash, hasher(mWorkspace));
         AttrHashCombine(mAppHash, hasher(mServiceId));
+
+        if (metricMgr) {
+            // init metrics
+            MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}};
+            auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+            mRefAndLabels.emplace_back(eventTypeLabels);
+            mPushMetricsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            mPushMetricGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+            eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}};
+            mRefAndLabels.emplace_back(eventTypeLabels);
+            ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+            mPushSpansTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            mPushSpanGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+            eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+            mRefAndLabels.emplace_back(eventTypeLabels);
+            ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+            mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+        }
+    }
+
+    ~AppDetail() {
+        for (auto& item : mRefAndLabels) {
+            if (mMetricMgr) {
+                mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+            }
+        }
     }
 
     std::string mAppName;
@@ -81,7 +118,16 @@ public:
     QueueKey mQueueKey = 0;
     uint32_t mPluginIndex = -1;
 
+    CounterPtr mPushSpansTotal;
+    CounterPtr mPushSpanGroupTotal;
+    CounterPtr mPushMetricsTotal;
+    CounterPtr mPushMetricGroupTotal;
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+
     size_t mAppHash = 0UL;
+    std::vector<MetricLabels> mRefAndLabels;
+    PluginMetricManagerPtr mMetricMgr;
 };
 
 struct CaseInsensitiveLess {

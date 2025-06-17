@@ -148,6 +148,8 @@ void Connection::updateL4Meta(struct conn_stats_event_t* event) {
             cidTrim = match.str(0);
         }
     }
+    std::hash<std::string> hasher;
+    AttrHashCombine(mCidKey, hasher(cidTrim));
 
     // handle socket info ...
     struct socket_info& si = event->si;
@@ -194,7 +196,6 @@ void Connection::updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     mTags.Set<kWorkloadKind>(workloadKind);
     mTags.Set<kNamespace>(pod->mNamespace);
     mTags.Set<kHostName>(pod->mPodName);
-    mWorkloadKey = GenerateWorkloadKey(pod->mNamespace, pod->mWorkloadKind, pod->mWorkloadName);
 }
 
 void Connection::updatePeerPodMetaForExternal() {
@@ -222,6 +223,12 @@ void Connection::updatePeerPodMetaForLocalhost() {
     }
 }
 
+void Connection::updateSelfPodMetaForEnv() {
+    mTags.SetNoCopy<kPodIp>(kGetSelfPodIp());
+    mTags.SetNoCopy<kHostName>(kGetSelfPodName());
+    mTags.SetNoCopy<kPodName>(kGetSelfPodName());
+}
+
 void Connection::updateSelfPodMetaForUnknown() {
     mTags.SetNoCopy<kPodIp>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadName>(kUnknownStr);
@@ -247,7 +254,6 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     mTags.Set<kPeerWorkloadKind>(peerWorkloadKind.size() ? peerWorkloadKind : kUnknownStr);
     mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : kUnknownStr);
     mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : kUnknownStr);
-    mPeerWorkloadKey = GenerateWorkloadKey(pod->mNamespace, pod->mWorkloadKind, pod->mWorkloadName);
 
     // set destId and endpoint ...
     if (mRole == IsClient) {
@@ -271,6 +277,7 @@ void Connection::TryAttachSelfMeta() {
     }
     if (!K8sMetadata::GetInstance().Enable()) {
         // set self metadata ...
+        updateSelfPodMetaForEnv();
         MarkSelfMetaAttached();
         return;
     }
@@ -344,6 +351,21 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
         // start an async task
         K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::IpInfo, dip);
     }
+}
+
+StringView Connection::kGetSelfPodName() {
+    static const std::string kSelfPodName = [] {
+        const char* podName = std::getenv("POD_NAME");
+        return podName ? podName : "";
+    }();
+    return StringView(kSelfPodName);
+}
+StringView Connection::kGetSelfPodIp() {
+    static const std::string kSelfPodIp = [] {
+        const char* podIp = std::getenv("PodIp");
+        return podIp ? podIp : "";
+    }();
+    return StringView(kSelfPodIp);
 }
 
 } // namespace logtail::ebpf

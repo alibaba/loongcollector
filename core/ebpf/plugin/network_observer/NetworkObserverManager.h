@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "MetricTypes.h"
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
@@ -60,9 +61,24 @@ public:
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            std::unique_ptr<ThreadPool>& threadPool,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricManager) {
-        return std::make_shared<NetworkObserverManager>(
-            processCacheManager, eBPFAdapter, threadPool, queue, metricManager);
+           const PluginMetricManagerPtr& metricManager,
+           IntGaugePtr connNum = nullptr,
+           CounterPtr pollEvents = nullptr,
+           CounterPtr lossEvents = nullptr,
+           CounterPtr attachSuccess = nullptr,
+           CounterPtr attachFailed = nullptr,
+           CounterPtr rollbackTotal = nullptr) {
+        return std::make_shared<NetworkObserverManager>(processCacheManager,
+                                                        eBPFAdapter,
+                                                        threadPool,
+                                                        queue,
+                                                        metricManager,
+                                                        connNum,
+                                                        pollEvents,
+                                                        lossEvents,
+                                                        attachSuccess,
+                                                        attachFailed,
+                                                        rollbackTotal);
     }
 
     NetworkObserverManager() = delete;
@@ -72,7 +88,13 @@ public:
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                            std::unique_ptr<ThreadPool>& threadPool,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           const PluginMetricManagerPtr& metricManager,
+                           IntGaugePtr connNum,
+                           CounterPtr pollEvents,
+                           CounterPtr lossEvents,
+                           CounterPtr attachSuccess,
+                           CounterPtr attachFailed,
+                           CounterPtr rollbackTotal);
 
     int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
@@ -139,11 +161,17 @@ public:
                       const std::shared_ptr<ScheduleConfig>& config) override;
 
 private:
+    // the following 3 methods are not thread safe ...
     std::shared_ptr<AppDetail>
-    getAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
-    std::shared_ptr<AppDetail> getAppConfig(size_t workloadKey);
-    std::shared_ptr<AppDetail> getAppConfig(const StringView& containerId);
-    std::shared_ptr<AppDetail> getAppConfig(const std::shared_ptr<Connection>& conn);
+    getWorkloadAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
+    std::shared_ptr<AppDetail> getWorkloadAppConfig(size_t workloadKey);
+    std::shared_ptr<AppDetail> getContainerAppConfig(size_t containerIdKey);
+
+    // thread safe, can be used in timer thread ...
+    std::shared_ptr<AppDetail> getConnAppConfig(const std::shared_ptr<Connection>& conn);
+
+    // only used in poller thread ...
+    std::shared_ptr<AppDetail> getAppConfigFromReplica(const std::shared_ptr<Connection>& conn);
 
     std::array<size_t, 1> generateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&,
                                                 const std::shared_ptr<logtail::ebpf::AppDetail>&);
@@ -154,7 +182,8 @@ private:
     std::array<size_t, 2> generateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&,
                                                      const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
-    void processRecord(const std::shared_ptr<AbstractRecord>& record);
+    void processRecord(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs,
+                       const std::shared_ptr<AbstractRecord>& record);
     void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record,
                             const std::shared_ptr<logtail::ebpf::AppDetail>&);
     void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record,
@@ -181,22 +210,6 @@ private:
     mutable std::atomic_int64_t mLostCtrlEventsTotal = 0;
     mutable std::atomic_int64_t mLostDataEventsTotal = 0;
 
-    // cache relative metric
-    IntGaugePtr mConnectionNum;
-
-    // metadata relative metric
-    CounterPtr mNetMetaAttachSuccessTotal;
-    CounterPtr mNetMetaAttachFailedTotal;
-    CounterPtr mNetMetaAttachRollbackTotal;
-    CounterPtr mAppMetaAttachSuccessTotal;
-    CounterPtr mAppMetaAttachFailedTotal;
-    CounterPtr mAppMetaAttachRollbackTotal;
-
-    CounterPtr mPushSpansTotal;
-    CounterPtr mPushSpanGroupTotal;
-    CounterPtr mPushMetricsTotal;
-    CounterPtr mPushMetricGroupTotal;
-
     // store parsed records
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRollbackQueue;
     std::deque<std::shared_ptr<AbstractRecord>> mRollbackRecords;
@@ -214,16 +227,22 @@ private:
     ReadWriteLock mAppAggLock;
     SIZETAggTreeWithSourceBuffer<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
 
-
     ReadWriteLock mNetAggLock;
     SIZETAggTreeWithSourceBuffer<NetMetricData, std::shared_ptr<AbstractRecord>> mNetAggregator;
-
 
     ReadWriteLock mSpanAggLock;
     SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractRecord>> mSpanAggregator;
 
     ReadWriteLock mLogAggLock;
     SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
+
+    // cache relative metric
+    IntGaugePtr mConnectionNum;
+    CounterPtr mPollNetEventsTotal;
+    CounterPtr mLossNetEventsTotal;
+    CounterPtr mNetMetaAttachSuccessTotal;
+    CounterPtr mNetMetaAttachFailedTotal;
+    CounterPtr mNetMetaAttachRollbackTotal;
 
     // namespace/workloadKind/workloadName hash combine to app
     mutable ReadWriteLock mAppConfigLock;
@@ -233,10 +252,14 @@ private:
     // containerId ==> appDetail or we need to store containerId to workloadKey??
     // mContainerConfigs used in data plane
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs;
+    int mConfigVersion = 0;
     // configName ==> workloadKeys
     std::unordered_map<std::string, std::set<size_t>> mWorkloads;
     // workloadKey ==> containerIds
     std::unordered_map<size_t, std::set<std::string>> mWorkloadContainers;
+
+    // will do deep copy ...
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
 
     std::shared_ptr<Sampler> mSampler;
 

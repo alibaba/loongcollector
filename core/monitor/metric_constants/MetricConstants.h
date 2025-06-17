@@ -149,16 +149,16 @@ extern const std::string METRIC_LABEL_VALUE_META_TYPE_L7;
 extern const std::string METRIC_LABEL_VALUE_META_TYPE_NET;
 
 extern const std::string METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNECTION_NUM;
-extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_EVENTS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_KEY_NUM;
+extern const std::string METRIC_RUNNER_EBPF_NETWORK_OBSERVER_CONNECTION_NUM;
+// extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL;
+// extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL;
+// extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_EVENTS_TOTAL;
+// extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_KEY_NUM;
 extern const std::string METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM;
 extern const std::string METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL;
-extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_META_ATTACH_SUCCESS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_META_ATTACH_FAILED_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_META_ATTACH_ROLLBACK_TOTAL;
 
 /**********************************************************
  *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
@@ -335,6 +335,8 @@ extern const std::string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_POLL_NETWORK_OBSERVER_EVENTS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_LOSS_NETWORK_OBSERVER_EVENTS_TOTAL;
 
 /**********************************************************
  *   k8s metadata

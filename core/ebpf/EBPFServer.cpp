@@ -187,6 +187,14 @@ void EBPFServer::Init() {
     mProcessCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
     mProcessCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
 
+    // network observer
+    mConnectionNum = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_NETWORK_OBSERVER_CONNECTION_NUM);
+    mPollNetEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_NETWORK_OBSERVER_EVENTS_TOTAL);
+    mLossNetEventsTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_LOSS_NETWORK_OBSERVER_EVENTS_TOTAL);
+    mNetMetaAttachSuccessTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_META_ATTACH_SUCCESS_TOTAL);
+    mNetMetaAttachFailedTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_META_ATTACH_FAILED_TOTAL);
+    mNetMetaAttachRollbackTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_META_ATTACH_ROLLBACK_TOTAL);
+
     mEBPFAdapter->Init();
 
     mThreadPool = std::make_unique<ThreadPool>(INT32_FLAG(ebpf_server_workers_num));
@@ -303,8 +311,17 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         }
 
         case PluginType::NETWORK_OBSERVE: {
-            pluginMgr = NetworkObserverManager::Create(
-                mProcessCacheManager, mEBPFAdapter, mThreadPool, mDataEventQueue, metricManager);
+            pluginMgr = NetworkObserverManager::Create(mProcessCacheManager,
+                                                       mEBPFAdapter,
+                                                       mThreadPool,
+                                                       mDataEventQueue,
+                                                       metricManager,
+                                                       mConnectionNum,
+                                                       mPollNetEventsTotal,
+                                                       mLossNetEventsTotal,
+                                                       mNetMetaAttachSuccessTotal,
+                                                       mNetMetaAttachFailedTotal,
+                                                       mNetMetaAttachRollbackTotal);
             UpdatePluginManager(type, pluginMgr);
 
             int status = pluginMgr->Init(options);

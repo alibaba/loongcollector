@@ -101,7 +101,8 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
     conn->RecordActive();
 }
 
-void ConnectionManager::Iterations() {
+void ConnectionManager::Iterations(
+    const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs) {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
     auto nowTs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
     // report every seconds ...
@@ -140,7 +141,7 @@ void ConnectionManager::Iterations() {
                                                                                              forceGenRecord));
             bool res = connection->GenerateConnStatsRecord(record);
             if (res && mConnStatsHandler) {
-                mConnStatsHandler(record);
+                mConnStatsHandler(currentContainerConfigs, record);
             }
             if (needGenRecord) {
                 mLastReportTs = nowTs; // update report ts

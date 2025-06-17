@@ -139,7 +139,7 @@ void ConnectionManagerUnittest::TestTimeoutMechanism() {
     manager->AcceptNetCtrlEvent(&closeEvent);
 
     for (size_t i = 0; i < 12; i++) {
-        manager->Iterations();
+        manager->Iterations({});
     }
 
     auto nullTracker = manager->getConnection(connId);
@@ -217,7 +217,7 @@ void ConnectionManagerUnittest::TestResourceManagement() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     for (size_t i = 0; i < 12; i++) {
-        manager->Iterations();
+        manager->Iterations({});
     }
 
     for (int i = 0; i < connectionCount; ++i) {

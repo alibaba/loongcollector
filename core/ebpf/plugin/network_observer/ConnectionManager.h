@@ -40,7 +40,9 @@ public:
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
-    using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
+    using ConnStatsHandler
+        = std::function<void(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs,
+                             std::shared_ptr<AbstractRecord>& record)>;
 
     ~ConnectionManager() {}
 
@@ -48,7 +50,7 @@ public:
     std::shared_ptr<Connection> AcceptNetDataEvent(struct conn_data_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
-    void Iterations();
+    void Iterations(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs);
 
     void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
 

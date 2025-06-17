@@ -71,9 +71,7 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
-    [[nodiscard]] size_t GetWorkloadKey() const { return mWorkloadKey; }
-
-    [[nodiscard]] size_t GetPeerWorkloadKey() const { return mPeerWorkloadKey; }
+    [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
@@ -179,6 +177,9 @@ private:
     // self pod meta
     void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void updateSelfPodMetaForUnknown();
+    void updateSelfPodMetaForEnv();
+    static StringView kGetSelfPodName();
+    static StringView kGetSelfPodIp();
 
     using Flag = unsigned int;
 
@@ -187,6 +188,7 @@ private:
     static constexpr Flag kSFlagPeerMetaAttached = 0b0100; // Flags[2]
     static constexpr Flag kSFlagL7MetaAttached = 0b1000; // Flags[3]
     static constexpr Flag kSFlagConnDeleted = 0b10000; // Flags[4]
+    static constexpr Flag kSFlagContainerIdSet = 0b100000; // Flags[5]
 
     static constexpr Flag kSFlagNetRecordAttachReady
         = (kSFlagL4MetaAttached | kSFlagSelfMetaAttached | kSFlagPeerMetaAttached);
@@ -215,9 +217,7 @@ private:
 
     StaticDataRow<&kConnTrackerTable> mTags;
 
-    // std::shared_ptr<AppDetail> mAppInfo;
-    size_t mWorkloadKey = 0;
-    size_t mPeerWorkloadKey = 0;
+    size_t mCidKey = 0;
 
     std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;

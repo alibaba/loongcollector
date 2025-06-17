@@ -22,6 +22,7 @@
 #include <variant>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/ThreadPool.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
@@ -32,7 +33,6 @@
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"
-#include "common/ThreadPool.h"
 
 namespace logtail::ebpf {
 
@@ -145,6 +145,13 @@ private:
     CounterPtr mProcessCacheMissTotal;
     IntGaugePtr mProcessCacheSize;
 
+    IntGaugePtr mConnectionNum; // runner
+    CounterPtr mPollNetEventsTotal;
+    CounterPtr mLossNetEventsTotal;
+    CounterPtr mNetMetaAttachSuccessTotal;
+    CounterPtr mNetMetaAttachFailedTotal;
+    CounterPtr mNetMetaAttachRollbackTotal;
+
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
@@ -163,4 +170,3 @@ private:
 };
 
 } // namespace logtail::ebpf
-
