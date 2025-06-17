@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "plugin/flusher/sls/SLSClientManager.h"
+
 #ifdef __linux__
 #include <sys/utsname.h>
 #endif
@@ -31,7 +33,6 @@
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
-#include "plugin/flusher/sls/SLSClientManager.h"
 
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 DEFINE_FLAG_STRING(default_access_key_id, "", "");

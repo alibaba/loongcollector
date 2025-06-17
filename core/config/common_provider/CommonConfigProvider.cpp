@@ -385,14 +385,13 @@ bool CommonConfigProvider::DumpConfigFile(const configserver::proto::v2::ConfigD
     }
     detail[CommonConfigProvider::configVersion] = config.version();
     string configDetail = detail.toStyledString();
-    {
-        ofstream fout(tmpFilePath);
-        if (!fout) {
-            LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
-            return false;
-        }
-        fout << configDetail;
+    ofstream fout(tmpFilePath);
+    if (!fout) {
+        LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
+        return false;
     }
+    fout << configDetail;
+    fout.close();
 
     error_code ec;
     filesystem::rename(tmpFilePath, filePath, ec);

@@ -577,8 +577,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                             "endpoint", host)("projectName", bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 }
-                                std::this_thread::sleep_for(
-                                    std::chrono::microseconds(INT32_FLAG(send_retry_sleep_interval)));
+                                usleep(INT32_FLAG(send_retry_sleep_interval));
                                 break;
                             case SEND_QUOTA_EXCEED:
                                 AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
@@ -596,12 +595,10 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
                                             "endpoint", host)("projectName", bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
-                                std::this_thread::sleep_for(
-                                    std::chrono::microseconds(INT32_FLAG(quota_exceed_wait_interval)));
+                                usleep(INT32_FLAG(quota_exceed_wait_interval));
                                 break;
                             case SEND_UNAUTHORIZED:
-                                std::this_thread::sleep_for(
-                                    std::chrono::microseconds(INT32_FLAG(unauthorized_wait_interval)));
+                                usleep(INT32_FLAG(unauthorized_wait_interval));
                                 break;
                             default:
                                 sendResult = true;
