@@ -30,11 +30,11 @@ const string ProcessorParseFromPBNative::sName = "processor_parse_from_pb_native
 
 // only for inner processor
 bool ProcessorParseFromPBNative::Init(const Json::Value&) {
+    // no config for this processor for now
     return true;
 }
 
 void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
-    // TODO support for multi schema version
     if (eventGroup.GetEvents().empty()) {
         LOG_ERROR(sLogger, ("unsupported event type", "pipelineEventGroup is empty"));
         return;

@@ -157,7 +157,7 @@ void ProcessorParseFromPBNativeUnittest::generateNoSQLValidSpanData(logtail::mod
     pbSpan.set_spanid("9a2c1a8a371d6798");
     pbSpan.set_parentspanid("4083239a6a2e704e");
     pbSpan.set_name("LLEN");
-    pbSpan.set_kind(models::SpanEvent::CLIENT); // kind=2 is SERVER
+    pbSpan.set_kind(models::SpanEvent::CLIENT); // kind=3 is SERVER
     pbSpan.set_starttime(1748313840259486017ULL);
     pbSpan.set_endtime(1748313840259765375ULL);
     pbSpan.set_status(models::SpanEvent::Unset); // statusCode=0
