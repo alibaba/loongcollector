@@ -33,7 +33,8 @@ const string ProcessorParseFromPBNative::sName = "processor_parse_from_pb_native
 // only for inner processor
 bool ProcessorParseFromPBNative::Init(const Json::Value&) {
     mOutFailedEventGroupsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL);
-    mOutSuccessfulEventGroupsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL);
+    mOutSuccessfulEventGroupsTotal
+        = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL);
     return true;
 }
 
@@ -51,7 +52,7 @@ void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
 
     std::string errMsg;
     models::PipelineEventGroup pbGroup;
-    
+
     if (pbGroup.ParseFromString(sourceEvent.GetContent().data())) {
         eventGroup.MutableEvents().clear();
         TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg);
