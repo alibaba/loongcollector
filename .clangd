@@ -7,21 +7,6 @@ CompileFlags:
     # - -DAPSARA_UNIT_TEST_MAIN  # 允许编译UT特殊方法
     - -I/opt/rh/devtoolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9/include
     - -I/opt/logtail/deps/include
-    - -I/workspaces/loongcollector/core
-    - -I/workspaces/loongcollector/core/app_config
-    - -I/workspaces/loongcollector/core/collection_pipeline
-    - -I/workspaces/loongcollector/core/collection_pipeline/plugin
-    - -I/workspaces/loongcollector/core/common
-    - -I/workspaces/loongcollector/core/config
-    - -I/workspaces/loongcollector/core/constants
-    - -I/workspaces/loongcollector/core/ebpf
-    - -I/workspaces/loongcollector/core/file_server
-    - -I/workspaces/loongcollector/core/logger
-    - -I/workspaces/loongcollector/core/models
-    - -I/workspaces/loongcollector/core/monitor/metric_models
-    - -I/workspaces/loongcollector/core/monitor
-    - -I/workspaces/loongcollector/core/prometheus/labels
-    - -I/workspaces/loongcollector/core/**
   CompilationDatabase: build
 
 Diagnostics:

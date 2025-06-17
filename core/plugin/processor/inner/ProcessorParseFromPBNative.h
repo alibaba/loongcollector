@@ -33,11 +33,7 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
-    // TODO listen to config for multi protocol version
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    // TODO unittest
-#endif
 };
 
 } // namespace logtail
