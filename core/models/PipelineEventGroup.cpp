@@ -366,13 +366,11 @@ const string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
 }
 
 const string EventGroupMetaValueToString(string value) {
-#if defined(__linux__)
     if (value == ProcessorParseContainerLogNative::CONTAINERD_TEXT) {
         return EVENT_GROUP_META_CONTAINERD_TEXT;
     } else if (value == ProcessorParseContainerLogNative::DOCKER_JSON_FILE) {
         return EVENT_GROUP_META_DOCKER_JSON_FILE;
     }
-#endif
     return value;
 }
 

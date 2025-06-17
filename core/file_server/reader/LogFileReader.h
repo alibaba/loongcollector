@@ -91,7 +91,6 @@ private:
     StringBuffer mStringBuffer;
 };
 
-#if defined(__linux__)
 class ContainerdTextParser : public BaseLineParse {
 public:
     LineInfo GetLastLine(StringView buffer,
@@ -114,7 +113,6 @@ public:
     bool parseLine(LineInfo rawLine, LineInfo& paseLine);
     DockerJsonFileParser(size_t size) : BaseLineParse(size) {}
 };
-#endif
 
 class RawTextParser : public BaseLineParse {
 public:
@@ -562,9 +560,7 @@ protected:
 
 private:
     bool mHasReadContainerBom = false;
-#if defined(__linux__)
     void checkContainerType(LogFileOperator& op);
-#endif
 
     // Initialized when the exactly once feature is enabled.
     struct ExactlyOnceOption {

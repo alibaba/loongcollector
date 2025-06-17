@@ -24,10 +24,8 @@ file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/*.c ${CMA
 if (MSVC)
     list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromRelabelMetricNative.cpp)
     list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromParseMetricNative.cpp)
-    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorParseContainerLogNative.cpp)
     list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromRelabelMetricNative.h)
     list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromParseMetricNative.h)
-    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorParseContainerLogNative.h)
 endif()
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 

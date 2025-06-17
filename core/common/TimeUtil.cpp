@@ -410,12 +410,14 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
     return result;
 }
 
-#if defined(__linux__)
 long GetTicksPerSecond() {
+#if defined(__linux__)
     static long sTicksPerSecond = sysconf(_SC_CLK_TCK);
     return sTicksPerSecond;
-}
+#else
+    return 1; // not support in other platform
 #endif
+}
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
 #if defined(__linux__)

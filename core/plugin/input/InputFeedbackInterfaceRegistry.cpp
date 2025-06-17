@@ -15,9 +15,7 @@
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 
 #include "file_server/event/BlockEventManager.h"
-#if defined(__linux__)
 #include "plugin/input/InputContainerStdio.h"
-#endif
 #include "plugin/input/InputFile.h"
 
 using namespace std;
@@ -26,9 +24,7 @@ namespace logtail {
 
 void InputFeedbackInterfaceRegistry::LoadFeedbackInterfaces() {
     mInputFeedbackInterfaceMap[InputFile::sName] = BlockedEventManager::GetInstance();
-#if defined(__linux__)
     mInputFeedbackInterfaceMap[InputContainerStdio::sName] = BlockedEventManager::GetInstance();
-#endif
 }
 
 FeedbackInterface* InputFeedbackInterfaceRegistry::GetFeedbackInterface(const string& name) const {

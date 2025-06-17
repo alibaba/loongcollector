@@ -25,10 +25,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 
-#if defined(_MSC_VER)
-#include "windows.h"
-#endif
-
 DEFINE_FLAG_INT32(adhoc_checkpoint_dump_thread_wait_interval, "microseconds", 5 * 1000);
 
 namespace logtail {

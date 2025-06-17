@@ -28,9 +28,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/un.h>
-#elif defined(_MSC_VER)
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #endif
 
 namespace logtail {
@@ -126,28 +123,41 @@ constexpr int kIPv4BitLen = 32;
 constexpr int kIPv6BitLen = 128;
 
 bool CIDRContainsForIPV4(uint32_t cidrIp, size_t prefixLen, uint32_t ip) {
+#if defined(__linux__)
     LOG_DEBUG(sLogger, ("cidr ip", cidrIp)("ip", ip));
     return ntohl(cidrIp) >> (kIPv4BitLen - prefixLen) == ntohl(ip) >> (kIPv4BitLen - prefixLen);
+#else
+    return false;
+#endif
 }
 
 // The IPv4 IP is located in the last 32-bit word of IPv6 address.
 constexpr int kIPv4Offset = 3;
 
 bool ParseIPv4Addr(const std::string& addrStr, struct in_addr* inAddr) {
+#if defined(__linux__)
     if (!inet_pton(AF_INET, addrStr.c_str(), inAddr)) {
         return false;
     }
     return true;
+#else
+    return false;
+#endif
 }
 
 bool ParseIPv6Addr(const std::string& addrStr, struct in6_addr* in6Addr) {
+#if defined(__linux__)
     if (!inet_pton(AF_INET6, addrStr.c_str(), in6Addr)) {
         return false;
     }
     return true;
+#else
+    return false;
+#endif
 }
 
 bool ParseIPAddr(const std::string& addrStr, InetAddr* ipAddr) {
+#if defined(__linux__)
     struct in_addr v4Addr = {};
     struct in6_addr v6Addr = {};
     v6Addr.s6_addr;
@@ -166,9 +176,13 @@ bool ParseIPAddr(const std::string& addrStr, InetAddr* ipAddr) {
     }
 
     return true;
+#else
+    return false;
+#endif
 }
 
 bool ParseCIDR(const std::string& cidrStr, CIDR* cidr) {
+#if defined(__linux__)
     auto items = StringSpliter(cidrStr, "/");
     if (items.size() != 2) {
         return false;
@@ -191,6 +205,9 @@ bool ParseCIDR(const std::string& cidrStr, CIDR* cidr) {
     cidr->mAddr = std::move(addr);
     cidr->mPrefixLength = prefixLen;
     return true;
+#else
+    return false;
+#endif
 }
 
 } // namespace logtail

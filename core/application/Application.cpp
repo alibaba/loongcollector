@@ -59,14 +59,9 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
-#elif defined(_MSC_VER)
-#include "direct.h"
 #endif
 #else
 #include "provider/Provider.h"
-#if defined(_MSC_VER)
-#include "direct.h"
-#endif
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
@@ -204,10 +199,6 @@ void Application::Init() {
 void Application::Start() { // GCOVR_EXCL_START
     LoongCollectorMonitor::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
 
-#if defined(__ENTERPRISE__) && defined(_MSC_VER)
-    InitWindowsSignalObject();
-#endif
-
     // resource monitor
     // TODO: move metric related initialization to input Init
     LoongCollectorMonitor::GetInstance()->Init();
@@ -315,9 +306,7 @@ void Application::Start() { // GCOVR_EXCL_START
             LOG_INFO(sLogger, ("received SIGTERM signal", "exit process"));
             Exit();
         }
-#if defined(__ENTERPRISE__) && defined(_MSC_VER)
-        SyncWindowsSignalObject();
-#endif
+
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
@@ -382,7 +371,6 @@ void Application::Exit() {
     FlusherSLS::RecycleResourceIfNotUsed();
 
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
-
     TimeKeeper::GetInstance()->Stop();
     LOG_INFO(sLogger, ("exit", "bye!"));
     exit(0);

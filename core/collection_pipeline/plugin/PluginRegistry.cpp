@@ -30,18 +30,10 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-#include "plugin/input/InputContainerStdio.h"
-#include "plugin/input/InputHostMeta.h"
-#include "plugin/input/InputHostMonitor.h"
-#include "plugin/input/InputNetworkObserver.h"
-#include "plugin/input/InputNetworkSecurity.h"
-#include "plugin/input/InputProcessSecurity.h"
-#include "plugin/input/InputPrometheus.h"
-#endif
 #include "collection_pipeline/plugin/creator/CProcessor.h"
 #include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
 #include "collection_pipeline/plugin/creator/StaticFlusherCreator.h"
@@ -56,14 +48,20 @@
 #include "plugin/processor/ProcessorParseRegexNative.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
-#if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
-#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
-#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
-#endif
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputHostMeta.h"
+#include "plugin/input/InputHostMonitor.h"
+#include "plugin/input/InputNetworkObserver.h"
+#include "plugin/input/InputNetworkSecurity.h"
+#include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputPrometheus.h"
+#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
+#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "plugin/processor/ProcessorSPL.h"
 #endif
@@ -146,8 +144,8 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
+    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
         RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
     }
@@ -167,8 +165,8 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
-#if defined(__linux__) && !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
+#if defined(__linux__) && !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
 #endif

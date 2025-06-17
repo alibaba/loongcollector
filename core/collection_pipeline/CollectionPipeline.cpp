@@ -86,9 +86,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
 
     // for special treatment below
     const InputFile* inputFile = nullptr;
-#if defined(__linux__)
     const InputContainerStdio* inputContainerStdio = nullptr;
-#endif
     bool hasFlusherSLS = false;
 
     // to send alarm and init MetricsRecord before flusherSLS is built, a temporary object is made, which will be
@@ -119,12 +117,9 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             // for special treatment below
             if (pluginType == InputFile::sName) {
                 inputFile = static_cast<const InputFile*>(mInputs[0]->GetPlugin());
-            }
-#if defined(__linux__)
-            else if (pluginType == InputContainerStdio::sName) {
+            } else if (pluginType == InputContainerStdio::sName) {
                 inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs[0]->GetPlugin());
             }
-#endif
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
         }
@@ -253,11 +248,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     }
 
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.
-#if defined(__linux__)
     if ((inputFile != nullptr || inputContainerStdio != nullptr) && IsFlushingThroughGoPipeline()) {
-#else
-    if (inputFile != nullptr && IsFlushingThroughGoPipeline()) {
-#endif
         mGoPipelineWithoutInput["global"]["DefaultLogQueueSize"]
             = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
     }

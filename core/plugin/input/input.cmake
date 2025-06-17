@@ -29,7 +29,6 @@ if(MSVC)
         ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMeta.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMonitor.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputPrometheus.cpp
-        ${CMAKE_SOURCE_DIR}/plugin/input/InputContainerStdio.cpp
         )
 elseif(UNIX)
 endif()
