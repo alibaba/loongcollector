@@ -15,6 +15,7 @@
  */
 
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
+
 #include "Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"

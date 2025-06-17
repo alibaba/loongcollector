@@ -33,7 +33,6 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
-
 };
 
 } // namespace logtail
