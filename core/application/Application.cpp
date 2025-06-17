@@ -306,7 +306,6 @@ void Application::Start() { // GCOVR_EXCL_START
             LOG_INFO(sLogger, ("received SIGTERM signal", "exit process"));
             Exit();
         }
-
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 

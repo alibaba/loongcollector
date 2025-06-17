@@ -110,7 +110,7 @@ bool CommonParserOptions::ShouldEraseEvent(bool parseSuccess,
         if (size == 1 && (offsetKey != metadata.end() && sourceEvent.cbegin()->first == offsetKey->second)) {
             return true;
         } else if (size == 2 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerTimeKey)
-                 && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerSourceKey)) {
+                   && sourceEvent.HasContent(ProcessorParseContainerLogNative::containerSourceKey)) {
             return true;
         }
     }
