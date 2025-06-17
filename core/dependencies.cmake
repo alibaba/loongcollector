@@ -45,6 +45,7 @@ set(DEP_NAME_LIST
         rapidjson               # header-only
         gtest
         gmock
+        protobuf
         re2
         cityhash
         gflags
@@ -102,6 +103,21 @@ macro(link_gtest target_name)
     endif ()
 endmacro()
 
+# protobuf
+macro(link_protobuf target_name)
+    if (protobuf_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${protobuf_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${protobuf_${LIBRARY_DIR_SUFFIX}}/libprotobuf.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "libprotobufd"
+                optimized "libprotobuf")
+    endif ()
+    if (ANDROID)
+        target_link_libraries(${target_name} "log")
+    endif ()
+endmacro()
 logtail_define(protobuf_BIN "Absolute path to protoc" "${DEPS_BINARY_ROOT}/protoc")
 
 function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
