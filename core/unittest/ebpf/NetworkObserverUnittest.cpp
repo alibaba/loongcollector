@@ -47,6 +47,7 @@ public:
     void TestErrorHandling();
     void TestPluginLifecycle();
     void TestHandleHostMetadataUpdate();
+    void TestSaeScenario();
     void TestPeriodicalTask();
     void BenchmarkConsumeTask();
 
@@ -355,6 +356,9 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
 
     APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
 
+    // copy current
+    mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
+
     // Generate 10 records
     for (size_t i = 0; i < 100; i++) {
         auto* dataEvent = CreateHttpDataEvent(i);
@@ -377,7 +381,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
-    APSARA_TEST_EQUAL(tags["host.name"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["arms.app.type"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
@@ -393,7 +397,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
-    APSARA_TEST_EQUAL(tags["host"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["source"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
     LOG_INFO(sLogger, ("====== consume log ======", ""));
@@ -406,11 +410,8 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
 
 // TEST RollBack mechanism
 void NetworkObserverManagerUnittest::TestRollbackProcessing() {
-    // case1. caused by conn stats event comes later than data event ...
     {
-        // auto mManager = CreateManager();
         ObserverNetworkOption options;
-        // options.mEnableProtocols = {"HTTP"};
         options.mL7Config.mEnable = true;
         options.mL7Config.mEnableLog = true;
         options.mL7Config.mEnableMetric = true;
@@ -447,6 +448,9 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         peerPodInfo->mPodName = "peer-pod-name";
         peerPodInfo->mNamespace = "peer-namespace";
         K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
+
+        // copy current
+        mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
 
         // Generate 10 records
         for (size_t i = 0; i < 100; i++) {
@@ -487,22 +491,6 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
         APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
     }
-
-    // case2. caused by fetch metadata from server ...
-    {
-        // mock data event
-        // mock conn stats event
-
-        // mock iterations
-
-        // mock async fetch metadata
-
-        // verify
-    }
-
-    // case3. caused by no conn stats received ...
-    // conn stats data may loss
-    {}
 }
 
 size_t GenerateContainerIdHash(const std::string& cid) {
@@ -877,27 +865,92 @@ std::shared_ptr<K8sPodInfo> CreatePodInfo(const std::string& cid) {
     podInfo->mPodIp = "test-pod-ip";
     podInfo->mPodName = "test-pod-name";
     podInfo->mNamespace = "test-namespace";
+    podInfo->mWorkloadKind = "Deployment";
+    podInfo->mWorkloadName = "test-workloadname";
     podInfo->mAppId = cid + "-test-app-id";
     podInfo->mAppName = cid + "-test-app-name";
     return podInfo;
 }
 
 void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
-    // std::vector<std::string> cidLists0 = {"1", "2", "3", "4", "5"};
-    // for (auto cid : cidLists0) {
-    //     K8sMetadata::GetInstance().mContainerCache.insert(cid, CreatePodInfo(cid));
-    // }
-    // mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
-    // APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
-    // APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 0);
+    std::vector<std::string> cidLists0 = {"1", "2", "3", "4", "5"};
+    for (auto cid : cidLists0) {
+        K8sMetadata::GetInstance().mContainerCache.insert(cid, CreatePodInfo(cid));
+    }
 
-    // mManager->HandleHostMetadataUpdate({"2", "3", "4", "5"});
-    // APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 1); // only add "5"
-    // APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 1); // delete "1"
+    ObserverNetworkOption options;
+    options.mL7Config.mEnable = true;
+    options.mL7Config.mEnableLog = true;
+    options.mL7Config.mEnableMetric = true;
+    options.mL7Config.mEnableSpan = true;
+    options.mL7Config.mSampleRate = 1.0;
 
-    // mManager->HandleHostMetadataUpdate({"4", "5", "6"});
-    // APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 0);
-    // APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
+    options.mApmConfig.mAppId = "test-app-id";
+    options.mApmConfig.mAppName = "test-app-name";
+    options.mApmConfig.mWorkspace = "test-workspace";
+    options.mApmConfig.mServiceId = "test-service-id";
+
+    options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
+
+    mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test-config-networkobserver");
+    ctx.SetProcessQueueKey(1);
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 0);
+
+    mManager->HandleHostMetadataUpdate({"2", "3", "4", "5"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 1); // only add "5"
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 1); // delete "1"
+
+    mManager->HandleHostMetadataUpdate({"4", "5", "6"});
+    APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 0);
+    APSARA_TEST_EQUAL(mManager->mDisableCids.size(), 2); // delete "2" "3"
+}
+
+void NetworkObserverManagerUnittest::TestSaeScenario() {
+    K8sMetadata::GetInstance().mEnable = false;
+
+    ObserverNetworkOption options;
+    options.mL7Config.mEnable = true;
+    options.mL7Config.mEnableLog = true;
+    options.mL7Config.mEnableMetric = true;
+    options.mL7Config.mEnableSpan = true;
+    options.mL7Config.mSampleRate = 1.0;
+
+    options.mApmConfig.mAppId = "test-app-id";
+    options.mApmConfig.mAppName = "test-app-name";
+    options.mApmConfig.mWorkspace = "test-workspace";
+    options.mApmConfig.mServiceId = "test-service-id";
+
+    mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test-config-networkobserver");
+    ctx.SetProcessQueueKey(1);
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    // only 0
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.count(0), 1);
+
+    // copy current
+    mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
+
+    auto* dataEvent = CreateHttpDataEvent(1);
+    const auto conn = mManager->mConnectionManager->AcceptNetDataEvent(dataEvent);
+    const auto& appInfo = mManager->getAppConfigFromReplica(conn);
+    APSARA_TEST_TRUE(appInfo != nullptr);
+    APSARA_TEST_EQUAL(appInfo->mAppId, "test-app-id");
+    APSARA_TEST_EQUAL(appInfo->mServiceId, "test-service-id");
+    APSARA_TEST_EQUAL(appInfo->mAppName, "test-app-name");
+    APSARA_TEST_EQUAL(appInfo->mWorkspace, "test-workspace");
+
+    K8sMetadata::GetInstance().mEnable = true;
 }
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
@@ -946,10 +999,11 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestDataEventProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPerfBufferOperations);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
-// UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 

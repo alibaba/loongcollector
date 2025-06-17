@@ -861,7 +861,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.MetricKey(), appInfo->mWorkspace);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
-                eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kIp>()); // pod ip
+                eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod ip
 
                 auto* tagMetric = eventGroup.AddMetricEvent();
                 tagMetric->SetName(kMetricNameTag);
@@ -1503,6 +1503,9 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
         // podCidVec includes current pods running in the host ...
         for (const auto& cid : podCidVec) {
             auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
+            if (podInfo == nullptr) {
+                continue;
+            }
             size_t workloadKey
                 = GenerateWorkloadKey(podInfo->mNamespace, podInfo->mWorkloadKind, podInfo->mWorkloadName);
             // check if in selectors ...
