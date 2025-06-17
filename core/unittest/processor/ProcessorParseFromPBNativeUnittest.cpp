@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "models/PipelineEventGroup.h"
-#include "protobuf/models/span_event.pb.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
+#include "protobuf/models/span_event.pb.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -71,14 +71,14 @@ void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
 
 void ProcessorParseFromPBNativeUnittest::TestProcessNonRawEvent() {
     ProcessorParseFromPBNative processor;
-    
+
     // Prepare event group with no raw event
     PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
     APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
 
     // Process the event
     processor.Process(invalidEventGroup);
-    
+
     // Validate output
     APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
 }
@@ -102,17 +102,18 @@ void ProcessorParseFromPBNativeUnittest::generateValidSpanData(logtail::Pipeline
     logtail::models::PipelineEventGroup pbEventGroup;
     this->generateHttpServerValidSpanData(pbEventGroup);
     this->generateNoSQLValidSpanData(pbEventGroup);
-    
+
     eventGroup.AddRawEvent()->SetContent(pbEventGroup.SerializeAsString());
 }
 
 void ProcessorParseFromPBNativeUnittest::generateInvalidSpanData(logtail::PipelineEventGroup& eventGroup) {
     logtail::models::PipelineEventGroup pbEventGroup;
-    
+
     eventGroup.AddRawEvent()->SetContent("invalid_protobuf_data");
 }
 
-void ProcessorParseFromPBNativeUnittest::generateHttpServerValidSpanData(logtail::models::PipelineEventGroup& eventGroup) {
+void ProcessorParseFromPBNativeUnittest::generateHttpServerValidSpanData(
+    logtail::models::PipelineEventGroup& eventGroup) {
     models::SpanEvent pbSpan;
 
     pbSpan.set_traceid("cba78930fe0c2626bc60696a3453cc40");
@@ -124,23 +125,19 @@ void ProcessorParseFromPBNativeUnittest::generateHttpServerValidSpanData(logtail
     pbSpan.set_endtime(1748313840262969241ULL);
     pbSpan.set_status(models::SpanEvent::Unset); // statusCode=0
 
-    std::map<std::string, std::string> mergedTags1 = {
-        {"http.path", "/components/api/v1/http/success"},
-        {"endpoint", "mall-user-service:9190"},
-        {"http.method", "POST"},
-        {"component.name", "http"},
-        {"http.status_code", "200"},
-        {"http.route", "/components/api/v1/http/success"}
-    };
+    std::map<std::string, std::string> mergedTags1 = {{"http.path", "/components/api/v1/http/success"},
+                                                      {"endpoint", "mall-user-service:9190"},
+                                                      {"http.method", "POST"},
+                                                      {"component.name", "http"},
+                                                      {"http.status_code", "200"},
+                                                      {"http.route", "/components/api/v1/http/success"}};
 
     for (const auto& tag : mergedTags1) {
         (*pbSpan.mutable_tags())[tag.first] = tag.second;
     }
 
-    std::map<std::string, std::string> mergedScopeTags1 = {
-        {"otel.scope.version", "1.28.0-alpha"},
-        {"otel.scope.name", "io.opentelemetry.tomcat-8.0.15"}
-    };
+    std::map<std::string, std::string> mergedScopeTags1
+        = {{"otel.scope.version", "1.28.0-alpha"}, {"otel.scope.name", "io.opentelemetry.tomcat-8.0.15"}};
 
     for (const auto& tag : mergedScopeTags1) {
         (*pbSpan.mutable_scopetags())[tag.first] = tag.second;
@@ -162,29 +159,25 @@ void ProcessorParseFromPBNativeUnittest::generateNoSQLValidSpanData(logtail::mod
     pbSpan.set_endtime(1748313840259765375ULL);
     pbSpan.set_status(models::SpanEvent::Unset); // statusCode=0
 
-    std::map<std::string, std::string> mergedTags2 = {
-        {"db.system", "redis"},
-        {"endpoint", "redis:6379"},
-        {"component.name", "redis"},
-        {"db.name", "redis:6379"},
-        {"net.peer.name", "redis:6379"},
-        {"redis.args", "key<big_key>"},
-        {"db.statement.id", "2191aada7df3c872"}
-    };
+    std::map<std::string, std::string> mergedTags2 = {{"db.system", "redis"},
+                                                      {"endpoint", "redis:6379"},
+                                                      {"component.name", "redis"},
+                                                      {"db.name", "redis:6379"},
+                                                      {"net.peer.name", "redis:6379"},
+                                                      {"redis.args", "key<big_key>"},
+                                                      {"db.statement.id", "2191aada7df3c872"}};
 
     for (const auto& tag : mergedTags2) {
         (*pbSpan.mutable_tags())[tag.first] = tag.second;
     }
 
-    std::map<std::string, std::string> mergedScopeTags2 = {
-        {"otel.scope.version", "1.28.0-alpha"},
-        {"otel.scope.name", "io.opentelemetry.lettuce-5.1"}
-    };
+    std::map<std::string, std::string> mergedScopeTags2
+        = {{"otel.scope.version", "1.28.0-alpha"}, {"otel.scope.name", "io.opentelemetry.lettuce-5.1"}};
 
     for (const auto& tag : mergedScopeTags2) {
         (*pbSpan.mutable_scopetags())[tag.first] = tag.second;
     }
-    
+
     auto* spanEvents = eventGroup.mutable_spans();
     *spanEvents->add_events() = pbSpan;
 }
