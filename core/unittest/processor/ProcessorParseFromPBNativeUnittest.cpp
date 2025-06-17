@@ -26,9 +26,7 @@ namespace logtail {
 
 class ProcessorParseFromPBNativeUnittest : public testing::Test {
 public:
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
     void TestInit();
     void TestProcessValidSpanData();
