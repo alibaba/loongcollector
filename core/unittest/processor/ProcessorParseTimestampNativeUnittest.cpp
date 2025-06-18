@@ -668,10 +668,8 @@ public:
 };
 
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTime);
-#if !defined(_MSC_VER)
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTimeSecondCache);
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestAdjustTimeZone);
-#endif
 
 void ProcessorParseLogTimeUnittest::TestParseLogTime() {
     struct Case {
@@ -760,7 +758,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
 
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -791,7 +789,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -820,7 +818,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -851,7 +849,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -882,7 +880,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "15:04:59.0 2012-01-01";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -933,7 +931,7 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -965,7 +963,7 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);

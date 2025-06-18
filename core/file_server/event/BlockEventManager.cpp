@@ -21,11 +21,6 @@
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 
-#if defined(_MSC_VER)
-// GetObject is a preprocessor definition in "windows.h"
-#undef GetObject
-#endif
-
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
 using namespace std;
@@ -96,7 +91,7 @@ void BlockedEventManager::UpdateBlockEvent(
         string key;
         key.append(pEvent->GetSource())
             .append(">")
-            .append(pEvent->GetObject())
+            .append(pEvent->GetObject_())
             .append(">")
             .append(ToString(pEvent->GetDev()))
             .append(">")
@@ -106,7 +101,7 @@ void BlockedEventManager::UpdateBlockEvent(
         hashKey = HashSignatureString(key.c_str(), key.size());
     }
     LOG_DEBUG(sLogger,
-              ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
+              ("Add block event ", pEvent->GetSource())(pEvent->GetObject_(),
                                                         pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
     mEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }

@@ -79,8 +79,8 @@ void TimeUtilUnittest::TestDeduceYear() {
                             {"0/9/9", "2018/1/1", 2018}};
 
     for (auto& c : cases) {
-        struct tm input{};
-        struct tm current{};
+        struct tm input {};
+        struct tm current {};
         parse(c.input, &input);
         parse(c.current, &current);
         EXPECT_EQ(c.expected, 1900 + DeduceYear(&input, &current));
@@ -117,6 +117,7 @@ void TimeUtilUnittest::TestStrptime() {
         int nanosecondLength;
         auto ret1 = strptime(c.buf.c_str(), c.format.c_str(), &o1);
         auto ret2 = Strptime(c.buf.c_str(), c.format.c_str(), &o2, nanosecondLength, c.specifiedYear);
+
         EXPECT_TRUE(ret1 != NULL);
         EXPECT_TRUE(ret2 != NULL);
         o1.tm_year = c.expectedYear - 1900;
@@ -202,6 +203,7 @@ void TimeUtilUnittest::TestStrptimeNanosecond() {
         int nanosecondLength;
         auto ret1 = strptime_ns(c.buf1.c_str(), c.format1.c_str(), &o1, &nanosecond, &nanosecondLength);
         auto ret2 = strptime(c.buf2.c_str(), c.format2.c_str(), &o2);
+
         EXPECT_TRUE(ret1 != NULL) << "FAILED: " + c.buf1;
         EXPECT_TRUE(ret2 != NULL) << "FAILED: " + c.buf2;
         EXPECT_EQ(mktime(&o1), mktime(&o2)) << "FAILED: " + c.buf1;

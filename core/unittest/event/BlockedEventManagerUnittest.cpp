@@ -17,11 +17,6 @@
 
 using namespace std;
 
-#if defined(_MSC_VER)
-// GetObject is a preprocessor definition in "windows.h"
-#undef GetObject
-#endif
-
 namespace logtail {
 
 class BlockedEventManagerUnittest : public testing::Test {
@@ -43,7 +38,7 @@ void BlockedEventManagerUnittest::OnFeedback() const {
     BlockedEventManager::GetInstance()->GetFeedbackEvent(res);
     APSARA_TEST_EQUAL(1U, res.size());
     APSARA_TEST_EQUAL("dir", res[0]->GetSource());
-    APSARA_TEST_EQUAL("file", res[0]->GetObject());
+    APSARA_TEST_EQUAL("file", res[0]->GetObject_());
     APSARA_TEST_EQUAL(1U, BlockedEventManager::GetInstance()->mEventMap.size());
     for (auto* e : res) {
         delete e;

@@ -67,7 +67,7 @@ go env -w GOPROXY="https://goproxy.cn,direct"
 set GOARCH=amd64
 set GOFLAGS=-buildvcs=false
 set CGO_ENABLED=1
-set LINK="/ignore:4099 /ignore:C4100"
+set LINK=/ignore:4099
 
 set PATH=%DEVENV_BIN%;%MINGW_PATH%;%PATH%
 
@@ -88,7 +88,12 @@ if defined BUILD_LOGTAIL_UT (
         set LOGTAIL_UT=ON
     )
 )
-%CMAKE_BIN% -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DBUILD_LOGTAIL_UT=%LOGTAIL_UT% -DLOGTAIL_VERSION=%LOONCOLLECTOR_VERSION% -DDEPS_ROOT=%LOONCOLLECTOR_DEPS_PATH% ..
+%CMAKE_BIN% -G "Visual Studio 15 2017 Win64" ^
+    -DBUILD_LOGTAIL_UT=%LOGTAIL_UT% ^
+    -DLOGTAIL_VERSION=%LOONCOLLECTOR_VERSION% ^
+    -DDEPS_ROOT=%LOONCOLLECTOR_DEPS_PATH% ^
+    -DCMAKE_BUILD_TYPE=Release ..
+
 if not %ERRORLEVEL% == 0 (
     echo Run cmake failed.
     exit /b 1
