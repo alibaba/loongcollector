@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -63,7 +64,7 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
@@ -153,7 +154,7 @@ protected:
         discoveryOpts.SetContainerInfo(containerInfo);
     }
 
-    void TearDown() override { bfs::remove_all(gRootDir); }
+    void TearDown() override { filesystem::remove_all(gRootDir); }
 
     static std::string gRootDir;
     static std::string gLogName;

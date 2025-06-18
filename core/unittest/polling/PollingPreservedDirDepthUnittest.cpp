@@ -1,5 +1,6 @@
 
 #include <chrono> // Include the <chrono> header for sleep_for
+#include <filesystem>
 #include <thread> // Include the <thread> header for this_thread
 
 #include "json/json.h"
@@ -18,6 +19,7 @@
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
+
 
 using namespace std;
 
@@ -95,7 +97,7 @@ public:
         INT32_FLAG(polling_check_timeout_interval) = 0;
         AppConfig::GetInstance()->mCheckPointFilePath = GetProcessExecutionDir() + gCheckpoint;
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         LoongCollectorMonitor::GetInstance()->Init();
         FlusherRunner::GetInstance()->Init(); // reference: Application::Start
@@ -120,10 +122,10 @@ public:
 
     void SetUp() override {
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         if (bfs::exists(gRootDir)) {
-            bfs::remove_all(gRootDir);
+            filesystem::remove_all(gRootDir);
         }
         bfs::create_directories(gRootDir);
     }
@@ -140,9 +142,9 @@ public:
         PollingModify::GetInstance()->ClearCache();
         CheckPointManager::Instance()->RemoveAllCheckPoint();
         // PollingEventQueue::GetInstance()->Clear();
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         FileServer::GetInstance()->Resume();
     }

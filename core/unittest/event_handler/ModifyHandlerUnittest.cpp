@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -60,7 +61,7 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
@@ -151,14 +152,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        for (int i = 0; i < 3; ++i) {
-            try {
-                bfs::remove_all(gRootDir);
-                break;
-            } catch (...) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            }
-        }
+        filesystem::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
