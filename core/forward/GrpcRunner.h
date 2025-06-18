@@ -17,10 +17,10 @@
 #pragma once
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "json/value.h"
 
@@ -64,11 +64,9 @@ public:
     void Intercept(grpc::experimental::InterceptorBatchMethods* methods) override {
         if (methods->QueryInterceptionHookPoint(
                 grpc::experimental::InterceptionHookPoints::POST_RECV_INITIAL_METADATA)) {
-            std::cout << "Intercepting gRPC call, incrementing in-flight count." << std::endl;
             mInFlightCnt->fetch_add(1);
         }
         if (methods->QueryInterceptionHookPoint(grpc::experimental::InterceptionHookPoints::POST_RECV_CLOSE)) {
-            std::cout << "Intercepting gRPC call, decrementing in-flight count." << std::endl;
             mInFlightCnt->fetch_sub(1);
         }
         methods->Proceed();
@@ -116,7 +114,7 @@ private:
     bool ShutdownGrpcServer(grpc::Server* server, std::atomic_int* inFlightCnt);
 
     mutable std::mutex mListenInputsMutex;
-    std::map<std::string, GrpcListenInput> mListenInputs;
+    std::unordered_map<std::string, GrpcListenInput> mListenInputs;
 
     std::atomic_bool mIsStarted = false;
 };

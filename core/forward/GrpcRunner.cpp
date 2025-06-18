@@ -62,21 +62,24 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
                                         const Json::Value& config) {
     std::lock_guard<std::mutex> lock(mListenInputsMutex);
     auto it = mListenInputs.find(address);
-    bool shouldBuildNewServer = false;
     if (it != mListenInputs.end()) {
         if (it->second.mServer == nullptr || it->second.mService == nullptr) {
-            // Address exists but server or service is not initialized, we can build a new server
-            LOG_INFO(
+            // should never happen
+            LOG_ERROR(
                 sLogger,
-                ("GrpcInputRunner", "address exists but server or service is not initialized, building new server")(
+                ("GrpcInputRunner", "address exists but server or service is not initialized, should never happen")(
                     "address", address)("service", T::Name()));
-            shouldBuildNewServer = true;
+            return false;
         } else if (it->second.mService->Name() != T::Name()) {
             // Address already exists, check if the service type matches
             LOG_ERROR(sLogger,
                       ("GrpcInputRunner", "address already exists with a different service type")("address", address)(
                           "existing service", it->second.mService->Name())("new service", T::Name()));
             return false;
+        } else {
+            if (!it->second.mService->Update(configName, config)) {
+                return false;
+            }
         }
     } else {
         GrpcListenInput input;
@@ -90,10 +93,6 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
             sLogger,
             ("GrpcInputRunner", "new address inserted into listen inputs")("address", address)("service", T::Name()));
         it = result.first;
-        shouldBuildNewServer = true;
-    };
-
-    if (shouldBuildNewServer) {
         std::unique_ptr<T> service = std::make_unique<T>();
         if (!service->Update(configName, config)) {
             LOG_ERROR(sLogger,
@@ -118,9 +117,8 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
         }
         it->second.mServer = std::move(server);
         it->second.mService = std::move(service);
-    } else {
-        it->second.mService->Update(configName, config);
     }
+
     it->second.mReferenceCount++;
     return true;
 }
@@ -133,6 +131,10 @@ bool GrpcInputRunner::RemoveListenInput(const std::string& address, const std::s
         if (it->second.mService && it->second.mService->Remove(configName)) {
             it->second.mReferenceCount--;
         }
+    } else {
+        LOG_ERROR(sLogger,
+                  ("GrpcInputRunner", "listen input not found")("address", address)("config name", configName));
+        return false;
     }
     if (it->second.mReferenceCount <= 0) {
         if (!ShutdownGrpcServer(it->second.mServer.get(), &it->second.mInFlightCnt)) {
