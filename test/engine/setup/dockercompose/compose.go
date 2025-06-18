@@ -43,6 +43,18 @@ const (
 	finalFileName   = "testcase-compose.yaml"
 	template        = `version: '3.8'
 services:
+  goc:
+    image: goc-server:latest
+    hostname: goc
+    ports:
+      - 7777:7777
+    volumes:
+      - %s:/coverage.log
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -O /dev/null http://localhost:7777 || exit 1" ]
+      timeout: 5s
+      interval: 1s
+      retries: 10
   loongcollectorC:
     image: aliyun/loongcollector:0.0.1
     hostname: loongcollector
@@ -74,6 +86,7 @@ services:
 // ComposeBooter control docker-compose to start or stop containers.
 type ComposeBooter struct {
 	cli       *client.Client
+	gocID     string
 	logtailID string
 }
 
@@ -135,6 +148,14 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		return err
 	}
 	c.logtailID = list[0].ID
+	gocList, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", "goc")),
+	})
+	if len(gocList) != 1 {
+		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "goc container size is not equal 1, got %d count", len(list))
+		return err
+	}
+	c.gocID = gocList[0].ID
 
 	// the docker engine cannot access host on the linux platform, more details please see: https://github.com/docker/for-linux/issues/264
 	cmd := []string{
@@ -151,6 +172,20 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 }
 
 func (c *ComposeBooter) Stop() error {
+	// fetch logtail code coverage
+	if c.gocID != "" {
+		f := strings.Join(config.TestConfig.CoveragePackages, "|")
+		cmd := "goc profile -o /coverage-raw.log"
+		if f == "" {
+			cmd += " && cat /coverage-raw.log >> /coverage.log"
+		} else {
+			cmd += " && head -n 1 /coverage-raw.log >> /coverage.log && cat /coverage-raw.log|grep -E \"" + f + "\" >> /coverage.log"
+		}
+		execCmd := []string{"sh", "-c", cmd}
+		if err := c.exec(c.gocID, execCmd); err != nil {
+			logger.Error(context.Background(), "FETCH_COVERAGE_ALARM", "err", err)
+		}
+	}
 	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
 	hasher := sha256.New()
 	hasher.Write([]byte(projectName))
@@ -238,7 +273,11 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			return err
 		}
 		// depend on
-		loongcollectorDependOn := map[string]interface{}{}
+		loongcollectorDependOn := map[string]interface{}{
+			"goc": map[string]string{
+				"condition": "service_healthy",
+			},
+		}
 		if dependOnContainers, ok := ctx.Value(config.DependOnContainerKey).([]string); ok {
 			for _, container := range dependOnContainers {
 				loongcollectorDependOn[container] = map[string]string{
@@ -278,7 +317,9 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 // getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
-	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir)
+	f, _ := os.Create(config.CoverageFile)
+	_ = f.Close()
+	str := fmt.Sprintf(template, config.CoverageFile, config.FlusherFile, config.ConfigDir)
 	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
 		panic(err)
 	}

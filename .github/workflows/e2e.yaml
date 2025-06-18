@@ -34,6 +34,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
+        go-version: [1.19.10]
         runner: [ubuntu-latest]
       fail-fast: true
     steps:
@@ -52,13 +53,13 @@ jobs:
         run: |
           df -hT $PWD
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.23.10
+          go-version: ${{ matrix.go-version }}
 
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
         with:
           submodules: false
 
@@ -87,8 +88,16 @@ jobs:
           WITHOUTGDB: ON
         run: make e2e
 
-  actions-timeline:
+  result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [E2E]
+    steps:
+      - name: Build Result
+        run: echo "Just to make the GitHub merge button green"
+
+  actions-timeline:
+    needs: [result]
     runs-on: ubuntu-latest
     permissions:
       actions: read

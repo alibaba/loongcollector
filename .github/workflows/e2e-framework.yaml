@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build Core
+name: E2E Core Test
 
 on:
   pull_request:
@@ -28,38 +28,16 @@ on:
     branches:
       - main
       - 1.*
-
 jobs:
-  BuildCore:
+  E2EFramework:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [1.19]
-        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [arc-runner-set-ilogtail]
+        go-version: [1.19.10]
+        runner: [ubuntu-latest]
       fail-fast: true
     steps:
-      - name: prepare ubuntu environment
-        run: |
-          sudo bash -c 'cat > /etc/apt/sources.list << EOL
-          deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-
-          # deb https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-          # deb-src https://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse
-
-          deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb-src https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-          EOL'
-          sudo apt update
-          sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
         run: |
@@ -75,15 +53,15 @@ jobs:
           df -hT $PWD
 
       - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Check out code
-        uses: actions/checkout@v4
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
         with:
           submodules: false
-      
+
       - name: Set custom submodule URL and fetch
         run: |
           SUBMODULE_PATH="core/_thirdparty/coolbpf"
@@ -92,28 +70,26 @@ jobs:
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
 
-      - name: Build Binary
-        env:
-          BUILD_LOGTAIL_UT: OFF
-          ENABLE_COMPATIBLE_MODE: ON
-          ENABLE_STATIC_LINK_CRT: ON
-          WITHOUTGDB: ON
-          MAKE_JOBS: 16
-          WITHSPL: ON
-        run: make core
+      - name: Update Docker-compose to v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: Check compatibility
+      - name: E2E Plugin Framework Test
         env:
           BUILD_LOGTAIL_UT: OFF
-          ENABLE_COMPATIBLE_MODE: ON
-          ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
-        run: make dist && scripts/check_glibc.sh
+        run: make e2e-core
+
+      # Framework Test will provide local image that Unit Test required
+      - name: E2E Engine Unit Test
+        run: |
+          make unittest_e2e_engine
 
   result:
-    runs-on: arc-runner-set-ilogtail
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [BuildCore]
+    needs: [E2EFramework]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"
