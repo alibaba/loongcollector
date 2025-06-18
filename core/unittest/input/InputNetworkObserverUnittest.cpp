@@ -37,7 +37,7 @@ public:
     void OnFailedInit();
     void OnSuccessfulStart();
     void OnSuccessfulStop();
-    // void OnPipelineUpdate();
+    void TestSaeConfig();
 
 protected:
     void SetUp() override {
@@ -369,13 +369,50 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Start());
 }
 
+void InputNetworkObserverUnittest::TestSaeConfig() {
+    unique_ptr<InputNetworkObserver> input;
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+
+    configStr = R"(
+        {
+            "ProbeConfig": {
+                "ApmConfig": {
+                    "AppId": "76fe228e-2c2e-4363-9f08-dcc412502062",
+                    "AppName": "zizhao-ebpf-test",
+                    "ServiceId": "hc4fs1hkb3@71ec1c84e2ca4cc069064",
+                    "Workspace": "default-cms-1760720386195983-cn-beijing"
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "L7Config": {
+                    "Enable": true,
+                    "EnableMetric": true,
+                    "EnableProtocols": [
+                        "http"
+                    ],
+                    "EnableSpan": true,
+                    "SampleRate": 1
+                }
+            },
+            "Type": "input_network_observer"
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputNetworkObserver());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+}
+
 UNIT_TEST_CASE(InputNetworkObserverUnittest, TestName)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, TestSupportAck)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStart)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStop)
-// UNIT_TEST_CASE(InputNetworkObserverUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, TestSaeConfig)
 
 } // namespace logtail
 

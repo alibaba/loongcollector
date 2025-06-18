@@ -45,7 +45,6 @@ public:
     void TestRollbackProcessing();
     void TestConfigUpdate();
     void TestErrorHandling();
-    void TestPluginLifecycle();
     void TestHandleHostMetadataUpdate();
     void TestSaeScenario();
     void TestPeriodicalTask();
@@ -500,363 +499,266 @@ size_t GenerateContainerIdHash(const std::string& cid) {
     return key;
 }
 
-// TODO @qianlu.kk
 void NetworkObserverManagerUnittest::TestConfigUpdate() {
     auto mManager = CreateManager();
-    std::cout << "begin" << std::endl;
     CollectionPipelineContext context;
     context.SetConfigName("test-config-1");
     context.SetCreateTime(12345);
+
+    // 准备测试配置
     ObserverNetworkOption options;
-    options.mApmConfig.mAppId = "test-app-id-1";
-    options.mApmConfig.mAppName = "test-app-name-1";
-    options.mApmConfig.mServiceId = "test-service-id-1";
-    options.mApmConfig.mWorkspace = "test-workspace-1";
-
+    options.mApmConfig = {.mWorkspace = "test-workspace-1",
+                          .mAppName = "test-app-name-1",
+                          .mAppId = "test-app-id-1",
+                          .mServiceId = "test-service-id-1"};
     options.mL4Config.mEnable = true;
-
-    options.mL7Config.mEnable = true;
-    options.mL7Config.mEnableLog = true;
-    options.mL7Config.mEnableMetric = true;
-    options.mL7Config.mEnableSpan = true;
-    options.mL7Config.mSampleRate = 1.0;
-
+    options.mL7Config
+        = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
     options.mSelectors = {{"test-workload-name-1", "test-workload-kind-1", "test-namespace-1"}};
 
-    size_t workload0Key = GenerateWorkloadKey("test-namespace-0", "test-workload-kind-0", "test-workload-name-0");
-    size_t workload2Key = GenerateWorkloadKey("test-namespace-2", "test-workload-kind-2", "test-workload-name-2");
-    size_t workload3Key = GenerateWorkloadKey("test-namespace-3", "test-workload-kind-3", "test-workload-name-3");
-    size_t workload4Key = GenerateWorkloadKey("test-namespace-4", "test-workload-kind-4", "test-workload-name-4");
+    // 预先生成 workload keys
+    size_t keys[5];
+    for (int i = 0; i < 5; i++) {
+        keys[i] = GenerateWorkloadKey("test-namespace-" + std::to_string(i),
+                                      "test-workload-kind-" + std::to_string(i),
+                                      "test-workload-name-" + std::to_string(i));
+    }
 
-    // case1. add config for test-config-1 which select workload1
-    mManager->AddOrUpdateConfig(&context, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-    size_t workload1Key = GenerateWorkloadKey("test-namespace-1", "test-workload-kind-1", "test-workload-name-1");
-    // step1. validate every member
-    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-1"), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].size(), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload1Key), 1); // "test-config-1"
+    /******************** 测试用例1: 添加初始配置 ********************/
+    mManager->AddOrUpdateConfig(&context, 0, nullptr, &options);
+    size_t workload1Key = keys[1];
+
+    // 详细验证配置添加
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads.count("test-config-1"), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].size(), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].count(workload1Key), 1);
 
     APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload1Key), 1);
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs.find(workload1Key) != mManager->mWorkloadConfigs.end());
 
-    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload1Key] != nullptr);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mAppId, "test-app-id-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mAppName, "test-app-name-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mWorkspace, "test-workspace-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mServiceId, "test-service-id-1");
+    const auto& wlConfig = mManager->mWorkloadConfigs[workload1Key];
+    APSARA_TEST_TRUE(wlConfig.config != nullptr);
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableL4, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableL7, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableMetric, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableSpan, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mEnableLog, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload1Key]->mSampleRate, 1.0);
+    // 验证所有配置字段
+    APSARA_TEST_EQUAL(wlConfig.config->mAppId, "test-app-id-1");
+    APSARA_TEST_EQUAL(wlConfig.config->mAppName, "test-app-name-1");
+    APSARA_TEST_EQUAL(wlConfig.config->mWorkspace, "test-workspace-1");
+    APSARA_TEST_EQUAL(wlConfig.config->mServiceId, "test-service-id-1");
+    APSARA_TEST_EQUAL(wlConfig.config->mEnableL4, true);
+    APSARA_TEST_EQUAL(wlConfig.config->mEnableL7, true);
+    APSARA_TEST_EQUAL(wlConfig.config->mEnableLog, true);
+    APSARA_TEST_EQUAL(wlConfig.config->mEnableSpan, true);
+    APSARA_TEST_EQUAL(wlConfig.config->mEnableMetric, true);
+    APSARA_TEST_EQUAL(wlConfig.config->mSampleRate, 1.0);
+    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 0); // 初始无容器
 
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+    /******************** 准备容器数据 ********************/
+    for (int i = 0; i <= 4; i++) {
+        auto podInfo = std::make_shared<K8sPodInfo>();
+        podInfo->mPodIp = "test-pod-ip-" + std::to_string(i);
+        podInfo->mPodName = "test-pod-name-" + std::to_string(i);
+        podInfo->mNamespace = "test-namespace-" + std::to_string(i);
+        podInfo->mWorkloadKind = "test-workload-kind-" + std::to_string(i);
+        podInfo->mWorkloadName = "test-workload-name-" + std::to_string(i);
 
-    // step2. mock host metadata update ...
-    {
-        for (int i = 0; i <= 9; i++) {
-            auto podInfo = std::make_shared<K8sPodInfo>();
-            podInfo->mPodIp = "test-pod-ip-" + std::to_string(i);
-            podInfo->mPodName = "test-pod-name-" + std::to_string(i);
-            podInfo->mNamespace = "test-namespace-" + std::to_string(i);
-            podInfo->mWorkloadKind = "test-workload-kind-" + std::to_string(i);
-            podInfo->mWorkloadName = "test-workload-name-" + std::to_string(i);
-
-            LOG_INFO(sLogger, ("step", "0-0"));
-            for (int j = 0; j < 5; j++) {
-                std::string containerId = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a446131"
-                    + std::to_string(i) + std::to_string(j);
-                podInfo->mContainerIds.push_back(containerId);
-                K8sMetadata::GetInstance().mContainerCache.insert(containerId, podInfo);
-            }
+        for (int j = 0; j < 3; j++) { // 每个pod 3个容器
+            std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a446131" + std::to_string(i)
+                + std::to_string(j);
+            podInfo->mContainerIds.push_back(cid);
+            K8sMetadata::GetInstance().mContainerCache.insert(cid, podInfo);
         }
     }
 
-    mManager->HandleHostMetadataUpdate(
-        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
-                                                                               // "test-workload-kind-1",
-                                                                               // "test-namespace-1"
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2); // 2 containers
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
+    /******************** 测试用例2: 添加容器关联 ********************/
+    std::vector<std::string> cids = {
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110", // workload1
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111" // workload1
+    };
+    mManager->HandleHostMetadataUpdate(cids);
 
-    for (int i = 0; i < 2; i++) {
-        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
-        size_t key = GenerateContainerIdHash(cid);
-        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+    // 验证容器关联
+    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
 
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
-    }
+    // 详细验证每个容器的配置字段
+    for (const auto& cid : cids) {
+        APSARA_TEST_EQUAL(wlConfig.containerIds.count(cid), 1);
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 2); // 2 containers
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110"),
-                      1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
-                      1);
+        size_t cidKey = GenerateContainerKey(cid);
+        APSARA_TEST_TRUE(mManager->mContainerConfigs.find(cidKey) != mManager->mContainerConfigs.end());
 
-    // add pod
-    mManager->HandleHostMetadataUpdate(
-        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
-                                                                               // "test-workload-kind-1",
-                                                                               // "test-namespace-1"
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2); // 2 containers
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
-    for (int i = 1; i <= 2; i++) {
-        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
-        size_t key = GenerateContainerIdHash(cid);
-        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+        const auto& appConfig = mManager->mContainerConfigs[cidKey];
+        APSARA_TEST_TRUE(appConfig != nullptr);
 
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
+        // 验证所有字段
+        APSARA_TEST_EQUAL(appConfig->mAppId, "test-app-id-1");
+        APSARA_TEST_EQUAL(appConfig->mAppName, "test-app-name-1");
+        APSARA_TEST_EQUAL(appConfig->mWorkspace, "test-workspace-1");
+        APSARA_TEST_EQUAL(appConfig->mServiceId, "test-service-id-1");
+        APSARA_TEST_EQUAL(appConfig->mEnableL4, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableL7, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableLog, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableSpan, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableMetric, true);
+        APSARA_TEST_EQUAL(appConfig->mSampleRate, 1.0);
+        APSARA_TEST_EQUAL(appConfig->mConfigName, "test-config-1");
+        APSARA_TEST_EQUAL(appConfig->mQueueKey, context.GetProcessQueueKey());
+        APSARA_TEST_EQUAL(appConfig->mPluginIndex, 0);
+        APSARA_TEST_TRUE(appConfig->mSampler != nullptr);
+        // APSARA_TEST_EQUAL(appConfig->mSampler->GetSampleRate(), 1.0);
     }
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 2); // 2 containers
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112"),
-                      1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
-                      1);
+    /******************** 测试用例3: 添加新容器 ********************/
+    std::vector<std::string> newCids = {
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112", // workload1
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111" // workload1 (已存在)
+    };
+    mManager->HandleHostMetadataUpdate(newCids);
 
-    // remove 1 pod
-    mManager->HandleHostMetadataUpdate(
-        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613122",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // "test-workload-name-1",
-                                                                               // "test-workload-kind-1",
-                                                                               // "test-namespace-1"
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1); // 1 containers
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
-    for (int i = 1; i <= 1; i++) {
-        std::string cid = "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a4461311" + std::to_string(i);
-        size_t key = GenerateContainerIdHash(cid);
-        APSARA_TEST_TRUE(mManager->mContainerConfigs[key] != nullptr);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppId, "test-app-id-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mAppName, "test-app-name-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mWorkspace, "test-workspace-1");
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mServiceId, "test-service-id-1");
+    // 验证容器更新
+    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
 
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL4, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableL7, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableMetric, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableSpan, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mEnableLog, true);
-        APSARA_TEST_EQUAL(mManager->mContainerConfigs[key]->mSampleRate, 1.0);
-    }
+    // 验证新容器配置
+    size_t newCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112");
+    APSARA_TEST_TRUE(mManager->mContainerConfigs.find(newCidKey) != mManager->mContainerConfigs.end());
+    const auto& newContainerConfig = mManager->mContainerConfigs[newCidKey];
+    APSARA_TEST_EQUAL(newContainerConfig->mAppId, "test-app-id-1");
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.count(workload1Key), 1); // 1 workload
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].size(), 1); // 2 containers
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112"),
-                      0);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers[workload1Key].count(
-                          "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"),
-                      1);
+    // 验证旧容器不再存在
+    size_t removedCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613110");
+    APSARA_TEST_TRUE(mManager->mContainerConfigs.find(removedCidKey) == mManager->mContainerConfigs.end());
 
-    // ========
-    // case2. update config1 and select both workload2 and workload3
+    /******************** 测试用例4: 移除容器 ********************/
+    std::vector<std::string> removeCids = {
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613122", // workload2
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111" // workload1
+    };
+    mManager->HandleHostMetadataUpdate(removeCids);
+
+    // 验证容器移除
+    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1);
+
+    // 验证保留的容器配置
+    size_t keptCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111");
+    APSARA_TEST_TRUE(mManager->mContainerConfigs.find(keptCidKey) != mManager->mContainerConfigs.end());
+    const auto& keptContainerConfig = mManager->mContainerConfigs[keptCidKey];
+    APSARA_TEST_EQUAL(keptContainerConfig->mAppName, "test-app-name-1");
+
+    // 验证移除的容器不再存在
+    size_t missingCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613112");
+    APSARA_TEST_TRUE(mManager->mContainerConfigs.find(missingCidKey) == mManager->mContainerConfigs.end());
+
+    /******************** 测试用例5: 更新配置 ********************/
     options.mSelectors = {{"test-workload-name-2", "test-workload-kind-2", "test-namespace-2"},
                           {"test-workload-name-3", "test-workload-kind-3", "test-namespace-3"}};
     options.mL4Config.mEnable = false;
     options.mL7Config.mEnableLog = false;
-    mManager->AddOrUpdateConfig(&context, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    options.mL7Config.mSampleRate = 0.5; // 修改采样率
 
-    // step1. validate every member
-    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-1"), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].size(), 2);
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload2Key), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload3Key), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload1Key), 0); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-1"].count(workload0Key), 0); // "test-config-1"
+    mManager->AddOrUpdateConfig(&context, 0, nullptr, &options);
+
+    // 验证配置更新
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].size(), 2);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].count(keys[2]), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].count(keys[3]), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-1"].count(keys[1]), 0);
 
     APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 2);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload1Key), 0);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload2Key), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload3Key), 1);
 
-    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload2Key] != nullptr);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mAppId, "test-app-id-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mAppName, "test-app-name-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mWorkspace, "test-workspace-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mServiceId, "test-service-id-1");
+    // 验证workload2配置
+    const auto& wlConfig2 = mManager->mWorkloadConfigs[keys[2]];
+    APSARA_TEST_EQUAL(wlConfig2.config->mEnableL4, false);
+    APSARA_TEST_EQUAL(wlConfig2.config->mEnableLog, false);
+    APSARA_TEST_EQUAL(wlConfig2.config->mSampleRate, 0.5);
+    APSARA_TEST_TRUE(wlConfig2.config->mSampler != nullptr);
+    // APSARA_TEST_EQUAL(wlConfig2.config->mSampler->GetSampleRate(), 0.5);
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableL4, false);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableL7, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableMetric, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableSpan, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mEnableLog, false);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload2Key]->mSampleRate, 1.0);
+    // 验证workload3配置
+    const auto& wlConfig3 = mManager->mWorkloadConfigs[keys[3]];
+    APSARA_TEST_EQUAL(wlConfig3.config->mServiceId, "test-service-id-1");
 
-    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload3Key] != nullptr);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mAppId, "test-app-id-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mAppName, "test-app-name-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mWorkspace, "test-workspace-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mServiceId, "test-service-id-1");
-
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableL4, false);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableL7, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableMetric, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableSpan, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mEnableLog, false);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload3Key]->mSampleRate, 1.0);
-
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0); // will clean when hostMetaUpdate is called ...
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
-
-    mManager->HandleHostMetadataUpdate(
-        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613102",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613111"}); // workload0 workload1
+    // 验证旧容器配置已被清除
     APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
+    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 0); // 确保旧workload的容器被清除
 
-    mManager->HandleHostMetadataUpdate(
-        {"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613102",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613122",
-         "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613123"}); // workload2
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
-    for (const auto& it : mManager->mContainerConfigs) {
-        std::cout << it.first << std::endl;
-    }
-    std::cout << "===" << std::endl;
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1);
-
-
-    // case3. add config2 which select workload2
+    /******************** 测试用例6: 添加新配置 ********************/
     CollectionPipelineContext context2;
     context2.SetConfigName("test-config-2");
-    context2.SetCreateTime(12345);
+    context2.SetProcessQueueKey(54321); // 设置不同的队列key
+
     ObserverNetworkOption options2;
-    options2.mApmConfig.mAppId = "test-app-id-2";
-    options2.mApmConfig.mAppName = "test-app-name-2";
-    options2.mApmConfig.mServiceId = "test-service-id-2";
-    options2.mApmConfig.mWorkspace = "test-workspace-2";
-
+    options2.mApmConfig = {
+        .mWorkspace = "test-workspace-2",
+        .mAppName = "test-app-name-2",
+        .mAppId = "test-app-id-2",
+        .mServiceId = "test-service-id-2",
+    };
     options2.mL4Config.mEnable = true;
-
-    options2.mL7Config.mEnable = true;
-    options2.mL7Config.mEnableLog = true;
-    options2.mL7Config.mEnableMetric = true;
-    options2.mL7Config.mEnableSpan = true;
-    options2.mL7Config.mSampleRate = 1.0;
-
+    options2.mL7Config
+        = {.mEnable = true, .mEnableSpan = false, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 0.1};
     options2.mSelectors = {{"test-workload-name-4", "test-workload-kind-4", "test-namespace-4"}};
-    mManager->AddOrUpdateConfig(
-        &context2, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options2));
-    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 2); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-2"), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].size(), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].count(workload4Key), 1); // "test-config-1"
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 3);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload4Key), 1);
+    mManager->AddOrUpdateConfig(&context2, 1, nullptr, &options2); // 使用不同的index
 
-    APSARA_TEST_TRUE(mManager->mWorkloadConfigs[workload4Key] != nullptr);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mAppId, "test-app-id-2");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mAppName, "test-app-name-2");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mWorkspace, "test-workspace-2");
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mServiceId, "test-service-id-2");
+    // 验证新配置添加
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-2"].size(), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads["test-config-2"].count(keys[4]), 1);
 
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableL4, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableL7, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableMetric, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableSpan, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mEnableLog, true);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[workload4Key]->mSampleRate, 1.0);
+    // 验证新workload配置
+    const auto& wlConfig4 = mManager->mWorkloadConfigs[keys[4]];
+    APSARA_TEST_EQUAL(wlConfig4.config->mAppId, "test-app-id-2");
+    APSARA_TEST_EQUAL(wlConfig4.config->mEnableSpan, false);
+    APSARA_TEST_EQUAL(wlConfig4.config->mQueueKey, 54321);
+    APSARA_TEST_EQUAL(wlConfig4.config->mPluginIndex, 1);
 
-    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 1);
-
-    // case4. remove config1
+    /******************** 测试用例7: 删除配置 ********************/
     mManager->RemoveConfig("test-config-1");
-    APSARA_TEST_EQUAL(mManager->mWorkloads.size(), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads.count("test-config-2"), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].size(), 1); // "test-config-1"
-    APSARA_TEST_EQUAL(mManager->mWorkloads["test-config-2"].count(workload4Key), 1); // "test-config-1"
 
+    // 验证配置删除
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads.size(), 1);
+    APSARA_TEST_EQUAL(mManager->mConfigToWorkloads.count("test-config-1"), 0);
     APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.size(), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload4Key), 1);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload2Key), 0);
-    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload3Key), 0);
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(keys[4]), 1);
 
+    // 验证容器配置为空
     APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
-    APSARA_TEST_EQUAL(mManager->mWorkloadContainers.size(), 0);
 
+    /******************** 测试用例8: 添加新容器到配置2 ********************/
+    std::vector<std::string> workload4Cids = {
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613140", // workload4
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613141" // workload4
+    };
+    mManager->HandleHostMetadataUpdate(workload4Cids);
 
-    std::cout << "end" << std::endl;
-}
+    // 验证新容器配置
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs[keys[4]].containerIds.size(), 2);
+    APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 2);
 
-// TODO @qianlu.kk
-void NetworkObserverManagerUnittest::TestPluginLifecycle() {
-    // auto mManager = CreateManager();
+    for (const auto& cid : workload4Cids) {
+        size_t cidKey = GenerateContainerKey(cid);
+        APSARA_TEST_TRUE(mManager->mContainerConfigs.find(cidKey) != mManager->mContainerConfigs.end());
 
-    // ObserverNetworkOption options;
-    // options.mEnableProtocols = {"HTTP"};
-    // int result = mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-    // EXPECT_EQ(result, 0);
-
-    // case1: udpate
-    // suspend
-
-    // update
-
-    // destroy
-
-    // case2: init and stop
-
-    // case3: stop and re-run
-
-    // options.mEnableProtocols = {"HTTP", "MySQL"};
-    // result = mManager->Update(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-    // EXPECT_EQ(result, 0);
-
-    // result = mManager->Destroy();
-    // EXPECT_EQ(result, 0);
+        const auto& appConfig = mManager->mContainerConfigs[cidKey];
+        APSARA_TEST_EQUAL(appConfig->mAppId, "test-app-id-2");
+        APSARA_TEST_EQUAL(appConfig->mAppName, "test-app-name-2");
+        APSARA_TEST_EQUAL(appConfig->mWorkspace, "test-workspace-2");
+        APSARA_TEST_EQUAL(appConfig->mServiceId, "test-service-id-2");
+        APSARA_TEST_EQUAL(appConfig->mEnableL4, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableL7, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableLog, true);
+        APSARA_TEST_EQUAL(appConfig->mEnableSpan, false); // 验证关闭span
+        APSARA_TEST_EQUAL(appConfig->mEnableMetric, true);
+        APSARA_TEST_EQUAL(appConfig->mSampleRate, 0.1);
+        APSARA_TEST_EQUAL(appConfig->mConfigName, "test-config-2");
+        APSARA_TEST_EQUAL(appConfig->mQueueKey, 54321);
+        APSARA_TEST_EQUAL(appConfig->mPluginIndex, 1);
+        APSARA_TEST_TRUE(appConfig->mSampler != nullptr);
+        // APSARA_TEST_EQUAL(appConfig->mSampler->GetSampleRate(), 0.1);
+    }
 }
 
 std::shared_ptr<K8sPodInfo> CreatePodInfo(const std::string& cid) {
@@ -1001,7 +903,6 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPerfBufferOperations);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPluginLifecycle);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPeriodicalTask);

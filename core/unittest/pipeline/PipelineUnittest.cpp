@@ -36,6 +36,8 @@
 
 using namespace std;
 
+DECLARE_FLAG_BOOL(enable_ebpf_network_observer);
+
 namespace logtail {
 
 class PipelineUnittest : public ::testing::Test {
@@ -52,9 +54,11 @@ public:
     void TestInProcessingCount() const;
     void TestWaitAllItemsInProcessFinished() const;
     void TestMultiFlusherAndRouter() const;
+    void TestSaePipeline() const;
 
 protected:
     static void SetUpTestCase() {
+        FLAGS_enable_ebpf_network_observer = true;
         PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
         InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
@@ -3045,6 +3049,101 @@ void PipelineUnittest::TestMultiFlusherAndRouter() const {
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
 }
 
+void PipelineUnittest::TestSaePipeline() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<CollectionConfig> config;
+    unique_ptr<CollectionPipeline> pipeline;
+    // new pipeline
+    configStr = R"(
+        {
+            "configName": "sae-ebpf",
+            "configVersion": 7346654927369556508,
+            "createTime": 1750053945,
+            "flushers": [
+                {
+                    "Aliuid": "1760720386195983",
+                    "Endpoint": "cn-beijing-b-intranet.log.aliyuncs.com",
+                    "Logstore": "metricstore-apm-metrics",
+                    "Match": {
+                        "Key": "data_type",
+                        "Type": "tag",
+                        "Value": "agent_info"
+                    },
+                    "Project": "proj-xtrace-8da8356138b19ca60149ea53b4d5b1-cn-beijing",
+                    "Region": "cn-beijing-b",
+                    "TelemetryType": "metrics",
+                    "Type": "flusher_sls",
+                    "Workspace": "default-cms-1760720386195983-cn-beijing"
+                },
+                {
+                    "Aliuid": "1760720386195983",
+                    "Endpoint": "cn-beijing-b-intranet.log.aliyuncs.com",
+                    "Logstore": "logstore-tracing",
+                    "Match": {
+                        "Key": "data_type",
+                        "Type": "tag",
+                        "Value": "trace"
+                    },
+                    "Project": "proj-xtrace-8da8356138b19ca60149ea53b4d5b1-cn-beijing",
+                    "Region": "cn-beijing-b",
+                    "TelemetryType": "arms_traces",
+                    "Type": "flusher_sls",
+                    "Workspace": "default-cms-1760720386195983-cn-beijing"
+                },
+                {
+                    "Aliuid": "1760720386195983",
+                    "Endpoint": "cn-beijing-b-intranet.log.aliyuncs.com",
+                    "Logstore": "metricstore-apm-metrics",
+                    "Match": {
+                        "Key": "data_type",
+                        "Type": "tag",
+                        "Value": "metric"
+                    },
+                    "Project": "proj-xtrace-8da8356138b19ca60149ea53b4d5b1-cn-beijing",
+                    "Region": "cn-beijing-b",
+                    "TelemetryType": "arms_metrics",
+                    "Type": "flusher_sls",
+                    "Workspace": "default-cms-1760720386195983-cn-beijing"
+                }
+            ],
+            "groupTopic": "",
+            "inputs": [
+                {
+                    "ProbeConfig": {
+                        "ApmConfig": {
+                            "AppId": "76fe228e-2c2e-4363-9f08-dcc412502062",
+                            "AppName": "zizhao-ebpf-test",
+                            "ServiceId": "hc4fs1hkb3@71ec1c84e2ca4cc069064",
+                            "Workspace": "default-cms-1760720386195983-cn-beijing"
+                        },
+                        "L4Config": {
+                            "Enable": true
+                        },
+                        "L7Config": {
+                            "Enable": true,
+                            "EnableMetric": true,
+                            "EnableProtocols": [
+                                "http"
+                            ],
+                            "EnableSpan": true,
+                            "SampleRate": 1
+                        }
+                    },
+                    "Type": "input_network_observer"
+                }
+            ],
+            "region": "cn-beijing-b",
+            "version": 2
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig("test-sae-config", std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new CollectionPipeline());
+}
+
 UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
 UNIT_TEST_CASE(PipelineUnittest, TestProcessQueue)
@@ -3057,6 +3156,7 @@ UNIT_TEST_CASE(PipelineUnittest, TestFlushBatch)
 UNIT_TEST_CASE(PipelineUnittest, TestInProcessingCount)
 UNIT_TEST_CASE(PipelineUnittest, TestWaitAllItemsInProcessFinished)
 UNIT_TEST_CASE(PipelineUnittest, TestMultiFlusherAndRouter)
+UNIT_TEST_CASE(PipelineUnittest, TestSaePipeline)
 
 
 } // namespace logtail

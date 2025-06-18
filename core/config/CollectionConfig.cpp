@@ -528,6 +528,9 @@ bool CollectionConfig::Parse() {
         auto itr = mFlushers[i]->find(key.c_str(), key.c_str() + key.size());
         if (itr) {
             if (IsFlushingThroughGoPipelineExisted()) {
+                LOG_INFO(sLogger,
+                         ("go flusher", mHasGoFlusher)("go input", mHasGoInput)("native flusher", mHasNativeFlusher)(
+                             "go processor", mHasGoProcessor)("native input", mHasNativeInput));
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
                                    "route found in non-native flushing mode",

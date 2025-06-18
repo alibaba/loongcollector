@@ -99,6 +99,55 @@ public:
         }
     }
 
+    bool operator==(const AppDetail& other) const {
+        if (mConfigName != other.mConfigName) {
+            return false;
+        }
+        if (mQueueKey != other.mQueueKey) {
+            return false;
+        }
+        if (mPluginIndex != other.mPluginIndex) {
+            return false;
+        }
+
+        // 比较基本类型成员
+        if (mAppName != other.mAppName) {
+            return false;
+        }
+        if (mAppId != other.mAppId) {
+            return false;
+        }
+        if (mWorkspace != other.mWorkspace) {
+            return false;
+        }
+        if (mServiceId != other.mServiceId) {
+            return false;
+        }
+
+        // 比较布尔类型成员
+        if (mEnableL7 != other.mEnableL7) {
+            return false;
+        }
+        if (mEnableLog != other.mEnableLog) {
+            return false;
+        }
+        if (mEnableSpan != other.mEnableSpan) {
+            return false;
+        }
+        if (mEnableMetric != other.mEnableMetric) {
+            return false;
+        }
+        if (mEnableL4 != other.mEnableL4) {
+            return false;
+        }
+
+        // 比较浮点类型成员（使用容差）
+        if (std::abs(mSampleRate - other.mSampleRate) > 1e-9) {
+            return false;
+        }
+        return true;
+    }
+
     std::string mAppName;
     std::string mAppId;
     std::string mWorkspace;

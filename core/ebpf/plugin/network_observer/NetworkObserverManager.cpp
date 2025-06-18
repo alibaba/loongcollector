@@ -1165,143 +1165,6 @@ int NetworkObserverManager::Update(
     return 0;
 }
 
-int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
-                                              uint32_t index,
-                                              const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
-    if (ctx == nullptr) {
-        LOG_ERROR(sLogger, ("ctx is null", ""));
-        return 1;
-    }
-
-    // update ns/wk/wn => option map ...
-    auto* option = std::get<ObserverNetworkOption*>(opt);
-    if (option == nullptr) {
-        LOG_WARNING(sLogger, ("option is null, configName", ctx->GetConfigName()));
-        return 1;
-    }
-
-    std::shared_ptr<AppDetail> appConfig = std::make_shared<AppDetail>(option, metricMgr);
-    appConfig->mQueueKey = ctx->GetProcessQueueKey();
-    appConfig->mPluginIndex = index;
-    appConfig->mConfigName = ctx->GetConfigName();
-    std::set<size_t> currentWorkloadKeys;
-
-    WriteLock lk(mAppConfigLock);
-    if (option->mSelectors.empty()) {
-        mWorkloads.insert({ctx->GetConfigName(), {0}});
-        mWorkloadConfigs.insert({0, appConfig});
-        mContainerConfigs.insert({0, appConfig});
-        mConfigVersion++;
-        return 0;
-    }
-
-    for (const auto& selector : option->mSelectors) {
-        auto workloadKey = GenerateWorkloadKey(selector.mNamespace, selector.mWorkloadKind, selector.mWorkloadName);
-        currentWorkloadKeys.insert(workloadKey);
-        mWorkloadConfigs.insert({workloadKey, appConfig});
-    }
-
-    const auto& workloads = mWorkloads.find(ctx->GetConfigName());
-    if (workloads == mWorkloads.end()) {
-        // new
-        mWorkloads.insert({ctx->GetConfigName(), currentWorkloadKeys});
-        return 0;
-    }
-
-    // check expire ...
-    std::vector<std::string> expiredCids;
-    bool containerConfigChanged = false;
-    for (auto it = workloads->second.begin(); it != workloads->second.end();) {
-        // old workload key
-        if (currentWorkloadKeys.count(*it)) {
-            ++it;
-            continue;
-        }
-
-        // expired workload key
-        mWorkloadConfigs.erase(*it); // clean mWorkloadConfigs
-        const auto& iterator = mWorkloadContainers.find(*it);
-        if (iterator != mWorkloadContainers.end()) {
-            for (const auto& cid : iterator->second) {
-                expiredCids.push_back(cid);
-                std::hash<std::string> hasher;
-                size_t cidKey = 0;
-                AttrHashCombine(cidKey, hasher(cid));
-                mContainerConfigs.erase(cidKey);
-                containerConfigChanged = true;
-            }
-        }
-        mWorkloadContainers.erase(*it); // clean mWorkloadContainers
-        it = workloads->second.erase(it); // remove int current
-    }
-    if (containerConfigChanged) {
-        mConfigVersion++;
-    }
-    for (size_t key : currentWorkloadKeys) {
-        if (!workloads->second.count(key)) {
-            workloads->second.insert(key);
-        }
-    }
-
-    UpdateWhitelists({}, std::move(expiredCids));
-
-    return 0;
-}
-
-int NetworkObserverManager::RemoveConfig(const std::string& configName) {
-    // delete ns/wk/wn => option map ...
-    LOG_DEBUG(
-        sLogger,
-        ("before remove config, workloads size", mWorkloads.size())("workloadContainers", mWorkloadContainers.size())(
-            "mWorkloadConfigs", mWorkloadConfigs.size())("containerConfigs", mContainerConfigs.size()));
-    WriteLock lk(mAppConfigLock);
-    const auto& it = mWorkloads.find(configName);
-    if (it == mWorkloads.end()) { // no workloads ...
-        LOG_DEBUG(sLogger, ("no workloads for config", configName));
-        return 0;
-    }
-
-    std::vector<std::string> disableCids;
-    std::set<size_t>& workloadKeys = it->second;
-    bool containerConfigChanged = false;
-    for (size_t key : workloadKeys) {
-        mWorkloadConfigs.erase(key);
-        const auto& it2 = mWorkloadContainers.find(key);
-        if (it2 == mWorkloadContainers.end()) { // no containers ...
-            continue;
-        }
-
-        for (const auto& cid : it2->second) {
-            disableCids.push_back(cid);
-            std::hash<std::string> hasher;
-            size_t key = 0;
-            AttrHashCombine(key, hasher(cid));
-            mContainerConfigs.erase(key);
-            containerConfigChanged = true;
-        }
-        mWorkloadContainers.erase(key);
-    }
-
-    if (containerConfigChanged) {
-        mConfigVersion++;
-    }
-
-    mWorkloads.erase(configName);
-
-    LOG_INFO(sLogger,
-             ("successfully remove config, workloads size", mWorkloads.size())("workloadContainers",
-                                                                               mWorkloadContainers.size())(
-                 "mWorkloadConfigs", mWorkloadConfigs.size())("containerConfigs", mContainerConfigs.size()));
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    return 0;
-#endif
-    UpdateWhitelists({}, std::move(disableCids));
-
-    return 0;
-}
-
 int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
     if (mFlag) {
         return 0;
@@ -1472,7 +1335,7 @@ std::shared_ptr<AppDetail> NetworkObserverManager::getWorkloadAppConfig(const st
 std::shared_ptr<AppDetail> NetworkObserverManager::getWorkloadAppConfig(size_t workloadKey) {
     const auto& it = mWorkloadConfigs.find(workloadKey);
     if (it != mWorkloadConfigs.end()) {
-        return it->second;
+        return it->second.config;
     }
     return nullptr;
 }
@@ -1493,69 +1356,213 @@ std::shared_ptr<AppDetail> NetworkObserverManager::getAppConfigFromReplica(const
     return GetAppDetail(mContainerConfigsReplica, conn->GetContainerIdKey());
 }
 
-void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
-    std::vector<std::string> newContainerIds;
-    std::vector<std::string> expiredContainerIds;
-    std::unordered_map<size_t, std::set<std::string>> currentWorkloadCids;
+int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
+                                              uint32_t index,
+                                              const PluginMetricManagerPtr& metricMgr,
+                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return 1;
+    }
 
-    {
-        WriteLock lk(mAppConfigLock);
-        // podCidVec includes current pods running in the host ...
-        for (const auto& cid : podCidVec) {
-            auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
-            if (podInfo == nullptr) {
-                continue;
-            }
-            size_t workloadKey
-                = GenerateWorkloadKey(podInfo->mNamespace, podInfo->mWorkloadKind, podInfo->mWorkloadName);
-            // check if in selectors ...
-            auto appConfig = getWorkloadAppConfig(workloadKey);
-            if (appConfig == nullptr || appConfig->mAppName.empty()) {
-                // no app info ...
-                continue;
-            }
+    auto* option = std::get<ObserverNetworkOption*>(opt);
+    if (!option) {
+        LOG_WARNING(sLogger, ("option is null, configName", ctx->GetConfigName()));
+        return 1;
+    }
 
-            std::hash<std::string> hasher;
-            size_t key = 0;
-            AttrHashCombine(key, hasher(cid));
+    auto newConfig = std::make_shared<AppDetail>(option, metricMgr);
+    newConfig->mQueueKey = ctx->GetProcessQueueKey();
+    newConfig->mPluginIndex = index;
+    newConfig->mConfigName = ctx->GetConfigName();
 
-            currentWorkloadCids[workloadKey].insert(cid);
-            auto& enableCids = mWorkloadContainers[workloadKey];
-            if (!enableCids.count(cid)) {
-                newContainerIds.push_back(cid);
-                // if not enabled before, insert ...
-                mContainerConfigs[key] = appConfig;
-            }
+    WriteLock lk(mAppConfigLock);
+    std::vector<std::string> expiredCids;
+    std::set<size_t> currentWorkloadKeys;
+    const std::string& configName = ctx->GetConfigName();
 
-            LOG_DEBUG(sLogger,
-                      ("appId", appConfig->mAppId)("appName", appConfig->mAppName)("podIp", podInfo->mPodIp)(
-                          "podName", podInfo->mPodName)("containerId", cid));
-        }
+    if (option->mSelectors.empty()) {
+        const size_t defaultKey = 0;
 
-        bool containerConfigChanged = false;
-        for (auto& it : mWorkloadContainers) {
-            const auto& key = it.first;
-            // loop old containerIds to clean some expired containerIds
-            for (const auto& oldContainerId : it.second) {
-                if (currentWorkloadCids[key].count(oldContainerId)) {
-                    continue;
+        // clean old config
+        if (auto it = mConfigToWorkloads.find(configName); it != mConfigToWorkloads.end()) {
+            for (auto key : it->second) {
+                if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
+                    for (const auto& cid : wIt->second.containerIds) {
+                        expiredCids.push_back(cid);
+                    }
+                    mWorkloadConfigs.erase(wIt);
                 }
-                // expired
-                expiredContainerIds.push_back(oldContainerId);
-                std::hash<std::string> hasher;
-                size_t cidKey = 0;
-                AttrHashCombine(cidKey, hasher(oldContainerId));
-                mContainerConfigs.erase(cidKey);
-                containerConfigChanged = true;
             }
-            it.second = std::move(currentWorkloadCids[key]);
+            mConfigToWorkloads.erase(it);
         }
-        if (containerConfigChanged) {
-            mConfigVersion++;
+
+        // setup new config
+        WorkloadConfig defaultConfig;
+        defaultConfig.config = newConfig;
+        mWorkloadConfigs[defaultKey] = defaultConfig;
+        mConfigToWorkloads[configName] = {defaultKey};
+        mContainerConfigs.insert({0, newConfig});
+
+        UpdateConfigVersionAndWhitelist({}, std::move(expiredCids));
+        return 0;
+    }
+
+    // collect current workload keys
+    for (const auto& selector : option->mSelectors) {
+        auto key = GenerateWorkloadKey(selector.mNamespace, selector.mWorkloadKind, selector.mWorkloadName);
+        currentWorkloadKeys.insert(key);
+    }
+
+    // add or update config => workloads
+    auto& workloadKeys = mConfigToWorkloads[configName];
+    std::set<size_t> expiredWorkloadKeys;
+
+    // search expired workloads
+    std::set_difference(workloadKeys.begin(),
+                        workloadKeys.end(),
+                        currentWorkloadKeys.begin(),
+                        currentWorkloadKeys.end(),
+                        std::inserter(expiredWorkloadKeys, expiredWorkloadKeys.begin()));
+
+    // clean expired workloads
+    for (auto key : expiredWorkloadKeys) {
+        if (auto it = mWorkloadConfigs.find(key); it != mWorkloadConfigs.end()) {
+            for (const auto& cid : it->second.containerIds) {
+                expiredCids.push_back(cid);
+                size_t cidKey = GenerateContainerKey(cid);
+                mContainerConfigs.erase(cidKey);
+            }
+            mWorkloadConfigs.erase(it);
+        }
+        workloadKeys.erase(key);
+    }
+
+    // add or update workload configs
+    for (auto key : currentWorkloadKeys) {
+        bool configChanged = false;
+        if (auto it = mWorkloadConfigs.find(key); it != mWorkloadConfigs.end()) {
+            if (!(*(it->second.config) == *newConfig)) {
+                it->second.config = newConfig;
+                configChanged = true;
+            }
+        } else {
+            WorkloadConfig wc;
+            wc.config = newConfig;
+            mWorkloadConfigs[key] = wc;
+            configChanged = true;
+            workloadKeys.insert(key);
+        }
+
+        // update container configs
+        if (configChanged) {
+            UpdateContainerConfigs(key, newConfig);
         }
     }
 
-    UpdateWhitelists(std::move(newContainerIds), std::move(expiredContainerIds));
+    UpdateConfigVersionAndWhitelist({}, std::move(expiredCids));
+    return 0;
+}
+
+int NetworkObserverManager::RemoveConfig(const std::string& configName) {
+    WriteLock lk(mAppConfigLock);
+
+    auto configIt = mConfigToWorkloads.find(configName);
+    if (configIt == mConfigToWorkloads.end()) {
+        LOG_DEBUG(sLogger, ("No workloads for config", configName));
+        return 0;
+    }
+
+    if (configIt->second.empty()) {
+        const size_t defaultKey = 0;
+        mContainerConfigs.erase(defaultKey);
+    }
+
+    std::vector<std::string> expiredCids;
+
+    // clear related workloads
+    for (auto key : configIt->second) {
+        if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
+            for (const auto& cid : wIt->second.containerIds) {
+                expiredCids.push_back(cid);
+            }
+            mWorkloadConfigs.erase(wIt);
+        }
+    }
+
+    // delete config
+    mConfigToWorkloads.erase(configIt);
+
+    UpdateConfigVersionAndWhitelist({}, std::move(expiredCids));
+
+    LOG_INFO(sLogger,
+             ("Removed config", configName)("remaining workloads", mWorkloadConfigs.size())("container configs",
+                                                                                            mContainerConfigs.size()));
+
+    return 0;
+}
+
+void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
+    std::vector<std::string> newContainerIds;
+    std::vector<std::string> expiredContainerIds;
+
+    WriteLock lk(mAppConfigLock);
+
+    std::unordered_map<size_t, std::set<std::string>> currentWorkloadCids;
+    for (const auto& cid : podCidVec) {
+        auto podInfo = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
+        if (!podInfo) {
+            continue;
+        }
+
+        size_t workloadKey = GenerateWorkloadKey(podInfo->mNamespace, podInfo->mWorkloadKind, podInfo->mWorkloadName);
+        auto wIt = mWorkloadConfigs.find(workloadKey);
+        if (wIt == mWorkloadConfigs.end() || !wIt->second.config || wIt->second.config->mAppName.empty()) {
+            continue;
+        }
+
+        currentWorkloadCids[workloadKey].insert(cid);
+
+        // check if is new container
+        if (!wIt->second.containerIds.count(cid)) {
+            newContainerIds.push_back(cid);
+            size_t cidKey = GenerateContainerKey(cid);
+            mContainerConfigs[cidKey] = wIt->second.config;
+        }
+
+        LOG_DEBUG(sLogger,
+                  ("appId", wIt->second.config->mAppId)("appName", wIt->second.config->mAppName)(
+                      "podIp", podInfo->mPodIp)("podName", podInfo->mPodName)("containerId", cid));
+    }
+
+    // check expiration and update workload config
+    for (auto& [workloadKey, wConfig] : mWorkloadConfigs) {
+        std::set<std::string> expiredInWorkload;
+
+        // find expired container
+        for (const auto& cid : wConfig.containerIds) {
+            if (!currentWorkloadCids[workloadKey].count(cid)) {
+                expiredContainerIds.push_back(cid);
+                expiredInWorkload.insert(cid);
+            }
+        }
+
+        // erase expired container
+        for (const auto& cid : expiredInWorkload) {
+            wConfig.containerIds.erase(cid);
+            size_t cidKey = GenerateContainerKey(cid);
+            mContainerConfigs.erase(cidKey);
+        }
+
+        // add new container
+        if (auto it = currentWorkloadCids.find(workloadKey); it != currentWorkloadCids.end()) {
+            for (const auto& cid : it->second) {
+                wConfig.containerIds.insert(cid);
+            }
+        }
+    }
+
+    UpdateConfigVersionAndWhitelist(std::move(newContainerIds), std::move(expiredContainerIds));
 }
 
 void NetworkObserverManager::executeTimerTask(JobType jobType, const std::chrono::steady_clock::time_point& execTime) {

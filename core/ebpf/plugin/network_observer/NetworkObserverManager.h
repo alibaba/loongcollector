@@ -54,6 +54,13 @@ public:
     JobType mJobType;
 };
 
+inline size_t GenerateContainerKey(const std::string& cid) {
+    std::hash<std::string> hasher;
+    size_t key = 0;
+    AttrHashCombine(key, hasher(cid));
+    return key;
+}
+
 class NetworkObserverManager : public AbstractManager {
 public:
     static std::shared_ptr<NetworkObserverManager>
@@ -111,7 +118,8 @@ public:
 
     int RegisteredConfigCount() override {
         ReadLock lk(mAppConfigLock);
-        return mWorkloads.size();
+        // return mWorkloads.size();
+        return mWorkloadConfigs.size();
     }
 
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
@@ -244,21 +252,38 @@ private:
     CounterPtr mNetMetaAttachFailedTotal;
     CounterPtr mNetMetaAttachRollbackTotal;
 
-    // namespace/workloadKind/workloadName hash combine to app
-    mutable ReadWriteLock mAppConfigLock;
-    // workloadKey ==> appDetail
-    // mWorkloadConfigs used in control plane
-    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mWorkloadConfigs;
-    // containerId ==> appDetail or we need to store containerId to workloadKey??
-    // mContainerConfigs used in data plane
-    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs;
-    int mConfigVersion = 0;
-    // configName ==> workloadKeys
-    std::unordered_map<std::string, std::set<size_t>> mWorkloads;
-    // workloadKey ==> containerIds
-    std::unordered_map<size_t, std::set<std::string>> mWorkloadContainers;
+    void UpdateConfigVersionAndWhitelist(std::vector<std::string>&& newCids, std::vector<std::string>&& expiredCids) {
+        if (!newCids.empty() || !expiredCids.empty()) {
+            mConfigVersion++;
+            UpdateWhitelists(std::move(newCids), std::move(expiredCids));
+        }
+    }
 
-    // will do deep copy ...
+    void UpdateContainerConfigs(size_t workloadKey, std::shared_ptr<AppDetail> newConfig) {
+        auto it = mWorkloadConfigs.find(workloadKey);
+        if (it == mWorkloadConfigs.end()) {
+            return;
+        }
+
+        for (const auto& cid : it->second.containerIds) {
+            size_t cidKey = GenerateContainerKey(cid);
+            mContainerConfigs[cidKey] = newConfig;
+        }
+    }
+
+    struct WorkloadConfig {
+        std::shared_ptr<AppDetail> config;
+        std::set<std::string> containerIds;
+    };
+
+    mutable ReadWriteLock
+        mAppConfigLock; // protect mConfigVersion/mWorkloadConfigs/mContainerConfigs/mConfigToWorkloads
+    int mConfigVersion = 0;
+    std::unordered_map<size_t, WorkloadConfig> mWorkloadConfigs; // workloadKey => {config, containers}
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs; // containerKey => config
+    std::unordered_map<std::string, std::set<size_t>> mConfigToWorkloads; // configName => workloadKeys
+
+    // replica of mContainerConfigs, only used in poller thread ...
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
 
     std::shared_ptr<Sampler> mSampler;
