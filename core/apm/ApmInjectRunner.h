@@ -21,8 +21,8 @@
 #include <future>
 #include <memory>
 #include <mutex>
-#include <variant>
 #include <unordered_map>
+#include <variant>
 
 #include "apm/AttachManager.h"
 #include "apm/PackageManager.h"
@@ -62,7 +62,6 @@ public:
 
 private:
     // pipeline name ==> AttachConfig
-
     void injectApmAgentInner();
     void removeApmAgentInner();
 

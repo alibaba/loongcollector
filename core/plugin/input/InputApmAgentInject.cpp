@@ -15,7 +15,11 @@
  */
 
 #include "plugin/input/InputApmAgentInject.h"
+
+#include <memory>
+
 #include "apm/ApmInjectRunner.h"
+#include "apm/Types.h"
 
 namespace logtail {
 
@@ -23,18 +27,18 @@ const std::string ApmAgentInjectTask::sName = "apm_agent_inject";
 
 bool ApmAgentInjectTask::Init(const Json::Value& config) {
     apm::ApmInjectRunner::GetInstance()->Init();
-    // parse config ...
-    
-
-    return true;
+    mAttachConfig = std::make_unique<apm::AttachConfig>();
+    return apm::InitApmAttachOption(mContext, config, mAttachConfig, ApmAgentInjectTask::sName);
 }
 
 void ApmAgentInjectTask::Start() {
-    // do attach ...
+    apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, std::move(mAttachConfig));
 }
 
 void ApmAgentInjectTask::Stop(bool isRemoving) {
-    // remove attach config ...
+    if (isRemoving) {
+        apm::ApmInjectRunner::GetInstance()->RemoveApmAgent(mContext);
+    }
 }
 
-}
+} // namespace logtail
