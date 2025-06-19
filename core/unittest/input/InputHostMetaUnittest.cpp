@@ -75,6 +75,7 @@ void InputHostMetaUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_host_meta");
 }
 
@@ -96,6 +97,7 @@ void InputHostMetaUnittest::OnSuccessfulStart() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
 }
 
@@ -114,6 +116,7 @@ void InputHostMetaUnittest::OnSuccessfulStop() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(input->Stop(false));
 }

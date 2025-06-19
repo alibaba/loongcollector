@@ -75,6 +75,7 @@ void InputHostMonitorUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_host_monitor");
 }
 
@@ -95,6 +96,7 @@ void InputHostMonitorUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL_FATAL(input->mInterval, 15);
 }
 
@@ -113,6 +115,7 @@ void InputHostMonitorUnittest::OnSuccessfulStart() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
 }
 
@@ -131,6 +134,7 @@ void InputHostMonitorUnittest::OnSuccessfulStop() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(input->Stop(false));
 }

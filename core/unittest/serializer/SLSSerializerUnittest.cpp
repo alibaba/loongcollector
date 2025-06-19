@@ -34,6 +34,7 @@ protected:
         mCtx.SetConfigName("test_config");
         sFlusher->SetContext(mCtx);
         sFlusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
+        sFlusher->CommitMetricsRecordRef();
     }
 
 private:

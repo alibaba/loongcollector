@@ -48,6 +48,7 @@ void WriteMetrics::CommitMetricsRecordRef(MetricsRecordRef& ref) {
     std::lock_guard<std::mutex> lock(mMutex);
     ref.mMetrics->SetNext(mHead);
     mHead = ref.mMetrics;
+    ref.mMetrics->MarkCommitted();
 }
 
 MetricsRecord* WriteMetrics::GetHead() {

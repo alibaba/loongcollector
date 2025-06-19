@@ -49,6 +49,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         flusher->SetContext(ctx);
         flusher->CreateMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
+        flusher->CommitMetricsRecordRef();
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
         auto realItem = item.get();
@@ -68,6 +69,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         flusher->SetContext(ctx);
         flusher->CreateMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
+        flusher->CommitMetricsRecordRef();
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
         auto realItem = item.get();
@@ -86,6 +88,7 @@ void FlusherRunnerUnittest::TestPushToHttpSink() {
     flusher->SetContext(ctx);
     flusher->CreateMetricsRecordRef("name", "1");
     flusher->Init(Json::Value(), tmp);
+    flusher->CommitMetricsRecordRef();
     {
         // keep item
         auto item = make_unique<SenderQueueItem>("invalid_keep", 10, flusher.get(), flusher->GetQueueKey());

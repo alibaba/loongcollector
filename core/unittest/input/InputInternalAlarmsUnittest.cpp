@@ -75,6 +75,7 @@ void InputInternalAlarmsUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     input.CreateMetricsRecordRef(InputInternalAlarms::sName, "1");
     APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
 
     APSARA_TEST_EQUAL(nullptr, SelfMonitorServer::GetInstance()->mAlarmPipelineCtx);
     APSARA_TEST_TRUE(input.Start());

@@ -53,6 +53,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
         // start + continue init通过，IsMultiline为true
@@ -65,6 +66,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
         // continue + end init通过，IsMultiline为true
@@ -77,6 +79,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
         // end init通过，IsMultiline为true
@@ -88,6 +91,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
         // start + end init通过，IsMultiline为true
@@ -100,6 +104,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
     } // namespace logtail
@@ -115,6 +120,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
         }
         // continue init通过，IsMultiline为false
@@ -126,6 +132,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
         }
         // 正则格式非法 init通过，IsMultiline为false
@@ -137,6 +144,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
         }
         // 正则格式非法 init通过，IsMultiline为false
@@ -148,6 +156,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
         }
         // 正则格式缺失 init通过，IsMultiline为false
@@ -158,6 +167,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
         }
     }
@@ -171,6 +181,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
         }
         // flag init通过
@@ -181,6 +192,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // unknown init不通过
         {
@@ -191,6 +203,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_FALSE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // 格式错误 init不通过
         {
@@ -201,6 +214,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_FALSE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // 不存在 init不通过
         {
@@ -210,6 +224,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_FALSE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
     }
     // 测试UnmatchedContentTreatment
@@ -224,6 +239,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // discard init通过
         {
@@ -235,6 +251,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // unknown init通过
         {
@@ -246,6 +263,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // 格式错误 init通过
         {
@@ -257,6 +275,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
         // 不存在 init通过
         {
@@ -267,6 +286,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
             processor.SetContext(mContext);
             processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE(processor.Init(config));
+            processor.CommitMetricsRecordRef();
         }
     }
 }
@@ -288,6 +308,7 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // group为空
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -879,6 +900,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -931,6 +953,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -979,6 +1002,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -1041,6 +1065,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -1102,6 +1127,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -1173,6 +1199,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -1253,6 +1280,7 @@ void ProcessEventsWithPartLogUnittest::TestProcessEventsWithPartLog() {
         processorMergeMultilineLogNative.SetContext(mContext);
         processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+        processorMergeMultilineLogNative.CommitMetricsRecordRef();
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -1334,6 +1362,7 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // event 不支持
     {
         // 第一个event就不支持 不支持PPFFF
@@ -1874,6 +1903,7 @@ void ProcessorMergeMultilineLogDisacardUnmatchUnittest::TestLogSplitWithBeginCon
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -2143,6 +2173,7 @@ void ProcessorMergeMultilineLogDisacardUnmatchUnittest::TestLogSplitWithBeginEnd
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -2387,6 +2418,7 @@ void ProcessorMergeMultilineLogDisacardUnmatchUnittest::TestLogSplitWithBegin() 
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + start
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -2581,6 +2613,7 @@ void ProcessorMergeMultilineLogDisacardUnmatchUnittest::TestLogSplitWithContinue
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -2776,6 +2809,7 @@ void ProcessorMergeMultilineLogDisacardUnmatchUnittest::TestLogSplitWithEnd() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: end
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -2933,6 +2967,7 @@ void ProcessorMergeMultilineLogKeepUnmatchUnittest::TestLogSplitWithBeginContinu
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -3295,6 +3330,7 @@ void ProcessorMergeMultilineLogKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -3666,6 +3702,7 @@ void ProcessorMergeMultilineLogKeepUnmatchUnittest::TestLogSplitWithBegin() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch + start
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -3885,6 +3922,7 @@ void ProcessorMergeMultilineLogKeepUnmatchUnittest::TestLogSplitWithContinueEnd(
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: unmatch
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -4139,6 +4177,7 @@ void ProcessorMergeMultilineLogKeepUnmatchUnittest::TestLogSplitWithEnd() {
     processorMergeMultilineLogNative.SetContext(mContext);
     processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+    processorMergeMultilineLogNative.CommitMetricsRecordRef();
     // case: end
     {
         auto sourceBuffer = std::make_shared<SourceBuffer>();

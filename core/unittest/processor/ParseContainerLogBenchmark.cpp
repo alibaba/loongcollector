@@ -128,6 +128,7 @@ static void BM_DockerJson(int size, int batchSize) {
     std::string inJson = oss.str();
 
     bool init = processor.Init(config);
+    processor.CommitMetricsRecordRef();
     if (init) {
         int count = 0;
         // Perform setup here
@@ -241,6 +242,7 @@ static void BM_ContainerdText(int size, int batchSize) {
     std::string inJson = oss.str();
 
     bool init = processor.Init(config);
+    processor.CommitMetricsRecordRef();
     if (init) {
         int count = 0;
         // Perform setup here

@@ -43,6 +43,7 @@ protected:
         mCtx.SetConfigName("test_config");
         sFlusher->SetContext(mCtx);
         sFlusher->CreateMetricsRecordRef(FlusherMock::sName, "1");
+        sFlusher->CommitMetricsRecordRef();
         sFlusher->SetPluginID("1");
     }
 

@@ -123,6 +123,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     // valid optional param
     configStr = R"(
@@ -138,6 +139,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     // invalid optional param
     configStr = R"(
@@ -151,6 +153,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     // TailingAllMatchedFiles
     configStr = R"(
@@ -164,6 +167,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->mFileReader.mTailingAllMatchedFiles);
 
     configStr = R"(
@@ -176,6 +180,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 }
 
 void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
@@ -217,6 +222,7 @@ void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputContainerStdio::sName, meta.mPluginID);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
 }
 
@@ -234,6 +240,7 @@ void InputContainerStdioUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     input.CreateMetricsRecordRef(InputContainerStdio::sName, "1");
     APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
 
     APSARA_TEST_TRUE(input.Start());
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetFileReaderConfig("test_config").first);

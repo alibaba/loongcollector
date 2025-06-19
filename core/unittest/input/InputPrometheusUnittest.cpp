@@ -81,6 +81,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(input->Name(), "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -116,6 +117,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -144,6 +146,7 @@ void InputPrometheusUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     // with invalid ScrapeConfig
     configStr = R"(
@@ -168,6 +171,7 @@ void InputPrometheusUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     PrometheusInputRunner::GetInstance()->Stop();
 }
 
@@ -199,6 +203,7 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(
@@ -244,6 +249,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
 
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());
@@ -351,6 +357,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
 
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());

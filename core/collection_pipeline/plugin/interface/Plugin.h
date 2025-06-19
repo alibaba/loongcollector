@@ -47,9 +47,7 @@ public:
              {METRIC_LABEL_KEY_PLUGIN_ID, id}});
     }
 
-    void CommitMetricsRecordRef() {
-        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
-    }
+    void CommitMetricsRecordRef() { WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef); }
 
 protected:
     CollectionPipelineContext* mContext = nullptr;

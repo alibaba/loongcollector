@@ -574,6 +574,7 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         processorSplitMultilineLogStringNative.SetContext(mContext);
         processorSplitMultilineLogStringNative.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processorSplitMultilineLogStringNative.Init(config));
+        processorSplitMultilineLogStringNative.CommitMetricsRecordRef();
         processorSplitMultilineLogStringNative.Process(eventGroup);
 
         // run function ProcessorParseApsaraNative

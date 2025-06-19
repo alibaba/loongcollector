@@ -29,31 +29,47 @@ const std::string MetricCategory::METRIC_CATEGORY_PLUGIN = "plugin";
 const std::string MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE = "plugin_source";
 
 MetricsRecord::MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
-    : mCategory(category), mLabels(std::move(labels)), mDynamicLabels(std::move(dynamicLabels)), mDeleted(false) {
+    : mCategory(category), mLabels(std::move(labels)), mDynamicLabels(std::move(dynamicLabels)), mCommitted(false), mDeleted(false) {
 }
 
 CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
+    if (mCommitted) {
+        return nullptr;
+    }
     CounterPtr counterPtr = std::make_shared<Counter>(name);
     mCounters.emplace_back(counterPtr);
     return counterPtr;
 }
 
 TimeCounterPtr MetricsRecord::CreateTimeCounter(const std::string& name) {
+    if (mCommitted) {
+        return nullptr;
+    }
     TimeCounterPtr counterPtr = std::make_shared<TimeCounter>(name);
     mTimeCounters.emplace_back(counterPtr);
     return counterPtr;
 }
 
 IntGaugePtr MetricsRecord::CreateIntGauge(const std::string& name) {
+    if (mCommitted) {
+        return nullptr;
+    }
     IntGaugePtr gaugePtr = std::make_shared<IntGauge>(name);
     mIntGauges.emplace_back(gaugePtr);
     return gaugePtr;
 }
 
 DoubleGaugePtr MetricsRecord::CreateDoubleGauge(const std::string& name) {
+    if (mCommitted) {
+        return nullptr;
+    }
     DoubleGaugePtr gaugePtr = std::make_shared<Gauge<double>>(name);
     mDoubleGauges.emplace_back(gaugePtr);
     return gaugePtr;
+}
+
+void MetricsRecord::MarkCommitted() {
+    mCommitted = true;
 }
 
 void MetricsRecord::MarkDeleted() {

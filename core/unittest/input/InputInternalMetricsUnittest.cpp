@@ -100,6 +100,7 @@ void InputInternalMetricsUnittest::OnInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef(InputInternalMetrics::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mAgentMetricsRule.mEnable, true);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mAgentMetricsRule.mInterval, 1);
@@ -155,6 +156,7 @@ void InputInternalMetricsUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     input.CreateMetricsRecordRef(InputInternalMetrics::sName, "1");
     APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
 
     APSARA_TEST_TRUE(input.Start());
     APSARA_TEST_NOT_EQUAL(nullptr, SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules);

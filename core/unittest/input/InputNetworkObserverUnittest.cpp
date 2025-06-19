@@ -95,6 +95,7 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
@@ -129,6 +130,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
@@ -154,6 +156,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 }
 
 void InputNetworkObserverUnittest::OnSuccessfulStart() {
@@ -180,6 +183,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
         = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
@@ -212,6 +216,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
         = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
