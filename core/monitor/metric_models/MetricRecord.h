@@ -48,6 +48,7 @@ public:
     MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels = nullptr);
     MetricsRecord() = default;
     void MarkCommitted();
+    bool IsCommitted() const;
     void MarkDeleted();
     bool IsDeleted() const;
     const std::string& GetCategory() const;

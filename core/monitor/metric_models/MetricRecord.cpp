@@ -76,6 +76,10 @@ void MetricsRecord::MarkCommitted() {
     mCommitted = true;
 }
 
+bool MetricsRecord::IsCommitted() const {
+    return mCommitted;
+}
+
 void MetricsRecord::MarkDeleted() {
     mDeleted = true;
 }
@@ -143,7 +147,11 @@ void MetricsRecord::SetNext(MetricsRecord* next) {
 
 MetricsRecordRef::~MetricsRecordRef() {
     if (mMetrics) {
-        mMetrics->MarkDeleted();
+        if (mMetrics->IsCommitted()) {
+            mMetrics->MarkDeleted();
+        } else {
+            delete mMetrics;
+        }
     }
 }
 
