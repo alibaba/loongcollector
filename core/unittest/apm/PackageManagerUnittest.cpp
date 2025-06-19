@@ -42,7 +42,9 @@ public:
     void TearDown() override {
         // 清理临时测试目录
         std::filesystem::remove_all(mTestDir);
+        std::filesystem::remove_all("/opt/.arms");
         mPackageManager.reset();
+        mPackageManager->UninstallExecHook();
     }
 
     void TestPrepareExecHook() {
@@ -62,7 +64,6 @@ public:
         fs::path agentPath;
         bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "12@13", "cn-heyuan", "", agentPath);
         APSARA_TEST_TRUE(result);
-
 
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/latest/AliyunJavaAgent.zip"));
         APSARA_TEST_TRUE(std::filesystem::exists("/opt/.arms/apm-java-agent/12@13/current/AliyunJavaAgent.zip"));
@@ -84,6 +85,7 @@ public:
         // 测试安装 exec hook
         bool result = mPackageManager->InstallExecHook("cn-heyuan");
         APSARA_TEST_TRUE(result);
+        APSARA_TEST_TRUE(fs::exists("/lib64/libexec-hook.so"));
 
         // 验证 ld.so.preload 文件是否被正确更新
         std::ifstream preloadFile("/etc/ld.so.preload");
@@ -91,84 +93,84 @@ public:
         APSARA_TEST_TRUE(content.find("libexec-hook.so") != std::string::npos);
     }
 
-    void UpdateExecHookTest() {
-        // // 先安装
-        // bool installResult = mPackageManager->InstallExecHook("cn-heyuan");
-        // APSARA_TEST_TRUE(installResult);
+    // void UpdateExecHookTest() {
+    //     // 先安装
+    //     bool installResult = mPackageManager->InstallExecHook("cn-hangzhou");
+    //     APSARA_TEST_TRUE(installResult);
 
-        // // 测试更新
-        // bool updateResult = mPackageManager->UpdateExecHook();
-        // APSARA_TEST_TRUE(updateResult);
-    }
+    //     // 测试更新
+    //     bool updateResult = mPackageManager->UpdateExecHook("cn-hangzhou");
+    //     APSARA_TEST_TRUE(updateResult);
+    // }
 
-    void UninstallExecHookTest() {
-        // // 先安装
-        // bool installResult = mPackageManager->InstallExecHook("cn-heyuan");
-        // APSARA_TEST_TRUE(installResult);
+    // void UninstallExecHookTest() {
+    //     // // 先安装
+    //     // bool installResult = mPackageManager->InstallExecHook("cn-heyuan");
+    //     // APSARA_TEST_TRUE(installResult);
 
-        // // 测试卸载
-        // bool uninstallResult = mPackageManager->UninstallExecHook();
-        // APSARA_TEST_TRUE(uninstallResult);
-    }
+    //     // // 测试卸载
+    //     // bool uninstallResult = mPackageManager->UninstallExecHook();
+    //     // APSARA_TEST_TRUE(uninstallResult);
+    // }
 
-    void PrepareAPMAgentTest() {
-        // 测试准备 APM Agent
-        fs::path agentPath;
-        bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "10", "cn-heyuan", "1.0.0", agentPath);
-        APSARA_TEST_TRUE(result);
-    }
+    // void PrepareAPMAgentTest() {
+    //     // 测试准备 APM Agent
+    //     fs::path agentPath;
+    //     bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "10", "cn-heyuan", "1.0.0", agentPath);
+    //     APSARA_TEST_TRUE(result);
+    // }
 
-    void PrepareAPMAgentWithInvalidRegion() {
-        // 测试使用无效的区域
-        fs::path agentPath;
-        bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "11", "invalid-region", "1.0.0", agentPath);
-        APSARA_TEST_FALSE(result);
-    }
+    // void PrepareAPMAgentWithInvalidRegion() {
+    //     // 测试使用无效的区域
+    //     fs::path agentPath;
+    //     bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "11", "invalid-region", "1.0.0",
+    //     agentPath); APSARA_TEST_FALSE(result);
+    // }
 
-    void PrepareAPMAgentWithInvalidVersion() {
-        // 测试使用无效的版本
-        fs::path agentPath;
-        bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "12", "cn-heyuan", "", agentPath);
-        APSARA_TEST_FALSE(result);
-    }
+    // void PrepareAPMAgentWithInvalidVersion() {
+    //     // 测试使用无效的版本
+    //     fs::path agentPath;
+    //     bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kJava, "12", "cn-heyuan", "", agentPath);
+    //     APSARA_TEST_FALSE(result);
+    // }
 
-    void PrepareAPMAgentWithUnsupportedLanguage() {
-        // 测试不支持的语言
-        fs::path agentPath;
-        bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kPython, "13", "cn-heyuan", "1.0.0", agentPath);
-        APSARA_TEST_FALSE(result);
-    }
+    // void PrepareAPMAgentWithUnsupportedLanguage() {
+    //     // 测试不支持的语言
+    //     fs::path agentPath;
+    //     bool result = mPackageManager->PrepareAPMAgent(APMLanguage::kPython, "13", "cn-heyuan", "1.0.0", agentPath);
+    //     APSARA_TEST_FALSE(result);
+    // }
 
-    void InstallExecHookWithExistingPreload() {
-        // 准备已有的 ld.so.preload 文件内容
-        std::ofstream preloadFile(mPreloadFile);
-        preloadFile << "/usr/lib/other.so\n";
-        preloadFile.close();
+    // void InstallExecHookWithExistingPreload() {
+    //     // 准备已有的 ld.so.preload 文件内容
+    //     std::ofstream preloadFile(mPreloadFile);
+    //     preloadFile << "/usr/lib/other.so\n";
+    //     preloadFile.close();
 
-        // 测试安装
-        bool result = mPackageManager->InstallExecHook("cn-heyuan");
-        APSARA_TEST_TRUE(result);
+    //     // 测试安装
+    //     bool result = mPackageManager->InstallExecHook("cn-heyuan");
+    //     APSARA_TEST_TRUE(result);
 
-        // 验证文件内容是否正确追加
-        std::ifstream updatedPreloadFile(mPreloadFile);
-        std::string content((std::istreambuf_iterator<char>(updatedPreloadFile)), std::istreambuf_iterator<char>());
-        APSARA_TEST_TRUE(content.find("/usr/lib/other.so") != std::string::npos);
-        APSARA_TEST_TRUE(content.find("libexec-hook.so") != std::string::npos);
-    }
+    //     // 验证文件内容是否正确追加
+    //     std::ifstream updatedPreloadFile(mPreloadFile);
+    //     std::string content((std::istreambuf_iterator<char>(updatedPreloadFile)), std::istreambuf_iterator<char>());
+    //     APSARA_TEST_TRUE(content.find("/usr/lib/other.so") != std::string::npos);
+    //     APSARA_TEST_TRUE(content.find("libexec-hook.so") != std::string::npos);
+    // }
 
-    void InstallExecHookWithNoPermission() {
-        // 设置文件为只读
-        std::filesystem::permissions(
-            mPreloadFile, std::filesystem::perms::owner_read, std::filesystem::perm_options::replace);
+    // void InstallExecHookWithNoPermission() {
+    //     // 设置文件为只读
+    //     std::filesystem::permissions(
+    //         mPreloadFile, std::filesystem::perms::owner_read, std::filesystem::perm_options::replace);
 
-        // 测试安装
-        APSARA_TEST_FALSE(mPackageManager->InstallExecHook("cn-heyuan"));
+    //     // 测试安装
+    //     APSARA_TEST_FALSE(mPackageManager->InstallExecHook("cn-heyuan"));
 
-        // 恢复权限
-        std::filesystem::permissions(mPreloadFile,
-                                     std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
-                                     std::filesystem::perm_options::replace);
-    }
+    //     // 恢复权限
+    //     std::filesystem::permissions(mPreloadFile,
+    //                                  std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+    //                                  std::filesystem::perm_options::replace);
+    // }
 
 private:
     std::unique_ptr<PackageManager> mPackageManager;

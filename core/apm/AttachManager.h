@@ -42,7 +42,16 @@ public:
      */
     bool DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config);
 
-    // bool DoDetach(AttachConfig& config, int pid);
+    /**
+     * DoDetach is used to remove APP META from rc file
+     */
+    bool DoDetach(MatchRule& rule);
+
+    /**
+     * CheckAttachStatus is used to check if the process is already injected
+     */
+    bool CheckAttachStatus(const std::filesystem::path& cwd, int pid);
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class AttachManagerUnittest;
 #endif
@@ -51,6 +60,9 @@ private:
                              const std::string& agentJarPath,
                              const std::string& licenseKey,
                              const std::string& appName);
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class AttachManagerUnittest;
+#endif
 };
 
 } // namespace logtail::apm

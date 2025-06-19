@@ -34,6 +34,7 @@ public:
                 "Type": "apm_agent_inject",
                 "AppId": "test-app-id",
                 "AppName": "test-app-name",
+                "CommandType": "install",
                 "Workspace": "test-workspace",
                 "ServiceId": "test-service-id",
                 "LicenseKey": "test-license-key",
@@ -69,6 +70,7 @@ public:
         APSARA_TEST_EQUAL(attachConfig->mWorkspace, "test-workspace");
         APSARA_TEST_EQUAL(attachConfig->mAgentVersion, "test-agent-version");
         APSARA_TEST_EQUAL(attachConfig->mMatchRules.size(), 2);
+        APSARA_TEST_EQUAL(attachConfig->mCommandType, CommandType::kInstall);
     }
 
 private:

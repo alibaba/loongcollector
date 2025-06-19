@@ -18,6 +18,8 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -30,11 +32,26 @@
 #include "common/MachineInfoUtil.h"
 #include "common/ProcParser.h"
 #include "common/ThreadPool.h"
+#include "common/timer/Timer.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
 #include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail::apm {
+
+struct AttachContextWithRetry {
+    std::unique_ptr<AttachContext> context;
+    int retryCount = 0;
+    ApmAttachStatus lastStatus = ApmAttachStatus::kUnknown;
+};
+
+struct CheckUpdateEvent : public TimerEvent {
+    std::chrono::seconds mInterval;
+    explicit CheckUpdateEvent(std::chrono::seconds i)
+        : TimerEvent(std::chrono::steady_clock::now() + i), mInterval(i) {}
+    bool IsValid() const override { return true; }
+    bool Execute() override;
+};
 
 class ApmInjectRunner : public InputRunner {
 public:
@@ -54,16 +71,18 @@ public:
 
     void Init() override;
     void Stop() override;
-    [[nodiscard]] bool HasRegisteredPlugins() const override;
+    [[nodiscard]] bool HasRegisteredPlugins() const override { return mAttachConfigs.size(); }
     void EventGC() override {}
 
     bool InjectApmAgent(const TaskPipelineContext* ctx, std::unique_ptr<AttachConfig>&& config);
     bool RemoveApmAgent(const TaskPipelineContext* ctx);
 
+    void CheckUpdates();
+    void ScheduleCheckUpdates();
+
 private:
-    // pipeline name ==> AttachConfig
-    void injectApmAgentInner();
-    void removeApmAgentInner();
+    void injectApmAgentInner(const std::string& configName, AttachContextWithRetry& ctxWithRetry, bool isUpdate);
+    void removeApmAgentInner(const std::string& configName, AttachContextWithRetry& ctxWithRetry);
 
     AttachManager mAttachMgr;
     PackageManager mPackageMgr;
@@ -71,8 +90,17 @@ private:
     std::atomic_bool mStarted = false;
     ECSMeta mEcsMeta;
 
-    std::unordered_map<std::string, std::unique_ptr<AttachContext>> mAttachConfigs;
-    std::vector<std::pair<std::string, std::unique_ptr<AttachContext>>> mDeletedConfigs;
+    std::mutex mConfigMutex;
+    std::unordered_map<std::string, AttachContextWithRetry> mAttachConfigs;
+    int mMaxRetry = 5;
+    std::chrono::seconds mUpdateCheckInterval{300}; // 5分钟
+    // TimerEvent句柄
+    // std::shared_ptr<TimerEvent> mCheckUpdateTimerEvent;
+
+    std::string mRegionId;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class ApmInjectRunnerUnittest;
+#endif
 };
 
 } // namespace logtail::apm

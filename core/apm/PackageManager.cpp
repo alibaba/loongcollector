@@ -21,6 +21,7 @@
 #include <map>
 #include <regex>
 #include <string>
+#include <thread>
 #include <tuple>
 
 #include "common/ArchiveHelper.h"
@@ -57,6 +58,8 @@ const std::string kManifestExt = ".manifest";
 const char kHiddenFilePrefix = '.';
 const int kDefaultDownloadTimeout = 30; // seconds
 const std::string kPlaceHolderRegionId = "${REGION_ID}";
+const int kMaxRetries = 3;
+const std::chrono::seconds kRetryDelay(1);
 
 std::regex gPattern(R"(Url: (.+)\nEtag: (.+)\nLastModified: (.+))");
 
@@ -101,6 +104,9 @@ int DumpManifest(const std::string& dir,
                  const std::string& lastModified) {
     std::string manifestFile = GetManifestFile(filename);
     fs::path manifestPath = fs::path(dir) / manifestFile;
+    if (fs::exists(manifestPath)) {
+        fs::remove(manifestPath);
+    }
     LOG_INFO(sLogger, ("dir", dir)("fileName", filename)("url", url)("etag", etag)("lastModified", lastModified));
     std::ofstream out(manifestPath);
     if (!out) {
@@ -116,7 +122,7 @@ int DumpManifest(const std::string& dir,
 }
 
 // Get endpoint
-std::string GetArmsOssDefaultEndpoint(const std::string& regionId, bool vpc) {
+std::string GetApmOssDefaultEndpoint(const std::string& regionId, bool vpc) {
     if (regionId == "cn-hangzhou-finance") {
         return "arms-apm-cn-hangzhou-finance.oss-cn-hzjbp-b-internal.aliyuncs.com";
     }
@@ -146,32 +152,114 @@ bool InitDir(const fs::path& dir) {
     return true;
 }
 
+bool PackageManager::downloadWithRetry(const std::string& url,
+                                       const std::string& dir,
+                                       const std::string& filename,
+                                       bool& changed) {
+    for (int retry = 0; retry < kMaxRetries; ++retry) {
+        if (retry > 0) {
+            LOG_INFO(sLogger, ("retrying download", retry)("url", url));
+            std::this_thread::sleep_for(kRetryDelay);
+        }
+
+        if (download(url, dir, filename, changed)) {
+            // TODO @qianlu.kk
+
+            // 验证下载的文件
+            fs::path filePath = fs::path(dir) / filename;
+            if (verifyDownloadedFile(filePath)) {
+                return true;
+            }
+            LOG_WARNING(sLogger, ("downloaded file verification failed", filePath));
+        }
+    }
+
+    LOG_ERROR(sLogger, ("failed to download after retries", url));
+    return false;
+}
+
+bool PackageManager::verifyDownloadedFile(const fs::path& filePath) {
+    if (!fs::exists(filePath)) {
+        LOG_WARNING(sLogger, ("file does not exist", filePath));
+        return false;
+    }
+
+    // 检查文件大小
+    auto fileSize = fs::file_size(filePath);
+    if (fileSize == 0) {
+        LOG_WARNING(sLogger, ("file is empty", filePath));
+        return false;
+    }
+
+    // TODO: 可以添加更多的验证，比如文件完整性检查
+
+    return true;
+}
+
+// bool PackageManager::backupExistingFile(const fs::path& filePath) {
+//     if (!fs::exists(filePath)) {
+//         return true;
+//     }
+
+//     auto backupPath = filePath.string() + ".bak";
+//     try {
+//         fs::copy_file(filePath, backupPath, fs::copy_options::overwrite_existing);
+//         return true;
+//     } catch (const fs::filesystem_error& e) {
+//         LOG_WARNING(sLogger, ("failed to backup file", e.what()));
+//         return false;
+//     }
+// }
+
+// bool PackageManager::restoreBackupFile(const fs::path& filePath) {
+//     auto backupPath = filePath.string() + ".bak";
+//     if (!fs::exists(backupPath)) {
+//         return true;
+//     }
+
+//     try {
+//         fs::copy_file(backupPath, filePath, fs::copy_options::overwrite_existing);
+//         fs::remove(backupPath);
+//         return true;
+//     } catch (const fs::filesystem_error& e) {
+//         LOG_WARNING(sLogger, ("failed to restore backup file", e.what()));
+//         return false;
+//     }
+// }
+
 bool PackageManager::PrepareExecHook(const std::string& region) {
-    // step1. prepare shared lib dir ...
+    // 准备共享库目录
     bool res = InitDir(kDefaultExecHookDownloadDir);
     if (!res) {
-        // send alarm
         LOG_WARNING(sLogger, ("failed to init shared library dir", ""));
         return false;
     }
 
-    // step2. download ...
-    std::string url = GetArmsOssDefaultEndpoint(region, false) + "/" + kDefaultExecHookName;
+    // 备份现有文件
+    auto hookPath = kDefaultExecHookDownloadDir / kDefaultExecHookName;
+    // if (!backupExistingFile(hookPath)) {
+    //     LOG_WARNING(sLogger, ("failed to backup existing exec hook file", ""));
+    // }
+
+    // 下载 exec hook
+    std::string url = GetApmOssDefaultEndpoint(region, false) + "/" + kDefaultExecHookName;
     LOG_DEBUG(sLogger, ("url", url));
     bool changed = false;
-    bool status = downloadFromOss(url, kDefaultExecHookDownloadDir, kDefaultExecHookName, changed);
+    bool status = downloadWithRetry(url, kDefaultExecHookDownloadDir, kDefaultExecHookName, changed);
     if (!status) {
         LOG_WARNING(sLogger, ("failed to download from oss", kDefaultExecHookName));
+        // 恢复备份
+        // restoreBackupFile(hookPath);
         return false;
     }
 
     if (changed || !fs::exists(kSysSharedLibraryPath / kDefaultExecHookName)) {
-        // 步骤1: 设置源文件权限为 644 (owner: read/write, group/other: read)
+        // 设置文件权限
         fs::permissions(kDefaultExecHookDownloadDir / kDefaultExecHookName,
                         fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::others_read,
                         fs::perm_options::replace);
 
-        // 步骤2: 删除目标路径（文件或目录）
+        // 删除目标文件
         if (fs::exists(kSysSharedLibraryPath / kDefaultExecHookName)) {
             fs::remove(kSysSharedLibraryPath / kDefaultExecHookName);
         }
@@ -181,11 +269,19 @@ bool PackageManager::PrepareExecHook(const std::string& region) {
             fs::create_directories(kSysSharedLibraryPath);
         }
 
-        // 步骤3: 复制文件到工作路径
-        fs::copy(kDefaultExecHookDownloadDir / kDefaultExecHookName,
-                 kSysSharedLibraryPath / kDefaultExecHookName,
-                 fs::copy_options::overwrite_existing);
+        // 复制文件到系统目录
+        try {
+            fs::copy(kDefaultExecHookDownloadDir / kDefaultExecHookName,
+                     kSysSharedLibraryPath / kDefaultExecHookName,
+                     fs::copy_options::overwrite_existing);
+        } catch (const fs::filesystem_error& e) {
+            LOG_WARNING(sLogger, ("failed to copy exec hook to system dir", e.what()));
+            // 恢复备份
+            // restoreBackupFile(hookPath);
+            return false;
+        }
     }
+
     LOG_INFO(sLogger, ("exec hook is ready", ""));
     return true;
 }
@@ -258,28 +354,32 @@ int ClearDirectory(const fs::path& dirPath) {
     }
 }
 
-bool PackageManager::downloadFromOss(const std::string& url,
-                                     const std::string& dir,
-                                     const std::string& filename,
-                                     bool& changed) {
+bool PackageManager::download(const std::string& url,
+                              const std::string& dir,
+                              const std::string& filenameOrigin,
+                              bool& changed) {
     changed = false;
     std::string lastUrl;
     std::string lastEtag;
     std::string lastModified;
-    bool res = ReadManifest(dir, filename, lastUrl, lastEtag, lastModified);
-    LOG_DEBUG(sLogger,
-              ("ReadManifest res",
-               res)("dir", dir)("fileName", filename)("url", lastUrl)("etag", lastEtag)("lastModified", lastModified));
+    std::string filename = filenameOrigin + ".download";
+    // store ...
+    if (fs::exists(fs::path(dir) / filenameOrigin)) {
+        bool res = ReadManifest(dir, filenameOrigin, lastUrl, lastEtag, lastModified);
+        LOG_DEBUG(sLogger,
+                  ("ReadManifest res", res)("dir", dir)("fileName", filename)("url", lastUrl)("etag", lastEtag)(
+                      "lastModified", lastModified));
+    }
 
     // url changed ...
-    if (url != lastUrl) {
-        // std::string manifestFile = GetManifestFile(filename);
-        int ret = ClearDirectory(dir);
-        if (ret) {
-            LOG_ERROR(sLogger, ("Failed to clean dir: ", dir));
-            // do we need send alarm ???
-        }
-    }
+    // if (url != lastUrl) {
+    //     // std::string manifestFile = GetManifestFile(filename);
+    //     int ret = ClearDirectory(dir);
+    //     if (ret) {
+    //         LOG_ERROR(sLogger, ("Failed to clean dir: ", dir));
+    //         // do we need send alarm ???
+    //     }
+    // }
 
     fs::path savedPath = fs::path(dir) / filename;
 
@@ -314,12 +414,10 @@ bool PackageManager::downloadFromOss(const std::string& url,
 
     // get signature and md5
     // or manifest
-    // auto headers = res.GetHeader();
     if (response.GetStatusCode() == 304) {
         LOG_DEBUG(sLogger, ("not modified", ""));
         return true;
     }
-
     if (response.GetStatusCode() == 200) {
         // dump manifest
         std::string etag;
@@ -337,8 +435,26 @@ bool PackageManager::downloadFromOss(const std::string& url,
         }
         lastModified = it->second;
         changed = true;
-        return DumpManifest(dir, filename, url, etag, lastModified) == 0;
+
+        // remove old file
+        if (fs::exists(fs::path(dir) / filenameOrigin)) {
+            fs::remove(fs::path(dir) / filenameOrigin);
+        }
+
+        // download success ...
+        fs::rename(fs::path(dir) / filename, fs::path(dir) / filenameOrigin);
+
+        if (DumpManifest(dir, filenameOrigin, url, etag, lastModified)) {
+            LOG_WARNING(sLogger, ("failed to dump manifest file", filename));
+            return false;
+        }
+        // do backup ...
+        // if (!backupExistingFile(fs::path(dir) / filename)) {
+        //     LOG_WARNING(sLogger, ("failed to backup file", fs::path(dir) / filename));
+        // }
+        return true;
     }
+
 
     LOG_WARNING(sLogger,
                 ("failed to download, statusCode", response.GetStatusCode())("filename", filename)("url", url));
@@ -348,7 +464,7 @@ bool PackageManager::downloadFromOss(const std::string& url,
 
 std::string
 PackageManager::GetApmAgentDownloadUrl(APMLanguage lang, const std::string& region, const std::string& version) {
-    auto endpoint = GetArmsOssDefaultEndpoint(region, false);
+    auto endpoint = GetApmOssDefaultEndpoint(region, false);
 
     if (version.size() && version != "latest") {
         endpoint += '/';
@@ -397,48 +513,170 @@ bool PackageManager::PrepareAPMAgent(APMLanguage lang,
         return false;
     }
 
-    // download from oss ...
+    // 备份现有文件
+    auto agentPath = kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kArmsJavaAgentFilename;
+    // if (!backupExistingFile(agentPath)) {
+    //     LOG_WARNING(sLogger, ("failed to backup existing agent file", ""));
+    // }
+
+    // 下载探针包
     auto url = GetApmAgentDownloadUrl(lang, region, version);
     bool changed = false;
-    status = downloadFromOss(url, kDefaultJavaAgentDir / appId / kLatestAgentSubpath, kArmsJavaAgentFilename, changed);
+    status
+        = downloadWithRetry(url, kDefaultJavaAgentDir / appId / kLatestAgentSubpath, kArmsJavaAgentFilename, changed);
     if (!status) {
         LOG_WARNING(sLogger, ("failed to download from oss", kArmsJavaAgentFilename));
+        // 恢复备份
+        // restoreBackupFile(agentPath);
         return false;
     }
 
     if (changed
         || !fs::exists(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kJavaAgentSubpath
                        / kJavaAgentBootstrapFile)) {
-        // unzip
+        // 解压
         ArchiveHelper helper(kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kArmsJavaAgentFilename,
                              kDefaultJavaAgentDir / appId / kLatestAgentSubpath);
         status = helper.Extract();
         if (!status) {
             LOG_WARNING(sLogger, ("failed to unzip agent from oss", kArmsJavaAgentFilename));
+            // 恢复备份
+            // restoreBackupFile(agentPath);
             return false;
         }
 
-        // clean current dir
+        // 清理当前目录
         int ret = ClearDirectory(kDefaultJavaAgentDir / appId / kCurrentAgentSubpath);
         if (ret) {
             LOG_WARNING(sLogger, ("Failed to clear current dir, ret", ret));
         }
 
-        // copy latest to current dir ...
+        // 复制最新版本到当前目录
         try {
             fs::copy(kDefaultJavaAgentDir / appId / kLatestAgentSubpath,
                      kDefaultJavaAgentDir / appId / kCurrentAgentSubpath,
                      fs::copy_options::recursive);
         } catch (const fs::filesystem_error& e) {
             LOG_WARNING(sLogger, ("failed to copy latest dir to current dir, e", e.what()));
+            // 恢复备份
+            // restoreBackupFile(agentPath);
             return false;
         }
     }
 
     outBootstrapPath
         = kDefaultJavaAgentDir / appId / kCurrentAgentSubpath / kJavaAgentSubpath / kJavaAgentBootstrapFile;
-
     return true;
+}
+
+// TODO @qianlu.kk
+bool PackageManager::UpdateExecHook(const std::string& regionId) {
+    // 强制重新下载并覆盖
+    // 先删除本地和系统文件
+    UninstallExecHook();
+    // 再重新下载
+    return PrepareExecHook(regionId);
+}
+
+bool PackageManager::UninstallExecHook() {
+    bool success = true;
+    // 删除系统目录下的libexec-hook.so
+    auto sysPath = kSysSharedLibraryPath / kDefaultExecHookName;
+    if (fs::exists(sysPath)) {
+        try {
+            fs::remove(sysPath);
+        } catch (const fs::filesystem_error& e) {
+            LOG_WARNING(sLogger, ("failed to remove system exec hook", e.what()));
+            success = false;
+        }
+    }
+    // 删除本地下载目录下的libexec-hook.so及manifest
+    auto localPath = kDefaultExecHookDownloadDir / kDefaultExecHookName;
+    if (fs::exists(localPath)) {
+        try {
+            fs::remove(localPath);
+        } catch (const fs::filesystem_error& e) {
+            LOG_WARNING(sLogger, ("failed to remove local exec hook", e.what()));
+            success = false;
+        }
+    }
+    auto manifestPath = kDefaultExecHookDownloadDir / GetManifestFile(kDefaultExecHookName);
+    if (fs::exists(manifestPath)) {
+        try {
+            fs::remove(manifestPath);
+        } catch (const fs::filesystem_error& e) {
+            LOG_WARNING(sLogger, ("failed to remove exec hook manifest", e.what()));
+            success = false;
+        }
+    }
+
+    // 删除
+    if (fs::exists(kDefaultPreloadConfigFile)) {
+        try {
+            std::ifstream inFile(kDefaultPreloadConfigFile);
+            std::stringstream buffer;
+            buffer << inFile.rdbuf();
+            std::string content = buffer.str();
+            inFile.close();
+            std::string execHookEntry = (kSysSharedLibraryPath / kDefaultExecHookName).string();
+            std::istringstream iss(content);
+            std::ostringstream oss;
+            std::string line;
+            while (std::getline(iss, line)) {
+                if (line.find(execHookEntry) == std::string::npos) {
+                    oss << line << "\n";
+                }
+            }
+            std::ofstream outFile(kDefaultPreloadConfigFile, std::ios::out | std::ios::trunc);
+            if (outFile) {
+                outFile << oss.str();
+                outFile.close();
+            } else {
+                LOG_WARNING(sLogger, ("failed to update ld.so.preload when uninstall exec hook", ""));
+                success = false;
+            }
+        } catch (const std::exception& e) {
+            LOG_WARNING(sLogger, ("failed to clean ld.so.preload", e.what()));
+            success = false;
+        }
+    }
+    return success;
+}
+
+bool PackageManager::RemoveAPMAgent(APMLanguage lang, const std::string& appId) {
+    if (lang != APMLanguage::kJava) {
+        LOG_WARNING(sLogger, ("language not supported", magic_enum::enum_name(lang)));
+        return false;
+    }
+
+    // 只删除指定appId/agentVersion的包目录
+    fs::path agentBaseDir = kDefaultJavaAgentDir / appId;
+    if (!fs::exists(agentBaseDir)) {
+        return true;
+    }
+    // 删除latest和current子目录
+    bool success = true;
+    std::vector<fs::path> subDirs = {agentBaseDir / kLatestAgentSubpath, agentBaseDir / kCurrentAgentSubpath};
+    for (const auto& subDir : subDirs) {
+        if (fs::exists(subDir)) {
+            try {
+                fs::remove_all(subDir);
+            } catch (const fs::filesystem_error& e) {
+                LOG_WARNING(sLogger, ("failed to remove agent subdir", subDir)("err", e.what()));
+                success = false;
+            }
+        }
+    }
+    // 如果appId目录下已无内容，则删除appId目录
+    if (fs::exists(agentBaseDir) && fs::is_empty(agentBaseDir)) {
+        try {
+            fs::remove(agentBaseDir);
+        } catch (const fs::filesystem_error& e) {
+            LOG_WARNING(sLogger, ("failed to remove agent appId dir", agentBaseDir)("err", e.what()));
+            success = false;
+        }
+    }
+    return success;
 }
 
 } // namespace logtail::apm

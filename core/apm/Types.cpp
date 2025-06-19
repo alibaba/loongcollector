@@ -52,6 +52,22 @@ bool RuleTypeToEnum(std::string& ruleTypeStr, RuleType& ruleType) {
     return false;
 }
 
+bool CommandTypeToEnum(std::string& commandType, CommandType& commType) {
+    std::transform(
+        commandType.begin(), commandType.end(), commandType.begin(), [](unsigned char c) { return std::toupper(c); });
+    if (commandType == "INSTALL") {
+        commType = CommandType::kInstall;
+        return true;
+    }
+    if (commandType == "UPDATE") {
+        commType = CommandType::kUpdate;
+        return true;
+    }
+    LOG_DEBUG(sLogger, ("unknown command type", commandType));
+    commType = CommandType::kMax;
+    return false;
+}
+
 bool RuleOperationToEnum(std::string& ruleOpStr, RuleOperation& ruleOp) {
     std::transform(
         ruleOpStr.begin(), ruleOpStr.end(), ruleOpStr.begin(), [](unsigned char c) { return std::toupper(c); });
@@ -105,9 +121,16 @@ bool InitApmAttachOption(const TaskPipelineContext* ctx,
         PARAM_ERROR_RETURN(ctx->GetLogger(), ctx->GetAlarm(), errorMsg, inputType, ctx->GetConfigName(), "", "", "");
     }
 
-    // AgentVersion
-    if (!GetMandatoryStringParam(config, "AgentVersion", attachConfig->mAgentVersion, errorMsg)) {
+    // CommandType
+    std::string commandType;
+    if (!GetMandatoryStringParam(config, "CommandType", commandType, errorMsg)
+        || !CommandTypeToEnum(commandType, attachConfig->mCommandType)) {
         PARAM_ERROR_RETURN(ctx->GetLogger(), ctx->GetAlarm(), errorMsg, inputType, ctx->GetConfigName(), "", "", "");
+    }
+
+    // AgentVersion
+    if (!GetOptionalStringParam(config, "AgentVersion", attachConfig->mAgentVersion, errorMsg)) {
+        PARAM_WARNING_IGNORE(ctx->GetLogger(), ctx->GetAlarm(), errorMsg, inputType, ctx->GetConfigName(), "", "", "");
     }
 
     // MatchRules

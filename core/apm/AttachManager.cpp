@@ -93,20 +93,27 @@ int AttachManager::prepareRuntimeConfig(const fs::path& cwd,
     return 0;
 }
 
-int RemoveRuntimeConfig(const fs::path& cwd) {
-    auto configPath = cwd / kRuntimeConfigFile;
-    if (fs::exists(configPath) && !fs::remove(configPath)) {
-        LOG_WARNING(sLogger, ("Failed to remove config file", configPath));
-        return 1;
+bool AttachManager::DoDetach(MatchRule& rule) {
+    auto configPath = rule.mVal / kRuntimeConfigFile;
+    if (!fs::exists(configPath)) {
+        LOG_DEBUG(sLogger, ("config file does not exist", configPath));
+        return true;
     }
-    return 0;
+
+    try {
+        if (!fs::remove(configPath)) {
+            LOG_WARNING(sLogger, ("failed to remove config file", configPath));
+            return false;
+        }
+        LOG_INFO(sLogger, ("runtime config file removed for cwd", rule.mVal));
+        return true;
+    } catch (const fs::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("failed to remove config file", e.what()));
+        return false;
+    }
 }
 
-bool CheckRuntimeConfig(const fs::path& cwd) {
-    return fs::exists(cwd / kRuntimeConfigFile);
-}
-
-bool CheckProcessInjected(const fs::path& cwd, int pid) {
+bool AttachManager::CheckAttachStatus(const fs::path& cwd, int pid) {
     auto pidFilePath = cwd / kRuntimePidFile;
     if (!fs::exists(pidFilePath)) {
         return false;
@@ -127,7 +134,9 @@ bool CheckProcessInjected(const fs::path& cwd, int pid) {
 }
 
 bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config) {
-    return prepareRuntimeConfig(rule.mVal, agentPath, config->mAttachConfig->mLicenseKey, config->mAttachConfig->mAppName) == 0;
+    return prepareRuntimeConfig(
+               rule.mVal, agentPath, config->mAttachConfig->mLicenseKey, config->mAttachConfig->mAppName)
+        == 0;
 }
 
 } // namespace logtail::apm

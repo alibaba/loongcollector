@@ -38,6 +38,12 @@ enum class RuleType {
     kMax,
 };
 
+enum class CommandType {
+    kInstall,
+    kUpdate,
+    kMax,
+};
+
 struct MatchRule {
     RuleType mRuleType;
     RuleOperation mOperation;
@@ -47,6 +53,7 @@ struct MatchRule {
 struct AttachConfig {
     APMLanguage mLanguage;
     std::string mCommandId;
+    CommandType mCommandType;
     std::string mLicenseKey;
     std::string mAppName;
     std::string mAppId;

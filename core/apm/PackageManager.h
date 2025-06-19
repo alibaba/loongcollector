@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 
 #include "apm/Types.h"
@@ -34,8 +35,9 @@ public:
 
     void Init() {}
 
-
-    bool UpdateExecHook();
+    // 更新exec hook（强制重新下载并覆盖）
+    bool UpdateExecHook(const std::string& regionId);
+    // 卸载exec hook（删除系统和本地文件）
     bool UninstallExecHook();
 
     std::string GetApmAgentDownloadUrl(APMLanguage lang, const std::string& region, const std::string& version);
@@ -51,17 +53,24 @@ public:
 
     bool PrepareExecHook(const std::string& region);
 
-    // TODO uninstall logic ...
-    bool RemoveAPMAgent(APMLanguage lang,
-                         const std::string& pid,
-                         const std::string& region,
-                         const std::string& version,
-                         std::filesystem::path& outBootstrapPath);
-
-    // TODO update latest agent logic ...
+    // 只删除指定appId/agentVersion的包，不影响其他配置
+    bool RemoveAPMAgent(APMLanguage lang, const std::string& appId);
 
 private:
-    bool downloadFromOss(const std::string& url, const std::string& dir, const std::string& filename, bool& changed);
+    bool download(const std::string& url, const std::string& dir, const std::string& filename, bool& changed);
+    bool downloadWithRetry(const std::string& url, const std::string& dir, const std::string& filename, bool& changed);
+    bool verifyDownloadedFile(const std::filesystem::path& filePath);
+    // bool backupExistingFile(const std::filesystem::path& filePath);
+    // bool restoreBackupFile(const std::filesystem::path& filePath);
+
+    // 重试相关配置
+    static constexpr int kMaxRetries = 3;
+    static constexpr std::chrono::seconds kRetryDelay{5};
+    static constexpr int kDefaultDownloadTimeout = 30; // seconds
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PackageManagerUnittest;
+#endif
 };
 
 } // namespace logtail::apm
