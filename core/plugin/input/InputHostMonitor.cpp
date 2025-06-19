@@ -24,6 +24,7 @@
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
+#include "host_monitor/collector/DiskCollector.h"
 
 namespace logtail {
 
@@ -143,6 +144,24 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     if (enableProcess) {
         mCollectors.push_back(ProcessCollector::sName);
     }
+
+    // system disk
+    bool enableDisk = true;
+    if (!GetOptionalBoolParam(config, "EnableDisk", enableDisk, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableDisk) {
+        mCollectors.push_back(DiskCollector::sName);
+    }
+
+
     return true;
 }
 
