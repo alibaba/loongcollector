@@ -142,7 +142,7 @@ void eBPFServerUnittest::TestNetworkObserver() {
     // observer_options.Init(ObserverType::NETWORK, configJson, &ctx, "test");
     std::shared_ptr<InputNetworkObserver> input(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(initStatus);
     EXPECT_TRUE(ebpf::EBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
@@ -171,7 +171,7 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     )";
     std::shared_ptr<InputNetworkSecurity> input(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
 
     std::string errorMsg;
     Json::Value configJson, optionalGoPipeline;
@@ -179,7 +179,7 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     APSARA_TEST_TRUE(initStatus);
 
@@ -223,7 +223,7 @@ void eBPFServerUnittest::TestNetworkSecurity() {
 //     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 
 //     input->SetContext(ctx);
-//     input->SetMetricsRecordRef("test", "1");
+//     input->CreateMetricsRecordRef("test", "1");
 //     auto initStatus = input->Init(configJson, optionalGoPipeline);
 //     APSARA_TEST_TRUE(initStatus);
 
@@ -259,7 +259,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
     security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "test");
     std::shared_ptr<InputProcessSecurity> input(new InputProcessSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     APSARA_TEST_TRUE(initStatus);
 
@@ -301,7 +301,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
 //     ctx.SetConfigName("test-pipeline-1");
 //     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
 //     input->SetContext(ctx);
-//     input->SetMetricsRecordRef("test", "1");
+//     input->CreateMetricsRecordRef("test", "1");
 
 //     std::string errorMsg;
 //     Json::Value configJson, optionalGoPipeline;
@@ -329,7 +329,7 @@ void eBPFServerUnittest::TestProcessSecurity() {
 //         }
 //     )";
 //     input->SetContext(ctx);
-//     input->SetMetricsRecordRef("test", "2");
+//     input->CreateMetricsRecordRef("test", "2");
 //     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 //     res = input->Init(configJson, optionalGoPipeline);
 //     EXPECT_TRUE(res);
@@ -360,7 +360,7 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     std::shared_ptr<InputNetworkSecurity> input(new InputNetworkSecurity());
     ctx.SetConfigName("test-file-pipeline");
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
 
     std::string errorMsg;
     Json::Value configJson, optionalGoPipeline;
@@ -368,7 +368,7 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     APSARA_TEST_TRUE(initStatus);
 
@@ -400,7 +400,7 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
         }
     )";
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "2");
+    input->CreateMetricsRecordRef("test", "2");
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     res = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(res);

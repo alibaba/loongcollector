@@ -47,7 +47,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         Json::Value tmp;
         CollectionPipelineContext ctx;
         flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef("name", "1");
+        flusher->CreateMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
@@ -66,7 +66,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         Json::Value tmp;
         CollectionPipelineContext ctx;
         flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef("name", "1");
+        flusher->CreateMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
@@ -84,7 +84,7 @@ void FlusherRunnerUnittest::TestPushToHttpSink() {
     Json::Value tmp;
     CollectionPipelineContext ctx;
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef("name", "1");
+    flusher->CreateMetricsRecordRef("name", "1");
     flusher->Init(Json::Value(), tmp);
     {
         // keep item

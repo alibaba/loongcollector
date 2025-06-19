@@ -83,7 +83,7 @@ void InputProcessSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputProcessSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_process_security");
     APSARA_TEST_EQUAL(input->mSecurityOptions.mOptionList[0].mCallNames.size(), 5UL);
@@ -104,7 +104,7 @@ void InputProcessSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputProcessSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
@@ -127,7 +127,7 @@ void InputProcessSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputProcessSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName

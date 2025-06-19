@@ -114,7 +114,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(optionalGoPipeline.isNull());
     APSARA_TEST_EQUAL("test_project", flusher->mProject);
@@ -171,7 +171,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL("test_region", flusher->mRegion);
 #ifdef __ENTERPRISE__
@@ -207,7 +207,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
 #ifdef __ENTERPRISE__
@@ -234,7 +234,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
     EnterpriseConfigProvider::GetInstance()->mIsPrivateCloud = false;
@@ -258,7 +258,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mEndpointMode);
     APSARA_TEST_EQUAL(EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap.end(),
@@ -282,7 +282,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
     auto& endpoints
@@ -308,7 +308,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
     endpoints = EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap["test_region"].mRemoteEndpoints;
@@ -335,7 +335,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL("test_region.log.aliyuncs.com", flusher->mEndpoint);
     SenderQueueManager::GetInstance()->Clear();
@@ -355,7 +355,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS, flusher->mTelemetryType);
     SenderQueueManager::GetInstance()->Clear();
@@ -373,7 +373,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     SenderQueueManager::GetInstance()->Clear();
@@ -395,7 +395,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher.reset(new FlusherSLS());
     ctx.SetExactlyOnceFlag(true);
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     ctx.SetExactlyOnceFlag(false);
@@ -417,7 +417,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     SenderQueueManager::GetInstance()->Clear();
@@ -435,7 +435,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher.reset(new FlusherSLS());
     ctx.SetExactlyOnceFlag(true);
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     APSARA_TEST_EQUAL(nullptr, SenderQueueManager::GetInstance()->GetQueue(flusher->GetQueueKey()));
@@ -455,7 +455,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     SenderQueueManager::GetInstance()->Clear();
@@ -473,7 +473,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     SenderQueueManager::GetInstance()->Clear();
@@ -532,7 +532,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         APSARA_TEST_TRUE(ParseJsonTable(cfg, configJson, errorMsg));
         flusher.reset(new FlusherSLS());
         flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
         APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
         APSARA_TEST_EQUAL(flusher->mSubpath, apmSubpath[ii]);
         APSARA_TEST_EQUAL(flusher->mTelemetryType, apmTelemetryTypes[ii]);
@@ -565,7 +565,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     pipeline.mPluginID.store(4);
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
     optionalGoPipeline.clear();
@@ -597,7 +597,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     pipeline.mPluginID.store(4);
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
     ctx.SetIsFlushingThroughGoPipelineFlag(false);
@@ -620,7 +620,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
     configStr = R"(
@@ -634,7 +634,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
     // invalid Logstore
@@ -648,7 +648,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
     configStr = R"(
@@ -662,7 +662,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
 #ifndef __ENTERPRISE__
@@ -677,7 +677,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
     configStr = R"(
@@ -691,7 +691,7 @@ void FlusherSLSUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 #endif
 }
@@ -703,7 +703,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     FlusherSLS flusher1;
     flusher1.SetContext(ctx1);
-    flusher1.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher1.CreateMetricsRecordRef(FlusherSLS::sName, "1");
     string configStr, errorMsg;
 
     configStr = R"(
@@ -725,7 +725,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         ctx2.SetConfigName("test_config_2");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
-        flusher2.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher2.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         configStr = R"(
             {
                 "Type": "flusher_sls",
@@ -755,7 +755,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         ctx2.SetConfigName("test_config_1");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
-        flusher2.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher2.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         configStr = R"(
             {
                 "Type": "flusher_sls",
@@ -803,7 +803,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     FlusherSLS flusher;
     flusher.SetContext(ctx);
-    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher.Init(configJson, optionalGoPipeline));
 
     string body = "hello, world!";
@@ -1466,7 +1466,7 @@ void FlusherSLSUnittest::TestSend() {
         ctx.SetConfigName("test_config");
         ctx.SetExactlyOnceFlag(true);
         flusher.SetContext(ctx);
-        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
 
         // create exactly once queue
@@ -1607,7 +1607,7 @@ void FlusherSLSUnittest::TestSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
-        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
         {
             // empty group
@@ -1696,7 +1696,7 @@ void FlusherSLSUnittest::TestSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
-        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
 
         PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -1795,7 +1795,7 @@ void FlusherSLSUnittest::TestFlush() {
     ParseJsonTable(configStr, configJson, errorMsg);
     FlusherSLS flusher;
     flusher.SetContext(ctx);
-    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
     flusher.Init(configJson, optionalGoPipeline);
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -1838,7 +1838,7 @@ void FlusherSLSUnittest::TestFlushAll() {
     ParseJsonTable(configStr, configJson, errorMsg);
     FlusherSLS flusher;
     flusher.SetContext(ctx);
-    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
     flusher.Init(configJson, optionalGoPipeline);
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -1889,7 +1889,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
-        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
+        flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
         {
             APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));

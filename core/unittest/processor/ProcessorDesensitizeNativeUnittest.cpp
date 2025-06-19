@@ -162,7 +162,7 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         // run function ProcessorSplitMultilineLogStringNative
         ProcessorSplitMultilineLogStringNative processorSplitMultilineLogStringNative;
         processorSplitMultilineLogStringNative.SetContext(mContext);
-        processorSplitMultilineLogStringNative.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+        processorSplitMultilineLogStringNative.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processorSplitMultilineLogStringNative.Init(config));
         processorSplitMultilineLogStringNative.Process(eventGroup);
 
@@ -268,7 +268,7 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         // run function ProcessorMergeMultilineLogNative
         ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
         processorMergeMultilineLogNative.SetContext(mContext);
-        processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
         processorMergeMultilineLogNative.Process(eventGroup);
 

@@ -41,7 +41,7 @@ bool FlusherRunner::Init() {
     mCallback = [this]() { return LoadModuleConfig(false); };
     AppConfig::GetInstance()->RegisterCallback("max_bytes_per_sec", &mCallback);
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER}});
@@ -52,6 +52,7 @@ bool FlusherRunner::Init() {
     mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
     mInItemRawDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES);
     mWaitingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
     mThreadRes = async(launch::async, &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);

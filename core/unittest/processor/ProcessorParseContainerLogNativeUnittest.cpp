@@ -140,7 +140,7 @@ void ProcessorParseContainerLogNativeUnittest::TestInit() {
     config["IgnoringStderr"] = 1;
     ProcessorParseContainerLogNative processor;
     processor.SetContext(mContext);
-    processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+    processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processor.Init(config));
 }
 
@@ -154,7 +154,7 @@ void ProcessorParseContainerLogNativeUnittest::TestIgnoringStdoutStderr() {
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -260,7 +260,7 @@ void ProcessorParseContainerLogNativeUnittest::TestIgnoringStdoutStderr() {
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -398,7 +398,7 @@ void ProcessorParseContainerLogNativeUnittest::TestIgnoringStdoutStderr() {
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -560,7 +560,7 @@ void ProcessorParseContainerLogNativeUnittest::TestIgnoringStdoutStderr() {
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // make eventGroup
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -751,7 +751,7 @@ void ProcessorParseContainerLogNativeUnittest::TestContainerdLog() {
     // make ProcessorParseContainerLogNative
     ProcessorParseContainerLogNative processor;
     processor.SetContext(mContext);
-    processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+    processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processor.Init(config));
     // make eventGroup
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -1020,7 +1020,7 @@ void ProcessorParseContainerLogNativeUnittest::TestContainerdLogWithSplit() {
         // make ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1034,7 +1034,7 @@ void ProcessorParseContainerLogNativeUnittest::TestContainerdLogWithSplit() {
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1048,7 +1048,7 @@ void ProcessorParseContainerLogNativeUnittest::TestContainerdLogWithSplit() {
         // make ProcessorMergeMultilineLogNative
         ProcessorMergeMultilineLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1063,7 +1063,7 @@ void ProcessorParseContainerLogNativeUnittest::TestContainerdLogWithSplit() {
         // make ProcessorMergeMultilineLogNative
         ProcessorMergeMultilineLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1133,7 +1133,7 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParserWithSp
         // make ProcessorSplitLogStringNative
         ProcessorSplitLogStringNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1147,7 +1147,7 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParserWithSp
         // make ProcessorParseContainerLogNative
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1161,7 +1161,7 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParserWithSp
         // make ProcessorMergeMultilineLogNative
         ProcessorMergeMultilineLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1176,7 +1176,7 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParserWithSp
         // make ProcessorMergeMultilineLogNative
         ProcessorMergeMultilineLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // run test function
         processor.Process(eventGroup);
@@ -1224,7 +1224,7 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonLogLineParser() {
     config["IgnoringStderr"] = false;
     ProcessorParseContainerLogNative processor;
     processor.SetContext(mContext);
-    processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+    processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processor.Init(config));
     // log 测试
     { // log 不存在情况下
@@ -1643,7 +1643,7 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
 
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -1763,7 +1763,7 @@ void ProcessorParseContainerLogNativeUnittest::TestKeepingSourceWhenParseFail() 
         config["KeepingSourceWhenParseFail"] = false;
         ProcessorParseContainerLogNative processor;
         processor.SetContext(mContext);
-        processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processor.Init(config));
         // log 测试
         { // log 不存在情况下

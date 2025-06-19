@@ -35,14 +35,6 @@ WriteMetrics::~WriteMetrics() {
     Clear();
 }
 
-void WriteMetrics::PrepareMetricsRecordRef(MetricsRecordRef& ref,
-                                           const std::string& category,
-                                           MetricLabels&& labels,
-                                           DynamicMetricLabels&& dynamicLabels) {
-    CreateMetricsRecordRef(ref, category, std::move(labels), std::move(dynamicLabels));
-    CommitMetricsRecordRef(ref);
-}
-
 void WriteMetrics::CreateMetricsRecordRef(MetricsRecordRef& ref,
                                           const std::string& category,
                                           MetricLabels&& labels,

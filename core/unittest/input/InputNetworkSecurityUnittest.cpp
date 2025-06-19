@@ -93,7 +93,7 @@ void InputNetworkSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
     logtail::ebpf::SecurityNetworkFilter thisFilter1
@@ -128,7 +128,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_security");
     logtail::ebpf::SecurityNetworkFilter thisFilter1
@@ -155,7 +155,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter5
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
@@ -183,7 +183,7 @@ void InputNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     logtail::ebpf::SecurityNetworkFilter thisFilter6
         = std::get<logtail::ebpf::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
@@ -212,7 +212,7 @@ void InputNetworkSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
@@ -244,7 +244,7 @@ void InputNetworkSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkSecurity());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName

@@ -73,7 +73,7 @@ void InputHostMetaUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputHostMeta());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_host_meta");
 }
@@ -94,7 +94,7 @@ void InputHostMetaUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputHostMeta());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
 }
@@ -112,7 +112,7 @@ void InputHostMetaUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputHostMeta());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(input->Stop(false));

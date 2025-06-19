@@ -66,7 +66,7 @@ void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
     APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterKeys.size());
     APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterRegs.size());
@@ -81,7 +81,7 @@ void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
     APSARA_TEST_TRUE(processor->mDiscardingNonUTF8);
 
@@ -94,7 +94,7 @@ void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
     APSARA_TEST_FALSE(processor->mDiscardingNonUTF8);
 }
@@ -115,7 +115,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 
     configStr = R"(
@@ -132,7 +132,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 
     configStr = R"(
@@ -150,7 +150,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 
     configStr = R"(
@@ -169,7 +169,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 }
 

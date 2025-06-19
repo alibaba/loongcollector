@@ -73,7 +73,7 @@ void InputInternalAlarmsUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.SetContext(ctx);
-    input.SetMetricsRecordRef(InputInternalAlarms::sName, "1");
+    input.CreateMetricsRecordRef(InputInternalAlarms::sName, "1");
     APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_EQUAL(nullptr, SelfMonitorServer::GetInstance()->mAlarmPipelineCtx);

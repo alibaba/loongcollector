@@ -28,7 +28,7 @@ namespace logtail {
 
 bool ProcessorInstance::Init(const Json::Value& config, CollectionPipelineContext& context) {
     mPlugin->SetContext(context);
-    mPlugin->SetMetricsRecordRef(Name(), PluginID());
+    mPlugin->CreateMetricsRecordRef(Name(), PluginID());
     if (!mPlugin->Init(config)) {
         return false;
     }
@@ -39,7 +39,7 @@ bool ProcessorInstance::Init(const Json::Value& config, CollectionPipelineContex
     mInSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_SIZE_BYTES);
     mOutSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
     mTotalProcessTimeMs = mPlugin->GetMetricsRecordRef().CreateTimeCounter(METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS);
-
+    mPlugin->CommitMetricsRecordRef();
     return true;
 }
 

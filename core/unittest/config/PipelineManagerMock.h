@@ -22,11 +22,12 @@ class PipelineMock : public CollectionPipeline {
 public:
     bool Init(CollectionConfig&& config) {
         mConfig = std::move(config.mDetail);
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef,
             MetricCategory::METRIC_CATEGORY_PIPELINE,
             {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
         mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
         mSingletonInput = config.mSingletonInput;
         mContext.SetCreateTime(config.mCreateTime);
         return (*mConfig)["valid"].asBool();
