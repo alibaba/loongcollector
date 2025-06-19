@@ -25,6 +25,8 @@
 
 #include <string>
 #include <vector>
+#include <iomanip>
+#include <boost/algorithm/string.hpp>
 
 #include "boost/regex.hpp"
 
@@ -403,5 +405,16 @@ std::vector<std::string> split(const std::string &src, const std::string &chars,
 inline std::vector<std::string> split(const std::string &s, char delim, const SplitOpt &opt) {
             return split(s, std::string{&delim, &delim + 1}, opt);
         }
+
+// T只接受数值型或枚举
+template<typename T, typename std::enable_if<
+        std::is_integral<T>::value || std::is_floating_point<T>::value ||
+        std::is_enum<T>::value, int>::type = 0>
+std::string NumberToString(const T &v) {
+    std::stringstream ss;
+    ss << std::setprecision(20) << v;
+    return ss.str();
+}
+
 
 } // namespace logtail

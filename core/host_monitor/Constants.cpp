@@ -28,6 +28,16 @@ std::filesystem::path PROCESS_MTRR = "mtrr";
 const std::filesystem::path PROCESS_NET_SOCKSTAT = "net/sockstat";
 const std::filesystem::path PROCESS_NET_SOCKSTAT6 = "net/sockstat6";
 const std::filesystem::path PROCESS_NET_DEV = "net/dev";
+const std::filesystem::path PROCESS_STATM = "statm";
+const std::filesystem::path PROCESS_FD = "fd";
+const std::filesystem::path PROCESS_CMDLINE = "cmdline";
+const std::filesystem::path PROCESS_CWD = "cwd";
+const std::filesystem::path PROCESS_EXE = "exe";
+const std::filesystem::path PROCESS_ROOT = "root";
+const std::filesystem::path PROCESS_STATUS = "status";
+const std::filesystem::path PROCESS_UPTIME = "uptime";
+const int EXECUTE_SUCCESS = 0;
+const int EXECUTE_FAIL = -1;
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail
