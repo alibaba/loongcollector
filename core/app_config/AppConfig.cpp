@@ -1804,7 +1804,6 @@ void AppConfig::RegisterCallback(const std::string& key, std::function<bool()>* 
     mCallbacks[key] = callback;
 }
 
-#if defined(_MSC_VER)
 template <typename T>
 void tryMerge(const std::string& name,
               const std::function<bool(const std::string&, const T&)>& validateFn,
@@ -1877,7 +1876,6 @@ void tryMerge(const std::string& name,
         configName = keyToConfigName[name];
     }
 }
-#endif
 
 template <typename T>
 T AppConfig::MergeConfig(const T& defaultValue,
@@ -1891,49 +1889,9 @@ T AppConfig::MergeConfig(const T& defaultValue,
     T res = defaultValue;
     std::string configName = "default";
 
-    // as c++ standard, "if constexpr" need all branch compilable,
-    // but g++ has more relaxed restrict, just need hited branch compilable,
-    // so template specialization implemented in vc++.
-#if defined(_MSC_VER)
     tryMerge(name, validateFn, localInstanceConfig, mLocalInstanceConfigKeyToConfigName, res, configName);
     tryMerge(name, validateFn, envConfig, mEnvConfigKeyToConfigName, res, configName);
     tryMerge(name, validateFn, remoteInstanceConfig, mRemoteInstanceConfigKeyToConfigName, res, configName);
-#else
-    auto tryMerge = [&](const Json::Value& config, std::unordered_map<std::string, std::string>& keyToConfigName) {
-        if (config.isMember(name)) {
-            if constexpr (std::is_same_v<T, int32_t>) {
-                if (config[name].isInt() && validateFn(name, config[name].asInt())) {
-                    res = config[name].asInt();
-                    configName = keyToConfigName[name];
-                }
-            } else if constexpr (std::is_same_v<T, int64_t>) {
-                if (config[name].isInt64() && validateFn(name, config[name].asInt64())) {
-                    res = config[name].asInt64();
-                    configName = keyToConfigName[name];
-                }
-            } else if constexpr (std::is_same_v<T, bool>) {
-                if (config[name].isBool() && validateFn(name, config[name].asBool())) {
-                    res = config[name].asBool();
-                    configName = keyToConfigName[name];
-                }
-            } else if constexpr (std::is_same_v<T, std::string>) {
-                if (config[name].isString() && validateFn(name, config[name].asString())) {
-                    res = config[name].asString();
-                    configName = keyToConfigName[name];
-                }
-            } else if constexpr (std::is_same_v<T, double>) {
-                if (config[name].isDouble() && validateFn(name, config[name].asDouble())) {
-                    res = config[name].asDouble();
-                    configName = keyToConfigName[name];
-                }
-            }
-        }
-    };
-
-    tryMerge(localInstanceConfig, mLocalInstanceConfigKeyToConfigName);
-    tryMerge(envConfig, mEnvConfigKeyToConfigName);
-    tryMerge(remoteInstanceConfig, mRemoteInstanceConfigKeyToConfigName);
-#endif
 
     LOG_INFO(
         sLogger,
