@@ -63,6 +63,22 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 	return ctx, nil
 }
 
+func RemoveLocalConfig(ctx context.Context, configName string) (context.Context, error) {
+	if setup.Env.GetType() == "docker-compose" {
+		filePath := fmt.Sprintf("%s/%s.yaml", config.ConfigDir, configName)
+		if err := os.Remove(filePath); err != nil {
+			return ctx, err
+		}
+	} else {
+		command := fmt.Sprintf(`cd %s && rm -f %s.yaml`, config.TestConfig.LocalConfigDir, configName)
+		if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
+			return ctx, err
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return ctx, nil
+}
+
 func RemoveAllLocalConfig(ctx context.Context) (context.Context, error) {
 	command := fmt.Sprintf("cd %s && rm -rf *.yaml", config.TestConfig.LocalConfigDir)
 	if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
