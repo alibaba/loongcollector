@@ -37,8 +37,8 @@ public:
         mRunner->Stop();
         Timer::GetInstance()->Clear();
         Timer::GetInstance()->Stop();
-        fs::remove_all("/opt/.arms");
-        std::filesystem::remove_all(mTestDir);
+        // fs::remove_all("/opt/.arms");
+        // std::filesystem::remove_all(mTestDir);
     }
 
     void TestInitAndStop() {
@@ -135,12 +135,15 @@ public:
     }
 
     void TestInjectUpdate() {
+        // install
+        std::string configName = "remove-test";
+        AttachContextWithRetry ctxWithRetry;
         auto config = std::make_unique<AttachConfig>();
         config->mLanguage = APMLanguage::kJava;
-        config->mCommandType = CommandType::kUpdate;
+        config->mCommandType = CommandType::kInstall;
         config->mAppId = "test-appid";
         config->mAppName = "test-app";
-        config->mAgentVersion = "1.0.1";
+        config->mAgentVersion = "";
         config->mLicenseKey = "test-key";
         config->mServiceId = "svc";
         config->mWorkspace = "ws";
@@ -149,9 +152,39 @@ public:
         rule.mOperation = RuleOperation::kEq;
         rule.mVal = mTestDir.string();
         config->mMatchRules.push_back(rule);
-        TaskPipelineContext ctx;
-        ctx.SetConfigName("test-0");
-        APSARA_TEST_TRUE(mRunner->InjectApmAgent(&ctx, std::move(config)));
+        ctxWithRetry.context = std::make_unique<AttachContext>(std::move(config));
+        mRunner->injectApmAgentInner(configName, ctxWithRetry, false);
+        APSARA_TEST_TRUE(fs::exists("/opt/.arms/apm-java-agent/test-appid"));
+        APSARA_TEST_TRUE(
+            fs::exists("/opt/.arms/apm-java-agent/test-appid/current/AliyunJavaAgent/aliyun-java-agent.jar"));
+        APSARA_TEST_TRUE(ctxWithRetry.lastStatus == ApmAttachStatus::kSucceed);
+        APSARA_TEST_TRUE(fs::exists(mTestDir / ".arms.rc"));
+        std::ifstream rcFile(mTestDir / ".arms.rc");
+        std::string content((std::istreambuf_iterator<char>(rcFile)), std::istreambuf_iterator<char>());
+        APSARA_TEST_TRUE(content.find("test-key") != std::string::npos);
+        APSARA_TEST_TRUE(content.find("test-app") != std::string::npos);
+        APSARA_TEST_TRUE(content.find("ECS_AUTO") != std::string::npos);
+
+        AttachContextWithRetry ctxWithRetry2;
+        config = std::make_unique<AttachConfig>();
+        config->mLanguage = APMLanguage::kJava;
+        config->mCommandType = CommandType::kUpdate;
+        config->mAppId = "test-appid";
+        config->mAppName = "test-app";
+        config->mAgentVersion = "4.1.12";
+        config->mLicenseKey = "test-key";
+        config->mServiceId = "svc";
+        config->mWorkspace = "ws";
+        rule.mRuleType = RuleType::kCwd;
+        rule.mOperation = RuleOperation::kEq;
+        rule.mVal = mTestDir.string();
+        config->mMatchRules.push_back(rule);
+        ctxWithRetry2.context = std::make_unique<AttachContext>(std::move(config));
+        LOG_INFO(sLogger, ("begin", "update"));
+        mRunner->injectApmAgentInner(configName, ctxWithRetry2, true);
+        // TaskPipelineContext ctx;
+        // ctx.SetConfigName("test-0");
+        // APSARA_TEST_TRUE(mRunner->InjectApmAgent(&ctx, std::move(config)));
     }
 
     void TestInjectInvalidConfig() {
@@ -184,7 +217,7 @@ UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestScheduleCheckUpdates);
 UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestCheckUpdateEvent);
 UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestInjectApmAgentInner);
 UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestRemoveApmAgentInner);
-// UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestInjectUpdate);
+UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestInjectUpdate);
 // UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestInjectInvalidConfig);
 // UNIT_TEST_CASE(ApmInjectRunnerUnittest, TestCheckUpdatesRetry);
 

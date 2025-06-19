@@ -92,13 +92,8 @@ bool ApmInjectRunner::InjectApmAgent(const TaskPipelineContext* ctx, std::unique
     ctxWithRetry.context = std::make_unique<AttachContext>(std::move(config));
     ctxWithRetry.retryCount = 0;
     ctxWithRetry.lastStatus = ApmAttachStatus::kInProgress;
-    if (commandType == CommandType::kInstall) {
-        // 只处理当前config，成功后插入mAttachConfigs
-        mThreadPool->Add([&]() mutable { injectApmAgentInner(configName, ctxWithRetry, false); });
-    } else if (commandType == CommandType::kUpdate) {
-        // 只更新当前config
-        mThreadPool->Add([&]() mutable { injectApmAgentInner(configName, ctxWithRetry, true); });
-    }
+    mThreadPool->Add(
+        [&]() mutable { injectApmAgentInner(configName, ctxWithRetry, commandType == CommandType::kUpdate); });
     return true;
 }
 
@@ -136,10 +131,13 @@ void ApmInjectRunner::injectApmAgentInner(const std::string& configName,
     }
     ctxWithRetry.lastStatus = ApmAttachStatus::kSucceed;
     ctxWithRetry.retryCount = 0;
-    if (!isUpdate) {
-        std::lock_guard<std::mutex> lock(mConfigMutex);
-        mAttachConfigs[configName] = std::move(ctxWithRetry);
-    }
+
+    std::lock_guard<std::mutex> lock(mConfigMutex);
+    mAttachConfigs[configName] = std::move(ctxWithRetry);
+    // if (!isUpdate) {
+    //     std::lock_guard<std::mutex> lock(mConfigMutex);
+    //     mAttachConfigs[configName] = std::move(ctxWithRetry);
+    // }
 }
 
 void ApmInjectRunner::removeApmAgentInner(const std::string& configName, AttachContextWithRetry& ctxWithRetry) {

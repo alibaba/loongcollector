@@ -371,16 +371,6 @@ bool PackageManager::download(const std::string& url,
                       "lastModified", lastModified));
     }
 
-    // url changed ...
-    // if (url != lastUrl) {
-    //     // std::string manifestFile = GetManifestFile(filename);
-    //     int ret = ClearDirectory(dir);
-    //     if (ret) {
-    //         LOG_ERROR(sLogger, ("Failed to clean dir: ", dir));
-    //         // do we need send alarm ???
-    //     }
-    // }
-
     fs::path savedPath = fs::path(dir) / filename;
 
     std::unique_ptr<HttpRequest> request;
@@ -400,12 +390,15 @@ bool PackageManager::download(const std::string& url,
                           });
 
     std::map<std::string, std::string> headers;
-    if (lastEtag.size()) {
-        headers.insert({"If-None-Match", lastEtag});
+    if (url == lastUrl && fs::exists(savedPath)) {
+        if (lastEtag.size()) {
+            headers.insert({"If-None-Match", lastEtag});
+        }
+        if (lastModified.size()) {
+            headers.insert({"If-Modified-Since", lastModified});
+        }
     }
-    if (lastModified.size()) {
-        headers.insert({"If-Modified-Since", lastModified});
-    }
+
     request = std::make_unique<HttpRequest>("GET", true, url, 443, "", "", headers, "", 10, 3, true);
     bool success = SendHttpRequest(std::move(request), response);
     if (!success) {
@@ -513,7 +506,6 @@ bool PackageManager::PrepareAPMAgent(APMLanguage lang,
         return false;
     }
 
-    // 备份现有文件
     auto agentPath = kDefaultJavaAgentDir / appId / kLatestAgentSubpath / kArmsJavaAgentFilename;
     // if (!backupExistingFile(agentPath)) {
     //     LOG_WARNING(sLogger, ("failed to backup existing agent file", ""));
@@ -521,7 +513,9 @@ bool PackageManager::PrepareAPMAgent(APMLanguage lang,
 
     // 下载探针包
     auto url = GetApmAgentDownloadUrl(lang, region, version);
+    LOG_INFO(sLogger, ("url", url));
     bool changed = false;
+    // TODO filename 中我们可以加上 version，这样相当于有一层缓存了
     status
         = downloadWithRetry(url, kDefaultJavaAgentDir / appId / kLatestAgentSubpath, kArmsJavaAgentFilename, changed);
     if (!status) {
