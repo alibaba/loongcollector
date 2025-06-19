@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 
-#include "task_pipeline/Task.h"
 #include "apm/Types.h"
+#include "task_pipeline/Task.h"
 
 namespace logtail {
 
@@ -35,7 +35,7 @@ public:
 
 private:
     bool mIsRunning = false;
-    std::unique_ptr<apm::AttachConfig> mAttachConfig;
+    std::shared_ptr<apm::AttachConfig> mAttachConfig;
 };
 
-}
+} // namespace logtail

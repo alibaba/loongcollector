@@ -40,9 +40,9 @@
 namespace logtail::apm {
 
 struct AttachContextWithRetry {
-    std::unique_ptr<AttachContext> context;
-    int retryCount = 0;
-    ApmAttachStatus lastStatus = ApmAttachStatus::kUnknown;
+    std::shared_ptr<AttachContext> mContext;
+    int mRetryCount = 0;
+    ApmAttachStatus mLastStatus = ApmAttachStatus::kUnknown;
 };
 
 struct CheckUpdateEvent : public TimerEvent {
@@ -74,7 +74,7 @@ public:
     [[nodiscard]] bool HasRegisteredPlugins() const override { return mAttachConfigs.size(); }
     void EventGC() override {}
 
-    bool InjectApmAgent(const TaskPipelineContext* ctx, std::unique_ptr<AttachConfig>&& config);
+    bool InjectApmAgent(const TaskPipelineContext* ctx, std::shared_ptr<AttachConfig>& config);
     bool RemoveApmAgent(const TaskPipelineContext* ctx);
 
     void CheckUpdates();

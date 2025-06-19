@@ -40,7 +40,7 @@ public:
     /**
      * DoAttach is used to write APP META to rc file
      */
-    bool DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config);
+    bool DoAttach(MatchRule& rule, const std::string& agentPath, std::shared_ptr<AttachContext>& config);
 
     /**
      * DoDetach is used to remove APP META from rc file

@@ -72,14 +72,14 @@ enum class ApmAttachStatus {
 };
 
 struct AttachContext {
-    explicit AttachContext(std::unique_ptr<AttachConfig>&& config) : mAttachConfig(std::move(config)) {}
-    std::unique_ptr<AttachConfig> mAttachConfig;
+    explicit AttachContext(std::shared_ptr<AttachConfig>& config) : mAttachConfig(config) {}
+    std::shared_ptr<AttachConfig> mAttachConfig;
     ApmAttachStatus mStatus = ApmAttachStatus::kInProgress;
 };
 
 bool InitApmAttachOption(const TaskPipelineContext* ctx,
                          const Json::Value& config,
-                         std::unique_ptr<AttachConfig>& attachConfig,
+                         std::shared_ptr<AttachConfig>& attachConfig,
                          const std::string& inputType);
 
 } // namespace logtail::apm
