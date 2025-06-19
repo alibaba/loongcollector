@@ -29,7 +29,11 @@ const std::string MetricCategory::METRIC_CATEGORY_PLUGIN = "plugin";
 const std::string MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE = "plugin_source";
 
 MetricsRecord::MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
-    : mCategory(category), mLabels(std::move(labels)), mDynamicLabels(std::move(dynamicLabels)), mCommitted(false), mDeleted(false) {
+    : mCategory(category),
+      mLabels(std::move(labels)),
+      mDynamicLabels(std::move(dynamicLabels)),
+      mCommitted(false),
+      mDeleted(false) {
 }
 
 CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
