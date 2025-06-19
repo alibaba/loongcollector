@@ -3,6 +3,7 @@
 ## Dockerfiles to build iLogtail
 
 Dockerfile_build: build iLogtail
+Dockerfile_goc: goc server
 Dockerfile_development_part: testing entrypoint
 Dockerfile_production: production entrypoint
 

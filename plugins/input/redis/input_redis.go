@@ -171,8 +171,7 @@ func (r *InputRedis) gatherServer(addr *url.URL, collector pipeline.Collector) e
 		}
 		tags = map[string]string{"server": host, "port": port}
 	}
-	gatherInfoOutput(rdr, collector, tags)
-	return nil
+	return gatherInfoOutput(rdr, collector, tags)
 }
 
 // gatherInfoOutput gathers
@@ -180,7 +179,7 @@ func gatherInfoOutput(
 	rdr *bufio.Reader,
 	collector pipeline.Collector,
 	tags map[string]string,
-) {
+) error {
 	var section string
 
 	var dbTotal TotalDBInfo
@@ -239,6 +238,7 @@ func gatherInfoOutput(
 	fields["total_db_keys"] = strconv.FormatInt(dbTotal.keys, 10)
 	fields["total_db_expires"] = strconv.FormatInt(dbTotal.expires, 10)
 	collector.AddData(tags, fields)
+	return nil
 }
 
 // Parse the special Keyspace line at end of redis stats
