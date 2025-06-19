@@ -27,12 +27,14 @@ const std::string ApmAgentInjectTask::sName = "apm_agent_inject";
 
 bool ApmAgentInjectTask::Init(const Json::Value& config) {
     apm::ApmInjectRunner::GetInstance()->Init();
-    mAttachConfig = std::make_unique<apm::AttachConfig>();
+    mAttachConfig = std::make_shared<apm::AttachConfig>();
     return apm::InitApmAttachOption(mContext, config, mAttachConfig, ApmAgentInjectTask::sName);
 }
 
 void ApmAgentInjectTask::Start() {
-    apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, std::move(mAttachConfig));
+    apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, mAttachConfig);
+    apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, mAttachConfig);
+    mAttachConfig = nullptr;
 }
 
 void ApmAgentInjectTask::Stop(bool isRemoving) {

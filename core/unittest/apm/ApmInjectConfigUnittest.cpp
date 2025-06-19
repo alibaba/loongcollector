@@ -60,7 +60,7 @@ public:
         TaskPipelineContext ctx;
         ctx.SetConfigName("test-config");
         ctx.SetCreateTime(100);
-        std::unique_ptr<AttachConfig> attachConfig = std::make_unique<AttachConfig>();
+        auto attachConfig = std::make_shared<AttachConfig>();
         bool status = InitApmAttachOption(&ctx, configJson, attachConfig, "apm_agent_inject");
         APSARA_TEST_TRUE(status);
         APSARA_TEST_TRUE(attachConfig != nullptr);

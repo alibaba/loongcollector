@@ -84,26 +84,27 @@ void ApmInjectRunner::ScheduleCheckUpdates() {
     Timer::GetInstance()->PushEvent(std::move(event));
 }
 
-bool ApmInjectRunner::InjectApmAgent(const TaskPipelineContext* ctx, std::unique_ptr<AttachConfig>&& config) {
+bool ApmInjectRunner::InjectApmAgent(const TaskPipelineContext* ctx, std::shared_ptr<AttachConfig>& config) {
     std::lock_guard<std::mutex> lock(mConfigMutex);
-    std::string configName = ctx->GetConfigName();
+    const std::string& configName = ctx->GetConfigName();
     auto commandType = config->mCommandType;
     AttachContextWithRetry ctxWithRetry;
-    ctxWithRetry.context = std::make_unique<AttachContext>(std::move(config));
-    ctxWithRetry.retryCount = 0;
-    ctxWithRetry.lastStatus = ApmAttachStatus::kInProgress;
-    mThreadPool->Add(
-        [&]() mutable { injectApmAgentInner(configName, ctxWithRetry, commandType == CommandType::kUpdate); });
+    ctxWithRetry.mContext = std::make_shared<AttachContext>(config);
+    ctxWithRetry.mLastStatus = ApmAttachStatus::kInProgress;
+    ctxWithRetry.mRetryCount = 0;
+    mThreadPool->Add([this, configName, ctxWithRetry, commandType]() mutable {
+        injectApmAgentInner(configName, ctxWithRetry, commandType == CommandType::kUpdate);
+    });
     return true;
 }
 
 bool ApmInjectRunner::RemoveApmAgent(const TaskPipelineContext* ctx) {
     std::lock_guard<std::mutex> lock(mConfigMutex);
-    std::string configName = ctx->GetConfigName();
+    const std::string& configName = ctx->GetConfigName();
     auto it = mAttachConfigs.find(configName);
     if (it != mAttachConfigs.end()) {
-        auto& ctxWithRetry = it->second;
-        mThreadPool->Add([&]() mutable { removeApmAgentInner(configName, ctxWithRetry); });
+        auto ctxWithRetry = it->second;
+        mThreadPool->Add([this, configName, ctxWithRetry]() mutable { removeApmAgentInner(configName, ctxWithRetry); });
         mAttachConfigs.erase(it);
     }
     return true;
@@ -112,25 +113,33 @@ bool ApmInjectRunner::RemoveApmAgent(const TaskPipelineContext* ctx) {
 void ApmInjectRunner::injectApmAgentInner(const std::string& configName,
                                           AttachContextWithRetry& ctxWithRetry,
                                           bool isUpdate) {
-    auto& attachConfig = ctxWithRetry.context->mAttachConfig;
+    if (ctxWithRetry.mContext == nullptr) {
+        LOG_WARNING(sLogger, ("attach context", "nullptr"));
+        return;
+    }
+    auto& attachConfig = ctxWithRetry.mContext->mAttachConfig;
+    if (attachConfig == nullptr) {
+        LOG_WARNING(sLogger, ("attach config", "nullptr"));
+        return;
+    }
     fs::path agentPath;
     bool ok = mPackageMgr.PrepareAPMAgent(
         attachConfig->mLanguage, attachConfig->mAppId, mRegionId, attachConfig->mAgentVersion, agentPath);
     if (!ok) {
-        ctxWithRetry.lastStatus = ApmAttachStatus::kFailed;
-        ctxWithRetry.retryCount++;
+        ctxWithRetry.mLastStatus = ApmAttachStatus::kFailed;
+        ctxWithRetry.mRetryCount++;
         return;
     }
     // 写入rc文件
     for (auto& rule : attachConfig->mMatchRules) {
-        if (!mAttachMgr.DoAttach(rule, agentPath, ctxWithRetry.context)) {
-            ctxWithRetry.lastStatus = ApmAttachStatus::kFailed;
-            ctxWithRetry.retryCount++;
+        if (!mAttachMgr.DoAttach(rule, agentPath, ctxWithRetry.mContext)) {
+            ctxWithRetry.mLastStatus = ApmAttachStatus::kFailed;
+            ctxWithRetry.mRetryCount++;
             return;
         }
     }
-    ctxWithRetry.lastStatus = ApmAttachStatus::kSucceed;
-    ctxWithRetry.retryCount = 0;
+    ctxWithRetry.mLastStatus = ApmAttachStatus::kSucceed;
+    ctxWithRetry.mRetryCount = 0;
 
     std::lock_guard<std::mutex> lock(mConfigMutex);
     mAttachConfigs[configName] = std::move(ctxWithRetry);
@@ -141,7 +150,7 @@ void ApmInjectRunner::injectApmAgentInner(const std::string& configName,
 }
 
 void ApmInjectRunner::removeApmAgentInner(const std::string& configName, AttachContextWithRetry& ctxWithRetry) {
-    auto& attachConfig = ctxWithRetry.context->mAttachConfig;
+    auto& attachConfig = ctxWithRetry.mContext->mAttachConfig;
     if (attachConfig == nullptr) {
         LOG_WARNING(sLogger, ("failed to get attachConfig", ""));
         return;
@@ -161,15 +170,16 @@ void ApmInjectRunner::CheckUpdates() {
         // [configName, ctxWithRetry]
         const auto& configName = it.first;
         auto& ctxWithRetry = it.second;
-        if (ctxWithRetry.lastStatus == ApmAttachStatus::kSucceed) {
+        if (ctxWithRetry.mLastStatus == ApmAttachStatus::kSucceed) {
             continue;
         }
-        if (ctxWithRetry.retryCount >= mMaxRetry) {
+        if (ctxWithRetry.mRetryCount >= mMaxRetry) {
             // 超过最大重试次数，停止重试
             continue;
         }
+
         mThreadPool->Add(
-            [this, configName, &ctxWithRetry]() mutable { injectApmAgentInner(configName, ctxWithRetry, false); });
+            [this, configName, ctxWithRetry]() mutable { injectApmAgentInner(configName, ctxWithRetry, false); });
     }
 }
 

@@ -82,7 +82,7 @@ bool RuleOperationToEnum(std::string& ruleOpStr, RuleOperation& ruleOp) {
 
 bool InitApmAttachOption(const TaskPipelineContext* ctx,
                          const Json::Value& config,
-                         std::unique_ptr<AttachConfig>& attachConfig,
+                         std::shared_ptr<AttachConfig>& attachConfig,
                          const std::string& inputType) {
     std::string errorMsg;
     // AppId

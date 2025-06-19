@@ -50,7 +50,7 @@ public:
 
     void TestDoAttachTwice() {
         AttachManager mgr;
-        auto config = std::make_unique<AttachConfig>();
+        auto config = std::make_shared<AttachConfig>();
         config->mLicenseKey = "test-license-key";
         config->mAppName = "test-app-name";
         MatchRule rule;
@@ -58,7 +58,7 @@ public:
         rule.mOperation = RuleOperation::kEq;
         rule.mVal = mTestCwdDir.string();
         std::string agentPath = "/tmp/agent.jar";
-        auto context = std::make_unique<AttachContext>(std::move(config));
+        auto context = std::make_shared<AttachContext>(config);
         APSARA_TEST_TRUE(mMgr.DoAttach(rule, agentPath, context));
         APSARA_TEST_TRUE(mMgr.DoAttach(rule, agentPath, context));
         APSARA_TEST_TRUE(fs::exists(mTestCwdDir / ".arms.rc"));
@@ -91,14 +91,14 @@ public:
     }
     void TestAttachNoPermission() {
         AttachManager mgr;
-        auto config = std::make_unique<AttachConfig>();
+        auto config = std::make_shared<AttachConfig>();
         config->mLicenseKey = "key";
         config->mAppName = "app";
         MatchRule rule;
         rule.mRuleType = RuleType::kCwd;
         rule.mOperation = RuleOperation::kEq;
         rule.mVal = mTestCwdDir.string();
-        auto context = std::make_unique<AttachContext>(std::move(config));
+        auto context = std::make_shared<AttachContext>(config);
         std::string agentPath = "/tmp/agent.jar";
         // 创建只读目录
         LOG_INFO(sLogger, ("step readonly", ""));

@@ -37,8 +37,7 @@ const std::string kPlaceholderLicenseKey = "${licenseKey}";
 const std::string kPlaceholderAgentPath = "${path_to_agent_bootstrap}";
 const std::string kPlaceholderAppName = "${appName}";
 
-const std::string kRuntimeConfigTemplate = R"(
--javaagent:${path_to_agent_bootstrap}
+const std::string kRuntimeConfigTemplate = R"(-javaagent:${path_to_agent_bootstrap}
 -Darms.licenseKey=${licenseKey}
 -Darms.appName=${appName}
 -Darms.agent.env=ECS_AUTO
@@ -133,7 +132,7 @@ bool AttachManager::CheckAttachStatus(const fs::path& cwd, int pid) {
     return content.find(pidStr) != std::string::npos;
 }
 
-bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, std::unique_ptr<AttachContext>& config) {
+bool AttachManager::DoAttach(MatchRule& rule, const std::string& agentPath, std::shared_ptr<AttachContext>& config) {
     return prepareRuntimeConfig(
                rule.mVal, agentPath, config->mAttachConfig->mLicenseKey, config->mAttachConfig->mAppName)
         == 0;
