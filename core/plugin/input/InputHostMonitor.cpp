@@ -101,10 +101,12 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    if (enableMem) {
-        mCollectors.push_back(MemCollector::sName);
+    if (enableSystem) {
+        mCollectors.push_back(SystemCollector::sName);
     }
+
     
+
     return true;
 }
 

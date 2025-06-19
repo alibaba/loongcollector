@@ -218,6 +218,9 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
 bool LinuxSystemInterface::GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) {
     cpuCoreNumInfo.cpuCoreNum = std::thread::hardware_concurrency();
     cpuCoreNumInfo.cpuCoreNum = cpuCoreNumInfo.cpuCoreNum < 1 ? 1 : cpuCoreNumInfo.cpuCoreNum;
+    return true;
+}
+
 bool LinuxSystemInterface::GetMemoryInformationStringOnce(MemoryInformationString& memInfoStr) { 
     auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
     memInfoStr.meminfoString.clear();

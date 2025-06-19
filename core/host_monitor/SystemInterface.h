@@ -261,7 +261,6 @@ public:
           mCPUCoreNumInformationCache(ttl),
           mMemInformationCache(ttl),
           mMTRRInformationCache(ttl) {}
-
     virtual ~SystemInterface() = default;
 
 private:
