@@ -24,50 +24,121 @@
 namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
-const std::string kMetricLabelCPU = "cpu";
-const std::string kMetricLabelMode = "mode";
 
+CPUCollector::CPUCollector() {
+    Init();
+}
+int CPUCollector::Init(int totalCount) {
+    mCountPerReport = totalCount;
+    mCount = 0;
+    return 0;
+}
 bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
     CPUInformation cpuInfo;
+    CPUPercent totalCpuPercent{};
     if (!SystemInterface::GetInstance()->GetCPUInformation(cpuInfo)) {
         return false;
     }
     const time_t now = time(nullptr);
-    constexpr struct MetricDef {
-        const char* name;
-        const char* mode;
-        double CPUStat::*value;
-    } metrics[] = {
-        {"node_cpu_seconds_total", "user", &CPUStat::user},
-        {"node_cpu_seconds_total", "nice", &CPUStat::nice},
-        {"node_cpu_seconds_total", "system", &CPUStat::system},
-        {"node_cpu_seconds_total", "idle", &CPUStat::idle},
-        {"node_cpu_seconds_total", "iowait", &CPUStat::iowait},
-        {"node_cpu_seconds_total", "irq", &CPUStat::irq},
-        {"node_cpu_seconds_total", "softirq", &CPUStat::softirq},
-        {"node_cpu_seconds_total", "steal", &CPUStat::steal},
-        {"node_cpu_guest_seconds_total", "user", &CPUStat::guest},
-        {"node_cpu_guest_seconds_total", "nice", &CPUStat::guestNice},
-    };
+
     for (const auto& cpu : cpuInfo.stats) {
-        if (cpu.index == -1) {
+        if (cpu.index != -1) {
             continue;
         }
+
+        CPUStat cpuTolal = cpu;
+        double cpuCores = cpuCount;
+        if (!CalculateCPUPercent(totalCpuPercent, cpuTolal)) {
+            return false;
+        }
+        // first time get cpu count and not calculate mCount
+        if (cpuCount == 0) {
+            cpuCount = cpuInfo.stats.size() - 1;
+            return true;
+        }
+
+        cpuCount = cpuInfo.stats.size() - 1;
+        mCalculate.AddValue(totalCpuPercent);
+        mCount++;
+
+        if (mCount < mCountPerReport) {
+            return true;
+        }
+
+        CPUPercent minCPU, maxCPU, avgCPU, lastCPU;
+        mCalculate.Stat(maxCPU, minCPU, avgCPU, &lastCPU);
+
+        mCount = 0;
+        mCalculate.Reset();
+        struct MetricDef {
+            const char* name;
+            double* value;
+        } metrics[] = {
+            {"cpu_system_avg", &avgCPU.sys},  {"cpu_system_min", &minCPU.sys},  {"cpu_system_max", &maxCPU.sys},
+            {"cpu_idle_avg", &avgCPU.idle},   {"cpu_idle_min", &minCPU.idle},   {"cpu_idle_max", &maxCPU.idle},
+            {"cpu_user_avg", &avgCPU.user},   {"cpu_user_min", &minCPU.user},   {"cpu_user_max", &maxCPU.user},
+            {"cpu_wait_avg", &avgCPU.wait},   {"cpu_wait_min", &minCPU.wait},   {"cpu_wait_max", &maxCPU.wait},
+            {"cpu_other_avg", &avgCPU.other}, {"cpu_other_min", &minCPU.other}, {"cpu_other_max", &maxCPU.other},
+            {"cpu_total_avg", &avgCPU.total}, {"cpu_total_min", &minCPU.total}, {"cpu_total_max", &maxCPU.total},
+            {"cpu_cores_value", &cpuCores},
+
+        };
+        MetricEvent* metricEvent = group->AddMetricEvent(true);
+        if (!metricEvent) {
+            return false;
+        }
+        metricEvent->SetTimestamp(now, 0);
+        metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+        auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
         for (const auto& def : metrics) {
-            auto* metricEvent = group->AddMetricEvent(true);
-            if (!metricEvent) {
-                continue;
+            if (std::string(def.name) == "cpu_cores_value") {
+                multiDoubleValues->SetValue(
+                    std::string(def.name),
+                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
+            } else {
+                multiDoubleValues->SetValue(
+                    std::string(def.name),
+                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, (*def.value) * 100});
             }
-            metricEvent->SetName(def.name);
-            metricEvent->SetTimestamp(now, 0);
-            metricEvent->SetValue<UntypedSingleValue>(cpu.*(def.value) / SYSTEM_HERTZ);
-            metricEvent->SetTag(kMetricLabelCPU, std::to_string(cpu.index));
-            metricEvent->SetTagNoCopy(kMetricLabelMode, def.mode);
         }
     }
+    return true;
+}
+
+bool CPUCollector::CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& currentCpu) {
+    if (cpuCount == 0) {
+        lastCpu = currentCpu;
+        cpuPercent.sys = cpuPercent.user = cpuPercent.wait = cpuPercent.idle = cpuPercent.other = cpuPercent.total
+            = 0.0;
+        LOG_DEBUG(sLogger, ("first time collect Cpu info", "empty"));
+        return true;
+    }
+
+    double currentJiffies, lastJiffies, jiffiesDelta;
+    currentJiffies = currentCpu.user + currentCpu.nice + currentCpu.system + currentCpu.idle + currentCpu.iowait
+        + currentCpu.irq + currentCpu.softirq + currentCpu.steal;
+    lastJiffies = lastCpu.user + lastCpu.nice + lastCpu.system + lastCpu.idle + lastCpu.iowait + lastCpu.irq
+        + lastCpu.softirq + lastCpu.steal;
+    jiffiesDelta = currentJiffies - lastJiffies;
+
+
+    if (jiffiesDelta <= 0) {
+        LOG_DEBUG(sLogger, ("jiffies delta is negative", "skip"));
+        return false;
+    }
+
+    cpuPercent.sys = (currentCpu.system - lastCpu.system) / jiffiesDelta;
+    cpuPercent.user = (currentCpu.user - lastCpu.user) / jiffiesDelta;
+    cpuPercent.wait = (currentCpu.iowait - lastCpu.iowait) / jiffiesDelta;
+    cpuPercent.idle = (currentCpu.idle - lastCpu.idle) / jiffiesDelta;
+    cpuPercent.other = (currentCpu.nice + currentCpu.irq + currentCpu.softirq + currentCpu.steal - lastCpu.nice
+                        - lastCpu.irq - lastCpu.softirq - lastCpu.steal)
+        / jiffiesDelta;
+    cpuPercent.total = 1 - cpuPercent.idle;
+    lastCpu = currentCpu;
     return true;
 }
 
