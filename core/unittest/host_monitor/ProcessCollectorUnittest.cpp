@@ -102,6 +102,7 @@ protected:
 
 void ProcessCollectorUnittest::TestGetHostPidStat() const {
     auto collector = ProcessCollector();
+    pid_t pid = 12345;
     ProcessAllStat stat;
     APSARA_TEST_TRUE(collector.GetProcessAllStat(pid, stat));
     
@@ -118,7 +119,7 @@ void ProcessCollectorUnittest::TestCollect() const {
     
 }
 
-UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostSystemCPUStat);
+UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostPidStat);
 UNIT_TEST_CASE(ProcessCollectorUnittest, TestCollect);
 
 } // namespace logtail
