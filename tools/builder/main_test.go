@@ -82,7 +82,7 @@ func Test_generatePluginSourceCode(t *testing.T) {
 		ModFile:     "go.mod",
 		GoModContent: `module github.com/alibaba/ilogtail
 
-go 1.23
+go 1.19
 
 require (
 	github.com/alibaba/ilogtail/base v0.0.0-20230128101543-c0c844084b0e
@@ -222,7 +222,7 @@ import _ "github.com/mock/debug_plugins1"
 import _ "github.com/mock/debug_plugins2"`,
 		"go.mod": `module github.com/alibaba/ilogtail
 
-go 1.23
+go 1.19
 
 require (
 	github.com/alibaba/ilogtail/base v0.0.0-20230128101543-c0c844084b0e

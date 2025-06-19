@@ -154,7 +154,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/munnerz/goautoneg](https://pkg.go.dev/github.com/munnerz/goautoneg?tab=licenses)
 - [github.com/pmezard/go-difflib](https://pkg.go.dev/github.com/pmezard/go-difflib?tab=licenses)
 - [github.com/gorilla/websocket](https://github.com/gorilla/websocket?tab=BSD-3-Clause-1-ov-file#readme)
-- [gopkg.in/evanphx/json-patch.v4](https://pkg.go.dev/gopkg.in/evanphx/json-patch.v4?tab=licenses)
 
 ## MIT licenses
 
@@ -245,8 +244,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/go-playground/universal-translator](https://pkg.go.dev/github.com/go-playground/universal-translator?tab=licenses)
 - [github.com/go-playground/validator](https://pkg.go.dev/github.com/go-playground/validator?tab=licenses)
 - [github.com/leodido/go-urn](https://pkg.go.dev/github.com/leodido/go-urn?tab=licenses)
-- [github.com/fxamacker/cbor](https://pkg.go.dev/github.com/fxamacker/cbor?tab=licenses)
-- [github.com/x448/float16](https://pkg.go.dev/github.com/x448/float16?tab=licenses)
 
 ## ISC licenses
 

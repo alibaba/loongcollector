@@ -247,14 +247,14 @@ func ConvertPipelineEventToOtlpMetric(event models.PipelineEvent, scopeMetric pm
 		// skip untyped metrics
 	case models.MetricTypeGauge:
 		gauge := m.SetEmptyGauge()
-		_ = appgendNumberDatapoint(gauge, metricEvent)
+		_, err = appgendNumberDatapoint(gauge, metricEvent)
 	case models.MetricTypeCounter:
 		sum := m.SetEmptySum()
-		sum = appgendNumberDatapoint(sum, metricEvent)
+		sum, err = appgendNumberDatapoint(sum, metricEvent)
 		sum.SetAggregationTemporality(pmetric.AggregationTemporalityDelta)
 	case models.MetricTypeRateCounter:
 		sum := m.SetEmptySum()
-		sum = appgendNumberDatapoint(sum, metricEvent)
+		sum, err = appgendNumberDatapoint(sum, metricEvent)
 		at := metricEvent.Tags.Get(otlp.TagKeyMetricAggregationTemporality)
 		if at == pmetric.AggregationTemporalityDelta.String() {
 			sum.SetAggregationTemporality(pmetric.AggregationTemporalityDelta)
@@ -379,11 +379,11 @@ func setScope[T interface {
 
 func appgendNumberDatapoint[T interface {
 	DataPoints() pmetric.NumberDataPointSlice
-}](t T, metricEvent *models.Metric) T {
+}](t T, metricEvent *models.Metric) (T, error) {
 	datapoint := t.DataPoints().AppendEmpty()
 	datapoint = setDatapoint(datapoint, metricEvent)
 	datapoint.SetDoubleValue(metricEvent.GetValue().GetSingleValue())
-	return t
+	return t, nil
 }
 
 func appgendSummaryDatapoint(summary pmetric.Summary, metricEvent *models.Metric) {

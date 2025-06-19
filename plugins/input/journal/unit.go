@@ -196,12 +196,11 @@ func unitNameMangle(name, suffix string) (string, error) {
 func doEscapeMangle(name string) string {
 	var mangled string
 	for _, r := range name {
-		switch {
-		case r == '/':
+		if r == '/' {
 			mangled += "-"
-		case !strings.ContainsRune(validChars, r):
+		} else if !strings.ContainsRune(validChars, r) {
 			mangled += "\\x" + strconv.FormatInt(int64(r), 16)
-		default:
+		} else {
 			mangled += string(r)
 		}
 	}

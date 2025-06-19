@@ -89,7 +89,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 	if informer == nil {
 		return
 	}
-	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
