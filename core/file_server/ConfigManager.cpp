@@ -1023,7 +1023,7 @@ void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
         LOG_DEBUG(
             sLogger,
             ("GetContainerStoppedEvent Type", pStoppedEvent->GetType())("Source", pStoppedEvent->GetSource())(
-                "Object", pStoppedEvent->GetObject())("Config", pStoppedEvent->GetConfigName())(
+                "Object", pStoppedEvent->GetEventObject())("Config", pStoppedEvent->GetConfigName())(
                 "IsDir", pStoppedEvent->IsDir())("IsCreate", pStoppedEvent->IsCreate())("IsModify",
                                                                                         pStoppedEvent->IsModify())(
                 "IsDeleted", pStoppedEvent->IsDeleted())("IsMoveFrom", pStoppedEvent->IsMoveFrom())(
