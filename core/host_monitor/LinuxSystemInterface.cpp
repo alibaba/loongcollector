@@ -165,4 +165,46 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
     return true;
 }
 
+bool LinuxSystemInterface::GetMemoryInformationStringOnce(MemoryInformationString& memInfoStr) { 
+    auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
+    memInfoStr.meminfoString.clear();
+
+    std::ifstream file(static_cast<std::string>(memInfoStat));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open meminfo file", "fail")("file", memInfoStat));
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        memInfoStr.meminfoString.push_back(line);
+    }
+
+    file.close();
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetMTRRInformationStringOnce(MTRRInformationString& mtrrInfoStr) {
+    auto mtrrInfoStat = PROCESS_DIR / PROCESS_MTRR;
+    mtrrInfoStr.mtrrString.clear();
+
+    std::ifstream file(static_cast<std::string>(mtrrInfoStat));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open mtrr file", "fail")("file", mtrrInfoStat));
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        mtrrInfoStr.mtrrString.push_back(line);
+    }
+
+    file.close();
+
+    return true;
+}
+
 } // namespace logtail
