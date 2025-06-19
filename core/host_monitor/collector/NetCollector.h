@@ -33,8 +33,8 @@
 
 namespace logtail {
 
-extern const uint32_t kMinInterval;
-extern const uint32_t kDefaultInterval;
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
 
 // extern std::filesystem::path PROCESS_NET_SOCKSTAT;
 // extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
@@ -210,8 +210,8 @@ class NetCollector : public BaseCollector {
 public:
     NetCollector();
 
-    // int Init(int totalCount = kDefaultInterval / kMinInterval);
-    int Init(int totalCount = 15);
+    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+    // int Init(int totalCount = 15);
 
     ~NetCollector() override = default;
 
