@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-user-cm
+data:
+{{- range $filename, $filecontent := .Values.userConfig }}
+  {{ $filename }}: |-
+{{ $filecontent | indent 4 }}
+{{- end }}

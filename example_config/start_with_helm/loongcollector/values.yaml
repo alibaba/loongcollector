@@ -1,0 +1,137 @@
+# Default values for loongcollector.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+image:
+  repository: sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+# env variables
+env:
+  - name: LOGTAIL_LOG_LEVEL
+    value: "info"
+
+aliyunSlS:
+  accessKeyId: ""
+  accessKey: ""
+
+# user default configs
+userConfig:
+  ingress_stdout.yaml: |-
+    enable: false
+    inputs:
+      - Type: service_docker_stdout
+        Stderr: false
+        Stdout: true
+        IncludeK8sLabel:
+          app: ^(nginx-ingress|ingress-nginx)$
+          app.kubernetes.io/name: ^(nginx-ingress|ingress-nginx)$
+
+    processors:
+      - Type: processor_json
+        SourceKey: content
+        KeepSource: true
+        ExpandDepth: 1
+        ExpandConnector: ""
+
+    flushers:
+      - Type: flusher_stdout
+        OnlyStdout: true
+  containerd_stdout.yaml: |-
+    enable: false
+    inputs:
+      - Type: service_docker_stdout
+        Stdout: true
+        Stderr: false
+    flushers:
+      - Type: flusher_stdout
+        OnlyStdout: true
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+podLabels: {}
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
+
+resources:
+  limits:
+    cpu: 1
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+livenessProbe:
+  failureThreshold: 3
+  httpGet:
+    path: /liveness
+    port: 7953
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  successThreshold: 1
+  timeoutSeconds: 1
+readinessProbe:
+  failureThreshold: 3
+  httpGet:
+    path: /liveness
+    port: 7953
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  successThreshold: 1
+  timeoutSeconds: 1
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - hostPath:
+      path: /var/run
+      type: Directory
+    name: run
+  - hostPath:
+      path: /
+      type: Directory
+    name: root
+  - hostPath:
+      path: /etc/loongcollector-loongcollector-ds/checkpoint
+      type: DirectoryOrCreate
+    name: checkpoint
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - mountPath: /var/run # for container runtime socket
+    name: run
+  - mountPath: /logtail_host # for log access on the node
+    mountPropagation: HostToContainer
+    name: root
+    readOnly: true
+  - mountPath: /usr/local/loongcollector/data # for checkpoint between container restart
+    name: checkpoint
+
+
+tolerations:
+- operator: Exists
+
+# hostNetwork: true
+hostNetwork: true
