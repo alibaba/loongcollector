@@ -31,7 +31,8 @@ protected:
         sFlusher = make_unique<FlusherMock>();
         sCtx.SetConfigName("test_config");
         sFlusher->SetContext(sCtx);
-        sFlusher->SetMetricsRecordRef(FlusherMock::sName, "1");
+        sFlusher->CreateMetricsRecordRef(FlusherMock::sName, "1");
+        sFlusher->CommitMetricsRecordRef();
     }
 
     void TearDown() override { TimeoutFlushManager::GetInstance()->mTimeoutRecords.clear(); }
@@ -80,7 +81,8 @@ void TimeoutFlushManagerUnittest::TestFlushTimeoutBatch() {
 void TimeoutFlushManagerUnittest::TestUnregisterFlushers() {
     auto flusher = new FlusherMock();
     flusher->SetContext(sCtx);
-    flusher->SetMetricsRecordRef(FlusherMock::sName, "1");
+    flusher->CreateMetricsRecordRef(FlusherMock::sName, "1");
+    flusher->CommitMetricsRecordRef();
     auto instance = unique_ptr<FlusherInstance>(new FlusherInstance(flusher, PluginInstance::PluginMeta("1")));
     vector<unique_ptr<FlusherInstance>> flushers;
     flushers.push_back(std::move(instance));

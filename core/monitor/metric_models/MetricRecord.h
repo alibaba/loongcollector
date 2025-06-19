@@ -40,12 +40,15 @@ private:
     std::vector<IntGaugePtr> mIntGauges;
     std::vector<DoubleGaugePtr> mDoubleGauges;
 
+    std::atomic_bool mCommitted;
     std::atomic_bool mDeleted;
     MetricsRecord* mNext = nullptr;
 
 public:
     MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels = nullptr);
     MetricsRecord() = default;
+    void MarkCommitted();
+    bool IsCommitted() const;
     void MarkDeleted();
     bool IsDeleted() const;
     const std::string& GetCategory() const;

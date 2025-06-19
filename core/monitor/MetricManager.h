@@ -46,10 +46,11 @@ public:
         return ptr;
     }
 
-    void PrepareMetricsRecordRef(MetricsRecordRef& ref,
-                                 const std::string& category,
-                                 MetricLabels&& labels,
-                                 DynamicMetricLabels&& dynamicLabels = {});
+    // PrepareMetricsRecordRef is unsafe, use CreateMetricsRecordRef + CommitMetricsRecordRef instead
+    // void PrepareMetricsRecordRef(MetricsRecordRef& ref,
+    //                              const std::string& category,
+    //                              MetricLabels&& labels,
+    //                              DynamicMetricLabels&& dynamicLabels = {});
     void CreateMetricsRecordRef(MetricsRecordRef& ref,
                                 const std::string& category,
                                 MetricLabels&& labels,

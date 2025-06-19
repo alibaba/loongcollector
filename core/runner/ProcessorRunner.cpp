@@ -91,7 +91,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
     // thread local metrics should be initialized in each thread
     sThreadNo = threadNo;
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         sMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR},
@@ -100,6 +100,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
     sInEventsCnt = sMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_EVENTS_TOTAL);
     sInGroupDataSizeBytes = sMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_SIZE_BYTES);
     sLastRunTime = sMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(sMetricsRecordRef);
 
     static int32_t lastFlushBatchTime = 0;
     while (true) {

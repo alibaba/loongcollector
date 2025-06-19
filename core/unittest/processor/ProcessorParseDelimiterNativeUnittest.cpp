@@ -251,8 +251,9 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
 
             // run function ProcessorParseDelimiterNative
@@ -371,8 +372,9 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -519,8 +521,9 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -643,8 +646,9 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -764,8 +768,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -883,8 +888,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -1007,8 +1013,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -1135,8 +1142,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+            processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+            processorMergeMultilineLogNative.CommitMetricsRecordRef();
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -1261,8 +1269,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+            processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+            processorMergeMultilineLogNative.CommitMetricsRecordRef();
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -1392,8 +1401,9 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+            processorMergeMultilineLogNative.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
+            processorMergeMultilineLogNative.CommitMetricsRecordRef();
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
             ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
@@ -1690,8 +1700,9 @@ HTTP/2.0' '200' '154' 'go-sdk'"
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+            processor.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.CommitMetricsRecordRef();
             processor.Process(eventGroup);
 
             // run function ProcessorParseDelimiterNative

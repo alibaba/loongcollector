@@ -85,8 +85,9 @@ void ProcessorParseRegexNativeUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorParseRegexNative());
     processor->SetContext(ctx);
-    processor->SetMetricsRecordRef(ProcessorParseRegexNative::sName, "1");
+    processor->CreateMetricsRecordRef(ProcessorParseRegexNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
+    processor->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(2, processor->mKeys.size());
     APSARA_TEST_EQUAL("k1", processor->mKeys[0]);
     APSARA_TEST_EQUAL("k2", processor->mKeys[1]);
