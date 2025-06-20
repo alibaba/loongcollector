@@ -11,6 +11,10 @@
 # Dev Container
 .devcontainer/
 
+### visual studio
+.vs/
+core/out/*
+
 ### GoLand
 **/.idea/**
 

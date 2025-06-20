@@ -90,10 +90,7 @@ public:
 
     const std::string& GetSource() const { return mSource; }
 
-    const std::string& GetObject() const { return mObject; }
-
-    // GetObject_ is the same as GetObject, but used to avoid compilation failure on Windows.
-    const std::string& GetObject_() const { return mObject; }
+    const std::string& GetEventObject() const { return mObject; }
 
     EventType GetType() const { return mType; }
 

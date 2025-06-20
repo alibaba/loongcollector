@@ -19,17 +19,17 @@
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
-DECLARE_FLAG_INT32(ebpf_receive_event_chan_cap);
-DECLARE_FLAG_BOOL(ebpf_admin_config_debug_mode);
-DECLARE_FLAG_STRING(ebpf_admin_config_log_level);
-DECLARE_FLAG_BOOL(ebpf_admin_config_push_all_span);
-DECLARE_FLAG_INT32(ebpf_aggregation_config_agg_window_second);
-DECLARE_FLAG_STRING(ebpf_converage_config_strategy);
-DECLARE_FLAG_STRING(ebpf_sample_config_strategy);
-DECLARE_FLAG_DOUBLE(ebpf_sample_config_config_rate);
 DECLARE_FLAG_BOOL(logtail_mode);
 DECLARE_FLAG_STRING(host_path_blacklist);
 DECLARE_FLAG_DOUBLE(default_machine_cpu_usage_threshold);
+DEFINE_FLAG_INT32(test_receive_event_chan_cap, "test receive kernel event queue size", 4096);
+DEFINE_FLAG_BOOL(test_admin_config_debug_mode, "test admin config debug mode", false);
+DEFINE_FLAG_STRING(test_admin_config_log_level, "test admin config log level", "warn");
+DEFINE_FLAG_BOOL(test_admin_config_push_all_span, "if admin config push all span", false);
+DEFINE_FLAG_INT32(test_aggregation_config_agg_window_second, "test data aggregation window time", 15);
+DEFINE_FLAG_STRING(test_converage_config_strategy, "test converage strategy", "combine");
+DEFINE_FLAG_STRING(test_sample_config_strategy, "test sample strategy", "fixedRate");
+DEFINE_FLAG_DOUBLE(test_sample_config_config_rate, "test sample rate", 0.01);
 
 namespace logtail {
 
@@ -93,7 +93,7 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     // test multi-layer json, include bool, string, int, double
     configStr = R"(
         {
-            "ebpf": {
+            "test": {
                 "receive_event_chan_cap": 1024,
                 "admin_config": {
                     "debug_mode": true,
@@ -119,25 +119,25 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     value["logtail_sys_conf_dir"] = GetProcessExecutionDir();
     writeLogtailConfigJSON(value);
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
-    APSARA_TEST_EQUAL(INT32_FLAG(ebpf_receive_event_chan_cap), 1024);
-    APSARA_TEST_EQUAL(BOOL_FLAG(ebpf_admin_config_debug_mode), true);
-    APSARA_TEST_EQUAL(STRING_FLAG(ebpf_admin_config_log_level), "error");
-    APSARA_TEST_EQUAL(BOOL_FLAG(ebpf_admin_config_push_all_span), true);
-    APSARA_TEST_EQUAL(INT32_FLAG(ebpf_aggregation_config_agg_window_second), 8);
-    APSARA_TEST_EQUAL(STRING_FLAG(ebpf_converage_config_strategy), "combine1");
-    APSARA_TEST_EQUAL(STRING_FLAG(ebpf_sample_config_strategy), "fixedRate1");
-    APSARA_TEST_EQUAL(DOUBLE_FLAG(ebpf_sample_config_config_rate), 0.001);
+    APSARA_TEST_EQUAL(INT32_FLAG(test_receive_event_chan_cap), 1024);
+    APSARA_TEST_EQUAL(BOOL_FLAG(test_admin_config_debug_mode), true);
+    APSARA_TEST_EQUAL(STRING_FLAG(test_admin_config_log_level), "error");
+    APSARA_TEST_EQUAL(BOOL_FLAG(test_admin_config_push_all_span), true);
+    APSARA_TEST_EQUAL(INT32_FLAG(test_aggregation_config_agg_window_second), 8);
+    APSARA_TEST_EQUAL(STRING_FLAG(test_converage_config_strategy), "combine1");
+    APSARA_TEST_EQUAL(STRING_FLAG(test_sample_config_strategy), "fixedRate1");
+    APSARA_TEST_EQUAL(DOUBLE_FLAG(test_sample_config_config_rate), 0.001);
 
     // test json with array
     configStr = R"(
         {
-            "ebpf": {
+            "test": {
                 "receive_event_chan_cap": [1,2,3],
                 "admin_config": {
                     "debug_mode": true,
                     "log_level": "error",
                     "push_all_span": true
-                },
+                }
             }
         }
     )";
@@ -145,18 +145,18 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     value["logtail_sys_conf_dir"] = GetProcessExecutionDir();
     writeLogtailConfigJSON(value);
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
-    auto old_ebpf_receive_event_chan_cap = INT32_FLAG(ebpf_receive_event_chan_cap);
+    auto old_test_receive_event_chan_cap = INT32_FLAG(test_receive_event_chan_cap);
     // array is not supported, so the value should not be changed
-    APSARA_TEST_EQUAL(INT32_FLAG(ebpf_receive_event_chan_cap), old_ebpf_receive_event_chan_cap);
+    APSARA_TEST_EQUAL(INT32_FLAG(test_receive_event_chan_cap), old_test_receive_event_chan_cap);
     // other values should be changed
-    APSARA_TEST_EQUAL(BOOL_FLAG(ebpf_admin_config_debug_mode), true);
-    APSARA_TEST_EQUAL(STRING_FLAG(ebpf_admin_config_log_level), "error");
-    APSARA_TEST_EQUAL(BOOL_FLAG(ebpf_admin_config_push_all_span), true);
+    APSARA_TEST_EQUAL(BOOL_FLAG(test_admin_config_debug_mode), true);
+    APSARA_TEST_EQUAL(STRING_FLAG(test_admin_config_log_level), "error");
+    APSARA_TEST_EQUAL(BOOL_FLAG(test_admin_config_push_all_span), true);
 
     // test null object in json
     configStr = R"(
         {
-            "ebpf": {
+            "test": {
                 "admin_config": {},
                 "receive_event_chan_cap": 55
             }
@@ -167,10 +167,10 @@ void AppConfigUnittest::TestRecurseParseJsonToFlags() {
     writeLogtailConfigJSON(value);
     app_config->LoadAppConfig(STRING_FLAG(ilogtail_config));
     // admin_config is null, so the value should not be changed
-    auto old_ebpf_admin_config_debug_mode = BOOL_FLAG(ebpf_admin_config_debug_mode);
-    APSARA_TEST_EQUAL(BOOL_FLAG(ebpf_admin_config_debug_mode), old_ebpf_admin_config_debug_mode);
+    auto old_test_admin_config_debug_mode = BOOL_FLAG(test_admin_config_debug_mode);
+    APSARA_TEST_EQUAL(BOOL_FLAG(test_admin_config_debug_mode), old_test_admin_config_debug_mode);
     // other values should be changed
-    APSARA_TEST_EQUAL(INT32_FLAG(ebpf_receive_event_chan_cap), 55);
+    APSARA_TEST_EQUAL(INT32_FLAG(test_receive_event_chan_cap), 55);
 }
 
 void AppConfigUnittest::TestParseEnvToFlags() {

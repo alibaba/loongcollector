@@ -30,7 +30,14 @@ namespace logtail {
 
 class ProcessorParseTimestampNativeUnittest : public ::testing::Test {
 public:
-    void SetUp() override { mContext.SetConfigName("project##config_0"); }
+    void SetUp() override {
+#ifdef _MSC_VER
+        _putenv_s("TZ", "UTC");
+#else
+        setenv("TZ", "UTC", 1);
+#endif
+        mContext.SetConfigName("project##config_0");
+    }
 
     void TestInit();
     void TestProcessNoFormat();
@@ -70,6 +77,7 @@ bool CheckTimeFormatV2(const std::string& timeValue, const std::string& timeForm
     return true;
 }
 
+#if defined(__linux__)
 bool CheckTimeFormatV1(const std::string& timeValue, const std::string& timeFormat) {
     struct tm tm;
 
@@ -79,218 +87,213 @@ bool CheckTimeFormatV1(const std::string& timeValue, const std::string& timeForm
         return true;
     }
 }
+#endif
+
+void CheckTimeFormat(const std::string& timeValue,
+                     const std::string& timeFormat,
+                     const bool v1success,
+                     const bool v2success) {
+#if defined(__linux__)
+    APSARA_TEST_EQUAL_FATAL(v1success, CheckTimeFormatV1(timeValue, timeFormat));
+#endif
+    APSARA_TEST_EQUAL_FATAL(v2success, CheckTimeFormatV2(timeValue, timeFormat));
+}
 
 void ProcessorParseTimestampNativeUnittest::TestCheckTime() {
     std::string timeValue;
     std::string timeFormat;
+
     timeValue = "Fri";
     timeFormat = "%a";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "Friday";
     timeFormat = "%A";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "Jan";
     timeFormat = "%b";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "January";
     timeFormat = "%B";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "19";
     timeFormat = "%d";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "Jan";
     timeFormat = "%h";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "22";
     timeFormat = "%H";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "01";
     timeFormat = "%I";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "08";
     timeFormat = "%m";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "01";
     timeFormat = "%M";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "\n";
     timeFormat = "%n";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "AM";
     timeFormat = "%p";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "11:59:59 AM";
     timeFormat = "%r";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "23:59";
     timeFormat = "%R";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "59";
     timeFormat = "%S";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = " ";
     timeFormat = "%t";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "98";
     timeFormat = "%y";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "2004";
     timeFormat = "%Y";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "20";
     timeFormat = "%C";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "31";
     timeFormat = "%e";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "365";
     timeFormat = "%j";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "2";
     timeFormat = "%u";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "53";
     timeFormat = "%U";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "24";
     timeFormat = "%V";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "5";
     timeFormat = "%w";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "23";
     timeFormat = "%W";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeValue = "Tue Nov 20 14:12:58 2020";
     timeFormat = "%c";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeFormat = "%x";
     timeValue = "10/26/23";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeFormat = "%X";
     timeValue = "14:12:58";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeFormat = "%s";
     timeValue = "1605853978";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%f";
     timeValue = "123456789";
-    APSARA_TEST_TRUE_FATAL(!CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, false, true);
 
     timeFormat = "%Y-%m-%d %H:%M:%S.%f";
     timeValue = "2021-11-25 14:16:46.123456789";
-    APSARA_TEST_TRUE_FATAL(!CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, false, true);
 
     timeFormat = "%Y-%m-%d %H:%M:%S";
     timeValue = "2020-11-20 14:12:58";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "[%Y-%m-%d %H:%M:%S";
     timeValue = "[2017-12-11 15:05:07.012]";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%d %b %y %H:%M";
     timeValue = "02 Jan 06 15:04 MST";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%d %b %y %H:%M";
     timeValue = "02 Jan 06 15:04 -0700";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%A, %d-%b-%y %H:%M:%S";
     timeValue = "Monday, 02-Jan-06 15:04:05 MST";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%A, %d %b %Y %H:%M:%S";
     timeValue = "Mon, 02 Jan 2006 15:04:05 MST";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%Y-%m-%dT%H:%M:%S";
     timeValue = "2006-01-02T15:04:05Z07:00";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%Y-%m-%dT%H:%M:%S";
     timeValue = "2006-01-02T15:04:05.999999999Z07:00";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%s";
     timeValue = "1637843406";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%s";
     timeValue = "1637843406123";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%D";
     timeValue = "11/20/20";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeFormat = "%F";
     timeValue = "2020-11-20";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
+
     timeFormat = "%T";
     timeValue = "14:12:58";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%z";
     timeValue = "+0800";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%Z";
     timeValue = "CST";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 
     timeFormat = "%%";
     timeValue = "%";
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
-    APSARA_TEST_TRUE_FATAL(CheckTimeFormatV2(timeValue, timeFormat));
+    CheckTimeFormat(timeValue, timeFormat, true, true);
 }
 
 void ProcessorParseTimestampNativeUnittest::TestInit() {
@@ -666,7 +669,7 @@ public:
 
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTime);
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTimeSecondCache);
-// UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestAdjustTimeZone);
+UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestAdjustTimeZone);
 
 void ProcessorParseLogTimeUnittest::TestParseLogTime() {
     struct Case {
@@ -755,7 +758,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
 
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -786,7 +789,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -815,7 +818,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -846,7 +849,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -877,7 +880,7 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         }
         StringView timeStrCache = "15:04:59.0 2012-01-01";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -928,7 +931,7 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
@@ -960,7 +963,7 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
-            auto c = inputTimes[i];
+            auto& c = inputTimes[i];
             bool ret
                 = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);

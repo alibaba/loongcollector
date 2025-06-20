@@ -291,7 +291,12 @@ static int32_t parseLogType(char* buffer, int32_t idx, int32_t size, DockerLogTy
     return idx;
 }
 
+// windows can't instantiation with char32_t.
+#if defined(_MSC_VER)
+std::wstring_convert<std::codecvt_utf8<unsigned long>, unsigned long> convert;
+#else
 std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
+#endif
 
 static int32_t parseValue(char* buffer, int32_t idx, int32_t size, DockerLogType logType, int32_t& endIndex) {
     while (idx < size && buffer[idx] != '\"') {
@@ -332,7 +337,7 @@ static int32_t parseValue(char* buffer, int32_t idx, int32_t size, DockerLogType
                     if (idx + 4 < size && buffer[idx] == 'u') {
                         std::string unicode_seq;
                         unicode_seq.append(buffer + idx + 1, 4);
-                        char32_t unicode_char = std::stoul(unicode_seq, nullptr, 16);
+                        unsigned long unicode_char = std::stoul(unicode_seq, nullptr, 16);
                         std::string res = convert.to_bytes(unicode_char);
                         for (size_t i = 0; i < res.size(); ++i) {
                             buffer[endIndex++] = res[i];

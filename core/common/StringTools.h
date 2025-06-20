@@ -16,19 +16,23 @@
 
 #pragma once
 
-#include <algorithm>
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#include "boost/lexical_cast.hpp"
 #pragma GCC diagnostic pop
+#endif
+
 #include <charconv>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
+#include "boost/lexical_cast.hpp"
 #include "boost/regex.hpp"
 
 #include "common/StringView.h"
+
 
 namespace logtail {
 

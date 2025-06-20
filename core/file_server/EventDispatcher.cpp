@@ -399,7 +399,7 @@ void EventDispatcher::AddExistedFileEvents(const string& path, int wd) {
     for (size_t i = 0; i < eventVec.size(); ++i) {
         LOG_INFO(sLogger,
                  ("generate MODIFY event for the recently updated existing file",
-                  PathJoin(eventVec[i]->GetSource(), eventVec[i]->GetObject())));
+                  PathJoin(eventVec[i]->GetSource(), eventVec[i]->GetEventObject())));
     }
     if (eventVec.size() > 0)
         LogInput::GetInstance()->PushEventQueue(eventVec);
@@ -697,7 +697,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
 
     for (size_t i = 0; i < eventVec.size(); ++i) {
         LOG_DEBUG(sLogger,
-                  ("event from checkpoint", i)("file", eventVec[i]->GetObject())("inode", eventVec[i]->GetInode())(
+                  ("event from checkpoint", i)("file", eventVec[i]->GetEventObject())("inode", eventVec[i]->GetInode())(
                       "config", eventVec[i]->GetConfigName()));
     }
     if (eventVec.size() > 0) {

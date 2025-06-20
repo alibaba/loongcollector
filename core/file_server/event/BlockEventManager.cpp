@@ -91,7 +91,7 @@ void BlockedEventManager::UpdateBlockEvent(
         string key;
         key.append(pEvent->GetSource())
             .append(">")
-            .append(pEvent->GetObject())
+            .append(pEvent->GetEventObject())
             .append(">")
             .append(ToString(pEvent->GetDev()))
             .append(">")
@@ -101,7 +101,7 @@ void BlockedEventManager::UpdateBlockEvent(
         hashKey = HashSignatureString(key.c_str(), key.size());
     }
     LOG_DEBUG(sLogger,
-              ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
+              ("Add block event ", pEvent->GetSource())(pEvent->GetEventObject(),
                                                         pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
     mEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }

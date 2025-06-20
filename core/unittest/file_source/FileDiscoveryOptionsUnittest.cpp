@@ -18,6 +18,7 @@
 
 #include "json/json.h"
 
+#include "FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
@@ -123,7 +124,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     configStr = R"(
         {
             "FilePaths": [],
-            "ExcludeFilePaths": [],
+            "ExcludeFilePaths": []
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -144,7 +145,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     configStr = R"(
         {
             "FilePaths": [],
-            "ExcludeFiles": [],
+            "ExcludeFiles": []
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -166,7 +167,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     configStr = R"(
         {
             "FilePaths": [],
-            "ExcludeDirs": [],
+            "ExcludeDirs": []
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -188,7 +189,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     configStr = R"(
         {
             "FilePaths": [],
-            "AllowingCollectingFilesInRootDir": true,
+            "AllowingCollectingFilesInRootDir": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -229,7 +230,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    configJson["FilePaths"].append(Json::Value(filePath.string() + filesystem::path::preferred_separator));
+    configJson["FilePaths"].append(Json::Value(filePath.string() + PATH_SEPARATOR));
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 }

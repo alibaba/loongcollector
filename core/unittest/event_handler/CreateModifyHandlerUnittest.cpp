@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -29,6 +30,7 @@
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -62,7 +64,7 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
@@ -70,7 +72,7 @@ protected:
     void SetUp() override {
         bfs::create_directories(gRootDir);
         // create a file for reader
-        std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
+        std::string logPath = UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName);
         writeLog(logPath, "a sample log\n");
 
         // init pipeline and config
@@ -152,7 +154,7 @@ protected:
         discoveryOpts.SetContainerInfo(containerInfo);
     }
 
-    void TearDown() override { bfs::remove_all(gRootDir); }
+    void TearDown() override { filesystem::remove_all(gRootDir); }
 
     static std::string gRootDir;
     static std::string gLogName;
@@ -171,7 +173,7 @@ private:
     CreateHandler mCreateHandler;
 
     void writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app | ios_base::binary);
         writer << logContent;
         writer.close();
     }

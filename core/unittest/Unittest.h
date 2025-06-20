@@ -208,7 +208,7 @@ public:
 
 #define UNIT_TEST_MAIN \
     int main(int argc, char** argv) { \
-        logtail::Logger::Instance().InitGlobalLoggers(); \
+        InitUnittestMain(); \
         ::testing::InitGoogleTest(&argc, argv); \
         ::testing::AddGlobalTestEnvironment(new GlobalEnvironment); \
         return RUN_ALL_TESTS(); \

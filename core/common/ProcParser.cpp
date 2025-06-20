@@ -158,6 +158,11 @@ std::string GenerateExecId(const std::string& hostname, uint32_t pid, uint64_t k
     return Base64Encode(execid);
 }
 
+long GetTicksPerSecond() {
+    static long sTicksPerSecond = sysconf(_SC_CLK_TCK);
+    return sTicksPerSecond;
+}
+
 std::filesystem::path ProcParser::procPidPath(uint32_t pid, const std::string& subpath) const {
     return mProcPath / std::to_string(pid) / subpath;
 }

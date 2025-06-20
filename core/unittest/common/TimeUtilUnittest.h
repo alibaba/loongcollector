@@ -88,6 +88,8 @@ void TimeUtilUnittest::TestDeduceYear() {
 }
 
 void TimeUtilUnittest::TestStrptime() {
+#ifdef __linux__
+    // Only linux supports native strptime.
     struct Case {
         std::string buf;
         std::string format;
@@ -121,9 +123,12 @@ void TimeUtilUnittest::TestStrptime() {
         o1.tm_year = c.expectedYear - 1900;
         EXPECT_EQ(mktime(&o1), o2.tv_sec) << "FAILED: " + c.buf;
     }
+#endif
 }
 
 void TimeUtilUnittest::TestNativeStrptimeFormat() {
+#ifdef __linux__
+    // Only linux supports native strptime.
     // Only test timestamp converting now (UTF+8 is assumed).
     // TODO: Add more common cases in future.
 
@@ -138,9 +143,12 @@ void TimeUtilUnittest::TestNativeStrptimeFormat() {
     EXPECT_EQ(0, result.tm_hour - result.tm_gmtoff / 3600);
     EXPECT_EQ(19, result.tm_min);
     EXPECT_EQ(59, result.tm_sec);
+#endif
 }
 
 void TimeUtilUnittest::TestStrptimeNanosecond() {
+#ifdef __linux__
+    // Only linux supports native strptime.
     struct Case {
         std::string buf1;
         std::string format1;
@@ -201,6 +209,7 @@ void TimeUtilUnittest::TestStrptimeNanosecond() {
         EXPECT_EQ(mktime(&o1), mktime(&o2)) << "FAILED: " + c.buf1;
         EXPECT_EQ(nanosecond, c.expectedNanosecond) << "FAILED: " + c.buf1;
     }
+#endif
 }
 
 void TimeUtilUnittest::TestGetPreciseTimestampFromLogtailTime() {

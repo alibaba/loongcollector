@@ -21,7 +21,15 @@ file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/input/*.c ${CMAKE_SOURCE_
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 
 if(MSVC)
-# TODO: remote ebpf related source files
+    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputNetworkSecurity.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputNetworkObserver.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputFileSecurity.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputProcessSecurity.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMeta.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMonitor.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputPrometheus.cpp
+        )
 elseif(UNIX)
 endif()
 

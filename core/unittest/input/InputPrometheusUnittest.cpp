@@ -102,7 +102,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ],
                 "max_scrape_size": "10MiB",
@@ -136,7 +136,7 @@ void InputPrometheusUnittest::OnFailedInit() {
     // only mandatory param
     configStr = R"(
         {
-            "Type": "input_prometheus",
+            "Type": "input_prometheus"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -157,7 +157,7 @@ void InputPrometheusUnittest::OnFailedInit() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }
@@ -188,7 +188,7 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }
@@ -232,7 +232,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }

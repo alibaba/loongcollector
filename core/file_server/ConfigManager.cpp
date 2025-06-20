@@ -1023,7 +1023,7 @@ void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
         LOG_DEBUG(
             sLogger,
             ("GetContainerStoppedEvent Type", pStoppedEvent->GetType())("Source", pStoppedEvent->GetSource())(
-                "Object", pStoppedEvent->GetObject())("Config", pStoppedEvent->GetConfigName())(
+                "Object", pStoppedEvent->GetEventObject())("Config", pStoppedEvent->GetConfigName())(
                 "IsDir", pStoppedEvent->IsDir())("IsCreate", pStoppedEvent->IsCreate())("IsModify",
                                                                                         pStoppedEvent->IsModify())(
                 "IsDeleted", pStoppedEvent->IsDeleted())("IsMoveFrom", pStoppedEvent->IsMoveFrom())(
@@ -1099,7 +1099,7 @@ void ConfigManager::LoadDockerConfig() {
         // cmd 解析json
         Json::Value jsonParams;
         std::string errorMsg;
-        if (params.size() < 5UL || !ParseJsonTable(params, jsonParams, errorMsg)) {
+        if (params.size() < (size_t)5 || !ParseJsonTable(params, jsonParams, errorMsg)) {
             LOG_ERROR(sLogger, ("invalid docker container params", params)("errorMsg", errorMsg));
             continue;
         }
