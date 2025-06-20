@@ -410,7 +410,7 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
 }
 
 int DiskCollector::GetFileSystemStat(const std::string& dirName, SicFileSystemUsage& fileSystemUsage) {
-    struct statvfs buffer{};
+    struct statvfs buffer {};
     int status = statvfs(dirName.c_str(), &buffer);
     if (status != 0) {
         return status;
@@ -640,7 +640,7 @@ int DiskCollector::SicGetIOstat(std::string& dirName,
         return SIC_EXECUTABLE_FAILED;
     }
 
-    struct stat ioStat{};
+    struct stat ioStat {};
     // 此处使用设备名，以获取 更多stat信息，如st_rdev(驱动号、设备号)
     // 其实主要目的就是为了获取st_rdev
     if (stat(ioDev->name.c_str(), &ioStat) < 0) {
@@ -664,7 +664,7 @@ std::shared_ptr<SicIODev> DiskCollector::SicGetIODev(std::string& dirName) {
         dirName = "/dev/" + dirName;
     }
 
-    struct stat ioStat{};
+    struct stat ioStat {};
     if (stat(dirName.c_str(), &ioStat) < 0) {
         // SicPtr()->errorMessage = (sout{} << "stat(" << dirName << ") error: " << strerror(errno)).str();
         return std::shared_ptr<SicIODev>{};
@@ -702,7 +702,7 @@ void DiskCollector::RefreshLocalDisk() {
     if (GetFileSystemListInformation(fileSystemList)) {
         for (auto const& fileSystem : fileSystemList) {
             if (fileSystem.type == SIC_FILE_SYSTEM_TYPE_LOCAL_DISK && IsDev(fileSystem.devName)) {
-                struct stat ioStat{};
+                struct stat ioStat {};
                 if (stat(fileSystem.dirName.c_str(), &ioStat) < 0) {
                     continue;
                 }

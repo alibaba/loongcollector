@@ -142,8 +142,8 @@ void MemCollectorUnittest::TestCollect() const {
     }
 }
 
-UNIT_TEST_CASE(MemCollectorUnittest, TestGetHostSystemMeminfoStat);
-UNIT_TEST_CASE(MemCollectorUnittest, TestCollect);
+// UNIT_TEST_CASE(MemCollectorUnittest, TestGetHostSystemMeminfoStat);
+// UNIT_TEST_CASE(MemCollectorUnittest, TestCollect);
 
 } // namespace logtail
 

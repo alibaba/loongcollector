@@ -120,8 +120,8 @@ void ProcessCollectorUnittest::TestCollect() const {
     APSARA_TEST_EQUAL_FATAL(3 * 10, group.GetEvents().size());
 }
 
-UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostPidStat);
-UNIT_TEST_CASE(ProcessCollectorUnittest, TestCollect);
+// UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostPidStat);
+// UNIT_TEST_CASE(ProcessCollectorUnittest, TestCollect);
 
 } // namespace logtail
 

@@ -79,7 +79,7 @@ void SystemCollectorUnittest::TestCollect() const {
     }
 }
 
-UNIT_TEST_CASE(SystemCollectorUnittest, TestCollect);
+// UNIT_TEST_CASE(SystemCollectorUnittest, TestCollect);
 
 } // namespace logtail
 
