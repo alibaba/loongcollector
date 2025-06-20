@@ -26,16 +26,16 @@
 #include <memory>
 #include <mutex>
 
-#include "Flags.h"
+#include "common/Flags.h"
+#include "forward/loongsuite/LoongSuiteForwardService.h"
 #include "logger/Logger.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/forward/MockServiceImpl.h"
+#endif
 
 DEFINE_FLAG_INT32(grpc_server_stop_timeout, "grpc server stop timeout, second", 3);
 
 namespace logtail {
-
-template bool GrpcInputRunner::UpdateListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
-                                                                               const std::string&,
-                                                                               const Json::Value&);
 
 void GrpcInputRunner::Init() {
     if (mIsStarted.exchange(true)) {
@@ -47,6 +47,15 @@ void GrpcInputRunner::Init() {
 void GrpcInputRunner::Stop() {
     if (!mIsStarted.exchange(false)) {
         return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mListenInputsMutex);
+        for (auto& it : mListenInputs) {
+            if (it.second.mServer) {
+                ShutdownGrpcServer(it.second.mServer.get(), &it.second.mInFlightCnt);
+            }
+        }
+        mListenInputs.clear();
     }
     LOG_INFO(sLogger, ("GrpcInputRunner", "Stop"));
 }
@@ -165,5 +174,15 @@ bool GrpcInputRunner::ShutdownGrpcServer(grpc::Server* server, std::atomic_int* 
     return false;
 }
 
+template bool GrpcInputRunner::UpdateListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
+                                                                               const std::string&,
+                                                                               const Json::Value&);
+template bool GrpcInputRunner::RemoveListenInput<LoongSuiteForwardServiceImpl>(const std::string&, const std::string&);
+
+#ifdef APSARA_UNIT_TEST_MAIN
+template bool
+GrpcInputRunner::UpdateListenInput<MockServiceImpl>(const std::string&, const std::string&, const Json::Value&);
+template bool GrpcInputRunner::RemoveListenInput<MockServiceImpl>(const std::string&, const std::string&);
+#endif
 
 } // namespace logtail

@@ -24,7 +24,7 @@
 
 #include "json/value.h"
 
-#include "forward/loongsuite/LoongSuiteForwardService.h"
+#include "forward/BaseService.h"
 #include "grpcpp/server.h"
 #include "grpcpp/support/interceptor.h"
 #include "grpcpp/support/server_interceptor.h"
@@ -117,6 +117,10 @@ private:
     std::unordered_map<std::string, GrpcListenInput> mListenInputs;
 
     std::atomic_bool mIsStarted = false;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class GrpcRunnerUnittest;
+#endif
 };
 
 } // namespace logtail
