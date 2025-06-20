@@ -65,16 +65,16 @@ struct DeviceMetric {
     // Define the field descriptors
     static inline const FieldName<DeviceMetric> DeviceMetricFields[] = {
         FIELD_ENTRY(DeviceMetric, total),
-	FIELD_ENTRY(DeviceMetric, free),
-	FIELD_ENTRY(DeviceMetric, used),
-	FIELD_ENTRY(DeviceMetric, usePercent),
-	FIELD_ENTRY(DeviceMetric, avail),
-	FIELD_ENTRY(DeviceMetric, reads),
-	FIELD_ENTRY(DeviceMetric, writes),
-	FIELD_ENTRY(DeviceMetric, writeBytes),
-	FIELD_ENTRY(DeviceMetric, readBytes),
-	FIELD_ENTRY(DeviceMetric, inodePercent),
-	FIELD_ENTRY(DeviceMetric, avgqu_sz),
+        FIELD_ENTRY(DeviceMetric, free),
+        FIELD_ENTRY(DeviceMetric, used),
+        FIELD_ENTRY(DeviceMetric, usePercent),
+        FIELD_ENTRY(DeviceMetric, avail),
+        FIELD_ENTRY(DeviceMetric, reads),
+        FIELD_ENTRY(DeviceMetric, writes),
+        FIELD_ENTRY(DeviceMetric, writeBytes),
+        FIELD_ENTRY(DeviceMetric, readBytes),
+        FIELD_ENTRY(DeviceMetric, inodePercent),
+        FIELD_ENTRY(DeviceMetric, avgqu_sz),
     };
 
     // Define the enumerate function for your metric type
@@ -83,7 +83,6 @@ struct DeviceMetric {
             callback(field);
         }
     }
-
 };
 
 struct DiskMetric {
@@ -238,7 +237,7 @@ private:
     std::shared_ptr<SicIODev> SicGetIODev(std::string& dirName);
     void RefreshLocalDisk();
     void CalcDiskMetric(const DiskStat& current, const DiskStat& last, double interval, DiskMetric& diskMetric);
-    void SicGetDiskSerialId(const std::string &devName, std::string &serialId);
+    void SicGetDiskSerialId(const std::string& devName, std::string& serialId);
 
 private:
     std::map<std::string, DeviceMountInfo> mDeviceMountMap;
@@ -253,11 +252,11 @@ private:
     size_t maxDirSize = 0;
     std::chrono::steady_clock::time_point mLastTime; // 上次获取磁盘信息的时间
     std::unordered_map<uint64_t, std::shared_ptr<SicIODev>> fileSystemCache;
-    //const char* const  PROCESS_DIR = "/proc/";
+    // const char* const  PROCESS_DIR = "/proc/";
     const char* const PROCESS_DISKSTATS = "/proc/diskstats";
     const char* const PROCESS_UPTIME = "/proc/uptime";
     std::map<std::string, MetricCalculate<DeviceMetric>> mDeviceCalMap;
-    //MetricCalculate<DeviceMetric> mCalculate;
+    // MetricCalculate<DeviceMetric> mCalculate;
 };
 
 } // namespace logtail

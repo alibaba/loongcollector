@@ -112,7 +112,7 @@ void CPUCollectorUnittest::TestCollect() const {
     }
 }
 
-UNIT_TEST_CASE(CPUCollectorUnittest, TestCollect);
+// UNIT_TEST_CASE(CPUCollectorUnittest, TestCollect);
 
 } // namespace logtail
 

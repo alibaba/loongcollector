@@ -19,19 +19,20 @@
 #include <mntent.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+
 #include <string>
 
-//#include <boost/lexical_cast.hpp>
+// #include <boost/lexical_cast.hpp>
 #include "boost/algorithm/string.hpp"
 #include "boost/algorithm/string/split.hpp"
 
-#include "monitor/Monitor.h"
 #include "MetricValue.h"
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInformationTools.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 
 namespace logtail {
 
@@ -93,12 +94,12 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         LOG_WARNING(sLogger, ("collect disk error", "skip")("time", ""));
         return false;
     }
-    //std::cout << "mLastTime: "
-    //          << std::chrono::duration_cast<std::chrono::milliseconds>(mLastTime.time_since_epoch()).count()
-    //          << std::endl;
-    //std::cout << "currentTime: "
-    //          << std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch()).count()
-    //          << std::endl;
+    // std::cout << "mLastTime: "
+    //           << std::chrono::duration_cast<std::chrono::milliseconds>(mLastTime.time_since_epoch()).count()
+    //           << std::endl;
+    // std::cout << "currentTime: "
+    //           << std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch()).count()
+    //           << std::endl;
     mCurrentDiskCollectStatMap = diskCollectStatMap;
     if (IsZero(mLastTime)) {
         LOG_WARNING(sLogger, ("collect disk first time", "skip")("time", ""));
@@ -115,47 +116,47 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
     mLastTime = currentTime;
     mCount++;
 
-    //DeviceMetric deviceMetric{};
+    // DeviceMetric deviceMetric{};
 
     for (auto& it : mCurrentDiskCollectStatMap) {
         const std::string& devName = it.first;
-	DeviceMetric deviceMetric{};
+        DeviceMetric deviceMetric{};
         if (mLastDiskCollectStatMap.find(devName) != mLastDiskCollectStatMap.end()) {
             const DiskCollectStat& currentStat = mCurrentDiskCollectStatMap[devName];
             const DiskCollectStat& lastStat = mLastDiskCollectStatMap[devName];
             DiskMetric diskMetric;
-            //std::cout << "\ndevName:" << std::string(devName) << std::endl;
-            //std::cout << "total:" << it.second.space.total / 1024 / 1024 << std::endl;
-            //std::cout << "free:" << it.second.space.free / 1024 / 1024 << std::endl;
-            //std::cout << "used:" << it.second.space.used / 1024 / 1024 << std::endl;
-            //std::cout << "usePercent:" << it.second.space.usePercent << std::endl;
-            //std::cout << "spaceAvail:" << it.second.spaceAvail / 1024 / 1024 << std::endl;
+            // std::cout << "\ndevName:" << std::string(devName) << std::endl;
+            // std::cout << "total:" << it.second.space.total / 1024 / 1024 << std::endl;
+            // std::cout << "free:" << it.second.space.free / 1024 / 1024 << std::endl;
+            // std::cout << "used:" << it.second.space.used / 1024 / 1024 << std::endl;
+            // std::cout << "usePercent:" << it.second.space.usePercent << std::endl;
+            // std::cout << "spaceAvail:" << it.second.spaceAvail / 1024 / 1024 << std::endl;
             CalcDiskMetric(currentStat.diskStat, lastStat.diskStat, interval.count(), diskMetric);
-            //std::cout << "reads:" << diskMetric.reads << std::endl;
-            //std::cout << "writes:" << diskMetric.writes << std::endl;
-            //std::cout << "readBytes:" << diskMetric.readBytes << std::endl;
-            //std::cout << "writeBytes:" << diskMetric.writeBytes << std::endl;
-            //std::cout << "inode.usePercent:" << it.second.inode.usePercent << std::endl;
-            //std::cout << "avgqu_sz:" << diskMetric.avgqu_sz << std::endl;
-            // mMetricCalculateMap[devName].AddValue(diskMetric);
-	    deviceMetric.total = it.second.space.total;
-	    deviceMetric.free = it.second.space.free;
-	    deviceMetric.used = it.second.space.used;
-	    deviceMetric.usePercent = it.second.space.usePercent;
-	    deviceMetric.avail = it.second.spaceAvail;
-	    deviceMetric.reads = diskMetric.reads;
-	    deviceMetric.writes = diskMetric.writes;
-	    deviceMetric.readBytes = diskMetric.readBytes;
-	    deviceMetric.writeBytes = diskMetric.writeBytes;
-	    deviceMetric.avgqu_sz = diskMetric.avgqu_sz;
-	    deviceMetric.inodePercent = it.second.inode.usePercent;
-	    // mDeviceCalMap没有这个dev的数据
+            // std::cout << "reads:" << diskMetric.reads << std::endl;
+            // std::cout << "writes:" << diskMetric.writes << std::endl;
+            // std::cout << "readBytes:" << diskMetric.readBytes << std::endl;
+            // std::cout << "writeBytes:" << diskMetric.writeBytes << std::endl;
+            // std::cout << "inode.usePercent:" << it.second.inode.usePercent << std::endl;
+            // std::cout << "avgqu_sz:" << diskMetric.avgqu_sz << std::endl;
+            //  mMetricCalculateMap[devName].AddValue(diskMetric);
+            deviceMetric.total = it.second.space.total;
+            deviceMetric.free = it.second.space.free;
+            deviceMetric.used = it.second.space.used;
+            deviceMetric.usePercent = it.second.space.usePercent;
+            deviceMetric.avail = it.second.spaceAvail;
+            deviceMetric.reads = diskMetric.reads;
+            deviceMetric.writes = diskMetric.writes;
+            deviceMetric.readBytes = diskMetric.readBytes;
+            deviceMetric.writeBytes = diskMetric.writeBytes;
+            deviceMetric.avgqu_sz = diskMetric.avgqu_sz;
+            deviceMetric.inodePercent = it.second.inode.usePercent;
+            // mDeviceCalMap没有这个dev的数据
             if (mDeviceCalMap.find(devName) == mDeviceCalMap.end()) {
                 mDeviceCalMap[devName] = MetricCalculate<DeviceMetric>();
             }
             mDeviceCalMap[devName].AddValue(deviceMetric);
 
-            //mDeviceCalMap[devName].AddValue(deviceMetric);
+            // mDeviceCalMap[devName].AddValue(deviceMetric);
         }
     }
     mLastDiskCollectStatMap = mCurrentDiskCollectStatMap;
@@ -164,19 +165,19 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         return true;
     }
 
-    //std::diskName = GetDiskName(devName);
-    //std::string diskSerialId = "";
-    //SicGetDiskSerialId(diskName,serialId);
-    //std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
-    //std::cout << "\nserialId: " << std::string(serialId) << std::endl;
+    // std::diskName = GetDiskName(devName);
+    // std::string diskSerialId = "";
+    // SicGetDiskSerialId(diskName,serialId);
+    // std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
+    // std::cout << "\nserialId: " << std::string(serialId) << std::endl;
     const time_t now = time(nullptr);
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
 
     for (auto& mDeviceCal : mDeviceCalMap) {
         std::string devName = mDeviceCal.first;
         std::string diskName = GetDiskName(devName);
-	std::string diskSerialId = "";
-        SicGetDiskSerialId(diskName,diskSerialId);
+        std::string diskSerialId = "";
+        SicGetDiskSerialId(diskName, diskSerialId);
         MetricEvent* metricEvent = group->AddMetricEvent(true);
         if (!metricEvent) {
             return false;
@@ -185,10 +186,10 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         metricEvent->SetTimestamp(now, 0);
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), devName);
-	metricEvent->SetTag(std::string("id_serial"), diskSerialId);
-	metricEvent->SetTag(std::string("diskname"), diskName);
-	//std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
-	//std::cout << "\nserialId: " << std::string(diskSerialId) << std::endl;
+        metricEvent->SetTag(std::string("id_serial"), diskSerialId);
+        metricEvent->SetTag(std::string("diskname"), diskName);
+        // std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
+        // std::cout << "\nserialId: " << std::string(diskSerialId) << std::endl;
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
 
@@ -200,32 +201,53 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
             const char* name;
             double* value;
         } metrics[] = {
-            {"diskusage_total_avg", &avgDeviceMetric.total},  {"diskusage_total_min", &minDeviceMetric.total},  {"diskusage_total_max", &maxDeviceMetric.total},
-            {"diskusage_used_avg", &avgDeviceMetric.used},   {"diskusage_used_min", &minDeviceMetric.used},   {"diskusage_used_max", &maxDeviceMetric.used},
-            {"diskusage_free_avg", &avgDeviceMetric.free},   {"diskusage_free_min", &minDeviceMetric.free},   {"diskusage_free_max", &maxDeviceMetric.free},
-            {"diskusage_avail_avg", &avgDeviceMetric.avail},   {"diskusage_avail_min", &minDeviceMetric.avail},   {"diskusage_avail_max", &maxDeviceMetric.avail},
-            {"diskusage_utilization_avg", &avgDeviceMetric.usePercent}, {"diskusage_utilization_min", &minDeviceMetric.usePercent}, {"diskusage_utilization_max", &maxDeviceMetric.usePercent},
-            {"disk_readiops_avg", &avgDeviceMetric.reads}, {"disk_readiops_min", &minDeviceMetric.reads}, {"disk_readiops_max", &maxDeviceMetric.reads},
-            {"disk_writeiops_avg", &avgDeviceMetric.writes},   {"disk_writeiops_min", &minDeviceMetric.writes},   {"disk_writeiops_max", &maxDeviceMetric.writes},
-	    {"disk_writebytes_avg", &avgDeviceMetric.writeBytes},   {"disk_writebytes_min", &minDeviceMetric.writeBytes},   {"disk_writebytes_max", &maxDeviceMetric.writeBytes},
-	    {"disk_readbytes_avg", &avgDeviceMetric.readBytes},   {"disk_readbytes_min", &minDeviceMetric.readBytes},   {"disk_readbytes_max", &maxDeviceMetric.readBytes},
-	    {"fs_inodeutilization_avg", &avgDeviceMetric.inodePercent},   {"fs_inodeutilization_min", &minDeviceMetric.inodePercent},   {"fs_inodeutilization_max", &maxDeviceMetric.inodePercent},
-	    {"DiskIOQueueSize_avg", &avgDeviceMetric.avgqu_sz},   {"DiskIOQueueSize_min", &minDeviceMetric.avgqu_sz},   {"DiskIOQueueSize_max", &maxDeviceMetric.avgqu_sz},
+            {"diskusage_total_avg", &avgDeviceMetric.total},
+            {"diskusage_total_min", &minDeviceMetric.total},
+            {"diskusage_total_max", &maxDeviceMetric.total},
+            {"diskusage_used_avg", &avgDeviceMetric.used},
+            {"diskusage_used_min", &minDeviceMetric.used},
+            {"diskusage_used_max", &maxDeviceMetric.used},
+            {"diskusage_free_avg", &avgDeviceMetric.free},
+            {"diskusage_free_min", &minDeviceMetric.free},
+            {"diskusage_free_max", &maxDeviceMetric.free},
+            {"diskusage_avail_avg", &avgDeviceMetric.avail},
+            {"diskusage_avail_min", &minDeviceMetric.avail},
+            {"diskusage_avail_max", &maxDeviceMetric.avail},
+            {"diskusage_utilization_avg", &avgDeviceMetric.usePercent},
+            {"diskusage_utilization_min", &minDeviceMetric.usePercent},
+            {"diskusage_utilization_max", &maxDeviceMetric.usePercent},
+            {"disk_readiops_avg", &avgDeviceMetric.reads},
+            {"disk_readiops_min", &minDeviceMetric.reads},
+            {"disk_readiops_max", &maxDeviceMetric.reads},
+            {"disk_writeiops_avg", &avgDeviceMetric.writes},
+            {"disk_writeiops_min", &minDeviceMetric.writes},
+            {"disk_writeiops_max", &maxDeviceMetric.writes},
+            {"disk_writebytes_avg", &avgDeviceMetric.writeBytes},
+            {"disk_writebytes_min", &minDeviceMetric.writeBytes},
+            {"disk_writebytes_max", &maxDeviceMetric.writeBytes},
+            {"disk_readbytes_avg", &avgDeviceMetric.readBytes},
+            {"disk_readbytes_min", &minDeviceMetric.readBytes},
+            {"disk_readbytes_max", &maxDeviceMetric.readBytes},
+            {"fs_inodeutilization_avg", &avgDeviceMetric.inodePercent},
+            {"fs_inodeutilization_min", &minDeviceMetric.inodePercent},
+            {"fs_inodeutilization_max", &maxDeviceMetric.inodePercent},
+            {"DiskIOQueueSize_avg", &avgDeviceMetric.avgqu_sz},
+            {"DiskIOQueueSize_min", &minDeviceMetric.avgqu_sz},
+            {"DiskIOQueueSize_max", &maxDeviceMetric.avgqu_sz},
         };
         for (const auto& def : metrics) {
-            multiDoubleValues->SetValue(
-                std::string(def.name),
-                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
+            multiDoubleValues->SetValue(std::string(def.name),
+                                        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
         }
-        //ResNetPackRate minPackRate, maxPackRate, avgPackRate;
-        //packRateCal.second.Stat(maxPackRate, minPackRate, avgPackRate);
-        //packRateCal.second.Reset();
+        // ResNetPackRate minPackRate, maxPackRate, avgPackRate;
+        // packRateCal.second.Stat(maxPackRate, minPackRate, avgPackRate);
+        // packRateCal.second.Reset();
 
-    // LogDebug("collect disk spend {:.3f}ms", tp.cost<fraction_millis>().count());
-    // if (mCount < mTotalCount) {
-    //     return true;
-    // }
-    // mCount = 0;
+        // LogDebug("collect disk spend {:.3f}ms", tp.cost<fraction_millis>().count());
+        // if (mCount < mTotalCount) {
+        //     return true;
+        // }
+        // mCount = 0;
     }
 
     return true;
@@ -364,7 +386,7 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
 }
 
 int DiskCollector::GetFileSystemStat(const std::string& dirName, SicFileSystemUsage& fileSystemUsage) {
-    struct statvfs buffer{};
+    struct statvfs buffer {};
     int status = statvfs(dirName.c_str(), &buffer);
     if (status != 0) {
         return status;
@@ -553,7 +575,7 @@ int DiskCollector::CalDiskUsage(SicIODev& ioDev, SicDiskUsage& diskUsage) {
                << "                     interval: " << interval << " s" << std::endl
                << "              diskUsage.qTime: " << diskUsage.qTime << std::endl
                << "        ioDev.diskUsage.qTime: " << ioDev.diskUsage.qTime << std::endl;
-            //std::cout << ss.str();
+            // std::cout << ss.str();
         }
 
         ioDev.diskUsage = diskUsage;
@@ -594,7 +616,7 @@ int DiskCollector::SicGetIOstat(std::string& dirName,
         return SIC_EXECUTABLE_FAILED;
     }
 
-    struct stat ioStat{};
+    struct stat ioStat {};
     // 此处使用设备名，以获取 更多stat信息，如st_rdev(驱动号、设备号)
     // 其实主要目的就是为了获取st_rdev
     if (stat(ioDev->name.c_str(), &ioStat) < 0) {
@@ -618,7 +640,7 @@ std::shared_ptr<SicIODev> DiskCollector::SicGetIODev(std::string& dirName) {
         dirName = "/dev/" + dirName;
     }
 
-    struct stat ioStat{};
+    struct stat ioStat {};
     if (stat(dirName.c_str(), &ioStat) < 0) {
         // SicPtr()->errorMessage = (sout{} << "stat(" << dirName << ") error: " << strerror(errno)).str();
         return std::shared_ptr<SicIODev>{};
@@ -649,14 +671,14 @@ std::shared_ptr<SicIODev> DiskCollector::SicGetIODev(std::string& dirName) {
 }
 
 void DiskCollector::RefreshLocalDisk() {
-    //std::cout << "in RefreshLocalDisk" << std::endl;
-    // auto &cache = fileSystemCache;
+    // std::cout << "in RefreshLocalDisk" << std::endl;
+    //  auto &cache = fileSystemCache;
     std::vector<SicFileSystem> fileSystemList;
     // int ret = GetFileSystemListInformation(fileSystemList);
     if (GetFileSystemListInformation(fileSystemList)) {
         for (auto const& fileSystem : fileSystemList) {
             if (fileSystem.type == SIC_FILE_SYSTEM_TYPE_LOCAL_DISK && IsDev(fileSystem.devName)) {
-                struct stat ioStat{};
+                struct stat ioStat {};
                 if (stat(fileSystem.dirName.c_str(), &ioStat) < 0) {
                     continue;
                 }
@@ -867,22 +889,22 @@ std::string DiskCollector::GetDiskName(const std::string& dev) {
     return device;
 }
 
-void DiskCollector::SicGetDiskSerialId(const std::string &diskName, std::string &serialId) {
+void DiskCollector::SicGetDiskSerialId(const std::string& diskName, std::string& serialId) {
     std::vector<std::string> serialIdLines = {};
     std::string errorMessage;
     std::string PROCESS_SERIALID = "/sys/class/block/" + diskName + "/serial";
-    //std::cout << "\nproc: " << std::string(PROCESS_SERIALID) << std::endl;
+    // std::cout << "\nproc: " << std::string(PROCESS_SERIALID) << std::endl;
     if (!GetHostSystemStatWithPath(serialIdLines, errorMessage, PROCESS_SERIALID)) {
         LOG_WARNING(sLogger, ("failed to get serialId, proc:  ", PROCESS_SERIALID)("error msg", errorMessage));
-        //return SIC_EXECUTABLE_FAILED;
+        // return SIC_EXECUTABLE_FAILED;
     } else {
         serialId = serialIdLines[0];
-	//std::cout << "\nserialId: " << std::string(serialId) << std::endl;
-	//for (auto const& diskLine : serialIdLines) {
-	//	std::cout << "\nserialLine: " << std::string(diskLine) << std::endl;
-	//}
+        // std::cout << "\nserialId: " << std::string(serialId) << std::endl;
+        // for (auto const& diskLine : serialIdLines) {
+        //	std::cout << "\nserialLine: " << std::string(diskLine) << std::endl;
+        // }
     }
-    //return SIC_EXECUTABLE_FAILED;
+    // return SIC_EXECUTABLE_FAILED;
 }
 
 } // namespace logtail

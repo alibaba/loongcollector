@@ -221,7 +221,7 @@ bool LinuxSystemInterface::GetCPUCoreNumInformationOnce(CpuCoreNumInformation& c
     return true;
 }
 
-bool LinuxSystemInterface::GetMemoryInformationStringOnce(MemoryInformationString& memInfoStr) { 
+bool LinuxSystemInterface::GetMemoryInformationStringOnce(MemoryInformationString& memInfoStr) {
     auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
     memInfoStr.meminfoString.clear();
 
@@ -231,7 +231,7 @@ bool LinuxSystemInterface::GetMemoryInformationStringOnce(MemoryInformationStrin
         LOG_ERROR(sLogger, ("open meminfo file", "fail")("file", memInfoStat));
         return false;
     }
-    
+
     std::string line;
     while (std::getline(file, line)) {
         memInfoStr.meminfoString.push_back(line);

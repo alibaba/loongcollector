@@ -15,21 +15,22 @@
  */
 #pragma once
 
-#include <vector>
+#include <linux/inet_diag.h>
+#include <linux/netlink.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+
 #include <filesystem>
 #include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <linux/netlink.h>
-#include <linux/inet_diag.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
+#include <vector>
 
-#include "host_monitor/collector/BaseCollector.h"
-#include "host_monitor/collector/MetricCalculate.h" 
-#include "plugin/input/InputHostMonitor.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/MetricCalculate.h"
 #include "monitor/Monitor.h"
+#include "plugin/input/InputHostMonitor.h"
 
 namespace logtail {
 
@@ -70,12 +71,10 @@ struct NetState {
     unsigned int allOutboundTotal = 0;
 
     void calcTcpTotalAndNonEstablished();
-    std::string toString(const char *lf = "\n", const char *tab = "    ") const;
-    bool operator==(const NetState &) const;
+    std::string toString(const char* lf = "\n", const char* tab = "    ") const;
+    bool operator==(const NetState&) const;
 
-    inline bool operator!=(const NetState &r) const {
-        return !(*this == r);
-    }
+    inline bool operator!=(const NetState& r) const { return !(*this == r); }
 };
 
 struct NetLinkRequest {
@@ -105,9 +104,19 @@ enum class EnumNetSnmpTCPKey : int {
 static constexpr const bool simpleTcpState[] = {
     false,
     true, // SIC_TCP_ESTABLISHED
-    false, false, false, false, false, false, false, false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     true, // SIC_TCP_LISTEN
-    false, false, false, false,
+    false,
+    false,
+    false,
+    false,
     true, // SIC_TCP_TOTAL
     true, // SIC_TCP_NON_ESTABLISHED
 };
@@ -141,7 +150,6 @@ struct InterfaceConfig {
 
 // TCP各种状态下的连接数
 struct ResTCPStat {
-    
     uint64_t tcpEstablished;
     uint64_t tcpListen;
     uint64_t tcpTotal;
@@ -162,15 +170,14 @@ struct ResTCPStat {
 };
 
 // 入方向丢包率，出方向丢包率，
-struct ResNetPackRate{
+struct ResNetPackRate {
     double rxDropRate;
     double txDropRate;
     // double rxErrorRate;
     // double txErrorRate;
 
     static inline const FieldName<ResNetPackRate, double> resPackRateFields[] = {
-        FIELD_ENTRY(ResNetPackRate, rxDropRate),
-        FIELD_ENTRY(ResNetPackRate, txDropRate),
+        FIELD_ENTRY(ResNetPackRate, rxDropRate), FIELD_ENTRY(ResNetPackRate, txDropRate),
         // FIELD_ENTRY(ResNetPackRate, rxErrorRate),
         // FIELD_ENTRY(ResNetPackRate, txErrorRate),
     };
@@ -181,8 +188,8 @@ struct ResNetPackRate{
     };
 };
 
-//每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
-struct ResNetRatePerSec{
+// 每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
+struct ResNetRatePerSec {
     double rxPackRate;
     double txPackRate;
     double rxByteRate;
@@ -223,13 +230,13 @@ public:
 
 private:
     // bool GetNetInfo(std::vector<NetInterfaceMetric>& netInterfaceMetrics, ResTCPStat& resTCPStat); //获取全部网络指标
-    
-    bool GetNetTCPInfo(ResTCPStat& resTCPStat); //获取各种tcp状态
-    bool GetNetStateByNetLink(NetState& netState); //通过网络连接获取tcp指标
+
+    bool GetNetTCPInfo(ResTCPStat& resTCPStat); // 获取各种tcp状态
+    bool GetNetStateByNetLink(NetState& netState); // 通过网络连接获取tcp指标
     bool ReadNetLink(std::vector<uint64_t>& tcpStateCount);
     bool ReadSocketStat(const std::filesystem::path& path, int& tcp);
 
-    bool GetNetRateInfo(std::vector<NetInterfaceMetric>& netInterfaceMetrics); //获取各种rate指标
+    bool GetNetRateInfo(std::vector<NetInterfaceMetric>& netInterfaceMetrics); // 获取各种rate指标
     bool GetInterfaceConfigs(std::vector<NetInterfaceMetric>& netInterfaceMetrics);
 
     // bool GetNetStateBySS();
@@ -240,7 +247,7 @@ private:
     std::map<std::string, InterfaceConfig> mInterfaceConfigMap;
     // std::chrono::steady_clock::time_point mInterfaceConfigExpireTime;
     std::chrono::steady_clock::time_point mLastTime;
-    std::map<std::string,NetInterfaceMetric> mLastInterfaceMetrics;
+    std::map<std::string, NetInterfaceMetric> mLastInterfaceMetrics;
     int mTotalCount = 0;
     int mCount = 0;
     MetricCalculate<ResTCPStat, uint64_t> mTCPCal;

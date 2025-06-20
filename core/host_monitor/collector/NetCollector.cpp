@@ -16,10 +16,10 @@
 
 #include "host_monitor/collector/NetCollector.h"
 
+#include <boost/lexical_cast.hpp>
 #include <chrono>
 #include <filesystem>
 #include <string>
-#include <boost/lexical_cast.hpp>
 
 #include "boost/algorithm/string.hpp"
 #include "boost/algorithm/string/split.hpp"
@@ -67,7 +67,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 
     // tcp
     mTCPCal.AddValue(resTCPStat);
-    
+
     // rate
     for (auto& netInterfaceMetric : netInterfaceMetrics) {
         if (netInterfaceMetric.name.empty()) {
@@ -83,7 +83,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         resPackRate.txDropRate = netInterfaceMetric.txPackets == 0
             ? 0.0
             : netInterfaceMetric.txDropped / netInterfaceMetric.txPackets * 100.0;
-        
+
         // mPackRateCalMap没有这个接口的数据
         if (mPackRateCalMap.find(curname) == mPackRateCalMap.end()) {
             mPackRateCalMap[curname] = MetricCalculate<ResNetPackRate>();
@@ -96,32 +96,36 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         // 每秒发、收 的 字节数,每秒收包数，每秒收包错误数
         if (mLastInterfaceMetrics.find(curname) != mLastInterfaceMetrics.end()) {
             ResNetRatePerSec resRatePerSec;
-            
+
             resRatePerSec.rxByteRate
                 = mLastInterfaceMetrics[curname].rxBytes > netInterfaceMetric.rxBytes || interval <= 0
                 ? 0.0
-                : static_cast<double>(netInterfaceMetric.rxBytes - mLastInterfaceMetrics[curname].rxBytes) * 8 / interval;
-            
+                : static_cast<double>(netInterfaceMetric.rxBytes - mLastInterfaceMetrics[curname].rxBytes) * 8
+                    / interval;
+
             resRatePerSec.rxPackRate
                 = mLastInterfaceMetrics[curname].rxPackets > netInterfaceMetric.rxPackets || interval <= 0
                 ? 0.0
-                : static_cast<double>(netInterfaceMetric.rxPackets - mLastInterfaceMetrics[curname].rxPackets) / interval;
-            
+                : static_cast<double>(netInterfaceMetric.rxPackets - mLastInterfaceMetrics[curname].rxPackets)
+                    / interval;
+
             resRatePerSec.txPackRate
                 = mLastInterfaceMetrics[curname].txPackets > netInterfaceMetric.txPackets || interval <= 0
                 ? 0.0
-                : static_cast<double>(netInterfaceMetric.txPackets - mLastInterfaceMetrics[curname].txPackets) / interval;
-            
+                : static_cast<double>(netInterfaceMetric.txPackets - mLastInterfaceMetrics[curname].txPackets)
+                    / interval;
+
             resRatePerSec.txByteRate
                 = mLastInterfaceMetrics[curname].txBytes > netInterfaceMetric.txBytes || interval <= 0
                 ? 0.0
-                : static_cast<double>(netInterfaceMetric.txBytes - mLastInterfaceMetrics[curname].txBytes) * 8 / interval;
-            
+                : static_cast<double>(netInterfaceMetric.txBytes - mLastInterfaceMetrics[curname].txBytes) * 8
+                    / interval;
+
             resRatePerSec.txErrorRate
                 = mLastInterfaceMetrics[curname].txErrors > netInterfaceMetric.txErrors || interval <= 0
                 ? 0.0
                 : static_cast<double>(netInterfaceMetric.txErrors - mLastInterfaceMetrics[curname].txErrors) / interval;
-            
+
             // mRatePerSecCalMap没有这个接口的数据
             if (mRatePerSecCalMap.find(curname) == mRatePerSecCalMap.end()) {
                 mRatePerSecCalMap[curname] = MetricCalculate<ResNetRatePerSec>();
@@ -131,7 +135,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         // 第一次统计这个接口的数据，无法计算每秒收发的数据，只更新last内容
         mLastInterfaceMetrics[curname] = netInterfaceMetric;
     }
-    
+
 
     if (mCount < mTotalCount) {
         mLastTime = start;
@@ -250,15 +254,15 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     listenMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_min"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpListen)});
-    
+
     listenMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_max"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpListen)});
-    
+
     listenMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpListen)});
-    
+
 
     MetricEvent* establishedEvent = group->AddMetricEvent(true);
     if (!establishedEvent) {
@@ -272,15 +276,15 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     establishedMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_min"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpEstablished)});
-    
+
     establishedMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_max"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpEstablished)});
-    
+
     establishedMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpEstablished)});
-    
+
 
     MetricEvent* nonestablishedEvent = group->AddMetricEvent(true);
     if (!nonestablishedEvent) {
@@ -291,15 +295,15 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     nonestablishedEvent->SetTag(std::string("state"), std::string("NON_ESTABLISHED"));
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
     auto* nonestablishedMultiDoubleValues = nonestablishedEvent->MutableValue<UntypedMultiDoubleValues>();
-    nonestablishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_min"),
-        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpNonEstablished)});
-    nonestablishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_max"),
-        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpNonEstablished)});
-    nonestablishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_avg"),
-        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpNonEstablished)});
+    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_min"),
+                                              UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
+                                                                      static_cast<double>(minTCP.tcpNonEstablished)});
+    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_max"),
+                                              UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
+                                                                      static_cast<double>(maxTCP.tcpNonEstablished)});
+    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_avg"),
+                                              UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
+                                                                      static_cast<double>(avgTCP.tcpNonEstablished)});
 
     MetricEvent* totalEvent = group->AddMetricEvent(true);
     if (!totalEvent) {
@@ -313,15 +317,14 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     totalMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_min"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpTotal)});
-    
+
     totalMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_max"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpTotal)});
-    
+
     totalMultiDoubleValues->SetValue(
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
-    
 
 
     mCount = 0;
@@ -339,7 +342,6 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 // #define OPTION_FILE 4
 
 bool NetCollector::GetNetTCPInfo(ResTCPStat& resTCPStat) {
-    
     NetState netState;
     // typedef decltype(&NetCollector::GetNetStateByNetLink) FnType;
     // std::vector<FnType> funcs = {
@@ -395,14 +397,12 @@ bool NetCollector::GetNetStateByNetLink(NetState& netState) {
 
 
 bool NetCollector::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
-    
     static uint32_t sequence_number = 1;
     int fd;
     // struct inet_diag_msg *r;
     // 使用netlink socket与内核通信
     fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
     if (fd < 0) {
-
         LOG_WARNING(sLogger,
                     ("ReadNetLink, socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG) failed, error msg: ",
                      std::string(strerror(errno))));
@@ -468,12 +468,11 @@ bool NetCollector::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
             if (errno == EINTR || errno == EAGAIN) {
                 continue;
             }
-            
+
             LOG_WARNING(sLogger, ("ReadNetLink, recvmsg(2) failed, error msg: ", std::string(strerror(errno))));
             close(fd);
             return false;
         } else if (status == 0) {
-            
             LOG_WARNING(sLogger,
                         ("ReadNetLink, Unexpected zero-sized  reply from netlink socket. error msg: ",
                          std::string(strerror(errno))));
@@ -495,11 +494,10 @@ bool NetCollector::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
             } else if (h->nlmsg_type == NLMSG_ERROR) {
                 if (h->nlmsg_len < NLMSG_LENGTH(sizeof(struct nlmsgerr))) {
                     LOG_WARNING(sLogger, ("ReadNetLink ", "message truncated"));
-                    
+
                 } else {
                     auto msg_error = (struct nlmsgerr*)NLMSG_DATA(h);
                     LOG_WARNING(sLogger, ("ReadNetLink, Received error, error msg: ", msg_error));
-                    
                 }
                 close(fd);
                 return false;
@@ -559,7 +557,6 @@ bool NetCollector::ReadSocketStat(const std::filesystem::path& path, int& tcp) {
 
 
 bool NetCollector::GetNetRateInfo(std::vector<NetInterfaceMetric>& netInterfaceMetrics) {
-    
     //  /proc/net/dev
     std::vector<std::string> netDevLines = {};
     std::string errorMessage;

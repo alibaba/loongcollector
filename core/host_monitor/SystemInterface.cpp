@@ -117,7 +117,9 @@ bool SystemInterface::GetHostMeminfoStatString(MemoryInformationString& meminfoS
     const std::string errorType = "mem";
     return MemoizedCall(
         mMemInformationCache,
-        [this](BaseInformation& info) { return this->GetMemoryInformationStringOnce(static_cast<MemoryInformationString&>(info)); },
+        [this](BaseInformation& info) {
+            return this->GetMemoryInformationStringOnce(static_cast<MemoryInformationString&>(info));
+        },
         meminfoString,
         errorType);
 }
@@ -126,7 +128,9 @@ bool SystemInterface::GetMTRRInformationString(MTRRInformationString& mtrrString
     const std::string errorType = "mtrr";
     return MemoizedCall(
         mMTRRInformationCache,
-        [this](BaseInformation& info) { return this->GetMTRRInformationStringOnce(static_cast<MTRRInformationString&>(info)); },
+        [this](BaseInformation& info) {
+            return this->GetMTRRInformationStringOnce(static_cast<MTRRInformationString&>(info));
+        },
         mtrrString,
         errorType);
 }

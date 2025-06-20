@@ -81,7 +81,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-         meminfoStr.collectTime = std::chrono::steady_clock::now();
+        meminfoStr.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }

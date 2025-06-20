@@ -97,15 +97,16 @@ void MemCollectorUnittest::TestGetHostSystemMeminfoStat() const {
     MemoryInformation memInfoStat;
     SwapInformation swapStat;
     APSARA_TEST_TRUE(collector.GetHostMeminfoStat(memInfoStat, swapStat));
-    APSARA_TEST_EQUAL_FATAL((int64_t)31534908*1024, (int64_t)memInfoStat.total);
-    APSARA_TEST_EQUAL_FATAL((int64_t)13226912*1024, (int64_t)memInfoStat.free);
-    APSARA_TEST_EQUAL_FATAL((int64_t)28771376*1024, (int64_t)memInfoStat.available);
-    APSARA_TEST_EQUAL_FATAL((int64_t)28771376*1024, (int64_t)memInfoStat.actualFree);
-    APSARA_TEST_EQUAL_FATAL((int64_t)(31534908-28771376)*1024, (int64_t)memInfoStat.actualUsed);
-    APSARA_TEST_EQUAL_FATAL((static_cast<double>(31534908-28771376)/static_cast<double>(31534908))*100.0, static_cast<double>(memInfoStat.usedPercent));
-    double total=31534908.0;
+    APSARA_TEST_EQUAL_FATAL((int64_t)31534908 * 1024, (int64_t)memInfoStat.total);
+    APSARA_TEST_EQUAL_FATAL((int64_t)13226912 * 1024, (int64_t)memInfoStat.free);
+    APSARA_TEST_EQUAL_FATAL((int64_t)28771376 * 1024, (int64_t)memInfoStat.available);
+    APSARA_TEST_EQUAL_FATAL((int64_t)28771376 * 1024, (int64_t)memInfoStat.actualFree);
+    APSARA_TEST_EQUAL_FATAL((int64_t)(31534908 - 28771376) * 1024, (int64_t)memInfoStat.actualUsed);
+    APSARA_TEST_EQUAL_FATAL((static_cast<double>(31534908 - 28771376) / static_cast<double>(31534908)) * 100.0,
+                            static_cast<double>(memInfoStat.usedPercent));
+    double total = 31534908.0;
     double actual_free = 28771376.0;
-    double free_percent = actual_free*100.0/total;
+    double free_percent = actual_free * 100.0 / total;
     APSARA_TEST_EQUAL_FATAL(free_percent, static_cast<double>(memInfoStat.freePercent));
 }
 
@@ -117,18 +118,18 @@ void MemCollectorUnittest::TestCollect() const {
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    double total=31534908.0;
+    double total = 31534908.0;
     double actual_free = 28771376.0;
-    double free_percent = actual_free*100.0/total;
-    vector<double> expectedValues = {(31534908-28771376)*1024.0,
-                                (31534908-28771376)*1024.0,
-                                (static_cast<double>(31534908-28771376)/static_cast<double>(31534908))*100.0,
-                                free_percent};
+    double free_percent = actual_free * 100.0 / total;
+    vector<double> expectedValues = {(31534908 - 28771376) * 1024.0,
+                                     (31534908 - 28771376) * 1024.0,
+                                     (static_cast<double>(31534908 - 28771376) / static_cast<double>(31534908)) * 100.0,
+                                     free_percent};
 
     vector<string> expectedNames = {
         "memory_usedspace",
-        "memory_actualusedspace", 
-        "memory_usedutilization", 
+        "memory_actualusedspace",
+        "memory_usedutilization",
         "memory_freeutilization",
     };
 
@@ -139,7 +140,6 @@ void MemCollectorUnittest::TestCollect() const {
         double val = maps[expectedNames[i]].Value;
         EXPECT_NEAR(expectedValues[static_cast<size_t>(i / 3)], val, 1e-6);
     }
-
 }
 
 UNIT_TEST_CASE(MemCollectorUnittest, TestGetHostSystemMeminfoStat);

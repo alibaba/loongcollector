@@ -15,12 +15,13 @@
  */
 #pragma once
 
-#include <vector>
 #include <filesystem>
+#include <vector>
+
+#include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/collector/BaseCollector.h"
 #include "host_monitor/collector/MetricCalculate.h"
 #include "plugin/input/InputHostMonitor.h"
-#include "host_monitor/LinuxSystemInterface.h"
 
 namespace logtail {
 
@@ -44,9 +45,9 @@ private:
     bool GetHostMeminfoStat(MemoryInformation& memStat, SwapInformation& swapStat);
     bool GetMemoryStat(MemoryInformation& information, std::vector<std::string>& memoryLines);
     uint64_t GetMemoryValue(char unit, uint64_t value);
-    void completeMemoryInformation(MemoryInformation &memInfo);
-    uint64_t parseProcMtrr(std::vector<std::string> &lines);
-    bool GetMemoryRam(MemoryInformation &memInfo);
+    void completeMemoryInformation(MemoryInformation& memInfo);
+    uint64_t parseProcMtrr(std::vector<std::string>& lines);
+    bool GetMemoryRam(MemoryInformation& memInfo);
     int GetSwapStat(SwapInformation& swap, std::vector<std::string>& memoryLines);
     int GetSwapPageInfo(SwapInformation& swap);
 

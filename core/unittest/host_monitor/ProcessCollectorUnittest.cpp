@@ -94,7 +94,10 @@ protected:
         ofs_statm.close();
         // /proc/pid/stat
         ofstream ofs_stat("./12345/stat", std::ios::trunc);
-        ofs_stat << "1813 (ilogtail) S 1811 1811 1811 0 -1 1077936192 1378102 0 848 0 643169 334268 0 0 20 0 55 0 1304 1707982848 46314 18446744073709551615 4227072 53627809 140730946407792 0 0 0 65536 0 4281570 0 0 0 17 26 0 0 24 0 0 66246848 67456896 101158912 140730946416312 140730946416341 140730946416341 140730946416603 0";
+        ofs_stat << "1813 (ilogtail) S 1811 1811 1811 0 -1 1077936192 1378102 0 848 0 643169 334268 0 0 20 0 55 0 1304 "
+                    "1707982848 46314 18446744073709551615 4227072 53627809 140730946407792 0 0 0 65536 0 4281570 0 0 "
+                    "0 17 26 0 0 24 0 0 66246848 67456896 101158912 140730946416312 140730946416341 140730946416341 "
+                    "140730946416603 0";
         ofs.close();
         PROCESS_DIR = ".";
     }
@@ -105,7 +108,6 @@ void ProcessCollectorUnittest::TestGetHostPidStat() const {
     pid_t pid = 12345;
     ProcessAllStat stat;
     APSARA_TEST_TRUE(collector.GetProcessAllStat(pid, stat));
-    
 }
 
 void ProcessCollectorUnittest::TestCollect() const {
@@ -116,7 +118,6 @@ void ProcessCollectorUnittest::TestCollect() const {
     std::cout << group.GetEvents().size() << std::endl;
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_EQUAL_FATAL(3 * 10, group.GetEvents().size());
-    
 }
 
 UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostPidStat);

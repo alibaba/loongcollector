@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+#include "SystemInterface.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
@@ -35,13 +36,12 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
-#include "host_monitor/collector/ProcessEntityCollector.h"
-#include "host_monitor/collector/SystemCollector.h"
-#include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
-#include "SystemInterface.h"
+#include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
+#include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"

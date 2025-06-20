@@ -23,10 +23,10 @@
 #pragma GCC diagnostic pop
 #include <charconv>
 
+#include <boost/algorithm/string.hpp>
+#include <iomanip>
 #include <string>
 #include <vector>
-#include <iomanip>
-#include <boost/algorithm/string.hpp>
 
 #include "boost/regex.hpp"
 
@@ -365,52 +365,54 @@ bool StringTo(const StringView& str, T& val, int base = 10) {
 // 移除前后缀的空白符，
 // std::string Trim(const std::string &str, bool trimLeft = true, bool trimRight = true);
 // 移除前、后缀的trimCharacters中的字符
-std::string Trim(const std::string &str, const std::string &trimChars, bool trimLeft = true, bool trimRight = true);
+std::string Trim(const std::string& str, const std::string& trimChars, bool trimLeft = true, bool trimRight = true);
 
-inline std::string Trim(const std::string &str, const char *trimChars, bool trimLeft = true, bool trimRight = true) {
+inline std::string Trim(const std::string& str, const char* trimChars, bool trimLeft = true, bool trimRight = true) {
     return trimChars ? Trim(str, std::string{trimChars}, trimLeft, trimRight) : str;
 }
 
-inline std::string TrimLeft(const std::string &str, const std::string &trimCharacters) {
+inline std::string TrimLeft(const std::string& str, const std::string& trimCharacters) {
     return Trim(str, trimCharacters, true, false);
 }
 
-inline std::string TrimRight(const std::string &str, const std::string &trimCharacters) {
+inline std::string TrimRight(const std::string& str, const std::string& trimCharacters) {
     return Trim(str, trimCharacters, false, true);
 }
 
-inline std::string TrimSpace(const std::string &str) {
+inline std::string TrimSpace(const std::string& str) {
     return Trim(str, SPACE_CHARS, true, true);
 }
 
-inline std::string TrimLeftSpace(const std::string &str) {
+inline std::string TrimLeftSpace(const std::string& str) {
     return TrimLeft(str, SPACE_CHARS);
 }
 
-inline std::string TrimRightSpace(const std::string &str) {
+inline std::string TrimRightSpace(const std::string& str) {
     return TrimRight(str, SPACE_CHARS);
 }
 
 struct SplitOpt {
-            const bool bTrim;
-            const bool enableEmptyLine;
+    const bool bTrim;
+    const bool enableEmptyLine;
 
-            SplitOpt(bool t, bool e = false) : bTrim(t), enableEmptyLine(e) {} // NOLINT(*-explicit-constructor)
-        };
+    SplitOpt(bool t, bool e = false) : bTrim(t), enableEmptyLine(e) {} // NOLINT(*-explicit-constructor)
+};
 
 // 根据chars中的任意字符进行切分
-std::vector<std::string> split(const std::string &src, const std::string &chars, const SplitOpt &opt);
+std::vector<std::string> split(const std::string& src, const std::string& chars, const SplitOpt& opt);
 
 // 根据给定的字符进行切分
-inline std::vector<std::string> split(const std::string &s, char delim, const SplitOpt &opt) {
-            return split(s, std::string{&delim, &delim + 1}, opt);
-        }
+inline std::vector<std::string> split(const std::string& s, char delim, const SplitOpt& opt) {
+    return split(s, std::string{&delim, &delim + 1}, opt);
+}
 
 // T只接受数值型或枚举
-template<typename T, typename std::enable_if<
-        std::is_integral<T>::value || std::is_floating_point<T>::value ||
-        std::is_enum<T>::value, int>::type = 0>
-std::string NumberToString(const T &v) {
+template <
+    typename T,
+    typename std::enable_if<std::is_integral<T>::value || std::is_floating_point<T>::value || std::is_enum<T>::value,
+                            int>::type
+    = 0>
+std::string NumberToString(const T& v) {
     std::stringstream ss;
     ss << std::setprecision(20) << v;
     return ss.str();

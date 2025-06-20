@@ -25,11 +25,11 @@
 #include "MetricValue.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/SystemInterface.h"
 #include "host_monitor/LinuxSystemInterface.h"
+#include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 
-#define Diff(a, b)  a-b>0 ? a-b : 0;
+#define Diff(a, b) a - b > 0 ? a - b : 0;
 
 namespace logtail {
 
@@ -37,7 +37,7 @@ const std::string MemCollector::sName = "Memory";
 const std::string kMetricLabelMem = "valueTag";
 const std::string kMetricLabelMode = "mode";
 
-MemCollector::MemCollector(){
+MemCollector::MemCollector() {
     Init();
 }
 
@@ -63,13 +63,13 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     if (mCount < mTotalCount) {
         return true;
     }
-    MemoryInformation minMem,maxMem,avgMem,lastMem;
+    MemoryInformation minMem, maxMem, avgMem, lastMem;
 
     mCalculateMeminfo.Stat(maxMem, minMem, avgMem, &lastMem);
 
-    mCount=0;
+    mCount = 0;
     mCalculateMeminfo.Reset();
-    
+
     const time_t now = time(nullptr);
 
     MetricEvent* metricEvent = group->AddMetricEvent(true);
@@ -80,42 +80,42 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     multiDoubleValues->SetValue(std::string("memory_usedutilization_min"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.usedPercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.usedPercent});
     multiDoubleValues->SetValue(std::string("memory_usedutilization_max"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.usedPercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.usedPercent});
     multiDoubleValues->SetValue(std::string("memory_usedutilization_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.usedPercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.usedPercent});
     multiDoubleValues->SetValue(std::string("memory_freeutilization_min"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.freePercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.freePercent});
     multiDoubleValues->SetValue(std::string("memory_freeutilization_max"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.freePercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.freePercent});
     multiDoubleValues->SetValue(std::string("memory_freeutilization_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.freePercent});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.freePercent});
     multiDoubleValues->SetValue(std::string("memory_actualusedspace_min"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.actualUsed});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.actualUsed});
     multiDoubleValues->SetValue(std::string("memory_actualusedspace_max"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.actualUsed});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.actualUsed});
     multiDoubleValues->SetValue(std::string("memory_actualusedspace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.actualUsed});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.actualUsed});
     multiDoubleValues->SetValue(std::string("memory_freespace_min"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.free});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.free});
     multiDoubleValues->SetValue(std::string("memory_freespace_max"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.free});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.free});
     multiDoubleValues->SetValue(std::string("memory_freespace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.free});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.free});
     multiDoubleValues->SetValue(std::string("memory_usedspace_min"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.used});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.used});
     multiDoubleValues->SetValue(std::string("memory_usedspace_max"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.used});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.used});
     multiDoubleValues->SetValue(std::string("memory_usedspace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.used});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.used});
     multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
     multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
     multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});                                
-    
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
+
     return true;
 }
 
@@ -158,12 +158,12 @@ bool MemCollector::GetMemoryStat(MemoryInformation& information, std::vector<std
         return ret;
     }
 
-    std::unordered_map<std::string, double &> memoryProc{
-            {"MemTotal:",     information.total},
-            {"MemFree:",      information.free},
-            {"MemAvailable:", information.available},
-            {"Buffers:",      information.buffers},
-            {"Cached:",       information.cached},
+    std::unordered_map<std::string, double&> memoryProc{
+        {"MemTotal:", information.total},
+        {"MemFree:", information.free},
+        {"MemAvailable:", information.available},
+        {"Buffers:", information.buffers},
+        {"Cached:", information.cached},
     };
     /* 字符串处理，处理成对应的类型以及值*/
     for (size_t i = 0; i < memoryLines.size() && !memoryProc.empty(); i++) {
@@ -189,9 +189,9 @@ int MemCollector::GetSwapStat(SwapInformation& swap, std::vector<std::string>& m
         return ret;
     }
 
-    std::unordered_map<std::string, double &> swapProc{
-            {"SwapTotal:",     swap.total},
-            {"SwapFree:",      swap.free},
+    std::unordered_map<std::string, double&> swapProc{
+        {"SwapTotal:", swap.total},
+        {"SwapFree:", swap.free},
     };
 
     /* 字符串处理，处理成对应的类型以及值*/
@@ -221,29 +221,26 @@ uint64_t MemCollector::GetMemoryValue(char unit, uint64_t value) {
     return value;
 }
 
-void MemCollector::completeMemoryInformation(MemoryInformation &memInfo) {
+void MemCollector::completeMemoryInformation(MemoryInformation& memInfo) {
     std::vector<std::string> errorMessage;
     const uint64_t mb = 1024 * 1024;
     // 不需要考虑MemAvailable不存在的情况
     memInfo.actualUsed = Diff(memInfo.total, memInfo.available);
     memInfo.actualFree = memInfo.available;
-    memInfo.usedPercent =
-            memInfo.total > 0 ? static_cast<double>(memInfo.actualUsed) * 100 / memInfo.total : 0.0;
-    memInfo.freePercent =
-            memInfo.total > 0 ? static_cast<double>(memInfo.actualFree) * 100 / memInfo.total : 0.0;
+    memInfo.usedPercent = memInfo.total > 0 ? static_cast<double>(memInfo.actualUsed) * 100 / memInfo.total : 0.0;
+    memInfo.freePercent = memInfo.total > 0 ? static_cast<double>(memInfo.actualFree) * 100 / memInfo.total : 0.0;
     memInfo.ram = memInfo.total / mb;
 
     uint64_t diff = Diff(memInfo.total, memInfo.actualFree);
     memInfo.usedPercent = memInfo.total > 0 ? static_cast<double>(diff) * 100 / memInfo.total : 0.0;
     diff = Diff(memInfo.total, memInfo.actualUsed);
     memInfo.freePercent = memInfo.total > 0 ? static_cast<double>(diff) * 100 / memInfo.total : 0.0;
-
 }
 
-bool MemCollector::GetMemoryRam(MemoryInformation &memInfo) {
+bool MemCollector::GetMemoryRam(MemoryInformation& memInfo) {
     uint64_t ram = 0;
     MTRRInformationString mtrrInfo;
-    
+
     if (!SystemInterface::GetInstance()->GetMTRRInformationString(mtrrInfo)) {
         return false;
     }
@@ -258,16 +255,16 @@ bool MemCollector::GetMemoryRam(MemoryInformation &memInfo) {
 // reg00: base=0x00000000 (   0MB), size= 256MB: write-back, count=1
 // reg01: base=0xe8000000 (3712MB), size=  32MB: write-combining, count=1
 // /proc/mtrr格式2：
-// [root@7227ded95607 ilogtail]# cat /proc/mtrr 
+// [root@7227ded95607 ilogtail]# cat /proc/mtrr
 // reg00: base=0x000000000 (    0MB), size=262144MB, count=1: write-back
 // reg01: base=0x4000000000 (262144MB), size=131072MB, count=1: write-back
 // reg02: base=0x6000000000 (393216MB), size= 2048MB, count=1: write-back
 // reg03: base=0x6070000000 (395008MB), size=  256MB, count=1: uncachable
 // reg04: base=0x080000000 ( 2048MB), size= 2048MB, count=1: uncachable
 // reg05: base=0x070000000 ( 1792MB), size=   64MB, count=1: uncachable
-uint64_t MemCollector::parseProcMtrr(std::vector<std::string> &lines) {
+uint64_t MemCollector::parseProcMtrr(std::vector<std::string>& lines) {
     uint64_t ram = 0;
-    for (auto const &line: lines) {
+    for (auto const& line : lines) {
         if (line.find("write-back") == std::string::npos) {
             continue;
         }

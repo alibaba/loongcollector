@@ -34,8 +34,7 @@ public:
     void TestCollect() const;
 
 protected:
-    void SetUp() override{
-
+    void SetUp() override {
         // sockets: used 316
         // TCP: inuse 25 orphan 0 tw 2 alloc 28 mem 4
         // UDP: inuse 3 mem 0
@@ -66,25 +65,34 @@ protected:
         ofs2.close();
 
         // Inter-|   Receive                                                |  Transmit
-        //  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
-        //     lo: 1538516774 9633892    0    0    0     0          0         0 1538516774 9633892    0    0    0     0       0          0
-        //   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0    0    0     0       0          0
-        // docker0: 96663341  195219    0    0    0     0          0         0 155828048  161266    0    0    0     0       0          0
-        // veth6c3a07a:  188547     695    0    0    0     0          0         0   274800    1314    0    0    0     0       0          0
-        // vethc4371db: 99107500  194212    0    0    0     0          0         0 155543068  161069    0    0    0     0       0          0
+        //  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls
+        //  carrier compressed
+        //     lo: 1538516774 9633892    0    0    0     0          0         0 1538516774 9633892    0    0    0     0
+        //     0          0
+        //   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0    0    0 0
+        //   0          0
+        // docker0: 96663341  195219    0    0    0     0          0         0 155828048  161266    0    0    0     0 0
+        // 0 veth6c3a07a:  188547     695    0    0    0     0          0         0   274800    1314    0    0    0 0 0
+        // 0 vethc4371db: 99107500  194212    0    0    0     0          0         0 155543068  161069    0    0    0 0
+        // 0          0
         ofstream ofs3("./net/dev", std::ios::trunc);
         ofs3 << "Inter-|   Receive                                                |  Transmit\n";
-        ofs3 << " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n";
-        ofs3 << "     lo: 1538516774 9633892    0    0    0     0          0         0 1538516774 9633892    0    0    0     0       0          0\n";
-        ofs3 << "   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0    0    0     0       0          0\n";
-        ofs3 << " docker0: 96663341  195219    0    0    0     0          0         0 155828048  161266    0    0    0     0       0          0\n";
-        ofs3 << " veth6c3a07a:  188547     695    0    0    0     0          0         0   274800    1314    0    0    0     0       0          0\n";
-        ofs3 << " vethc4371db: 99107500  194212    0    0    0     0          0         0 155543068  161069    0    0    0     0       0          0\n";
+        ofs3 << " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo "
+                "colls carrier compressed\n";
+        ofs3 << "     lo: 1538516774 9633892    0    0    0     0          0         0 1538516774 9633892    0    0    "
+                "0     0       0          0\n";
+        ofs3 << "   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0    0 "
+                "   0     0       0          0\n";
+        ofs3 << " docker0: 96663341  195219    0    0    0     0          0         0 155828048  161266    0    0    0 "
+                "    0       0          0\n";
+        ofs3 << " veth6c3a07a:  188547     695    0    0    0     0          0         0   274800    1314    0    0    "
+                "0     0       0          0\n";
+        ofs3 << " vethc4371db: 99107500  194212    0    0    0     0          0         0 155543068  161069    0    0  "
+                "  0     0       0          0\n";
         ofs3.close();
-        
+
         PROCESS_DIR = ".";
     }
-
 };
 
 void NetCollectorUnittest::TestGetNetRateInfo() const {
@@ -190,7 +198,6 @@ void NetCollectorUnittest::TestGetNetStateByNetLink() const {
     NetCollector collector = NetCollector();
     NetState netState;
     APSARA_TEST_TRUE(collector.GetNetStateByNetLink(netState));
-
 }
 
 void NetCollectorUnittest::TestGetNetTCPInfo() const {
@@ -204,7 +211,7 @@ void NetCollectorUnittest::TestCollect() const {
     NetCollector collector = NetCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
     HostMonitorTimerEvent::CollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
-    
+
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
@@ -240,12 +247,12 @@ void NetCollectorUnittest::TestCollect() const {
         "networkout_rate_min",
     };
 
-    for(size_t j=0; j<device_names.size(); j++){
+    for (size_t j = 0; j < device_names.size(); j++) {
         auto event = group.GetEvents()[j].Cast<MetricEvent>();
         auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
         APSARA_TEST_EQUAL_FATAL(device_names[j], event.GetTag("device"));
         APSARA_TEST_EQUAL_FATAL(hostname, event.GetTag("hostname"));
-        for (size_t i = 0; i < rate_names.size(); ++i){
+        for (size_t i = 0; i < rate_names.size(); ++i) {
             APSARA_TEST_TRUE(maps.find(rate_names[i]) != maps.end());
             EXPECT_NEAR(0.0, maps[rate_names[i]].Value, 1e-6);
         }
@@ -261,12 +268,12 @@ void NetCollectorUnittest::TestCollect() const {
         "net_tcpconnection_max",
         "net_tcpconnection_min",
     };
-    for(size_t j=0; j<tcp_names.size(); j++){
-        std::cout<<"xixix "<<tcp_names[j]<<" "<<tcp_cnt_names[j]<<std::endl;
-        auto event = group.GetEvents()[j+device_names.size()].Cast<MetricEvent>();
+    for (size_t j = 0; j < tcp_names.size(); j++) {
+        std::cout << "xixix " << tcp_names[j] << " " << tcp_cnt_names[j] << std::endl;
+        auto event = group.GetEvents()[j + device_names.size()].Cast<MetricEvent>();
         auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
         APSARA_TEST_EQUAL_FATAL(tcp_names[j], event.GetTag("state"));
-        for (size_t i = 0; i < tcp_cnt_names.size(); ++i){
+        for (size_t i = 0; i < tcp_cnt_names.size(); ++i) {
             APSARA_TEST_TRUE(maps.find(tcp_cnt_names[i]) != maps.end());
         }
     }
@@ -279,10 +286,9 @@ void NetCollectorUnittest::TestCollect() const {
     auto event = group.GetEvents()[8].Cast<MetricEvent>();
     auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
     APSARA_TEST_EQUAL_FATAL(std::string("total"), event.GetTag("state"));
-    for(size_t i = 0; i < tcp_total_names.size(); ++i){
+    for (size_t i = 0; i < tcp_total_names.size(); ++i) {
         APSARA_TEST_TRUE(maps.find(tcp_total_names[i]) != maps.end());
     }
-
 }
 
 UNIT_TEST_CASE(NetCollectorUnittest, TestGetNetRateInfo);
