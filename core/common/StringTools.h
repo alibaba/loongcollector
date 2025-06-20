@@ -30,6 +30,9 @@
 
 #include "common/StringView.h"
 
+// C++11定义的空白符
+#define SPACE_CHARS " \f\n\r\t\v"
+
 namespace logtail {
 
 inline bool StartWith(const std::string& input, StringView pattern) {
@@ -355,6 +358,50 @@ bool StringTo(const std::string_view& str, T& val, int base = 10) {
 template <class T>
 bool StringTo(const StringView& str, T& val, int base = 10) {
     return StringTo(str.data(), str.data() + str.size(), val, base);
+}
+
+// 移除前后缀的空白符，
+// std::string Trim(const std::string &str, bool trimLeft = true, bool trimRight = true);
+// 移除前、后缀的trimCharacters中的字符
+std::string Trim(const std::string& str, const std::string& trimChars, bool trimLeft = true, bool trimRight = true);
+
+inline std::string Trim(const std::string& str, const char* trimChars, bool trimLeft = true, bool trimRight = true) {
+    return trimChars ? Trim(str, std::string{trimChars}, trimLeft, trimRight) : str;
+}
+
+inline std::string TrimLeft(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, true, false);
+}
+
+inline std::string TrimRight(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, false, true);
+}
+
+inline std::string TrimSpace(const std::string& str) {
+    return Trim(str, SPACE_CHARS, true, true);
+}
+
+inline std::string TrimLeftSpace(const std::string& str) {
+    return TrimLeft(str, SPACE_CHARS);
+}
+
+inline std::string TrimRightSpace(const std::string& str) {
+    return TrimRight(str, SPACE_CHARS);
+}
+
+struct SplitOpt {
+    const bool bTrim;
+    const bool enableEmptyLine;
+
+    SplitOpt(bool t, bool e = false) : bTrim(t), enableEmptyLine(e) {} // NOLINT(*-explicit-constructor)
+};
+
+// 根据chars中的任意字符进行切分
+std::vector<std::string> split(const std::string& src, const std::string& chars, const SplitOpt& opt);
+
+// 根据给定的字符进行切分
+inline std::vector<std::string> split(const std::string& s, char delim, const SplitOpt& opt) {
+    return split(s, std::string{&delim, &delim + 1}, opt);
 }
 
 } // namespace logtail
