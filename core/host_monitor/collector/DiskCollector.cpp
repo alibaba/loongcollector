@@ -83,6 +83,28 @@ std::string GetName(SicFileSystemType fs) {
     return "";
 }
 
+// 最少一条
+template <typename T>
+std::string join_n(const T& v, const std::string& splitter, size_t n) {
+    static_assert(std::is_base_of<std::vector<std::string>, T>::value
+                      || std::is_base_of<std::set<std::string>, T>::value
+                      || std::is_base_of<std::list<std::string>, T>::value,
+                  "type must be std::vector<std::string> or std::list<std::string> or std::set<std::string>");
+    std::string result;
+    auto begin = v.begin();
+    auto end = v.end();
+    if (begin != end) {
+        result = *begin++;
+        n = (n == 0 ? std::numeric_limits<size_t>::max() : n);
+        for (auto it = begin; it != end && result.size() + splitter.size() + it->size() <= n; ++it) {
+            result.append(splitter);
+            result.append(*it);
+        }
+    }
+    // 去掉最后一个分隔符
+    return result;
+}
+
 bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
@@ -179,6 +201,8 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         std::string diskSerialId = "";
         SicGetDiskSerialId(diskName, diskSerialId);
         MetricEvent* metricEvent = group->AddMetricEvent(true);
+        DiskCollectStat diskCollectStat = mCurrentDiskCollectStatMap[devName];
+        std::string dir_name = join_n(diskCollectStat.deviceMountInfo.mountPaths, ",", maxDirSize);
         if (!metricEvent) {
             return false;
         }
@@ -187,7 +211,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), devName);
         metricEvent->SetTag(std::string("id_serial"), diskSerialId);
-        metricEvent->SetTag(std::string("diskname"), diskName);
+        metricEvent->SetTag(std::string("diskname"), dir_name);
         // std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
         // std::cout << "\nserialId: " << std::string(diskSerialId) << std::endl;
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
@@ -351,11 +375,11 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
         diskCollectStat.deviceMountInfo = it.second;
 #define CastUint64(Expr) static_cast<uint64_t>(Expr)
 #define CastDouble(Expr) static_cast<double>(Expr)
-        diskCollectStat.space.total = CastDouble(fileSystemStat.total);
-        diskCollectStat.space.free = CastDouble(fileSystemStat.free);
-        diskCollectStat.space.used = CastDouble(fileSystemStat.used);
+        diskCollectStat.space.total = CastDouble(fileSystemStat.total) * 1024;
+        diskCollectStat.space.free = CastDouble(fileSystemStat.free) * 1024;
+        diskCollectStat.space.used = CastDouble(fileSystemStat.used) * 1024;
         diskCollectStat.space.usePercent = fileSystemStat.use_percent * 100.0;
-        diskCollectStat.spaceAvail = CastDouble(fileSystemStat.avail);
+        diskCollectStat.spaceAvail = CastDouble(fileSystemStat.avail) * 1024;
 
         diskCollectStat.inode.total = CastDouble(fileSystemStat.files);
         diskCollectStat.inode.free = CastDouble(fileSystemStat.freeFiles);
@@ -386,7 +410,7 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
 }
 
 int DiskCollector::GetFileSystemStat(const std::string& dirName, SicFileSystemUsage& fileSystemUsage) {
-    struct statvfs buffer {};
+    struct statvfs buffer{};
     int status = statvfs(dirName.c_str(), &buffer);
     if (status != 0) {
         return status;
@@ -616,7 +640,7 @@ int DiskCollector::SicGetIOstat(std::string& dirName,
         return SIC_EXECUTABLE_FAILED;
     }
 
-    struct stat ioStat {};
+    struct stat ioStat{};
     // 此处使用设备名，以获取 更多stat信息，如st_rdev(驱动号、设备号)
     // 其实主要目的就是为了获取st_rdev
     if (stat(ioDev->name.c_str(), &ioStat) < 0) {
@@ -640,7 +664,7 @@ std::shared_ptr<SicIODev> DiskCollector::SicGetIODev(std::string& dirName) {
         dirName = "/dev/" + dirName;
     }
 
-    struct stat ioStat {};
+    struct stat ioStat{};
     if (stat(dirName.c_str(), &ioStat) < 0) {
         // SicPtr()->errorMessage = (sout{} << "stat(" << dirName << ") error: " << strerror(errno)).str();
         return std::shared_ptr<SicIODev>{};
@@ -678,7 +702,7 @@ void DiskCollector::RefreshLocalDisk() {
     if (GetFileSystemListInformation(fileSystemList)) {
         for (auto const& fileSystem : fileSystemList) {
             if (fileSystem.type == SIC_FILE_SYSTEM_TYPE_LOCAL_DISK && IsDev(fileSystem.devName)) {
-                struct stat ioStat {};
+                struct stat ioStat{};
                 if (stat(fileSystem.dirName.c_str(), &ioStat) < 0) {
                     continue;
                 }

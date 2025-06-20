@@ -249,7 +249,7 @@ private:
     const std::string mModuleName;
     int mCountPerReport = 0;
     int mCount = 0;
-    size_t maxDirSize = 0;
+    size_t maxDirSize = 1024;
     std::chrono::steady_clock::time_point mLastTime; // 上次获取磁盘信息的时间
     std::unordered_map<uint64_t, std::shared_ptr<SicIODev>> fileSystemCache;
     // const char* const  PROCESS_DIR = "/proc/";
