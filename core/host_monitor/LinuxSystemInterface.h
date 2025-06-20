@@ -40,6 +40,9 @@ private:
     bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) override;
     bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) override;
 
+    bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
+    bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
+
     ProcParser mProcParser;
 };
 } // namespace logtail

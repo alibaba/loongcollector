@@ -58,6 +58,20 @@ double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) {
     return value;
 }
 
+bool GetHostLoadavg(vector<string>& lines, string& errorMessage) {
+    errorMessage.clear();
+    if (!CheckExistance(PROCESS_DIR / PROCESS_LOADAVG)) {
+        errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_LOADAVG).string();
+        return false;
+    }
+
+    int ret = GetFileLines(PROCESS_DIR / PROCESS_LOADAVG, lines, true, &errorMessage);
+    if (ret != 0 || lines.empty()) {
+        return false;
+    }
+    return true;
+}
+
 bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInfo) {
     std::vector<std::string> lines;
     std::string errorMessage;
@@ -162,6 +176,48 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
     processInfo.collectTime = steady_clock::now();
+    return true;
+}
+
+bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) {
+    std::vector<std::string> loadLines;
+    std::string errorMessage;
+    if (!GetHostLoadavg(loadLines, errorMessage) || loadLines.empty()) {
+        LOG_WARNING(sLogger, ("failed to get system load", "invalid System collector")("error msg", errorMessage));
+        return false;
+    }
+
+    // cat /proc/loadavg
+    // 0.10 0.07 0.03 1/561 78450
+    std::vector<std::string> loadMetric;
+    boost::split(loadMetric, loadLines[0], boost::is_any_of(" "), boost::token_compress_on);
+
+    if (loadMetric.size() < 3) {
+        LOG_WARNING(sLogger, ("failed to split load metric", "invalid System collector"));
+        return false;
+    }
+
+    CpuCoreNumInformation cpuCoreNumInfo;
+    if (!SystemInterface::GetInstance()->GetCPUCoreNumInformation(cpuCoreNumInfo)) {
+        LOG_WARNING(sLogger, ("failed to get cpu core num", "invalid System collector"));
+        return false;
+    }
+    systemLoadInfo.systemStat.load1 = std::stod(loadMetric[0]);
+    systemLoadInfo.systemStat.load5 = std::stod(loadMetric[1]);
+    systemLoadInfo.systemStat.load15 = std::stod(loadMetric[2]);
+
+    systemLoadInfo.systemStat.load1PerCore
+        = systemLoadInfo.systemStat.load1 / static_cast<double>(cpuCoreNumInfo.cpuCoreNum);
+    systemLoadInfo.systemStat.load5PerCore
+        = systemLoadInfo.systemStat.load5 / static_cast<double>(cpuCoreNumInfo.cpuCoreNum);
+    systemLoadInfo.systemStat.load15PerCore
+        = systemLoadInfo.systemStat.load15 / static_cast<double>(cpuCoreNumInfo.cpuCoreNum);
+
+    return true;
+}
+bool LinuxSystemInterface::GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) {
+    cpuCoreNumInfo.cpuCoreNum = std::thread::hardware_concurrency();
+    cpuCoreNumInfo.cpuCoreNum = cpuCoreNumInfo.cpuCoreNum < 1 ? 1 : cpuCoreNumInfo.cpuCoreNum;
     return true;
 }
 

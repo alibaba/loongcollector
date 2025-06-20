@@ -69,6 +69,24 @@ private:
         return true;
     }
 
+    bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        systemLoadInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        cpuCoreNumInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
 
