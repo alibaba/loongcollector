@@ -138,7 +138,7 @@ func (f *FlusherElasticSearch) Description() string {
 }
 
 func (f *FlusherElasticSearch) Validate() error {
-	if len(f.Addresses) == 0 {
+	if f.Addresses == nil || len(f.Addresses) == 0 {
 		var err = fmt.Errorf("elasticsearch addrs is nil")
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher error", err)
 		return err

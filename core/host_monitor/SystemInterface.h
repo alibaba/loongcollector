@@ -30,6 +30,7 @@
 
 #include "common/Flags.h"
 #include "common/ProcParser.h"
+#include "host_monitor/collector/MetricCalculate.h"
 
 DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 
@@ -82,6 +83,41 @@ struct ProcessListInformation : public BaseInformation {
 
 struct ProcessInformation : public BaseInformation {
     ProcessStat stat; // shared data structrue with eBPF process
+};
+
+// /proc/loadavg
+struct SystemStat {
+    double load1;
+    double load5;
+    double load15;
+    double load1PerCore;
+    double load5PerCore;
+    double load15PerCore;
+
+    // Define the field descriptors
+    static inline const FieldName<SystemStat> systemMetricFields[] = {
+        FIELD_ENTRY(SystemStat, load1),
+        FIELD_ENTRY(SystemStat, load5),
+        FIELD_ENTRY(SystemStat, load15),
+        FIELD_ENTRY(SystemStat, load1PerCore),
+        FIELD_ENTRY(SystemStat, load5PerCore),
+        FIELD_ENTRY(SystemStat, load15PerCore),
+    };
+
+    // Define the enumerate function for your metric type
+    static void enumerate(const std::function<void(const FieldName<SystemStat, double>&)>& callback) {
+        for (const auto& field : systemMetricFields) {
+            callback(field);
+        }
+    }
+};
+
+struct SystemLoadInformation : public BaseInformation {
+    SystemStat systemStat;
+};
+
+struct CpuCoreNumInformation : public BaseInformation {
+    unsigned int cpuCoreNum;
 };
 
 struct TupleHash {
@@ -146,13 +182,17 @@ public:
     bool GetCPUInformation(CPUInformation& cpuInfo);
     bool GetProcessListInformation(ProcessListInformation& processListInfo);
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
+    bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
+    bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
         : mSystemInformationCache(),
           mCPUInformationCache(ttl),
           mProcessListInformationCache(ttl),
-          mProcessInformationCache(ttl) {}
+          mProcessInformationCache(ttl),
+          mSystemLoadInformationCache(ttl),
+          mCPUCoreNumInformationCache(ttl) {}
     virtual ~SystemInterface() = default;
 
 private:
@@ -167,11 +207,15 @@ private:
     virtual bool GetCPUInformationOnce(CPUInformation& cpuInfo) = 0;
     virtual bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) = 0;
     virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
+    virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
+    virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
     SystemInformationCache<ProcessListInformation> mProcessListInformationCache;
     SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
+    SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
+    SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

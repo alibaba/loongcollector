@@ -85,7 +85,7 @@ func toMetricStoreFormat(metric *agent.JVMMetric, service string, serviceInstanc
 
 	for _, memPool := range metric.MemoryPool {
 		memLabels.Replace("type", memPool.Type.String())
-		memPoolCommitted := helper.NewMetricLog("skywalking_jvm_memory_pool_committed", metric.GetTime(), float64(memPool.Committed), memLabels)
+		memPoolCommitted := helper.NewMetricLog("skywalking_jvm_memory_pool_committed", metric.GetTime(), float64(memPool.Commited), memLabels)
 		logs = append(logs, memPoolCommitted)
 
 		memPoolInit := helper.NewMetricLog("skywalking_jvm_memory_pool_init", metric.GetTime(), float64(memPool.Init), memLabels)
