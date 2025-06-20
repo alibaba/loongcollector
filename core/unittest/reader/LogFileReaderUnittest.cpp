@@ -224,7 +224,6 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
         APSARA_TEST_EQUAL_FATAL(lastFilePos, reader.mLastFilePos);
     }
-#ifdef __linux__
     { // read twice, single line
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
@@ -259,7 +258,6 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
         APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
-#endif
     { // empty file
         MultilineOptions multilineOpts;
         FileReaderOptions readerOpts;
@@ -303,7 +301,11 @@ void LogFileReaderUnittest::TestReadGBK() {
         // first read, read first line without \n and not allowRollback
         int64_t firstReadSize = expectedPart.find("\n");
         expectedPart.resize(firstReadSize);
+#if defined(__linux__)
         reader.ReadGBK(logBuffer, 127, moreData, false); // first line without \n
+#else
+        reader.ReadGBK(logBuffer, 128, moreData, false); // Windows has an extra \r character compared to Linux.
+#endif
         APSARA_TEST_FALSE_FATAL(moreData);
         APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
         reader.ReadGBK(logBuffer, 127, moreData, false); // force read, clear cache

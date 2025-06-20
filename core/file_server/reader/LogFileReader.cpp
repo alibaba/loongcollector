@@ -1723,7 +1723,6 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         }
         readCharCount = alignedBytes;
     }
-    gbkBuffer[readCharCount] = '\0';
 
     vector<long> lineFeedPos = {-1}; // elements point to the last char of each line
     for (long idx = 0; idx < long(readCharCount - 1); ++idx) {
