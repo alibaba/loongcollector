@@ -407,11 +407,10 @@ endmacro()
 
 # grpc
 macro(link_grpc target_name)
-    find_package(absl REQUIRED PATHS /opt/logtail/deps/lib64/cmake/absl NO_DEFAULT_PATH)
-    find_package(utf8_range REQUIRED PATHS /opt/logtail/deps/lib64/cmake/utf8_range NO_DEFAULT_PATH)
-    find_package(protobuf REQUIRED PATHS /opt/logtail/deps/lib64/cmake/protobuf NO_DEFAULT_PATH)
-    find_package(gRPC REQUIRED PATHS /opt/logtail/deps NO_DEFAULT_PATH)
-    message("grpc lib" "${gRPC_LIBRARIES}")
+    find_package(absl REQUIRED PATHS ${DEPS_ROOT}/lib64/cmake/absl NO_DEFAULT_PATH)
+    find_package(utf8_range REQUIRED PATHS ${DEPS_ROOT}/lib64/cmake/utf8_range NO_DEFAULT_PATH)
+    find_package(protobuf REQUIRED PATHS ${DEPS_ROOT}/lib64/cmake/protobuf NO_DEFAULT_PATH)
+    find_package(gRPC REQUIRED PATHS ${DEPS_ROOT} NO_DEFAULT_PATH)
     target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
 endmacro()
 
