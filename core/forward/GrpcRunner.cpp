@@ -65,25 +65,28 @@ bool GrpcInputRunner::HasRegisteredPlugins() const {
     return !mListenInputs.empty();
 }
 
+// Add a new address to the listen inputs. If the address already exists, should call RemoveListenInput first.
 template <typename T>
 bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
                                         const std::string& address,
                                         const Json::Value& config) {
     std::lock_guard<std::mutex> lock(mListenInputsMutex);
     auto it = mListenInputs.find(address);
+    // generate a new service instance to get name
+    std::unique_ptr<T> service = std::make_unique<T>();
     if (it != mListenInputs.end()) {
         if (it->second.mServer == nullptr || it->second.mService == nullptr) {
             // should never happen
             LOG_ERROR(
                 sLogger,
                 ("GrpcInputRunner", "address exists but server or service is not initialized, should never happen")(
-                    "address", address)("service", T::Name()));
+                    "address", address)("service", service->Name()));
             return false;
-        } else if (it->second.mService->Name() != T::Name()) {
+        } else if (it->second.mService->Name() != service->Name()) {
             // Address already exists, check if the service type matches
             LOG_ERROR(sLogger,
                       ("GrpcInputRunner", "address already exists with a different service type")("address", address)(
-                          "existing service", it->second.mService->Name())("new service", T::Name()));
+                          "existing service", it->second.mService->Name())("new service", service->Name()));
             return false;
         } else {
             if (!it->second.mService->Update(configName, config)) {
@@ -92,46 +95,45 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
         }
     } else {
         GrpcListenInput input;
+        if (!service->Update(configName, config)) {
+            LOG_ERROR(sLogger,
+                      ("GrpcInputRunner", "failed to update service configuration")("service", service->Name())(
+                          "config", config.toStyledString()));
+            return false;
+        }
         auto result = mListenInputs.insert(std::make_pair(address, std::move(input)));
         if (!result.second) {
             LOG_ERROR(sLogger,
                       ("GrpcInputRunner", "failed to insert new address into listen inputs")("address", address));
             return false;
         }
-        LOG_INFO(
-            sLogger,
-            ("GrpcInputRunner", "new address inserted into listen inputs")("address", address)("service", T::Name()));
         it = result.first;
-        std::unique_ptr<T> service = std::make_unique<T>();
-        if (!service->Update(configName, config)) {
-            LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "failed to update service configuration")("service", T::Name())(
-                          "config", config.toStyledString()));
-            return false;
-        }
         grpc::ServerBuilder builder;
         std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;
         factories.emplace_back(std::make_unique<InFlightCountInterceptorFactory>(&it->second.mInFlightCnt));
         builder.experimental().SetInterceptorCreators(std::move(factories));
-
         builder.AddListeningPort(address, grpc::InsecureServerCredentials());
         // TODO: multi-service server is complex and lacks isolation, only support one service per server for now
         builder.RegisterService(service.get());
         auto server = builder.BuildAndStart();
         if (!server) {
             LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "failed to start gRPC server")("address", address)("service", T::Name())(
-                          "config name", configName));
+                      ("GrpcInputRunner", "failed to start gRPC server")("address", address)(
+                          "service", service->Name())("config name", configName));
+            mListenInputs.erase(result.first);
             return false;
         }
+        LOG_INFO(sLogger,
+                 ("GrpcInputRunner", "new address inserted into listen inputs")("address", address)("service",
+                                                                                                    service->Name()));
         it->second.mServer = std::move(server);
         it->second.mService = std::move(service);
     }
-
     it->second.mReferenceCount++;
     return true;
 }
 
+// Remove an address from the listen inputs
 template <typename T>
 bool GrpcInputRunner::RemoveListenInput(const std::string& address, const std::string& configName) {
     std::lock_guard<std::mutex> lock(mListenInputsMutex);

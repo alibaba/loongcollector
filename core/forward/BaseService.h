@@ -26,10 +26,7 @@ public:
 
     virtual bool Update(std::string configName, const Json::Value& config) = 0;
     virtual bool Remove(std::string configName) = 0;
-    static const std::string& Name() { return sName; };
-
-protected:
-    static const std::string sName;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
 };
 
 }; // namespace logtail

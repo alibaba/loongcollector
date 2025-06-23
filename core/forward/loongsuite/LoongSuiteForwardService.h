@@ -28,10 +28,17 @@ public:
 
     bool Update(std::string configName, const Json::Value& config) override;
     bool Remove(std::string configName) override;
+    [[nodiscard]] const std::string& Name() const override { return sName; };
 
     grpc::ServerUnaryReactor* Forward(grpc::CallbackServerContext* context,
                                       const LoongSuiteForwardRequest* request,
                                       LoongSuiteForwardResponse* response) override;
+
+private:
+    static const std::string sName;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class GrpcRunnerUnittest;
+#endif
 };
 
 } // namespace logtail

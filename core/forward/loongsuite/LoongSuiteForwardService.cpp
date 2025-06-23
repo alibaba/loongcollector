@@ -21,7 +21,7 @@
 
 namespace logtail {
 
-const std::string BaseService::sName = "LoongSuiteForwardService";
+const std::string LoongSuiteForwardServiceImpl::sName = "LoongSuiteForwardService";
 
 bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Value& config) {
     // Initialize the service with the provided configuration
