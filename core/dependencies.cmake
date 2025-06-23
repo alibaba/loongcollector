@@ -138,7 +138,7 @@ compile_proto(
 compile_proto_grpc(
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
-    "loongsuite.proto;"
+    "loongsuite.proto"
 )
 
 compile_proto(

@@ -26,7 +26,7 @@ public:
 
     bool Update(std::string configName, const Json::Value& config) override { return true; }
     bool Remove(std::string configName) override { return true; }
-    static std::string Name() { return "MockServiceImpl"; }
+    [[nodiscard]] const std::string& Name() const override { return sName; }
 
     grpc::ServerUnaryReactor* Forward(grpc::CallbackServerContext* context,
                                       const LoongSuiteForwardRequest* request,
@@ -35,6 +35,9 @@ public:
         reactor->Finish(grpc::Status::OK);
         return reactor;
     }
+
+private:
+    inline static const std::string sName = "MockServiceImpl";
 };
 
 } // namespace logtail

@@ -73,6 +73,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfi
     config["test"] = 1;
     const std::string address = "0.0.0.0:50052";
     runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    auto* serverPointer = runner->mListenInputs[address].mServer.get();
     config["test"] = 2;
     bool ret = runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     APSARA_TEST_TRUE_FATAL(ret);
@@ -82,6 +83,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfi
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 2);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
+    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mServer.get(), serverPointer);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt == 0);
     runner->Stop();
 }
@@ -100,7 +102,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError(
     APSARA_TEST_EQUAL_FATAL(runner->mListenInputs.size(), 1);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mService->Name(), LoongSuiteForwardServiceImpl::Name());
+    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mService->Name(), LoongSuiteForwardServiceImpl::sName);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt == 0);
