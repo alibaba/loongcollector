@@ -169,22 +169,14 @@ protected:
         FileServer::GetInstance()->Stop();
     }
 
-    void SetUp() override {
-        LogInput::GetInstance()->CleanEnviroments();
-        ProcessorRunner::GetInstance()->Init();
-        isFileServerStart = false; // file server stop is not reentrant, so we stop it only when start it
-    }
+    void SetUp() override { ProcessorRunner::GetInstance()->Init(); }
 
     void TearDown() override {
-        LogInput::GetInstance()->CleanEnviroments();
         EventDispatcher::GetInstance()->CleanEnviroments();
         for (auto& pipeline : CollectionPipelineManager::GetInstance()->GetAllPipelines()) {
             pipeline.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        // if (isFileServerStart) {
-        //     FileServer::GetInstance()->Stop();
-        // }
         ProcessorRunner::GetInstance()->Stop();
         FlusherRunner::GetInstance()->Stop();
         HttpSink::GetInstance()->Stop();
@@ -412,12 +404,9 @@ private:
         {
             "Type": "flusher_stdout2"
         })";
-
-    bool isFileServerStart = false;
 };
 
 void PipelineUpdateUnittest::TestFileServerStart() {
-    isFileServerStart = true;
     Json::Value nativePipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputFileConfig, nativeProcessorConfig, nativeFlusherConfig);
     Json::Value goPipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
