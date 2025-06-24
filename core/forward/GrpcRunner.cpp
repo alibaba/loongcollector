@@ -52,7 +52,7 @@ void GrpcInputRunner::Stop() {
         std::lock_guard<std::mutex> lock(mListenInputsMutex);
         for (auto& it : mListenInputs) {
             if (it.second.mServer) {
-                ShutdownGrpcServer(it.second.mServer.get(), &it.second.mInFlightCnt);
+                ShutdownGrpcServer(it.second.mServer.get(), it.second.mInFlightCnt);
             }
         }
         mListenInputs.clear();
@@ -82,16 +82,16 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
                 ("GrpcInputRunner", "address exists but server or service is not initialized, should never happen")(
                     "address", address)("service", service->Name()));
             return false;
-        } else if (it->second.mService->Name() != service->Name()) {
+        }
+        if (it->second.mService->Name() != service->Name()) {
             // Address already exists, check if the service type matches
             LOG_ERROR(sLogger,
                       ("GrpcInputRunner", "address already exists with a different service type")("address", address)(
                           "existing service", it->second.mService->Name())("new service", service->Name()));
             return false;
-        } else {
-            if (!it->second.mService->Update(configName, config)) {
-                return false;
-            }
+        }
+        if (!it->second.mService->Update(configName, config)) {
+            return false;
         }
     } else {
         GrpcListenInput input;
@@ -110,7 +110,7 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
         it = result.first;
         grpc::ServerBuilder builder;
         std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;
-        factories.emplace_back(std::make_unique<InFlightCountInterceptorFactory>(&it->second.mInFlightCnt));
+        factories.emplace_back(std::make_unique<InFlightCountInterceptorFactory>(it->second.mInFlightCnt));
         builder.experimental().SetInterceptorCreators(std::move(factories));
         builder.AddListeningPort(address, grpc::InsecureServerCredentials());
         // TODO: multi-service server is complex and lacks isolation, only support one service per server for now
@@ -148,7 +148,7 @@ bool GrpcInputRunner::RemoveListenInput(const std::string& address, const std::s
         return false;
     }
     if (it->second.mReferenceCount <= 0) {
-        if (!ShutdownGrpcServer(it->second.mServer.get(), &it->second.mInFlightCnt)) {
+        if (!ShutdownGrpcServer(it->second.mServer.get(), it->second.mInFlightCnt)) {
             LOG_ERROR(sLogger, ("GrpcInputRunner", "failed to shutdown gRPC server gracefully")("address", address));
         }
         mListenInputs.erase(it);
@@ -157,11 +157,16 @@ bool GrpcInputRunner::RemoveListenInput(const std::string& address, const std::s
     return true;
 }
 
-bool GrpcInputRunner::ShutdownGrpcServer(grpc::Server* server, std::atomic_int* inFlightCnt) {
+bool GrpcInputRunner::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<std::atomic_int> inFlightCnt) {
     if (server) {
         auto shutdownStartTime = std::chrono::system_clock::now();
         auto deadline = shutdownStartTime + std::chrono::seconds(INT32_FLAG(grpc_server_stop_timeout));
         server->Shutdown(deadline);
+        if (!inFlightCnt) {
+            // should never happen
+            LOG_INFO(sLogger, ("GrpcInputRunner", "inFlightCnt is nullptr, skip waiting for in-flight requests"));
+            return true;
+        }
         // Shutdown will release the server resources and new server can start
         // but cannot forcefully stop the in-flight requests.
         while (inFlightCnt->load() > 0) {

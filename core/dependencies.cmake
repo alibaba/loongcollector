@@ -430,6 +430,10 @@ macro(link_grpc target_name)
             message(FATAL_ERROR "gRPC not found, please upgrade your development image to compile!")
         endif()
         target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "libprotobufd"
+                optimized "libprotobuf")
     endif()
 endmacro()
 

@@ -35,20 +35,20 @@ namespace logtail {
 struct GrpcListenInput {
     std::unique_ptr<grpc::Server> mServer;
     std::unique_ptr<BaseService> mService;
-    std::atomic_int mInFlightCnt = 0;
+    std::shared_ptr<std::atomic_int> mInFlightCnt = std::make_shared<std::atomic_int>(0);
     size_t mReferenceCount = 0;
 
     GrpcListenInput() = default;
     GrpcListenInput(GrpcListenInput&& other) noexcept
         : mServer(std::move(other.mServer)),
           mService(std::move(other.mService)),
-          mInFlightCnt(other.mInFlightCnt.load()),
+          mInFlightCnt(std::move(other.mInFlightCnt)),
           mReferenceCount(other.mReferenceCount) {}
     GrpcListenInput& operator=(GrpcListenInput&& other) noexcept {
         if (this != &other) {
             mServer = std::move(other.mServer);
             mService = std::move(other.mService);
-            mInFlightCnt.store(other.mInFlightCnt.load());
+            mInFlightCnt = std::move(other.mInFlightCnt);
             mReferenceCount = other.mReferenceCount;
         }
         return *this;
@@ -60,7 +60,7 @@ struct GrpcListenInput {
 
 class InFlightCountInterceptor : public grpc::experimental::Interceptor {
 public:
-    explicit InFlightCountInterceptor(std::atomic_int* inFlightCnt) : mInFlightCnt(inFlightCnt) {}
+    explicit InFlightCountInterceptor(std::shared_ptr<std::atomic_int> inFlightCnt) : mInFlightCnt(inFlightCnt) {}
     void Intercept(grpc::experimental::InterceptorBatchMethods* methods) override {
         if (methods->QueryInterceptionHookPoint(
                 grpc::experimental::InterceptionHookPoints::POST_RECV_INITIAL_METADATA)) {
@@ -73,18 +73,19 @@ public:
     }
 
 private:
-    std::atomic_int* mInFlightCnt;
+    std::shared_ptr<std::atomic_int> mInFlightCnt;
 };
 
 class InFlightCountInterceptorFactory : public grpc::experimental::ServerInterceptorFactoryInterface {
 public:
-    explicit InFlightCountInterceptorFactory(std::atomic_int* inFlightCnt) : mInFlightCnt(inFlightCnt) {}
-    grpc::experimental::Interceptor* CreateServerInterceptor(grpc::experimental::ServerRpcInfo* info) override {
+    explicit InFlightCountInterceptorFactory(std::shared_ptr<std::atomic_int> inFlightCnt)
+        : mInFlightCnt(inFlightCnt) {}
+    grpc::experimental::Interceptor* CreateServerInterceptor(grpc::experimental::ServerRpcInfo*) override {
         return new InFlightCountInterceptor(mInFlightCnt);
     }
 
 private:
-    std::atomic_int* mInFlightCnt;
+    std::shared_ptr<std::atomic_int> mInFlightCnt;
 };
 
 class GrpcInputRunner : public InputRunner {
@@ -111,7 +112,7 @@ private:
     GrpcInputRunner() = default;
     ~GrpcInputRunner() override = default;
 
-    bool ShutdownGrpcServer(grpc::Server* server, std::atomic_int* inFlightCnt);
+    bool ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<std::atomic_int> inFlightCnt);
 
     mutable std::mutex mListenInputsMutex;
     std::unordered_map<std::string, GrpcListenInput> mListenInputs;

@@ -37,6 +37,7 @@ public:
     void TestUpdateListenInputExistingAddressDifferentTypeError() const;
     void TestRemoveListenInputNormalRemove() const;
     void TestRemoveListenInputAddressNotFoundError() const;
+    void TestRemoveListenInputAddressWithMultipleConfigs() const;
 
     void TestHasRegisteredPluginsEmpty() const;
     void TestHasRegisteredPluginsNotEmpty() const;
@@ -62,7 +63,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputNewAddressSuccess() const {
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt == 0);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
@@ -84,7 +85,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfi
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 2);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
     APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mServer.get(), serverPointer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt == 0);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
@@ -105,7 +106,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError(
     APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mService->Name(), LoongSuiteForwardServiceImpl::sName);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
     APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt == 0);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
@@ -129,6 +130,35 @@ void GrpcRunnerUnittest::TestRemoveListenInputAddressNotFoundError() const {
     bool ret = runner->RemoveListenInput<LoongSuiteForwardServiceImpl>(address, "configA");
     APSARA_TEST_FALSE_FATAL(ret);
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
+    runner->Stop();
+}
+
+void GrpcRunnerUnittest::TestRemoveListenInputAddressWithMultipleConfigs() const {
+    auto* runner = GrpcInputRunner::GetInstance();
+    runner->Init();
+    Json::Value config;
+    config["test"] = 1;
+    const std::string address = "0.0.0.0:50056";
+    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configB", address, config);
+    APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.size() == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 2);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
+
+    bool ret = runner->RemoveListenInput<LoongSuiteForwardServiceImpl>(address, "configA");
+    APSARA_TEST_TRUE_FATAL(ret);
+    APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.size() == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
@@ -160,14 +190,14 @@ void GrpcRunnerUnittest::TestShutdownGrpcServer() const {
     auto& inFlightCnt = runner->mListenInputs[address].mInFlightCnt;
     auto future = std::async(std::launch::async, [&inFlightCnt]() {
         for (int j = 0; j < 10; j++) {
-            inFlightCnt.fetch_add(1);
+            inFlightCnt->fetch_add(1);
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     });
     future.wait();
-    APSARA_TEST_FALSE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), &inFlightCnt));
+    APSARA_TEST_FALSE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), inFlightCnt));
     inFlightCnt = 0;
-    APSARA_TEST_TRUE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), &inFlightCnt));
+    APSARA_TEST_TRUE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), inFlightCnt));
     runner->Stop();
 }
 
@@ -176,6 +206,7 @@ UNIT_TEST_CASE(GrpcRunnerUnittest, TestUpdateListenInputExistingAddressSameTypeU
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestUpdateListenInputExistingAddressDifferentTypeError);
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputNormalRemove);
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputAddressNotFoundError);
+UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputAddressWithMultipleConfigs);
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestHasRegisteredPluginsEmpty);
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestHasRegisteredPluginsNotEmpty);
 UNIT_TEST_CASE(GrpcRunnerUnittest, TestShutdownGrpcServer);
