@@ -36,9 +36,9 @@ list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/BoostRegexVal
 
 if(MSVC)
     # remove LinuxDaemonUtil in common
-    if (ENABLE_ENTERPRISE)
-        list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
-    endif()
+    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
+    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/ProcParser.h ${CMAKE_SOURCE_DIR}/common/ProcParser.cpp)
+elseif(UNIX)
 endif()
 
 # Set source files to parent

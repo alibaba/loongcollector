@@ -120,26 +120,26 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         PipelineConfigWatcher::GetInstance()->AddSource("dir1");
         PipelineConfigWatcher::GetInstance()->AddSource("dir2");
 
-        filesystem::create_directories("config");
+        filesystem::create_directories("continuous_pipeline_config");
         filesystem::create_directories("dir1");
         filesystem::create_directories("dir2");
 
         {
             ofstream fout("dir1/config.json");
             fout << R"(
-            {
-                "inputs": [
-                    {
-                        "Type": "input_file"
-                    }
-                ],
-                "flushers": [
-                    {
-                        "Type": "flusher_sls"
-                    }
-                ]
-            }
-        )";
+                {
+                    "inputs": [
+                        {
+                            "Type": "input_file"
+                        }
+                    ],
+                    "flushers": [
+                        {
+                            "Type": "flusher_sls"
+                        }
+                    ]
+                }
+            )";
         }
         { ofstream fout("dir2/config.json"); }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -152,7 +152,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
-        filesystem::remove_all("config");
+        filesystem::remove_all("continuous_pipeline_config");
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
     {

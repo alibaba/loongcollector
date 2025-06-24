@@ -36,6 +36,7 @@ namespace logtail {
 std::string DecodeArgs(const StringView& rawArgs);
 StringView GetCapabilities(uint64_t capInt, SourceBuffer& sb);
 std::string GenerateExecId(const std::string& hostname, uint32_t pid, uint64_t ktime);
+long GetTicksPerSecond();
 
 struct Proc {
 public:

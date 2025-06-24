@@ -30,6 +30,7 @@
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
+DECLARE_FLAG_STRING(default_container_host_path);
 
 using namespace std;
 
@@ -138,7 +139,7 @@ void InputFileUnittest::OnSuccessfulInit() {
         {
             "Type": "input_file",
             "FilePaths": [],
-            "TailingAllMatchedFiles": true,
+            "TailingAllMatchedFiles": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -156,7 +157,7 @@ void InputFileUnittest::OnSuccessfulInit() {
         {
             "Type": "input_file",
             "FilePaths": [],
-            "EnableExactlyConcurrency": 600,
+            "EnableExactlyConcurrency": 600
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -490,27 +491,27 @@ void InputFileUnittest::TestSetContainerBaseDir() {
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data2/log"));
-    APSARA_TEST_EQUAL("/logtail_host/UpperDir/data2/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/UpperDir/data2/log", containerInfo.mRealBaseDir);
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/log"));
-    APSARA_TEST_EQUAL("/logtail_host/source1/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source1/log", containerInfo.mRealBaseDir);
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/log"));
-    APSARA_TEST_EQUAL("/logtail_host/source2/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source2/log", containerInfo.mRealBaseDir);
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/log"));
-    APSARA_TEST_EQUAL("/logtail_host/source3/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source3/log", containerInfo.mRealBaseDir);
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/log"));
-    APSARA_TEST_EQUAL("/logtail_host/source4/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source4/log", containerInfo.mRealBaseDir);
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/data5/log"));
-    APSARA_TEST_EQUAL("/logtail_host/source4/data5/log", containerInfo.mRealBaseDir);
+    APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source4/data5/log", containerInfo.mRealBaseDir);
 }
 
 UNIT_TEST_CASE(InputFileUnittest, OnSuccessfulInit)

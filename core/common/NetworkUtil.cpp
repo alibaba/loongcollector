@@ -28,6 +28,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/un.h>
+#elif defined(_MSC_VER)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 
 namespace logtail {
