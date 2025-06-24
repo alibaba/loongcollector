@@ -134,12 +134,13 @@ compile_proto(
     "log_event.proto;metric_event.proto;span_event.proto;pipeline_event_group.proto"
 )
 
-
+if (UNIX)
 compile_proto_grpc(
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
     "loongsuite.proto"
 )
+endif()
 
 compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/../config_server/protocol/v1"
@@ -407,27 +408,29 @@ endmacro()
 
 # grpc
 macro(link_grpc target_name)
-    find_package(re2 QUIET PATHS ${DEPS_ROOT}/lib64/cmake/re2 NO_DEFAULT_PATH)
-    if(NOT re2_FOUND)
-        message(FATAL_ERROR "re2 not found, please upgrade your development image to compile!")
+    if (UNIX)
+        find_package(re2 QUIET PATHS ${DEPS_ROOT}/lib64/cmake/re2 NO_DEFAULT_PATH)
+        if(NOT re2_FOUND)
+            message(FATAL_ERROR "re2 not found, please upgrade your development image to compile!")
+        endif()
+        find_package(absl QUIET PATHS ${DEPS_ROOT}/lib64/cmake/absl NO_DEFAULT_PATH)
+        if(NOT absl_FOUND)
+            message(FATAL_ERROR "absl not found, please upgrade your development image to compile!")
+        endif()
+        find_package(utf8_range QUIET PATHS ${DEPS_ROOT}/lib64/cmake/utf8_range NO_DEFAULT_PATH)
+        if(NOT utf8_range_FOUND)
+            message(FATAL_ERROR "utf8_range not found, please upgrade your development image to compile!")
+        endif()
+        find_package(protobuf QUIET PATHS ${DEPS_ROOT}/lib64/cmake/protobuf NO_DEFAULT_PATH)
+        if(NOT protobuf_FOUND)
+            message(FATAL_ERROR "protobuf not found, please upgrade your development image to compile!")
+        endif()
+        find_package(gRPC QUIET PATHS ${DEPS_ROOT} NO_DEFAULT_PATH)
+        if(NOT gRPC_FOUND)
+            message(FATAL_ERROR "gRPC not found, please upgrade your development image to compile!")
+        endif()
+        target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
     endif()
-    find_package(absl QUIET PATHS ${DEPS_ROOT}/lib64/cmake/absl NO_DEFAULT_PATH)
-    if(NOT absl_FOUND)
-        message(FATAL_ERROR "absl not found, please upgrade your development image to compile!")
-    endif()
-    find_package(utf8_range QUIET PATHS ${DEPS_ROOT}/lib64/cmake/utf8_range NO_DEFAULT_PATH)
-    if(NOT utf8_range_FOUND)
-        message(FATAL_ERROR "utf8_range not found, please upgrade your development image to compile!")
-    endif()
-    find_package(protobuf QUIET PATHS ${DEPS_ROOT}/lib64/cmake/protobuf NO_DEFAULT_PATH)
-    if(NOT protobuf_FOUND)
-        message(FATAL_ERROR "protobuf not found, please upgrade your development image to compile!")
-    endif()
-    find_package(gRPC QUIET PATHS ${DEPS_ROOT} NO_DEFAULT_PATH)
-    if(NOT gRPC_FOUND)
-        message(FATAL_ERROR "gRPC not found, please upgrade your development image to compile!")
-    endif()
-    target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
 endmacro()
 
 macro(link_spl target_name)
