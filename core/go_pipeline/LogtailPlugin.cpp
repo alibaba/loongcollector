@@ -292,7 +292,7 @@ int LogtailPlugin::ExecPluginCmd(
     // cmd 解析json
     Json::Value jsonParams;
     std::string errorMsg;
-    if (paramsStr.size() < 5UL || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
+    if (paramsStr.size() < (size_t)5 || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
         LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
         return -2;
     }

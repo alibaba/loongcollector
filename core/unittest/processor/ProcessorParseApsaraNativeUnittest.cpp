@@ -30,6 +30,11 @@ namespace logtail {
 class ProcessorParseApsaraNativeUnittest : public ::testing::Test {
 public:
     void SetUp() override {
+#ifdef _MSC_VER
+        _putenv_s("TZ", "UTC");
+#else
+        setenv("TZ", "UTC", 1);
+#endif
         mContext.SetConfigName("project##config_0");
         BOOL_FLAG(ilogtail_discard_old_data) = false;
     }

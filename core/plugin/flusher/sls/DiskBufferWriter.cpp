@@ -28,6 +28,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"

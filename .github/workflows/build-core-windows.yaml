@@ -1,0 +1,58 @@
+# Copyright 2021 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Build Core Windows
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
+  push:
+    branches:
+      - main
+      - 1.*
+
+jobs:
+  BuildCoreWindows:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        runner: [Windows]
+      fail-fast: true
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build Binary
+        env:
+          BUILD_LOGTAIL_UT: ON
+        run: scripts/windows64_build.bat
+
+      - name: Run UT
+        run: scripts/windows64_run_core_ut.bat
+
+  actions-timeline:
+    needs: [BuildCoreWindows]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2

@@ -18,6 +18,8 @@
 
 #if defined(__linux__)
 #include <fnmatch.h>
+#elif defined(_MSC_VER)
+#include "common/EncodingConverter.h"
 #endif
 
 #include "common/FileSystemUtil.h"

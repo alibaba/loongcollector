@@ -26,7 +26,7 @@
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 
-using namespace logtail;
+namespace logtail {
 
 class LogFileReaderUnittest : public ::testing::Test {
 public:
@@ -45,7 +45,7 @@ public:
     void SetUp() override {
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -301,7 +301,11 @@ void LogFileReaderUnittest::TestReadGBK() {
         // first read, read first line without \n and not allowRollback
         int64_t firstReadSize = expectedPart.find("\n");
         expectedPart.resize(firstReadSize);
+#if defined(__linux__)
         reader.ReadGBK(logBuffer, 127, moreData, false); // first line without \n
+#else
+        reader.ReadGBK(logBuffer, 128, moreData, false); // Windows has an extra \r character compared to Linux.
+#endif
         APSARA_TEST_FALSE_FATAL(moreData);
         APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
         reader.ReadGBK(logBuffer, 127, moreData, false); // force read, clear cache
@@ -588,7 +592,7 @@ public:
 
     void SetUp() override {
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -862,7 +866,7 @@ private:
     CollectionPipelineContext mCtx;
     FileDiscoveryConfig mConfig;
     bool writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc);
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
         if (!writer) {
             return false;
         }
@@ -893,7 +897,7 @@ void LogFileReaderHoleUnittest::TestReadLogHoleInTheMiddle() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == content);
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, content);
 }
 
 void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
@@ -913,7 +917,7 @@ void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
 }
 
 void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
@@ -934,12 +938,14 @@ void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(reader.ReadLog(logbuf, &event1)); // true means has more data
     APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
-    APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer == "a sample log");
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
 }
 
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
+
+} // namespace logtail
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

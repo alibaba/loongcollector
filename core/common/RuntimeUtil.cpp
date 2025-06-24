@@ -22,7 +22,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #elif defined(_MSC_VER)
-#include <Psapi.h>
 #include <Windows.h>
 #endif
 #include <cstdio>

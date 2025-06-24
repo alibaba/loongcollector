@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "Application.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -162,24 +163,20 @@ protected:
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
     }
 
-    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
-
-    void SetUp() override {
-        LogInput::GetInstance()->CleanEnviroments();
-        ProcessorRunner::GetInstance()->Init();
-        isFileServerStart = false; // file server stop is not reentrant, so we stop it only when start it
+    static void TearDownTestCase() {
+        PluginRegistry::GetInstance()->UnloadPlugins();
+        Application::GetInstance()->SetSigTermSignalFlag(true);
+        FileServer::GetInstance()->Stop();
     }
 
+    void SetUp() override { ProcessorRunner::GetInstance()->Init(); }
+
     void TearDown() override {
-        LogInput::GetInstance()->CleanEnviroments();
         EventDispatcher::GetInstance()->CleanEnviroments();
         for (auto& pipeline : CollectionPipelineManager::GetInstance()->GetAllPipelines()) {
             pipeline.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        if (isFileServerStart) {
-            FileServer::GetInstance()->Stop();
-        }
         ProcessorRunner::GetInstance()->Stop();
         FlusherRunner::GetInstance()->Stop();
         HttpSink::GetInstance()->Stop();
@@ -407,12 +404,9 @@ private:
         {
             "Type": "flusher_stdout2"
         })";
-
-    bool isFileServerStart = false;
 };
 
 void PipelineUpdateUnittest::TestFileServerStart() {
-    isFileServerStart = true;
     Json::Value nativePipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputFileConfig, nativeProcessorConfig, nativeFlusherConfig);
     Json::Value goPipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);

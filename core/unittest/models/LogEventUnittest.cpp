@@ -165,7 +165,7 @@ void LogEventUnittest::TestMeta() {
 }
 
 void LogEventUnittest::TestSize() {
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(vector<pair<LogContent, bool>>);
+    size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(vector<pair<LogContent, bool>>);
     // add content, and key not existed
     mLogEvent->SetContent(string("key1"), string("a"));
     APSARA_TEST_EQUAL(basicSize + 5U, mLogEvent->DataSize());
