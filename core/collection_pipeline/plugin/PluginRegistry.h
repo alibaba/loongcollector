@@ -92,6 +92,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;
+    friend class PipelineUpdateUnittest;
     friend void LoadPluginMock();
 #endif
 };

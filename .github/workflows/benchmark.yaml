@@ -103,7 +103,7 @@ jobs:
   #     - name: Set up Go
   #       uses: actions/setup-go@v4
   #       with:
-  #         go-version: 1.23.10
+  #         go-version: 1.19.10
 
   #     - name: Set up Python ${{ matrix.python-version }}
   #       uses: actions/setup-python@v5

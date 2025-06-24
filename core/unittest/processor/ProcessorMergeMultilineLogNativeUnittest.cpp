@@ -1797,7 +1797,7 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                         "timestamp" : 12345678901,
                         "timestampNanosecond" : 0,
                         "type" : 1
-                    },
+                    }
                 ],
                 "metadata": {
                     "has.part.log": "P"
