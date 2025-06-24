@@ -72,6 +72,13 @@ DoubleGaugePtr MetricsRecord::CreateDoubleGauge(const std::string& name) {
     return gaugePtr;
 }
 
+void MetricsRecord::AddLabels(MetricLabels&& labels) {
+    if (mCommitted) {
+        return;
+    }
+    mLabels->insert(mLabels->end(), labels.begin(), labels.end());
+}
+
 void MetricsRecord::MarkCommitted() {
     mCommitted = true;
 }
@@ -147,6 +154,8 @@ void MetricsRecord::SetNext(MetricsRecord* next) {
 
 MetricsRecordRef::~MetricsRecordRef() {
     if (mMetrics) {
+        // a check needs to be added: if MetricsRecordRef has not yet been committed to the linked list, MetricsRecord
+        // needs to be manually released to prevent memory leaks.
         if (mMetrics->IsCommitted()) {
             mMetrics->MarkDeleted();
         } else {
@@ -187,12 +196,12 @@ DoubleGaugePtr MetricsRecordRef::CreateDoubleGauge(const std::string& name) {
     return mMetrics->CreateDoubleGauge(name);
 }
 
-const MetricsRecord* MetricsRecordRef::operator->() const {
-    return mMetrics;
+void MetricsRecordRef::AddLabels(MetricLabels&& labels) {
+    mMetrics->AddLabels(std::move(labels));
 }
 
-void MetricsRecordRef::AddLabels(MetricLabels&& labels) {
-    mMetrics->GetLabels()->insert(mMetrics->GetLabels()->end(), labels.begin(), labels.end());
+const MetricsRecord* MetricsRecordRef::operator->() const {
+    return mMetrics;
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
