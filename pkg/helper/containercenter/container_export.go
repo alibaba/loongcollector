@@ -198,7 +198,7 @@ func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
 		return nil, err
 	}
 	// add dockerClient connectivity tests
-	pingCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	pingCtx, cancel := getContextWithTimeout(time.Second * 5)
 	defer cancel()
 	ping, err := client.Ping(pingCtx)
 	if err != nil {
