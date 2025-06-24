@@ -560,7 +560,6 @@ protected:
 
 private:
     bool mHasReadContainerBom = false;
-    void checkContainerType();
     void checkContainerType(LogFileOperator& op);
 
     // Initialized when the exactly once feature is enabled.
@@ -707,6 +706,8 @@ private:
     friend class LastMatchedContainerdTextWithDockerJsonUnittest;
     friend class ForceReadUnittest;
     friend class FileTagUnittest;
+    friend class CreateModifyHandlerUnittest;
+    friend class LogFileReaderHoleUnittest;
 
 protected:
     void UpdateReaderManual();

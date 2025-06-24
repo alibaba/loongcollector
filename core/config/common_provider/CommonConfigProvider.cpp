@@ -24,6 +24,7 @@
 #include "application/Application.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "common/YamlUtil.h"
 #include "common/http/Constant.h"
@@ -139,7 +140,7 @@ void CommonConfigProvider::LoadConfigFile() {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
-            info.name = entry.path().stem();
+            info.name = entry.path().stem().string();
             if (detail.isMember(CommonConfigProvider::configVersion)
                 && detail[CommonConfigProvider::configVersion].isInt64()) {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
@@ -157,7 +158,7 @@ void CommonConfigProvider::LoadConfigFile() {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
-            info.name = entry.path().stem();
+            info.name = entry.path().stem().string();
             if (detail.isMember(CommonConfigProvider::configVersion)
                 && detail[CommonConfigProvider::configVersion].isInt64()) {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
@@ -384,12 +385,14 @@ bool CommonConfigProvider::DumpConfigFile(const configserver::proto::v2::ConfigD
     }
     detail[CommonConfigProvider::configVersion] = config.version();
     string configDetail = detail.toStyledString();
-    ofstream fout(tmpFilePath);
-    if (!fout) {
-        LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
-        return false;
+    {
+        ofstream fout(tmpFilePath);
+        if (!fout) {
+            LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
+            return false;
+        }
+        fout << configDetail;
     }
-    fout << configDetail;
 
     error_code ec;
     filesystem::rename(tmpFilePath, filePath, ec);
@@ -428,18 +431,22 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::FAILED,
-                                                                             .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::FAILED;
+                info.detail = config.detail();
+                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::APPLYING,
-                                                                             .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::APPLYING;
+                info.detail = config.detail();
+                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
             }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
@@ -472,18 +479,22 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::FAILED,
-                                                                   .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::FAILED;
+                info.detail = config.detail();
+                mInstanceConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::APPLYING,
-                                                                   .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.detail = config.detail();
+                info.status = ConfigFeedbackStatus::APPLYING;
+                mInstanceConfigInfoMap[config.name()] = std::move(info);
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }

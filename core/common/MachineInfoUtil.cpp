@@ -45,6 +45,7 @@
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
+#include <ws2tcpip.h>
 #endif
 
 DEFINE_FLAG_STRING(agent_host_id, "", "");
@@ -182,6 +183,7 @@ std::string GetHostName() {
     return std::string(hostname);
 }
 
+#if defined(__linux__)
 std::unordered_set<std::string> GetNicIpv4IPSet() {
     struct ifaddrs* ifAddrStruct = NULL;
     void* tmpAddrPtr = NULL;
@@ -207,6 +209,7 @@ std::unordered_set<std::string> GetNicIpv4IPSet() {
     freeifaddrs(ifAddrStruct);
     return ipSet;
 }
+#endif
 
 std::string GetHostIpByHostName() {
     std::string hostname = GetHostName();
@@ -479,8 +482,9 @@ bool IsDigitsDotsHostname(const char* hostname) {
         int16_t digits = 32;
         while (*cp != '\0' && digits > 0) {
             char* endp;
-            uint64_t sum = strtoul(cp, &endp, 0);
-            if ((sum == ULONG_MAX && errno == ERANGE) || sum >= (1UL << digits)) {
+            // unsiged long 32 bit in windows, 64bit in linux.
+            uint64_t sum = strtoull(cp, &endp, 0);
+            if ((sum == ULONG_MAX && errno == ERANGE) || sum >= (1ULL << digits)) {
                 break;
             }
             cp = endp;

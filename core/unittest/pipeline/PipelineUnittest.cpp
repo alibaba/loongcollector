@@ -193,6 +193,35 @@ void PipelineUnittest::OnSuccessfulInit() const {
             ]
         }
     )";
+#if defined(_MSC_VER)
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 5,
+                "DefaultLogGroupQueueSize": 3
+            },
+            "inputs": [
+                {
+                    "type": "metric_container_info/2",
+                    "detail": {
+                        "CollectingContainersMeta": true,
+                        "LogPath": "C:\\home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ],
+            "extensions": [
+                {
+                    "type": "ext_basicauth/6",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+#else
     goPipelineWithInputStr = R"(
         {
             "global" : {
@@ -220,6 +249,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
             ]
         }
     )";
+#endif
     goPipelineWithoutInputStr = R"(
         {
             "global" : {
@@ -2605,6 +2635,28 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             ]
         }
     )";
+#if defined(_MSC_VER)
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "inputs": [
+                {
+                    "type": "metric_container_info/2",
+                    "detail": {
+                        "CollectingContainersMeta": true,
+                        "LogPath": "C:\\home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ]
+        }
+    )";
+#else
     goPipelineWithInputStr = R"(
         {
             "global" : {
@@ -2625,6 +2677,7 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             ]
         }
     )";
+#endif
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
@@ -2666,6 +2719,29 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             ]
         }
     )";
+#if defined(_MSC_VER)
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10,
+                "EnableProcessorTag": true
+            },
+            "inputs": [
+                {
+                    "type": "metric_container_info/2",
+                    "detail": {
+                        "CollectingContainersMeta": true,
+                        "LogPath": "C:\\home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ]
+        }
+    )";
+#else
     goPipelineWithInputStr = R"(
         {
             "global" : {
@@ -2687,6 +2763,7 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             ]
         }
     )";
+#endif
     goPipelineWithoutInputStr = R"(
         {
             "global" : {

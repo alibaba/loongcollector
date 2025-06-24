@@ -54,7 +54,7 @@ void RawEventUnittest::TestSetContent() {
 }
 
 void RawEventUnittest::TestSize() {
-    size_t basicSize = sizeof(time_t) + sizeof(long);
+    size_t basicSize = sizeof(time_t) + sizeof(uint64_t);
     mRawEvent->SetContent(string("content"));
     APSARA_TEST_EQUAL(basicSize + 7U, mRawEvent->DataSize());
 }
@@ -99,7 +99,7 @@ void RawEventUnittest::TestToJson() {
     string errorMsg;
     ParseJsonTable(eventStr, eventJson, errorMsg);
 
-    APSARA_TEST_TRUE(eventJson == res);
+    APSARA_TEST_TRUE(eventJson.toStyledString() == res.toStyledString());
 }
 
 UNIT_TEST_CASE(RawEventUnittest, TestTimestampOp)

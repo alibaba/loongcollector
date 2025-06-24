@@ -78,10 +78,31 @@ struct CompressedLogGroup {
     CompressedLogGroup(std::string&& data, size_t rawSize) : mData(std::move(data)), mRawSize(rawSize) {}
 };
 
+// template specialization must be implemented in header file in vc++
 template <>
-bool Serializer<std::vector<CompressedLogGroup>>::DoSerialize(std::vector<CompressedLogGroup>&& p,
-                                                              std::string& output,
-                                                              std::string& errorMsg);
+inline bool Serializer<std::vector<CompressedLogGroup>>::DoSerialize(std::vector<CompressedLogGroup>&& p,
+                                                                     std::string& output,
+                                                                     std::string& errorMsg) {
+    auto inputSize = 0;
+    for (auto& item : p) {
+        inputSize += item.mData.size();
+    }
+    ADD_COUNTER(mInItemsTotal, 1);
+    ADD_COUNTER(mInItemSizeBytes, inputSize);
+
+    auto before = std::chrono::system_clock::now();
+    auto res = Serialize(std::move(p), output, errorMsg);
+    ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
+
+    if (res) {
+        ADD_COUNTER(mOutItemsTotal, 1);
+        ADD_COUNTER(mOutItemSizeBytes, output.size());
+    } else {
+        ADD_COUNTER(mDiscardedItemsTotal, 1);
+        ADD_COUNTER(mDiscardedItemSizeBytes, inputSize);
+    }
+    return res;
+}
 
 class SLSEventGroupListSerializer : public Serializer<std::vector<CompressedLogGroup>> {
 public:

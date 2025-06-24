@@ -121,6 +121,7 @@ public:
     friend class SenderUnittest;
     friend class ModifyHandlerUnittest;
     friend class ForceReadUnittest;
+    friend class CreateModifyHandlerUnittest;
 #endif
 };
 

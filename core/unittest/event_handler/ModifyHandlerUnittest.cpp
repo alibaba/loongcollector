@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -30,6 +31,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -59,7 +61,7 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
@@ -76,6 +78,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+        std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
         // new pipeline
         configStr = R"(
             {
@@ -84,7 +87,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPath + R"("
+            + jsonLogPath + R"("
                         ]
                     }
                 ],
@@ -149,7 +152,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -169,7 +172,7 @@ private:
     std::shared_ptr<ModifyHandler> mHandlerPtr;
 
     void writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app | ios_base::binary);
         writer << logContent;
         writer.close();
     }
@@ -177,29 +180,29 @@ private:
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
         std::string containerStr = R"(
-        {
-            "ID": ")"
+            {
+                "ID": ")"
             + containerID + R"(",
-            "Mounts": [
-                {
-                    "Source": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-                    "Destination" : ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
-                }
-            ],
-            "UpperDir": ")"
-            + gRootDir + R"(",
-            "LogPath": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-            "MetaDatas": [
-                "_container_name_",
-                "test-container"
-            ],
-            "Path": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
-        }
-    )";
+                "Mounts": [
+                    {
+                        "Source": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
+                        "Destination" : ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
+                    }
+                ],
+                "UpperDir": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir) + R"(",
+                "LogPath": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
+                "MetaDatas": [
+                    "_container_name_",
+                    "test-container"
+                ],
+                "Path": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
+            }
+        )";
         Json::Value containerJson;
         APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
         APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
@@ -414,6 +417,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.dev, devInode.dev);
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.inode, devInode.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
+    handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
 }
 
 void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase1() {

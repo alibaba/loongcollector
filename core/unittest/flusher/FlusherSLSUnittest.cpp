@@ -547,7 +547,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Project": "test_project",
             "Logstore": "test_logstore",
             "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com"
         }
     )";
     optionalGoPipelineStr = R"(

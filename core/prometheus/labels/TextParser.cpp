@@ -302,7 +302,7 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
         mTokenLength = 0;
         return;
     }
-    if (milliTimestamp < 1UL << 31) {
+    if (milliTimestamp < 1ULL << 31) {
         milliTimestamp *= 1000;
     }
     time_t timestamp = (int64_t)milliTimestamp / 1000;
