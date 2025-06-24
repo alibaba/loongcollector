@@ -199,6 +199,10 @@ void Application::Init() {
 void Application::Start() { // GCOVR_EXCL_START
     LoongCollectorMonitor::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
 
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+    InitWindowsSignalObject();
+#endif
+
     // resource monitor
     // TODO: move metric related initialization to input Init
     LoongCollectorMonitor::GetInstance()->Init();
@@ -306,6 +310,9 @@ void Application::Start() { // GCOVR_EXCL_START
             LOG_INFO(sLogger, ("received SIGTERM signal", "exit process"));
             Exit();
         }
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+        SyncWindowsSignalObject();
+#endif
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
@@ -371,6 +378,9 @@ void Application::Exit() {
 
     CollectionPipelineManager::GetInstance()->ClearAllPipelines();
     TimeKeeper::GetInstance()->Stop();
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+    ReleaseWindowsSignalObject();
+#endif
     LOG_INFO(sLogger, ("exit", "bye!"));
     exit(0);
 }
