@@ -20,7 +20,6 @@
 #include <string>
 #include <utility>
 
-#include "ebpf/plugin/AbstractManager.h"
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
@@ -29,6 +28,7 @@
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 // #include "plugin/file_security/FileSecurityManager.h"
