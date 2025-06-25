@@ -262,12 +262,10 @@ func (sj *ServiceJournal) initJournal() error {
 			err = seekToHelper(SeekPositionTail, sj.journal.SeekTail())
 			if err != nil {
 				logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "seek to tail fail with error", err)
-				err = nil
 			}
-			_, err = sj.journal.Previous() //seek tail will move pointer after last entry, sets the read pointer into the journal back by one entry is necessary for ubuntu.
+			_, err = sj.journal.Previous() // seek tail will move pointer after last entry, sets the read pointer into the journal back by one entry is necessary for ubuntu.
 			if err != nil {
 				logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "seek to previous pointer fail with error", err)
-				err = nil
 			}
 		}
 	} else {
