@@ -109,10 +109,10 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.used});
     multiDoubleValues->SetValue(std::string("memory_usedspace_avg"),
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.used});
-    multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
-                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
-    multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
-                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
+    multiDoubleValues->SetValue(std::string("memory_totalspace_min"),
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.total});
+    multiDoubleValues->SetValue(std::string("memory_totalspace_max"),
+                                UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.total});
     multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
 
