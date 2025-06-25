@@ -30,12 +30,9 @@
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail::ebpf {
@@ -121,7 +118,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     return 0;
 }
 
-StringBuffer ToStringBuffer(std::shared_ptr<SourceBuffer> sourceBuffer, int32_t val) {
+StringBuffer ToStringBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer, int32_t val) {
     auto buf = sourceBuffer->AllocateStringBuffer(kMaxInt32Width);
     auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
     *end.out = '\0';

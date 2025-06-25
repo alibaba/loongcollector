@@ -26,8 +26,7 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/AggregateTree.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
     inline static constexpr StringView kExitTidKey = "exit_tid";
@@ -78,6 +77,7 @@ public:
         // do nothing ...
         return 0;
     }
+
 private:
     ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;
@@ -85,5 +85,4 @@ private:
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

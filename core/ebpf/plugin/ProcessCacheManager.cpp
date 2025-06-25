@@ -39,8 +39,8 @@
 #include "ebpf/plugin/ProcessExecveRetryableEvent.h"
 #include "ebpf/plugin/ProcessExitRetryableEvent.h"
 #include "logger/Logger.h"
-#include "type/table/BaseElements.h"
 #include "monitor/AlarmManager.h"
+#include "type/table/BaseElements.h"
 
 DEFINE_FLAG_INT32(max_ebpf_max_process_data_map_size, "Size of the data events cache", 2048);
 DEFINE_FLAG_INT32(max_ebpf_process_cache_size, "Size of the process cache", 131072);
@@ -192,8 +192,8 @@ void ProcessCacheManager::waitForPollingFinished() {
         int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
         if (!alarmOnce && duration > 10) { // 10s
             LOG_ERROR(sLogger, ("ProcessCacheManager stop", "too slow")("cost", duration));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
-                                                   std::string("ProcessCacheManager stop too slow; cost:" + ToString(duration)));
+            AlarmManager::GetInstance()->SendAlarm(
+                CONFIG_UPDATE_ALARM, std::string("ProcessCacheManager stop too slow; cost:" + ToString(duration)));
             alarmOnce = true;
         }
     }
@@ -436,12 +436,11 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
 void ProcessCacheManager::PollPerfBuffers() {
     int zero = 0;
     mIsPolling = true;
-    // mIsPolling must be set before mInited check to ensure 
+    // mIsPolling must be set before mInited check to ensure
     // when stopping, mIsPolling == false can ensure no more events will be processed
     if (mInited) {
         auto now = TimeKeeper::GetInstance()->NowSec();
-        if (now
-            > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
+        if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
             EventCache().HandleEvents();
             mLastEventCacheRetryTime = now;
             SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
@@ -450,8 +449,7 @@ void ProcessCacheManager::PollPerfBuffers() {
         auto ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
         LOG_DEBUG(sLogger, ("poll event num", ret));
-        if (now > mLastProcessCacheClearTime
-                + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {
+        if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {
             mProcessCache.ClearExpiredCache();
             mLastProcessCacheClearTime = now;
             int processCacheSize = mProcessCache.Size();

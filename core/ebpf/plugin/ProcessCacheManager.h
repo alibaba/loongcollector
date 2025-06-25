@@ -19,7 +19,6 @@
 #include <ctime>
 
 #include <atomic>
-#include <future>
 
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -31,7 +30,6 @@
 #include "ebpf/plugin/ProcessSyncRetryableEvent.h"
 #include "ebpf/plugin/RetryableEventCache.h"
 #include "ebpf/type/CommonDataEvent.h"
-#include "ebpf/util/FrequencyManager.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_models/MetricTypes.h"
 

@@ -18,14 +18,13 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
-#include "AbstractManager.h"
+#include "ebpf/plugin/AbstractManager.h"
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
-#include "common/StringTools.h"
-#include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
@@ -311,7 +310,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             if (!pluginMgr) {
                 pluginMgr = ProcessSecurityManager::Create(
                     mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
-                UpdatePluginManager(type, pluginMgr);
             }
             break;
         }
@@ -320,7 +318,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             if (!pluginMgr) {
                 pluginMgr = NetworkObserverManager::Create(
                     mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
-                UpdatePluginManager(type, pluginMgr);
             }
             break;
         }
@@ -329,7 +326,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
                     mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
-                UpdatePluginManager(type, pluginMgr);
             }
             break;
         }
@@ -339,7 +335,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         //         pluginMgr
         //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
         //             metricManager);
-        //         UpdatePluginManager(type, pluginMgr);
         //     }
         //     break;
         // }
@@ -353,8 +348,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         return false;
     }
 
-    updatePipelineName(type, pipelineName, ctx->GetProjectName());
-
+    updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
     pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
     return true;
 }
@@ -399,9 +393,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     auto& pluginState = getPluginState(type);
     std::unique_lock<std::shared_mutex> lock(pluginState.mMtx);
     std::string prevPipeline = checkLoadedPipelineName(type);
-    if (prevPipeline == pipelineName) {
-        updatePipelineName(type, "", "");
-    } else {
+    if (prevPipeline != pipelineName) {
         LOG_WARNING(
             sLogger,
             ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
@@ -416,7 +408,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         if (ret != 0) {
             LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         }
-        UpdatePluginManager(type, nullptr);
+        updatePluginState(type, "", "", nullptr);
         LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
             || type == PluginType::FILE_SECURITY) {
@@ -428,8 +420,8 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         }
     } else {
         LOG_WARNING(sLogger,
-                    ("No plugin registered or plugin not running, plugin type", magic_enum::enum_name(type))("pipeline",
-                                                                                                      pipelineName));
+                    ("No plugin registered or plugin not running, plugin type",
+                     magic_enum::enum_name(type))("pipeline", pipelineName));
     }
     return true;
 }
@@ -441,18 +433,18 @@ std::string EBPFServer::checkLoadedPipelineName(PluginType type) {
 std::string EBPFServer::GetAllProjects() {
     std::string res;
     for (int i = 0; i < int(PluginType::MAX); i++) {
-        std::shared_lock<std::shared_mutex> lock(getPluginState(PluginType(i)).mMtx);
+        auto type = PluginType(i);
+        auto& pluginState = getPluginState(type);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
+        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         if (mPlugins[i].mProject != "") {
             res += mPlugins[i].mProject;
             res += " ";
         }
     }
     return res;
-}
-
-void EBPFServer::updatePipelineName(PluginType type, const std::string& name, const std::string& project) {
-    mPlugins[int(type)].mPipelineName = name;
-    mPlugins[int(type)].mProject = project;
 }
 
 bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
@@ -492,13 +484,16 @@ void EBPFServer::pollPerfBuffers() {
         for (int i = 0; i < int(PluginType::MAX); i++) {
             auto type = PluginType(i);
             auto& pluginState = getPluginState(type);
+            if (!pluginState.mValid.load(std::memory_order_acquire)) {
+                continue;
+            }
             std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
             auto& plugin = pluginState.mManager;
             if (plugin) {
                 int cnt = plugin->PollPerfBuffer();
-                LOG_DEBUG(
-                    sLogger,
-                    ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status", plugin->IsRunning()));
+                LOG_DEBUG(sLogger,
+                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
+                                                                                        plugin->IsRunning()));
             }
         }
     }
@@ -517,11 +512,17 @@ PluginState& EBPFServer::getPluginState(PluginType type) {
     return mPlugins[static_cast<int>(type)];
 }
 
-void EBPFServer::UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager> mgr) {
+void EBPFServer::updatePluginState(PluginType type,
+                                   const std::string& name,
+                                   const std::string& project,
+                                   std::shared_ptr<AbstractManager> mgr) {
     if (type >= PluginType::MAX) {
         return;
     }
-    mPlugins[static_cast<int>(type)].mManager = mgr;
+    mPlugins[static_cast<int>(type)].mPipelineName = name;
+    mPlugins[static_cast<int>(type)].mProject = project;
+    mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
+    mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
 }
 
 void EBPFServer::handlerEvents() {
@@ -555,6 +556,9 @@ void EBPFServer::handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& it
         }
         auto pluginType = static_cast<PluginType>(i);
         auto& pluginState = getPluginState(pluginType);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         auto plugin = pluginState.mManager;
         for (int j = 0; j < groupCounts[i]; ++j) {
@@ -575,6 +579,9 @@ void EBPFServer::sendEvents() {
     for (int i = 0; i < int(PluginType::MAX); i++) {
         auto type = PluginType(i);
         auto& pluginState = getPluginState(type);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         auto& plugin = pluginState.mManager;
         if (plugin) {

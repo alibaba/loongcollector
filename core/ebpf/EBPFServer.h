@@ -58,6 +58,7 @@ struct PluginState {
     // Shared mutex to coordinate access between plugin management operations
     // (EnablePlugin/DisablePlugin/SuspendPlugin) and event handling operations
     // (PollPerfBuffers/HandlerEvents/GetAllProjects), allowing them to safely interleave.
+    mutable std::atomic_bool mValid;
     mutable std::shared_mutex mMtx;
 };
 
@@ -97,8 +98,6 @@ public:
     // TODO(qianlu): remove this function when network observer use unified threads
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
 
-    void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
-
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,
@@ -111,7 +110,10 @@ private:
     void pollPerfBuffers();
     void handlerEvents();
     std::string checkLoadedPipelineName(PluginType type);
-    void updatePipelineName(PluginType type, const std::string& name, const std::string& project);
+    void updatePluginState(PluginType type,
+                           const std::string& name,
+                           const std::string& project,
+                           std::shared_ptr<AbstractManager>);
     PluginState& getPluginState(PluginType type);
     bool checkIfNeedStopProcessCacheManager() const;
     void
