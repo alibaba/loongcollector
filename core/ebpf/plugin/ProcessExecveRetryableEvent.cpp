@@ -320,10 +320,12 @@ bool ProcessExecveRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    if (!mCommonEventQueue.try_enqueue(std::move(mProcessEvent))) {
-        LOG_ERROR(sLogger,
-                  ("event", "Failed to enqueue process execve event")("pid", mProcessEvent->mPid)(
-                      "ktime", mProcessEvent->mKtime));
+    if (!mCommonEventQueue.try_enqueue(mProcessEvent)) {
+        // don't use move as it will set mProcessEvent to nullptr even
+        // if enqueue failed, this is unexpected but don't know why
+        LOG_WARNING(sLogger,
+                    ("event", "Failed to enqueue process execve event")("pid", mProcessEvent->mPid)(
+                        "ktime", mProcessEvent->mKtime));
         // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }

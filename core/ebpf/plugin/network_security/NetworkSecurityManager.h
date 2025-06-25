@@ -51,14 +51,15 @@ public:
 
     void UpdateLossKernelEventsTotal(uint64_t cnt);
 
-    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
+    int SendEvents() override;
+
+    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
+        return true;
+    }
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -73,6 +74,8 @@ public:
 
 private:
     ReadWriteLock mLock;
+    int64_t mSendIntervalMs = 2000;
+    int64_t mLastSendTimeMs = 0;
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree; // guard by mLock
 };
 

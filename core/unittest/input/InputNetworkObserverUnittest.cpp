@@ -182,7 +182,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
@@ -214,16 +214,16 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     // APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
     serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 

@@ -644,7 +644,7 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
-    mManager->mFlag = true;
+    mManager->mInited = true;
     Timer::GetInstance()->Clear();
     EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
 

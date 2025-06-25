@@ -54,6 +54,7 @@ public:
 
     bool Init();
     void Stop();
+    void PollPerfBuffers();
 
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);
@@ -73,11 +74,10 @@ private:
     int syncAllProc();
     std::vector<std::shared_ptr<Proc>> listRunningProcs();
     int writeProcToBPFMap(const std::shared_ptr<Proc>& proc);
-
-    void pollPerfBuffers();
+    void waitForPollingFinished();
 
     std::atomic_bool mInited = false;
-    std::atomic_bool mRunFlag = false;
+    std::atomic_bool mIsPolling = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
     std::filesystem::path mHostPathPrefix;
@@ -97,9 +97,8 @@ private:
     IntGaugePtr mRetryableEventCacheSize;
 
     std::atomic_bool mFlushProcessEvent = false;
-    std::future<void> mPoller;
-
-    FrequencyManager mFrequencyMgr;
+    int64_t mLastProcessCacheClearTime = 0;
+    int64_t mLastEventCacheRetryTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessCacheManagerUnittest;
