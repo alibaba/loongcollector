@@ -77,14 +77,14 @@ protected:
                                                                      retryableEventCacheSize);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
-        EBPFServer::GetInstance()->updatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
     }
 
     void TearDown() override {
         Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
         mManager->Destroy();
-        EBPFServer::GetInstance()->updatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
+        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "", "", nullptr);
     }
 
 private:
@@ -646,7 +646,7 @@ void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
     mManager->mInited = true;
     Timer::GetInstance()->Clear();
-    EBPFServer::GetInstance()->updatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+    EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
 
     auto now = std::chrono::steady_clock::now();
     std::shared_ptr<ScheduleConfig> metricConfig
