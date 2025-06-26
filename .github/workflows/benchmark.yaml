@@ -18,7 +18,6 @@ on:
   push:
     branches:
       - main
-      - fix-selfmonitor-crash
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
