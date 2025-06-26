@@ -63,6 +63,7 @@ macro(add_core_subdir)
     if (LINUX)
         add_subdirectory(ebpf)
         add_subdirectory(host_monitor)
+        add_subdirectory(forward)
         add_subdirectory(prometheus)
     endif()
 
