@@ -154,7 +154,7 @@ int ProcessCollector::Init(int processTotalCount, int processReportTopN) {
     if (!SystemInterface::GetInstance()->GetHostMeminfoStatString(meminfoStr)) {
         return false;
     }
-
+    
     double totalMemory = GetMemoryStat(meminfoStr.meminfoString);
     mTotalMemory = totalMemory;
     mCountPerReport = processTotalCount;
@@ -168,9 +168,14 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     if (group == nullptr) {
         return false;
     }
-    if (!GetPids(pids)) {
+
+    ProcessListInformation processListInfo;
+
+    if (!SystemInterface::GetInstance()->GetProcessListInformation(processListInfo)) {
         return false;
     }
+
+    pids = processListInfo.pids;
 
     time_t now = time(nullptr);
 
@@ -233,7 +238,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     if (mCount < mCountPerReport) {
         return true;
     }
-
+    
     // 记录count满足条件以后，计算并推送多值指标；如果没有到达条件，只需要往多值体系内添加统计对象即可
     VMProcessNumStat minVMProcessNum, maxVMProcessNum, avgVMProcessNum, lastVMProcessNum;
     mVMProcessNumStat.Stat(minVMProcessNum, maxVMProcessNum, avgVMProcessNum, &lastVMProcessNum);
@@ -254,7 +259,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         mAvgProcessNumThreads.insert(std::make_pair(thisPid, avgMetric.numThreads));
         // 每个pid下的多值体系添加完毕
     }
-
+    
     // 指标推送
     MetricEvent* metricEvent = group->AddMetricEvent(true);
     if (!metricEvent) {
@@ -276,13 +281,13 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         avgVMProcessNum.vmProcessNum,
     };
     // vm的系统信息上传
-    for (size_t  i = 0; i < vmNames.size(); ++i) {
+    for (size_t i = 0; i < vmNames.size(); i++) {
         multiDoubleValues->SetValue(std::string(vmNames[i]),
                                     UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
     }
-
+    
     // 每个pid一条记录上报
-    for (size_t i = 0; i < mTopN; i++) {
+    for (size_t i = 0; i < mTopN && i<pushMerticList.size(); i++) {
         MetricEvent* metricEventEachPid = group->AddMetricEvent(true);
         metricEventEachPid->SetTimestamp(now, 0);
         metricEventEachPid->SetValue<UntypedMultiDoubleValues>(metricEventEachPid);
@@ -319,10 +324,10 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         metricEventEachPid->SetTag("name", pushMerticList[i].name);
         metricEventEachPid->SetTag("user", pushMerticList[i].user);
     }
-
+    
     // 打包记录，process_expand
     // average record
-    for (size_t i = 0; i < mTopN; ++i) {
+    for (size_t i = 0; i < mTopN && i<pushMerticList.size(); i++) {
         MetricEvent* metricEventEachPidExpand = group->AddMetricEvent(true);
         metricEventEachPidExpand->SetTimestamp(now, 0);
         metricEventEachPidExpand->SetValue<UntypedMultiDoubleValues>(metricEventEachPidExpand);
@@ -365,37 +370,6 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
 }
 
 //////////////////////////////////////////////
-bool ProcessCollector::GetPids(std::vector<pid_t>& pids) {
-    pids.clear();
-    bool ret;
-    ret = WalkAllDigitDirs(PROCESS_DIR, [&](const std::string &dirName) {
-            pid_t pid{};
-            if (!StringTo(dirName, pid)) {
-                return;
-            }
-            if (pid != 0) {
-                pids.push_back(pid);
-            }
-        });
-
-    return ret;
-}
-
-bool ProcessCollector::WalkAllDigitDirs(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback) {
-    if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        return false;
-    }
-
-    for (const auto& dirEntry :
-         std::filesystem::directory_iterator{root, std::filesystem::directory_options::skip_permission_denied}) {
-        std::string filename = dirEntry.path().filename().string();
-        if (IsInt(filename)) {
-            callback(filename);
-        }
-    }
-    return true;
-}
-
 // pid - self
 // pid - parent id
 void ProcessCollector::RemovePid(std::vector<pid_t> &pids, pid_t pid, pid_t ppid) {

@@ -43,9 +43,6 @@ public:
     const std::string& Name() const override { return sName; }
 
 public:
-    bool GetPids(std::vector<pid_t>& pids);
-
-    bool WalkAllDigitDirs(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
 
     void RemovePid(std::vector<pid_t> &pids, pid_t pid, pid_t ppid);
 
