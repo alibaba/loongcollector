@@ -48,7 +48,7 @@ def main():
 
     logger = logging.getLogger('log_generator')
     logger.setLevel(logging.INFO)
-    handler = TimedRotatingFileHandler(args.path, when="s", interval=600, backupCount=3)
+    handler = TimedRotatingFileHandler(args.path, when="s", interval=30, backupCount=3)
     formatter = logging.Formatter('%(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
