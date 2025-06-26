@@ -27,7 +27,7 @@ bool FlusherInstance::Init(const Json::Value& config,
     mPlugin->SetContext(context);
     mPlugin->SetPluginID(PluginID());
     mPlugin->SetFlusherIndex(flusherIdx);
-    mPlugin->SetMetricsRecordRef(Name(), PluginID());
+    mPlugin->CreateMetricsRecordRef(Name(), PluginID());
     if (!mPlugin->Init(config, optionalGoPipeline)) {
         return false;
     }
@@ -36,6 +36,7 @@ bool FlusherInstance::Init(const Json::Value& config,
     mInEventsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     mInSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_SIZE_BYTES);
     mTotalPackageTimeMs = mPlugin->GetMetricsRecordRef().CreateTimeCounter(METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS);
+    mPlugin->CommitMetricsRecordRef();
     return true;
 }
 

@@ -28,8 +28,10 @@ public:
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, "default_config");
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_TYPE, "default_plugin");
         defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_ID, "default_id");
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, std::move(*defaultLabels));
+        mSizeGauge = mMetricsRecordRef.CreateIntGauge("test_gauge");
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
         std::unordered_map<std::string, MetricType> metricKeys;
         metricKeys.emplace("default_counter", MetricType::METRIC_TYPE_COUNTER);
         metricKeys.emplace("default_gauge", MetricType::METRIC_TYPE_INT_GAUGE);
@@ -47,6 +49,8 @@ public:
 
 private:
     MetricsRecordRef mMetricsRecordRef;
+    IntGaugePtr mSizeGauge;
+
     PluginMetricManagerPtr pluginMetricManager;
 };
 
@@ -96,17 +100,16 @@ void PluginMetricManagerUnittest::TestReleaseMetricsRecordRefPtr() {
 }
 
 void PluginMetricManagerUnittest::TestRegisterSizeGauge() {
-    IntGaugePtr sizeGauge = mMetricsRecordRef.CreateIntGauge("test_gauge");
-    pluginMetricManager->RegisterSizeGauge(sizeGauge);
+    pluginMetricManager->RegisterSizeGauge(mSizeGauge);
 
     MetricLabels labels;
     labels.emplace_back("test_label", "test_value");
 
     auto ptr = pluginMetricManager->GetOrCreateReentrantMetricsRecordRef(labels);
-    APSARA_TEST_EQUAL(sizeGauge->GetValue(), 1); // One entry should be in the map
+    APSARA_TEST_EQUAL(mSizeGauge->GetValue(), 1); // One entry should be in the map
 
     pluginMetricManager->ReleaseReentrantMetricsRecordRef(labels);
-    APSARA_TEST_EQUAL(sizeGauge->GetValue(), 0); // The entry should have been removed
+    APSARA_TEST_EQUAL(mSizeGauge->GetValue(), 0); // The entry should have been removed
 }
 
 void PluginMetricManagerUnittest::TestReentrantMetricsRecord() {
