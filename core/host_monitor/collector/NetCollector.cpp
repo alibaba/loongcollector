@@ -76,19 +76,19 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 
         std::string curname = netInterfaceMetric.name;
         // 入方向、出方向 的 丢包率
-        ResNetPackRate resPackRate;
-        resPackRate.rxDropRate = netInterfaceMetric.rxPackets == 0
-            ? 0.0
-            : netInterfaceMetric.rxDropped / netInterfaceMetric.rxPackets * 100.0;
-        resPackRate.txDropRate = netInterfaceMetric.txPackets == 0
-            ? 0.0
-            : netInterfaceMetric.txDropped / netInterfaceMetric.txPackets * 100.0;
+        // ResNetPackRate resPackRate;
+        // resPackRate.rxDropRate = netInterfaceMetric.rxPackets == 0
+        //     ? 0.0
+        //     : netInterfaceMetric.rxDropped / netInterfaceMetric.rxPackets * 100.0;
+        // resPackRate.txDropRate = netInterfaceMetric.txPackets == 0
+        //     ? 0.0
+        //     : netInterfaceMetric.txDropped / netInterfaceMetric.txPackets * 100.0;
 
-        // mPackRateCalMap没有这个接口的数据
-        if (mPackRateCalMap.find(curname) == mPackRateCalMap.end()) {
-            mPackRateCalMap[curname] = MetricCalculate<ResNetPackRate>();
-        }
-        mPackRateCalMap[curname].AddValue(resPackRate);
+        // // mPackRateCalMap没有这个接口的数据
+        // if (mPackRateCalMap.find(curname) == mPackRateCalMap.end()) {
+        //     mPackRateCalMap[curname] = MetricCalculate<ResNetPackRate>();
+        // }
+        // mPackRateCalMap[curname].AddValue(resPackRate);
 
         // // 更新last内容
         // mLastInterfaceMetrics[curname] = netInterfaceMetric;
@@ -126,6 +126,18 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
                 ? 0.0
                 : static_cast<double>(netInterfaceMetric.txErrors - mLastInterfaceMetrics[curname].txErrors) / interval;
 
+            resRatePerSec.rxDropRate
+                = mLastInterfaceMetrics[curname].rxDropped > netInterfaceMetric.rxDropped || interval <= 0
+                ? 0.0
+                : static_cast<double>(netInterfaceMetric.rxDropped - mLastInterfaceMetrics[curname].rxDropped)
+                    / interval;
+
+            resRatePerSec.txDropRate
+                = mLastInterfaceMetrics[curname].txDropped > netInterfaceMetric.txDropped || interval <= 0
+                ? 0.0
+                : static_cast<double>(netInterfaceMetric.txDropped - mLastInterfaceMetrics[curname].txDropped)
+                    / interval;
+
             // mRatePerSecCalMap没有这个接口的数据
             if (mRatePerSecCalMap.find(curname) == mRatePerSecCalMap.end()) {
                 mRatePerSecCalMap[curname] = MetricCalculate<ResNetRatePerSec>();
@@ -149,7 +161,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     // 入方向、出方向 的 丢包率
     // 每秒发、收 的 字节数、包数
 
-    for (auto& packRateCal : mPackRateCalMap) {
+    for (auto& packRateCal : mRatePerSecCalMap) {
         std::string curname = packRateCal.first;
 
         MetricEvent* metricEvent = group->AddMetricEvent(true);
@@ -161,73 +173,85 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         metricEvent->SetTimestamp(now, 0);
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), curname);
+        metricEvent->SetTag(std::string("m"),std::string("system.net_original"));
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
 
 
-        ResNetPackRate minPackRate, maxPackRate, avgPackRate;
-        packRateCal.second.Stat(maxPackRate, minPackRate, avgPackRate);
-        packRateCal.second.Reset();
+        // ResNetPackRate minPackRate, maxPackRate, avgPackRate;
+        // packRateCal.second.Stat(maxPackRate, minPackRate, avgPackRate);
+        // packRateCal.second.Reset();
 
 
-        std::vector<std::string> packRateNames = {
-            "networkin_droppackages_percent_min",
-            "networkin_droppackages_percent_max",
-            "networkin_droppackages_percent_avg",
-            "networkout_droppackages_percent_min",
-            "networkout_droppackages_percent_max",
-            "networkout_droppackages_percent_avg",
-        };
-        std::vector<double> packRateValues = {
-            minPackRate.rxDropRate,
-            maxPackRate.rxDropRate,
-            avgPackRate.rxDropRate,
-            minPackRate.txDropRate,
-            maxPackRate.txDropRate,
-            avgPackRate.txDropRate,
-        };
+        std::vector<std::string> packRateNames = {};
+        //     "networkin_droppackages_percent_min",
+        //     "networkin_droppackages_percent_max",
+        //     "networkin_droppackages_percent_avg",
+        //     "networkout_droppackages_percent_min",
+        //     "networkout_droppackages_percent_max",
+        //     "networkout_droppackages_percent_avg",
+        // };
+        std::vector<double> packRateValues = {};
+        //     minPackRate.rxDropRate,
+        //     maxPackRate.rxDropRate,
+        //     avgPackRate.rxDropRate,
+        //     minPackRate.txDropRate,
+        //     maxPackRate.txDropRate,
+        //     avgPackRate.txDropRate,
+        // };
 
-        if (mRatePerSecCalMap.find(curname) != mRatePerSecCalMap.end()) {
-            ResNetRatePerSec minRatePerSec, maxRatePerSec, avgRatePerSec;
-            mRatePerSecCalMap[curname].Stat(maxRatePerSec, minRatePerSec, avgRatePerSec);
-            mRatePerSecCalMap[curname].Reset();
-            packRateNames.push_back("networkout_packages_min");
-            packRateValues.push_back(minRatePerSec.txPackRate);
-            packRateNames.push_back("networkout_packages_max");
-            packRateValues.push_back(maxRatePerSec.txPackRate);
-            packRateNames.push_back("networkout_packages_avg");
-            packRateValues.push_back(avgRatePerSec.txPackRate);
-            packRateNames.push_back("networkin_packages_min");
-            packRateValues.push_back(minRatePerSec.rxPackRate);
-            packRateNames.push_back("networkin_packages_max");
-            packRateValues.push_back(maxRatePerSec.rxPackRate);
-            packRateNames.push_back("networkin_packages_avg");
-            packRateValues.push_back(avgRatePerSec.rxPackRate);
-            packRateNames.push_back("networkout_errorpackages_min");
-            packRateValues.push_back(minRatePerSec.txErrorRate);
-            packRateNames.push_back("networkout_errorpackages_max");
-            packRateValues.push_back(maxRatePerSec.txErrorRate);
-            packRateNames.push_back("networkout_errorpackages_avg");
-            packRateValues.push_back(avgRatePerSec.txErrorRate);
-            packRateNames.push_back("networkin_errorpackages_min");
-            packRateValues.push_back(minRatePerSec.rxErrorRate);
-            packRateNames.push_back("networkin_errorpackages_max");
-            packRateValues.push_back(maxRatePerSec.rxErrorRate);
-            packRateNames.push_back("networkin_errorpackages_avg");
-            packRateValues.push_back(avgRatePerSec.rxErrorRate);
-            packRateNames.push_back("networkout_rate_min");
-            packRateValues.push_back(minRatePerSec.txByteRate);
-            packRateNames.push_back("networkout_rate_max");
-            packRateValues.push_back(maxRatePerSec.txByteRate);
-            packRateNames.push_back("networkout_rate_avg");
-            packRateValues.push_back(avgRatePerSec.txByteRate);
-            packRateNames.push_back("networkin_rate_min");
-            packRateValues.push_back(minRatePerSec.rxByteRate);
-            packRateNames.push_back("networkin_rate_max");
-            packRateValues.push_back(maxRatePerSec.rxByteRate);
-            packRateNames.push_back("networkin_rate_avg");
-            packRateValues.push_back(avgRatePerSec.rxByteRate);
-        }
+
+        ResNetRatePerSec minRatePerSec, maxRatePerSec, avgRatePerSec;
+        mRatePerSecCalMap[curname].Stat(maxRatePerSec, minRatePerSec, avgRatePerSec);
+        mRatePerSecCalMap[curname].Reset();
+        packRateNames.push_back("networkout_packages_min");
+        packRateValues.push_back(minRatePerSec.txPackRate);
+        packRateNames.push_back("networkout_packages_max");
+        packRateValues.push_back(maxRatePerSec.txPackRate);
+        packRateNames.push_back("networkout_packages_avg");
+        packRateValues.push_back(avgRatePerSec.txPackRate);
+        packRateNames.push_back("networkin_packages_min");
+        packRateValues.push_back(minRatePerSec.rxPackRate);
+        packRateNames.push_back("networkin_packages_max");
+        packRateValues.push_back(maxRatePerSec.rxPackRate);
+        packRateNames.push_back("networkin_packages_avg");
+        packRateValues.push_back(avgRatePerSec.rxPackRate);
+        packRateNames.push_back("networkout_errorpackages_min");
+        packRateValues.push_back(minRatePerSec.txErrorRate);
+        packRateNames.push_back("networkout_errorpackages_max");
+        packRateValues.push_back(maxRatePerSec.txErrorRate);
+        packRateNames.push_back("networkout_errorpackages_avg");
+        packRateValues.push_back(avgRatePerSec.txErrorRate);
+        packRateNames.push_back("networkin_errorpackages_min");
+        packRateValues.push_back(minRatePerSec.rxErrorRate);
+        packRateNames.push_back("networkin_errorpackages_max");
+        packRateValues.push_back(maxRatePerSec.rxErrorRate);
+        packRateNames.push_back("networkin_errorpackages_avg");
+        packRateValues.push_back(avgRatePerSec.rxErrorRate);
+        packRateNames.push_back("networkout_rate_min");
+        packRateValues.push_back(minRatePerSec.txByteRate);
+        packRateNames.push_back("networkout_rate_max");
+        packRateValues.push_back(maxRatePerSec.txByteRate);
+        packRateNames.push_back("networkout_rate_avg");
+        packRateValues.push_back(avgRatePerSec.txByteRate);
+        packRateNames.push_back("networkin_rate_min");
+        packRateValues.push_back(minRatePerSec.rxByteRate);
+        packRateNames.push_back("networkin_rate_max");
+        packRateValues.push_back(maxRatePerSec.rxByteRate);
+        packRateNames.push_back("networkin_rate_avg");
+        packRateValues.push_back(avgRatePerSec.rxByteRate);
+        packRateNames.push_back("networkout_droppackages_min");
+        packRateValues.push_back(minRatePerSec.txDropRate);
+        packRateNames.push_back("networkout_droppackages_max");
+        packRateValues.push_back(maxRatePerSec.txDropRate);
+        packRateNames.push_back("networkout_droppackages_avg");
+        packRateValues.push_back(avgRatePerSec.txDropRate);
+        packRateNames.push_back("networkin_droppackages_min");
+        packRateValues.push_back(minRatePerSec.rxDropRate);
+        packRateNames.push_back("networkin_droppackages_max");
+        packRateValues.push_back(maxRatePerSec.rxDropRate);
+        packRateNames.push_back("networkin_droppackages_avg");
+        packRateValues.push_back(avgRatePerSec.rxDropRate);
 
 
         for (size_t i = 0; i < packRateNames.size(); i++) {
@@ -249,6 +273,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     listenEvent->SetTimestamp(now, 0);
     listenEvent->SetTag(std::string("state"), std::string("LISTEN"));
+    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
     listenEvent->SetValue<UntypedMultiDoubleValues>(listenEvent);
     auto* listenMultiDoubleValues = listenEvent->MutableValue<UntypedMultiDoubleValues>();
     listenMultiDoubleValues->SetValue(
@@ -271,6 +296,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     establishedEvent->SetTimestamp(now, 0);
     establishedEvent->SetTag(std::string("state"), std::string("ESTABLISHED"));
+    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
     establishedEvent->SetValue<UntypedMultiDoubleValues>(establishedEvent);
     auto* establishedMultiDoubleValues = establishedEvent->MutableValue<UntypedMultiDoubleValues>();
     establishedMultiDoubleValues->SetValue(
@@ -293,6 +319,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     nonestablishedEvent->SetTimestamp(now, 0);
     nonestablishedEvent->SetTag(std::string("state"), std::string("NON_ESTABLISHED"));
+    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
     auto* nonestablishedMultiDoubleValues = nonestablishedEvent->MutableValue<UntypedMultiDoubleValues>();
     nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_min"),
@@ -312,6 +339,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     totalEvent->SetTimestamp(now, 0);
     totalEvent->SetTag(std::string("state"), std::string("TCP_TOTAL"));
+    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
     totalEvent->SetValue<UntypedMultiDoubleValues>(totalEvent);
     auto* totalMultiDoubleValues = totalEvent->MutableValue<UntypedMultiDoubleValues>();
     totalMultiDoubleValues->SetValue(
