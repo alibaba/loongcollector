@@ -33,5 +33,11 @@ std::vector<ConfigProvider*> GetRemoteConfigProviders();
 void InitRemoteConfigProviders();
 
 // GetProfileSender returns the ProfileSender instance.
+// Self-monitor metrics are not sent via ProfileSender anymore.
 ProfileSender* GetProfileSender();
+
+// RegisterExternalPlugins registers the external cpp plugins.
+// For example:
+//  PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherExternal>());
+void RegisterExternalPlugins();
 } // namespace logtail
