@@ -93,8 +93,9 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
@@ -127,8 +128,9 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
@@ -152,8 +154,9 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 }
 
 void InputNetworkObserverUnittest::OnSuccessfulStart() {
@@ -178,8 +181,9 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
@@ -210,8 +214,9 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);

@@ -340,11 +340,11 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         MetricCategory::METRIC_CATEGORY_PIPELINE,
-                                                         {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
-                                                          {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
-                                                          {METRIC_LABEL_KEY_LOGSTORE, mContext.GetLogstoreName()}});
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,
+                                                        MetricCategory::METRIC_CATEGORY_PIPELINE,
+                                                        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
+                                                         {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
+                                                         {METRIC_LABEL_KEY_LOGSTORE, mContext.GetLogstoreName()}});
     mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
     mProcessorsInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     mProcessorsInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);
@@ -355,6 +355,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mFlushersInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
     mFlushersInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
     mFlushersTotalPackageTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
     return true;
 }

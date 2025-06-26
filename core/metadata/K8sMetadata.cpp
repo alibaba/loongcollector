@@ -117,7 +117,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
 #endif
 
     // self monitor
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA}});
@@ -127,6 +127,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mExternalIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE);
     mRequestMetaServerTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL);
     mRequestMetaServerFailedTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mRef);
 
     // batch query metadata ...
     if (mEnable) {

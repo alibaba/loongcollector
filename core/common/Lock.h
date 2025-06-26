@@ -20,13 +20,15 @@
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#pragma GCC diagnostic pop
 #endif
 #include "boost/concept_check.hpp"
 #include "boost/range/algorithm/equal.hpp"
 #include "boost/range/size.hpp"
 #include "boost/smart_ptr/detail/spinlock.hpp"
 #include "boost/thread.hpp"
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #ifdef _MSC_VER
 #define NOGDI
 #include <windows.h>

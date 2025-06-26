@@ -627,7 +627,7 @@ void LoongCollectorMonitor::Init() {
         return EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
     });
 #endif
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_AGENT, std::move(labels), std::move(dynamicLabels));
     // init value
     mAgentCpu = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
@@ -636,6 +636,7 @@ void LoongCollectorMonitor::Init() {
     mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
     mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 void LoongCollectorMonitor::Stop() {

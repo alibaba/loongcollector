@@ -40,12 +40,15 @@ private:
     std::vector<IntGaugePtr> mIntGauges;
     std::vector<DoubleGaugePtr> mDoubleGauges;
 
+    std::atomic_bool mCommitted;
     std::atomic_bool mDeleted;
     MetricsRecord* mNext = nullptr;
 
 public:
     MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels = nullptr);
     MetricsRecord() = default;
+    void MarkCommitted();
+    bool IsCommitted() const;
     void MarkDeleted();
     bool IsDeleted() const;
     const std::string& GetCategory() const;
@@ -59,6 +62,7 @@ public:
     TimeCounterPtr CreateTimeCounter(const std::string& name);
     IntGaugePtr CreateIntGauge(const std::string& name);
     DoubleGaugePtr CreateDoubleGauge(const std::string& name);
+    void AddLabels(MetricLabels&& labels);
     MetricsRecord* Collect();
     void SetNext(MetricsRecord* next);
     MetricsRecord* GetNext() const;
@@ -87,9 +91,8 @@ public:
     TimeCounterPtr CreateTimeCounter(const std::string& name);
     IntGaugePtr CreateIntGauge(const std::string& name);
     DoubleGaugePtr CreateDoubleGauge(const std::string& name);
-    const MetricsRecord* operator->() const;
-    // this is not thread-safe, and should be only used before WriteMetrics::CommitMetricsRecordRef
     void AddLabels(MetricLabels&& labels);
+    const MetricsRecord* operator->() const;
 #ifdef APSARA_UNIT_TEST_MAIN
     bool HasLabel(const std::string& key, const std::string& value) const;
 #endif

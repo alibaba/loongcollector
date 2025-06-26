@@ -52,7 +52,7 @@ static void BM_DockerJson(int size, int batchSize) {
     config["IgnoringStderr"] = false;
     ProcessorParseContainerLogNative processor;
     processor.SetContext(mContext);
-    processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+    processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
 
     std::string data1
         = R"({"log":"Exception in thread \"main\" java.lang.NullPointerExceptionat  com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitle\n","stream":"stdout","time":"2024-04-07T08:02:40.873971412Z"})";
@@ -128,6 +128,7 @@ static void BM_DockerJson(int size, int batchSize) {
     std::string inJson = oss.str();
 
     bool init = processor.Init(config);
+    processor.CommitMetricsRecordRef();
     if (init) {
         int count = 0;
         // Perform setup here
@@ -165,7 +166,7 @@ static void BM_ContainerdText(int size, int batchSize) {
     config["IgnoringStderr"] = false;
     ProcessorParseContainerLogNative processor;
     processor.SetContext(mContext);
-    processor.SetMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+    processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
 
     std::string data1
         = R"(2024-04-08T12:48:59.665663286+08:00 stdout P Exception in thread "main" java.lang.NullPointerExceptionat  com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat com.example.myproject.Book.getTitleat )";
@@ -241,6 +242,7 @@ static void BM_ContainerdText(int size, int batchSize) {
     std::string inJson = oss.str();
 
     bool init = processor.Init(config);
+    processor.CommitMetricsRecordRef();
     if (init) {
         int count = 0;
         // Perform setup here

@@ -46,10 +46,9 @@ public:
         return ptr;
     }
 
-    void PrepareMetricsRecordRef(MetricsRecordRef& ref,
-                                 const std::string& category,
-                                 MetricLabels&& labels,
-                                 DynamicMetricLabels&& dynamicLabels = {});
+    // First, create a MetricsRecordRef using the CreateMetricsRecordRef method and Labels. Then add counter and gauge
+    // metrics. Finally, commit the MetricsRecordRef through CommitMetricsRecordRef. This will successfully collect the
+    // metric data.
     void CreateMetricsRecordRef(MetricsRecordRef& ref,
                                 const std::string& category,
                                 MetricLabels&& labels,
