@@ -212,6 +212,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         metricEvent->SetTag(std::string("device"), devName);
         metricEvent->SetTag(std::string("id_serial"), diskSerialId);
         metricEvent->SetTag(std::string("diskname"), dir_name);
+	metricEvent->SetTag(std::string("m"), std::string("system.disk"));
         // std::cout << "\ndiskName: " << std::string(diskName) << std::endl;
         // std::cout << "\nserialId: " << std::string(diskSerialId) << std::endl;
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);

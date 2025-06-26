@@ -110,6 +110,7 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
     }
     metricEvent->SetTimestamp(now, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+    metricEvent->SetTag(std::string("m"), std::string("system.load"));
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     for (size_t i = 0; i < names.size(); ++i) {
         multiDoubleValues->SetValue(std::string(names[i]),

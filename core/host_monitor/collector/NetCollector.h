@@ -170,25 +170,25 @@ struct ResTCPStat {
 };
 
 // 入方向丢包率，出方向丢包率，
-struct ResNetPackRate {
-    double rxDropRate;
-    double txDropRate;
-    // double rxErrorRate;
-    // double txErrorRate;
+// struct ResNetPackRate {
+//     double rxDropRate;
+//     double txDropRate;
+//     // double rxErrorRate;
+//     // double txErrorRate;
 
-    static inline const FieldName<ResNetPackRate, double> resPackRateFields[] = {
-        FIELD_ENTRY(ResNetPackRate, rxDropRate), FIELD_ENTRY(ResNetPackRate, txDropRate),
-        // FIELD_ENTRY(ResNetPackRate, rxErrorRate),
-        // FIELD_ENTRY(ResNetPackRate, txErrorRate),
-    };
-    static void enumerate(const std::function<void(const FieldName<ResNetPackRate, double>&)>& callback) {
-        for (auto& field : resPackRateFields) {
-            callback(field);
-        }
-    };
-};
+//     static inline const FieldName<ResNetPackRate, double> resPackRateFields[] = {
+//         FIELD_ENTRY(ResNetPackRate, rxDropRate), FIELD_ENTRY(ResNetPackRate, txDropRate),
+//         // FIELD_ENTRY(ResNetPackRate, rxErrorRate),
+//         // FIELD_ENTRY(ResNetPackRate, txErrorRate),
+//     };
+//     static void enumerate(const std::function<void(const FieldName<ResNetPackRate, double>&)>& callback) {
+//         for (auto& field : resPackRateFields) {
+//             callback(field);
+//         }
+//     };
+// };
 
-// 每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
+// 每秒发包数，上行带宽，下行带宽.每秒接受发送错误包数量。每秒发送接收丢包数
 struct ResNetRatePerSec {
     double rxPackRate;
     double txPackRate;
@@ -196,6 +196,8 @@ struct ResNetRatePerSec {
     double txByteRate;
     double txErrorRate;
     double rxErrorRate;
+    double rxDropRate;
+    double txDropRate;
 
     static inline const FieldName<ResNetRatePerSec, double> resRatePerSecFields[] = {
         FIELD_ENTRY(ResNetRatePerSec, rxPackRate),
@@ -204,6 +206,8 @@ struct ResNetRatePerSec {
         FIELD_ENTRY(ResNetRatePerSec, txByteRate),
         FIELD_ENTRY(ResNetRatePerSec, txErrorRate),
         FIELD_ENTRY(ResNetRatePerSec, rxErrorRate),
+        FIELD_ENTRY(ResNetRatePerSec, rxDropRate), 
+        FIELD_ENTRY(ResNetRatePerSec, txDropRate),
     };
     static void enumerate(const std::function<void(const FieldName<ResNetRatePerSec, double>&)>& callback) {
         for (auto& field : resRatePerSecFields) {
@@ -251,7 +255,7 @@ private:
     int mTotalCount = 0;
     int mCount = 0;
     MetricCalculate<ResTCPStat, uint64_t> mTCPCal;
-    std::map<std::string, MetricCalculate<ResNetPackRate>> mPackRateCalMap;
+    // std::map<std::string, MetricCalculate<ResNetPackRate>> mPackRateCalMap;
     std::map<std::string, MetricCalculate<ResNetRatePerSec>> mRatePerSecCalMap;
 };
 

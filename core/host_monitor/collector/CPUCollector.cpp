@@ -92,6 +92,7 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         }
         metricEvent->SetTimestamp(now, 0);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+	metricEvent->SetTag(std::string("m"), std::string("system.cpu"));
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
         for (const auto& def : metrics) {
             if (std::string(def.name) == "cpu_cores_value") {
