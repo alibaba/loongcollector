@@ -268,6 +268,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         multiDoubleValues->SetValue(std::string(vmNames[i]),
                                     UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
     }
+    metricEvent->SetTag(std::string("m"), std::string("system.process"));
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < pushMerticList.size(); ++i) {
@@ -303,9 +304,10 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         multiDoubleValuesEachPid->SetValue(std::string("process_number_minimum"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
-        metricEventEachPid->SetTag("pid", std::to_string(pid));
-        metricEventEachPid->SetTag("name", pushMerticList[i].name);
-        metricEventEachPid->SetTag("user", pushMerticList[i].user);
+        metricEventEachPid->SetTag(std::string("pid"), std::to_string(pid));
+        metricEventEachPid->SetTag(std::string("name"), pushMerticList[i].name);
+        metricEventEachPid->SetTag(std::string("user"), pushMerticList[i].user);
+        metricEventEachPid->SetTag(std::string("m"), std::string("system.process"));
     }
 
     // 打包记录，process_expand
@@ -333,11 +335,12 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
             std::string("process_expand_openfile_number"),
             UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
-        metricEventEachPidExpand->SetTag("pid", std::to_string(pid));
-        metricEventEachPidExpand->SetTag("name", pushMerticList[i].name);
-        metricEventEachPidExpand->SetTag("user", pushMerticList[i].user);
-        metricEventEachPidExpand->SetTag("args", pushMerticList[i].args);
-        metricEventEachPidExpand->SetTag("path", pushMerticList[i].path);
+        metricEventEachPidExpand->SetTag(std::string("pid"), std::to_string(pid));
+        metricEventEachPidExpand->SetTag(std::string("name"), pushMerticList[i].name);
+        metricEventEachPidExpand->SetTag(std::string("user"), pushMerticList[i].user);
+        metricEventEachPidExpand->SetTag(std::string("args"), pushMerticList[i].args);
+        metricEventEachPidExpand->SetTag(std::string("path"), pushMerticList[i].path);
+        metricEventEachPidExpand->SetTag(std::string("m"), std::string("system.process"));
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失

@@ -115,7 +115,7 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.total});
     multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
-
+    metricEvent->SetTag(std::string("m"), std::string("system.process"));
     return true;
 }
 
