@@ -143,7 +143,7 @@ var (
 	ClusterID            = flag.String("GLOBAL_CLUSTER_ID", "", "cluster id")
 	ClusterName          = flag.String("GLOBAL_CLUSTER_NAME", "", "cluster name")
 	ClusterRegion        = flag.String("GLOBAL_CLUSTER_REGION", "", "cluster region")
-	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "k8s", "cluster type, configurable: k8s (default)")
+	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "k8s", "cluster domain, configurable: k8s (default)")
 )
 
 // lookupFlag returns the flag.Flag for the given name, or an error if not found
