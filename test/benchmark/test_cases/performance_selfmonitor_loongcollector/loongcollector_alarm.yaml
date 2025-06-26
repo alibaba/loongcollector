@@ -1,6 +1,0 @@
-enable: true
-inputs:
-  - Type: input_internal_alarms
-flushers:
-  - Type: flusher_file
-    FilePath: self_monitor/self_alarms.log
