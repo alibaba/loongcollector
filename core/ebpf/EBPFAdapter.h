@@ -94,6 +94,7 @@ private:
         EBPF_FUNC_MAX,
     };
 
+    std::atomic_bool mInited = false;
     std::shared_ptr<DynamicLibLoader> mLib;
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};

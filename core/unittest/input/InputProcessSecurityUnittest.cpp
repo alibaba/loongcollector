@@ -110,7 +110,7 @@ void InputProcessSecurityUnittest::OnSuccessfulStart() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     input->Stop(true);
@@ -134,16 +134,16 @@ void InputProcessSecurityUnittest::OnSuccessfulStop() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     // APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
     serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 

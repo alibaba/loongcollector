@@ -447,7 +447,7 @@ bool NetworkObserverManager::updateParsers(const std::vector<std::string>& proto
 }
 
 bool NetworkObserverManager::ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
-    if (!this->mFlag || this->mSuspendFlag) {
+    if (!this->mInited || this->mSuspendFlag) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -581,7 +581,7 @@ static constexpr StringView kDefaultNetAppName = "__default_app_name__";
 static constexpr StringView kDefaultNetAppId = "__default_app_id__";
 
 bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
-    if (!this->mFlag || this->mSuspendFlag) {
+    if (!this->mInited || this->mSuspendFlag) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -737,7 +737,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree(const std::chrono::st
 }
 
 bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
-    if (!this->mFlag || this->mSuspendFlag) {
+    if (!this->mInited || this->mSuspendFlag) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -941,7 +941,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree(const std::chrono::stead
 static constexpr StringView kSpanHostAttrKey = "host";
 
 bool NetworkObserverManager::ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point&) { // handler
-    if (!this->mFlag || this->mSuspendFlag) {
+    if (!this->mInited || this->mSuspendFlag) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -1156,7 +1156,7 @@ int NetworkObserverManager::Update(
 }
 
 int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    if (mFlag) {
+    if (mInited) {
         return 0;
     }
     auto* opt = std::get<ObserverNetworkOption*>(options);
@@ -1167,7 +1167,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     updateParsers(opt->mEnableProtocols, {});
 
-    mFlag = true;
+    mInited = true;
 
     mConnectionManager = ConnectionManager::Create();
     mConnectionManager->SetConnStatsStatus(!opt->mDisableConnStats);
@@ -1296,7 +1296,7 @@ int NetworkObserverManager::Init(const std::variant<SecurityOptions*, ObserverNe
     mRollbackQueue = moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>>(4096);
 
     LOG_INFO(sLogger, ("begin to start ebpf ... ", ""));
-    this->mFlag = true;
+    this->mInited = true;
     this->runInThread();
 
     // register update host K8s metadata task ...
@@ -1539,7 +1539,7 @@ void NetworkObserverManager::processRecord(const std::shared_ptr<AbstractRecord>
 
 void NetworkObserverManager::ConsumeRecords() {
     std::array<std::shared_ptr<AbstractRecord>, 4096> items;
-    while (mFlag) {
+    while (mInited) {
         // poll event from
         auto now = std::chrono::steady_clock::now();
         auto nextWindow = mConsumerFreqMgr.Next();
@@ -1576,7 +1576,7 @@ void NetworkObserverManager::ConsumeRecords() {
 void NetworkObserverManager::PollBufferWrapper() {
     LOG_DEBUG(sLogger, ("enter poll perf buffer", ""));
     int32_t flag = 0;
-    while (this->mFlag) {
+    while (this->mInited) {
         // poll event from
         auto now = std::chrono::steady_clock::now();
         auto nextWindow = mPollKernelFreqMgr.Next();
@@ -1675,13 +1675,13 @@ void NetworkObserverManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event)
 }
 
 int NetworkObserverManager::Destroy() {
-    if (!mFlag) {
+    if (!mInited) {
         return 0;
     }
     LOG_INFO(sLogger, ("prepare to destroy", ""));
     mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
     LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
-    this->mFlag = false;
+    this->mInited = false;
 
     if (this->mCoreThread.joinable()) {
         this->mCoreThread.join();

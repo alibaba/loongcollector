@@ -47,6 +47,8 @@ public:
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent>& event) = 0;
 
+    virtual int SendEvents() = 0;
+
     virtual int PollPerfBuffer() {
         int zero = 0;
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
@@ -56,9 +58,9 @@ public:
             GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
     }
 
-    bool IsRunning() { return mFlag && !mSuspendFlag; }
+    bool IsRunning() { return mInited && !mSuspendFlag; }
 
-    bool IsExists() { return mFlag; }
+    bool IsExists() { return mInited; }
 
     virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
                               const std::shared_ptr<ScheduleConfig>& config)
@@ -116,7 +118,7 @@ private:
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:
-    std::atomic<bool> mFlag = false;
+    std::atomic<bool> mInited = false;
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
