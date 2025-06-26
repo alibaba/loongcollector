@@ -73,7 +73,10 @@ type ServiceK8sMeta struct {
 	metaCollector *metaCollector
 	configName    string
 	clusterID     string
+	clusterName   string
+	clusterRegion string
 	domain        string
+
 	// self metric
 	entityCount selfmonitor.CounterMetric
 	linkCount   selfmonitor.CounterMetric
@@ -117,19 +120,22 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 }
 
 func (s *ServiceK8sMeta) initDomain() {
-	switch *flags.ClusterType {
-	case ackCluster, oneCluster, asiCluster:
-		s.domain = acsDomain
-	default:
-		s.domain = infraDomain
+
+	if flags.ClusterType != nil && *flags.ClusterType != "" {
+		s.domain = *flags.ClusterType
+	} else {
+		s.domain = k8sDomain
 	}
+
 }
 
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
-			Interval:  60,
-			clusterID: *flags.ClusterID,
+			Interval:      60,
+			clusterID:     *flags.ClusterID,
+			clusterName:   *flags.ClusterName,
+			clusterRegion: *flags.ClusterRegion,
 		}
 	}
 }
