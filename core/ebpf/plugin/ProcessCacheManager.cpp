@@ -24,11 +24,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <utility>
 
 #include "Flags.h"
 #include "ProcessCache.h"
+#include "TimeKeeper.h"
 #include "_thirdparty/coolbpf/src/security/bpf_process_event_type.h"
 #include "common/ProcParser.h"
 #include "common/StringTools.h"
@@ -37,8 +39,8 @@
 #include "ebpf/plugin/ProcessExecveRetryableEvent.h"
 #include "ebpf/plugin/ProcessExitRetryableEvent.h"
 #include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 #include "type/table/BaseElements.h"
-#include "util/FrequencyManager.h"
 
 DEFINE_FLAG_INT32(max_ebpf_max_process_data_map_size, "Size of the data events cache", 2048);
 DEFINE_FLAG_INT32(max_ebpf_process_cache_size, "Size of the process cache", 131072);
@@ -149,22 +151,19 @@ bool ProcessCacheManager::Init() {
     if (mInited) {
         return true;
     }
-    mInited = true;
-    mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     auto ebpfConfig = std::make_unique<PluginConfig>();
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
 
     pconfig.mPerfBufferSpec = {{"tcpmon_map", 128, this, HandleKernelProcessEvent, HandleKernelProcessEventLost}};
     ebpfConfig->mConfig = pconfig;
-    mRunFlag = true;
-    mPoller = async(std::launch::async, &ProcessCacheManager::pollPerfBuffers, this);
     bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
-        LOG_ERROR(sLogger, ("start process security plugin", "failed"));
-        Stop();
+        LOG_ERROR(sLogger, ("start process probes", "failed"));
         return false;
     }
+    LOG_INFO(sLogger, ("start process probes, status", status));
+    mInited = true;
     auto ret = syncAllProc(); // write process cache contention with pollPerfBuffers
     if (ret) {
         LOG_WARNING(sLogger, ("failed to sync all proc, ret", ret));
@@ -177,20 +176,27 @@ void ProcessCacheManager::Stop() {
         return;
     }
     auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);
-    LOG_INFO(sLogger, ("stop process probes for base manager, status", res));
-    mRunFlag = false;
-    std::future_status s1 = mPoller.wait_for(std::chrono::seconds(1));
-    if (mPoller.valid()) {
-        if (s1 == std::future_status::ready) {
-            LOG_INFO(sLogger, ("poller thread", "stopped successfully"));
-            mProcessCache.Clear();
-            mProcessDataMap.Clear();
-            mRetryableEventCache.Clear();
-        } else {
-            LOG_WARNING(sLogger, ("poller thread", "forced to stopped"));
+    LOG_INFO(sLogger, ("stop process probes, status", res));
+    mInited = false;
+    waitForPollingFinished();
+    mProcessCache.Clear();
+    mProcessDataMap.Clear();
+    mRetryableEventCache.Clear();
+}
+
+void ProcessCacheManager::waitForPollingFinished() {
+    int64_t startTime = TimeKeeper::GetInstance()->NowSec();
+    bool alarmOnce = false;
+    while (mIsPolling) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms
+        int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
+        if (!alarmOnce && duration > 10) { // 10s
+            LOG_ERROR(sLogger, ("ProcessCacheManager stop", "too slow")("cost", duration));
+            AlarmManager::GetInstance()->SendAlarm(
+                CONFIG_UPDATE_ALARM, std::string("ProcessCacheManager stop too slow; cost:" + ToString(duration)));
+            alarmOnce = true;
         }
     }
-    mInited = false;
 }
 
 void ProcessCacheManager::UpdateRecvEventTotal(uint64_t count) {
@@ -427,35 +433,25 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     return res;
 }
 
-void ProcessCacheManager::pollPerfBuffers() {
-    auto now = std::chrono::steady_clock::now();
-    auto lastProcessCacheClearTime = now;
-    auto lastEventCacheRetryTime = now;
+void ProcessCacheManager::PollPerfBuffers() {
     int zero = 0;
-    LOG_DEBUG(sLogger, ("enter poller thread", ""));
-    while (mRunFlag) {
-        now = std::chrono::steady_clock::now();
-        auto nextWindow = mFrequencyMgr.Next();
-        if (!mFrequencyMgr.Expired(now)) {
-            std::this_thread::sleep_until(nextWindow);
-            mFrequencyMgr.Reset(nextWindow);
-        } else {
-            mFrequencyMgr.Reset(now);
-        }
-        if (now
-            > lastEventCacheRetryTime + static_cast<std::chrono::seconds>(INT32_FLAG(ebpf_event_retry_interval_sec))) {
+    mIsPolling = true;
+    // mIsPolling must be set before mInited check to ensure
+    // when stopping, mIsPolling == false can ensure no more events will be processed
+    if (mInited) {
+        auto now = TimeKeeper::GetInstance()->NowSec();
+        if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
             EventCache().HandleEvents();
-            lastEventCacheRetryTime = now;
+            mLastEventCacheRetryTime = now;
             SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
         }
         // poll after retry to avoid instant retry
         auto ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
         LOG_DEBUG(sLogger, ("poll event num", ret));
-        if (now > lastProcessCacheClearTime
-                + static_cast<std::chrono::seconds>(INT32_FLAG(ebpf_process_cache_gc_interval_sec))) {
+        if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {
             mProcessCache.ClearExpiredCache();
-            lastProcessCacheClearTime = now;
+            mLastProcessCacheClearTime = now;
             int processCacheSize = mProcessCache.Size();
             SET_GAUGE(mProcessCacheSize, processCacheSize);
             SET_GAUGE(mProcessDataMapSize, mProcessDataMap.Size());
@@ -467,7 +463,7 @@ void ProcessCacheManager::pollPerfBuffers() {
             }
         }
     }
-    LOG_DEBUG(sLogger, ("exit poller thread", ""));
+    mIsPolling = false;
 }
 
 } // namespace logtail::ebpf

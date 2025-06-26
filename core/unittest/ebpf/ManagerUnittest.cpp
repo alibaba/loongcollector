@@ -339,8 +339,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
-    auto execTime = std::chrono::steady_clock::now();
-    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+    APSARA_TEST_EQUAL(0, manager->SendEvents());
 
     manager->Destroy();
 }
@@ -381,8 +380,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
-    auto execTime = std::chrono::steady_clock::now();
-    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+    APSARA_TEST_EQUAL(0, manager->SendEvents());
 
     manager->Destroy();
 }

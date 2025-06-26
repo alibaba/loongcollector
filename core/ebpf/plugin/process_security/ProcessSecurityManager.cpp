@@ -22,6 +22,7 @@
 #include <thread>
 #include <utility>
 
+#include "TimeKeeper.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -29,12 +30,9 @@
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
-#include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 
 namespace logtail::ebpf {
@@ -57,7 +55,7 @@ int ProcessSecurityManager::Init(
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // just set timer ...
     // register base manager ...
-    mFlag = true;
+    mInited = true;
     mSuspendFlag = false;
 
     auto processCacheMgr = GetProcessCacheManager();
@@ -67,16 +65,11 @@ int ProcessSecurityManager::Init(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
-
-    std::shared_ptr<ScheduleConfig> scheduleConfig
-        = std::make_shared<ScheduleConfig>(PluginType::PROCESS_SECURITY, std::chrono::seconds(2));
-    ScheduleNext(std::chrono::steady_clock::now(), scheduleConfig);
-
     return 0;
 }
 
 int ProcessSecurityManager::Destroy() {
-    mFlag = false;
+    mInited = false;
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
         LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
@@ -125,7 +118,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     return 0;
 }
 
-StringBuffer ToStringBuffer(std::shared_ptr<SourceBuffer> sourceBuffer, int32_t val) {
+StringBuffer ToStringBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer, int32_t val) {
     auto buf = sourceBuffer->AllocateStringBuffer(kMaxInt32Width);
     auto end = fmt::format_to_n(buf.data, buf.capacity, "{}", val);
     *end.out = '\0';
@@ -133,17 +126,13 @@ StringBuffer ToStringBuffer(std::shared_ptr<SourceBuffer> sourceBuffer, int32_t 
     return buf;
 }
 
-bool ProcessSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                                          const std::shared_ptr<ScheduleConfig>& config) {
-    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
-    return ConsumeAggregateTree(execTime);
-}
-
-bool ProcessSecurityManager::ConsumeAggregateTree(
-    [[maybe_unused]] const std::chrono::steady_clock::time_point& execTime) {
-    if (!mFlag || mSuspendFlag) {
-        return false;
+int ProcessSecurityManager::SendEvents() {
+    if (!IsRunning()) {
+        return 0;
+    }
+    auto nowMs = TimeKeeper::GetInstance()->NowMs();
+    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+        return 0;
     }
 
     WriteLock lk(mLock);
@@ -155,7 +144,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
     if (nodes.empty()) {
         LOG_DEBUG(sLogger, ("empty nodes...", ""));
-        return true;
+        return 0;
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -218,7 +207,7 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
     {
         std::lock_guard lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
-            return true;
+            return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
         ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
@@ -240,6 +229,6 @@ bool ProcessSecurityManager::ConsumeAggregateTree(
         }
     }
 
-    return true;
+    return 0;
 }
 } // namespace logtail::ebpf

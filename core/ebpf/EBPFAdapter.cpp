@@ -99,6 +99,10 @@ EBPFAdapter::~EBPFAdapter() {
 }
 
 void EBPFAdapter::Init() {
+    if (mInited) {
+        return;
+    }
+    mInited = true;
     mBinaryPath = GetProcessExecutionDir();
     setenv("SYSAK_WORK_PATH", mBinaryPath.c_str(), 1);
     for (auto& x : mRunning) {

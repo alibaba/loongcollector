@@ -107,10 +107,12 @@ bool ProcessExitRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    if (!mCommonEventQueue.try_enqueue(std::move(mProcessExitEvent))) {
-        LOG_ERROR(sLogger,
-                  ("event", "Failed to enqueue process clone event")("pid", mRawEvent->current.pid)(
-                      "ktime", mRawEvent->current.ktime));
+    if (!mCommonEventQueue.try_enqueue(mProcessExitEvent)) {
+        // don't use move as it will set mProcessEvent to nullptr even
+        // if enqueue failed, this is unexpected but don't know why
+        LOG_WARNING(sLogger,
+                    ("event", "Failed to enqueue process clone event")("pid", mRawEvent->current.pid)(
+                        "ktime", mRawEvent->current.ktime));
         // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }

@@ -24,20 +24,6 @@ namespace logtail {
 const std::string InputProcessSecurity::sName = "input_process_security";
 
 bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    ebpf::EBPFServer::GetInstance()->Init();
-    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY)) {
-        return false;
-    }
-    std::string prevPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::PROCESS_SECURITY);
-    std::string pipelineName = mContext->GetConfigName();
-    if (prevPipelineName.size() && prevPipelineName != pipelineName) {
-        LOG_WARNING(sLogger,
-                    ("pipeline already loaded", "PROCESS_SECURITY")("prev pipeline", prevPipelineName)("curr pipeline",
-                                                                                                       pipelineName));
-        return false;
-    }
-
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
@@ -53,6 +39,10 @@ bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optional
 }
 
 bool InputProcessSecurity::Start() {
+    ebpf::EBPFServer::GetInstance()->Init();
+    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY)) {
+        return false;
+    }
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
                                                          logtail::ebpf::PluginType::PROCESS_SECURITY,
