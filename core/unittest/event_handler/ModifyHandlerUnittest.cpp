@@ -22,6 +22,8 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "checkpoint/CheckPointManager.h"
+#include "checkpoint/CheckpointManagerV2.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -418,6 +420,72 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.inode, devInode.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
+}
+
+
+void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
+
+    
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpoint() begin", time(NULL)));
+    std::string basicLogName = "rotate.log";
+    std::string logPath = gRootDir + PATH_SEPARATOR + basicLogName;
+    std::string logPath1 = logPath + ".1";
+    std::string signature = "a sample log";
+    auto sigSize = (uint32_t)signature.size();
+    auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
+    // build a modify handler
+    auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
+    writeLog(logPath, "a sample log\n");
+    writeLog(logPath1, "a sample log\n");
+    auto devInode = GetFileDevInode(logPath);
+
+    auto devInode1 = GetFileDevInode(logPath1);
+
+    CheckPoint* checkPointPtr = new CheckPoint(logPath,
+                                                0,
+                                                sigSize,
+                                                sigHash,
+                                                devInode,
+                                                mConfigName,
+                                                logPath,
+                                                false
+                                                true,
+                                                "1",
+                                                false);
+    // use last event time as checkpoint's last update time
+    checkPointPtr->mLastUpdateTime = 0;
+    checkPointPtr->mCache = 0;
+    checkPointPtr->mIdxInReaderArray = 0;
+
+    CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
+
+    CheckPoint* checkPointPtr1 = new CheckPoint(logPath1,
+                                                0,
+                                                sigSize,
+                                                sigHash,
+                                                devInode1,
+                                                mConfigName,
+                                                logPath,
+                                                false
+                                                true,
+                                                "1",
+                                                false);
+
+    CheckPointManager::Instance()->AddCheckPoint(checkPointPtr1);
+
+    Event event(gRootDir, basicLogName, EVENT_MODIFY, wd, 0, devInode.dev, devInode.inode);
+    event.SetConfigName(mConfigName);
+    handlerPtr->Handle(event);
+
+    Event event1(gRootDir, basicLogName, EVENT_MODIFY, wd, 0, devInode1.dev, devInode1.inode);
+    event1.SetConfigName(mConfigName);
+    handlerPtr->Handle(event1);
+
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mNameReaderMap.size() == 1);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mNameReaderMap[basicLogName].size() == 1);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap.size() == 1);
+
+
 }
 
 void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase1() {
