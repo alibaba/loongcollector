@@ -164,7 +164,7 @@ func RemoveShellScript(ctx context.Context, tempFileName string) (context.Contex
 func CreateAndDeleteE2eGeneratorPodOnK8s(ctx context.Context) (context.Context, error) {
 	time.Sleep(5 * time.Second)
 	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
-		if ctx, err := k8sEnv.CreateAndDeleteE2eGeneratorPod(ctx); err != nil {
+		if _, err := k8sEnv.CreateAndDeleteE2eGeneratorPod(ctx); err != nil {
 			return ctx, err
 		}
 	} else {
@@ -175,7 +175,7 @@ func CreateAndDeleteE2eGeneratorPodOnK8s(ctx context.Context) (context.Context, 
 
 func DeleteSingletonServiceOnK8s(ctx context.Context) (context.Context, error) {
 	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
-		if ctx, err := k8sEnv.DeleteSingletonService(ctx); err != nil {
+		if _, err := k8sEnv.DeleteSingletonService(ctx); err != nil {
 			return ctx, err
 		}
 	} else {
@@ -186,7 +186,7 @@ func DeleteSingletonServiceOnK8s(ctx context.Context) (context.Context, error) {
 
 func CreateSingletonServiceOnK8s(ctx context.Context) (context.Context, error) {
 	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
-		if ctx, err := k8sEnv.CreateSingletonService(ctx); err != nil {
+		if _, err := k8sEnv.CreateSingletonService(ctx); err != nil {
 			return ctx, err
 		}
 	} else {
