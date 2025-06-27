@@ -23,6 +23,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/FileEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
 namespace logtail::ebpf {
 
@@ -32,6 +33,8 @@ public:
     static const std::string sMmapValue;
     static const std::string sTruncateValue;
     static const std::string sPermissionValue;
+    static const std::string sPermissionReadValue;
+    static const std::string sPermissionWriteValue;    
 
     FileSecurityManager() = delete;
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,

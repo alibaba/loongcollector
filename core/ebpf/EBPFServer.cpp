@@ -27,7 +27,7 @@
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-// #include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
@@ -311,15 +311,14 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             break;
         }
 
-        // case PluginType::FILE_SECURITY: {
-        //     if (!pluginMgr) {
-        //         pluginMgr
-        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
-        //             metricManager);
-        //         UpdatePluginManager(type, pluginMgr);
-        //     }
-        //     break;
-        // }
+        case PluginType::FILE_SECURITY: {
+            if (!pluginMgr) {
+                pluginMgr
+                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+                UpdatePluginManager(type, pluginMgr);
+            }
+            break;
+        }
         default:
             LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
             return false;
