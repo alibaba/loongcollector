@@ -20,10 +20,10 @@
 #include <memory>
 #include <string>
 
-#include "collection_pipeline/CollectionPipeline.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -447,17 +447,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     auto devInode2 = GetFileDevInode(logPath2);
 
     addContainerInfo("1");
-    CheckPoint* checkPointPtr = new CheckPoint(logPath,
-                                                13,
-                                                sigSize,
-                                                sigHash,
-                                                devInode,
-                                                mConfigName,
-                                                logPath,
-                                                false,
-                                                true,
-                                                "1",
-                                                false);
+    CheckPoint* checkPointPtr
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode, mConfigName, logPath, false, true, "1", false);
     // use last event time as checkpoint's last update time
     checkPointPtr->mLastUpdateTime = time(NULL);
     checkPointPtr->mCache = "";
@@ -465,17 +456,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
 
     // not set container stopped for rotator reader
-    CheckPoint* checkPointPtr1 = new CheckPoint(logPath,
-                                                13,
-                                                sigSize,
-                                                sigHash,
-                                                devInode1,
-                                                mConfigName,
-                                                logPath1,
-                                                false,
-                                                false,
-                                                "1",
-                                                false);
+    CheckPoint* checkPointPtr1
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode1, mConfigName, logPath1, false, false, "1", false);
     checkPointPtr1->mLastUpdateTime = time(NULL);
     checkPointPtr1->mCache = "";
     checkPointPtr1->mIdxInReaderArray = -2;
@@ -483,17 +465,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
 
 
     // set container stopped for rotator reader
-    CheckPoint* checkPointPtr2 = new CheckPoint(logPath,
-                                                13,
-                                                sigSize,
-                                                sigHash,
-                                                devInode2,
-                                                mConfigName,
-                                                logPath2,
-                                                false,
-                                                true,
-                                                "1",
-                                                false);
+    CheckPoint* checkPointPtr2
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode2, mConfigName, logPath2, false, true, "1", false);
     checkPointPtr2->mLastUpdateTime = time(NULL);
     checkPointPtr2->mCache = "";
     checkPointPtr2->mIdxInReaderArray = -2;
@@ -517,7 +490,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode1]->mLogFileOp.IsOpen() == true);
     APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->mLogFileOp.IsOpen() == false);
 
-    
+
     Event event3(gRootDir, "", EVENT_CONTAINER_STOPPED, 0);
     event3.SetContainerID("1");
     handlerPtr->Handle(event3);
