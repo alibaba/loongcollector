@@ -72,7 +72,7 @@
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
 
 using namespace std;
@@ -152,9 +152,9 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     }
-    // if (BOOL_FLAG(enable_ebpf_file_secure)) {
-    //     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
-    // }
+    if (BOOL_FLAG(enable_ebpf_file_secure)) {
+        RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
