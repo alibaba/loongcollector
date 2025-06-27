@@ -562,7 +562,7 @@ void ModifyHandler::Handle(const Event& event) {
             if (pair.second->GetContainerID() != event.GetContainerID()) {
                 continue;
             }
-            v->SetContainerStopped();
+            pair.second->SetContainerStopped();
         }
     } else if (event.IsModify()) {
         // devInode cannot be found, this means a rotate file(like a.log.1) has event, and reader for rotate file is
