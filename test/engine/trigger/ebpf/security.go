@@ -161,6 +161,40 @@ func RemoveShellScript(ctx context.Context, tempFileName string) (context.Contex
 	return ctx, nil
 }
 
+func CreateAndDeleteE2eGeneratorPodOnK8s(ctx context.Context) (context.Context, error) {
+	time.Sleep(5 * time.Second)
+	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
+		if ctx, err := k8sEnv.CreateAndDeleteE2eGeneratorPod(ctx); err != nil {
+			return ctx, err
+		}
+	} else {
+		return ctx, fmt.Errorf("try to create and delete pod, but env is not k8s env")
+	}
+	return ctx, nil
+}
+
+func DeleteSingletonServiceOnK8s(ctx context.Context) (context.Context, error) {
+	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
+		if ctx, err := k8sEnv.DeleteSingletonService(ctx); err != nil {
+			return ctx, err
+		}
+	} else {
+		return ctx, fmt.Errorf("try to delete singleton service, but env is not k8s env")
+	}
+	return ctx, nil
+}
+
+func CreateSingletonServiceOnK8s(ctx context.Context) (context.Context, error) {
+	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
+		if ctx, err := k8sEnv.CreateSingletonService(ctx); err != nil {
+			return ctx, err
+		}
+	} else {
+		return ctx, fmt.Errorf("try to create singleton service, but env is not k8s env")
+	}
+	return ctx, nil
+}
+
 /*
 ********************
 input_network_security
