@@ -22,6 +22,8 @@
 
 namespace logtail {
 
+extern const uint32_t kHostMonitorMinInterval;
+
 extern std::filesystem::path PROCESS_DIR;
 const extern std::filesystem::path PROCESS_STAT;
 const extern std::filesystem::path PROCESS_LOADAVG;

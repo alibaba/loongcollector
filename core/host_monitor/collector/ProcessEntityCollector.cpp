@@ -60,8 +60,11 @@ system_clock::time_point ProcessEntityCollector::TicksToUnixTime(int64_t startTi
     return system_clock::time_point{static_cast<milliseconds>(startTicks) + milliseconds{systemInfo.bootTime * 1000}};
 }
 
-bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
-                                     PipelineEventGroup* group) {
+void ProcessEntityCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mInterval = collectConfig.mInterval.count();
+}
+
+bool ProcessEntityCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
@@ -96,7 +99,7 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
 
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
-        int keepAliveSeconds = collectConfig.mInterval.count() * 2;
+        int keepAliveSeconds = mInterval * 2;
         event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
 
         // custom fields

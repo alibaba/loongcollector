@@ -27,7 +27,10 @@ const std::string CPUCollector::sName = "cpu";
 const std::string kMetricLabelCPU = "cpu";
 const std::string kMetricLabelMode = "mode";
 
-bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+void CPUCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+}
+
+bool CPUCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

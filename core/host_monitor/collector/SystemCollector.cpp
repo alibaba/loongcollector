@@ -17,31 +17,23 @@
 #include "host_monitor/collector/SystemCollector.h"
 
 #include <chrono>
-#include <filesystem>
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
-
 #include "MetricValue.h"
-#include "common/StringTools.h"
+#include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
-#include "logger/Logger.h"
 
 namespace logtail {
 
 const std::string SystemCollector::sName = "system";
 const std::string kMetricLabelMode = "valueTag";
 
-SystemCollector::SystemCollector() {
-    Init();
-}
-int SystemCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
+void SystemCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mCountPerReport = collectConfig.mInterval.count() / kHostMonitorMinInterval;
     mCount = 0;
-    return 0;
 }
-bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+
+bool SystemCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

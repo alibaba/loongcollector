@@ -32,6 +32,7 @@ const uint32_t kDefaultInterval = 15; // seconds
 
 bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
+    mConfigName = mContext->GetConfigName();
     mInterval = kDefaultInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
@@ -56,12 +57,12 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
 bool InputHostMeta::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        {ProcessEntityCollector::sName}, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
+        mConfigName, {ProcessEntityCollector::sName}, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector({ProcessEntityCollector::sName});
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mConfigName);
     return true;
 }
 
