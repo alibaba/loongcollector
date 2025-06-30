@@ -255,7 +255,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     establishedEvent->SetTimestamp(now, 0);
     establishedEvent->SetTag(std::string("state"), std::string("ESTABLISHED"));
-    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    establishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
     establishedEvent->SetValue<UntypedMultiDoubleValues>(establishedEvent);
     auto* establishedMultiDoubleValues = establishedEvent->MutableValue<UntypedMultiDoubleValues>();
     establishedMultiDoubleValues->SetValue(
@@ -277,7 +277,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     nonestablishedEvent->SetTimestamp(now, 0);
     nonestablishedEvent->SetTag(std::string("state"), std::string("NON_ESTABLISHED"));
-    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    nonestablishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
     auto* nonestablishedMultiDoubleValues = nonestablishedEvent->MutableValue<UntypedMultiDoubleValues>();
     nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_min"),
@@ -299,7 +299,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     }
     totalEvent->SetTimestamp(now, 0);
     totalEvent->SetTag(std::string("state"), std::string("TCP_TOTAL"));
-    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    totalEvent->SetTag(std::string("m"), std::string("system.tcp"));
     totalEvent->SetValue<UntypedMultiDoubleValues>(totalEvent);
     auto* totalMultiDoubleValues = totalEvent->MutableValue<UntypedMultiDoubleValues>();
     totalMultiDoubleValues->SetValue(
