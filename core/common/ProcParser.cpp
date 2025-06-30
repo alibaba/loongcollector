@@ -547,51 +547,51 @@ bool ProcParser::ParseProcessStat(pid_t pid, const std::string& line, ProcessSta
         ps.state = words[EnumProcessStat::state - offset].front();
     }
     if (!StringTo(words[EnumProcessStat::ppid - offset], ps.parentPid)) {
-        LOG_WARNING(sLogger, ("Invalid ppid:", words[EnumProcessStat::ppid - offset]));
+        LOG_WARNING(sLogger, ("Invalid ppid", words[EnumProcessStat::ppid - offset]));
     }
     if (!StringTo(words[EnumProcessStat::tty_nr - offset], ps.tty)) {
-        LOG_WARNING(sLogger, ("Invalid tty_nr:", words[EnumProcessStat::tty_nr - offset]));
+        LOG_WARNING(sLogger, ("Invalid tty_nr", words[EnumProcessStat::tty_nr - offset]));
     }
     if (!StringTo(words[EnumProcessStat::minflt - offset], ps.minorFaults)) {
-        LOG_WARNING(sLogger, ("Invalid minflt:", words[EnumProcessStat::minflt - offset]));
+        LOG_WARNING(sLogger, ("Invalid minflt", words[EnumProcessStat::minflt - offset]));
     }
     if (!StringTo(words[EnumProcessStat::majflt - offset], ps.majorFaults)) {
-        LOG_WARNING(sLogger, ("Invalid majflt:", words[EnumProcessStat::majflt - offset]));
+        LOG_WARNING(sLogger, ("Invalid majflt", words[EnumProcessStat::majflt - offset]));
     }
     if (!StringTo(words[EnumProcessStat::utime - offset], ps.utimeTicks)) {
-        LOG_WARNING(sLogger, ("Invalid utime:", words[EnumProcessStat::utime - offset]));
+        LOG_WARNING(sLogger, ("Invalid utime", words[EnumProcessStat::utime - offset]));
     }
     if (!StringTo(words[EnumProcessStat::stime - offset], ps.stimeTicks)) {
-        LOG_WARNING(sLogger, ("Invalid stime:", words[EnumProcessStat::stime - offset]));
+        LOG_WARNING(sLogger, ("Invalid stime", words[EnumProcessStat::stime - offset]));
     }
     if (!StringTo(words[EnumProcessStat::cutime - offset], ps.cutimeTicks)) {
-        LOG_WARNING(sLogger, ("Invalid cutime:", words[EnumProcessStat::cutime - offset]));
+        LOG_WARNING(sLogger, ("Invalid cutime", words[EnumProcessStat::cutime - offset]));
     }
     if (!StringTo(words[EnumProcessStat::cstime - offset], ps.cstimeTicks)) {
-        LOG_WARNING(sLogger, ("Invalid cstime:", words[EnumProcessStat::cstime - offset]));
+        LOG_WARNING(sLogger, ("Invalid cstime", words[EnumProcessStat::cstime - offset]));
     }
     if (!StringTo(words[EnumProcessStat::priority - offset], ps.priority)) {
-        LOG_WARNING(sLogger, ("Invalid priority:", words[EnumProcessStat::priority - offset]));
+        LOG_WARNING(sLogger, ("Invalid priority", words[EnumProcessStat::priority - offset]));
     }
     if (!StringTo(words[EnumProcessStat::nice - offset], ps.nice)) {
-        LOG_WARNING(sLogger, ("Invalid nice:", words[EnumProcessStat::nice - offset]));
+        LOG_WARNING(sLogger, ("Invalid nice", words[EnumProcessStat::nice - offset]));
     }
     if (!StringTo(words[EnumProcessStat::num_threads - offset], ps.numThreads)) {
-        LOG_WARNING(sLogger, ("Invalid num_threads:", words[EnumProcessStat::num_threads - offset]));
+        LOG_WARNING(sLogger, ("Invalid num_threads", words[EnumProcessStat::num_threads - offset]));
     }
     if (!StringTo(words[EnumProcessStat::starttime - offset], ps.startTicks)) {
-        LOG_WARNING(sLogger, ("Invalid starttime:", words[EnumProcessStat::starttime - offset]));
+        LOG_WARNING(sLogger, ("Invalid starttime", words[EnumProcessStat::starttime - offset]));
     }
     if (!StringTo(words[EnumProcessStat::vsize - offset], ps.vSize)) {
-        LOG_WARNING(sLogger, ("Invalid vsize:", words[EnumProcessStat::vsize - offset]));
+        LOG_WARNING(sLogger, ("Invalid vsize", words[EnumProcessStat::vsize - offset]));
     }
     if (!StringTo(words[EnumProcessStat::rss - offset], ps.rss)) {
-        LOG_WARNING(sLogger, ("Invalid rss:", words[EnumProcessStat::rss - offset]));
+        LOG_WARNING(sLogger, ("Invalid rss", words[EnumProcessStat::rss - offset]));
     } else {
         ps.rss <<= getpagesize();
     }
     if (!StringTo(words[EnumProcessStat::processor - offset], ps.processor)) {
-        LOG_WARNING(sLogger, ("Invalid processor:", words[EnumProcessStat::processor - offset]));
+        LOG_WARNING(sLogger, ("Invalid processor", words[EnumProcessStat::processor - offset]));
     }
     return true;
 }
