@@ -335,7 +335,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             if (!pluginMgr) {
                 pluginMgr
                     = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
-                UpdatePluginManager(type, pluginMgr);
             }
             break;
         }

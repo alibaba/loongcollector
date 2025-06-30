@@ -71,7 +71,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                  callName.c_str());
         // step1: add a new entry into string_prefix_maps, and assign a filter id
         // step2: add a filter into filter map and record filter type and filter id
-        selector_filter kFilter;
+        selector_filter kFilter{};
         ::memset(&kFilter, 0, sizeof(kFilter));
         kFilter.filter_type = FILTER_TYPE_FILE_PREFIX;
         kFilter.map_idx[0] = idx;
@@ -90,7 +90,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                      x.c_str());
 
             // update inner map
-            string_prefix_lpm_trie prefixTrie;
+            string_prefix_lpm_trie prefixTrie{};
             ::memset(&prefixTrie, 0, sizeof(prefixTrie));
             ::memcpy(prefixTrie.data, x.data(), x.length());
             prefixTrie.prefixlen = x.length() * 8; // in bits

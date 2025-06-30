@@ -18,11 +18,10 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
-#include "ebpf/EBPFServer.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 
@@ -35,6 +34,8 @@ const std::string FileSecurityManager::sPathKey = "path";
 const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
 const std::string FileSecurityManager::sTruncateValue = "security_path_truncate";
 const std::string FileSecurityManager::sPermissionValue = "security_file_permission";
+const std::string FileSecurityManager::sPermissionReadValue = "read";
+const std::string FileSecurityManager::sPermissionWriteValue = "write";
 
 void HandleFileKernelEvent(void* ctx, int, void* data, __u32) {
     if (!ctx) {
@@ -50,6 +51,7 @@ void HandleFileKernelEvent(void* ctx, int, void* data, __u32) {
 }
 
 void HandleFileKernelEventLoss(void* ctx, int, __u64 num) {
+    LOG_WARNING(sLogger, ("kernel event loss, lost_count", num)("type", "file security"));
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", "")("lost network kernel events num", num));
         return;
@@ -65,29 +67,18 @@ void FileSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
     ADD_COUNTER(mLossKernelEventsTotal, cnt);
 }
 
-void FileSecurityManager::RecordFileEvent(file_data_t* event) {
+void FileSecurityManager::RecordFileEvent(file_data_t* rawEvent) {
     ADD_COUNTER(mRecvKernelEventsTotal, 1);
-    KernelEventType type;
-    switch (event->func) {
-        case TRACEPOINT_FUNC_SECURITY_FILE_PERMISSION:
-            type = KernelEventType::FILE_PERMISSION_EVENT;
-            break;
-        case TRACEPOINT_FUNC_SECURITY_MMAP_FILE:
-            type = KernelEventType::FILE_MMAP;
-            break;
-        case TRACEPOINT_FUNC_SECURITY_PATH_TRUNCATE:
-            type = KernelEventType::FILE_PATH_TRUNCATE;
-            break;
-        default:
-            return;
+    auto processCacheMgr = GetProcessCacheManager();
+    if (processCacheMgr == nullptr) {
+        LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
+        return;
     }
-    std::string path = &event->path[4];
-    std::shared_ptr<FileEvent> evt
-        = std::make_shared<FileEvent>(event->key.pid, event->key.ktime, type, event->timestamp, path);
-    LOG_DEBUG(sLogger, ("[record_file_event] path", path));
-    // compose to generic event
-    // enqueue
-    mCommonEventQueue.enqueue(std::move(evt));
+
+    std::unique_ptr<FileRetryableEvent> event(processCacheMgr->CreateFileRetryableEvent(rawEvent));
+    if (!event->HandleMessage()) {
+        processCacheMgr->EventCache().AddEvent(std::move(event));
+    }
 }
 
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -106,9 +97,13 @@ FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManag
           }) {
 }
 
-bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::time_point&) {
-    if (!this->mFlag || this->mSuspendFlag) {
-        return false;
+int FileSecurityManager::SendEvents() {
+    if (!IsRunning()) {
+        return 0;
+    }
+    auto nowMs = TimeKeeper::GetInstance()->NowMs();
+    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+        return 0;
     }
 
     WriteLock lk(this->mLock);
@@ -119,7 +114,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
     if (nodes.empty()) {
         LOG_DEBUG(sLogger, ("empty nodes...", ""));
-        return true;
+        return 0;
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -131,7 +126,7 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
         auto processCacheMgr = GetProcessCacheManager();
         if (processCacheMgr == nullptr) {
             LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
-            return false;
+            return 0;
         }
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
@@ -164,12 +159,34 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
+                        break;
+                    }
+                    case KernelEventType::FILE_PERMISSION_EVENT_WRITE: {
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionWriteValue));
+                        logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
+                        break;
+                    }
+                    case KernelEventType::FILE_PERMISSION_EVENT_READ: {
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionReadValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     default:
                         break;
+                }
+
+                // log debug输出logEvent中的值
+                // 获取 logEvent 中的值并以 debug 形式输出
+                StringView callName = logEvent->GetContent("call_name");
+                if(callName == "security_path_truncate") {
+                    StringView path = logEvent->GetContent("path");
+                    StringView pid = logEvent->GetContent("pid");
+                    StringView ktime = logEvent->GetContent("ktime");     
+
+                    // 输出 debug 日志
+                    LOG_DEBUG(sLogger, ("[security_path_truncate]", "LogEvent")("call_name" , callName.data())("path", path.data())("pid", pid.data())("ktime", ktime.data()));
                 }
             }
         });
@@ -177,36 +194,38 @@ bool FileSecurityManager::ConsumeAggregateTree(const std::chrono::steady_clock::
     {
         std::lock_guard lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
-            return true;
+            return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
         ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger,
-                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                            "[FileSecurityEvent] push queue failed!", ""));
+        int maxRetry = 5;
+        for (int retry = 0; retry < maxRetry; ++retry) {
+            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (retry == maxRetry - 1) {
+                LOG_WARNING(sLogger,
+                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                                "[ProcessSecurityEvent] push queue failed!", ""));
+                // TODO: Alarm discard data
+            }
         }
     }
-    return true;
-}
-
-bool FileSecurityManager::ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                                       const std::shared_ptr<ScheduleConfig>& config) {
-    std::chrono::steady_clock::time_point nextTime = execTime + config->mInterval;
-    Timer::GetInstance()->PushEvent(std::make_unique<AggregateEvent>(nextTime, config));
-    return ConsumeAggregateTree(execTime);
+    return 0;
 }
 
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // set init flag ...
-    mFlag = true;
-
-    std::shared_ptr<ScheduleConfig> scheduleConfig
-        = std::make_shared<ScheduleConfig>(PluginType::FILE_SECURITY, std::chrono::seconds(2));
-    ScheduleNext(std::chrono::steady_clock::now(), scheduleConfig);
+    mInited = true;
+    auto processCacheMgr = GetProcessCacheManager();
+    if (processCacheMgr == nullptr) {
+        LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
+    }
+    processCacheMgr->MarkFileEventFlushStatus(true);
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;
@@ -215,7 +234,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"file_secure_output",
-            128,
+            2048,
             this,
             [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
             [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
@@ -251,6 +270,9 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
                                                                        magic_enum::enum_name(event->GetPluginType())));
         return 1;
     }
+    if(fileEvent->mEventType == KernelEventType::FILE_PATH_TRUNCATE) {
+        LOG_DEBUG(sLogger, ("[security_path_truncate]", "FileEvent after mCommonEventQueue")("path", fileEvent->mPath)("pid", fileEvent->mPid)("ktime", fileEvent->mKtime));
+    }
 
     // calculate agg key
     std::array<size_t, 2> hashResult = GenerateAggKeyForFileEvent(event);
@@ -263,7 +285,12 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 }
 
 int FileSecurityManager::Destroy() {
-    mFlag = false;
+    mInited = false;
+    auto processCacheMgr = GetProcessCacheManager();
+    if (processCacheMgr == nullptr) {
+        LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
+    }
+    processCacheMgr->MarkFileEventFlushStatus(false);
     return mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
 }
 

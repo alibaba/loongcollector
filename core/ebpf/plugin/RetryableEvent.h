@@ -59,7 +59,7 @@ public:
      * @brief Checks if the event can be retried.
      * @return true if there are retry attempts left, false otherwise.
      */
-    [[nodiscard]] bool CanRetry() const { return mRetryLeft > 0; }
+    [[nodiscard]] virtual bool CanRetry() const { return mRetryLeft > 0; }
 
     /**
      * @brief Decrements the number of retry attempts left.

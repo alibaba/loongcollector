@@ -34,7 +34,7 @@ public:
     static const std::string sTruncateValue;
     static const std::string sPermissionValue;
     static const std::string sPermissionReadValue;
-    static const std::string sPermissionWriteValue;    
+    static const std::string sPermissionWriteValue;
 
     FileSecurityManager() = delete;
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -61,10 +61,13 @@ public:
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
+    int SendEvents() override;
+
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
+    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
+        return true;
+    }
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -79,6 +82,8 @@ public:
 
 private:
     ReadWriteLock mLock;
+    int64_t mSendIntervalMs = 400;
+    int64_t mLastSendTimeMs = 0;
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
