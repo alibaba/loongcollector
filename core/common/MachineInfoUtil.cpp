@@ -510,14 +510,55 @@ ECSMeta FetchECSMeta() {
     metaObj.userID = "";
     metaObj.regionID = "";
     if (curl) {
+        std::string token;
+        auto* tokenHeaders = curl_slist_append(nullptr, "X-aliyun-ecs-metadata-token-ttl-seconds:3600");
+        if (!tokenHeaders) {
+            curl_easy_cleanup(curl);
+            LOG_WARNING(
+                sLogger,
+                ("tokenHeaders curl_slist_append failed", "ecs meta may be mislabeled"));
+            return metaObj;
+        }
+        curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/api/token");
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, tokenHeaders);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+        // 超时1秒
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
+
+        CURLcode res = curl_easy_perform(curl);
+        curl_slist_free_all(tokenHeaders);
+
+        if (res != CURLE_OK) {
+            curl_easy_cleanup(curl);
+            LOG_WARNING(
+                sLogger,
+                ("failed to get ecs meta token", "ecs meta may be mislabeled"));
+            return metaObj;
+        }
+
+        // Get metadata with token
         std::string meta;
+        auto* metaHeaders = curl_slist_append(nullptr, ("X-aliyun-ecs-metadata-token: " + token).c_str());
+        if (!metaHeaders) {
+            curl_easy_cleanup(curl);
+            LOG_WARNING(
+                sLogger,
+                ("tokenHeaders curl_slist_append failed", "ecs meta may be mislabeled"));
+            return metaObj;
+        }
+        curl_easy_reset(curl);
         curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/dynamic/instance-identity/document");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, metaHeaders);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &meta);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
-        CURLcode res = curl_easy_perform(curl);
+        res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
             LOG_DEBUG(sLogger, ("fetch ecs meta fail", curl_easy_strerror(res)));
         } else {
