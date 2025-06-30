@@ -268,7 +268,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         multiDoubleValues->SetValue(std::string(vmNames[i]),
                                     UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
     }
-    metricEvent->SetTag(std::string("m"), std::string("system.process"));
+    metricEvent->SetTag(std::string("m"), std::string("system.processCount"));
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < pushMerticList.size(); ++i) {

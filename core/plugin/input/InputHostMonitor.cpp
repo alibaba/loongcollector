@@ -34,7 +34,7 @@ constexpr uint32_t kHostMonitorDefaultInterval = 15; // seconds
 
 bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
-    mInterval = kHostMonitorDefaultInterval;
+    mInterval = kHostMonitorMinInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
