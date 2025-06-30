@@ -127,6 +127,7 @@ void NetCollectorUnittest::TestCollect() const {
         auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
         APSARA_TEST_EQUAL_FATAL(device_names[j], event.GetTag("device"));
         APSARA_TEST_EQUAL_FATAL(hostname, event.GetTag("hostname"));
+        APSARA_TEST_EQUAL_FATAL(std::string("system.net_original"), event.GetTag("m"));
         for (size_t i = 0; i < rate_names.size(); ++i) {
             APSARA_TEST_TRUE(maps.find(rate_names[i]) != maps.end());
             EXPECT_NEAR(0.0, maps[rate_names[i]].Value, 1e-6);
@@ -148,6 +149,7 @@ void NetCollectorUnittest::TestCollect() const {
         auto event = group.GetEvents()[j + device_names.size()].Cast<MetricEvent>();
         auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
         APSARA_TEST_EQUAL_FATAL(tcp_names[j], event.GetTag("state"));
+        APSARA_TEST_EQUAL_FATAL(std::string("system.tcp"), event.GetTag("m"));
         for (size_t i = 0; i < tcp_cnt_names.size(); ++i) {
             APSARA_TEST_TRUE(maps.find(tcp_cnt_names[i]) != maps.end());
         }
