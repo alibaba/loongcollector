@@ -34,7 +34,7 @@ constexpr uint32_t kHostMonitorDefaultInterval = 15; // seconds
 
 bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
-    mInterval = kHostMonitorDefaultInterval;
+    mInterval = kHostMonitorMinInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -162,8 +162,9 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
+    std::vector<uint32_t> intervals = {mInterval, mInterval, mInterval, 1, mInterval, mInterval};
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mCollectors, std::vector(mCollectors.size(), mInterval), mContext->GetProcessQueueKey(), mIndex);
+        mCollectors, intervals, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 

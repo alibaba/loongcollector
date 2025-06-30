@@ -221,8 +221,8 @@ class NetCollector : public BaseCollector {
 public:
     NetCollector();
 
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-    // int Init(int totalCount = 15);
+    // int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+    int Init(int totalCount = 15);
 
     ~NetCollector() override = default;
 

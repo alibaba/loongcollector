@@ -25,15 +25,15 @@
 
 namespace logtail {
 
-extern const uint32_t kMinInterval;
-extern const uint32_t kDefaultInterval;
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
 extern std::filesystem::path PROC_MEMINFO;
 
 class MemCollector : public BaseCollector {
 public:
     MemCollector();
 
-    int Init(int totalCount = 3);
+    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
     ~MemCollector() override = default;
 
     bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
