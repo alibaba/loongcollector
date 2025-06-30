@@ -88,6 +88,8 @@ constexpr int operator-(EnumProcessStat a, EnumProcessStat b) {
 }
 
 namespace logtail {
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
 
 struct tagPidTotal {
     pid_t pid = 0;
@@ -268,7 +270,7 @@ class ProcessCollector : public BaseCollector {
 public:
     ProcessCollector();
 
-    int Init(int totalCount = 3);
+    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
 
     ~ProcessCollector() override = default;
 

@@ -186,7 +186,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
     if (mCount < mCountPerReport) {
         return true;
     }
-
+    mCount = 0;
     // std::diskName = GetDiskName(devName);
     // std::string diskSerialId = "";
     // SicGetDiskSerialId(diskName,serialId);
