@@ -21,8 +21,6 @@
 
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "collection_pipeline/CollectionPipeline.h"
-#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -30,7 +28,7 @@
 #include "event/Event.h"
 #include "event_handler/EventHandler.h"
 #include "pipeline/Pipeline.h"
-#include "plugin/PluginRegistry.h"core/unittest/event_handler/ModifyHandlerUnittest.cpp
+#include "plugin/PluginRegistry.h"
 #include "reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
