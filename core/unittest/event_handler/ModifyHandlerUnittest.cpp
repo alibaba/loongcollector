@@ -16,9 +16,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
+#include "checkpoint/CheckPointManager.h"
+#include "checkpoint/CheckpointManagerV2.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
@@ -30,6 +33,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -43,6 +47,7 @@ public:
     void TestHandleContainerStoppedEventWhenNotReadToEnd();
     void TestHandleModifyEventWhenContainerStopped();
     void TestRecoverReaderFromCheckpoint();
+    void TestRecoverReaderFromCheckpointContainer();
     void TestHandleModifyEventWhenContainerRestartCase1();
     void TestHandleModifyEventWhenContainerRestartCase2();
     void TestHandleModifyEventWhenContainerRestartCase3();
@@ -59,7 +64,7 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
@@ -76,6 +81,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+        std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
         // new pipeline
         configStr = R"(
             {
@@ -84,7 +90,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPath + R"("
+            + jsonLogPath + R"("
                         ]
                     }
                 ],
@@ -113,6 +119,7 @@ protected:
 
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
+        discoveryOpts.SetEnableContainerDiscoveryFlag(true);
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
             [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
                 containerInfo.mRealBaseDir = containerInfo.mUpperDir;
@@ -149,7 +156,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -169,7 +176,7 @@ private:
     std::shared_ptr<ModifyHandler> mHandlerPtr;
 
     void writeLog(const std::string& logPath, const std::string& logContent) {
-        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app);
+        std::ofstream writer(logPath.c_str(), fstream::out | fstream::app | ios_base::binary);
         writer << logContent;
         writer.close();
     }
@@ -177,29 +184,29 @@ private:
     void addContainerInfo(const std::string containerID) {
         std::string errorMsg;
         std::string containerStr = R"(
-        {
-            "ID": ")"
+            {
+                "ID": ")"
             + containerID + R"(",
-            "Mounts": [
-                {
-                    "Source": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-                    "Destination" : ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
-                }
-            ],
-            "UpperDir": ")"
-            + gRootDir + R"(",
-            "LogPath": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"(",
-            "MetaDatas": [
-                "_container_name_",
-                "test-container"
-            ],
-            "Path": ")"
-            + gRootDir + PATH_SEPARATOR + gLogName + R"("
-        }
-    )";
+                "Mounts": [
+                    {
+                        "Source": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
+                        "Destination" : ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
+                    }
+                ],
+                "UpperDir": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir) + R"(",
+                "LogPath": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
+                "MetaDatas": [
+                    "_container_name_",
+                    "test-container"
+                ],
+                "Path": ")"
+            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
+            }
+        )";
         Json::Value containerJson;
         APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
         APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
@@ -222,6 +229,7 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToE
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointContainer);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase2);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase3);
@@ -414,6 +422,84 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.dev, devInode.dev);
     APSARA_TEST_EQUAL_FATAL(readerArray[2]->mDevInode.inode, devInode.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
+    handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
+}
+
+
+void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointContainer() begin", time(NULL)));
+    std::string basicLogName = "rotate_test.log";
+    std::string basicLogName1 = "rotate_test.log.1";
+    std::string basicLogName2 = "rotate_test.log.2";
+    std::string logPath = gRootDir + PATH_SEPARATOR + basicLogName;
+    std::string logPath1 = gRootDir + PATH_SEPARATOR + basicLogName1;
+    std::string logPath2 = gRootDir + PATH_SEPARATOR + basicLogName2;
+    std::string signature = "a sample log\n";
+    auto sigSize = (uint32_t)signature.size();
+    auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
+    // build a modify handler
+    auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
+    writeLog(logPath, signature);
+    writeLog(logPath1, signature);
+    writeLog(logPath2, signature);
+    auto devInode = GetFileDevInode(logPath);
+    auto devInode1 = GetFileDevInode(logPath1);
+    auto devInode2 = GetFileDevInode(logPath2);
+
+    addContainerInfo("1");
+    CheckPoint* checkPointPtr
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode, mConfigName, logPath, false, true, "1", false);
+    // use last event time as checkpoint's last update time
+    checkPointPtr->mLastUpdateTime = time(NULL);
+    checkPointPtr->mCache = "";
+    checkPointPtr->mIdxInReaderArray = 0;
+    CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
+
+    // not set container stopped for rotator reader
+    CheckPoint* checkPointPtr1
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode1, mConfigName, logPath1, false, false, "1", false);
+    checkPointPtr1->mLastUpdateTime = time(NULL);
+    checkPointPtr1->mCache = "";
+    checkPointPtr1->mIdxInReaderArray = -2;
+    CheckPointManager::Instance()->AddCheckPoint(checkPointPtr1);
+
+
+    // set container stopped for rotator reader
+    CheckPoint* checkPointPtr2
+        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode2, mConfigName, logPath2, false, true, "1", false);
+    checkPointPtr2->mLastUpdateTime = time(NULL);
+    checkPointPtr2->mCache = "";
+    checkPointPtr2->mIdxInReaderArray = -2;
+    CheckPointManager::Instance()->AddCheckPoint(checkPointPtr2);
+
+    Event event(gRootDir, basicLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
+    event.SetConfigName(mConfigName);
+    handlerPtr->Handle(event);
+
+    Event event1(gRootDir, basicLogName, EVENT_MODIFY, 0, 0, devInode1.dev, devInode1.inode);
+    event1.SetConfigName(mConfigName);
+    handlerPtr->Handle(event1);
+
+    Event event2(gRootDir, basicLogName, EVENT_MODIFY, 0, 0, devInode2.dev, devInode2.inode);
+    event2.SetConfigName(mConfigName);
+    handlerPtr->Handle(event2);
+
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[basicLogName].size(), 1);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mNameReaderMap[basicLogName][0]->mLogFileOp.IsOpen() == false);
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode1]->mLogFileOp.IsOpen() == true);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->mLogFileOp.IsOpen() == false);
+
+
+    Event event3(gRootDir, "", EVENT_CONTAINER_STOPPED, 0);
+    event3.SetContainerID("1");
+    handlerPtr->Handle(event3);
+
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mNameReaderMap[basicLogName][0]->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode1]->IsContainerStopped());
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->IsContainerStopped());
+
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointContainer() end", time(NULL)));
 }
 
 void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerRestartCase1() {

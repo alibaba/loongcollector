@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "Application.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -58,6 +59,7 @@ protected:
     static void TearDownTestCase() {
         PluginRegistry::GetInstance()->UnloadPlugins();
         TaskRegistry::GetInstance()->UnloadPlugins();
+        Application::GetInstance()->SetSigTermSignalFlag(true);
         FileServer::GetInstance()->Stop();
     }
 

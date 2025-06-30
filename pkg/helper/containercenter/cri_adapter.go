@@ -95,7 +95,9 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 	if *flags.EnableContainerdUpperDirDetect {
 		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
 		if err == nil {
-			_, err = containerdClient.Version(context.Background())
+			ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+			defer cancel()
+			_, err = containerdClient.Version(ctx)
 		}
 		if err != nil {
 			logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "Connect containerd failed", err)
@@ -238,7 +240,7 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	// when it resumes, it may process on a staled list and make wrong decisions
 	cw.containersLock.Lock()
 	defer cw.containersLock.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := getContextWithTimeout(time.Minute)
 	defer cancel()
 	containersResp, err := cw.client.ListContainers(ctx)
 	if err != nil {
@@ -548,7 +550,9 @@ func (cw *CRIRuntimeWrapper) getContainerUpperDir(containerid, snapshotter strin
 	}
 
 	si := cw.nativeClient.SnapshotService(snapshotter)
-	mounts, err := si.Mounts(context.Background(), containerid)
+	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+	defer cancel()
+	mounts, err := si.Mounts(ctx, containerid)
 	if err != nil {
 		logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "cannot get snapshot info, containerID", containerid, "errInfo", err)
 		return ""

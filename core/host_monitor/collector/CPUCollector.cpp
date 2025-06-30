@@ -24,16 +24,13 @@
 namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
+const std::string kMetricLabelCPU = "cpu";
+const std::string kMetricLabelMode = "mode";
 
-CPUCollector::CPUCollector() {
-    Init();
+void CPUCollector::Init(const HostMonitorCollectConfig& collectConfig) {
 }
-int CPUCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
-    return 0;
-}
-bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+
+bool CPUCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

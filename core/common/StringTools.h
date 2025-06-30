@@ -16,10 +16,19 @@
 
 #pragma once
 
+#include <charconv>
+
 #include <algorithm>
+#include <string>
+#include <vector>
+
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
 #include "boost/lexical_cast.hpp"
+#include "boost/regex.hpp"
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
 #include <charconv>
 

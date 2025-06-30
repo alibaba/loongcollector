@@ -41,9 +41,10 @@ protected:
 void CPUCollectorUnittest::TestCollect() const {
     auto collector = CPUCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorCollectConfig collectConfig("test", CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+    collector.Init(collectConfig);
 
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(&group));
     APSARA_TEST_EQUAL_FATAL(3 * 10, group.GetEvents().size());
     vector<double> expected1 = {14708487.0 / SYSTEM_HERTZ,
                                 14216.0 / SYSTEM_HERTZ,

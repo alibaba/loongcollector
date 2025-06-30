@@ -25,6 +25,7 @@
 #include "common/EncodingUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "common/http/Constant.h"
 #include "common/http/Curl.h"
 #include "common/version.h"
@@ -314,6 +315,7 @@ void LegacyCommonConfigProvider::UpdateRemoteConfig(
                     continue;
                 }
                 fout << configDetail;
+                fout.close();
 
                 error_code ec;
                 filesystem::rename(tmpFilePath, filePath, ec);

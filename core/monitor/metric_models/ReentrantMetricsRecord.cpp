@@ -22,7 +22,7 @@ void ReentrantMetricsRecord::Init(const std::string& category,
                                   MetricLabels& labels,
                                   DynamicMetricLabels& dynamicLabels,
                                   std::unordered_map<std::string, MetricType>& metricKeys) {
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, category, std::move(labels), std::move(dynamicLabels));
     for (auto metric : metricKeys) {
         switch (metric.second) {
@@ -42,6 +42,7 @@ void ReentrantMetricsRecord::Init(const std::string& category,
                 break;
         }
     }
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 const MetricLabelsPtr& ReentrantMetricsRecord::GetLabels() const {

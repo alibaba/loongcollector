@@ -15,8 +15,10 @@
  */
 
 #include <stdlib.h>
+#if defined(__linux__)
 #include <sys/errno.h>
 #include <sys/utsname.h>
+#endif
 
 #include <string>
 
@@ -67,6 +69,7 @@ public:
         return findRst.second && findRst.first == value;
     }
 
+#if defined(__linux__)
     static bool GetKernelVersion(int& mainVersion, int& subVersion) {
         struct utsname buf;
         if (uname(&buf) != 0) {
@@ -90,6 +93,23 @@ public:
             subVersion = atoi(releaseVersion.substr(mainPos + 1, subPos - mainPos).c_str());
         }
         return true;
+    }
+#endif
+
+    static std::string JsonEscapeDirPath(const std::string& path) {
+#if defined(_MSC_VER)
+        std::string jsonPath = "";
+        for (auto& c : path) {
+            if (c == '\\') {
+                jsonPath += "\\\\";
+            } else {
+                jsonPath.push_back(c);
+            }
+        }
+        return jsonPath;
+#else
+        return path;
+#endif
     }
 };
 

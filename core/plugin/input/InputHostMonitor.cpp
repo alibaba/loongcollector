@@ -29,12 +29,12 @@
 namespace logtail {
 
 const std::string InputHostMonitor::sName = "input_host_monitor";
-constexpr uint32_t kHostMonitorMinInterval = 5; // seconds
 constexpr uint32_t kHostMonitorDefaultInterval = 15; // seconds
 
 bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string errorMsg;
-    mInterval = kHostMonitorMinInterval;
+    mConfigName = mContext->GetConfigName();
+    mInterval = kHostMonitorDefaultInterval;
     if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -162,14 +162,16 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
-    std::vector<uint32_t> intervals = {mInterval, mInterval, mInterval, 1, mInterval, mInterval};
-    HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mCollectors, intervals, mContext->GetProcessQueueKey(), mIndex);
+    HostMonitorInputRunner::GetInstance()->UpdateCollector(mConfigName,
+                                                           mCollectors,
+                                                           std::vector(mCollectors.size(), kHostMonitorMinInterval),
+                                                           mContext->GetProcessQueueKey(),
+                                                           mIndex);
     return true;
 }
 
 bool InputHostMonitor::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector(mCollectors);
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mConfigName);
     return true;
 }
 

@@ -99,6 +99,7 @@ private:
     friend class PipelineUnittest;
     friend class PipelineUpdateUnittest;
     friend class HostMonitorInputRunnerUnittest;
+    friend class ModifyHandlerUnittest;
 #endif
 };
 

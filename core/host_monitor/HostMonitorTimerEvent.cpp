@@ -21,11 +21,12 @@
 namespace logtail {
 
 bool HostMonitorTimerEvent::IsValid() const {
-    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(GetExecTime(), mCollectConfig.mCollectorName);
+    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig.mConfigName,
+                                                                     mCollectConfig.mCollectorName);
 }
 
 bool HostMonitorTimerEvent::Execute() {
-    HostMonitorInputRunner::GetInstance()->ScheduleOnce(GetExecTime(), mCollectConfig);
+    HostMonitorInputRunner::GetInstance()->ScheduleOnce(*this, GetExecTime());
     return true;
 }
 

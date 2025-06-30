@@ -20,6 +20,8 @@
 
 namespace logtail {
 
+const uint32_t kHostMonitorMinInterval = 5;
+
 std::filesystem::path PROCESS_DIR = "/proc";
 const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";

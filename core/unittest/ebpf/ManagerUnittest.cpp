@@ -40,7 +40,7 @@ protected:
         Timer::GetInstance()->Init();
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
         DynamicMetricLabels dynamicLabels;
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mRef,
             MetricCategory::METRIC_CATEGORY_RUNNER,
             {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
@@ -51,6 +51,7 @@ protected:
         auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
         auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
         auto retryableEventCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mRef);
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                      "test_host",
                                                                      "/",
@@ -339,8 +340,7 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
-    auto execTime = std::chrono::steady_clock::now();
-    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+    APSARA_TEST_EQUAL(0, manager->SendEvents());
 
     manager->Destroy();
 }
@@ -381,8 +381,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
 
     // 触发聚合
-    auto execTime = std::chrono::steady_clock::now();
-    APSARA_TEST_TRUE(manager->ConsumeAggregateTree(execTime));
+    APSARA_TEST_EQUAL(0, manager->SendEvents());
 
     manager->Destroy();
 }

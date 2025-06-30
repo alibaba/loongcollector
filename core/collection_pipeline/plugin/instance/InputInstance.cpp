@@ -20,11 +20,12 @@ bool InputInstance::Init(const Json::Value& config,
                          size_t inputIdx,
                          Json::Value& optionalGoPipeline) {
     mPlugin->SetContext(context);
-    mPlugin->SetMetricsRecordRef(Name(), PluginID());
+    mPlugin->CreateMetricsRecordRef(Name(), PluginID());
     mPlugin->SetInputIndex(inputIdx);
     if (!mPlugin->Init(config, optionalGoPipeline)) {
         return false;
     }
+    mPlugin->CommitMetricsRecordRef();
     return true;
 }
 

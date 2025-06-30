@@ -79,8 +79,9 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(input->Name(), "1");
+    input->CreateMetricsRecordRef(input->Name(), "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -102,7 +103,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ],
                 "max_scrape_size": "10MiB",
@@ -114,8 +115,9 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+    input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -136,14 +138,15 @@ void InputPrometheusUnittest::OnFailedInit() {
     // only mandatory param
     configStr = R"(
         {
-            "Type": "input_prometheus",
+            "Type": "input_prometheus"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+    input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     // with invalid ScrapeConfig
     configStr = R"(
@@ -157,7 +160,7 @@ void InputPrometheusUnittest::OnFailedInit() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }
@@ -166,8 +169,9 @@ void InputPrometheusUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+    input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
     PrometheusInputRunner::GetInstance()->Stop();
 }
 
@@ -188,7 +192,7 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }
@@ -197,8 +201,9 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+    input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
 
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(
@@ -232,7 +237,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
                 "scrape_timeout": "15s",
                 "scrape_targets": [
                     {
-                        "host": "172.17.0.3:9100",
+                        "host": "172.17.0.3:9100"
                     }
                 ]
             }
@@ -241,9 +246,10 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         input = make_unique<InputPrometheus>();
         input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+        input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
 
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());
@@ -348,9 +354,10 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         input = make_unique<InputPrometheus>();
         input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+        input->CreateMetricsRecordRef(InputPrometheus::sName, "1");
 
         APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());

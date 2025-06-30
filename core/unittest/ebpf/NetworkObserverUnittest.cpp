@@ -54,7 +54,7 @@ protected:
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
         mEBPFAdapter->Init();
         DynamicMetricLabels dynamicLabels;
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mRef,
             MetricCategory::METRIC_CATEGORY_RUNNER,
             {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}},
@@ -65,6 +65,7 @@ protected:
         auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
         auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
         auto retryableEventCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mRef);
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                      "test_host",
                                                                      "/",
@@ -77,14 +78,14 @@ protected:
                                                                      retryableEventCacheSize);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
-        EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
     }
 
     void TearDown() override {
         Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
         mManager->Destroy();
-        EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, nullptr);
+        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "", "", nullptr);
     }
 
 private:
@@ -644,9 +645,9 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
-    mManager->mFlag = true;
+    mManager->mInited = true;
     Timer::GetInstance()->Clear();
-    EBPFServer::GetInstance()->UpdatePluginManager(PluginType::NETWORK_OBSERVE, mManager);
+    EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
 
     auto now = std::chrono::steady_clock::now();
     std::shared_ptr<ScheduleConfig> metricConfig

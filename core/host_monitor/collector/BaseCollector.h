@@ -18,16 +18,34 @@
 
 #include <string>
 
-#include "host_monitor/HostMonitorTimerEvent.h"
 #include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
+struct HostMonitorCollectConfig {
+    std::string mConfigName;
+    std::string mCollectorName;
+    QueueKey mProcessQueueKey;
+    size_t mInputIndex;
+    std::chrono::seconds mInterval;
+
+    HostMonitorCollectConfig(const std::string& configName,
+                             const std::string& collectorName,
+                             QueueKey processQueueKey,
+                             size_t inputIndex,
+                             const std::chrono::seconds& interval)
+        : mConfigName(configName),
+          mCollectorName(collectorName),
+          mProcessQueueKey(processQueueKey),
+          mInputIndex(inputIndex),
+          mInterval(interval) {}
+};
+
 class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
-
-    virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
+    virtual void Init(const HostMonitorCollectConfig& collectConfig) = 0;
+    virtual bool Collect(PipelineEventGroup* group) = 0;
     virtual const std::string& Name() const = 0;
 
 protected:

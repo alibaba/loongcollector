@@ -34,6 +34,7 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
+    std::string mConfigName;
     uint32_t mInterval = 0;
     std::vector<std::string> mCollectors;
 #ifdef APSARA_UNIT_TEST_MAIN

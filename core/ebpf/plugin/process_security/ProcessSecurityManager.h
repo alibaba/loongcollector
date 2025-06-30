@@ -15,6 +15,7 @@
 #pragma once
 
 #include <coolbpf/security/type.h>
+#include <cstdint>
 
 #include <memory>
 
@@ -25,8 +26,7 @@
 #include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/AggregateTree.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
     inline static constexpr StringView kExitTidKey = "exit_tid";
@@ -57,11 +57,14 @@ public:
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
+    int SendEvents() override;
+
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
+    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
+        return true;
+    }
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -75,12 +78,11 @@ public:
         return 0;
     }
 
-    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-
 private:
     ReadWriteLock mLock;
+    int64_t mSendIntervalMs = 400;
+    int64_t mLastSendTimeMs = 0;
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

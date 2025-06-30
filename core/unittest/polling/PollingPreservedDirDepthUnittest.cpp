@@ -1,5 +1,6 @@
 
 #include <chrono> // Include the <chrono> header for sleep_for
+#include <filesystem>
 #include <thread> // Include the <thread> header for this_thread
 
 #include "json/json.h"
@@ -9,6 +10,7 @@
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
@@ -17,6 +19,7 @@
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
+
 
 using namespace std;
 
@@ -62,6 +65,17 @@ class PollingPreservedDirDepthUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
         gRootDir = GetProcessExecutionDir() + "var" + PATH_SEPARATOR;
+#if defined(_MSC_VER)
+        gTestMatrix = {
+            {"log", "log\\app\\0", "log\\app\\1", 0, false, true, true, false, true},
+            {"*\\log", "app\\log\\0", "app\\log\\1", 0, true, true, false, false, true},
+            {"log", "app\\log\\0", "app\\log\\1", 1, false, false, false, false, false},
+            {"log", "log\\0", "log\\1", 0, false, true, true, false, true},
+            {"*\\log", "log\\0", "log\\1", 1, true, false, false, false, false},
+            {"*\\log", "app\\log\\0", "app\\log\\1", 1, true, true, true, true, true},
+            {"log", "log\\app\\0", "log\\app\\0\\1", 0, false, true, true, false, false},
+        };
+#else
         gTestMatrix = {
             {"log", "log/app/0", "log/app/1", 0, false, true, true, false, true},
             {"*/log", "app/log/0", "app/log/1", 0, true, true, false, false, true},
@@ -71,6 +85,7 @@ public:
             {"*/log", "app/log/0", "app/log/1", 1, true, true, true, true, true},
             {"log", "log/app/0", "log/app/0/1", 0, false, true, true, false, false},
         };
+#endif
 
         sLogger->set_level(spdlog::level::trace);
         srand(time(nullptr));
@@ -82,7 +97,7 @@ public:
         INT32_FLAG(polling_check_timeout_interval) = 0;
         AppConfig::GetInstance()->mCheckPointFilePath = GetProcessExecutionDir() + gCheckpoint;
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         LoongCollectorMonitor::GetInstance()->Init();
         FlusherRunner::GetInstance()->Init(); // reference: Application::Start
@@ -101,15 +116,16 @@ public:
     static void TearDownTestCase() {
         PollingDirFile::GetInstance()->mRuningFlag = false;
         PollingModify::GetInstance()->mRuningFlag = false;
+        Application::GetInstance()->SetSigTermSignalFlag(true);
         Application::GetInstance()->Exit();
     }
 
     void SetUp() override {
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         if (bfs::exists(gRootDir)) {
-            bfs::remove_all(gRootDir);
+            filesystem::remove_all(gRootDir);
         }
         bfs::create_directories(gRootDir);
     }
@@ -126,9 +142,9 @@ public:
         PollingModify::GetInstance()->ClearCache();
         CheckPointManager::Instance()->RemoveAllCheckPoint();
         // PollingEventQueue::GetInstance()->Clear();
-        bfs::remove_all(gRootDir);
+        filesystem::remove_all(gRootDir);
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            bfs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         FileServer::GetInstance()->Resume();
     }
@@ -193,15 +209,13 @@ private:
 
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
 
         // write testFile1 for the 1st time
         generateLog(testFile1);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile1stWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -222,8 +236,7 @@ private:
         generateLog(testFile1);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile2ndWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -242,8 +255,7 @@ private:
         generateLog(testFile2);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         if (testVector.mCollectTestFile3rdWrite) {
             APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile1));
         } else {
@@ -267,8 +279,13 @@ public:
     void TestPollingDirFile6() { testPollingDirFile(gTestMatrix[6]); }
 
     void TestCheckpoint() {
+#if defined(_MSC_VER)
+        auto configInputFilePath = gRootDir + "log\\**\\0.log";
+        auto testFile = gRootDir + "log\\0\\0.log";
+#else
         auto configInputFilePath = gRootDir + "log/**/0.log";
         auto testFile = gRootDir + "log/0/0.log";
+#endif
         FileServer::GetInstance()->Pause();
         auto configJson = createPipelineConfig(configInputFilePath, 0);
         CollectionConfig pipelineConfig("polling", std::move(configJson));
@@ -282,15 +299,13 @@ public:
 
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
 
         // generate log for testFile1 for the 1st time
         generateLog(testFile);
         PollingDirFile::GetInstance()->PollingIteration();
         PollingModify::GetInstance()->PollingIteration();
-        std::this_thread::sleep_for(std::chrono::microseconds(
-            10 * INT32_FLAG(log_input_thread_wait_interval))); // give enough time to consume event
+        usleep(10 * INT32_FLAG(log_input_thread_wait_interval)); // give enough time to consume event
         APSARA_TEST_TRUE_FATAL(isFileDirRegistered(testFile));
 
         // Dump and load checkpoint

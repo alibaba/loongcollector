@@ -15,6 +15,7 @@
 #include <chrono>
 #include <memory>
 
+#include "CPUCollector.h"
 #include "HostMonitorInputRunner.h"
 #include "HostMonitorTimerEvent.h"
 #include "ProcessQueueItem.h"
@@ -38,7 +39,7 @@ private:
     static void SetUpTestCase() {
         auto collector = std::make_unique<MockCollector>();
         HostMonitorInputRunner::GetInstance()->mRegisteredCollectorMap.emplace(MockCollector::sName,
-                                                                               CollectorInstance(std::move(collector)));
+                                                                               CollectorFactory<MockCollector>::Create);
     }
 
     void TearDown() override {
@@ -50,14 +51,14 @@ private:
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->UpdateCollector({MockCollector::sName}, {60}, QueueKey{}, 0);
-    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid(std::chrono::steady_clock::now(), MockCollector::sName));
-    APSARA_TEST_FALSE_FATAL(
-        runner->IsCollectTaskValid(std::chrono::steady_clock::now() - std::chrono::seconds(60), MockCollector::sName));
+    runner->UpdateCollector("test", {MockCollector::sName}, {60}, QueueKey{}, 0);
+    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid("test", MockCollector::sName));
+    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test2", MockCollector::sName));
+    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", CPUCollector::sName));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
     APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
     runner->RemoveCollector({MockCollector::sName});
-    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid(std::chrono::steady_clock::now(), MockCollector::sName));
+    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
@@ -66,16 +67,19 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
     runner->mThreadPool->Start();
-    runner->mRegisteredCollectorMap.find(MockCollector::sName)->second.Enable();
     std::string configName = "test";
+    runner->mRunningConfigMap.emplace(configName, std::unordered_set<std::string>());
+    runner->mRunningConfigMap[configName].insert(MockCollector::sName);
     auto queueKey = QueueKeyManager::GetInstance()->GetKey(configName);
     auto ctx = CollectionPipelineContext();
     ctx.SetConfigName(configName);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
 
-    HostMonitorTimerEvent::CollectConfig collectConfig(MockCollector::sName, queueKey, 0, std::chrono::seconds(60));
     std::chrono::time_point now = std::chrono::steady_clock::now();
-    runner->ScheduleOnce(now, collectConfig);
+    HostMonitorCollectConfig collectConfig(configName, MockCollector::sName, 0, 0, std::chrono::seconds(60));
+    auto collector = CollectorFactory<MockCollector>::Create(collectConfig);
+    HostMonitorTimerEvent event(now, std::move(collectConfig), std::move(collector));
+    runner->ScheduleOnce(event, now);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
     APSARA_TEST_EQUAL_FATAL((now + std::chrono::seconds(60)).time_since_epoch().count(),

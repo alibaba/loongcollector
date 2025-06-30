@@ -33,6 +33,7 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
+    std::string mConfigName;
     uint32_t mInterval = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
