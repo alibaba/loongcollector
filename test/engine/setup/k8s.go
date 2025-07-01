@@ -27,6 +27,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -202,34 +203,7 @@ func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerNam
 	return stdout.String(), nil
 }
 
-func (k *K8sEnv) createTestE2eGeneratorPod(ctx context.Context, namespace string) (context.Context, string, error) {
-	if namespace == "" {
-		return ctx, "", fmt.Errorf("namespace is empty")
-	}
-	podName := fmt.Sprintf("e2e-generator-test-pod-%d", time.Now().Unix())
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "generator",
-					Image: "registry.cn-hangzhou.aliyuncs.com/log-service/docker-log-test:e2e",
-				},
-			},
-		},
-	}
-
-	if _, err := k.k8sClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-		return ctx, "", err
-	}
-	logger.Debugf(ctx, "pod created:%s", pod.Name)
-	fmt.Printf("Pod created: %s\n", pod.Name)
-	return ctx, podName, nil
-}
-
-func (k *K8sEnv) deletePod(ctx context.Context, namespace, podName string) (context.Context, error) {
+func (k *K8sEnv) DeletePod(ctx context.Context, namespace, podName string) (context.Context, error) {
 	if namespace == "" {
 		return ctx, fmt.Errorf("namespace is empty")
 	}
@@ -241,63 +215,41 @@ func (k *K8sEnv) deletePod(ctx context.Context, namespace, podName string) (cont
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		return ctx, err
 	}
+
+	if _, err = k.waitForPodDeleted(ctx, namespace, podName, 120*time.Second); err != nil {
+		return ctx, err
+	}
 	logger.Debugf(ctx, "pod deleted:%s", podName)
 	return ctx, nil
 }
 
-func (k *K8sEnv) waitForPodRunning(ctx context.Context, namespace, podName string, timeout time.Duration) (context.Context, error) {
-	start := time.Now()
-	for {
-		pod, err := k.k8sClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-		if err != nil {
-			return ctx, err
-		}
-		if pod.Status.Phase == corev1.PodRunning {
-			logger.Debugf(ctx, "Pod %s is Running\n", podName)
-			return ctx, nil
-		}
-
-		if time.Since(start) > timeout {
-			return ctx, fmt.Errorf("timeout waiting for pod %s to become Running", podName)
-		}
-
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func (k *K8sEnv) waitForPodDeleted(ctx context.Context, namespace, podName string, timeout time.Duration) (context.Context, error) {
-	start := time.Now()
-	for {
-		_, err := k.k8sClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-		if k8sErrors.IsNotFound(err) {
-			logger.Debugf(ctx, "Pod %s has been deleted", podName)
-			return ctx, nil
-		}
-		if time.Since(start) > timeout {
-			return ctx, fmt.Errorf("timeout waiting for pod %s to be deleted", podName)
-		}
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func (k *K8sEnv) CreateAndDeleteE2eGeneratorPod(ctx context.Context) (context.Context, error) {
-	ctx, podName, err := k.createTestE2eGeneratorPod(ctx, "default")
+func (k *K8sEnv) waitForPodDeleted(ctx context.Context, namespace, podName string, timeoutDuration time.Duration) (context.Context, error) {
+	// 创建 Context 和 Watcher
+	watcher, err := k.k8sClient.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + podName,
+	})
 	if err != nil {
-		panic(err)
+		return ctx, fmt.Errorf("failed to create watcher for pod %s: %w", podName, err)
 	}
-	if ctx, err = k.waitForPodRunning(ctx, "default", podName, 180*time.Second); err != nil {
-		panic(err)
-	}
-	time.Sleep(5 * time.Second)
-	ctx, err = k.deletePod(ctx, "default", podName)
-	if err != nil {
-		panic(err)
-	}
-	if ctx, err = k.waitForPodDeleted(ctx, "default", podName, 120*time.Second); err != nil {
-		panic(err)
-	}
+	defer watcher.Stop()
 
-	return ctx, nil
+	timeout := time.After(timeoutDuration)
+	for {
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return ctx, fmt.Errorf("watcher channel closed unexpectedly")
+			}
+
+			if event.Type == watch.Deleted {
+				logger.Debugf(ctx, "Pod %s has been deleted", podName)
+				return ctx, nil
+			}
+
+		case <-timeout:
+			return ctx, fmt.Errorf("timeout waiting for pod %s to be deleted after %v", podName, timeoutDuration)
+		}
+	}
 }
 
 func (k *K8sEnv) DeleteSingletonService(ctx context.Context) (context.Context, error) {
