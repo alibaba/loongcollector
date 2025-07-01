@@ -31,9 +31,7 @@
 
 namespace logtail {
 
-const std::string MemCollector::sName = "Memory";
-const std::string kMetricLabelMem = "valueTag";
-const std::string kMetricLabelMode = "mode";
+const std::string MemCollector::sName = "memory";
 
 MemCollector::MemCollector() {
     Init();
@@ -118,7 +116,7 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 }
 
 bool MemCollector::GetHostMeminfoStat(MemoryInformation& meminfo) {
-    if (!SystemInterface::GetInstance()->GetHostMeminfomationStat(meminfo)) {
+    if (!SystemInterface::GetInstance()->GetHostMemInfomationStat(meminfo)) {
         return false;
     }
 

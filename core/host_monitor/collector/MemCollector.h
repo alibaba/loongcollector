@@ -25,10 +25,6 @@
 
 namespace logtail {
 
-extern const uint32_t kMinInterval;
-extern const uint32_t kDefaultInterval;
-extern std::filesystem::path PROC_MEMINFO;
-
 class MemCollector : public BaseCollector {
 public:
     MemCollector();

@@ -245,7 +245,7 @@ SwapCached:            0 kB
 Active:           417452 kB
 Inactive:        1131312 kB
  */
-bool LinuxSystemInterface::GetHostMeminfomationStatOnce(MemoryInformation& meminfo) {
+bool LinuxSystemInterface::GetHostMemInfomationStatOnce(MemoryInformation& meminfo) {
     auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
     std::vector<std::string> memInfoStr;
     const uint64_t mb = 1024 * 1024;
@@ -264,12 +264,12 @@ bool LinuxSystemInterface::GetHostMeminfomationStatOnce(MemoryInformation& memin
 
     file.close();
 
-    std::unordered_map<std::string, double&> memoryProc{
-        {"MemTotal:", meminfo.memStat.total},
-        {"MemFree:", meminfo.memStat.free},
-        {"MemAvailable:", meminfo.memStat.available},
-        {"Buffers:", meminfo.memStat.buffers},
-        {"Cached:", meminfo.memStat.cached},
+    std::unordered_set<std::string> memoryProc{
+        "MemTotal:",
+        "MemFree:",
+        "MemAvailable:",
+        "Buffers:",
+        "Cached:",
     };
 
     /* 字符串处理，处理成对应的类型以及值*/
@@ -277,11 +277,34 @@ bool LinuxSystemInterface::GetHostMeminfomationStatOnce(MemoryInformation& memin
         std::vector<std::string> words;
         boost::algorithm::split(words, memInfoStr[i], boost::is_any_of(" "), boost::token_compress_on);
         // words-> MemTotal: / 12344 / kB
-
-        auto entry = memoryProc.find(words[0]);
-        if (entry != memoryProc.end()) {
-            entry->second = GetMemoryValue(words.back()[0], std::stoi(words[1]));
-            memoryProc.erase(entry);
+        if (words.size() < 2) {
+            continue;
+        }
+        double val;
+        uint64_t orival;
+        if (words.size() == 2) {
+            if (!StringTo(words[1], val)) {
+                memoryProc.erase(words[0]);
+                continue;
+            }
+        } else if (words.back().size() > 0 && StringTo(words[1], orival)) {
+            val = GetMemoryValue(words.back()[0], orival);
+        }
+        if (words[0] == "MemTotal:") {
+            meminfo.memStat.total = val;
+            memoryProc.erase("MemTotal:");
+        } else if (words[0] == "MemFree:") {
+            meminfo.memStat.free = val;
+            memoryProc.erase("MemFree:");
+        } else if (words[0] == "MemAvailable:") {
+            meminfo.memStat.available = val;
+            memoryProc.erase("MemAvailable:");
+        } else if (words[0] == "Buffers:") {
+            meminfo.memStat.buffers = val;
+            memoryProc.erase("Buffers:");
+        } else if (words[0] == "Cached:") {
+            meminfo.memStat.cached = val;
+            memoryProc.erase("Cached:");
         }
     }
     meminfo.memStat.used = Diff(meminfo.memStat.total, meminfo.memStat.free);
@@ -289,12 +312,10 @@ bool LinuxSystemInterface::GetHostMeminfomationStatOnce(MemoryInformation& memin
     meminfo.memStat.actualFree = meminfo.memStat.available;
     meminfo.memStat.ram = meminfo.memStat.total / mb;
 
-    uint64_t diff = Diff(meminfo.memStat.total, meminfo.memStat.actualFree);
-    meminfo.memStat.usedPercent
-        = meminfo.memStat.total > 0 ? static_cast<double>(diff) * 100 / meminfo.memStat.total : 0.0;
+    double diff = Diff(meminfo.memStat.total, meminfo.memStat.actualFree);
+    meminfo.memStat.usedPercent = meminfo.memStat.total > 0 ? diff * 100 / meminfo.memStat.total : 0.0;
     diff = Diff(meminfo.memStat.total, meminfo.memStat.actualUsed);
-    meminfo.memStat.freePercent
-        = meminfo.memStat.total > 0 ? static_cast<double>(diff) * 100 / meminfo.memStat.total : 0.0;
+    meminfo.memStat.freePercent = meminfo.memStat.total > 0 ? diff * 100 / meminfo.memStat.total : 0.0;
     return true;
 }
 

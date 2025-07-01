@@ -87,7 +87,7 @@ private:
         return true;
     }
 
-    bool GetHostMeminfomationStatOnce(MemoryInformation& meminfo) override {
+    bool GetHostMemInfomationStatOnce(MemoryInformation& meminfo) override {
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }

@@ -222,7 +222,7 @@ public:
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
-    bool GetHostMeminfomationStat(MemoryInformation& meminfo);
+    bool GetHostMemInfomationStat(MemoryInformation& meminfo);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -250,7 +250,7 @@ private:
     virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
-    virtual bool GetHostMeminfomationStatOnce(MemoryInformation& meminfoStr) = 0;
+    virtual bool GetHostMemInfomationStatOnce(MemoryInformation& meminfoStr) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
