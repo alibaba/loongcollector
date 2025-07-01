@@ -16,8 +16,6 @@ package ebpf
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -159,46 +157,6 @@ func RemoveShellScript(ctx context.Context, tempFileName string) (context.Contex
 	command := fmt.Sprintf(`rm %s.sh`, tempFileName)
 	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
 		return ctx, err
-	}
-	return ctx, nil
-}
-
-func ApplyOnK8s(ctx context.Context, yamlContent string) (context.Context, error) {
-	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
-		dir := filepath.Join("test_cases")
-		yamlFileName := fmt.Sprintf("k8s-objects-%d.yaml", time.Now().Unix())
-		fullPath := filepath.Join(dir, yamlFileName)
-
-		file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) //nolint:gosec
-		if err != nil {
-			return ctx, err
-		}
-		defer func() {
-			_ = os.Remove(fullPath)
-		}()
-		defer file.Close()
-
-		_, err = file.WriteString(yamlContent)
-		if err != nil {
-			return ctx, err
-		}
-
-		if err := k8sEnv.Apply(yamlFileName); err != nil {
-			return ctx, err
-		}
-	} else {
-		return ctx, fmt.Errorf("try to delete pod, but env is not k8s env")
-	}
-	return ctx, nil
-}
-
-func DeletePodOnK8s(ctx context.Context, namespace, podName string) (context.Context, error) {
-	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
-		if _, err := k8sEnv.DeletePod(ctx, namespace, podName); err != nil {
-			return ctx, err
-		}
-	} else {
-		return ctx, fmt.Errorf("try to delete pod, but env is not k8s env")
 	}
 	return ctx, nil
 }

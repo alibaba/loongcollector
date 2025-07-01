@@ -21,13 +21,11 @@ import (
 	"math/big"
 	"sort"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -201,55 +199,6 @@ func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerNam
 		return "", err
 	}
 	return stdout.String(), nil
-}
-
-func (k *K8sEnv) DeletePod(ctx context.Context, namespace, podName string) (context.Context, error) {
-	if namespace == "" {
-		return ctx, fmt.Errorf("namespace is empty")
-	}
-	if podName == "" {
-		return ctx, fmt.Errorf("pod name is empty, skip deletion")
-	}
-
-	err := k.k8sClient.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
-	if err != nil && !k8sErrors.IsNotFound(err) {
-		return ctx, err
-	}
-
-	if _, err = k.waitForPodDeleted(ctx, namespace, podName, 120*time.Second); err != nil {
-		return ctx, err
-	}
-	logger.Debugf(ctx, "pod deleted:%s", podName)
-	return ctx, nil
-}
-
-func (k *K8sEnv) waitForPodDeleted(ctx context.Context, namespace, podName string, timeoutDuration time.Duration) (context.Context, error) {
-	// 创建 Context 和 Watcher
-	watcher, err := k.k8sClient.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + podName,
-	})
-	if err != nil {
-		return ctx, fmt.Errorf("failed to create watcher for pod %s: %w", podName, err)
-	}
-	defer watcher.Stop()
-
-	timeout := time.After(timeoutDuration)
-	for {
-		select {
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				return ctx, fmt.Errorf("watcher channel closed unexpectedly")
-			}
-
-			if event.Type == watch.Deleted {
-				logger.Debugf(ctx, "Pod %s has been deleted", podName)
-				return ctx, nil
-			}
-
-		case <-timeout:
-			return ctx, fmt.Errorf("timeout waiting for pod %s to be deleted after %v", podName, timeoutDuration)
-		}
-	}
 }
 
 func (k *K8sEnv) DeleteSingletonService(ctx context.Context) (context.Context, error) {

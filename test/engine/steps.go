@@ -81,8 +81,6 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^execute \{(\d+)\} the shell script file \{(\S+)\} in parallel`, ebpf.ExecuteShellScriptParallel)
 	ctx.When(`^execute \{(\d+)\} the shell script file \{(\S+)\} in sequence`, ebpf.ExecuteShellScriptSerial)
 	ctx.When(`^delete the shell script file \{(\S+)\}`, ebpf.RemoveShellScript)
-	ctx.When(`^apply k8s yaml as below$`, ebpf.ApplyOnK8s)
-	ctx.When(`^delete pod with namespace \{(\S+)\} name \{(\S+)\}$`, ebpf.DeletePodOnK8s)
 	ctx.When(`^delete singleton service on k8s$`, ebpf.DeleteSingletonServiceOnK8s)
 	ctx.When(`^create singleton service on k8s$`, ebpf.CreateSingletonServiceOnK8s)
 	ctx.When(`^execute \{(\d+)\} commands to generate network security events on url \{(.*)\}$`, ebpf.NetworksSecurityEvents)
