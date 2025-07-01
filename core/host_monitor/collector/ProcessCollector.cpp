@@ -97,11 +97,6 @@ const std::string ProcessCollector::sName = "process";
 const std::string kMetricLabelProcess = "valueTag";
 const std::string kMetricLabelMode = "mode";
 
-
-ProcessCollector::ProcessCollector() {
-    Init();
-}
-
 static uint64_t GetMemoryValue(char unit, uint64_t value) {
     if (unit == 'k' || unit == 'K') {
         value *= 1024;
@@ -137,24 +132,23 @@ static double GetMemoryStat(std::vector<std::string>& memoryLines) {
     return totalMemory;
 }
 
-int ProcessCollector::Init(int totalCount) {
+void ProcessCollector::Init(const HostMonitorCollectConfig& collectConfig) {
     std::vector<std::string> memLines;
     std::string errorMessage;
+    int totalCount = collectConfig.mInterval.count() / 5;
 
     if (!GetHostSystemStatWithPath(memLines, errorMessage, "/proc/meminfo")) {
         LOG_WARNING(sLogger, ("failed to get system load", "invalid System collector")("error msg", errorMessage));
         mTotalMemory = 0;
-        return -1;
+        return;
     }
 
     double totalMemory = GetMemoryStat(memLines);
     mTotalMemory = totalMemory;
     mTotalCount = totalCount;
-
-    return 0;
 }
 
-bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool ProcessCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

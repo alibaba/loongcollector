@@ -30,6 +30,7 @@
 #include "boost/regex.hpp"
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 #include <charconv>
 
 #include <boost/algorithm/string.hpp>

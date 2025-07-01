@@ -29,7 +29,7 @@ const std::string SystemCollector::sName = "system";
 const std::string kMetricLabelMode = "valueTag";
 
 void SystemCollector::Init(const HostMonitorCollectConfig& collectConfig) {
-    mCountPerReport = collectConfig.mInterval.count() / kHostMonitorMinInterval;
+    mCountPerReport = collectConfig.mInterval.count() / 5;
     mCount = 0;
 }
 

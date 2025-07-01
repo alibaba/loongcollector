@@ -162,6 +162,8 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
+    std::vector<uint32_t> intervals(mCollectors.size(), mInterval);
+    intervals[3] = 1;
     HostMonitorInputRunner::GetInstance()->UpdateCollector(mConfigName,
                                                            mCollectors,
                                                            std::vector(mCollectors.size(), kHostMonitorMinInterval),

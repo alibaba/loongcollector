@@ -37,18 +37,13 @@ const std::string kMetricValueTag = "valueTag";
 
 const static int NET_INTERFACE_LIST_MAX = 20;
 
-NetCollector::NetCollector() {
-    Init();
-}
-
-int NetCollector::Init(int totalCount) {
-    mTotalCount = totalCount;
+void NetCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mTotalCount = collectConfig.mInterval.count() / 1;
     mCount = 0;
     mLastTime = std::chrono::steady_clock::now();
-    return 0;
 }
 
-bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool NetCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
@@ -172,7 +167,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         metricEvent->SetTimestamp(now, 0);
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), curname);
-        metricEvent->SetTag(std::string("m"),std::string("system.net_original"));
+        metricEvent->SetTag(std::string("m"), std::string("system.net_original"));
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
 

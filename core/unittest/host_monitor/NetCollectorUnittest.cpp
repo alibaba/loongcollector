@@ -210,7 +210,7 @@ void NetCollectorUnittest::TestCollect() const {
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
     NetCollector collector = NetCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorCollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
 
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));

@@ -113,7 +113,7 @@ void ProcessCollectorUnittest::TestGetHostPidStat() const {
 void ProcessCollectorUnittest::TestCollect() const {
     auto collector = ProcessCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorCollectConfig collectConfig(ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
 
     std::cout << group.GetEvents().size() << std::endl;
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));

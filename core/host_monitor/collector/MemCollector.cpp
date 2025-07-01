@@ -37,17 +37,12 @@ const std::string MemCollector::sName = "Memory";
 const std::string kMetricLabelMem = "valueTag";
 const std::string kMetricLabelMode = "mode";
 
-MemCollector::MemCollector() {
-    Init();
-}
-
-int MemCollector::Init(int totalCount) {
-    mTotalCount = totalCount;
+void MemCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mTotalCount = collectConfig.mInterval.count() / 5;
     mCount = 0;
-    return 0;
 }
 
-bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool MemCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

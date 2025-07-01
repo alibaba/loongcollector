@@ -31,12 +31,11 @@ extern std::filesystem::path PROC_MEMINFO;
 
 class MemCollector : public BaseCollector {
 public:
-    MemCollector();
-
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+    MemCollector() = default;
     ~MemCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    void Init(const HostMonitorCollectConfig& collectConfig) override;
+    bool Collect(PipelineEventGroup* group) override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }

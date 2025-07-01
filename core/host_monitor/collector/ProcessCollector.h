@@ -268,13 +268,11 @@ struct SystemTaskInfo {
 
 class ProcessCollector : public BaseCollector {
 public:
-    ProcessCollector();
-
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-
+    ProcessCollector() = default;
     ~ProcessCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    void Init(const HostMonitorCollectConfig& collectConfig) override;
+    bool Collect(PipelineEventGroup* group) override;
 
     static const std::string sName;
 

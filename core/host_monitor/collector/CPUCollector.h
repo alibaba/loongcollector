@@ -55,9 +55,7 @@ struct CPUPercent {
 
 class CPUCollector : public BaseCollector {
 public:
-    CPUCollector();
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-
+    CPUCollector() = default;
     ~CPUCollector() override = default;
 
     void Init(const HostMonitorCollectConfig& collectConfig) override;

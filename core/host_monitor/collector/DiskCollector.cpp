@@ -49,16 +49,6 @@ bool IsZero(const std::chrono::steady_clock::time_point& t) {
 bool IsZero(const std::chrono::system_clock::time_point& t) {
     return t.time_since_epoch().count() == 0;
 }
-DiskCollector::DiskCollector() {
-    Init();
-}
-int DiskCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
-    mLastTime = std::chrono::steady_clock::time_point{};
-    mDeviceMountMapExpireTime = std::chrono::steady_clock::time_point{};
-    return 0;
-}
 
 const struct {
     SicFileSystemType fs;
@@ -105,7 +95,14 @@ std::string join_n(const T& v, const std::string& splitter, size_t n) {
     return result;
 }
 
-bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+void DiskCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mCountPerReport = collectConfig.mInterval.count() / 5;
+    mCount = 0;
+    mLastTime = std::chrono::steady_clock::time_point{};
+    mDeviceMountMapExpireTime = std::chrono::steady_clock::time_point{};
+}
+
+bool DiskCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }

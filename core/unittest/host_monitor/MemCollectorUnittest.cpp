@@ -113,7 +113,7 @@ void MemCollectorUnittest::TestGetHostSystemMeminfoStat() const {
 void MemCollectorUnittest::TestCollect() const {
     auto collector = MemCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(MemCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorCollectConfig collectConfig(MemCollector::sName, 0, 0, std::chrono::seconds(1));
 
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));

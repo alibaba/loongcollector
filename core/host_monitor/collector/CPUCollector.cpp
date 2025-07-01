@@ -28,6 +28,9 @@ const std::string kMetricLabelCPU = "cpu";
 const std::string kMetricLabelMode = "mode";
 
 void CPUCollector::Init(const HostMonitorCollectConfig& collectConfig) {
+    mCountPerReport = collectConfig.mInterval.count() / 5;
+    mCount = 0;
+    mCalculate.Reset();
 }
 
 bool CPUCollector::Collect(PipelineEventGroup* group) {

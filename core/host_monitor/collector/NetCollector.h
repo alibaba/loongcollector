@@ -206,7 +206,7 @@ struct ResNetRatePerSec {
         FIELD_ENTRY(ResNetRatePerSec, txByteRate),
         FIELD_ENTRY(ResNetRatePerSec, txErrorRate),
         FIELD_ENTRY(ResNetRatePerSec, rxErrorRate),
-        FIELD_ENTRY(ResNetRatePerSec, rxDropRate), 
+        FIELD_ENTRY(ResNetRatePerSec, rxDropRate),
         FIELD_ENTRY(ResNetRatePerSec, txDropRate),
     };
     static void enumerate(const std::function<void(const FieldName<ResNetRatePerSec, double>&)>& callback) {
@@ -219,14 +219,11 @@ struct ResNetRatePerSec {
 
 class NetCollector : public BaseCollector {
 public:
-    NetCollector();
-
-    // int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-    int Init(int totalCount = 15);
-
+    NetCollector() = default;
     ~NetCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    void Init(const HostMonitorCollectConfig& collectConfig) override;
+    bool Collect(PipelineEventGroup* group) override;
 
     static const std::string sName;
 
