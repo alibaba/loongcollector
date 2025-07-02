@@ -265,7 +265,7 @@ bool ProcessCollector::Collect(PipelineEventGroup* group) {
     metricEvent->SetTag(std::string("m"), std::string("system.processCount"));
 
     // 每个pid一条记录上报
-    for (size_t i = 0; i < pushMerticList.size(); ++i) {
+    for (size_t i = 0; i < pushMerticList.size() && i<5; ++i) {
         MetricEvent* metricEventEachPid = group->AddMetricEvent(true);
         metricEventEachPid->SetTimestamp(now, 0);
         metricEventEachPid->SetValue<UntypedMultiDoubleValues>(metricEventEachPid);
@@ -306,7 +306,7 @@ bool ProcessCollector::Collect(PipelineEventGroup* group) {
 
     // 打包记录，process_expand
     // average record
-    for (size_t i = 0; i < pushMerticList.size(); ++i) {
+    for (size_t i = 0; i < pushMerticList.size() && i<5; ++i) {
         MetricEvent* metricEventEachPidExpand = group->AddMetricEvent(true);
         metricEventEachPidExpand->SetTimestamp(now, 0);
         metricEventEachPidExpand->SetValue<UntypedMultiDoubleValues>(metricEventEachPidExpand);
