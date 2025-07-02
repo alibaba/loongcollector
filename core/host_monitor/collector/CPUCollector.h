@@ -24,11 +24,11 @@ class CPUCollector : public BaseCollector {
 public:
     ~CPUCollector() override = default;
 
-    void Init(const HostMonitorCollectConfig& collectConfig) override;
     bool Collect(PipelineEventGroup* group) override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
+    int GetCollectInterval() const override;
 };
 
 } // namespace logtail

@@ -18,7 +18,6 @@
 
 #include <chrono>
 #include <memory>
-#include <string>
 
 #include "host_monitor/collector/BaseCollector.h"
 #include "timer/TimerEvent.h"
@@ -29,14 +28,15 @@ class HostMonitorTimerEvent : public TimerEvent {
 public:
     HostMonitorTimerEvent(const std::chrono::steady_clock::time_point& execTime,
                           HostMonitorCollectConfig&& collectConfig,
-                          std::unique_ptr<BaseCollector>&& collector)
+                          std::shared_ptr<BaseCollector>&& collector)
         : TimerEvent(execTime), mCollectConfig(std::move(collectConfig)), mCollector(std::move(collector)) {}
 
     bool IsValid() const override;
     bool Execute() override;
 
     HostMonitorCollectConfig mCollectConfig;
-    std::unique_ptr<BaseCollector> mCollector;
+    // Timer accept std::function which doesn't support move, so we need to use shared_ptr here.
+    std::shared_ptr<BaseCollector> mCollector;
 };
 
 } // namespace logtail

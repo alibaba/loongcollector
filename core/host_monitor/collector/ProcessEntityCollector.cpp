@@ -61,7 +61,7 @@ system_clock::time_point ProcessEntityCollector::TicksToUnixTime(int64_t startTi
 }
 
 void ProcessEntityCollector::Init(const HostMonitorCollectConfig& collectConfig) {
-    mInterval = collectConfig.mInterval.count();
+    mInterval = collectConfig.mFlushInterval.count();
 }
 
 bool ProcessEntityCollector::Collect(PipelineEventGroup* group) {

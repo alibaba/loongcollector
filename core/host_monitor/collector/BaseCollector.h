@@ -27,29 +27,35 @@ struct HostMonitorCollectConfig {
     std::string mCollectorName;
     QueueKey mProcessQueueKey;
     size_t mInputIndex;
-    std::chrono::seconds mInterval;
+    std::chrono::seconds mFlushInterval;
 
     HostMonitorCollectConfig(const std::string& configName,
                              const std::string& collectorName,
                              QueueKey processQueueKey,
                              size_t inputIndex,
-                             const std::chrono::seconds& interval)
+                             const std::chrono::seconds& flushInterval)
         : mConfigName(configName),
           mCollectorName(collectorName),
           mProcessQueueKey(processQueueKey),
           mInputIndex(inputIndex),
-          mInterval(interval) {}
+          mFlushInterval(flushInterval) {}
 };
 
 class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
-    virtual void Init(const HostMonitorCollectConfig& collectConfig) = 0;
+    void Init(const HostMonitorCollectConfig& collectConfig) {
+        mTotalCount = collectConfig.mFlushInterval.count() / GetCollectInterval();
+        mCount = 0;
+    }
     virtual bool Collect(PipelineEventGroup* group) = 0;
-    virtual const std::string& Name() const = 0;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
+    [[nodiscard]] virtual int GetCollectInterval() const = 0;
 
 protected:
     bool mValidState = true;
+    int mTotalCount = 0;
+    int mCount = 0;
 };
 
 } // namespace logtail

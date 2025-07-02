@@ -18,17 +18,17 @@
 
 #include <string>
 
+#include "common/Flags.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
+
+DEFINE_FLAG_INT32(host_monitor_cpu_collect_interval, "host monitor cpu collect interval, seconds", 5);
 
 namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
 const std::string kMetricLabelCPU = "cpu";
 const std::string kMetricLabelMode = "mode";
-
-void CPUCollector::Init(const HostMonitorCollectConfig& collectConfig) {
-}
 
 bool CPUCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
@@ -72,6 +72,10 @@ bool CPUCollector::Collect(PipelineEventGroup* group) {
         }
     }
     return true;
+}
+
+int CPUCollector::GetCollectInterval() const {
+    return INT32_FLAG(host_monitor_cpu_collect_interval);
 }
 
 } // namespace logtail

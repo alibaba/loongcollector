@@ -57,8 +57,9 @@ public:
     ProcessEntityCollector();
     ~ProcessEntityCollector() override = default;
 
-    void Init(const HostMonitorCollectConfig& collectConfig) override;
+    void Init(const HostMonitorCollectConfig& collectConfig);
     bool Collect(PipelineEventGroup* group) override;
+    int GetCollectInterval() const override { return mInterval; }
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }

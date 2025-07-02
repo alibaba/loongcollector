@@ -93,11 +93,8 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
-    HostMonitorInputRunner::GetInstance()->UpdateCollector(mConfigName,
-                                                           mCollectors,
-                                                           std::vector(mCollectors.size(), kHostMonitorMinInterval),
-                                                           mContext->GetProcessQueueKey(),
-                                                           mIndex);
+    HostMonitorInputRunner::GetInstance()->UpdateCollector(
+        mConfigName, mCollectors, std::vector(mCollectors.size(), mInterval), mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 

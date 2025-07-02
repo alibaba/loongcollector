@@ -37,8 +37,8 @@ namespace logtail {
 template <typename T>
 class CollectorFactory {
 public:
-    static std::unique_ptr<BaseCollector> Create(const HostMonitorCollectConfig& collectConfig) {
-        auto collector = std::make_unique<T>();
+    static std::shared_ptr<BaseCollector> Create(const HostMonitorCollectConfig& collectConfig) {
+        auto collector = std::make_shared<T>();
         collector->Init(collectConfig);
         return collector;
     }
@@ -80,13 +80,15 @@ private:
         mRegisteredCollectorMap.emplace(T::sName, CollectorFactory<T>::Create);
     }
 
-    void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime, HostMonitorTimerEvent& event);
+    void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
+                            HostMonitorCollectConfig&& collectConfig,
+                            std::shared_ptr<BaseCollector>&& collector);
     void AddHostLabels(PipelineEventGroup& group);
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
 
-    std::unordered_map<std::string, std::function<std::unique_ptr<BaseCollector>(const HostMonitorCollectConfig&)>>
+    std::unordered_map<std::string, std::function<std::shared_ptr<BaseCollector>(const HostMonitorCollectConfig&)>>
         mRegisteredCollectorMap;
     mutable std::shared_mutex mRunningConfigMapMutex;
     std::unordered_map<std::string, std::unordered_set<std::string>> mRunningConfigMap;

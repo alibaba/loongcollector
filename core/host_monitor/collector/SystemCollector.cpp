@@ -20,18 +20,16 @@
 #include <string>
 
 #include "MetricValue.h"
+#include "common/Flags.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
+
+DEFINE_FLAG_INT32(host_monitor_system_collect_interval, "host monitor system collect interval, seconds", 5);
 
 namespace logtail {
 
 const std::string SystemCollector::sName = "system";
 const std::string kMetricLabelMode = "valueTag";
-
-void SystemCollector::Init(const HostMonitorCollectConfig& collectConfig) {
-    mCountPerReport = collectConfig.mInterval.count() / kHostMonitorMinInterval;
-    mCount = 0;
-}
 
 bool SystemCollector::Collect(PipelineEventGroup* group) {
     if (group == nullptr) {
@@ -45,7 +43,7 @@ bool SystemCollector::Collect(PipelineEventGroup* group) {
     mCalculate.AddValue(load.systemStat);
 
     mCount++;
-    if (mCount < mCountPerReport) {
+    if (mCount < mTotalCount) {
         return true;
     }
 
@@ -111,5 +109,8 @@ bool SystemCollector::Collect(PipelineEventGroup* group) {
     return true;
 }
 
+int SystemCollector::GetCollectInterval() const {
+    return INT32_FLAG(host_monitor_system_collect_interval);
+}
 
 } // namespace logtail

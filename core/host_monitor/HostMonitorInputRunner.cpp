@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+#include "BaseCollector.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
@@ -90,7 +91,7 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
         auto now = std::chrono::steady_clock::now();
         auto event = std::make_unique<HostMonitorTimerEvent>(now, std::move(collectConfig), std::move(collector));
         Timer::GetInstance()->PushEvent(std::move(event));
-        mRunningConfigMap[configName].insert(collectorName);
+        mRunningConfigMap[configName].emplace(collectorName);
         LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collectorName));
     }
 }
@@ -151,53 +152,56 @@ void HostMonitorInputRunner::ScheduleOnce(HostMonitorTimerEvent& event,
         LOG_WARNING(sLogger,
                     ("host monitor push process queue failed", "discard data")("collector",
                                                                                event.mCollectConfig.mCollectorName));
-        PushNextTimerEvent(execTime, event);
+        PushNextTimerEvent(execTime, std::move(event.mCollectConfig), std::move(event.mCollector));
         return;
     }
 
-    auto collectFn = [this, &event, execTime]() mutable {
-        PipelineEventGroup group(std::make_shared<SourceBuffer>());
-        std::unique_lock<std::shared_mutex> lock(mRunningConfigMapMutex);
-        auto it = mRunningConfigMap.find(event.mCollectConfig.mCollectorName);
-        if (it == mRunningConfigMap.end()) {
-            LOG_ERROR(sLogger,
-                      ("collector not found, will not collect again",
-                       "discard data")("collector", event.mCollectConfig.mCollectorName));
-            return;
-        }
-        if (event.mCollector->Collect(&group)) {
-            LOG_DEBUG(sLogger,
-                      ("host monitor", "collect data")("collector", event.mCollectConfig.mCollectorName)(
-                          "size", group.GetEvents().size()));
-            if (group.GetEvents().size() > 0) {
-                AddHostLabels(group);
-                bool result = ProcessorRunner::GetInstance()->PushQueue(
-                    event.mCollectConfig.mProcessQueueKey, event.mCollectConfig.mInputIndex, std::move(group));
-                if (!result) {
+    auto collectFn =
+        [this, config = std::move(event.mCollectConfig), collector = std::move(event.mCollector), execTime]() mutable {
+            {
+                std::unique_lock<std::shared_mutex> lock(mRunningConfigMapMutex);
+                auto it = mRunningConfigMap.find(config.mConfigName);
+                if (it == mRunningConfigMap.end()) {
                     LOG_ERROR(sLogger,
-                              ("host monitor push process queue failed",
-                               "discard data")("collector", event.mCollectConfig.mCollectorName));
+                              ("collector not found, will not collect again", "discard data")("collector",
+                                                                                              config.mCollectorName));
+                    return;
                 }
             }
-        } else {
-            LOG_ERROR(sLogger,
-                      ("host monitor collect data failed", "collect error")("collector",
-                                                                            event.mCollectConfig.mCollectorName));
-        }
-        PushNextTimerEvent(execTime, event);
-    };
+            PipelineEventGroup group(std::make_shared<SourceBuffer>());
+            if (collector->Collect(&group)) {
+                LOG_INFO(sLogger,
+                         ("host monitor", "collect data")("collector",
+                                                          config.mCollectorName)("size", group.GetEvents().size()));
+                if (group.GetEvents().size() > 0) {
+                    AddHostLabels(group);
+                    bool result = ProcessorRunner::GetInstance()->PushQueue(
+                        config.mProcessQueueKey, config.mInputIndex, std::move(group));
+                    if (!result) {
+                        LOG_ERROR(sLogger,
+                                  ("host monitor push process queue failed", "discard data")("collector",
+                                                                                             config.mCollectorName));
+                    }
+                }
+            } else {
+                LOG_ERROR(sLogger,
+                          ("host monitor collect data failed", "collect error")("collector", config.mCollectorName));
+            }
+            PushNextTimerEvent(execTime, std::move(config), std::move(collector));
+        };
     mThreadPool->Add(collectFn);
 }
 
 void HostMonitorInputRunner::PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
-                                                HostMonitorTimerEvent& event) {
-    auto& config = event.mCollectConfig;
-    std::chrono::steady_clock::time_point nextExecTime = execTime + config.mInterval;
+                                                HostMonitorCollectConfig&& collectConfig,
+                                                std::shared_ptr<BaseCollector>&& collector) {
+    auto& config = collectConfig;
+    std::chrono::steady_clock::time_point nextExecTime
+        = execTime + std::chrono::seconds(collector->GetCollectInterval());
     while (nextExecTime < std::chrono::steady_clock::now()) {
-        nextExecTime += config.mInterval;
+        nextExecTime += std::chrono::seconds(collector->GetCollectInterval());
     }
-    auto newEvent
-        = std::make_unique<HostMonitorTimerEvent>(nextExecTime, std::move(config), std::move(event.mCollector));
+    auto newEvent = std::make_unique<HostMonitorTimerEvent>(nextExecTime, std::move(config), std::move(collector));
     Timer::GetInstance()->PushEvent(std::move(newEvent));
 }
 
