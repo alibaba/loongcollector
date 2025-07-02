@@ -24,7 +24,6 @@ std::filesystem::path PROCESS_DIR = "/proc";
 const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";
 const std::filesystem::path PROCESS_MEMINFO = "meminfo";
-const std::filesystem::path PROCESS_MTRR = "mtrr";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail
