@@ -2,14 +2,16 @@ package kubernetesmetav2
 
 const (
 	// should keep same with EntityConstants.cpp
-	entityDomainFieldName       = "__domain__"
-	entityTypeFieldName         = "__entity_type__"
-	entityIDFieldName           = "__entity_id__"
-	entityMethodFieldName       = "__method__"
-	entityClusterIDFieldName    = "cluster_id"
-	entityKindFieldName         = "kind"
-	entityNameFieldName         = "name"
-	entityCreationTimeFieldName = "create_time"
+	entityDomainFieldName        = "__domain__"
+	entityTypeFieldName          = "__entity_type__"
+	entityIDFieldName            = "__entity_id__"
+	entityMethodFieldName        = "__method__"
+	entityClusterIDFieldName     = "cluster_id"
+	entityClusterNameFieldName   = "cluster_name"
+	entityClusterRegionFieldName = "region_id"
+	entityKindFieldName          = "kind"
+	entityNameFieldName          = "name"
+	entityCreationTimeFieldName  = "create_time"
 
 	entityFirstObservedTimeFieldName = "__first_observed_time__"
 	entityLastObservedTimeFieldName  = "__last_observed_time__"
@@ -30,9 +32,7 @@ const (
 )
 
 const (
-	acsDomain   = "acs"
-	infraDomain = "infra"
-
+	k8sDomain  = "k8s"
 	ackCluster = "ack"
 	oneCluster = "one"
 	asiCluster = "asi"
