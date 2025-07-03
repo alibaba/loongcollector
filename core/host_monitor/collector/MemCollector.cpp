@@ -116,7 +116,7 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 }
 
 bool MemCollector::GetHostMeminfoStat(MemoryInformation& meminfo) {
-    if (!SystemInterface::GetInstance()->GetHostMemInfomationStat(meminfo)) {
+    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(meminfo)) {
         return false;
     }
 

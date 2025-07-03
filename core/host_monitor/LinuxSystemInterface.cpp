@@ -245,7 +245,7 @@ SwapCached:            0 kB
 Active:           417452 kB
 Inactive:        1131312 kB
  */
-bool LinuxSystemInterface::GetHostMemInfomationStatOnce(MemoryInformation& meminfo) {
+bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& meminfo) {
     auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
     std::vector<std::string> memInfoStr;
     const uint64_t mb = 1024 * 1024;
@@ -264,16 +264,10 @@ bool LinuxSystemInterface::GetHostMemInfomationStatOnce(MemoryInformation& memin
 
     file.close();
 
-    std::unordered_set<std::string> memoryProc{
-        "MemTotal:",
-        "MemFree:",
-        "MemAvailable:",
-        "Buffers:",
-        "Cached:",
-    };
+    int count = 0;
 
     /* 字符串处理，处理成对应的类型以及值*/
-    for (size_t i = 0; i < memInfoStr.size() && !memoryProc.empty(); i++) {
+    for (size_t i = 0; i < memInfoStr.size() && count < 5; i++) {
         std::vector<std::string> words;
         boost::algorithm::split(words, memInfoStr[i], boost::is_any_of(" "), boost::token_compress_on);
         // words-> MemTotal: / 12344 / kB
@@ -284,27 +278,26 @@ bool LinuxSystemInterface::GetHostMemInfomationStatOnce(MemoryInformation& memin
         uint64_t orival;
         if (words.size() == 2) {
             if (!StringTo(words[1], val)) {
-                memoryProc.erase(words[0]);
-                continue;
+                val = 0.0;
             }
         } else if (words.back().size() > 0 && StringTo(words[1], orival)) {
             val = GetMemoryValue(words.back()[0], orival);
         }
         if (words[0] == "MemTotal:") {
             meminfo.memStat.total = val;
-            memoryProc.erase("MemTotal:");
+            count++;
         } else if (words[0] == "MemFree:") {
             meminfo.memStat.free = val;
-            memoryProc.erase("MemFree:");
+            count++;
         } else if (words[0] == "MemAvailable:") {
             meminfo.memStat.available = val;
-            memoryProc.erase("MemAvailable:");
+            count++;
         } else if (words[0] == "Buffers:") {
             meminfo.memStat.buffers = val;
-            memoryProc.erase("Buffers:");
+            count++;
         } else if (words[0] == "Cached:") {
             meminfo.memStat.cached = val;
-            memoryProc.erase("Cached:");
+            count++;
         }
     }
     meminfo.memStat.used = Diff(meminfo.memStat.total, meminfo.memStat.free);
