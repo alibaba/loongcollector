@@ -525,6 +525,26 @@ void EBPFServer::updatePluginState(PluginType type,
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
 }
 
+void EBPFServer::SetPluginLifecycleState(PluginType type,
+                                         const std::string& pipelineName,
+                                         LifecycleState state) 
+{
+    if (type >= PluginType::MAX) {
+        return;
+    }
+    mPlugins[static_cast<int>(type)].mStatePipelineName = pipelineName;
+    mPlugins[static_cast<int>(type)].mLifecycleState = state;
+
+    LOG_DEBUG(sLogger, ("update plugin lifestate", "")("type", magic_enum::enum_name(type).data())("pipeline", pipelineName)("lifestate", magic_enum::enum_name(state).data()));
+}
+
+bool EBPFServer::IsPluginInited(PluginType type, const std::string& pipelineName) {
+    if (type >= PluginType::MAX) {
+        return false;
+    }
+    return mPlugins[static_cast<int>(type)].mLifecycleState == LifecycleState::INITIALIZED && mPlugins[static_cast<int>(type)].mStatePipelineName == pipelineName;
+}
+
 void EBPFServer::handlerEvents() {
     std::array<std::shared_ptr<CommonEvent>, 4096> items;
     while (mRunning) {

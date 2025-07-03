@@ -82,8 +82,16 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
 
         // LOG(INFO) << "filter not empty!";
         for (int i = 0; i < (int)filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
-            const auto& x = filter->mFilePathList[i];
-
+            const auto& origin = filter->mFilePathList[i];
+            std::string truncatedPath;
+            if (origin.length() > STRING_PREFIX_MAX_LENGTH - 1) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                    "[CreateFilterForCallname] filter path is too long, truncating to %d bytes: %s",
+                    STRING_PREFIX_MAX_LENGTH,
+                    origin.c_str());
+                truncatedPath = origin.substr(0, STRING_PREFIX_MAX_LENGTH - 1);
+            }
+            const auto& x = truncatedPath.empty() ? origin : truncatedPath;
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[CreateFilterForCallname] begin to update map in map for filter detail, idx: %d, path: %s\n",
                      idx,

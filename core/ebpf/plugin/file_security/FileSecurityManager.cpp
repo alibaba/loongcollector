@@ -133,8 +133,7 @@ int FileSecurityManager::SendEvents() {
             auto sharedEvent = sharedEventGroup.CreateLogEvent();
             bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
             if (!hit) {
-                LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
-                return;
+                LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }
 
             for (const auto& innerEvent : group->mInnerEvents) {

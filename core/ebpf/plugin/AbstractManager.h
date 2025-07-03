@@ -71,6 +71,9 @@ public:
     virtual int Suspend() {
         WriteLock lock(mMtx);
         mSuspendFlag = true;
+        if(GetPluginType() == PluginType::PROCESS_SECURITY) {
+            return 0;
+        }
         bool ret = mEBPFAdapter->SuspendPlugin(GetPluginType());
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(GetPluginType())));

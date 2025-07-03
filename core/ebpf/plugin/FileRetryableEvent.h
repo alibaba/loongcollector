@@ -15,7 +15,6 @@
 #pragma once
 
 #include "FileEvent.h"
-#include "RetryableEventCache.h"
 #include "ebpf/plugin/RetryableEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
@@ -43,7 +42,7 @@ public:
     bool HandleMessage() override;
     bool OnRetry() override;
     void OnDrop() override;
-    bool CanRetry() const override;
+    [[nodiscard]] bool CanRetry() const override;
 
 private:
     bool incrementProcessRef();
