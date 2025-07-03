@@ -559,11 +559,11 @@ void ModifyHandler::Handle(const Event& event) {
             }
         }
         for (auto& pair : mRotatorReaderMap) {
-            if (pair.second->GetContainerID() != event.GetContainerID()) {
+            auto& reader = pair.second;
+            if (reader->GetContainerID() != event.GetContainerID()) {
                 continue;
             }
-            pair.second->SetContainerStopped();
-            auto reader = pair.second;
+            reader->SetContainerStopped();
             if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
                 if (reader->IsFileOpened()) {
                     LOG_INFO(
