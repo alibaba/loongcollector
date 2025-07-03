@@ -326,13 +326,6 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             }
             // new property to recover reader exactly from checkpoint
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
-            LOG_INFO(sLogger,
-                     ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
-                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
-                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
-                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
-                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
-                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID));
             // if file is open or
             // last update time is new and the file's container is not stopped we
             // we should use first modify
@@ -343,6 +336,14 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             } else {
                 mSkipFirstModify = true;
             }
+            LOG_INFO(sLogger,
+                     ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
+                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
+                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
+                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID)(
+                         "container stop", mContainerStopped)("skipFirstModify", mSkipFirstModify));
             // delete checkpoint at last
             checkPointManagerPtr->DeleteCheckPoint(mDevInode, GetConfigName());
             // because the reader is initialized by checkpoint, so set first watch to false
