@@ -566,14 +566,13 @@ void ModifyHandler::Handle(const Event& event) {
             reader->SetContainerStopped();
             if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
                 if (reader->IsFileOpened()) {
-                    LOG_INFO(
-                        sLogger,
-                        ("close the file",
-                            "the container has been stopped, and current file has been read or is forced to close")(
-                            "project", reader->GetProject())("logstore", reader->GetLogstore())(
-                            "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                            "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                            "file size", reader->GetFileSize())("container id", event.GetContainerID()));
+                    LOG_INFO(sLogger,
+                             ("close the file",
+                              "the container has been stopped, and current file has been read or is forced to close")(
+                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                 "file size", reader->GetFileSize())("container id", event.GetContainerID()));
                     // release fd as quick as possible
                     reader->CloseFilePtr();
                 }
