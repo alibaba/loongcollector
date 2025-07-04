@@ -559,10 +559,24 @@ void ModifyHandler::Handle(const Event& event) {
             }
         }
         for (auto& pair : mRotatorReaderMap) {
-            if (pair.second->GetContainerID() != event.GetContainerID()) {
+            auto& reader = pair.second;
+            if (reader->GetContainerID() != event.GetContainerID()) {
                 continue;
             }
-            pair.second->SetContainerStopped();
+            reader->SetContainerStopped();
+            if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
+                if (reader->IsFileOpened()) {
+                    LOG_INFO(sLogger,
+                             ("close the file",
+                              "the container has been stopped, and current file has been read or is forced to close")(
+                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                 "file size", reader->GetFileSize())("container id", event.GetContainerID()));
+                    // release fd as quick as possible
+                    reader->CloseFilePtr();
+                }
+            }
         }
     } else if (event.IsModify()) {
         // devInode cannot be found, this means a rotate file(like a.log.1) has event, and reader for rotate file is
