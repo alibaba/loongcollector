@@ -134,7 +134,7 @@ void ContainerInfo::AddMetadata(const std::string& key, const std::string& value
     if (it != containerNameTag.end()) {
         mMetadatas.emplace_back(it->second, value);
     } else {
-        mMetadatas.emplace_back(key, value);
+        mCustomMetadatas.emplace_back(key, value);
     }
 }
 

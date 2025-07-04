@@ -38,14 +38,19 @@ protected:
     void TearDown() override {}
 
 private:
-    vector<pair<std::variant<TagKey, string>, string>> GenerateFakeContainerMetadatas() {
-        vector<pair<std::variant<TagKey, string>, string>> metadata;
+    vector<pair<TagKey, string>> GenerateFakeContainerMetadatas() {
+        vector<pair<TagKey, string>> metadata;
         metadata.emplace_back(TagKey::K8S_NAMESPACE_TAG_KEY, "test_namespace");
         metadata.emplace_back(TagKey::K8S_POD_NAME_TAG_KEY, "test_pod");
         metadata.emplace_back(TagKey::K8S_POD_UID_TAG_KEY, "test_pod_uid");
         metadata.emplace_back(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, "test_image");
         metadata.emplace_back(TagKey::CONTAINER_NAME_TAG_KEY, "test_container");
         metadata.emplace_back(TagKey::CONTAINER_IP_TAG_KEY, "test_container_ip");
+        return metadata;
+    }
+
+    vector<pair<string, string>> GenerateFakeContainerCustomMetadatas() {
+        vector<pair<string, string>> metadata;
         metadata.emplace_back("test_env_config_tag_key", "test_env_config_tag_value");
         return metadata;
     }
@@ -109,6 +114,7 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -241,6 +247,7 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -375,6 +382,7 @@ void FileTagUnittest::TestRenameTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -498,6 +506,7 @@ void FileTagUnittest::TestDeleteTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
