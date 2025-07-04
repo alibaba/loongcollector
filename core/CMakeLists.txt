@@ -143,9 +143,6 @@ if (LINUX)
         host_monitor host_monitor/collector
         )
 elseif(MSVC)
-    if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
-    endif()
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
@@ -230,9 +227,16 @@ endif ()
 # Generate independent libraries.
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
-# Build eBPF dependencies
-set(EBPF_DIRVER_TARGET "eBPFDriver")
-add_subdirectory(ebpf/driver)
+if(MSVC)
+    if (ENABLE_ENTERPRISE)
+        add_subdirectory(daemon)
+        add_subdirectory(installer)
+    endif()
+elseif(UNIX)
+    # Build eBPF dependencies
+    set(EBPF_DIRVER_TARGET "eBPFDriver")
+    add_subdirectory(ebpf/driver)
+endif()
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)

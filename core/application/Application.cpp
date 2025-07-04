@@ -59,6 +59,8 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
+#elif defined(_MSC_VER)
+#include "common/WindowsDaemonUtil.h"
 #endif
 #else
 #include "provider/Provider.h"
@@ -117,9 +119,11 @@ void Application::Init() {
     LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+#if defined(__linux__)
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
         AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
     }
+#endif
     // get last crash info
     string backTraceStr = GetCrashBackTrace();
     if (!backTraceStr.empty()) {
