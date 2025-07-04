@@ -2391,10 +2391,14 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         }
         const auto& containerMetadatas = GetContainerMetadatas();
         for (const auto& metadata : containerMetadatas) {
-            const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
-            if (!key.empty()) {
-                StringBuffer b = group.GetSourceBuffer()->CopyString(metadata.second);
-                group.SetTagNoCopy(key, StringView(b.data, b.size));
+            if (std::holds_alternative<TagKey>(metadata.first)) {
+                const auto& key = mTagConfig.first->GetFileTagKeyName(std::get<TagKey>(metadata.first));
+                if (!key.empty()) {
+                    StringBuffer b = group.GetSourceBuffer()->CopyString(metadata.second);
+                    group.SetTagNoCopy(key, StringView(b.data, b.size));
+                }
+            } else {
+                group.SetTag(std::get<std::string>(metadata.first), metadata.second);
             }
         }
     }

@@ -21,6 +21,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "json/json.h"
@@ -46,7 +47,7 @@ struct ContainerInfo {
     std::string mUpperDir;
     std::vector<Mount> mMounts; // mounts of this container
     std::vector<std::pair<std::string, std::string>> mTags; // ExternalEnvTag and ExternalK8sLabelTag.
-    std::vector<std::pair<TagKey, std::string>> mMetadatas; //  ContainerNameTag
+    std::vector<std::pair<std::variant<TagKey, std::string>, std::string>> mMetadatas; //  ContainerNameTag
     Json::Value mJson; // this obj's json, for saving to local file
     bool mStopped = false; // whether this container is stopped
 
