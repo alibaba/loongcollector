@@ -27,6 +27,21 @@ flushers:
     Project: {{.Project}}
     Logstore: {{.Logstore}}`
 
+const SLSFlusherConfigWithMatchTemplate = `
+flushers:
+  - Type: flusher_sls
+    Aliuid: "{{.Aliuid}}"
+    TelemetryType: "{{.TelemetryType}}"
+    Region: {{.Region}}
+    Endpoint: {{.Endpoint}}
+    Project: {{.Project}}
+    Logstore: "{{.Logstore}}"
+    Match:
+      Type: {{.MatchType}}
+      Key: {{.MatchKey}}
+      Value: {{.MatchValue}}
+`
+
 type SLSSubscriber struct {
 	client        *sls.Client
 	TelemetryType string
@@ -36,6 +51,9 @@ type SLSSubscriber struct {
 	QueryEndpoint string
 	Project       string
 	Logstore      string
+	MatchType     string
+	MatchKey      string
+	MatchValue    string
 }
 
 func (s *SLSSubscriber) Name() string {
@@ -70,6 +88,9 @@ func (s *SLSSubscriber) GetData(query string, startTime int32) ([]*protocol.LogG
 
 func (s *SLSSubscriber) FlusherConfig() string {
 	tpl := template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigTemplate))
+	if s.MatchType != "" && s.MatchKey != "" && s.MatchValue != "" {
+		tpl = template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigWithMatchTemplate))
+	}
 	var builder strings.Builder
 	_ = tpl.Execute(&builder, map[string]interface{}{
 		"Aliuid":        s.Aliuid,
@@ -78,6 +99,9 @@ func (s *SLSSubscriber) FlusherConfig() string {
 		"Project":       s.Project,
 		"Logstore":      s.Logstore,
 		"TelemetryType": s.TelemetryType,
+		"MatchType":     s.MatchType,
+		"MatchKey":      s.MatchKey,
+		"MatchValue":    s.MatchValue,
 	})
 	config := builder.String()
 	return config
@@ -210,6 +234,8 @@ func (s *SLSSubscriber) getCompleteQuery(query string) string {
 	switch s.TelemetryType {
 	case "logs":
 		return query
+	case "arms_metrics":
+		fallthrough
 	case "metrics":
 		return fmt.Sprintf("* | select promql_query_range('%s') from metrics limit 10000", query)
 	case "traces":
@@ -287,6 +313,15 @@ func init() {
 			l.Logstore = v.(string)
 		} else {
 			l.Logstore = config.TestConfig.GetLogstore(l.TelemetryType)
+		}
+		if v, ok := spec["match_type"]; ok {
+			l.MatchType = v.(string)
+		}
+		if v, ok := spec["match_key"]; ok {
+			l.MatchKey = v.(string)
+		}
+		if v, ok := spec["match_value"]; ok {
+			l.MatchValue = v.(string)
 		}
 		l.client = createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, l.QueryEndpoint)
 		return l, nil
