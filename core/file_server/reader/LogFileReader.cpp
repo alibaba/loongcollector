@@ -132,6 +132,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                       containerPath->mRealBaseDir.size());
                 reader->SetContainerID(containerPath->mID);
                 reader->SetContainerMetadatas(containerPath->mMetadatas);
+                reader->SetContainerCustomMetadatas(containerPath->mCustomMetadatas);
                 reader->SetContainerExtraTags(containerPath->mTags);
             }
         }
@@ -2397,6 +2398,10 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
                 StringBuffer b = group.GetSourceBuffer()->CopyString(metadata.second);
                 group.SetTagNoCopy(key, StringView(b.data, b.size));
             }
+        }
+        const auto& containerCustomMetadatas = GetContainerCustomMetadatas();
+        for (const auto& metadata : containerCustomMetadatas) {
+            group.SetTag(metadata.first, metadata.second);
         }
     }
 

@@ -391,6 +391,13 @@ public:
 
     void SetContainerMetadatas(const std::vector<std::pair<TagKey, std::string>>& tags) { mContainerMetadatas = tags; }
 
+    const std::vector<std::pair<std::string, std::string>>& GetContainerCustomMetadatas() {
+        return mContainerCustomMetadatas;
+    }
+    void SetContainerCustomMetadatas(const std::vector<std::pair<std::string, std::string>>& tags) {
+        mContainerCustomMetadatas = tags;
+    }
+
     const std::vector<std::pair<std::string, std::string>>& GetExtraTags() { return mContainerExtraTags; }
 
     void SetContainerExtraTags(const std::vector<std::pair<std::string, std::string>>& tags) {
@@ -530,6 +537,7 @@ protected:
     // tags
     std::vector<std::pair<std::string, std::string>> mTopicExtraTags;
     std::vector<std::pair<TagKey, std::string>> mContainerMetadatas;
+    std::vector<std::pair<std::string, std::string>> mContainerCustomMetadatas;
     std::vector<std::pair<std::string, std::string>> mContainerExtraTags;
     // int32_t mCloseUnusedInterval;
 
