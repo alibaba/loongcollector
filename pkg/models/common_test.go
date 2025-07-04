@@ -15,8 +15,10 @@
 package models
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
@@ -71,4 +73,40 @@ func Test_Tags_SortTo(t *testing.T) {
 			assert.Equalf(t, (*reflect.SliceHeader)(unsafe.Pointer(&cases.buf)).Data, (*reflect.SliceHeader)(unsafe.Pointer(&result)).Data, cases.caseName)
 		}
 	}
+}
+
+func BenchmarkMetricGetSize(b *testing.B) {
+	tags := NewTags()
+	for i := 0; i < 15; i++ {
+		tags.Add(fmt.Sprintf("tag_%d", i), fmt.Sprintf("value_%d", i))
+	}
+	metric := NewSingleValueMetric("cpu_usage", MetricTypeGauge, tags, time.Now().UnixNano(), 1.0)
+
+	b.Run("GetSizeByString", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = int64(len(metric.String()))
+		}
+	})
+
+	b.Run("MetricGetSize", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = metric.GetSize()
+		}
+	})
+}
+
+func BenchmarkNilKeyValueGetIterator(b *testing.B) {
+	kvs := NilStringValues
+
+	b.Run("NilKeyValueGetIterator", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = kvs.Iterator()
+		}
+	})
 }
