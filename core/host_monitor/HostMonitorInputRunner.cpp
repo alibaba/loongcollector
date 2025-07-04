@@ -159,7 +159,7 @@ void HostMonitorInputRunner::ScheduleOnce(HostMonitorTimerEvent& event,
     auto collectFn =
         [this, config = std::move(event.mCollectConfig), collector = std::move(event.mCollector), execTime]() mutable {
             {
-                std::unique_lock<std::shared_mutex> lock(mRunningConfigMapMutex);
+                std::shared_lock<std::shared_mutex> lock(mRunningConfigMapMutex);
                 auto it = mRunningConfigMap.find(config.mConfigName);
                 if (it == mRunningConfigMap.end()) {
                     LOG_ERROR(sLogger,

@@ -34,10 +34,11 @@ class HostMonitorInputRunnerUnittest : public testing::Test {
 public:
     void TestUpdateAndRemoveCollector() const;
     void TestScheduleOnce() const;
+    void TestDifferentCollectAndFlushInterval() const;
 
 private:
     static void SetUpTestCase() {
-        auto collector = std::make_unique<MockCollector>();
+        auto collector = std::make_shared<MockCollector>();
         HostMonitorInputRunner::GetInstance()->mRegisteredCollectorMap.emplace(MockCollector::sName,
                                                                                CollectorFactory<MockCollector>::Create);
     }
@@ -57,7 +58,7 @@ void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", CPUCollector::sName));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
     APSARA_TEST_EQUAL_FATAL(1, Timer::GetInstance()->mQueue.size());
-    runner->RemoveCollector({MockCollector::sName});
+    runner->RemoveCollector("test");
     APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
@@ -93,8 +94,27 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     runner->Stop();
 }
 
+void HostMonitorInputRunnerUnittest::TestDifferentCollectAndFlushInterval() const {
+    auto runner = HostMonitorInputRunner::GetInstance();
+    runner->Init();
+    runner->mThreadPool->Start();
+    runner->UpdateCollector("test", {MockCollector::sName}, {15}, QueueKey{}, 0);
+    // get collector from event
+    auto event = Timer::GetInstance()->mQueue.top().get();
+    auto collector = static_cast<HostMonitorTimerEvent*>(event)->mCollector;
+    auto mockCollector = static_cast<MockCollector*>(collector.get());
+    mockCollector->mCollectInterval = 1;
+    Timer::GetInstance()->Init();
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    Timer::GetInstance()->Stop();
+    runner->mThreadPool->Stop();
+    runner->Stop();
+    APSARA_TEST_GT_FATAL(mockCollector->mCollectCount, 2);
+}
+
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestUpdateAndRemoveCollector);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestScheduleOnce);
+UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestDifferentCollectAndFlushInterval);
 
 } // namespace logtail
 

@@ -25,7 +25,10 @@ public:
     MockCollector() = default;
     ~MockCollector() = default;
 
-    void Init(const HostMonitorCollectConfig& collectConfig) override {}
+    void Init(const HostMonitorCollectConfig& collectConfig) {
+        BaseCollector::Init(collectConfig);
+        mCollectInterval = collectConfig.mFlushInterval.count();
+    }
 
     bool Collect(PipelineEventGroup* group) override {
         auto event = group->AddLogEvent();
@@ -34,10 +37,15 @@ public:
         std::string key = "mock_key";
         std::string value = "mock_value";
         event->SetContent(key, value);
+        mCollectCount++;
         return true;
     }
     static const std::string sName;
-    const std::string& Name() const { return sName; }
+    const std::string& Name() const override { return sName; }
+    int GetCollectInterval() const override { return mCollectInterval; }
+
+    int mCollectInterval = 0;
+    int mCollectCount = 0;
 };
 
 const std::string MockCollector::sName = "mock";

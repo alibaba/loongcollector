@@ -45,7 +45,11 @@ class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
     void Init(const HostMonitorCollectConfig& collectConfig) {
-        mTotalCount = collectConfig.mFlushInterval.count() / GetCollectInterval();
+        if (GetCollectInterval() == 0) {
+            mTotalCount = 1;
+        } else {
+            mTotalCount = collectConfig.mFlushInterval.count() / GetCollectInterval();
+        }
         mCount = 0;
     }
     virtual bool Collect(PipelineEventGroup* group) = 0;
