@@ -112,6 +112,7 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
 }
 
 void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long cnt) {
+    LOG_WARNING(sLogger, ("kernel event loss, lost_count", cnt)("type", "process security"));
     auto* processCacheMgr = static_cast<ProcessCacheManager*>(ctx);
     if (!processCacheMgr) {
         LOG_ERROR(sLogger, ("ProcessCacheManager is null!", "")("lost events", cnt)("cpu", cpu));
@@ -155,7 +156,7 @@ bool ProcessCacheManager::Init() {
     ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
     ProcessConfig pconfig;
 
-    pconfig.mPerfBufferSpec = {{"tcpmon_map", 128, this, HandleKernelProcessEvent, HandleKernelProcessEventLost}};
+    pconfig.mPerfBufferSpec = {{"tcpmon_map", 1024, this, HandleKernelProcessEvent, HandleKernelProcessEventLost}};
     ebpfConfig->mConfig = pconfig;
     bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
@@ -231,6 +232,14 @@ ProcessCloneRetryableEvent* ProcessCacheManager::CreateProcessCloneRetryableEven
 ProcessExitRetryableEvent* ProcessCacheManager::CreateProcessExitRetryableEvent(msg_exit* eventPtr) {
     return new ProcessExitRetryableEvent(
         INT32_FLAG(ebpf_event_retry_limit), *eventPtr, mProcessCache, mFlushProcessEvent, mCommonEventQueue);
+}
+
+FileRetryableEvent* ProcessCacheManager::CreateFileRetryableEvent(file_data_t* eventPtr) {
+    return new FileRetryableEvent(std::max(1, INT32_FLAG(ebpf_event_retry_limit)),
+                                  *eventPtr,
+                                  mProcessCache,
+                                  mCommonEventQueue,
+                                  mFlushFileEvent);
 }
 
 void ProcessCacheManager::RecordDataEvent(msg_data* eventPtr) {

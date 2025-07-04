@@ -31,7 +31,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-// #include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
@@ -331,14 +331,13 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             break;
         }
 
-        // case PluginType::FILE_SECURITY: {
-        //     if (!pluginMgr) {
-        //         pluginMgr
-        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
-        //             metricManager);
-        //     }
-        //     break;
-        // }
+        case PluginType::FILE_SECURITY: {
+            if (!pluginMgr) {
+                pluginMgr
+                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+            }
+            break;
+        }
         default:
             LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
             return false;
@@ -524,6 +523,26 @@ void EBPFServer::updatePluginState(PluginType type,
     mPlugins[static_cast<int>(type)].mProject = project;
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
+}
+
+void EBPFServer::SetPluginLifecycleState(PluginType type,
+                                         const std::string& pipelineName,
+                                         LifecycleState state) 
+{
+    if (type >= PluginType::MAX) {
+        return;
+    }
+    mPlugins[static_cast<int>(type)].mStatePipelineName = pipelineName;
+    mPlugins[static_cast<int>(type)].mLifecycleState = state;
+
+    LOG_DEBUG(sLogger, ("update plugin lifestate", "")("type", magic_enum::enum_name(type).data())("pipeline", pipelineName)("lifestate", magic_enum::enum_name(state).data()));
+}
+
+bool EBPFServer::IsPluginInited(PluginType type, const std::string& pipelineName) {
+    if (type >= PluginType::MAX) {
+        return false;
+    }
+    return mPlugins[static_cast<int>(type)].mLifecycleState == LifecycleState::INITIALIZED && mPlugins[static_cast<int>(type)].mStatePipelineName == pipelineName;
 }
 
 void EBPFServer::handlerEvents() {

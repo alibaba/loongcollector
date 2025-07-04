@@ -51,6 +51,12 @@ private:
 #endif
 };
 
+enum class LifecycleState {
+        STOPPED,
+        INITIALIZED,
+        RUNNING,
+        SUSPENDED      
+};
 struct PluginState {
     std::string mPipelineName;
     std::string mProject;
@@ -60,6 +66,8 @@ struct PluginState {
     // (PollPerfBuffers/HandlerEvents/GetAllProjects), allowing them to safely interleave.
     mutable std::atomic_bool mValid;
     mutable std::shared_mutex mMtx;
+    std::atomic<LifecycleState> mLifecycleState{LifecycleState::STOPPED};
+    std::string mStatePipelineName;
 };
 
 class EBPFServer : public InputRunner {
@@ -97,6 +105,9 @@ public:
 
     // TODO(qianlu): remove this function when network observer use unified threads
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
+
+    void SetPluginLifecycleState(PluginType type, const std::string& pipelineName, LifecycleState state);
+    bool IsPluginInited(PluginType type, const std::string& pipelineName);
 
 private:
     bool startPluginInternal(const std::string& pipelineName,
