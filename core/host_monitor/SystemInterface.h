@@ -28,9 +28,9 @@
 #include <utility>
 #include <vector>
 
+#include "collector/MetricCalculate.h"
 #include "common/Flags.h"
 #include "common/ProcParser.h"
-#include "host_monitor/collector/MetricCalculate.h"
 
 DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 
@@ -131,6 +131,44 @@ struct TupleHash {
     }
 };
 
+struct MemoryStat {
+    double ram = 0;
+    double total = 0;
+    double used = 0;
+    double free = 0;
+    double available = 0;
+    double actualUsed = 0;
+    double actualFree = 0;
+    double buffers = 0;
+    double cached = 0;
+    double usedPercent = 0.0;
+    double freePercent = 0.0;
+
+    static inline const FieldName<MemoryStat> memStatMetas[] = {
+        FIELD_ENTRY(MemoryStat, ram),
+        FIELD_ENTRY(MemoryStat, total),
+        FIELD_ENTRY(MemoryStat, used),
+        FIELD_ENTRY(MemoryStat, free),
+        FIELD_ENTRY(MemoryStat, available),
+        FIELD_ENTRY(MemoryStat, actualUsed),
+        FIELD_ENTRY(MemoryStat, actualFree),
+        FIELD_ENTRY(MemoryStat, buffers),
+        FIELD_ENTRY(MemoryStat, cached),
+        FIELD_ENTRY(MemoryStat, usedPercent),
+        FIELD_ENTRY(MemoryStat, freePercent),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<MemoryStat>&)>& callback) {
+        for (const auto& field : memStatMetas) {
+            callback(field);
+        }
+    }
+};
+
+struct MemoryInformation : public BaseInformation {
+    MemoryStat memStat;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -184,6 +222,7 @@ public:
     bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
+    bool GetHostMemInformationStat(MemoryInformation& meminfo);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -192,7 +231,9 @@ public:
           mProcessListInformationCache(ttl),
           mProcessInformationCache(ttl),
           mSystemLoadInformationCache(ttl),
-          mCPUCoreNumInformationCache(ttl) {}
+          mCPUCoreNumInformationCache(ttl),
+          mMemInformationCache(ttl) {}
+
     virtual ~SystemInterface() = default;
 
 private:
@@ -209,6 +250,7 @@ private:
     virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
+    virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -216,6 +258,7 @@ private:
     SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
+    SystemInformationCache<MemoryInformation> mMemInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;
