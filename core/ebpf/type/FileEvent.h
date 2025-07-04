@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "CommonDataEvent.h"
+#include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {
 

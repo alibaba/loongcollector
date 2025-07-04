@@ -20,6 +20,7 @@
 
 #include "ebpf/plugin/network_observer/Connection.h"
 #include "ebpf/plugin/network_observer/Type.h"
+#include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/DataTable.h"
 #include "ebpf/type/table/HttpTable.h"
@@ -34,6 +35,87 @@ class Connection;
 enum class RecordType {
     APP_RECORD,
     CONN_STATS_RECORD,
+};
+
+class L7Record : public CommonEvent {
+public:
+    virtual ~L7Record() {}
+    void MarkSample() { mSample = true; }
+    bool ShouldSample() { return mSample; }
+    [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
+    [[nodiscard]] std::shared_ptr<AppDetail> GetAppDetail() const { return mAppDetail; }
+    uint64_t GetStartTimeStamp() { return mStartTs; }
+    uint64_t GetEndTimeStamp() { return mEndTs; }
+    [[nodiscard]] double GetLatencyNs() const { return mEndTs - mStartTs; }
+    [[nodiscard]] double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
+    [[nodiscard]] double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
+
+    [[nodiscard]] virtual const std::string& GetSpanName() = 0;
+    [[nodiscard]] virtual bool IsError() const = 0;
+    [[nodiscard]] virtual bool IsSlow() const = 0;
+    [[nodiscard]] virtual int GetStatusCode() const = 0;
+
+    const std::array<uint64_t, 4>& GetTraceId() { return mTraceId; }
+    const std::array<uint64_t, 2>& GetSpanId() { return mSpanId; }
+
+private:
+    std::shared_ptr<AppDetail> mAppDetail;
+    std::shared_ptr<Connection> mConnection;
+    uint64_t mStartTs;
+    uint64_t mEndTs;
+    bool mSample = false;
+    mutable std::array<uint64_t, 4> mTraceId{};
+    mutable std::array<uint64_t, 2> mSpanId{};
+};
+
+class HttpRecordV2 : public L7Record {
+public:
+    [[nodiscard]] virtual bool IsError() const override { return mCode >= 400; }
+    [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
+    [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
+    [[nodiscard]] virtual const std::string& GetSpanName() { return mPath; }
+
+    const std::string& GetReqBody() const { return mReqBody; }
+    const std::string& GetRespBody() const { return mRespBody; }
+    std::string GetRespMsg() const { return mRespMsg; }
+    size_t GetReqBodySize() const { return mReqBodySize; }
+    size_t GetRespBodySize() const { return mRespBodySize; }
+    const std::string& GetMethod() const { return mHttpMethod; }
+    const std::string& GetReqHeaders() const { return mReqHeaders; }
+    const std::string& GetRespHeaders() const { return mRespHeades; }
+    const std::string& GetProtocolVersion() const { return mProtocolVersion; }
+    const std::string& GetPath() const { return mPath; }
+    const std::string& GetRealPath() const { return mRealPath; }
+
+private:
+    int mCode = 0;
+    size_t mReqBodySize = 0;
+    size_t mRespBodySize = 0;
+    std::string mPath;
+    std::string mRealPath;
+    std::string mReqBody;
+    std::string mRespBody;
+    std::string mHttpMethod;
+    std::string mProtocolVersion;
+    std::string mRespMsg;
+    std::string mReqHeaders;
+    std::string mRespHeades;
+};
+
+class ConnStatsRecordV2 : public CommonEvent {
+public:
+    [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
+    std::shared_ptr<Connection> mConnection;
+    uint64_t mTimestamp;
+    int mState = 0;
+    uint64_t mDropCount = 0;
+    uint64_t mRttVar = 0;
+    uint64_t mRtt = 0;
+    uint64_t mRetransCount = 0;
+    uint64_t mRecvPackets = 0;
+    uint64_t mSendPackets = 0;
+    uint64_t mRecvBytes = 0;
+    uint64_t mSendBytes = 0;
 };
 
 /// record ///
@@ -258,7 +340,7 @@ public:
     AppSpanGroup() = default;
     ~AppSpanGroup() {}
 
-    std::vector<std::shared_ptr<AbstractRecord>> mRecords;
+    std::vector<std::shared_ptr<CommonEvent>> mRecords;
 };
 
 class AppLogGroup {
@@ -266,7 +348,7 @@ public:
     AppLogGroup() = default;
     ~AppLogGroup() {}
 
-    std::vector<std::shared_ptr<AbstractRecord>> mRecords;
+    std::vector<std::shared_ptr<CommonEvent>> mRecords;
 };
 
 

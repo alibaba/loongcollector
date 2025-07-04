@@ -211,6 +211,8 @@ void EBPFServer::Init() {
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
     LOG_DEBUG(sLogger, ("begin to start handler", ""));
     mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
+    LOG_DEBUG(sLogger, ("begin to start iterator", ""));
+    mIterator = async(std::launch::async, &EBPFServer::iterateMaps, this);
 
     mEBPFAdapter->Init(); // Idempotent
 }
@@ -270,6 +272,11 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                                      const PluginMetricManagerPtr& metricManager) {
+    // auto& pluginMgr = getPluginState(type).mManager;
+    // if (pluginMgr) {
+    //     // update ...
+    // }
+
     std::string prevPipelineName = checkLoadedPipelineName(type);
     if (prevPipelineName == pipelineName) { // update
         auto& pluginMgr = getPluginState(type).mManager;
@@ -340,12 +347,19 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         //     break;
         // }
         default:
-            LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
+            LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
             return false;
     }
 
-    if (pluginMgr->Init(options) != 0) {
+    if (pluginMgr->Init() != 0) {
         pluginMgr.reset();
+        LOG_WARNING(sLogger, ("Failed to init plugin, type", magic_enum::enum_name(type)));
+        return false;
+    }
+
+    if (pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) != 0) {
+        pluginMgr.reset();
+        LOG_WARNING(sLogger, ("Failed to AddOrUpdateConfig, type", magic_enum::enum_name(type)));
         return false;
     }
 
@@ -354,6 +368,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     return true;
 }
 
+// TODO @qianlu.kk
 bool EBPFServer::HasRegisteredPlugins() const {
     for (const auto& p : mPlugins) {
         if (!p.mPipelineName.empty()) {
@@ -535,6 +550,26 @@ void EBPFServer::handlerEvents() {
         // handle ....
         handleEvents(items, count);
         sendEvents();
+    }
+}
+
+void EBPFServer::iterateMaps() {
+    while (mRunning) {
+        for (int i = 0; i < int(PluginType::MAX); i++) {
+            auto type = PluginType(i);
+            auto& pluginState = getPluginState(type);
+            if (!pluginState.mValid.load(std::memory_order_acquire)) {
+                continue;
+            }
+            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+            auto& plugin = pluginState.mManager;
+            if (plugin) {
+                // TODO iterate map
+                // int cnt = plugin->PollPerfBuffer();
+                LOG_DEBUG(sLogger,
+                          ("poll buffer for ", magic_enum::enum_name(type))("running status", plugin->IsRunning()));
+            }
+        }
     }
 }
 

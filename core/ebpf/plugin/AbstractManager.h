@@ -41,7 +41,17 @@ public:
                              const PluginMetricManagerPtr& metricManager);
     virtual ~AbstractManager();
 
-    virtual int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
+    virtual int Init() = 0;
+
+    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
+                                  uint32_t,
+                                  const PluginMetricManagerPtr&,
+                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&)
+        = 0;
+
+    virtual int RemoveConfig(const std::string&) = 0;
+
+    virtual int RegisteredConfigCount() { return 0; }
 
     virtual int Destroy() = 0;
 
@@ -62,9 +72,9 @@ public:
 
     bool IsExists() { return mInited; }
 
-    virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                              const std::shared_ptr<ScheduleConfig>& config)
-        = 0;
+    // virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
+    //                           const std::shared_ptr<ScheduleConfig>& config)
+    //     = 0;
 
     virtual PluginType GetPluginType() = 0;
 
@@ -122,14 +132,16 @@ protected:
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
-    PluginMetricManagerPtr mMetricMgr;
 
+    // TODO need hold by plugin manager ...
+    PluginMetricManagerPtr mMetricMgr;
     mutable std::mutex mContextMutex;
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 
+    // runner metric ...
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogsTotal;

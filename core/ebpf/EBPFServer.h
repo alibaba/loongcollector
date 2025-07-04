@@ -109,6 +109,7 @@ private:
 
     void pollPerfBuffers();
     void handlerEvents();
+    void iterateMaps();
     std::string checkLoadedPipelineName(PluginType type);
     void updatePluginState(PluginType type,
                            const std::string& name,
@@ -141,8 +142,9 @@ private:
 
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mCommonEventQueue;
 
-    std::future<void> mPoller;
-    std::future<void> mHandler;
+    std::future<void> mPoller; // used to poll perf buffers and handle retry events
+    std::future<void> mHandler; // used to handle common events, do aggregate and send events
+    std::future<void> mIterator; // used to iterate bpf maps
 
     FrequencyManager mFrequencyMgr;
 

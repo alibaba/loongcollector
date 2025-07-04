@@ -81,6 +81,8 @@ public:
 
     std::string GetSubpath() const { return mSubpath; }
 
+    std::string GetWorkspace() const { return mWorkspace; }
+
     std::string mProject;
     std::string mLogstore;
     std::string mRegion;
@@ -139,12 +141,12 @@ private:
     std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
                                                                  const std::string& accessKeySecret,
                                                                  SLSClientManager::AuthType type,
-                                                                 SLSSenderQueueItem* item,
-                                                                 const std::string& subPath) const;
+                                                                 SLSSenderQueueItem* item) const;
     bool IsRawSLSTelemetryType() const;
     bool IsMetricsTelemetryType() const;
 
     std::string mSubpath;
+    std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;

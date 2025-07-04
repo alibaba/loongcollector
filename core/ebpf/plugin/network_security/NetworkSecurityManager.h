@@ -44,7 +44,7 @@ public:
         return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
     }
 
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
     void RecordNetworkEvent(tcp_data_t* event);
@@ -57,9 +57,17 @@ public:
 
     int SendEvents() override;
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
-        return true;
-    }
+    // bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override
+    // {
+    //     return true;
+    // }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {

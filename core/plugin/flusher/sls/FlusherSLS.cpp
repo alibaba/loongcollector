@@ -297,6 +297,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // Workspace
+    if (!GetOptionalStringParam(config, "Workspace", mWorkspace, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
@@ -685,7 +697,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data);
             break;
         default:
             break;
@@ -1287,9 +1299,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
                                                                     const string& accessKeySecret,
                                                                     SLSClientManager::AuthType type,
-                                                                    SLSSenderQueueItem* item,
-                                                                    const std::string& subPath) const {
-    string query;
+                                                                    SLSSenderQueueItem* item) const {
     map<string, string> header;
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
@@ -1297,20 +1307,18 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  item->mCurrentHost,
                                  item->mRealIpFlag,
                                  mProject,
-                                 item->mLogstore,
                                  CompressTypeToString(mCompressor->GetCompressType()),
                                  item->mType,
                                  item->mData,
                                  item->mRawSize,
                                  mSubpath,
-                                 query,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
-                                        subPath,
+                                        mSubpath,
                                         "",
                                         header,
                                         item->mData,

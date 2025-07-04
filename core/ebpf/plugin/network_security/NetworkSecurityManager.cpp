@@ -238,18 +238,21 @@ int NetworkSecurityManager::SendEvents() {
     return 0;
 }
 
-int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+int NetworkSecurityManager::Init() {
+    mInited = true;
+}
+
+int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext*,
+                                              uint32_t,
+                                              const PluginMetricManagerPtr&,
+                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    // TODO @qianlu.kk init metrics ...
+
     const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
     if (!securityOpts) {
         LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
         return -1;
     }
-
-    mInited = true;
-
-    std::shared_ptr<ScheduleConfig> scheduleConfig
-        = std::make_shared<ScheduleConfig>(PluginType::NETWORK_SECURITY, std::chrono::seconds(2));
-    ScheduleNext(std::chrono::steady_clock::now(), scheduleConfig);
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::NETWORK_SECURITY;
@@ -267,9 +270,14 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
     return mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
 }
 
+int NetworkSecurityManager::RemoveConfig(const std::string&) {
+    return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
+    // TODO @qianlu.kk clean metrics ...
+}
+
 int NetworkSecurityManager::Destroy() {
     mInited = false;
-    return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
+    return 0;
 }
 
 std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<CommonEvent>& in) {

@@ -26,12 +26,11 @@
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 #define LOAD_EBPF_FUNC_ADDR(funcName) \
     ({ \
-        void* funcPtr = tmp_lib->LoadMethod(#funcName, loadErr); \
+        void* funcPtr = tmpLib->LoadMethod(#funcName, loadErr); \
         if (funcPtr == NULL) { \
             LOG_ERROR(sLogger, \
                       ("[source_manager] load ebpf method", "failed")("method", #funcName)("error", loadErr)); \
@@ -58,7 +57,7 @@ namespace ebpf {
 
 #define LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(funcName) \
     ({ \
-        void* funcPtr = tmp_lib->LoadMethod(#funcName, loadErr); \
+        void* funcPtr = tmpLib->LoadMethod(#funcName, loadErr); \
         long offset = 0; \
         if (funcPtr == NULL) { \
             LOG_ERROR(sLogger, \
@@ -157,10 +156,10 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
         return true;
     }
 
-    std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
+    std::shared_ptr<DynamicLibLoader> tmpLib = std::make_shared<DynamicLibLoader>();
     LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path", mBinaryPath));
     std::string loadErr;
-    if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
+    if (!tmpLib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
         return false;
     }
@@ -201,7 +200,7 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     }
 
     // update meta
-    mLib = std::move(tmp_lib);
+    mLib = std::move(tmpLib);
     return true;
 }
 
@@ -211,10 +210,10 @@ bool EBPFAdapter::loadCoolBPF() {
         return true;
     }
 
-    std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
+    std::shared_ptr<DynamicLibLoader> tmpLib = std::make_shared<DynamicLibLoader>();
     LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path", mBinaryPath));
     std::string loadErr;
-    if (!tmp_lib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
+    if (!tmpLib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf, path", mBinaryPath)("error", loadErr));
         return false;
     }
@@ -233,7 +232,7 @@ bool EBPFAdapter::loadCoolBPF() {
         return false;
     }
 
-    mCoolbpfLib = std::move(tmp_lib);
+    mCoolbpfLib = std::move(tmpLib);
 
     return true;
 }
@@ -463,5 +462,4 @@ bool EBPFAdapter::BPFMapUpdateElem(
 #endif
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

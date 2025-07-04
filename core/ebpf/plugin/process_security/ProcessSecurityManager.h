@@ -50,7 +50,7 @@ public:
     }
 
     ~ProcessSecurityManager() = default;
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
     PluginType GetPluginType() override { return PluginType::PROCESS_SECURITY; }
@@ -62,9 +62,21 @@ public:
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
-        return true;
+    // deprecated
+    // bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override
+    // {
+    //     return true;
+    // }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
+        // TODO @qianlu.kk init metrics ...
+        return 0;
     }
+
+    int RemoveConfig(const std::string&) override { return 0; }
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {

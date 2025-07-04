@@ -21,13 +21,13 @@
 #include "ebpf/Config.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/plugin/RetryableEventCache.h"
 #include "ebpf/plugin/network_observer/ConnectionManager.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
-
 
 namespace logtail::ebpf {
 
@@ -37,6 +37,23 @@ enum class JobType {
     LOG_AGG,
     HOST_META_UPDATE,
 };
+
+inline size_t GenerateContainerKey(const std::string& cid) {
+    std::hash<std::string> hasher;
+    size_t key = 0;
+    AttrHashCombine(key, hasher(cid));
+    return key;
+}
+
+inline size_t
+GenerateWorkloadKey(const std::string& ns, const std::string& workloadKind, const std::string& workloadName) {
+    std::hash<std::string> hasher;
+    size_t res = 0;
+    AttrHashCombine(res, hasher(ns));
+    AttrHashCombine(res, hasher(workloadKind));
+    AttrHashCombine(res, hasher(workloadName));
+    return res;
+}
 
 class NetworkObserverScheduleConfig : public ScheduleConfig {
 public:
@@ -64,31 +81,29 @@ public:
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                            const PluginMetricManagerPtr& metricManager);
 
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
 
     int Destroy() override;
 
     void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
 
-    int HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& event) override { return 0; }
+    int HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& event) override;
 
-    int SendEvents() override { return 0; };
+    int SendEvents() override;
 
-    int PollPerfBuffer() override { return 0; }
+    int PollPerfBuffer() override;
 
     void RecordEventLost(enum callback_type_e type, uint64_t lostCount);
-
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
     void AcceptDataEvent(struct conn_data_event_t* event);
-
-    void PollBufferWrapper();
-    void ConsumeRecords();
-
-    std::array<size_t, 1> GenerateAggKeyForSpan(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 1> GenerateAggKeyForLog(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> GenerateAggKeyForAppMetric(const std::shared_ptr<AbstractRecord>&);
-    std::array<size_t, 2> GenerateAggKeyForNetMetric(const std::shared_ptr<AbstractRecord>&);
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -109,30 +124,45 @@ public:
         return 0;
     }
 
-    bool ConsumeLogAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-    bool ConsumeMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-    bool ConsumeSpanAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-    bool ConsumeNetMetricAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    // periodically tasks ...
+    bool ConsumeLogAggregateTree();
+    bool ConsumeMetricAggregateTree();
+    bool ConsumeSpanAggregateTree();
+    bool ConsumeNetMetricAggregateTree();
     bool UploadHostMetadataUpdateTask();
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
-
 private:
-    void processRecord(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsLog(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsSpan(const std::shared_ptr<AbstractRecord>& record);
-    void processRecordAsMetric(const std::shared_ptr<AbstractRecord>& record);
+    // the following 3 methods are not thread safe ...
+    std::shared_ptr<AppDetail>
+    getWorkloadAppConfig(const std::string& ns, const std::string& workloadKind, const std::string& workloadName);
+    std::shared_ptr<AppDetail> getWorkloadAppConfig(size_t workloadKey);
+    std::shared_ptr<AppDetail> getContainerAppConfig(size_t containerIdKey);
 
-    void handleRollback(const std::shared_ptr<AbstractRecord>& record, bool& drop);
+    // thread safe, can be used in timer thread ...
+    std::shared_ptr<AppDetail> getConnAppConfig(const std::shared_ptr<Connection>& conn);
 
-    void runInThread();
+    // only used in poller thread ...
+    std::shared_ptr<AppDetail> getAppConfigFromReplica(const std::shared_ptr<Connection>& conn);
+
+    std::array<size_t, 1> generateAggKeyForSpan(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 1> generateAggKeyForLog(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForAppMetric(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    std::array<size_t, 2> generateAggKeyForNetMetric(ConnStatsRecordV2*,
+                                                     const std::shared_ptr<logtail::ebpf::AppDetail>&);
+
+    // void processRecord(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs,
+    //                    const std::shared_ptr<AbstractRecord>& record);
+    void processRecordAsLog(const std::shared_ptr<CommonEvent>& record,
+                            const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsSpan(const std::shared_ptr<CommonEvent>& record,
+                             const std::shared_ptr<logtail::ebpf::AppDetail>&);
+    void processRecordAsMetric(L7Record* record, const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
     bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
 
-    std::unique_ptr<ConnectionManager> mConnectionManager;
+    std::unique_ptr<ConnectionManager> mConnectionManager; // hold connection cache ...
 
     mutable std::atomic_long mDataEventsDropTotal = 0;
 
@@ -144,73 +174,82 @@ private:
     mutable std::atomic_int64_t mLostCtrlEventsTotal = 0;
     mutable std::atomic_int64_t mLostDataEventsTotal = 0;
 
+    int mCidOffset = -1;
+
+    // ReadWriteLock mAppAggLock;
+    SIZETAggTreeWithSourceBuffer<AppMetricData, L7Record*> mAppAggregator;
+
+
+    // ReadWriteLock mNetAggLock;
+    SIZETAggTreeWithSourceBuffer<NetMetricData, ConnStatsRecordV2*> mNetAggregator;
+
+
+    // ReadWriteLock mSpanAggLock;
+    SIZETAggTree<AppSpanGroup, std::shared_ptr<CommonEvent>> mSpanAggregator;
+
+    // ReadWriteLock mLogAggLock;
+    SIZETAggTree<AppLogGroup, std::shared_ptr<CommonEvent>> mLogAggregator;
+
+
     // cache relative metric
     IntGaugePtr mConnectionNum;
-
-    // metadata relative metric
+    CounterPtr mPollNetEventsTotal;
+    CounterPtr mLossNetEventsTotal;
     CounterPtr mNetMetaAttachSuccessTotal;
     CounterPtr mNetMetaAttachFailedTotal;
     CounterPtr mNetMetaAttachRollbackTotal;
-    CounterPtr mAppMetaAttachSuccessTotal;
-    CounterPtr mAppMetaAttachFailedTotal;
-    CounterPtr mAppMetaAttachRollbackTotal;
 
-    CounterPtr mPushSpansTotal;
-    CounterPtr mPushSpanGroupTotal;
-    CounterPtr mPushMetricsTotal;
-    CounterPtr mPushMetricGroupTotal;
-
-    mutable ReadWriteLock mSamplerLock;
-    std::shared_ptr<Sampler> mSampler;
-
-    // store parsed records
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<AbstractRecord>> mRollbackQueue;
-    std::deque<std::shared_ptr<AbstractRecord>> mRollbackRecords;
-
-    // coreThread used for polling kernel event...
-    std::thread mCoreThread;
-
-    std::thread mRecordConsume;
-
-    std::atomic_bool mEnableSpan = false;
-    std::atomic_bool mEnableLog = false;
-    std::atomic_bool mEnableMetric = false;
-
-    FrequencyManager mPollKernelFreqMgr;
-    FrequencyManager mConsumerFreqMgr;
-
-    std::unique_ptr<ObserverNetworkOption> mPreviousOpt;
-
-    int mCidOffset = -1;
-    std::unordered_set<std::string> mEnabledCids;
-
-    ReadWriteLock mAppAggLock;
-    SIZETAggTreeWithSourceBuffer<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;
-
-
-    ReadWriteLock mNetAggLock;
-    SIZETAggTreeWithSourceBuffer<NetMetricData, std::shared_ptr<AbstractRecord>> mNetAggregator;
-
-
-    ReadWriteLock mSpanAggLock;
-    SIZETAggTree<AppSpanGroup, std::shared_ptr<AbstractRecord>> mSpanAggregator;
-
-    ReadWriteLock mLogAggLock;
-    SIZETAggTree<AppLogGroup, std::shared_ptr<AbstractRecord>> mLogAggregator;
-
-    std::string mClusterId;
-    std::string mAppId;
-    std::string mAppName;
-    std::string mHostName;
-    std::string mHostIp;
-
-    template <typename T, typename Func>
-    void compareAndUpdate(const std::string& fieldName, const T& oldValue, const T& newValue, Func onUpdate) {
-        if (oldValue != newValue) {
-            LOG_INFO(sLogger, ("config change!, fieldName", fieldName));
-            onUpdate(oldValue, newValue);
+    void updateConfigVersionAndWhitelist(std::vector<std::string>&& newCids, std::vector<std::string>&& expiredCids) {
+        if (!newCids.empty() || !expiredCids.empty()) {
+            mConfigVersion++;
+            UpdateWhitelists(std::move(newCids), std::move(expiredCids));
         }
     }
+
+    void updateContainerConfigs(size_t workloadKey, const std::shared_ptr<AppDetail>& newConfig) {
+        auto it = mWorkloadConfigs.find(workloadKey);
+        if (it == mWorkloadConfigs.end()) {
+            return;
+        }
+
+        for (const auto& cid : it->second.containerIds) {
+            size_t cidKey = GenerateContainerKey(cid);
+            mContainerConfigs[cidKey] = newConfig;
+        }
+    }
+
+    struct WorkloadConfig {
+        std::shared_ptr<AppDetail> config;
+        std::set<std::string> containerIds;
+    };
+
+    mutable ReadWriteLock
+        mAppConfigLock; // protect mConfigVersion/mWorkloadConfigs/mContainerConfigs/mConfigToWorkloads
+    int mConfigVersion = 0;
+    int mLastConfigVersion = -1;
+    std::unordered_map<size_t, WorkloadConfig> mWorkloadConfigs; // workloadKey => {config, containers}
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs; // containerKey => config
+    std::unordered_map<std::string, std::set<size_t>> mConfigToWorkloads; // configName => workloadKeys
+
+    // replica of mContainerConfigs, only used in poller thread ...
+    std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
+
+    std::shared_ptr<Sampler> mSampler;
+
+    std::string mClusterId; // inited in Init()
+    std::string mHostName; // host
+    std::string mHostIp; // host
+
+    RetryableEventCache mRetryableEventCache;
+    int64_t mLastUpdateHostMetaTimeMs = INT_MIN;
+    int64_t mLastSendSpanTimeMs = INT_MIN;
+    int64_t mLastSendMetricTimeMs = INT_MIN;
+    int64_t mLastSendLogTimeMs = INT_MIN;
+
+    int64_t mSendSpanIntervalMs = 2000;
+    int64_t mSendLogIntervalMs = 2000;
+    int64_t mSendMetricIntervalMs = 15000;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;
     std::vector<PipelineEventGroup> mMetricEventGroups;

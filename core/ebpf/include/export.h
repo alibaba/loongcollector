@@ -22,6 +22,32 @@ using PerfBufferSampleHandler = void (*)(void* ctx, int cpu, void* data, uint32_
 using PerfBufferLostHandler = void (*)(void* ctx, int cpu, unsigned long long cnt);
 using eBPFLogHandler = int (*)(int16_t level, const char* format, va_list args);
 
+struct WorkloadSelector {
+    std::string mWorkloadName;
+    std::string mWorkloadKind;
+    std::string mNamespace;
+};
+
+struct L7Config {
+    bool mEnable = false;
+    bool mEnableSpan = false;
+    bool mEnableMetric = false;
+    bool mEnableLog = false;
+    double mSampleRate = 0.01;
+};
+
+struct L4Config {
+    bool mEnable = false;
+    // int mMaxConnections = 5000;
+};
+
+struct ApmConfig {
+    std::string mWorkspace;
+    std::string mAppName;
+    std::string mAppId; // optional, if not configured by backend, we need calculate it ...
+    std::string mServiceId;
+};
+
 struct ObserverNetworkOption {
     std::vector<std::string> mEnableProtocols;
     bool mDisableProtocolParse = false;
@@ -40,6 +66,11 @@ struct ObserverNetworkOption {
     std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;
     std::string mSpanHandlerType;
+
+    L7Config mL7Config;
+    L4Config mL4Config;
+    ApmConfig mApmConfig;
+    std::vector<WorkloadSelector> mSelectors;
 };
 
 struct PerfBufferSpec {
