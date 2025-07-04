@@ -16,11 +16,11 @@ macro(all_link target_name)
     if (BUILD_LOGTAIL_UT)
         link_gtest(${target_name})
     endif ()
-    link_protobuf(${target_name})
     link_cityhash(${target_name})
     link_leveldb(${target_name})
     link_curl(${target_name})
     link_tcmalloc(${target_name})
+    link_grpc(${target_name})
     link_ssl(${target_name}) # must after link_spl
     link_crypto(${target_name}) # must after link_spl
     if (UNIX)
