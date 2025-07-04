@@ -34,6 +34,7 @@
 
 #include "common/StringView.h"
 
+inline constexpr char SPACE_CHARS[] = " \f\n\r\t\v";
 
 namespace logtail {
 
