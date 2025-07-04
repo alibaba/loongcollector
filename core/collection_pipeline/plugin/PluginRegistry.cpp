@@ -68,6 +68,7 @@
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
 #endif
+#include "provider/Provider.h"
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
@@ -83,6 +84,7 @@ void PluginRegistry::LoadPlugins() {
     LoadStaticPlugins();
     auto& plugins = AppConfig::GetInstance()->GetDynamicPlugins();
     LoadDynamicPlugins(plugins);
+    RegisterExternalPlugins(); // external plugin registration
 }
 
 void PluginRegistry::UnloadPlugins() {
