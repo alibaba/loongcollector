@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "forward/GrpcRunner.h"
+#include "forward/GrpcInputManager.h"
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/security/server_credentials.h>
@@ -37,56 +37,59 @@ DEFINE_FLAG_INT32(grpc_server_stop_timeout, "grpc server stop timeout, second", 
 
 namespace logtail {
 
-void GrpcInputRunner::Init() {
+void GrpcInputManager::Init() {
     if (mIsStarted.exchange(true)) {
         return;
     }
-    LOG_INFO(sLogger, ("GrpcInputRunner", "Start"));
+    LOG_INFO(sLogger, ("GrpcInputManager", "Start"));
 }
 
-void GrpcInputRunner::Stop() {
+void GrpcInputManager::Stop() {
     if (!mIsStarted.exchange(false)) {
         return;
     }
     {
-        std::lock_guard<std::mutex> lock(mListenInputsMutex);
-        for (auto& it : mListenInputs) {
+        std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
+        for (auto& it : mListenAddressToInputMap) {
             if (it.second.mServer) {
-                ShutdownGrpcServer(it.second.mServer.get(), it.second.mInFlightCnt);
+                if (!ShutdownGrpcServer(it.second.mServer.get(), it.second.mInFlightCnt)) {
+                    LOG_ERROR(sLogger,
+                              ("GrpcInputManager", "failed to shutdown gRPC server gracefully")("address", it.first));
+                }
             }
         }
-        mListenInputs.clear();
+        mListenAddressToInputMap.clear();
     }
-    LOG_INFO(sLogger, ("GrpcInputRunner", "Stop"));
+    LOG_INFO(sLogger, ("GrpcInputManager", "Stop"));
 }
 
-bool GrpcInputRunner::HasRegisteredPlugins() const {
-    std::lock_guard<std::mutex> lock(mListenInputsMutex);
-    return !mListenInputs.empty();
+bool GrpcInputManager::HasRegisteredPlugins() const {
+    std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
+    return !mListenAddressToInputMap.empty();
 }
 
 // Add a new address to the listen inputs. If the address already exists, should call RemoveListenInput first.
 template <typename T>
-bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
-                                        const std::string& address,
-                                        const Json::Value& config) {
-    std::lock_guard<std::mutex> lock(mListenInputsMutex);
-    auto it = mListenInputs.find(address);
+bool GrpcInputManager::AddListenInput(const std::string& configName,
+                                      const std::string& address,
+                                      const Json::Value& config) {
+    std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
+    auto it = mListenAddressToInputMap.find(address);
     // generate a new service instance to get name
     std::unique_ptr<T> service = std::make_unique<T>();
-    if (it != mListenInputs.end()) {
+    if (it != mListenAddressToInputMap.end()) {
         if (it->second.mServer == nullptr || it->second.mService == nullptr) {
             // should never happen
             LOG_ERROR(
                 sLogger,
-                ("GrpcInputRunner", "address exists but server or service is not initialized, should never happen")(
+                ("GrpcInputManager", "address exists but server or service is not initialized, should never happen")(
                     "address", address)("service", service->Name()));
             return false;
         }
         if (it->second.mService->Name() != service->Name()) {
             // Address already exists, check if the service type matches
             LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "address already exists with a different service type")("address", address)(
+                      ("GrpcInputManager", "address already exists with a different service type")("address", address)(
                           "existing service", it->second.mService->Name())("new service", service->Name()));
             return false;
         }
@@ -97,14 +100,14 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
         GrpcListenInput input;
         if (!service->Update(configName, config)) {
             LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "failed to update service configuration")("service", service->Name())(
+                      ("GrpcInputManager", "failed to update service configuration")("service", service->Name())(
                           "config", config.toStyledString()));
             return false;
         }
-        auto result = mListenInputs.insert(std::make_pair(address, std::move(input)));
+        auto result = mListenAddressToInputMap.insert(std::make_pair(address, std::move(input)));
         if (!result.second) {
             LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "failed to insert new address into listen inputs")("address", address));
+                      ("GrpcInputManager", "failed to insert new address into listen inputs")("address", address));
             return false;
         }
         it = result.first;
@@ -118,14 +121,14 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
         auto server = builder.BuildAndStart();
         if (!server) {
             LOG_ERROR(sLogger,
-                      ("GrpcInputRunner", "failed to start gRPC server")("address", address)(
+                      ("GrpcInputManager", "failed to start gRPC server")("address", address)(
                           "service", service->Name())("config name", configName));
-            mListenInputs.erase(result.first);
+            mListenAddressToInputMap.erase(result.first);
             return false;
         }
         LOG_INFO(sLogger,
-                 ("GrpcInputRunner", "new address inserted into listen inputs")("address", address)("service",
-                                                                                                    service->Name()));
+                 ("GrpcInputManager", "new address inserted into listen inputs")("address", address)("service",
+                                                                                                     service->Name()));
         it->second.mServer = std::move(server);
         it->second.mService = std::move(service);
     }
@@ -135,36 +138,36 @@ bool GrpcInputRunner::UpdateListenInput(const std::string& configName,
 
 // Remove an address from the listen inputs
 template <typename T>
-bool GrpcInputRunner::RemoveListenInput(const std::string& address, const std::string& configName) {
-    std::lock_guard<std::mutex> lock(mListenInputsMutex);
-    auto it = mListenInputs.find(address);
-    if (it != mListenInputs.end()) {
+bool GrpcInputManager::RemoveListenInput(const std::string& address, const std::string& configName) {
+    std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
+    auto it = mListenAddressToInputMap.find(address);
+    if (it != mListenAddressToInputMap.end()) {
         if (it->second.mService && it->second.mService->Remove(configName)) {
             it->second.mReferenceCount--;
         }
     } else {
         LOG_ERROR(sLogger,
-                  ("GrpcInputRunner", "listen input not found")("address", address)("config name", configName));
+                  ("GrpcInputManager", "listen input not found")("address", address)("config name", configName));
         return false;
     }
     if (it->second.mReferenceCount <= 0) {
         if (!ShutdownGrpcServer(it->second.mServer.get(), it->second.mInFlightCnt)) {
-            LOG_ERROR(sLogger, ("GrpcInputRunner", "failed to shutdown gRPC server gracefully")("address", address));
+            LOG_ERROR(sLogger, ("GrpcInputManager", "failed to shutdown gRPC server gracefully")("address", address));
         }
-        mListenInputs.erase(it);
-        LOG_INFO(sLogger, ("GrpcInputRunner", "removed listen input")("address", address));
+        mListenAddressToInputMap.erase(it);
+        LOG_INFO(sLogger, ("GrpcInputManager", "removed listen input")("address", address));
     }
     return true;
 }
 
-bool GrpcInputRunner::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<std::atomic_int> inFlightCnt) {
+bool GrpcInputManager::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<std::atomic_int> inFlightCnt) {
     if (server) {
         auto shutdownStartTime = std::chrono::system_clock::now();
         auto deadline = shutdownStartTime + std::chrono::seconds(INT32_FLAG(grpc_server_stop_timeout));
         server->Shutdown(deadline);
         if (!inFlightCnt) {
             // should never happen
-            LOG_INFO(sLogger, ("GrpcInputRunner", "inFlightCnt is nullptr, skip waiting for in-flight requests"));
+            LOG_INFO(sLogger, ("GrpcInputManager", "inFlightCnt is nullptr, skip waiting for in-flight requests"));
             return true;
         }
         // Shutdown will release the server resources and new server can start
@@ -181,15 +184,15 @@ bool GrpcInputRunner::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<s
     return false;
 }
 
-template bool GrpcInputRunner::UpdateListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
-                                                                               const std::string&,
-                                                                               const Json::Value&);
-template bool GrpcInputRunner::RemoveListenInput<LoongSuiteForwardServiceImpl>(const std::string&, const std::string&);
+template bool GrpcInputManager::AddListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
+                                                                             const std::string&,
+                                                                             const Json::Value&);
+template bool GrpcInputManager::RemoveListenInput<LoongSuiteForwardServiceImpl>(const std::string&, const std::string&);
 
 #ifdef APSARA_UNIT_TEST_MAIN
 template bool
-GrpcInputRunner::UpdateListenInput<MockServiceImpl>(const std::string&, const std::string&, const Json::Value&);
-template bool GrpcInputRunner::RemoveListenInput<MockServiceImpl>(const std::string&, const std::string&);
+GrpcInputManager::AddListenInput<MockServiceImpl>(const std::string&, const std::string&, const Json::Value&);
+template bool GrpcInputManager::RemoveListenInput<MockServiceImpl>(const std::string&, const std::string&);
 #endif
 
 } // namespace logtail

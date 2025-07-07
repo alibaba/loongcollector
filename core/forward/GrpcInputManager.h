@@ -88,14 +88,14 @@ private:
     std::shared_ptr<std::atomic_int> mInFlightCnt;
 };
 
-class GrpcInputRunner : public InputRunner {
+class GrpcInputManager : public InputRunner {
 public:
-    GrpcInputRunner(const GrpcInputRunner&) = delete;
-    GrpcInputRunner(GrpcInputRunner&&) = delete;
-    GrpcInputRunner& operator=(const GrpcInputRunner&) = delete;
-    GrpcInputRunner& operator=(GrpcInputRunner&&) = delete;
-    static GrpcInputRunner* GetInstance() {
-        static GrpcInputRunner sInstance;
+    GrpcInputManager(const GrpcInputManager&) = delete;
+    GrpcInputManager(GrpcInputManager&&) = delete;
+    GrpcInputManager& operator=(const GrpcInputManager&) = delete;
+    GrpcInputManager& operator=(GrpcInputManager&&) = delete;
+    static GrpcInputManager* GetInstance() {
+        static GrpcInputManager sInstance;
         return &sInstance;
     }
 
@@ -104,18 +104,18 @@ public:
     bool HasRegisteredPlugins() const override;
 
     template <typename T>
-    bool UpdateListenInput(const std::string& configName, const std::string& address, const Json::Value& config);
+    bool AddListenInput(const std::string& configName, const std::string& address, const Json::Value& config);
     template <typename T>
     bool RemoveListenInput(const std::string& address, const std::string& configName);
 
 private:
-    GrpcInputRunner() = default;
-    ~GrpcInputRunner() override = default;
+    GrpcInputManager() = default;
+    ~GrpcInputManager() override = default;
 
     bool ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<std::atomic_int> inFlightCnt);
 
-    mutable std::mutex mListenInputsMutex;
-    std::unordered_map<std::string, GrpcListenInput> mListenInputs;
+    mutable std::mutex mListenAddressToInputMapMutex;
+    std::unordered_map<std::string, GrpcListenInput> mListenAddressToInputMap;
 
     std::atomic_bool mIsStarted = false;
 

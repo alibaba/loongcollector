@@ -21,7 +21,7 @@
 
 namespace logtail {
 
-class LoongSuiteForwardServiceImpl : public BaseService, public LoongSuiteForward::CallbackService {
+class LoongSuiteForwardServiceImpl : public BaseService, public LoongSuiteForwardService::CallbackService {
 public:
     LoongSuiteForwardServiceImpl() = default;
     ~LoongSuiteForwardServiceImpl() override = default;

@@ -18,7 +18,7 @@
 #include <string>
 
 #include "common/Flags.h"
-#include "forward/GrpcRunner.h"
+#include "forward/GrpcInputManager.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
 #include "unittest/Unittest.h"
 #include "unittest/forward/MockServiceImpl.h"
@@ -45,78 +45,79 @@ public:
     void TestShutdownGrpcServer() const;
 
 protected:
-    void SetUp() override { GrpcInputRunner::GetInstance()->Stop(); }
+    void SetUp() override { GrpcInputManager::GetInstance()->Stop(); }
 };
 
 void GrpcRunnerUnittest::TestUpdateListenInputNewAddressSuccess() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50051";
-    bool ret = runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    bool ret = runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     APSARA_TEST_TRUE_FATAL(ret);
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.size() == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.size() == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.find(address) != runner->mListenAddressToInputMap.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mReferenceCount == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mServer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfig() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50052";
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
-    auto* serverPointer = runner->mListenInputs[address].mServer.get();
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    auto* serverPointer = runner->mListenAddressToInputMap[address].mServer.get();
     config["test"] = 2;
-    bool ret = runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    bool ret = runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     APSARA_TEST_TRUE_FATAL(ret);
-    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs.size(), 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 2);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mServer.get(), serverPointer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
+    APSARA_TEST_EQUAL_FATAL(runner->mListenAddressToInputMap.size(), 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.find(address) != runner->mListenAddressToInputMap.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mReferenceCount == 2);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mServer);
+    APSARA_TEST_EQUAL_FATAL(runner->mListenAddressToInputMap[address].mServer.get(), serverPointer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError() const {
     MockServiceImpl mockService;
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50053";
-    bool ret = runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    bool ret = runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     APSARA_TEST_TRUE_FATAL(ret);
-    ret = runner->UpdateListenInput<MockServiceImpl>("configB", address, config);
+    ret = runner->AddListenInput<MockServiceImpl>("configB", address, config);
     APSARA_TEST_FALSE_FATAL(ret);
-    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs.size(), 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_EQUAL_FATAL(runner->mListenInputs[address].mService->Name(), LoongSuiteForwardServiceImpl::sName);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
+    APSARA_TEST_EQUAL_FATAL(runner->mListenAddressToInputMap.size(), 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.find(address) != runner->mListenAddressToInputMap.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService);
+    APSARA_TEST_EQUAL_FATAL(runner->mListenAddressToInputMap[address].mService->Name(),
+                            LoongSuiteForwardServiceImpl::sName);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mReferenceCount == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mServer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestRemoveListenInputNormalRemove() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50054";
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     bool ret = runner->RemoveListenInput<LoongSuiteForwardServiceImpl>(address, "configA");
     APSARA_TEST_TRUE_FATAL(ret);
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
@@ -124,7 +125,7 @@ void GrpcRunnerUnittest::TestRemoveListenInputNormalRemove() const {
 }
 
 void GrpcRunnerUnittest::TestRemoveListenInputAddressNotFoundError() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     const std::string address = "0.0.0.0:50055";
     bool ret = runner->RemoveListenInput<LoongSuiteForwardServiceImpl>(address, "configA");
@@ -134,60 +135,60 @@ void GrpcRunnerUnittest::TestRemoveListenInputAddressNotFoundError() const {
 }
 
 void GrpcRunnerUnittest::TestRemoveListenInputAddressWithMultipleConfigs() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50056";
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configB", address, config);
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configB", address, config);
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.size() == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 2);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.size() == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.find(address) != runner->mListenAddressToInputMap.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mReferenceCount == 2);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mServer);
 
     bool ret = runner->RemoveListenInput<LoongSuiteForwardServiceImpl>(address, "configA");
     APSARA_TEST_TRUE_FATAL(ret);
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.size() == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs.find(address) != runner->mListenInputs.end());
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mService->Name() == "LoongSuiteForwardService");
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mReferenceCount == 1);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mServer);
-    APSARA_TEST_TRUE_FATAL(runner->mListenInputs[address].mInFlightCnt->load() == 0);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.size() == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap.find(address) != runner->mListenAddressToInputMap.end());
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mService->Name() == "LoongSuiteForwardService");
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mReferenceCount == 1);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mServer);
+    APSARA_TEST_TRUE_FATAL(runner->mListenAddressToInputMap[address].mInFlightCnt->load() == 0);
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestHasRegisteredPluginsEmpty() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestHasRegisteredPluginsNotEmpty() const {
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", "0.0.0.0:50056", config);
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", "0.0.0.0:50056", config);
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
 
 void GrpcRunnerUnittest::TestShutdownGrpcServer() const {
     INT32_FLAG(grpc_server_stop_timeout) = 1;
-    auto* runner = GrpcInputRunner::GetInstance();
+    auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
     config["test"] = 1;
     const std::string address = "0.0.0.0:50057";
-    runner->UpdateListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
-    auto& inFlightCnt = runner->mListenInputs[address].mInFlightCnt;
+    runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
+    auto& inFlightCnt = runner->mListenAddressToInputMap[address].mInFlightCnt;
     auto future = std::async(std::launch::async, [&inFlightCnt]() {
         for (int j = 0; j < 10; j++) {
             inFlightCnt->fetch_add(1);
@@ -195,9 +196,11 @@ void GrpcRunnerUnittest::TestShutdownGrpcServer() const {
         }
     });
     future.wait();
-    APSARA_TEST_FALSE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), inFlightCnt));
+    APSARA_TEST_FALSE_FATAL(
+        runner->ShutdownGrpcServer(runner->mListenAddressToInputMap[address].mServer.get(), inFlightCnt));
     inFlightCnt = 0;
-    APSARA_TEST_TRUE_FATAL(runner->ShutdownGrpcServer(runner->mListenInputs[address].mServer.get(), inFlightCnt));
+    APSARA_TEST_TRUE_FATAL(
+        runner->ShutdownGrpcServer(runner->mListenAddressToInputMap[address].mServer.get(), inFlightCnt));
     runner->Stop();
 }
 

@@ -17,7 +17,7 @@
 syntax = "proto3";
 package logtail;
 
-service LoongSuiteForward {
+service LoongSuiteForwardService {
     rpc Forward(LoongSuiteForwardRequest) returns (LoongSuiteForwardResponse) {}
 }
 

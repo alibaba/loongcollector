@@ -19,7 +19,7 @@
 
 namespace logtail {
 
-class MockServiceImpl : public BaseService, public LoongSuiteForward::CallbackService {
+class MockServiceImpl : public BaseService, public LoongSuiteForwardService::CallbackService {
 public:
     MockServiceImpl() = default;
     ~MockServiceImpl() override = default;
