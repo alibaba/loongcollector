@@ -41,11 +41,17 @@ const (
 	BodyKey    = ContentKey
 )
 
+const (
+	intValueBytes    = 4
+	longValueBytes   = 8
+	doubleValueBytes = 8
+)
+
 var (
-	NilStringValues    = &keyValuesNil[string]{}
-	NilTypedValues     = &keyValuesNil[*TypedValue]{}
-	NilFloatValues     = &keyValuesNil[float64]{}
-	NilInterfaceValues = &keyValuesNil[interface{}]{}
+	NilStringValues    = &keyValuesNil[string]{m: make(map[string]string)}
+	NilTypedValues     = &keyValuesNil[*TypedValue]{m: make(map[string]*TypedValue)}
+	NilFloatValues     = &keyValuesNil[float64]{m: make(map[string]float64)}
+	NilInterfaceValues = &keyValuesNil[interface{}]{m: make(map[string]interface{})}
 )
 
 type TypedValue struct {
@@ -183,6 +189,7 @@ func (kv *keyValuesImpl[TValue]) SortTo(buf []KeyValue[TValue]) []KeyValue[TValu
 }
 
 type keyValuesNil[TValue string | float64 | *TypedValue | any] struct {
+	m map[string]TValue
 }
 
 func (kv *keyValuesNil[TValue]) Add(key string, value TValue) {
@@ -207,7 +214,7 @@ func (kv *keyValuesNil[TValue]) Merge(other KeyValues[TValue]) {
 }
 
 func (kv *keyValuesNil[TValue]) Iterator() map[string]TValue {
-	return make(map[string]TValue)
+	return kv.m
 }
 
 func (kv *keyValuesNil[TValue]) Len() int {
