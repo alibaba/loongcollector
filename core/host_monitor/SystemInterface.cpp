@@ -125,14 +125,14 @@ bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
         errorType);
 }
 
-bool SystemInterface::GetMTRRInformationString(MTRRInformationString& mtrrString) {
-    const std::string errorType = "mtrr";
-    return MemoizedCall(
-        mMTRRInformationCache,
-        [this](BaseInformation& info) { return this->GetMTRRInformationStringOnce(static_cast<MTRRInformationString&>(info)); },
-        mtrrString,
-        errorType);
-}
+// bool SystemInterface::GetMTRRInformationString(MTRRInformationString& mtrrString) {
+//     const std::string errorType = "mtrr";
+//     return MemoizedCall(
+//         mMTRRInformationCache,
+//         [this](BaseInformation& info) { return this->GetMTRRInformationStringOnce(static_cast<MTRRInformationString&>(info)); },
+//         mtrrString,
+//         errorType);
+// }
 
 bool SystemInterface::GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& processCmdlineString) {
     const std::string errorType = "processCmdline";

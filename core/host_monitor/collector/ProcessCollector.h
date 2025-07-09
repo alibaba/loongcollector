@@ -31,7 +31,7 @@ class ProcessCollector : public BaseCollector {
 public:
     ProcessCollector();
 
-    int Init(int processTotalCount,int processReportTopN);
+    int Init(int processTotalCount,int processReportTopN = 5);
 
     ~ProcessCollector() override = default;
 

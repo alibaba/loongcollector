@@ -45,8 +45,6 @@ private:
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
 
     uint64_t GetMemoryValue(char unit, uint64_t value);
-    bool GetMemoryInformationStringOnce(MemoryInformationString& meminfoStr) override;
-    bool GetMTRRInformationStringOnce(MTRRInformationString& mtrrStr) override;
     bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
     bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override;
     bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) override;

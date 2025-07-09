@@ -308,7 +308,7 @@ struct ProcessStatmString : public BaseInformation {
     std::vector<std::string> processStatmString;
 };
 
-struct MemoryInformation {
+struct MemoryStat {
     double ram = 0;
     double total = 0;
     double used = 0;
@@ -321,21 +321,21 @@ struct MemoryInformation {
     double usedPercent = 0.0;
     double freePercent = 0.0;
 
-    static inline const FieldName<MemoryInformation> memStatMetas[] = {
-        FIELD_ENTRY(MemoryInformation, ram),
-        FIELD_ENTRY(MemoryInformation, total),
-        FIELD_ENTRY(MemoryInformation, used),
-        FIELD_ENTRY(MemoryInformation, free),
-        FIELD_ENTRY(MemoryInformation, available),
-        FIELD_ENTRY(MemoryInformation, actualUsed),
-        FIELD_ENTRY(MemoryInformation, actualFree),
-        FIELD_ENTRY(MemoryInformation, buffers),
-        FIELD_ENTRY(MemoryInformation, cached),
-        FIELD_ENTRY(MemoryInformation, usedPercent),
-        FIELD_ENTRY(MemoryInformation, freePercent),
+    static inline const FieldName<MemoryStat> memStatMetas[] = {
+        FIELD_ENTRY(MemoryStat, ram),
+        FIELD_ENTRY(MemoryStat, total),
+        FIELD_ENTRY(MemoryStat, used),
+        FIELD_ENTRY(MemoryStat, free),
+        FIELD_ENTRY(MemoryStat, available),
+        FIELD_ENTRY(MemoryStat, actualUsed),
+        FIELD_ENTRY(MemoryStat, actualFree),
+        FIELD_ENTRY(MemoryStat, buffers),
+        FIELD_ENTRY(MemoryStat, cached),
+        FIELD_ENTRY(MemoryStat, usedPercent),
+        FIELD_ENTRY(MemoryStat, freePercent),
     };
 
-    static void enumerate(const std::function<void(const FieldName<MemoryInformation>&)>& callback) {
+    static void enumerate(const std::function<void(const FieldName<MemoryStat>&)>& callback) {
         for (const auto& field : memStatMetas) {
             callback(field);
         }
@@ -344,28 +344,6 @@ struct MemoryInformation {
 
 struct MemoryInformation : public BaseInformation {
     MemoryStat memStat;
-};
-
-struct SwapInformation {
-    double total = 0;
-    double used = 0;
-    double free = 0;
-    double pageIn = 0;
-    double pageOut = 0;
-
-    static inline const FieldName<SwapInformation> swapStatMetas[] = {
-        FIELD_ENTRY(SwapInformation, total),
-        FIELD_ENTRY(SwapInformation, used),
-        FIELD_ENTRY(SwapInformation, used),
-        FIELD_ENTRY(SwapInformation, pageIn),
-        FIELD_ENTRY(SwapInformation, pageOut),
-    };
-
-    static void enumerate(const std::function<void(const FieldName<SwapInformation>&)>& callback) {
-        for (const auto& field : swapStatMetas) {
-            callback(field);
-        }
-    }
 };
 
 class SystemInterface {
@@ -422,8 +400,6 @@ public:
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
     bool GetHostMemInformationStat(MemoryInformation& meminfo);
-    bool GetHostMeminfoStatString(MemoryInformationString& meminfoString);
-    bool GetMTRRInformationString(MTRRInformationString& mtrrString);
     bool GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& cmdline);
     bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation &processMemory);
     bool GetProcessCredNameObj(pid_t pid, ProcessCredName &credName);
@@ -439,7 +415,6 @@ public:
           mSystemLoadInformationCache(ttl),
           mCPUCoreNumInformationCache(ttl),
           mMemInformationCache(ttl),
-          mMTRRInformationCache(ttl),
           mProcessCmdlineCache(ttl),
           mProcessStatmCache(ttl),
           mProcessStatusCache(ttl),
@@ -463,8 +438,6 @@ private:
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
     virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
-    virtual bool GetMemoryInformationStringOnce(MemoryInformationString& meminfoStr) = 0;
-    virtual bool GetMTRRInformationStringOnce(MTRRInformationString& mtrrStr) = 0;
     virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
     virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
     virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
@@ -478,8 +451,6 @@ private:
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
     SystemInformationCache<MemoryInformation> mMemInformationCache;
-    SystemInformationCache<MemoryInformationString> mMemInformationCache;
-    SystemInformationCache<MTRRInformationString> mMTRRInformationCache;
     SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
     SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
     SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;

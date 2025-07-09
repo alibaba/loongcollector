@@ -122,41 +122,14 @@ static inline void GetProcessCpuSorted(std::vector<ProcessAllStat> &allPidStats)
         });
 }
 
-static double GetMemoryStat(std::vector<std::string>& memoryLines) {
-    int ret = false;
-    double totalMemory = 0.0;
-
-    if (memoryLines.empty()) {
-        return ret;
-    }
-
-    std::unordered_map<std::string, double &> memoryProc{
-            {"MemTotal:",     totalMemory},
-    };
-    /* 字符串处理，处理成对应的类型以及值*/
-    for (size_t i = 0; i < memoryLines.size() && !memoryProc.empty(); i++) {
-        std::vector<std::string> words = split(memoryLines[i], ' ', true);
-        // words-> MemTotal: / 12344 / kB
-
-        auto entry = memoryProc.find(words[0]);
-        if (entry != memoryProc.end()) {
-            entry->second = GetMemoryValue(words.back()[0], std::stoi(words[1]));
-            memoryProc.erase(entry);
-        }
-    }
-
-    return totalMemory;
-}
-
 int ProcessCollector::Init(int processTotalCount, int processReportTopN) {
-    MemoryInformationString meminfoStr;
+    MemoryInformation meminfo;
 
-    if (!SystemInterface::GetInstance()->GetHostMeminfoStatString(meminfoStr)) {
+    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(meminfo)) {
         return false;
     }
     
-    double totalMemory = GetMemoryStat(meminfoStr.meminfoString);
-    mTotalMemory = totalMemory;
+    mTotalMemory = meminfo.memStat.total;
     mCountPerReport = processTotalCount;
     mTopN = processReportTopN;
 
@@ -285,6 +258,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         multiDoubleValues->SetValue(std::string(vmNames[i]),
                                     UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
     }
+    metricEvent->SetTag(std::string("m"), std::string("system.processCount"));
     
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i<pushMerticList.size(); i++) {
@@ -323,6 +297,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         metricEventEachPid->SetTag("pid", std::to_string(pid));
         metricEventEachPid->SetTag("name", pushMerticList[i].name);
         metricEventEachPid->SetTag("user", pushMerticList[i].user);
+        metricEventEachPid->SetTag(std::string("m"), std::string("system.process"));
     }
     
     // 打包记录，process_expand
