@@ -133,21 +133,6 @@ void ConnectionManager::Iterations() {
             continue;
         }
 
-        // TODO @qianlu.kk generate in iterator thread ...
-        // if (mEnableConnStats && connection->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
-        //     std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(connection);
-        //     LOG_DEBUG(sLogger,
-        //               ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
-        //                                                                                      forceGenRecord));
-        //     bool res = connection->GenerateConnStatsRecord(record);
-        //     if (res && mConnStatsHandler) {
-        //         mConnStatsHandler(record);
-        //     }
-        //     if (needGenRecord) {
-        //         mLastReportTs = nowTs; // update report ts
-        //     }
-        // }
-
         // when we query for conn tracker, we record active
         connection->CountDown();
     }
