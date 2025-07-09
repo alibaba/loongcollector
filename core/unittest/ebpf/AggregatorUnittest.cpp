@@ -21,11 +21,8 @@
 #include <random>
 
 #include "common/timer/Timer.h"
-#include "common/timer/TimerEvent.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
-#include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -214,35 +211,6 @@ void AggregatorUnittest::TestAggregator() {
     this->mAggregateTree->Reset();
 }
 
-void AggregatorUnittest::TestAggManager() {
-    // std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
-    //     1,
-    //     [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-    //         if (!this->mFlag) {
-    //             return false;
-    //         }
-    //         this->mVec.push_back(1);
-    //         return true;
-    //     },
-    //     [this]() { // validator
-    //         auto isStop = !this->mFlag.load();
-    //         if (isStop) {
-    //             LOG_INFO(sLogger, ("stop schedule, mflag", this->mFlag));
-    //         }
-    //         return isStop;
-    //     });
-
-    // Timer::GetInstance()->PushEvent(std::move(event));
-
-    // std::this_thread::sleep_for(std::chrono::seconds(4));
-    // mFlag = false;
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
-    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
-    // mFlag = true;
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
-    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
-}
-
 void AggregatorUnittest::TestBasicAgg() {
     Aggregate({"a", "b", "c", "d"}, 4);
     Aggregate({"a", "b", "c", "d", "e"}, 4);
@@ -279,7 +247,6 @@ void AggregatorUnittest::TestGetAndReset() {
 
 UNIT_TEST_CASE(AggregatorUnittest, TestBasicAgg);
 UNIT_TEST_CASE(AggregatorUnittest, TestGetAndReset);
-// UNIT_TEST_CASE(AggregatorUnittest, TestAggManager);
 UNIT_TEST_CASE(AggregatorUnittest, TestAggregator);
 
 

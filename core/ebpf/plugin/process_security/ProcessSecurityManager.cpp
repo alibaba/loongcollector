@@ -38,9 +38,8 @@
 namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -69,6 +68,13 @@ int ProcessSecurityManager::Init() {
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
     return 0;
+}
+
+int ProcessSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
+                                              uint32_t index,
+                                              const PluginMetricManagerPtr& metricMgr,
+                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    ;
 }
 
 int ProcessSecurityManager::Destroy() {

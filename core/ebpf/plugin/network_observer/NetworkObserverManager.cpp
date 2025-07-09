@@ -148,9 +148,8 @@ GetAppDetail(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& curre
 
 NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, L7Record* other) {
@@ -221,7 +220,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
           }),
       mNetAggregator(
           10240,
-          [](std::unique_ptr<NetMetricData>& base, ConnStatsRecordV2* other) {
+          [](std::unique_ptr<NetMetricData>& base, ConnStatsRecord* other) {
               base->mDropCount += other->mDropCount;
               base->mRetransCount += other->mRetransCount;
               base->mRecvBytes += other->mRecvBytes;
@@ -236,7 +235,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
                   base->mStateCounts[0]++;
               }
           },
-          [](ConnStatsRecordV2* in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
+          [](ConnStatsRecord* in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
               auto connection = in->GetConnection();
               auto data = std::make_unique<NetMetricData>(connection, sourceBuffer);
               const auto& ctAttrs = connection->GetConnTrackerAttrs();
@@ -299,7 +298,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
 }
 
 std::array<size_t, 2>
-NetworkObserverManager::generateAggKeyForNetMetric(ConnStatsRecordV2* record,
+NetworkObserverManager::generateAggKeyForNetMetric(ConnStatsRecord* record,
                                                    const std::shared_ptr<logtail::ebpf::AppDetail>& appInfo) {
     // calculate agg key
     std::array<size_t, 2> result{};
@@ -472,6 +471,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
         bool needPush = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
+        StringView configName;
         CounterPtr pushLogsTotal = nullptr;
         CounterPtr pushLogGroupTotal = nullptr;
         aggTree.ForEach(node, [&](const AppLogGroup* group) {
@@ -489,6 +489,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                     const auto& appInfo = getConnAppConfig(ct);
                     queueKey = appInfo->mQueueKey;
                     pluginIdx = appInfo->mPluginIndex;
+                    configName = appInfo->mConfigName;
                     pushLogsTotal = appInfo->mPushLogsTotal;
                     pushLogGroupTotal = appInfo->mPushLogGroupTotal;
                     if (ct == nullptr) {
@@ -514,7 +515,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                     logEvent->SetContentNoCopy(kConnTrackerTable.ColLogKey(i), ctAttrVal[i]);
                 }
                 // set time stamp
-                auto* httpRecord = static_cast<HttpRecordV2*>(record);
+                auto* httpRecord = static_cast<HttpRecord*>(record);
                 auto timeSpec = ConvertKernelTimeToUnixTime(httpRecord->GetStartTimeStamp());
                 logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
                 logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
@@ -547,7 +548,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                 auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
                 if (QueueStatus::OK != result) {
                     LOG_WARNING(sLogger,
-                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", pluginIdx)(
+                                ("configName", configName)("pluginIdx", pluginIdx)(
                                     "[NetworkObserver] push log to queue failed!", magic_enum::enum_name(result)));
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 } else {
@@ -616,6 +617,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         bool init = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
+        StringView configName;
         CounterPtr pushMetricsTotal = nullptr;
         CounterPtr pushMetricGroupTotal = nullptr;
         aggTree.ForEach(node, [&](const NetMetricData* group) {
@@ -631,6 +633,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
                 }
                 queueKey = appInfo->mQueueKey;
                 pluginIdx = appInfo->mPluginIndex;
+                configName = appInfo->mConfigName;
                 pushMetricsTotal = appInfo->mPushMetricsTotal;
                 pushMetricGroupTotal = appInfo->mPushMetricGroupTotal;
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppId.MetricKey(), appInfo->mAppId);
@@ -731,7 +734,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
             auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
             if (QueueStatus::OK != result) {
                 LOG_WARNING(sLogger,
-                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", pluginIdx)(
+                            ("configName", configName)("pluginIdx", pluginIdx)(
                                 "[NetworkObserver] push net metric queue failed!", magic_enum::enum_name(result)));
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             } else {
@@ -782,6 +785,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         bool init = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
+        StringView configName;
         CounterPtr pushMetricsTotal = nullptr;
         CounterPtr pushMetricGroupTotal = nullptr;
         aggTree.ForEach(node, [&](const AppMetricData* group) {
@@ -799,6 +803,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 }
                 queueKey = appInfo->mQueueKey;
                 pluginIdx = appInfo->mPluginIndex;
+                configName = appInfo->mConfigName;
                 pushMetricsTotal = appInfo->mPushMetricsTotal;
                 pushMetricGroupTotal = appInfo->mPushMetricGroupTotal;
 
@@ -927,7 +932,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
                 if (QueueStatus::OK != result) {
                     LOG_WARNING(sLogger,
-                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", pluginIdx)(
+                                ("configName", configName)("pluginIdx", pluginIdx)(
                                     "[NetworkObserver] push app metric queue failed!", magic_enum::enum_name(result)));
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 } else {
@@ -970,6 +975,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
         bool needPush = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
+        StringView configName;
         CounterPtr pushSpansTotal = nullptr;
         CounterPtr pushSpanGroupTotal = nullptr;
         aggTree.ForEach(node, [&](const AppSpanGroup* group) {
@@ -993,6 +999,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     }
                     queueKey = appInfo->mQueueKey;
                     pluginIdx = appInfo->mPluginIndex;
+                    configName = appInfo->mConfigName;
                     pushSpansTotal = appInfo->mPushSpansTotal;
                     pushSpanGroupTotal = appInfo->mPushSpanGroupTotal;
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppId.SpanKey(), appInfo->mAppId);
@@ -1036,13 +1043,14 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 }
 
                 spanEvent->SetName(record->GetSpanName());
-                auto* httpRecord = static_cast<HttpRecordV2*>(record);
+                auto* httpRecord = static_cast<HttpRecord*>(record);
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
                 spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(httpRecord->GetRespBodySize()));
                 spanEvent->SetTag(kHTTPVersion.SpanKey(), httpRecord->GetProtocolVersion());
-                // spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaders());
+
+                // spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaderMap());
                 // spanEvent->SetTag(kHTTPRespHeader.SpanKey(), httpRecord->GetRespHeaders());
 
                 struct timespec startTime = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
@@ -1063,10 +1071,6 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
         mSpanEventGroups.emplace_back(std::move(eventGroup));
 #else
         if (init && needPush) {
-            std::lock_guard lk(mContextMutex);
-            if (this->mPipelineCtx == nullptr) {
-                return true;
-            }
             ADD_COUNTER(pushSpansTotal, eventSize);
             ADD_COUNTER(pushSpanGroupTotal, 1);
             LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
@@ -1077,7 +1081,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
                 if (QueueStatus::OK != result) {
                     LOG_WARNING(sLogger,
-                                ("configName", mPipelineCtx->GetConfigName())("pluginIdx", pluginIdx)(
+                                ("configName", configName)("pluginIdx", pluginIdx)(
                                     "[NetworkObserver] push span queue failed!", magic_enum::enum_name(result)));
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 } else {
@@ -1474,6 +1478,7 @@ int NetworkObserverManager::PollPerfBuffer() {
 
     // 2. do perf callback ==> update cache, generate record(if not ready, add to mRetryableEventCache, else add to
     // aggregator) poll stats -> ctrl -> info
+    // 4000
     {
         ReadLock lk(mAppConfigLock);
         // deep copy app config ...
@@ -1604,7 +1609,7 @@ int NetworkObserverManager::SendEvents() {
 }
 
 int NetworkObserverManager::HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& commonEvent) {
-    auto* httpRecord = static_cast<HttpRecordV2*>(commonEvent.get());
+    auto* httpRecord = static_cast<HttpRecord*>(commonEvent.get());
     if (httpRecord) {
         auto appDetail = httpRecord->GetAppDetail();
         if (appDetail->mEnableLog && httpRecord->ShouldSample()) {

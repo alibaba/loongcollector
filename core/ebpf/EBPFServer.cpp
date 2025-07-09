@@ -204,15 +204,11 @@ void EBPFServer::Init() {
     mInited = true;
     mRunning = true;
 
-    LOG_DEBUG(sLogger, ("begin to init timer", ""));
-    Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
     LOG_DEBUG(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
     LOG_DEBUG(sLogger, ("begin to start handler", ""));
     mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
-    LOG_DEBUG(sLogger, ("begin to start iterator", ""));
-    mIterator = async(std::launch::async, &EBPFServer::iterateMaps, this);
 
     mEBPFAdapter->Init(); // Idempotent
 }
@@ -225,12 +221,11 @@ void EBPFServer::Stop() {
     mRunning = false;
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     for (int i = 0; i < int(PluginType::MAX); i++) {
-        auto pipelineName = mPlugins[i].mPipelineName;
-        if (pipelineName.size()) {
-            bool ret = DisablePlugin(pipelineName, static_cast<PluginType>(i));
+        for (const auto& entry : mPlugins[i].mPipelines) {
+            bool ret = DisablePlugin(entry.first, static_cast<PluginType>(i));
             LOG_INFO(sLogger,
                      ("force stop plugin",
-                      magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", pipelineName)("ret", ret));
+                      magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", entry.first)("ret", ret));
         }
     }
 
@@ -276,86 +271,70 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     // if (pluginMgr) {
     //     // update ...
     // }
-
-    std::string prevPipelineName = checkLoadedPipelineName(type);
-    if (prevPipelineName == pipelineName) { // update
-        auto& pluginMgr = getPluginState(type).mManager;
-        if (pluginMgr) {
-            int res = pluginMgr->Update(options);
-            if (res) {
-                LOG_WARNING(sLogger, ("update plugin failed, type", magic_enum::enum_name(type))("res", res));
-                return false;
-            }
-            res = pluginMgr->Resume(options);
-            if (res) {
-                LOG_WARNING(sLogger, ("resume plugin failed, type", magic_enum::enum_name(type))("res", res));
-                return false;
-            }
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-            return true;
-        }
-        LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
-        return false;
-    }
-
-    if (type != PluginType::NETWORK_OBSERVE) {
-        if (mProcessCacheManager->Init()) {
-            LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
-        } else {
-            LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
-            return false;
-        }
-    }
-
-    // step1: convert options to export type
-    auto eBPFConfig = std::make_unique<PluginConfig>();
-    eBPFConfig->mPluginType = type;
-    // call update function
-    // step2: call init function
     auto& pluginMgr = getPluginState(type).mManager;
-    switch (type) {
-        case PluginType::PROCESS_SECURITY: {
-            if (!pluginMgr) {
-                pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+    if (!pluginMgr) {
+        // create ...
+        if (type != PluginType::NETWORK_OBSERVE) {
+            if (mProcessCacheManager->Init()) {
+                LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
+            } else {
+                LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
+                return false;
             }
-            break;
         }
 
-        case PluginType::NETWORK_OBSERVE: {
-            if (!pluginMgr) {
-                pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+        // step1: convert options to export type
+        auto eBPFConfig = std::make_unique<PluginConfig>();
+        eBPFConfig->mPluginType = type;
+        // call update function
+        // step2: call init function
+        auto& pluginMgr = getPluginState(type).mManager;
+        switch (type) {
+            case PluginType::PROCESS_SECURITY: {
+                if (!pluginMgr) {
+                    pluginMgr = ProcessSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                }
+                break;
             }
-            break;
+
+            case PluginType::NETWORK_OBSERVE: {
+                if (!pluginMgr) {
+                    pluginMgr = NetworkObserverManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                }
+                break;
+            }
+
+            case PluginType::NETWORK_SECURITY: {
+                if (!pluginMgr) {
+                    pluginMgr = NetworkSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                }
+                break;
+            }
+
+            // case PluginType::FILE_SECURITY: {
+            //     if (!pluginMgr) {
+            //         pluginMgr
+            //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
+            //             metricManager);
+            //     }
+            //     break;
+            // }
+            default:
+                LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
+                return false;
         }
 
-        case PluginType::NETWORK_SECURITY: {
-            if (!pluginMgr) {
-                pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
-            }
-            break;
-        }
-
-        // case PluginType::FILE_SECURITY: {
-        //     if (!pluginMgr) {
-        //         pluginMgr
-        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
-        //             metricManager);
-        //     }
-        //     break;
-        // }
-        default:
-            LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
+        if (pluginMgr->Init() != 0) {
+            pluginMgr.reset();
+            LOG_WARNING(sLogger, ("Failed to init plugin, type", magic_enum::enum_name(type)));
             return false;
+        }
     }
 
-    if (pluginMgr->Init() != 0) {
-        pluginMgr.reset();
-        LOG_WARNING(sLogger, ("Failed to init plugin, type", magic_enum::enum_name(type)));
-        return false;
-    }
+    // update??
 
     if (pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) != 0) {
         pluginMgr.reset();
@@ -364,14 +343,47 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
-    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
+
+    // 
+
+    // std::string prevPipelineName = checkLoadedPipelineName(type);
+    // if (prevPipelineName == pipelineName) { // update
+    //     auto& pluginMgr = getPluginState(type).mManager;
+    //     if (pluginMgr) {
+    //         int res = pluginMgr->Update(options);
+    //         if (res) {
+    //             LOG_WARNING(sLogger, ("update plugin failed, type", magic_enum::enum_name(type))("res", res));
+    //             return false;
+    //         }
+    //         res = pluginMgr->Resume(options);
+    //         if (res) {
+    //             LOG_WARNING(sLogger, ("resume plugin failed, type", magic_enum::enum_name(type))("res", res));
+    //             return false;
+    //         }
+    //         pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
+    //         return true;
+    //     }
+    //     LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
+    //     return false;
+    // }
+
+    
+
+    // if (pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) != 0) {
+    //     pluginMgr.reset();
+    //     LOG_WARNING(sLogger, ("Failed to AddOrUpdateConfig, type", magic_enum::enum_name(type)));
+    //     return false;
+    // }
+
+    updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
+    // pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
     return true;
 }
 
 // TODO @qianlu.kk
 bool EBPFServer::HasRegisteredPlugins() const {
     for (const auto& p : mPlugins) {
-        if (!p.mPipelineName.empty()) {
+        if (!p.mPipelines.empty()) {
             return true;
         }
     }
@@ -408,19 +420,30 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     }
     auto& pluginState = getPluginState(type);
     std::unique_lock<std::shared_mutex> lock(pluginState.mMtx);
-    std::string prevPipeline = checkLoadedPipelineName(type);
-    if (prevPipeline != pipelineName) {
-        LOG_WARNING(
-            sLogger,
-            ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
-        return true;
-    }
+    // std::string prevPipeline = checkLoadedPipelineName(type);
+    // if (prevPipeline != pipelineName) {
+    //     LOG_WARNING(
+    //         sLogger,
+    //         ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
+    //     return true;
+    // }
 
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipelineName));
     auto& pluginManager = pluginState.mManager;
     if (pluginManager) {
-        pluginManager->UpdateContext(nullptr, -1, -1);
-        int ret = pluginManager->Destroy();
+        // pluginManager->UpdateContext(nullptr, -1, -1);
+        int ret = pluginManager->RemoveConfig(pipelineName);
+        if (ret) {
+            LOG_ERROR(sLogger, ("failed to remove config for", magic_enum::enum_name(type))("pipeline", pipelineName));
+            return false;
+        }
+
+        if (pluginManager->RegisteredConfigCount() > 0) {
+            return true;
+        }
+
+        // do real destroy ...
+        ret = pluginManager->Destroy();
         if (ret != 0) {
             LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         }
@@ -442,9 +465,9 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     return true;
 }
 
-std::string EBPFServer::checkLoadedPipelineName(PluginType type) {
-    return mPlugins[int(type)].mPipelineName;
-}
+// std::string EBPFServer::checkLoadedPipelineName(PluginType type) {
+//     return mPlugins[int(type)].mPipelineName;
+// }
 
 std::string EBPFServer::GetAllProjects() {
     std::string res;
@@ -455,8 +478,8 @@ std::string EBPFServer::GetAllProjects() {
             continue;
         }
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-        if (mPlugins[i].mProject != "") {
-            res += mPlugins[i].mProject;
+        for (const auto& entry : mPlugins[i].mPipelines) {
+            res += entry.first;
             res += " ";
         }
     }
@@ -475,7 +498,7 @@ bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
         return true;
     }
 
-    mgr->UpdateContext(nullptr, -1, -1);
+    // mgr->UpdateContext(nullptr, -1, -1);
 
     int ret = mgr->Suspend();
     if (ret) {
@@ -535,8 +558,7 @@ void EBPFServer::updatePluginState(PluginType type,
     if (type >= PluginType::MAX) {
         return;
     }
-    mPlugins[static_cast<int>(type)].mPipelineName = name;
-    mPlugins[static_cast<int>(type)].mProject = project;
+    mPlugins[static_cast<int>(type)].mPipelines.insert(name, project);
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
 }
@@ -550,33 +572,6 @@ void EBPFServer::handlerEvents() {
         // handle ....
         handleEvents(items, count);
         sendEvents();
-    }
-}
-
-// TODO
-void EBPFServer::iterateMaps() {
-    mIteratorFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
-    while (mRunning) {
-        auto now = std::chrono::steady_clock::now();
-        auto nextWindow = mIteratorFrequencyMgr.Next();
-        if (!mIteratorFrequencyMgr.Expired(now)) {
-            std::this_thread::sleep_until(nextWindow);
-            mIteratorFrequencyMgr.Reset(nextWindow);
-        } else {
-            mIteratorFrequencyMgr.Reset(now);
-        }
-
-        // Iterator ...
-        for (int i = 0; i < int(PluginType::MAX); ++i) {
-            auto pluginType = static_cast<PluginType>(i);
-            auto& pluginState = getPluginState(pluginType);
-            if (!pluginState.mValid.load(std::memory_order_acquire)) {
-                continue;
-            }
-
-            // TODO @qianlu.kk iterate bpf maps ...
-            // pluginState.mManager->
-        }
     }
 }
 

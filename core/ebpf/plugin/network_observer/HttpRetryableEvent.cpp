@@ -17,9 +17,9 @@
 namespace logtail::ebpf {
 
 bool HttpRetryableEvent::HandleMessage() {
-    if (!mRecord || !mRecord->GetConnection()) {
+    if (!mRecord || !mRecord->GetConnection() || !mRecord->GetAppDetail()) {
         // should not happen
-        LOG_WARNING(sLogger, ("no record or connection", ""));
+        LOG_WARNING(sLogger, ("no record or connection or no app detail", ""));
         return true;
     }
 
@@ -30,23 +30,12 @@ bool HttpRetryableEvent::HandleMessage() {
     }
 
     if (!mRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
+        ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachRollbackTotal, 1);
         return false;
-        // TODO record self monitor ...
-        // rollback
-        // handleRollback(record, isDrop);
-        // if (isDrop) {
-        //     ADD_COUNTER(mAppMetaAttachFailedTotal, 1);
-        // } else {
-        //     ADD_COUNTER(mAppMetaAttachRollbackTotal, 1);
-        // }
-        // return;
     }
 
-    
-
-    // ADD_COUNTER(mAppMetaAttachSuccessTotal, 1);
-    // flush to queue
-
+    // success
+    ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachSuccessTotal, 1);
     return true;
 }
 
@@ -54,9 +43,8 @@ bool HttpRetryableEvent::flushEvent() {
     if (!mCommonEventQueue.try_enqueue(mRecord)) {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why
-        // LOG_WARNING(sLogger,
-        //             ("event", "Failed to enqueue process execve event")("pid", mProcessEvent->mPid)(
-        //                 "ktime", mProcessEvent->mKtime));
+        LOG_WARNING(sLogger,
+                    ("event", "Failed to enqueue http record")("pid", mRecord->GetPath()));
         // TODO: Alarm discard event if it is called by OnDrop
         return false;
     }
@@ -64,11 +52,14 @@ bool HttpRetryableEvent::flushEvent() {
 }
 
 bool HttpRetryableEvent::OnRetry() {
-    // flush to queue
-    return true;
+    return HandleMessage();
 }
 
 void HttpRetryableEvent::OnDrop() {
+    if (mRecord && mRecord->GetAppDetail()) {
+        ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachFailedTotal, 1);
+    }
+    
 }
 
 }

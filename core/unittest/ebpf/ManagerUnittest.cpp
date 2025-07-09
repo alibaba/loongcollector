@@ -25,7 +25,6 @@
 // #include "ebpf/plugin/file_security/FileSecurityManager.h"
 #include "ebpf/plugin/network_security/NetworkSecurityManager.h"
 #include "ebpf/plugin/process_security/ProcessSecurityManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
 #include "ebpf/type/ProcessEvent.h"

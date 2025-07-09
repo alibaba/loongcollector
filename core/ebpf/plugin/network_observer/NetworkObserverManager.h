@@ -60,9 +60,8 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricManager) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue, metricManager);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
+        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue);
     }
 
     NetworkObserverManager() = delete;
@@ -70,8 +69,7 @@ public:
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
 
     int Init() override;
 
@@ -91,6 +89,8 @@ public:
     int SendEvents() override;
 
     int PollPerfBuffer() override;
+
+    int RegisteredConfigCount() override { return mConfigToWorkloads.size(); }
 
     void RecordEventLost(enum callback_type_e type, uint64_t lostCount);
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);
@@ -141,7 +141,7 @@ private:
     std::array<size_t, 1> generateAggKeyForSpan(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
     std::array<size_t, 1> generateAggKeyForLog(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
     std::array<size_t, 2> generateAggKeyForAppMetric(L7Record*, const std::shared_ptr<logtail::ebpf::AppDetail>&);
-    std::array<size_t, 2> generateAggKeyForNetMetric(ConnStatsRecordV2*,
+    std::array<size_t, 2> generateAggKeyForNetMetric(ConnStatsRecord*,
                                                      const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
     // void processRecord(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs,
@@ -170,17 +170,17 @@ private:
 
     // handler thread ...
     SIZETAggTreeWithSourceBuffer<AppMetricData, L7Record*> mAppAggregator;
-    SIZETAggTreeWithSourceBuffer<NetMetricData, ConnStatsRecordV2*> mNetAggregator;
+    SIZETAggTreeWithSourceBuffer<NetMetricData, ConnStatsRecord*> mNetAggregator;
     SIZETAggTree<AppSpanGroup, std::shared_ptr<CommonEvent>> mSpanAggregator;
     SIZETAggTree<AppLogGroup, std::shared_ptr<CommonEvent>> mLogAggregator;
 
     // cache relative metric
-    IntGaugePtr mConnectionNum;
-    CounterPtr mPollNetEventsTotal;
-    CounterPtr mLossNetEventsTotal;
-    CounterPtr mNetMetaAttachSuccessTotal;
-    CounterPtr mNetMetaAttachFailedTotal;
-    CounterPtr mNetMetaAttachRollbackTotal;
+    IntGaugePtr mConnectionNum; // runner ...
+    // CounterPtr mPollNetEventsTotal;
+    // CounterPtr mLossNetEventsTotal;
+    // CounterPtr mNetMetaAttachSuccessTotal;
+    // CounterPtr mNetMetaAttachFailedTotal;
+    // CounterPtr mNetMetaAttachRollbackTotal;
 
     void updateConfigVersionAndWhitelist(std::vector<std::string>&& newCids, std::vector<std::string>&& expiredCids) {
         if (!newCids.empty() || !expiredCids.empty()) {
@@ -232,6 +232,9 @@ private:
     int64_t mSendSpanIntervalMs = 2000;
     int64_t mSendLogIntervalMs = 2000;
     int64_t mSendMetricIntervalMs = 15000;
+
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;

@@ -52,8 +52,8 @@ private:
 };
 
 struct PluginState {
-    std::string mPipelineName;
-    std::string mProject;
+    // pipelineName ==> project
+    std::map<std::string, std::string> mPipelines;
     std::shared_ptr<AbstractManager> mManager;
     // Shared mutex to coordinate access between plugin management operations
     // (EnablePlugin/DisablePlugin/SuspendPlugin) and event handling operations
@@ -109,8 +109,7 @@ private:
 
     void pollPerfBuffers();
     void handlerEvents();
-    void iterateMaps();
-    std::string checkLoadedPipelineName(PluginType type);
+    // std::string checkLoadedPipelineName(PluginType type);
     void updatePluginState(PluginType type,
                            const std::string& name,
                            const std::string& project,

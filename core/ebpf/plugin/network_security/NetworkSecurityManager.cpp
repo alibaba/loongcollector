@@ -22,7 +22,6 @@
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -107,9 +106,8 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 
 NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(base, eBPFAdapter, queue, metricManager),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+    : AbstractManager(base, eBPFAdapter, queue),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -247,9 +245,9 @@ int NetworkSecurityManager::Init() {
     mInited = true;
 }
 
-int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext*,
-                                              uint32_t,
-                                              const PluginMetricManagerPtr&,
+int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
+                                              uint32_t index,
+                                              const PluginMetricManagerPtr& metricMgr,
                                               const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // TODO @qianlu.kk init metrics ...
 

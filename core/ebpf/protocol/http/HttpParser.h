@@ -70,9 +70,9 @@ enum class ParseState {
 
 namespace http {
 
-ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool forceSample = false);
+ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool forceSample = false);
 
-ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result);
+ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result);
 
 HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t numHeaders);
 
@@ -83,7 +83,7 @@ ParseState ParseContent(std::string_view& contentLenStr,
                         size_t& bodySize);
 
 ParseState
-ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool closed, bool forceSample = false);
+ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample = false);
 
 int ParseHttpRequest(std::string_view& buf, HTTPRequest& result);
 } // namespace http

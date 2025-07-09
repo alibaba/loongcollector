@@ -38,15 +38,13 @@ public:
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue);
     }
 
     ~ProcessSecurityManager() = default;
@@ -62,19 +60,12 @@ public:
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
-    // deprecated
-    // bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override
-    // {
-    //     return true;
-    // }
+    int RegisteredConfigCount() override;
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
-        // TODO @qianlu.kk init metrics ...
-        return 0;
-    }
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
 
     int RemoveConfig(const std::string&) override { return 0; }
 
@@ -95,6 +86,15 @@ private:
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
+
+    PluginMetricManagerPtr mMetricMgr;
+    // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
+    mutable std::mutex mContextMutex;
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    uint32_t mPluginIndex{0};
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
 };
 
 } // namespace logtail::ebpf

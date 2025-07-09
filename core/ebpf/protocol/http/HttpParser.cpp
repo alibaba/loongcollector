@@ -30,7 +30,7 @@ inline constexpr char kUpgrade[] = "Upgrade";
 std::vector<std::shared_ptr<L7Record>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
                                                                        const std::shared_ptr<Connection>& conn,
                                                                        const std::shared_ptr<AppDetail>& appDetail) {
-    auto record = std::make_shared<HttpRecordV2>(conn, appDetail);
+    auto record = std::make_shared<HttpRecord>(conn, appDetail);
     record->SetEndTsNs(dataEvent->end_ts);
     record->SetStartTsNs(dataEvent->start_ts);
     auto spanId = GenerateSpanID();
@@ -94,7 +94,7 @@ const std::string kRootPath = "/";
 const char kQuestionMark = '?';
 const std::string kHttP1Prefix = "http1.";
 
-ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool forceSample) {
+ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool forceSample) {
     HTTPRequest req;
     int retval = http::ParseHttpRequest(buf, req);
     if (retval >= 0) {
@@ -173,7 +173,7 @@ ParseState ParseChunked(std::string_view& data, size_t bodySizeLimitBytes, std::
     return PicoParseChunked(data, bodySizeLimitBytes, result, bodySize);
 }
 
-ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result) {
+ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result) {
     // Case 1: Content-Length
     const auto contentLengthIter = result->GetReqHeaderMap().find(kContentLength);
     if (contentLengthIter != result->GetReqHeaderMap().end()) {
@@ -262,7 +262,7 @@ bool StartsWithHttp(const std::string_view& buf) {
     return buf.size() >= kPrefix.size() && buf.substr(0, kPrefix.size()) == kPrefix;
 }
 
-ParseState ParseResponseBody(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool closed) {
+ParseState ParseResponseBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed) {
     HTTPResponse r;
     bool adjacentResp = StartsWithHttp(buf) && (ParseHttpResponse(buf, &r) > 0);
 
@@ -318,7 +318,7 @@ ParseState ParseResponseBody(std::string_view& buf, std::shared_ptr<HttpRecordV2
     return ParseState::kSuccess;
 }
 
-ParseState ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool closed, bool forceSample) {
+ParseState ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample) {
     HTTPResponse resp;
     int retval = ParseHttpResponse(buf, &resp);
 

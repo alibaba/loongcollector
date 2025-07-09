@@ -172,6 +172,10 @@ public:
     CounterPtr mPushMetricGroupTotal;
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+    // TODO
+    CounterPtr mAppMetaAttachRollbackTotal;
+    CounterPtr mAppMetaAttachFailedTotal;
+    CounterPtr mAppMetaAttachSuccessTotal;
 
     size_t mAppHash = 0UL;
     std::vector<MetricLabels> mRefAndLabels;

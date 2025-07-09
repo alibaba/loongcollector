@@ -34,9 +34,6 @@ extern "C" {
 
 namespace logtail::ebpf {
 
-// class AbstractRecord;
-// class ConnStatsRecord;
-
 struct ConnStatsData {
 public:
     void Clear() { ::memset(this, 0, sizeof(ConnStatsData)); }

@@ -24,7 +24,6 @@
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
@@ -37,8 +36,8 @@ public:
     AbstractManager() = delete;
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                              const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             const PluginMetricManagerPtr& metricManager);
+                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue
+                             /*const PluginMetricManagerPtr& metricManager*/);
     virtual ~AbstractManager();
 
     virtual int Init() = 0;
@@ -51,7 +50,7 @@ public:
 
     virtual int RemoveConfig(const std::string&) = 0;
 
-    virtual int RegisteredConfigCount() { return 0; }
+    virtual int RegisteredConfigCount() = 0;
 
     virtual int Destroy() = 0;
 
@@ -71,10 +70,6 @@ public:
     bool IsRunning() { return mInited && !mSuspendFlag; }
 
     bool IsExists() { return mInited; }
-
-    // virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-    //                           const std::shared_ptr<ScheduleConfig>& config)
-    //     = 0;
 
     virtual PluginType GetPluginType() = 0;
 
@@ -114,12 +109,12 @@ public:
         return 0;
     }
 
-    void UpdateContext(const CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
-        std::lock_guard lk(mContextMutex);
-        mPipelineCtx = ctx;
-        mQueueKey = key;
-        mPluginIndex = index;
-    }
+    // void UpdateContext(const CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
+    //     std::lock_guard lk(mContextMutex);
+    //     mPipelineCtx = ctx;
+    //     mQueueKey = key;
+    //     mPluginIndex = index;
+    // }
 
     std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
 
@@ -134,20 +129,20 @@ protected:
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
 
     // TODO need hold by plugin manager ...
-    PluginMetricManagerPtr mMetricMgr;
-    mutable std::mutex mContextMutex;
+    // PluginMetricManagerPtr mMetricMgr;
+    // mutable std::mutex mContextMutex;
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    const CollectionPipelineContext* mPipelineCtx{nullptr};
-    logtail::QueueKey mQueueKey = 0;
-    uint32_t mPluginIndex{0};
+    // const CollectionPipelineContext* mPipelineCtx{nullptr};
+    // logtail::QueueKey mQueueKey = 0;
+    // uint32_t mPluginIndex{0};
 
     // runner metric ...
-    CounterPtr mRecvKernelEventsTotal;
-    CounterPtr mLossKernelEventsTotal;
-    CounterPtr mPushLogsTotal;
-    CounterPtr mPushLogGroupTotal;
+    // CounterPtr mRecvKernelEventsTotal;
+    // CounterPtr mLossKernelEventsTotal;
+    // CounterPtr mPushLogsTotal;
+    // CounterPtr mPushLogGroupTotal;
 
-    std::vector<MetricLabels> mRefAndLabels;
+    // std::vector<MetricLabels> mRefAndLabels;
 };
 
 } // namespace logtail::ebpf

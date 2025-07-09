@@ -18,21 +18,4 @@
 
 namespace logtail::ebpf {
 
-bool AggregateEvent::Execute() {
-    auto manager = EBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
-    if (manager == nullptr || !manager->IsExists()) {
-        return false;
-    }
-
-    return manager->ScheduleNext(GetExecTime(), mScheduleConfig);
-}
-
-bool AggregateEvent::IsValid() const {
-    auto manager = EBPFServer::GetInstance()->GetPluginManager(mScheduleConfig->mType);
-    if (manager == nullptr) {
-        return false;
-    }
-    return manager->IsExists();
-}
-
 } // namespace logtail::ebpf

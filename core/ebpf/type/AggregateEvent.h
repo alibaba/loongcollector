@@ -22,23 +22,4 @@
 
 namespace logtail::ebpf {
 
-class ScheduleConfig {
-public:
-    PluginType mType;
-    std::chrono::seconds mInterval;
-    ScheduleConfig(PluginType type, const std::chrono::seconds& interval) : mType(type), mInterval(interval) {}
-};
-
-class AggregateEvent : public TimerEvent {
-public:
-    AggregateEvent(const std::chrono::steady_clock::time_point& execTime, const std::shared_ptr<ScheduleConfig>& config)
-        : TimerEvent(execTime), mScheduleConfig(config) {}
-
-    [[nodiscard]] bool IsValid() const override;
-    bool Execute() override;
-
-private:
-    std::shared_ptr<ScheduleConfig> mScheduleConfig;
-};
-
 } // namespace logtail::ebpf
