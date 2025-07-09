@@ -162,6 +162,9 @@ private:
     // self pod meta
     void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void updateSelfPodMetaForUnknown();
+    void updateSelfPodMetaForEnv();
+    static StringView kGetSelfPodName();
+    static StringView kGetSelfPodIp();
 
     using Flag = unsigned int;
 
