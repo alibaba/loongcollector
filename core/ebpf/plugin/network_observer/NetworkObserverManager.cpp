@@ -1042,8 +1042,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
                 spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(httpRecord->GetRespBodySize()));
                 spanEvent->SetTag(kHTTPVersion.SpanKey(), httpRecord->GetProtocolVersion());
-                spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaders());
-                spanEvent->SetTag(kHTTPRespHeader.SpanKey(), httpRecord->GetRespHeaders());
+                // spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaders());
+                // spanEvent->SetTag(kHTTPRespHeader.SpanKey(), httpRecord->GetRespHeaders());
 
                 struct timespec startTime = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
                 struct timespec endTime = ConvertKernelTimeToUnixTime(record->GetEndTimeStamp());
@@ -1492,7 +1492,7 @@ int NetworkObserverManager::PollPerfBuffer() {
     // 3. connection cache gc
     // Iterations() mainly do gc and do not generate conn stats records ...
     // map in map, outter key is epoc, inner key is id?
-    mConnectionManager->Iterations(); // do connection gc ...
+    mConnectionManager->GC(); // do connection gc ...
     SET_GAUGE(mConnectionNum, mConnectionManager->ConnectionTotal());
 
     LOG_DEBUG(
@@ -1540,33 +1540,26 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
 
     LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
 
+    // AcceptDataEvent is called in poller thread, PollPerfBuffer will copy app config before do callback ...
     const auto& appDetail = getAppConfigFromReplica(conn);
     if (appDetail == nullptr) {
-        // discard
+        LOG_DEBUG(sLogger, ("failed to find app detail for conn", conn->DumpConnection()));
         return;
     }
 
-    // TODO @qianlu.kk 这里需要把解析后的结果，放到 commonEvent 中
-    std::vector<std::shared_ptr<AbstractRecord>> records
-        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail->mSampler);
+    std::vector<std::shared_ptr<L7Record>> records
+        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail);
 
     if (records.empty()) {
         return;
     }
 
-    // TODO @qianlu.kk
-    std::shared_ptr<L7Record> ee;
-    std::shared_ptr<RetryableEvent> re = std::make_shared<HttpRetryableEvent>(ee);
-
     // add records to span/event generate queue
     for (auto& record : records) {
-        // TODO @qianlu.kk
-        auto status = re->HandleMessage();
-        if (status) {
-            mRetryableEventCache.AddEvent(re);
+        std::shared_ptr<RetryableEvent> retryableEvent = std::make_shared<HttpRetryableEvent>(record);
+        if (!retryableEvent->HandleMessage()) {
+            mRetryableEventCache.AddEvent(retryableEvent);
         }
-        // processRecord(mContainerConfigsReplica, record);
-        // mRollbackQueue.enqueue(std::move(record));
     }
 }
 

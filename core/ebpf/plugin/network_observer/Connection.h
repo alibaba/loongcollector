@@ -34,8 +34,8 @@ extern "C" {
 
 namespace logtail::ebpf {
 
-class AbstractRecord;
-class ConnStatsRecord;
+// class AbstractRecord;
+// class ConnStatsRecord;
 
 struct ConnStatsData {
 public:
@@ -147,7 +147,7 @@ public:
     void TryAttachSelfMeta();
     void TryAttachPeerMeta(int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
-    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
+    // bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
 
     [[nodiscard]] support_role_e GetRole() const { return mRole; }
 

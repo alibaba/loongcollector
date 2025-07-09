@@ -64,7 +64,6 @@ bool HttpRetryableEvent::flushEvent() {
 }
 
 bool HttpRetryableEvent::OnRetry() {
-
     // flush to queue
     return true;
 }

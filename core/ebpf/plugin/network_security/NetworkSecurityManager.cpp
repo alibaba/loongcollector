@@ -190,7 +190,12 @@ int NetworkSecurityManager::SendEvents() {
                 logEvent->SetContentNoCopy(kDport.LogKey(), StringView(dportSb.data, dportSb.size));
                 logEvent->SetContentNoCopy(kNetNs.LogKey(), StringView(netnsSb.data, netnsSb.size));
 
-                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
+                auto* ne = static_cast<NetworkEvent*>(innerEvent.get());
+                if (ne == nullptr) {
+                    LOG_WARNING(sLogger, ("failed to convert innerEvent to NetworkEvent", magic_enum::enum_name(innerEvent->GetKernelEventType())));
+                    continue;
+                }
+                struct timespec ts = ConvertKernelTimeToUnixTime(ne->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
 
                 // set callnames
@@ -306,7 +311,7 @@ std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<Common
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     auto* networkEvent = static_cast<NetworkEvent*>(event.get());
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("saddr", networkEvent->mSaddr)(
+              ("receive event, pid", networkEvent->mPid)("ktime", networkEvent->mKtime)("saddr", networkEvent->mSaddr)(
                   "daddr", networkEvent->mDaddr)("sport", networkEvent->mSport)("dport", networkEvent->mDport)(
                   "eventType", magic_enum::enum_name(event->mEventType)));
     if (networkEvent == nullptr) {

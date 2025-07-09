@@ -70,9 +70,9 @@ enum class ParseState {
 
 namespace http {
 
-ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool forceSample = false);
+ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool forceSample = false);
 
-ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecord>& result);
+ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result);
 
 HeadersMap GetHTTPHeadersMap(const phr_header* headers, size_t numHeaders);
 
@@ -83,7 +83,7 @@ ParseState ParseContent(std::string_view& contentLenStr,
                         size_t& bodySize);
 
 ParseState
-ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecord>& result, bool closed, bool forceSample = false);
+ParseResponse(std::string_view& buf, std::shared_ptr<HttpRecordV2>& result, bool closed, bool forceSample = false);
 
 int ParseHttpRequest(std::string_view& buf, HTTPRequest& result);
 } // namespace http
@@ -93,9 +93,9 @@ class HTTPProtocolParser : public AbstractProtocolParser {
 public:
     std::shared_ptr<AbstractProtocolParser> Create() override { return std::make_shared<HTTPProtocolParser>(); }
 
-    std::vector<std::shared_ptr<AbstractRecord>> Parse(struct conn_data_event_t* dataEvent,
+    std::vector<std::shared_ptr<L7Record>> Parse(struct conn_data_event_t* dataEvent,
                                                        const std::shared_ptr<Connection>& conn,
-                                                       const std::shared_ptr<Sampler>& sampler = nullptr) override;
+                                                       const std::shared_ptr<AppDetail>& appDetail) override;
 };
 
 REGISTER_PROTOCOL_PARSER(support_proto_e::ProtoHTTP, HTTPProtocolParser)

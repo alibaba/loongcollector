@@ -553,22 +553,29 @@ void EBPFServer::handlerEvents() {
     }
 }
 
+// TODO
 void EBPFServer::iterateMaps() {
+    mIteratorFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
-        for (int i = 0; i < int(PluginType::MAX); i++) {
-            auto type = PluginType(i);
-            auto& pluginState = getPluginState(type);
+        auto now = std::chrono::steady_clock::now();
+        auto nextWindow = mIteratorFrequencyMgr.Next();
+        if (!mIteratorFrequencyMgr.Expired(now)) {
+            std::this_thread::sleep_until(nextWindow);
+            mIteratorFrequencyMgr.Reset(nextWindow);
+        } else {
+            mIteratorFrequencyMgr.Reset(now);
+        }
+
+        // Iterator ...
+        for (int i = 0; i < int(PluginType::MAX); ++i) {
+            auto pluginType = static_cast<PluginType>(i);
+            auto& pluginState = getPluginState(pluginType);
             if (!pluginState.mValid.load(std::memory_order_acquire)) {
                 continue;
             }
-            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-            auto& plugin = pluginState.mManager;
-            if (plugin) {
-                // TODO iterate map
-                // int cnt = plugin->PollPerfBuffer();
-                LOG_DEBUG(sLogger,
-                          ("poll buffer for ", magic_enum::enum_name(type))("running status", plugin->IsRunning()));
-            }
+
+            // TODO @qianlu.kk iterate bpf maps ...
+            // pluginState.mManager->
         }
     }
 }

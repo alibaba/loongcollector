@@ -55,14 +55,6 @@ GenerateWorkloadKey(const std::string& ns, const std::string& workloadKind, cons
     return res;
 }
 
-class NetworkObserverScheduleConfig : public ScheduleConfig {
-public:
-    NetworkObserverScheduleConfig(const std::chrono::seconds& interval, JobType jobType)
-        : ScheduleConfig(PluginType::NETWORK_OBSERVE, interval), mJobType(jobType) {}
-
-    JobType mJobType;
-};
-
 class NetworkObserverManager : public AbstractManager {
 public:
     static std::shared_ptr<NetworkObserverManager>
@@ -176,20 +168,11 @@ private:
 
     int mCidOffset = -1;
 
-    // ReadWriteLock mAppAggLock;
+    // handler thread ...
     SIZETAggTreeWithSourceBuffer<AppMetricData, L7Record*> mAppAggregator;
-
-
-    // ReadWriteLock mNetAggLock;
     SIZETAggTreeWithSourceBuffer<NetMetricData, ConnStatsRecordV2*> mNetAggregator;
-
-
-    // ReadWriteLock mSpanAggLock;
     SIZETAggTree<AppSpanGroup, std::shared_ptr<CommonEvent>> mSpanAggregator;
-
-    // ReadWriteLock mLogAggLock;
     SIZETAggTree<AppLogGroup, std::shared_ptr<CommonEvent>> mLogAggregator;
-
 
     // cache relative metric
     IntGaugePtr mConnectionNum;

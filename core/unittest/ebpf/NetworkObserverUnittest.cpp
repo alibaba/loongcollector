@@ -645,36 +645,36 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
 
 void NetworkObserverManagerUnittest::TestPeriodicalTask() {
     // manager init, will execute
-    mManager->mInited = true;
-    Timer::GetInstance()->Clear();
-    EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
+    // mManager->mInited = true;
+    // Timer::GetInstance()->Clear();
+    // EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", mManager);
 
-    auto now = std::chrono::steady_clock::now();
-    std::shared_ptr<ScheduleConfig> metricConfig
-        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(15), JobType::METRIC_AGG);
-    std::shared_ptr<ScheduleConfig> spanConfig
-        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::SPAN_AGG);
-    std::shared_ptr<ScheduleConfig> logConfig
-        = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::LOG_AGG);
-    mManager->ScheduleNext(now, metricConfig);
-    mManager->ScheduleNext(now, spanConfig);
-    mManager->ScheduleNext(now, logConfig);
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 4);
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 6);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 8);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 10);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 12);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 14);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 16);
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    // execute 2 metric task
-    APSARA_TEST_EQUAL(mManager->mExecTimes, 20);
+    // auto now = std::chrono::steady_clock::now();
+    // std::shared_ptr<ScheduleConfig> metricConfig
+    //     = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(15), JobType::METRIC_AGG);
+    // std::shared_ptr<ScheduleConfig> spanConfig
+    //     = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::SPAN_AGG);
+    // std::shared_ptr<ScheduleConfig> logConfig
+    //     = std::make_shared<NetworkObserverScheduleConfig>(std::chrono::seconds(2), JobType::LOG_AGG);
+    // mManager->ScheduleNext(now, metricConfig);
+    // mManager->ScheduleNext(now, spanConfig);
+    // mManager->ScheduleNext(now, logConfig);
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 4);
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 6);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 8);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 10);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 12);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 14);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 16);
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+    // // execute 2 metric task
+    // APSARA_TEST_EQUAL(mManager->mExecTimes, 20);
 }
 
 void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {

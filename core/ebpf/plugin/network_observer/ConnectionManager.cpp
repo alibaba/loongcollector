@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ConnectionManager.h"
+#include "ebpf/plugin/network_observer/ConnectionManager.h"
 
 #include "logger/Logger.h"
 
@@ -133,19 +133,20 @@ void ConnectionManager::Iterations() {
             continue;
         }
 
-        if (mEnableConnStats && connection->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
-            std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(connection);
-            LOG_DEBUG(sLogger,
-                      ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
-                                                                                             forceGenRecord));
-            bool res = connection->GenerateConnStatsRecord(record);
-            if (res && mConnStatsHandler) {
-                mConnStatsHandler(record);
-            }
-            if (needGenRecord) {
-                mLastReportTs = nowTs; // update report ts
-            }
-        }
+        // TODO @qianlu.kk generate in iterator thread ...
+        // if (mEnableConnStats && connection->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
+        //     std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(connection);
+        //     LOG_DEBUG(sLogger,
+        //               ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
+        //                                                                                      forceGenRecord));
+        //     bool res = connection->GenerateConnStatsRecord(record);
+        //     if (res && mConnStatsHandler) {
+        //         mConnStatsHandler(record);
+        //     }
+        //     if (needGenRecord) {
+        //         mLastReportTs = nowTs; // update report ts
+        //     }
+        // }
 
         // when we query for conn tracker, we record active
         connection->CountDown();

@@ -125,7 +125,6 @@ public:
             return false;
         }
 
-        // 比较布尔类型成员
         if (mEnableL7 != other.mEnableL7) {
             return false;
         }
@@ -142,7 +141,6 @@ public:
             return false;
         }
 
-        // 比较浮点类型成员（使用容差）
         if (std::abs(mSampleRate - other.mSampleRate) > 1e-9) {
             return false;
         }

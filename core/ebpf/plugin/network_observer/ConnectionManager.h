@@ -24,7 +24,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include "Connection.h"
+#include "ebpf/plugin/network_observer/Connection.h"
 #include "common/Lock.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 extern "C" {
@@ -40,7 +40,7 @@ public:
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
-    using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
+    // using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
 
     ~ConnectionManager() {}
 
@@ -50,9 +50,8 @@ public:
 
     void Iterations();
 
-    void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
-
-    void RegisterConnStatsFunc(ConnStatsHandler fn) { mConnStatsHandler = fn; }
+    // TODO(@qianlu.kk) Implement this func to recycle expired connections ...
+    void GC();
 
     int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
@@ -67,7 +66,7 @@ private:
     std::atomic_int mMaxConnections;
 
     std::atomic_bool mEnableConnStats = false;
-    ConnStatsHandler mConnStatsHandler = nullptr;
+    // ConnStatsHandler mConnStatsHandler = nullptr;
 
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects

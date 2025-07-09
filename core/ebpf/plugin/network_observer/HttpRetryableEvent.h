@@ -24,8 +24,6 @@
 
 namespace logtail::ebpf {
 
-
-
 class HttpRetryableEvent : public RetryableEvent {
 public:
     HttpRetryableEvent(int retryLimit, const std::shared_ptr<HttpRecordV2>& record, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)

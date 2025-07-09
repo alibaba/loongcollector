@@ -23,7 +23,8 @@ public:
                  uint16_t sport,
                  uint16_t dport,
                  uint32_t netNs)
-        : CommonEvent(pid, ktime, type, timestamp),
+        : CommonEvent(type),
+          mPid(pid), mKtime(ktime), mTimestamp(timestamp),
           mProtocol(protocol),
           mFamily(family),
           mSport(sport),
@@ -32,6 +33,10 @@ public:
           mDaddr(daddr),
           mNetns(netNs) {}
     [[nodiscard]] PluginType GetPluginType() const override { return PluginType::NETWORK_SECURITY; };
+
+    uint32_t mPid;
+    uint64_t mKtime;
+    uint64_t mTimestamp; // for kernel ts nano
     uint16_t mProtocol;
     uint16_t mFamily;
     uint16_t mSport; // Source port

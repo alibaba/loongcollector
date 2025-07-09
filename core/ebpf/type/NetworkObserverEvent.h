@@ -40,10 +40,17 @@ enum class RecordType {
 class L7Record : public CommonEvent {
 public:
     virtual ~L7Record() {}
+    explicit L7Record(std::shared_ptr<Connection>& conn, std::shared_ptr<AppDetail>& appDetail) : CommonEvent(KernelEventType::L7_RECORD), mConnection(conn), mAppDetail(appDetail) {}
+    PluginType GetPluginType() const override  { return PluginType::NETWORK_OBSERVE; }
+
     void MarkSample() { mSample = true; }
     bool ShouldSample() { return mSample; }
+    void SetStartTsNs(uint64_t ts) { mStartTs = ts; }
+    void SetEndTsNs(uint64_t ts) { mEndTs = ts; }
+    void SetConnection(const std::shared_ptr<Connection>& conn) { mConnection = conn; }
     [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
     [[nodiscard]] std::shared_ptr<AppDetail> GetAppDetail() const { return mAppDetail; }
+    void SetAppDetail(const std::shared_ptr<AppDetail>& detail) { mAppDetail = detail; }
     uint64_t GetStartTimeStamp() { return mStartTs; }
     uint64_t GetEndTimeStamp() { return mEndTs; }
     [[nodiscard]] double GetLatencyNs() const { return mEndTs - mStartTs; }
@@ -57,10 +64,12 @@ public:
 
     const std::array<uint64_t, 4>& GetTraceId() { return mTraceId; }
     const std::array<uint64_t, 2>& GetSpanId() { return mSpanId; }
+    void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = traceId; }
+    void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = spanId; }
 
 private:
-    std::shared_ptr<AppDetail> mAppDetail;
     std::shared_ptr<Connection> mConnection;
+    std::shared_ptr<AppDetail> mAppDetail;
     uint64_t mStartTs;
     uint64_t mEndTs;
     bool mSample = false;
@@ -70,8 +79,10 @@ private:
 
 class HttpRecordV2 : public L7Record {
 public:
+    HttpRecordV2(std::shared_ptr<Connection>& conn, std::shared_ptr<AppDetail>& appDetail) : L7Record(conn, appDetail) {}
     [[nodiscard]] virtual bool IsError() const override { return mCode >= 400; }
     [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
+    void SetStatusCode(int code) { mCode = code; }
     [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
     [[nodiscard]] virtual const std::string& GetSpanName() { return mPath; }
 
@@ -81,13 +92,25 @@ public:
     size_t GetReqBodySize() const { return mReqBodySize; }
     size_t GetRespBodySize() const { return mRespBodySize; }
     const std::string& GetMethod() const { return mHttpMethod; }
-    const std::string& GetReqHeaders() const { return mReqHeaders; }
-    const std::string& GetRespHeaders() const { return mRespHeades; }
+
+    const HeadersMap& GetReqHeaderMap() const { return mReqHeaderMap; }
+    const HeadersMap& GetRespHeaderMap() const { return mRespHeaderMap; }
+    void SetReqHeaderMap(HeadersMap&& headerMap) { mReqHeaderMap = std::move(headerMap); }
+    void SetRespHeaderMap(HeadersMap&& headerMap) { mRespHeaderMap = std::move(headerMap); }
+
+    void SetProtocolVersion(const std::string& version) { mProtocolVersion = version; }
     const std::string& GetProtocolVersion() const { return mProtocolVersion; }
     const std::string& GetPath() const { return mPath; }
     const std::string& GetRealPath() const { return mRealPath; }
+    void SetPath(const std::string& path) { mPath = path; }
+    void SetRealPath(const std::string& path) { mRealPath = path; }
 
-private:
+    void SetReqBody(const std::string& body) { mReqBody = body; }
+    void SetRespBody(const std::string& body) { mRespBody = body; }
+    void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
+    void SetMethod(const std::string& method) { mHttpMethod = method; }
+
+// private:
     int mCode = 0;
     size_t mReqBodySize = 0;
     size_t mRespBodySize = 0;
@@ -98,8 +121,8 @@ private:
     std::string mHttpMethod;
     std::string mProtocolVersion;
     std::string mRespMsg;
-    std::string mReqHeaders;
-    std::string mRespHeades;
+    HeadersMap mReqHeaderMap;
+    HeadersMap mRespHeaderMap;
 };
 
 class ConnStatsRecordV2 : public CommonEvent {
@@ -119,153 +142,153 @@ public:
 };
 
 /// record ///
-class AbstractRecord {
-public:
-    virtual ~AbstractRecord() {}
-    virtual RecordType GetRecordType() = 0;
-    virtual const std::string& GetSpanName() = 0;
+// class AbstractRecord {
+// public:
+//     virtual ~AbstractRecord() {}
+//     virtual RecordType GetRecordType() = 0;
+//     virtual const std::string& GetSpanName() = 0;
 
-    uint64_t GetStartTimeStamp() { return mStartTs; }
-    uint64_t GetEndTimeStamp() { return mEndTs; }
-    [[nodiscard]] double GetLatencyNs() const { return mEndTs - mStartTs; }
-    [[nodiscard]] double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
-    [[nodiscard]] double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
-    void SetStartTsNs(uint64_t startTsNs) { mStartTs = startTsNs; }
-    void SetEndTsNs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
-    [[nodiscard]] int RollbackCount() const { return mRollbackCount; }
-    [[nodiscard]] int Rollback() { return mRollbackCount++; }
-    bool ShouldSample() const { return mIsSample; }
-    void MarkSample() { mIsSample = true; }
+//     uint64_t GetStartTimeStamp() { return mStartTs; }
+//     uint64_t GetEndTimeStamp() { return mEndTs; }
+//     [[nodiscard]] double GetLatencyNs() const { return mEndTs - mStartTs; }
+//     [[nodiscard]] double GetLatencyMs() const { return (mEndTs - mStartTs) / 1e6; }
+//     [[nodiscard]] double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
+//     void SetStartTsNs(uint64_t startTsNs) { mStartTs = startTsNs; }
+//     void SetEndTsNs(uint64_t mEndTsns) { mEndTs = mEndTsns; }
+//     [[nodiscard]] int RollbackCount() const { return mRollbackCount; }
+//     [[nodiscard]] int Rollback() { return mRollbackCount++; }
+//     bool ShouldSample() const { return mIsSample; }
+//     void MarkSample() { mIsSample = true; }
 
-    [[nodiscard]] virtual bool IsError() const = 0;
-    [[nodiscard]] virtual bool IsSlow() const = 0;
-    [[nodiscard]] virtual int GetStatusCode() const = 0;
+//     [[nodiscard]] virtual bool IsError() const = 0;
+//     [[nodiscard]] virtual bool IsSlow() const = 0;
+//     [[nodiscard]] virtual int GetStatusCode() const = 0;
 
-protected:
-    uint64_t mStartTs;
-    uint64_t mEndTs;
-    bool mIsSample = false;
-    int mRollbackCount = 0;
-};
+// protected:
+//     uint64_t mStartTs;
+//     uint64_t mEndTs;
+//     bool mIsSample = false;
+//     int mRollbackCount = 0;
+// };
 
-inline const std::string kSpanNameEmpty;
-inline const std::string kConnStatsSpan = "CONN_STATS";
+// inline const std::string kSpanNameEmpty;
+// inline const std::string kConnStatsSpan = "CONN_STATS";
 
-class AbstractNetRecord : public AbstractRecord {
-public:
-    ~AbstractNetRecord() override {}
-    const std::string& GetSpanName() override { return kSpanNameEmpty; }
-    RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
-    [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
-    explicit AbstractNetRecord(std::shared_ptr<Connection>& connection) : mConnection(connection) {}
+// class AbstractNetRecord : public AbstractRecord {
+// public:
+//     ~AbstractNetRecord() override {}
+//     const std::string& GetSpanName() override { return kSpanNameEmpty; }
+//     RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
+//     [[nodiscard]] std::shared_ptr<Connection> GetConnection() const { return mConnection; }
+//     explicit AbstractNetRecord(std::shared_ptr<Connection>& connection) : mConnection(connection) {}
 
-protected:
-    std::shared_ptr<Connection> mConnection;
-};
+// protected:
+//     std::shared_ptr<Connection> mConnection;
+// };
 
-class ConnStatsRecord : public AbstractNetRecord {
-public:
-    ~ConnStatsRecord() override {}
-    explicit ConnStatsRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
-    RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
-    [[nodiscard]] bool IsError() const override { return false; }
-    [[nodiscard]] bool IsSlow() const override { return false; }
-    [[nodiscard]] int GetStatusCode() const override { return 0; }
+// class ConnStatsRecord : public AbstractNetRecord {
+// public:
+//     ~ConnStatsRecord() override {}
+//     explicit ConnStatsRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
+//     RecordType GetRecordType() override { return RecordType::CONN_STATS_RECORD; }
+//     [[nodiscard]] bool IsError() const override { return false; }
+//     [[nodiscard]] bool IsSlow() const override { return false; }
+//     [[nodiscard]] int GetStatusCode() const override { return 0; }
 
-    const std::string& GetSpanName() override { return kConnStatsSpan; }
-    int mState = 0;
-    uint64_t mDropCount = 0;
-    uint64_t mRttVar = 0;
-    uint64_t mRtt = 0;
-    uint64_t mRetransCount = 0;
-    uint64_t mRecvPackets = 0;
-    uint64_t mSendPackets = 0;
-    uint64_t mRecvBytes = 0;
-    uint64_t mSendBytes = 0;
-};
+//     const std::string& GetSpanName() override { return kConnStatsSpan; }
+//     int mState = 0;
+//     uint64_t mDropCount = 0;
+//     uint64_t mRttVar = 0;
+//     uint64_t mRtt = 0;
+//     uint64_t mRetransCount = 0;
+//     uint64_t mRecvPackets = 0;
+//     uint64_t mSendPackets = 0;
+//     uint64_t mRecvBytes = 0;
+//     uint64_t mSendBytes = 0;
+// };
 
-// AbstractAppRecord is intentionally designed to distinguish L5 and L7 Record of AbstractNetRecord. AbstractAppRecord
-// is L7, while ConnStatsRecord is L5.
-class AbstractAppRecord : public AbstractNetRecord {
-public:
-    explicit AbstractAppRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
-    ~AbstractAppRecord() override {}
+// // AbstractAppRecord is intentionally designed to distinguish L5 and L7 Record of AbstractNetRecord. AbstractAppRecord
+// // is L7, while ConnStatsRecord is L5.
+// class AbstractAppRecord : public AbstractNetRecord {
+// public:
+//     explicit AbstractAppRecord(std::shared_ptr<Connection>& connection) : AbstractNetRecord(connection) {}
+//     ~AbstractAppRecord() override {}
 
-    void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = traceId; }
-    void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = spanId; }
+//     void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = traceId; }
+//     void SetSpanId(std::array<uint64_t, 2>&& spanId) { mSpanId = spanId; }
 
-    RecordType GetRecordType() override { return RecordType::APP_RECORD; }
+//     RecordType GetRecordType() override { return RecordType::APP_RECORD; }
 
-    virtual const std::string& GetReqBody() const = 0;
-    virtual const std::string& GetRespBody() const = 0;
-    virtual size_t GetReqBodySize() const = 0;
-    virtual size_t GetRespBodySize() const = 0;
-    virtual const std::string& GetMethod() const = 0;
-    virtual const HeadersMap& GetReqHeaderMap() const = 0;
-    virtual const HeadersMap& GetRespHeaderMap() const = 0;
-    virtual const std::string& GetProtocolVersion() const = 0;
-    virtual const std::string& GetPath() const = 0;
+//     virtual const std::string& GetReqBody() const = 0;
+//     virtual const std::string& GetRespBody() const = 0;
+//     virtual size_t GetReqBodySize() const = 0;
+//     virtual size_t GetRespBodySize() const = 0;
+//     virtual const std::string& GetMethod() const = 0;
+//     virtual const HeadersMap& GetReqHeaderMap() const = 0;
+//     virtual const HeadersMap& GetRespHeaderMap() const = 0;
+//     virtual const std::string& GetProtocolVersion() const = 0;
+//     virtual const std::string& GetPath() const = 0;
 
-    mutable std::array<uint64_t, 4> mTraceId{};
-    mutable std::array<uint64_t, 2> mSpanId{};
-};
+//     mutable std::array<uint64_t, 4> mTraceId{};
+//     mutable std::array<uint64_t, 2> mSpanId{};
+// };
 
-class HttpRecord : public AbstractAppRecord {
-public:
-    ~HttpRecord() override {}
-    explicit HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) {}
+// class HttpRecord : public AbstractAppRecord {
+// public:
+//     ~HttpRecord() override {}
+//     explicit HttpRecord(std::shared_ptr<Connection> connection) : AbstractAppRecord(connection) {}
 
-    void SetPath(const std::string& path) { mPath = path; }
+//     void SetPath(const std::string& path) { mPath = path; }
 
-    void SetRealPath(const std::string& path) { mRealPath = path; }
+//     void SetRealPath(const std::string& path) { mRealPath = path; }
 
-    void SetReqBody(const std::string& body) { mReqBody = body; }
+//     void SetReqBody(const std::string& body) { mReqBody = body; }
 
-    void SetRespBody(const std::string& body) { mRespBody = body; }
+//     void SetRespBody(const std::string& body) { mRespBody = body; }
 
-    void SetMethod(const std::string& method) { mHttpMethod = method; }
+//     void SetMethod(const std::string& method) { mHttpMethod = method; }
 
-    void SetProtocolVersion(const std::string& version) { mProtocolVersion = version; }
+//     void SetProtocolVersion(const std::string& version) { mProtocolVersion = version; }
 
-    void SetStatusCode(int code) { mCode = code; }
+//     void SetStatusCode(int code) { mCode = code; }
 
-    void SetReqHeaderMap(HeadersMap&& headerMap) { mReqHeaderMap = std::move(headerMap); }
+//     void SetReqHeaderMap(HeadersMap&& headerMap) { mReqHeaderMap = std::move(headerMap); }
 
-    void SetRespHeaderMap(HeadersMap&& headerMap) { mRespHeaderMap = std::move(headerMap); }
+//     void SetRespHeaderMap(HeadersMap&& headerMap) { mRespHeaderMap = std::move(headerMap); }
 
-    void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
+//     void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
 
-    bool IsError() const override { return mCode >= 400; }
+//     bool IsError() const override { return mCode >= 400; }
 
-    bool IsSlow() const override { return GetLatencyMs() > 500; }
-    int GetStatusCode() const override { return mCode; }
-    const std::string& GetReqBody() const override { return mReqBody; }
-    const std::string& GetRespBody() const override { return mRespBody; }
-    std::string GetRespMsg() const { return mRespMsg; }
-    size_t GetReqBodySize() const override { return mReqBodySize; }
-    size_t GetRespBodySize() const override { return mRespBodySize; }
-    const std::string& GetMethod() const override { return mHttpMethod; }
-    const HeadersMap& GetReqHeaderMap() const override { return mReqHeaderMap; }
-    const HeadersMap& GetRespHeaderMap() const override { return mRespHeaderMap; }
-    const std::string& GetProtocolVersion() const override { return mProtocolVersion; }
-    const std::string& GetPath() const override { return mPath; }
-    const std::string& GetRealPath() const { return mRealPath; }
-    const std::string& GetSpanName() override { return mPath; }
+//     bool IsSlow() const override { return GetLatencyMs() > 500; }
+//     int GetStatusCode() const override { return mCode; }
+//     const std::string& GetReqBody() const override { return mReqBody; }
+//     const std::string& GetRespBody() const override { return mRespBody; }
+//     std::string GetRespMsg() const { return mRespMsg; }
+//     size_t GetReqBodySize() const override { return mReqBodySize; }
+//     size_t GetRespBodySize() const override { return mRespBodySize; }
+//     const std::string& GetMethod() const override { return mHttpMethod; }
+//     const HeadersMap& GetReqHeaderMap() const override { return mReqHeaderMap; }
+//     const HeadersMap& GetRespHeaderMap() const override { return mRespHeaderMap; }
+//     const std::string& GetProtocolVersion() const override { return mProtocolVersion; }
+//     const std::string& GetPath() const override { return mPath; }
+//     const std::string& GetRealPath() const { return mRealPath; }
+//     const std::string& GetSpanName() override { return mPath; }
 
-    int mCode = 0;
-    size_t mReqBodySize = 0;
-    size_t mRespBodySize = 0;
-    std::string mPath;
-    std::string mRealPath;
-    std::string mConvPath;
-    std::string mReqBody;
-    std::string mRespBody;
-    std::string mHttpMethod;
-    std::string mProtocolVersion;
-    std::string mRespMsg;
-    HeadersMap mReqHeaderMap;
-    HeadersMap mRespHeaderMap;
-};
+//     int mCode = 0;
+//     size_t mReqBodySize = 0;
+//     size_t mRespBodySize = 0;
+//     std::string mPath;
+//     std::string mRealPath;
+//     std::string mConvPath;
+//     std::string mReqBody;
+//     std::string mRespBody;
+//     std::string mHttpMethod;
+//     std::string mProtocolVersion;
+//     std::string mRespMsg;
+//     HeadersMap mReqHeaderMap;
+//     HeadersMap mRespHeaderMap;
+// };
 
 class MetricData {
 public:

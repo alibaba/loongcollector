@@ -147,6 +147,7 @@ private:
     std::future<void> mIterator; // used to iterate bpf maps
 
     FrequencyManager mFrequencyMgr;
+    FrequencyManager mIteratorFrequencyMgr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

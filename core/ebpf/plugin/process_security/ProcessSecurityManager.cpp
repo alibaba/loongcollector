@@ -47,7 +47,11 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
               base->mInnerEvents.emplace_back(other);
           },
           [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) {
-              return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
+              auto* processEvent = static_cast<ProcessEvent*>(in.get());
+              if (processEvent) {
+                return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);
+              }
+              
           }) {
 }
 
@@ -78,7 +82,7 @@ int ProcessSecurityManager::Destroy() {
     return 0;
 }
 
-std::array<size_t, 1> GenerateAggKeyForProcessEvent(const std::shared_ptr<CommonEvent>& event) {
+std::array<size_t, 1> GenerateAggKeyForProcessEvent(ProcessEvent* event) {
     // calculate agg key
     std::array<size_t, 1> hashResult{};
     std::hash<uint64_t> hasher;
@@ -96,7 +100,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
     auto* processEvent = static_cast<ProcessEvent*>(event.get());
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
+              ("receive event, pid", processEvent->mPid)("ktime", processEvent->mKtime)("eventType",
                                                                           magic_enum::enum_name(event->mEventType)));
     if (processEvent == nullptr) {
         LOG_ERROR(sLogger,
@@ -107,7 +111,7 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
 
     // calculate agg key
-    std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(event);
+    std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(processEvent);
     {
         WriteLock lk(mLock);
         bool ret = mAggregateTree.Aggregate(event, hashResult);
@@ -170,7 +174,12 @@ int ProcessSecurityManager::SendEvents() {
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
+                auto* processEvent = static_cast<ProcessEvent*>(innerEvent.get());
+                if (processEvent == nullptr) {
+                    LOG_WARNING(sLogger, ("failed to convert innerEvent to processEvent", magic_enum::enum_name(innerEvent->GetKernelEventType())));
+                    continue;
+                }
+                struct timespec ts = ConvertKernelTimeToUnixTime(processEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
                 switch (innerEvent->mEventType) {
                     case KernelEventType::PROCESS_EXECVE_EVENT: {
