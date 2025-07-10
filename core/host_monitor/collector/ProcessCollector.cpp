@@ -104,15 +104,6 @@ ProcessCollector::ProcessCollector() {
     Init(INT32_FLAG(process_total_count), INT32_FLAG(process_report_top_N));
 }
 
-static uint64_t GetMemoryValue(char unit, uint64_t value) {
-    if (unit == 'k' || unit == 'K') {
-        value *= 1024;
-    } else if (unit == 'm' || unit == 'M') {
-        value *= 1024 * 1024;
-    }
-    return value;
-}
-
 static inline void GetProcessCpuSorted(std::vector<ProcessAllStat>& allPidStats) {
     std::sort(allPidStats.begin(), allPidStats.end(), [](const ProcessAllStat& a, const ProcessAllStat& b) {
         return a.processCpu.percent > b.processCpu.percent;
