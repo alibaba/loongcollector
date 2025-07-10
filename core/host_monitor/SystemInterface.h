@@ -31,7 +31,6 @@
 #include "collector/MetricCalculate.h"
 #include "common/Flags.h"
 #include "common/ProcParser.h"
-#include "collector/MetricCalculate.h"
 
 DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
 
@@ -103,13 +102,9 @@ struct ProcessTime {
 
     std::chrono::milliseconds total{0}; // user + sys
 
-    std::chrono::milliseconds utime() const {
-        return user - cutime;
-    }
+    std::chrono::milliseconds utime() const { return user - cutime; }
 
-    std::chrono::milliseconds stime() const {
-        return sys - cstime;
-    }
+    std::chrono::milliseconds stime() const { return sys - cstime; }
 };
 
 struct ProcessCpuInformationCache {
@@ -124,13 +119,13 @@ struct CpuInformationCache {
 };
 
 struct ProcessInfo {
-        pid_t pid;
-        std::string name;
-        std::string path;
-        std::string cwd;
-        std::string root;
-        std::string args;
-        std::string user;
+    pid_t pid;
+    std::string name;
+    std::string path;
+    std::string cwd;
+    std::string root;
+    std::string args;
+    std::string user;
 };
 
 struct ProcessMemoryInformation : public BaseInformation {
@@ -145,24 +140,24 @@ struct ProcessMemoryInformation : public BaseInformation {
 // 进程打开文件数
 struct ProcessFd : public BaseInformation {
     uint64_t total = 0;
-    bool exact = true;  // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
+    bool exact = true; // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
 };
 
 struct ProcessCredName : public BaseInformation {
     std::string user;
     std::string group;
     std::string name;
-    uid_t uid;   //real user ID
-    gid_t gid;   //real group ID
-    uid_t euid;  //effective user ID
-    gid_t egid;  //effective group ID
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
 };
 
 struct ProcessCred {
-    uid_t uid;   //real user ID
-    gid_t gid;   //real group ID
-    uid_t euid;  //effective user ID
-    gid_t egid;  //effective group ID
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
 };
 
 struct ProcessAllStat {
@@ -185,7 +180,7 @@ struct ProcessPushMertic {
     double cpuPercent = 0.0;
     double memPercent = 0.0;
     double fdNum = 0.0;
-    double numThreads  = 0.0;
+    double numThreads = 0.0;
     double allNumProcess = 0.0;
 
     static inline const FieldName<ProcessPushMertic> processPushMerticFields[] = {
@@ -293,7 +288,7 @@ struct MTRRInformationString : public BaseInformation {
     std::vector<std::string> mtrrString;
 };
 
-// /proc/pid/status 
+// /proc/pid/status
 struct ProcessStatusString : public BaseInformation {
     std::vector<std::string> processStatusString;
 };
@@ -401,10 +396,10 @@ public:
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
     bool GetHostMemInformationStat(MemoryInformation& meminfo);
     bool GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& cmdline);
-    bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation &processMemory);
-    bool GetProcessCredNameObj(pid_t pid, ProcessCredName &credName);
-    bool GetExecutablePathCache(pid_t pid, ProcessExecutePath &executePath);
-    bool GetProcessOpenFiles(pid_t pid, ProcessFd &processFd);
+    bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessCredNameObj(pid_t pid, ProcessCredName& credName);
+    bool GetExecutablePathCache(pid_t pid, ProcessExecutePath& executePath);
+    bool GetProcessOpenFiles(pid_t pid, ProcessFd& processFd);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -441,8 +436,8 @@ private:
     virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
     virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
     virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
-    virtual bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath &executePath) = 0;
-    virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd &processFd) = 0;
+    virtual bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) = 0;
+    virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;

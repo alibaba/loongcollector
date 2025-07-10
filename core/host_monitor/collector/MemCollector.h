@@ -22,7 +22,6 @@
 #include "host_monitor/collector/BaseCollector.h"
 #include "host_monitor/collector/MetricCalculate.h"
 #include "plugin/input/InputHostMonitor.h"
-#include "host_monitor/LinuxSystemInterface.h"
 
 namespace logtail {
 

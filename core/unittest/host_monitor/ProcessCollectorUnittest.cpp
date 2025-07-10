@@ -104,7 +104,10 @@ protected:
         ofs_stam.close();
         // /proc/pid/stat
         ofstream ofs_stat("./12345/stat", std::ios::trunc);
-        ofs_stat << "1813 (ilogtail) S 1811 1811 1811 0 -1 1077936192 1378102 0 848 0 643169 334268 0 0 20 0 55 0 1304 1707982848 46314 18446744073709551615 4227072 53627809 140730946407792 0 0 0 65536 0 4281570 0 0 0 17 26 0 0 24 0 0 66246848 67456896 101158912 140730946416312 140730946416341 140730946416341 140730946416603 0";
+        ofs_stat << "1813 (ilogtail) S 1811 1811 1811 0 -1 1077936192 1378102 0 848 0 643169 334268 0 0 20 0 55 0 1304 "
+                    "1707982848 46314 18446744073709551615 4227072 53627809 140730946407792 0 0 0 65536 0 4281570 0 0 "
+                    "0 17 26 0 0 24 0 0 66246848 67456896 101158912 140730946416312 140730946416341 140730946416341 "
+                    "140730946416603 0";
         ofs_stat.close();
         // /proc/pid/cmdline
         ofstream ofs_cmdline("./12345/cmdline", std::ios::trunc);
@@ -129,7 +132,7 @@ void ProcessCollectorUnittest::TestCollect() const {
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    
+
     vector<string> expectedVMProcessNames = {
         "vm_process_minimum",
         "vm_process_maximum",
@@ -141,7 +144,7 @@ void ProcessCollectorUnittest::TestCollect() const {
         1.0,
         1.0,
     };
-    
+
     auto event = group.GetEvents()[0].Cast<MetricEvent>();
     auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
 
@@ -151,23 +154,14 @@ void ProcessCollectorUnittest::TestCollect() const {
         EXPECT_NEAR(expectedVMProcessValues[static_cast<size_t>(i)], val, 1e-6);
     }
 
-    vector<string> expectedProcessNames = {
-        "process_cpu_average",
-        "process_memory_average",
-        "process_openfile_average",
-        "process_number_average",
-        "process_number_maximum",
-        "process_number_minimum"
-    };
+    vector<string> expectedProcessNames = {"process_cpu_average",
+                                           "process_memory_average",
+                                           "process_openfile_average",
+                                           "process_number_average",
+                                           "process_number_maximum",
+                                           "process_number_minimum"};
 
-    vector<double> expectedProcessValues = {
-        std::nan(""),
-        0.591865,
-        3.0,
-        55.0,
-        55.0,
-        55.0
-    };
+    vector<double> expectedProcessValues = {std::nan(""), 0.591865, 3.0, 55.0, 55.0, 55.0};
 
     event = group.GetEvents()[1].Cast<MetricEvent>();
     maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
@@ -179,17 +173,10 @@ void ProcessCollectorUnittest::TestCollect() const {
         EXPECT_NEAR(expectedProcessValues[static_cast<size_t>(i)], val, 1e-6);
     }
 
-    vector<string> expectedExpandedProcessNames = {
-        "process_expand_cpu_percent",
-        "process_expand_memory_percent",
-        "process_expand_openfile_number"
-    };
+    vector<string> expectedExpandedProcessNames
+        = {"process_expand_cpu_percent", "process_expand_memory_percent", "process_expand_openfile_number"};
 
-    vector<double> expectedExpandedProcessValues = {
-        std::nan(""),
-        0.591865,
-        3.0
-    };
+    vector<double> expectedExpandedProcessValues = {std::nan(""), 0.591865, 3.0};
 
     event = group.GetEvents()[2].Cast<MetricEvent>();
     maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
@@ -200,7 +187,6 @@ void ProcessCollectorUnittest::TestCollect() const {
         double val = maps[expectedExpandedProcessNames[i]].Value;
         EXPECT_NEAR(expectedExpandedProcessValues[static_cast<size_t>(i)], val, 1e-6);
     }
-    
 }
 
 UNIT_TEST_CASE(ProcessCollectorUnittest, TestGetHostPidStat);

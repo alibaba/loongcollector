@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <vector>
 #include <boost/filesystem.hpp>
 #include <filesystem>
+#include <vector>
 
-#include "host_monitor/collector/BaseCollector.h"
-#include "host_monitor/collector/MetricCalculate.h"
 #include "common/ProcParser.h"
 #include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/MetricCalculate.h"
 
 using namespace std::chrono;
 
@@ -31,7 +31,7 @@ class ProcessCollector : public BaseCollector {
 public:
     ProcessCollector();
 
-    int Init(int processTotalCount,int processReportTopN = 5);
+    int Init(int processTotalCount, int processReportTopN = 5);
 
     ~ProcessCollector() override = default;
 
@@ -43,42 +43,40 @@ public:
     const std::string& Name() const override { return sName; }
 
 public:
+    void RemovePid(std::vector<pid_t>& pids, pid_t pid, pid_t ppid);
 
-    void RemovePid(std::vector<pid_t> &pids, pid_t pid, pid_t ppid);
+    void GetSelfPid(pid_t& pid, pid_t& ppid);
 
-    void GetSelfPid(pid_t &pid, pid_t &ppid);
+    int GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime);
 
-    int GetProcessTime(pid_t pid, ProcessTime &output, bool includeCTime);
+    int ReadProcessStat(pid_t pid, ProcessStat& processStat);
 
-    int ReadProcessStat(pid_t pid, ProcessStat &processStat);
+    int GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
 
-    int GetPidsCpu(const std::vector<pid_t> &pids, std::map<pid_t, uint64_t> &pidMap);
+    int GetTopNProcessStat(std::vector<pid_t>& sortPids, int topN, std::vector<ProcessAllStat>& processAllStats);
 
-    int GetTopNProcessStat(std::vector <pid_t> &sortPids, int topN, std::vector<ProcessAllStat> &processAllStats);
+    int GetProcessAllStat(pid_t pid, ProcessAllStat& processStat);
 
-    int GetProcessAllStat(pid_t pid, ProcessAllStat &processStat);
+    int GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory);
 
-    int GetProcessMemory(pid_t pid, ProcessMemoryInformation &processMemory);
+    int GetProcessFdNumber(pid_t pid, ProcessFd& processFd);
 
-    int GetProcessFdNumber(pid_t pid, ProcessFd &processFd);
+    int GetProcessInfo(pid_t pid, ProcessInfo& processInfo);
 
-    int GetProcessInfo(pid_t pid, ProcessInfo &processInfo);
+    int GetProcessCredName(pid_t pid, ProcessCredName& processCredName);
 
-    int GetProcessCredName(pid_t pid,ProcessCredName &processCredName);
+    int GetProcessArgs(pid_t pid, std::vector<std::string>& args);
 
-    int GetProcessArgs(pid_t pid, std::vector<std::string> &args);
+    int GetProcessState(pid_t pid, ProcessStat& processState);
 
-    int GetProcessState(pid_t pid, ProcessStat &processState);
-
-    int CountNumsDir(const std::filesystem::path& root, ProcessFd &processFd);
+    int CountNumsDir(const std::filesystem::path& root, ProcessFd& processFd);
 
     double GetSysHz();
 
     std::string GetExecutablePath(pid_t pid);
 
 protected:
-
-    int GetProcessCpuInformation(pid_t pid, ProcessCpuInformation &information,bool includeCTime);
+    int GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime);
 
     bool GetProcessCpuInCache(pid_t pid, bool includeCTime);
 
@@ -96,7 +94,7 @@ private:
     decltype(ProcessCpuInformation{}.total) mLastAgentTotalMillis = 0;
     std::shared_ptr<std::map<pid_t, uint64_t>> mLastPidCpuMap;
     std::map<pid_t, ProcessCpuInformation> cpuTimeCache;
-    std::map<pid_t, MetricCalculate<ProcessPushMertic>> mProcessPushMertic; //记录每个pid对应的多值体系
+    std::map<pid_t, MetricCalculate<ProcessPushMertic>> mProcessPushMertic; // 记录每个pid对应的多值体系
     MetricCalculate<VMProcessNumStat> mVMProcessNumStat;
     std::map<pid_t, double> mAvgProcessCpuPercent;
     std::map<pid_t, double> mAvgProcessMemPercent;

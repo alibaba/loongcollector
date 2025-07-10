@@ -21,12 +21,13 @@
 using namespace std;
 using namespace std::chrono;
 
+#include <grp.h>
+#include <pwd.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <pwd.h>
-#include <grp.h>
-#include <filesystem>
 #include <boost/program_options.hpp>
+#include <filesystem>
 #include <iostream>
 
 #include "common/FileSystemUtil.h"
@@ -328,7 +329,7 @@ bool LinuxSystemInterface::GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdline
         LOG_ERROR(sLogger, ("open process cmdline file", "fail")("file", processCMDline));
         return false;
     }
-    
+
     std::string line;
     while (std::getline(file, line)) {
         cmdline.cmdline.push_back(line);
@@ -339,7 +340,7 @@ bool LinuxSystemInterface::GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdline
     return true;
 }
 
-bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) { 
+bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) {
     auto processStatm = PROCESS_DIR / std::to_string(pid) / PROCESS_STATM;
     std::vector<std::string> processStatmString;
     char* endptr;
@@ -360,12 +361,7 @@ bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformati
     std::vector<std::string> processMemoryMetric;
     if (!processStatmString.empty()) {
         const std::string& input = processStatmString.front();
-        boost::algorithm::split(
-            processMemoryMetric,
-            input,
-            boost::is_any_of(" "),
-            boost::algorithm::token_compress_on
-        );
+        boost::algorithm::split(processMemoryMetric, input, boost::is_any_of(" "), boost::algorithm::token_compress_on);
     }
 
     if (processMemoryMetric.size() < 3) {
@@ -376,7 +372,7 @@ bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformati
     int index = 0;
     processMemory.size = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
     processMemory.size = processMemory.size * pagesize;
-    processMemory.resident = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10)); 
+    processMemory.resident = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
     processMemory.resident = processMemory.resident * pagesize;
     processMemory.share = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
     processMemory.share = processMemory.share * pagesize;
@@ -396,8 +392,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     }
 
     std::string line;
-    while (std::getline(file, line))
-    {
+    while (std::getline(file, line)) {
         processStatusString.push_back(line);
     }
     file.close();
@@ -406,11 +401,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
 
     for (size_t i = 0; i < processStatusString.size(); ++i) {
         boost::algorithm::split(
-            metric,
-            processStatusString[i],
-            boost::algorithm::is_any_of("\t"),
-            boost::algorithm::token_compress_on
-        );
+            metric, processStatusString[i], boost::algorithm::is_any_of("\t"), boost::algorithm::token_compress_on);
         if (metric.front() == "Name:") {
             processCredName.name = metric[1];
         }
@@ -425,7 +416,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
         }
     }
 
-    passwd *pw = nullptr;
+    passwd* pw = nullptr;
     passwd pwbuffer;
     char buffer[2048];
     if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0) {
@@ -436,7 +427,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     }
     processCredName.user = pw->pw_name;
 
-    group *grp = nullptr;
+    group* grp = nullptr;
     group grpbuffer{};
     char groupBuffer[2048];
     if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp)) {
@@ -450,7 +441,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     return true;
 }
 
-bool LinuxSystemInterface::GetExecutablePathOnce(pid_t pid, ProcessExecutePath &executePath) {
+bool LinuxSystemInterface::GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) {
     std::filesystem::path procExePath = PROCESS_DIR / std::to_string(pid) / PROCESS_EXE;
     char buffer[4096];
     ssize_t len = readlink(procExePath.c_str(), buffer, sizeof(buffer));
@@ -462,7 +453,7 @@ bool LinuxSystemInterface::GetExecutablePathOnce(pid_t pid, ProcessExecutePath &
     return true;
 }
 
-bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd &processFd) {
+bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) {
     std::filesystem::path procFdPath = PROCESS_DIR / std::to_string(pid) / PROCESS_FD;
 
     int count = 0;
