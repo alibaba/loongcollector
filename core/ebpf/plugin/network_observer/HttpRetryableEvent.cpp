@@ -14,6 +14,8 @@
 
 #include "ebpf/plugin/network_observer/HttpRetryableEvent.h"
 
+#include "common/magic_enum.hpp"
+
 namespace logtail::ebpf {
 
 bool HttpRetryableEvent::HandleMessage() {
@@ -43,23 +45,26 @@ bool HttpRetryableEvent::flushEvent() {
     if (!mCommonEventQueue.try_enqueue(mRecord)) {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why
-        LOG_WARNING(sLogger,
-                    ("event", "Failed to enqueue http record")("pid", mRecord->GetPath()));
-        // TODO: Alarm discard event if it is called by OnDrop
+        LOG_WARNING(sLogger, ("event", "Failed to enqueue http record")("pid", mRecord->GetPath()));
         return false;
     }
     return true;
 }
 
 bool HttpRetryableEvent::OnRetry() {
+    LOG_DEBUG(sLogger,
+              ("meta not ready, retry record, type", magic_enum::enum_name(mRecord->GetKernelEventType()))(
+                  "retry left", mRetryLeft)("meta", mRecord->GetConnection()->GetMetaFlags()));
     return HandleMessage();
 }
 
 void HttpRetryableEvent::OnDrop() {
+    LOG_WARNING(sLogger,
+                ("meta not ready, drop record, type", magic_enum::enum_name(mRecord->GetKernelEventType()))(
+                    "meta", mRecord->GetConnection()->GetMetaFlags()));
     if (mRecord && mRecord->GetAppDetail()) {
         ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachFailedTotal, 1);
     }
-    
 }
 
-}
+} // namespace logtail::ebpf

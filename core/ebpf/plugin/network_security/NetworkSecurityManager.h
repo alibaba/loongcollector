@@ -16,6 +16,8 @@
 
 #include <coolbpf/security/type.h>
 
+#include <utility>
+
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/type/NetworkEvent.h"
@@ -54,7 +56,12 @@ public:
 
     int SendEvents() override;
 
-    int RegisteredConfigCount() override;
+    int RegisteredConfigCount() override { return 0; }
+
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+        mLossKernelEventsTotal = std::move(lossEventsTotal);
+    }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
@@ -75,19 +82,24 @@ public:
     }
 
 private:
-    ReadWriteLock mLock;
     int64_t mSendIntervalMs = 2000;
     int64_t mLastSendTimeMs = 0;
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree; // guard by mLock
 
+    std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
+    std::string mConfigName;
+
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    mutable std::mutex mContextMutex;
+    ReadWriteLock mContextMutex;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
+    // plugin metrics, guarded by mContextMutex
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+
+    // runner metrics
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
 };

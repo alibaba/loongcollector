@@ -22,6 +22,7 @@
 #include <thread>
 #include <utility>
 
+#include "Lock.h"
 #include "TimeKeeper.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -48,17 +49,27 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
           [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) {
               auto* processEvent = static_cast<ProcessEvent*>(in.get());
               if (processEvent) {
-                return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);
+                  return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);
               }
-              
           }) {
 }
 
 int ProcessSecurityManager::Init() {
-    // just set timer ...
-    // register base manager ...
     mInited = true;
     mSuspendFlag = false;
+    return 0;
+}
+
+int ProcessSecurityManager::AddOrUpdateConfig(
+    const CollectionPipelineContext* ctx,
+    uint32_t index,
+    const PluginMetricManagerPtr& metricMgr,
+    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+    auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+    mRefAndLabels.emplace_back(eventTypeLabels);
+    mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
 
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
@@ -67,24 +78,42 @@ int ProcessSecurityManager::Init() {
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
+    if (Resume(opt)) {
+        LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
+        return 1;
+    }
+
+    mMetricMgr = metricMgr;
+    {
+        WriteLock lk(mContextMutex);
+        mPluginIndex = index;
+        mPipelineCtx = ctx;
+        mQueueKey = ctx->GetProcessQueueKey();
+    }
+
     return 0;
 }
 
-int ProcessSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
-                                              uint32_t index,
-                                              const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    ;
-}
-
-int ProcessSecurityManager::Destroy() {
-    mInited = false;
+int ProcessSecurityManager::RemoveConfig(const std::string&) {
+    {
+        ReadLock lk(mContextMutex);
+        for (auto& item : mRefAndLabels) {
+            if (mMetricMgr) {
+                mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+            }
+        }
+    }
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
         LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
         return 1;
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
+    return 0;
+}
+
+int ProcessSecurityManager::Destroy() {
+    mInited = false;
     return 0;
 }
 
@@ -106,8 +135,8 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
     auto* processEvent = static_cast<ProcessEvent*>(event.get());
     LOG_DEBUG(sLogger,
-              ("receive event, pid", processEvent->mPid)("ktime", processEvent->mKtime)("eventType",
-                                                                          magic_enum::enum_name(event->mEventType)));
+              ("receive event, pid", processEvent->mPid)("ktime", processEvent->mKtime)(
+                  "eventType", magic_enum::enum_name(event->mEventType)));
     if (processEvent == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to convert CommonEvent to ProcessEvent, kernel event type",
@@ -118,11 +147,8 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
 
     // calculate agg key
     std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(processEvent);
-    {
-        WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, hashResult);
-        LOG_DEBUG(sLogger, ("after aggregate", ret));
-    }
+    bool ret = mAggregateTree.Aggregate(event, hashResult);
+    LOG_DEBUG(sLogger, ("after aggregate", ret));
 
     return 0;
 }
@@ -144,9 +170,7 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
 
-    WriteLock lk(mLock);
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
-    lk.unlock();
 
     // read aggregator
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -182,7 +206,9 @@ int ProcessSecurityManager::SendEvents() {
                 }
                 auto* processEvent = static_cast<ProcessEvent*>(innerEvent.get());
                 if (processEvent == nullptr) {
-                    LOG_WARNING(sLogger, ("failed to convert innerEvent to processEvent", magic_enum::enum_name(innerEvent->GetKernelEventType())));
+                    LOG_WARNING(sLogger,
+                                ("failed to convert innerEvent to processEvent",
+                                 magic_enum::enum_name(innerEvent->GetKernelEventType())));
                     continue;
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(processEvent->mTimestamp);
@@ -219,7 +245,7 @@ int ProcessSecurityManager::SendEvents() {
         });
     }
     {
-        std::lock_guard lk(mContextMutex);
+        ReadLock lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }

@@ -104,7 +104,9 @@ public:
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+        return 0;
+    }
 
     int Suspend() override {
         mSuspendFlag = true;
@@ -114,6 +116,12 @@ public:
     int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
         mSuspendFlag = false;
         return 0;
+    }
+
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, IntGaugePtr connCacheSize) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+        mLossKernelEventsTotal = std::move(lossEventsTotal);
+        mConnectionNum = std::move(connCacheSize);
     }
 
     // periodically tasks ...
@@ -174,14 +182,6 @@ private:
     SIZETAggTree<AppSpanGroup, std::shared_ptr<CommonEvent>> mSpanAggregator;
     SIZETAggTree<AppLogGroup, std::shared_ptr<CommonEvent>> mLogAggregator;
 
-    // cache relative metric
-    IntGaugePtr mConnectionNum; // runner ...
-    // CounterPtr mPollNetEventsTotal;
-    // CounterPtr mLossNetEventsTotal;
-    // CounterPtr mNetMetaAttachSuccessTotal;
-    // CounterPtr mNetMetaAttachFailedTotal;
-    // CounterPtr mNetMetaAttachRollbackTotal;
-
     void updateConfigVersionAndWhitelist(std::vector<std::string>&& newCids, std::vector<std::string>&& expiredCids) {
         if (!newCids.empty() || !expiredCids.empty()) {
             mConfigVersion++;
@@ -233,8 +233,10 @@ private:
     int64_t mSendLogIntervalMs = 2000;
     int64_t mSendMetricIntervalMs = 15000;
 
+    // runner metrics
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
+    IntGaugePtr mConnectionNum;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;

@@ -51,6 +51,12 @@ private:
 #endif
 };
 
+enum class PluginStateOperation {
+    kAddPipeline,
+    kRemovePipeline,
+    kRemoveAll,
+};
+
 struct PluginState {
     // pipelineName ==> project
     std::map<std::string, std::string> mPipelines;
@@ -113,6 +119,7 @@ private:
     void updatePluginState(PluginType type,
                            const std::string& name,
                            const std::string& project,
+                           PluginStateOperation op,
                            std::shared_ptr<AbstractManager>);
     PluginState& getPluginState(PluginType type);
     bool checkIfNeedStopProcessCacheManager() const;
@@ -147,6 +154,11 @@ private:
 
     FrequencyManager mFrequencyMgr;
     FrequencyManager mIteratorFrequencyMgr;
+
+    // metrics
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
+    IntGaugePtr mConnectionCacheSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

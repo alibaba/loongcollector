@@ -136,9 +136,7 @@ int NetworkSecurityManager::SendEvents() {
         return 0;
     }
 
-    WriteLock lk(this->mLock);
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
-    lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
@@ -190,7 +188,9 @@ int NetworkSecurityManager::SendEvents() {
 
                 auto* ne = static_cast<NetworkEvent*>(innerEvent.get());
                 if (ne == nullptr) {
-                    LOG_WARNING(sLogger, ("failed to convert innerEvent to NetworkEvent", magic_enum::enum_name(innerEvent->GetKernelEventType())));
+                    LOG_WARNING(sLogger,
+                                ("failed to convert innerEvent to NetworkEvent",
+                                 magic_enum::enum_name(innerEvent->GetKernelEventType())));
                     continue;
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(ne->mTimestamp);
@@ -223,7 +223,7 @@ int NetworkSecurityManager::SendEvents() {
         });
     }
     {
-        std::lock_guard lk(mContextMutex);
+        ReadLock lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }
@@ -243,39 +243,81 @@ int NetworkSecurityManager::SendEvents() {
 
 int NetworkSecurityManager::Init() {
     mInited = true;
+    return 0;
 }
 
 int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
                                               const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    // TODO @qianlu.kk init metrics ...
+    // init metrics ...
+    MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+    auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+    mRefAndLabels.emplace_back(eventTypeLabels);
+    mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
 
-    const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
-    if (!securityOpts) {
-        LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
-        return -1;
+    if (mConfigName.size()) {
+        // update
+        LOG_DEBUG(sLogger, ("NetworkSecurity Update", ""));
+        // update config (BPF tailcall, filter map etc.)
+        if (Update(options)) {
+            LOG_WARNING(sLogger, ("NetworkSecurity Update failed", ""));
+            return 1;
+        }
+        // resume
+        if (Resume(options)) {
+            LOG_WARNING(sLogger, ("NetworkSecurity Resume failed", ""));
+            return 1;
+        }
+    } else {
+        const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
+        if (!securityOpts) {
+            LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
+            return -1;
+        }
+
+        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+        pc->mPluginType = PluginType::NETWORK_SECURITY;
+        NetworkSecurityConfig config;
+        SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        config.mOptions = opts->mOptionList;
+        config.mPerfBufferSpec
+            = {{"sock_secure_output",
+                128,
+                this,
+                [](void* ctx, int cpu, void* data, uint32_t size) { HandleNetworkKernelEvent(ctx, cpu, data, size); },
+                [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
+        pc->mConfig = std::move(config);
+
+        if (mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc))) {
+            LOG_WARNING(sLogger, ("NetworkSecurity Start failed", ""));
+            return 1;
+        }
     }
 
-    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
-    pc->mPluginType = PluginType::NETWORK_SECURITY;
-    NetworkSecurityConfig config;
-    SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    config.mOptions = opts->mOptionList;
-    config.mPerfBufferSpec
-        = {{"sock_secure_output",
-            128,
-            this,
-            [](void* ctx, int cpu, void* data, uint32_t size) { HandleNetworkKernelEvent(ctx, cpu, data, size); },
-            [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
-    pc->mConfig = std::move(config);
+    mConfigName = ctx->GetConfigName();
+    mMetricMgr = metricMgr;
+    {
+        WriteLock lk(mContextMutex);
+        mPluginIndex = index;
+        mPipelineCtx = ctx;
+        mQueueKey = ctx->GetProcessQueueKey();
+    }
 
-    return mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
+    return 0;
 }
 
 int NetworkSecurityManager::RemoveConfig(const std::string&) {
+    {
+        ReadLock lk(mContextMutex);
+        for (auto& item : mRefAndLabels) {
+            if (mMetricMgr) {
+                mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+            }
+        }
+    }
     return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
-    // TODO @qianlu.kk clean metrics ...
 }
 
 int NetworkSecurityManager::Destroy() {
@@ -322,12 +364,8 @@ int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
 
     // calculate agg key
     std::array<size_t, 2> result = GenerateAggKeyForNetworkEvent(event);
-
-    {
-        WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, result);
-        LOG_DEBUG(sLogger, ("after aggregate", ret));
-    }
+    bool ret = mAggregateTree.Aggregate(event, result);
+    LOG_DEBUG(sLogger, ("after aggregate", ret));
     return 0;
 }
 

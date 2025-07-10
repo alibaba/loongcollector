@@ -49,24 +49,6 @@ struct ApmConfig {
 };
 
 struct ObserverNetworkOption {
-    std::vector<std::string> mEnableProtocols;
-    bool mDisableProtocolParse = false;
-    bool mDisableConnStats = false;
-    bool mEnableConnTrackerDump = false;
-    bool mEnableSpan = false;
-    bool mEnableMetric = false;
-    bool mEnableLog = false;
-    double mSampleRate = 0.01;
-    int mMaxConnections = 5000;
-    std::string mAppId; // optional
-    std::string mAppName; // optional
-    std::string mHostName; // optional
-    std::string mHostIp; // optional
-    std::vector<std::string> mEnableCids;
-    std::vector<std::string> mDisableCids;
-    std::string mMeterHandlerType;
-    std::string mSpanHandlerType;
-
     L7Config mL7Config;
     L4Config mL4Config;
     ApmConfig mApmConfig;

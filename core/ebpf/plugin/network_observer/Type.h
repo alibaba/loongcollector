@@ -89,6 +89,13 @@ public:
             ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
             mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
             mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+
+            MetricLabels appLabels = {{METRIC_LABEL_KEY_RECORD_TYPE, METRIC_LABEL_VALUE_RECORD_TYPE_APP}};
+            ref = mMetricMgr->GetOrCreateReentrantMetricsRecordRef(appLabels);
+            mRefAndLabels.emplace_back(appLabels);
+            mAppMetaAttachSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL);
+            mAppMetaAttachFailedTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL);
+            mAppMetaAttachRollbackTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL);
         }
     }
 
@@ -172,7 +179,6 @@ public:
     CounterPtr mPushMetricGroupTotal;
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
-    // TODO
     CounterPtr mAppMetaAttachRollbackTotal;
     CounterPtr mAppMetaAttachFailedTotal;
     CounterPtr mAppMetaAttachSuccessTotal;

@@ -103,9 +103,6 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
 
 void ConnectionManager::Iterations() {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    auto nowTs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    // report every seconds ...
-    bool needGenRecord = (nowTs - mLastReportTs > 5);
     LOG_DEBUG(sLogger,
               ("[Iterations] conn tracker map size", mConnections.size())("total count", mConnectionTotal.load()));
     int n = 0;
@@ -123,9 +120,7 @@ void ConnectionManager::Iterations() {
         connection->TryAttachPeerMeta();
         connection->TryAttachSelfMeta();
 
-        bool forceGenRecord = false;
         if (connection && connection->ReadyToDestroy(now)) {
-            forceGenRecord = true;
             // push conn stats ...
             deleteQueue.push_back(it.first);
             connection->MarkConnDeleted();

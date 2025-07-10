@@ -60,14 +60,14 @@ public:
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
-    int RegisteredConfigCount() override;
+    int RegisteredConfigCount() override { return 0; }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
                           const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
 
-    int RemoveConfig(const std::string&) override { return 0; }
+    int RemoveConfig(const std::string&) override;
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -82,14 +82,14 @@ public:
     }
 
 private:
-    ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
 
+    std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
     // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    mutable std::mutex mContextMutex;
+    ReadWriteLock mContextMutex;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};

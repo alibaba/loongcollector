@@ -24,9 +24,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "ebpf/plugin/network_observer/Connection.h"
 #include "common/Lock.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/plugin/network_observer/Connection.h"
 extern "C" {
 #include <coolbpf/net.h>
 };
@@ -49,9 +49,6 @@ public:
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
     void Iterations();
-
-    // TODO(@qianlu.kk) Implement this func to recycle expired connections ...
-    void GC();
 
     int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }

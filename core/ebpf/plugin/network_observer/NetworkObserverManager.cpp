@@ -315,7 +315,6 @@ NetworkObserverManager::generateAggKeyForNetMetric(ConnStatsRecord* record,
     // level0: hostname hostip appId appName, if it's not arms app, we need set default appname ...
     // kConnTrackerTable.ColIndex();
     // level1: namespace workloadkind workloadname peerNamespace peerWorkloadKind peerWorkloadName
-    // TODO @qianlu.kk
     static constexpr auto kIdxes0 = {kHostNameIndex, kHostIpIndex};
     static constexpr auto kIdxes1 = {kWorkloadKindIndex,
                                      kWorkloadNameIndex,
@@ -1112,13 +1111,6 @@ int GuessContainerIdOffset() {
     return ProcParser::GetContainerId(kCgroupFilePath, containerId);
 }
 
-int NetworkObserverManager::Update(
-    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    auto* opt = std::get<ObserverNetworkOption*>(options);
-
-    return 0;
-}
-
 int NetworkObserverManager::Init() {
     if (mInited) {
         return 0;
@@ -1321,6 +1313,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     }
 
     updateConfigVersionAndWhitelist({}, std::move(expiredCids));
+    Resume(opt);
     return 0;
 }
 
@@ -1384,7 +1377,7 @@ bool NetworkObserverManager::UploadHostMetadataUpdateTask() {
     return true;
 }
 
-// TODO @qianlu.kk called by curl thread, async update configs for container ...
+// called by curl thread, async update configs for container ...
 void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
     std::vector<std::string> newContainerIds;
     std::vector<std::string> expiredContainerIds;
@@ -1478,7 +1471,6 @@ int NetworkObserverManager::PollPerfBuffer() {
 
     // 2. do perf callback ==> update cache, generate record(if not ready, add to mRetryableEventCache, else add to
     // aggregator) poll stats -> ctrl -> info
-    // 4000
     {
         ReadLock lk(mAppConfigLock);
         // deep copy app config ...
@@ -1487,6 +1479,7 @@ int NetworkObserverManager::PollPerfBuffer() {
             mLastConfigVersion = mConfigVersion;
         }
     }
+
     int32_t flag = 0;
     int ret = mEBPFAdapter->PollPerfBuffers(
         PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, kNetObserverMaxWaitTimeMS);
@@ -1497,7 +1490,7 @@ int NetworkObserverManager::PollPerfBuffer() {
     // 3. connection cache gc
     // Iterations() mainly do gc and do not generate conn stats records ...
     // map in map, outter key is epoc, inner key is id?
-    mConnectionManager->GC(); // do connection gc ...
+    mConnectionManager->Iterations();
     SET_GAUGE(mConnectionNum, mConnectionManager->ConnectionTotal());
 
     LOG_DEBUG(
@@ -1508,7 +1501,6 @@ int NetworkObserverManager::PollPerfBuffer() {
             " lost stats events:", mLostConnStatEventsTotal.load())(" lost ctrl events:", mLostCtrlEventsTotal.load()));
     // 4. consume mRetryableEventCache, used for handling metadata attach failed scenario ...
     mRetryableEventCache.HandleEvents();
-
     return ret;
 }
 
@@ -1561,7 +1553,8 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
 
     // add records to span/event generate queue
     for (auto& record : records) {
-        std::shared_ptr<RetryableEvent> retryableEvent = std::make_shared<HttpRetryableEvent>(record);
+        std::shared_ptr<RetryableEvent> retryableEvent
+            = std::make_shared<HttpRetryableEvent>(5, record, mCommonEventQueue);
         if (!retryableEvent->HandleMessage()) {
             mRetryableEventCache.AddEvent(retryableEvent);
         }
@@ -1603,7 +1596,7 @@ int NetworkObserverManager::SendEvents() {
     if (nowMs - mLastSendMetricTimeMs >= mSendMetricIntervalMs) {
         LOG_DEBUG(sLogger, ("begin consume agg tree", "metric"));
         ConsumeMetricAggregateTree();
-        ConsumeNetMetricAggregateTree(); // do we need ??
+        // ConsumeNetMetricAggregateTree();
     }
     return 0;
 }
