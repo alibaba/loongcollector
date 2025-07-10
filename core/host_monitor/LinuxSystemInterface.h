@@ -40,6 +40,9 @@ private:
     bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) override;
     bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) override;
     bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) override;
+    bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) override;
+    bool GetNetRateInformationOnce(NetRateInformation& netRateInfo) override;
+    bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) override;
 
     bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
