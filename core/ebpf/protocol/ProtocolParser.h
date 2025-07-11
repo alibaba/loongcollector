@@ -17,6 +17,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <set>
 
 #include "AbstractParser.h"
 #include "ParserRegistry.h"

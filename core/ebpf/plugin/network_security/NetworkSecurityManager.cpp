@@ -264,7 +264,13 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
-    return mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
+    auto res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
+    LOG_INFO(sLogger, ("start file plugin, status", res));
+    if(!res) {
+        mInited = false;
+        return 1;
+    }
+    return 0;
 }
 
 int NetworkSecurityManager::Destroy() {
