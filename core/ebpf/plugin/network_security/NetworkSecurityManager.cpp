@@ -251,11 +251,13 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
                                               const PluginMetricManagerPtr& metricMgr,
                                               const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // init metrics ...
-    MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
-    auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
-    mRefAndLabels.emplace_back(eventTypeLabels);
-    mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
-    mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    if (metricMgr) {
+        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+        auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    }
 
     if (mConfigName.size()) {
         // update
@@ -290,7 +292,7 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
                 [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
         pc->mConfig = std::move(config);
 
-        if (mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc))) {
+        if (!mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc))) {
             LOG_WARNING(sLogger, ("NetworkSecurity Start failed", ""));
             return 1;
         }

@@ -45,7 +45,7 @@ bool HttpRetryableEvent::flushEvent() {
     if (!mCommonEventQueue.try_enqueue(mRecord)) {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why
-        LOG_WARNING(sLogger, ("event", "Failed to enqueue http record")("pid", mRecord->GetPath()));
+        LOG_WARNING(sLogger, ("event", "Failed to enqueue http record")("pid", mRecord->GetSpanName()));
         return false;
     }
     return true;

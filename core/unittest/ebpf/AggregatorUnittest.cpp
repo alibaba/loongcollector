@@ -173,16 +173,17 @@ void AggregatorUnittest::TestAggregator() {
             LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime)("path", group->mPath));
             for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
-                if (innerEvent->mTimestamp == 9) {
+                auto* fe = static_cast<NetworkEvent*>(innerEvent.get());
+                if (fe->mTimestamp == 9) {
                     APSARA_TEST_EQUAL(group->mPid, 1U);
                     FileEvent* fe = static_cast<FileEvent*>(innerEvent.get());
                     APSARA_TEST_EQUAL(fe->mPath, "path-2");
                 }
                 auto* logEvent = eventGroup.AddLogEvent();
-                auto ts = innerEvent->mTimestamp;
+                auto ts = fe->mTimestamp;
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                 logEvent->SetTimestamp(seconds.count(), ts);
-                if (innerEvent->mTimestamp) {
+                if (fe->mTimestamp) {
                 }
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {

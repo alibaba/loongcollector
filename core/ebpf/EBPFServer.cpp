@@ -225,7 +225,8 @@ void EBPFServer::Stop() {
     mRunning = false;
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     for (int i = 0; i < int(PluginType::MAX); i++) {
-        for (const auto& entry : mPlugins[i].mPipelines) {
+        auto pipelines = mPlugins[i].mPipelines;
+        for (const auto& entry : pipelines) {
             bool ret = DisablePlugin(entry.first, static_cast<PluginType>(i));
             LOG_INFO(sLogger,
                      ("force stop plugin", magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline",
@@ -393,7 +394,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
             LOG_ERROR(sLogger, ("failed to remove config for", magic_enum::enum_name(type))("pipeline", pipelineName));
             return false;
         }
-        updatePluginState(type, pipelineName, "", PluginStateOperation::kRemovePipeline, nullptr);
+        updatePluginState(type, pipelineName, "", PluginStateOperation::kRemovePipeline, pluginManager);
         if (pluginManager->RegisteredConfigCount() > 0) {
             return true;
         }
@@ -511,7 +512,7 @@ void EBPFServer::updatePluginState(PluginType type,
     }
     switch (op) {
         case PluginStateOperation::kAddPipeline: {
-            mPlugins[static_cast<int>(type)].mPipelines.insert(name, project);
+            mPlugins[static_cast<int>(type)].mPipelines.insert({name, project});
             break;
         }
         case PluginStateOperation::kRemovePipeline: {

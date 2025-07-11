@@ -343,6 +343,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
+    mRunning[int(pluginType)] = true;
     return true;
 #else
     auto startF = (start_plugin_func)f;

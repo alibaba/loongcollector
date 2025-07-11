@@ -58,6 +58,8 @@ public:
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
 
+    [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
+
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
     [[nodiscard]] ConnId GetConnId() const { return mConnId; };
@@ -201,6 +203,8 @@ private:
     std::atomic<Flag> mMetaFlags = 0;
 
     StaticDataRow<&kConnTrackerTable> mTags;
+
+    size_t mCidKey = 0;
 
     std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;

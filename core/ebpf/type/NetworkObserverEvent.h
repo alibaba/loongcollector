@@ -40,7 +40,7 @@ enum class RecordType {
 class L7Record : public CommonEvent {
 public:
     virtual ~L7Record() {}
-    explicit L7Record(std::shared_ptr<Connection>& conn, std::shared_ptr<AppDetail>& appDetail) : CommonEvent(KernelEventType::L7_RECORD), mConnection(conn), mAppDetail(appDetail) {}
+    explicit L7Record(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail) : CommonEvent(KernelEventType::L7_RECORD), mConnection(conn), mAppDetail(appDetail) {}
     PluginType GetPluginType() const override  { return PluginType::NETWORK_OBSERVE; }
 
     void MarkSample() { mSample = true; }
@@ -79,7 +79,7 @@ private:
 
 class HttpRecord : public L7Record {
 public:
-    HttpRecord(std::shared_ptr<Connection>& conn, std::shared_ptr<AppDetail>& appDetail) : L7Record(conn, appDetail) {}
+    HttpRecord(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail) : L7Record(conn, appDetail) {}
     [[nodiscard]] virtual bool IsError() const override { return mCode >= 400; }
     [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
     void SetStatusCode(int code) { mCode = code; }

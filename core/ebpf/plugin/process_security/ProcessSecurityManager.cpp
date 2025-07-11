@@ -46,11 +46,12 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) {
+          [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<ProcessEventGroup> {
               auto* processEvent = static_cast<ProcessEvent*>(in.get());
               if (processEvent) {
                   return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);
               }
+              return nullptr;
           }) {
 }
 
@@ -65,11 +66,13 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     uint32_t index,
     const PluginMetricManagerPtr& metricMgr,
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
-    MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
-    auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
-    mRefAndLabels.emplace_back(eventTypeLabels);
-    mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
-    mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    if (metricMgr) {
+        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+        auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    }
 
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {

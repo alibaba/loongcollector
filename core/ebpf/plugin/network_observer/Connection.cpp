@@ -148,6 +148,8 @@ void Connection::updateL4Meta(struct conn_stats_event_t* event) {
             cidTrim = match.str(0);
         }
     }
+    std::hash<std::string> hasher;
+    AttrHashCombine(mCidKey, hasher(cidTrim));
 
     // handle socket info ...
     struct socket_info& si = event->si;
@@ -228,8 +230,6 @@ void Connection::updateSelfPodMetaForEnv() {
 }
 
 void Connection::updateSelfPodMetaForUnknown() {
-    mTags.SetNoCopy<kAppName>(kUnknownStr);
-    mTags.SetNoCopy<kAppId>(kUnknownStr);
     mTags.SetNoCopy<kPodIp>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadName>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadKind>(kUnknownStr);
@@ -248,7 +248,6 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : kUnknownStr);
     mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : kUnknownStr);
     mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : kUnknownStr);
     mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : kUnknownStr);

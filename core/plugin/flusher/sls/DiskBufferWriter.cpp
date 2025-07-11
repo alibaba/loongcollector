@@ -942,7 +942,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                        bufferMeta.rawsize());
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS: {
             std::map<std::string, std::string> headers;
             headers.insert({CMS_HEADER_WORKSPACE, bufferMeta.workspace()});
             headers.insert({APM_HEADER_PROJECT, bufferMeta.project()});
@@ -952,13 +952,13 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       host,
                                       httpsFlag,
                                       bufferMeta.project(),
-                                      bufferMeta.logstore(),
                                       GetSLSCompressTypeString(bufferMeta.compresstype()),
                                       dataType,
                                       logData,
                                       bufferMeta.rawsize(),
                                       bufferMeta.subpath(),
                                       headers);
+        }
         default: {
             // should not happen
             LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));
