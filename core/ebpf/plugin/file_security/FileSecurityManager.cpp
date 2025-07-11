@@ -69,16 +69,28 @@ void FileSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
 
 void FileSecurityManager::RecordFileEvent(file_data_t* rawEvent) {
     ADD_COUNTER(mRecvKernelEventsTotal, 1);
+
+    std::unique_ptr<FileRetryableEvent> event(CreateFileRetryableEvent(rawEvent));
+    if (event == nullptr) {
+        LOG_WARNING(sLogger, ("FileRetryableEvent is null", "file retry event lost"));
+        return;
+    } 
+    if (!event->HandleMessage()) {
+        EventCache().AddEvent(std::move(event));
+    }
+}
+
+FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* eventPtr) {
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
         LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
-        return;
+        return nullptr;
     }
-
-    std::unique_ptr<FileRetryableEvent> event(processCacheMgr->CreateFileRetryableEvent(rawEvent));
-    if (!event->HandleMessage()) {
-        processCacheMgr->EventCache().AddEvent(std::move(event));
-    }
+    return new FileRetryableEvent(std::max(1, INT32_FLAG(ebpf_event_retry_limit)),
+                                  *eventPtr,
+                                  processCacheMgr->GetProcessCache(),
+                                  mCommonEventQueue,
+                                  mFlushFileEvent);
 }
 
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
@@ -175,18 +187,6 @@ int FileSecurityManager::SendEvents() {
                     default:
                         break;
                 }
-
-                // log debug输出logEvent中的值
-                // 获取 logEvent 中的值并以 debug 形式输出
-                StringView callName = logEvent->GetContent("call_name");
-                if(callName == "security_path_truncate") {
-                    StringView path = logEvent->GetContent("path");
-                    StringView pid = logEvent->GetContent("pid");
-                    StringView ktime = logEvent->GetContent("ktime");     
-
-                    // 输出 debug 日志
-                    LOG_DEBUG(sLogger, ("[security_path_truncate]", "LogEvent")("call_name" , callName.data())("path", path.data())("pid", pid.data())("ktime", ktime.data()));
-                }
             }
         });
     }
@@ -220,11 +220,7 @@ int FileSecurityManager::SendEvents() {
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
     // set init flag ...
     mInited = true;
-    auto processCacheMgr = GetProcessCacheManager();
-    if (processCacheMgr == nullptr) {
-        LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
-    }
-    processCacheMgr->MarkFileEventFlushStatus(true);
+    markFileEventFlushStatus(true);
 
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;
@@ -233,13 +229,19 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"file_secure_output",
-            2048,
+            128,
             this,
             [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
             [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
-    return mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc)) ? 0 : 1;
+    auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
+    LOG_INFO(sLogger, ("start file plugin, status", res));
+    if(!res) {
+        mInited = false;
+        return 1;
+    }
+    return 0;
 }
 
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
@@ -256,6 +258,18 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
     AttrHashCombine(result[1], strHasher(event->mPath));
     return result;
 }
+int FileSecurityManager::PollPerfBuffer() {
+    auto now = TimeKeeper::GetInstance()->NowSec();
+    if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
+        EventCache().HandleEvents();
+        mLastEventCacheRetryTime = now;
+        SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
+        LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
+    }
+    int zero = 0;
+    return mEBPFAdapter->PollPerfBuffers(
+        PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+}
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     auto* fileEvent = static_cast<FileEvent*>(event.get());
@@ -268,9 +282,6 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
                    magic_enum::enum_name(event->GetKernelEventType()))("PluginType",
                                                                        magic_enum::enum_name(event->GetPluginType())));
         return 1;
-    }
-    if(fileEvent->mEventType == KernelEventType::FILE_PATH_TRUNCATE) {
-        LOG_DEBUG(sLogger, ("[security_path_truncate]", "FileEvent after mCommonEventQueue")("path", fileEvent->mPath)("pid", fileEvent->mPid)("ktime", fileEvent->mKtime));
     }
 
     // calculate agg key
@@ -285,12 +296,12 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 
 int FileSecurityManager::Destroy() {
     mInited = false;
-    auto processCacheMgr = GetProcessCacheManager();
-    if (processCacheMgr == nullptr) {
-        LOG_WARNING(sLogger, ("ProcessCacheManager is null", "file raw event lost"));
-    }
-    processCacheMgr->MarkFileEventFlushStatus(false);
-    return mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY) ? 0 : 1;
+    markFileEventFlushStatus(false);
+
+    auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
+    LOG_INFO(sLogger, ("stop file plugin, status", res));
+    mRetryableEventCache.Clear();
+    return res ?  0 : 1;
 }
 
 } // namespace ebpf

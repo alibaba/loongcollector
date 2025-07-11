@@ -14,17 +14,17 @@
 
 #pragma once
 
+#include "ebpf/plugin/ProcessCache.h"
 #include "FileEvent.h"
 #include "ebpf/plugin/RetryableEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
-#include "ebpf/plugin/ProcessCache.h"
 
 namespace logtail::ebpf {
 
 class FileRetryableEvent : public RetryableEvent {
 public:
-    enum TaskId { kIncrementProcessRef, kFlushEvent, kDecrementProcessRef, kDone };
+    enum TaskId { kFindProcess, kFlushEvent, kDone };
     explicit FileRetryableEvent(
         int retryLimit, 
         const file_data_t& event,
@@ -45,9 +45,8 @@ public:
     [[nodiscard]] bool CanRetry() const override;
 
 private:
-    bool incrementProcessRef();
+    bool findProcess();
     bool flushEvent();
-    bool decrementProcessRef();
 
     const file_data_t* mRawEvent = nullptr;
     ProcessCache& mProcessCache;

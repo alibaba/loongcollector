@@ -62,14 +62,14 @@ public:
     ProcessExecveRetryableEvent* CreateProcessExecveRetryableEvent(msg_execve_event* eventPtr);
     ProcessCloneRetryableEvent* CreateProcessCloneRetryableEvent(msg_clone_event* eventPtr);
     ProcessExitRetryableEvent* CreateProcessExitRetryableEvent(msg_exit* eventPtr);
-    FileRetryableEvent* CreateFileRetryableEvent(file_data_t* eventPtr);
+    
     void RecordDataEvent(msg_data* eventPtr);
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
-    void MarkFileEventFlushStatus(bool isFlush) { mFlushFileEvent = isFlush; }
 
     bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
+    ProcessCache& GetProcessCache() {return mProcessCache;}
 
 private:
     int syncAllProc();
@@ -98,7 +98,6 @@ private:
     IntGaugePtr mRetryableEventCacheSize;
 
     std::atomic_bool mFlushProcessEvent = false;
-    std::atomic_bool mFlushFileEvent = false;
     int64_t mLastProcessCacheClearTime = 0;
     int64_t mLastEventCacheRetryTime = 0;
 

@@ -65,14 +65,12 @@ int bump_memlock_rlimit(void) {
     return 0;
 }
 
-std::mutex gPbMtx;
 std::array<std::vector<void*>, size_t(logtail::ebpf::PluginType::MAX)> gPluginPbs;
 std::array<std::atomic_bool, size_t(logtail::ebpf::PluginType::MAX)> gPluginStatus = {};
 
 std::array<std::vector<std::string>, size_t(logtail::ebpf::PluginType::MAX)> gPluginCallNames;
 
 void UpdatePluginPerfBuffers(logtail::ebpf::PluginType type, std::vector<void*> pbs) {
-    std::lock_guard lk(gPbMtx);
     gPluginPbs[int(type)] = pbs;
 }
 
@@ -143,6 +141,20 @@ int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
         UpdatePluginPerfBuffers(arg->mPluginType, pbs);
     }
     return 0;
+}
+
+void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
+    std::vector<void*> pbs = gPluginPbs[static_cast<int>(pluginType)];
+    gPluginPbs[int(pluginType)] = {};
+    EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+             "[BPFWrapper][stop_plugin] begin clean perfbuffer for pluginType: %d  \n",
+             int(pluginType));
+    for (auto* pb : pbs) {
+        auto* perfbuffer = static_cast<perf_buffer*>(pb);
+        if (perfbuffer) {
+            perf_buffer__free(perfbuffer);
+        }
+    }
 }
 
 int start_plugin(logtail::ebpf::PluginConfig* arg) {
@@ -237,6 +249,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
                                  cn.c_str());
+                        // filter failed, delete perf buffers
+                        DeletePerfBuffers(arg->mPluginType);
                         return kErrDriverInternal;
                     }
                 }
@@ -285,6 +299,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                                  "[start_plugin] Failed to create filter for callname %s\n",
                                  cn.c_str());
+                        // filter failed, delete perf buffers
+                        DeletePerfBuffers(arg->mPluginType);
                         return kErrDriverInternal;
                     }
                 }
@@ -371,10 +387,9 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
     }
-
-    std::lock_guard lk(gPbMtx);
     // find pbs
-    auto& pbs = gPluginPbs[int(type)];
+    std::vector<void*> pbs = gPluginPbs[int(type)];
+
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "no pbs registered for type:%d \n", type);
         return -1;
@@ -517,26 +532,19 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
     return 0;
 }
 
-void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
-    std::vector<void*> pbs;
-    {
-        std::lock_guard lk(gPbMtx);
-        // return;
-        pbs = gPluginPbs[static_cast<int>(pluginType)];
-        gPluginPbs[int(pluginType)] = {};
-    }
-    EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-             "[BPFWrapper][stop_plugin] begin clean perfbuffer for pluginType: %d  \n",
-             int(pluginType));
-    for (auto* pb : pbs) {
-        auto* perfbuffer = static_cast<perf_buffer*>(pb);
-        if (perfbuffer) {
-            perf_buffer__free(perfbuffer);
-        }
-    }
-}
-
 int stop_plugin(logtail::ebpf::PluginType pluginType) {
+    if (pluginType >= logtail::ebpf::PluginType::MAX) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                 "[stop_plugin] invalid plugin type: %d\n", static_cast<int>(pluginType));
+        return -1;
+    }
+    
+    if (!gPluginStatus[int(pluginType)]) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                 "[stop_plugin] plugin already stopped, type: %d\n", static_cast<int>(pluginType));
+        return 0; 
+    }
+
     gPluginStatus[int(pluginType)] = false;
 
     switch (pluginType) {

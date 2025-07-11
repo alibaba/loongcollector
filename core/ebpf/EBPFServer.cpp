@@ -344,6 +344,12 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     if (pluginMgr->Init(options) != 0) {
+        LOG_ERROR(sLogger, ("plugin manager init failed", ""));
+        if ((type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
+            || type == PluginType::FILE_SECURITY) && checkIfNeedStopProcessCacheManager()) {
+            LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
+            mProcessCacheManager->Stop();
+        }
         pluginMgr.reset();
         return false;
     }

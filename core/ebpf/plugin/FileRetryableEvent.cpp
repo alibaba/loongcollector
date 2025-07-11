@@ -51,15 +51,13 @@ bool FileRetryableEvent::HandleMessage() {
     mRawEvent = nullptr;
     // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime));
 
-    if (!IsTaskCompleted(kIncrementProcessRef) && incrementProcessRef()) {
-        CompleteTask(kIncrementProcessRef);
+    if (!IsTaskCompleted(kFindProcess) && findProcess()) {
+        CompleteTask(kFindProcess);
     }
     if (AreAllPreviousTasksCompleted(kFlushEvent) && flushEvent()) {
         CompleteTask(kFlushEvent);
     }
-    if (IsTaskCompleted(kFlushEvent) && decrementProcessRef()) {
-        CompleteTask(kDecrementProcessRef);
-    }
+
     if (AreAllPreviousTasksCompleted(kDone)) {
         return true;
     }
@@ -67,87 +65,49 @@ bool FileRetryableEvent::HandleMessage() {
     return false;
 }
 
-bool FileRetryableEvent::incrementProcessRef() {
+bool FileRetryableEvent::findProcess() {
     if(mFileEvent->mPid <= 0 || mFileEvent->mPid <= 0) {
         LOG_WARNING(sLogger, ("file event", "not process pid or ktime"));
         return true;
     }
 
-    data_event_id key{mFileEvent->mPid, mFileEvent->mKtime};
-    auto cacheValue = mProcessCache.Lookup(key);
+    auto cacheValue = mProcessCache.Lookup({mFileEvent->mPid, mFileEvent->mKtime});
     if (!cacheValue) {
         LOG_DEBUG(sLogger, ("file event", "process cache not found")("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)("path", mFileEvent->mPath));
         return false;
     }
-    mProcessCache.IncRef(key, cacheValue);
-    LOG_DEBUG(sLogger,
-             ("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)(
-                "event", "file")("action", "IncRef process")("path", mFileEvent->mPath));
 
     return true;
 }
-
-bool FileRetryableEvent::decrementProcessRef() {
-    if(mFileEvent->mPid <= 0 || mFileEvent->mPid <= 0) {
-        LOG_WARNING(sLogger, ("file event", "not process pid or ktime"));
-        return true;
-    }
-
-    data_event_id key{mFileEvent->mPid, mFileEvent->mKtime};
-    auto cacheValue = mProcessCache.Lookup(key);
-    if (!cacheValue) {
-        return false;
-    }
-    mProcessCache.DecRef(key, cacheValue);
-    LOG_DEBUG(
-        sLogger,
-        ("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)(
-            "event", "file")("action", "DecRef process")("path", mFileEvent->mPath));
-
-    return true;
-}
-
 bool FileRetryableEvent::flushEvent() {
     if (!mFlushFileEvent) {
         return true;
     }
-    if(mFileEvent->mEventType == KernelEventType::FILE_PATH_TRUNCATE) {
-        LOG_DEBUG(sLogger, ("[security_path_truncate]", "FileEvent before mCommonEventQueue")("path", mFileEvent->mPath)("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime));
-    }
     if (!mEventQueue.try_enqueue(mFileEvent)) {
-        LOG_ERROR(sLogger,
-                  ("event", "Failed to enqueue file event")("pid", mFileEvent->mPid)(
-                      "ktime", mFileEvent->mKtime));
+        LOG_DEBUG(sLogger,
+                   ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
+                    "ktime", mFileEvent->mKtime));
         return false;
     }
     return true;
 }
 
 bool FileRetryableEvent::OnRetry() {
-    if (!IsTaskCompleted(kIncrementProcessRef) && incrementProcessRef()) {
-        CompleteTask(kIncrementProcessRef);
+    if (!IsTaskCompleted(kFindProcess) && findProcess()) {
+        CompleteTask(kFindProcess);
     }
-     if (AreAllPreviousTasksCompleted(kFlushEvent) && !IsTaskCompleted(kFlushEvent) && flushEvent()) {
+    if (AreAllPreviousTasksCompleted(kFlushEvent) && !IsTaskCompleted(kFlushEvent) && flushEvent()) {
         CompleteTask(kFlushEvent);
-    }
-    if (IsTaskCompleted(kFlushEvent) && !IsTaskCompleted(kDecrementProcessRef) && decrementProcessRef()) {
-        CompleteTask(kDecrementProcessRef);
     }
     if (AreAllPreviousTasksCompleted(kDone)) {
         return true;
     }
     return false;
-    return false;
 }
 
 void FileRetryableEvent::OnDrop() {
-    if (mFileEvent){
-        if (!IsTaskCompleted(kFlushEvent)) {
-            flushEvent();
-        }
-        if (!IsTaskCompleted(kDecrementProcessRef) && decrementProcessRef()) {
-            CompleteTask(kDecrementProcessRef);
-        }
+    if (mFileEvent && !IsTaskCompleted(kFlushEvent)){
+        flushEvent();
     }
 }
 

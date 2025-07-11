@@ -81,7 +81,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         kernelFilters.filters[0] = kFilter;
 
         // LOG(INFO) << "filter not empty!";
-        for (int i = 0; i < (int)filter->mFilePathList.size() && i < MAX_FILTER_FOR_PER_CALLNAME; i++) {
+        for (int i = 0; i < (int)filter->mFilePathList.size() && i < STRING_MAPS_INNER_MAX_ENTRIES; i++) {
             const auto& origin = filter->mFilePathList[i];
             std::string truncatedPath;
             if (origin.length() > STRING_PREFIX_MAX_LENGTH - 1) {
@@ -92,8 +92,8 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                 truncatedPath = origin.substr(0, STRING_PREFIX_MAX_LENGTH - 1);
             }
             const auto& x = truncatedPath.empty() ? origin : truncatedPath;
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CreateFilterForCallname] begin to update map in map for filter detail, idx: %d, path: %s\n",
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                     "[CreateFilterForCallname] begin to update map in map for filter detail, idx: %d, path: %s",
                      idx,
                      x.c_str());
 
@@ -103,19 +103,24 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
             ::memcpy(prefixTrie.data, x.data(), x.length());
             prefixTrie.prefixlen = x.length() * 8; // in bits
             uint8_t val = 1;
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CreateFilterForCallname][before update] prefix trie data: %s prefix_len: %u\n",
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                     "[CreateFilterForCallname][before update] prefix trie data: %s, prefix_len: %u",
                      prefixTrie.data,
                      prefixTrie.prefixlen);
             ret = wrapper->UpdateInnerMapElem<StringPrefixMap>(
                 std::string("string_prefix_maps"), &idx, &prefixTrie, &val, 0);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                         "[CreateFilterForCallname][update failed] prefix trie data: %s prefix_len: %u\n",
+                         "[CreateFilterForCallname][update failed] prefix trie data: %s, prefix_len: %u",
                          prefixTrie.data,
                          prefixTrie.prefixlen);
                 continue;
             }
+
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                    "[CreateFilterForCallname][update succeed] prefix trie data: %s, prefix_len: %u",
+                    prefixTrie.data,
+                    prefixTrie.prefixlen);
         }
 
         // udpate filter_map
@@ -127,7 +132,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
 
 int DeleteFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> wrapper,
                                 const std::string& callName) {
-    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "DeleteFilterForCallname %s\n", callName.c_str());
+    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO, "DeleteFilterForCallname %s", callName.c_str());
     int callNameIdx = GetCallNameIdx(callName);
     if (callNameIdx == ERR_UNKNOWN_CALLNAME) {
         return kErrDriverInvalidParam;
@@ -143,7 +148,7 @@ int DeleteFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
     if (ret) {
         // no filters found, return directly
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "[DeleteFilterForCallname] there is no filter for call name: %s\n",
+                 "[DeleteFilterForCallname] there is no filter for call name: %s",
                  callName.c_str());
         return 0;
     }
@@ -154,8 +159,8 @@ int DeleteFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         auto outterKey = filter.map_idx[0];
         wrapper->DeleteInnerMap<StringPrefixMap>("string_prefix_maps", &outterKey);
         IdAllocator::GetInstance()->ReleaseId<StringPrefixMap>(outterKey);
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "[DeleteFilterForCallname] release filter for type: %d mapIdx: %u\n",
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                 "[DeleteFilterForCallname] release filter for type: %d mapIdx: %u",
                  static_cast<int>(filter.filter_type),
                  outterKey);
     }

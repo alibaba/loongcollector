@@ -62,6 +62,7 @@ public:
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
     int SendEvents() override;
+    int PollPerfBuffer() override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
@@ -80,7 +81,18 @@ public:
         return pc;
     }
 
+    FileRetryableEvent* CreateFileRetryableEvent(file_data_t* eventPtr);
+    RetryableEventCache& EventCache() { return mRetryableEventCache; }
+
 private:
+    void markFileEventFlushStatus(bool isFlush) { mFlushFileEvent = isFlush; }
+    
+    RetryableEventCache mRetryableEventCache;
+    IntGaugePtr mRetryableEventCacheSize;
+    int64_t mLastEventCacheRetryTime = 0;
+
+    std::atomic_bool mFlushFileEvent = false;
+
     ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
