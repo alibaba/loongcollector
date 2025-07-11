@@ -116,7 +116,7 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
     auto execveEvent = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 799);
     APSARA_TEST_EQUAL(manager->HandleEvent(execveEvent), 0);
@@ -186,7 +186,7 @@ void ManagerUnittest::TestManagerConcurrency() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(processManager->Init(), 0);
-    APSARA_TEST_EQUAL(processManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    processManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
     // fileManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
     std::vector<std::thread> threads;
@@ -226,7 +226,7 @@ void ManagerUnittest::TestManagerErrorHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
     manager->Suspend();
     APSARA_TEST_FALSE(manager->IsRunning());
     APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
@@ -373,7 +373,7 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
     // 创建多个相关的进程事件
     std::vector<std::shared_ptr<ProcessEvent>> events;

@@ -32,12 +32,14 @@ bool HttpRetryableEvent::HandleMessage() {
     }
 
     if (!mRecord->GetConnection()->IsMetaAttachReadyForAppRecord()) {
+        LOG_DEBUG(sLogger, ("app meta not ready", mRecord->GetSpanName())("flag", mRecord->GetConnection()->GetMetaFlags()));
         ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachRollbackTotal, 1);
         return false;
     }
 
     // success
     ADD_COUNTER(mRecord->GetAppDetail()->mAppMetaAttachSuccessTotal, 1);
+    flushEvent();
     return true;
 }
 

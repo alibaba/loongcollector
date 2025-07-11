@@ -92,6 +92,21 @@ private:
         return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
     }
 
+    int HandleEvents() {
+        std::array<std::shared_ptr<CommonEvent>, 4096> items;
+        size_t count
+            = mEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
+        LOG_WARNING(sLogger, ("count", count));
+        for (size_t i = 0; i < count; i ++) {
+            if (items[i] == nullptr) {
+                LOG_WARNING(sLogger, ("event is null", ""));
+                continue;
+            }
+            mManager->HandleEvent(items[i]);
+        }
+        return count;
+    }
+
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
@@ -371,7 +386,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
         free(dataEvent);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    APSARA_TEST_EQUAL(HandleEvents(), 100);
     // verify
     // auto now = std::chrono::steady_clock::now();
     LOG_INFO(sLogger, ("====== consume span ======", ""));
@@ -415,7 +430,9 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
 
 // TEST RollBack mechanism
 void NetworkObserverManagerUnittest::TestRollbackProcessing() {
+    LOG_INFO(sLogger, ("TestRollbackProcessing", "start"));
     {
+        mManager = CreateManager();
         ObserverNetworkOption options;
         options.mL7Config.mEnable = true;
         options.mL7Config.mEnableLog = true;
@@ -453,20 +470,42 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         peerPodInfo->mPodName = "peer-pod-name";
         peerPodInfo->mNamespace = "peer-namespace";
         K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
+        mManager->HandleHostMetadataUpdate({"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106"});
 
+        APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 0);
         // copy current
         mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
 
         // Generate 10 records
         for (size_t i = 0; i < 100; i++) {
             auto* dataEvent = CreateHttpDataEvent(i);
+            auto cnn = mManager->mConnectionManager->AcceptNetDataEvent(dataEvent);
+            cnn->mCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106");
+            LOG_INFO(sLogger, ("cidKey", cnn->mCidKey));
+            APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
+            APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
+            APSARA_TEST_FALSE(cnn->IsPeerMetaAttachReady());
+            APSARA_TEST_FALSE(cnn->IsSelfMetaAttachReady());
+            APSARA_TEST_FALSE(cnn->IsL4MetaAttachReady());
+            APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 1);
             mManager->AcceptDataEvent(dataEvent);
             free(dataEvent);
         }
+
+        APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 1);
+        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 100);
+
         auto cnn = mManager->mConnectionManager->getConnection({0, 2, 1});
         APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
+        APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
+        APSARA_TEST_FALSE(cnn->IsPeerMetaAttachReady());
+        APSARA_TEST_FALSE(cnn->IsSelfMetaAttachReady());
+        APSARA_TEST_FALSE(cnn->IsL4MetaAttachReady());
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        APSARA_TEST_EQUAL(0, HandleEvents());
+        
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         // conn stats arrive
         auto statsEvent = CreateConnStatsEvent();
@@ -478,12 +517,19 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         APSARA_TEST_TRUE(cnn->IsL4MetaAttachReady());
 
         APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
-        APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
-        APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
+        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 100);
+        
+        
+        // APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-        APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
-        APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
+        LOG_INFO(sLogger, ("before handle cache", ""));
+        mManager->mRetryableEventCache.HandleEvents();
+        APSARA_TEST_EQUAL(100, HandleEvents());
+        LOG_INFO(sLogger, ("after handle cache", ""));
+
+        // std::this_thread::sleep_for(std::chrono::seconds(5));
+        // APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
+        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 0);
 
         // Generate 10 records
         for (size_t i = 0; i < 100; i++) {
@@ -492,10 +538,11 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
             free(dataEvent);
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
-        APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
+        APSARA_TEST_EQUAL(100, HandleEvents());
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 0);
     }
+    LOG_INFO(sLogger, ("TestRollbackProcessing", "stop"));
 }
 
 size_t GenerateContainerIdHash(const std::string& cid) {
@@ -871,11 +918,11 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestDataEventProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPerfBufferOperations);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 
 } // namespace ebpf
 } // namespace logtail

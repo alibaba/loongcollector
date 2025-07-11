@@ -22,6 +22,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "metadata/K8sMetadata.h"
+#include "plugin/network_observer/NetworkObserverManager.h"
 
 extern "C" {
 #include <coolbpf/net.h>
@@ -148,8 +149,7 @@ void Connection::updateL4Meta(struct conn_stats_event_t* event) {
             cidTrim = match.str(0);
         }
     }
-    std::hash<std::string> hasher;
-    AttrHashCombine(mCidKey, hasher(cidTrim));
+    mCidKey = GenerateContainerKey(cidTrim);
 
     // handle socket info ...
     struct socket_info& si = event->si;

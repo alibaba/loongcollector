@@ -153,6 +153,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, L7Record* other) {
+              if (base == nullptr) {
+                return;
+              }
               int statusCode = other->GetStatusCode();
               if (statusCode >= 500) {
                   base->m5xxCount += 1;
@@ -231,6 +234,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
       mNetAggregator(
           10240,
           [](std::unique_ptr<NetMetricData>& base, ConnStatsRecord* other) {
+              if (base == nullptr) {
+                return;
+              }
               base->mDropCount += other->mDropCount;
               base->mRetransCount += other->mRetransCount;
               base->mRecvBytes += other->mRecvBytes;
@@ -307,6 +313,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
       mSpanAggregator(
           4096, // 1024 span per second
           [](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<CommonEvent>& other) {
+              if (base == nullptr) {
+                return;
+              }
               base->mRecords.push_back(other);
           },
           [](const std::shared_ptr<CommonEvent>&, std::shared_ptr<SourceBuffer>&) {
@@ -315,6 +324,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
       mLogAggregator(
           4096, // 1024 log per second
           [](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<CommonEvent>& other) {
+              if (base == nullptr) {
+                return;
+              }
               base->mRecords.push_back(other);
           },
           [](const std::shared_ptr<CommonEvent>&, std::shared_ptr<SourceBuffer>&) {
@@ -807,8 +819,6 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
 
-        bool needPush = false;
-
         bool init = false;
         QueueKey queueKey = 0;
         uint32_t pluginIdx = -1;
@@ -944,14 +954,14 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         });
         auto eventSize = eventGroup.GetEvents().size();
 #ifdef APSARA_UNIT_TEST_MAIN
-        if (needPush) {
+        if (init) {
             ADD_COUNTER(pushMetricsTotal, eventSize);
             ADD_COUNTER(pushMetricGroupTotal, 1);
             mMetricEventGroups.emplace_back(std::move(eventGroup));
         }
         
 #else
-        if (needPush) {
+        if (init) {
             ADD_COUNTER(pushMetricsTotal, eventSize);
             ADD_COUNTER(pushMetricGroupTotal, 1);
             LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
@@ -1600,12 +1610,10 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
         return;
     }
 
-    LOG_DEBUG(sLogger, ("begin parse, protocol is", std::string(magic_enum::enum_name(event->protocol))));
-
     // AcceptDataEvent is called in poller thread, PollPerfBuffer will copy app config before do callback ...
     const auto& appDetail = getAppConfigFromReplica(conn);
     if (appDetail == nullptr) {
-        LOG_DEBUG(sLogger, ("failed to find app detail for conn", conn->DumpConnection()));
+        LOG_DEBUG(sLogger, ("failed to find app detail for conn", conn->DumpConnection())("cidKey", conn->GetContainerIdKey()));
         return;
     }
 
@@ -1621,6 +1629,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
         std::shared_ptr<RetryableEvent> retryableEvent
             = std::make_shared<HttpRetryableEvent>(5, record, mCommonEventQueue);
         if (!retryableEvent->HandleMessage()) {
+            // LOG_DEBUG(sLogger, ("failed once", "enqueue retry cache")("meta flag", conn->GetMetaFlags()));
             mRetryableEventCache.AddEvent(retryableEvent);
         }
     }
