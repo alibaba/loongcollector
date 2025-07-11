@@ -103,7 +103,6 @@ protected:
     void TearDown() override {
         mConfig.reset();
         EBPFServer::GetInstance()->Stop();
-        Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
     }
 

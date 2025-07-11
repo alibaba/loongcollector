@@ -22,7 +22,7 @@
 
 #include "json/value.h"
 
-#include "AppConfig.h"
+#include "app_config/AppConfig.h"
 #include "common/StringView.h"
 
 namespace logtail {

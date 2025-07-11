@@ -20,11 +20,11 @@
 
 #include <mutex>
 
-#include "ContainerInfo.h"
 #include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "ebpf/type/table/ProcessTable.h"
 #include "ebpf/type/table/StaticDataRow.h"
+#include "metadata/ContainerInfo.h"
 
 namespace logtail {
 

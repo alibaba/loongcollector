@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ConnectionManager.h"
+#include "ebpf/plugin/network_observer/ConnectionManager.h"
 
 #include "logger/Logger.h"
 
@@ -103,9 +103,6 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
 
 void ConnectionManager::Iterations() {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    auto nowTs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    // report every seconds ...
-    bool needGenRecord = (nowTs - mLastReportTs > 5);
     LOG_DEBUG(sLogger,
               ("[Iterations] conn tracker map size", mConnections.size())("total count", mConnectionTotal.load()));
     int n = 0;
@@ -123,28 +120,12 @@ void ConnectionManager::Iterations() {
         connection->TryAttachPeerMeta();
         connection->TryAttachSelfMeta();
 
-        bool forceGenRecord = false;
         if (connection && connection->ReadyToDestroy(now)) {
-            forceGenRecord = true;
             // push conn stats ...
             deleteQueue.push_back(it.first);
             connection->MarkConnDeleted();
             n++;
             continue;
-        }
-
-        if (mEnableConnStats && connection->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
-            std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(connection);
-            LOG_DEBUG(sLogger,
-                      ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
-                                                                                             forceGenRecord));
-            bool res = connection->GenerateConnStatsRecord(record);
-            if (res && mConnStatsHandler) {
-                mConnStatsHandler(record);
-            }
-            if (needGenRecord) {
-                mLastReportTs = nowTs; // update report ts
-            }
         }
 
         // when we query for conn tracker, we record active

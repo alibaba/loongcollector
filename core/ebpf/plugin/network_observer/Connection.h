@@ -34,9 +34,6 @@ extern "C" {
 
 namespace logtail::ebpf {
 
-class AbstractRecord;
-class ConnStatsRecord;
-
 struct ConnStatsData {
 public:
     void Clear() { ::memset(this, 0, sizeof(ConnStatsData)); }
@@ -60,6 +57,8 @@ public:
     explicit Connection(const ConnId& connId) : mConnId(connId) {}
     void UpdateConnStats(struct conn_stats_event_t* event);
     void UpdateConnState(struct conn_ctrl_event_t* event);
+
+    [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
@@ -147,7 +146,7 @@ public:
     void TryAttachSelfMeta();
     void TryAttachPeerMeta(int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
-    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
+    // bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
 
     [[nodiscard]] support_role_e GetRole() const { return mRole; }
 
@@ -165,6 +164,9 @@ private:
     // self pod meta
     void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void updateSelfPodMetaForUnknown();
+    void updateSelfPodMetaForEnv();
+    static StringView kGetSelfPodName();
+    static StringView kGetSelfPodIp();
 
     using Flag = unsigned int;
 
@@ -201,6 +203,8 @@ private:
     std::atomic<Flag> mMetaFlags = 0;
 
     StaticDataRow<&kConnTrackerTable> mTags;
+
+    size_t mCidKey = 0;
 
     std::atomic_int mEpoch = 4;
     std::atomic_bool mIsClose = false;

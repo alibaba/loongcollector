@@ -88,17 +88,17 @@ bool ProtocolParserManager::RemoveParser(support_proto_e type) {
 }
 
 
-std::vector<std::shared_ptr<AbstractRecord>> ProtocolParserManager::Parse(support_proto_e type,
-                                                                          const std::shared_ptr<Connection>& conn,
-                                                                          struct conn_data_event_t* data,
-                                                                          const std::shared_ptr<Sampler>& sampler) {
+std::vector<std::shared_ptr<L7Record>> ProtocolParserManager::Parse(support_proto_e type,
+                                                                    const std::shared_ptr<Connection>& conn,
+                                                                    struct conn_data_event_t* data,
+                                                                    const std::shared_ptr<AppDetail>& appDetail) {
     ReadLock lock(mLock);
     if (mParsers.find(type) != mParsers.end()) {
-        return mParsers[type]->Parse(data, conn, sampler);
+        return mParsers[type]->Parse(data, conn, appDetail);
     }
 
     LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
-    return std::vector<std::shared_ptr<AbstractRecord>>();
+    return std::vector<std::shared_ptr<L7Record>>();
 }
 
 } // namespace logtail::ebpf

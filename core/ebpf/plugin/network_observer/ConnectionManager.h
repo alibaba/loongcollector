@@ -24,9 +24,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "Connection.h"
 #include "common/Lock.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/plugin/network_observer/Connection.h"
 extern "C" {
 #include <coolbpf/net.h>
 };
@@ -40,7 +40,7 @@ public:
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
-    using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
+    // using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
 
     ~ConnectionManager() {}
 
@@ -49,10 +49,6 @@ public:
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
 
     void Iterations();
-
-    void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
-
-    void RegisterConnStatsFunc(ConnStatsHandler fn) { mConnStatsHandler = fn; }
 
     int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
@@ -67,7 +63,6 @@ private:
     std::atomic_int mMaxConnections;
 
     std::atomic_bool mEnableConnStats = false;
-    ConnStatsHandler mConnStatsHandler = nullptr;
 
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects

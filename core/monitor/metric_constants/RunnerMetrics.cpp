@@ -79,6 +79,9 @@ const string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL = "process_cache_miss_t
 const string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE = "process_cache_size";
 const string METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE = "process_data_map_size";
 const string METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE = "retryable_event_cache_size";
+const string METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL = "poll_kernel_event_total";
+const string METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL = "lost_kernel_event_total";
+const string METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE = "connection_cache_size";
 
 /**********************************************************
  *   k8s metadata

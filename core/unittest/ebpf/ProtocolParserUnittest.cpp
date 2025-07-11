@@ -57,7 +57,7 @@ void ProtocolParserUnittest::TestParseHttp() {
     const std::string input = "GET /index.html HTTP/1.1\r\nHost: www.cmonitor.ai\r\nAccept: image/gif, image/jpeg, "
                               "*/*\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64)\r\n\r\n";
     std::string_view buf(input);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
 
     ParseState state = http::ParseRequest(buf, result, true);
 
@@ -78,7 +78,7 @@ void ProtocolParserUnittest::TestParseHttp() {
 
     const std::string input2 = "GET /path HTTP/1.1\r\nHost: example.com"; // Incomplete header
     std::string_view buf2(input2);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf2, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 }
@@ -90,7 +90,7 @@ void ProtocolParserUnittest::TestParseHttpResponse() {
                               "\r\n"
                               "Hello, World!";
     std::string_view buf(input);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
 
     ParseState state = http::ParseResponse(buf, result, false, true);
 
@@ -107,7 +107,7 @@ void ProtocolParserUnittest::TestParseHttpResponse() {
                                  "\r\n"
                                  "Not Found";
     std::string_view buf2(notFound);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseResponse(buf2, result, false, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetStatusCode(), 404);
@@ -122,7 +122,7 @@ void ProtocolParserUnittest::TestParseHttpHeaders() {
                               "Cookie: session=abc123; user=john\r\n"
                               "\r\n";
     std::string_view buf(input);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
 
     ParseState state = http::ParseRequest(buf, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
@@ -156,7 +156,7 @@ void ProtocolParserUnittest::TestParseChunkedEncoding() {
                               "0\r\n"
                               "\r\n";
     std::string_view buf(input);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
 
     ParseState state = http::ParseResponse(buf, result, false, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
@@ -169,19 +169,19 @@ void ProtocolParserUnittest::TestParseChunkedEncoding() {
 void ProtocolParserUnittest::TestParseInvalidRequests() {
     const std::string invalidMethod = "INVALID /test HTTP/1.1\r\n\r\n";
     std::string_view buf1(invalidMethod);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
     ParseState state = http::ParseRequest(buf1, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
 
     const std::string invalidVersion = "GET /test HTTP/2.0\r\n\r\n";
     std::string_view buf2(invalidVersion);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf2, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 
     const std::string invalidHeader = "GET /test HTTP/1.1\r\nInvalid Header\r\n\r\n";
     std::string_view buf3(invalidHeader);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf3, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 }
@@ -190,14 +190,14 @@ void ProtocolParserUnittest::TestParsePartialRequests() {
     // 测试不完整的请求行
     const std::string partialRequestLine = "GET /test";
     std::string_view buf1(partialRequestLine);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
     ParseState state = http::ParseRequest(buf1, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
     // 测试不完整的头部
     const std::string partialHeaders = "GET /test HTTP/1.1\r\nHost: example.com\r\n";
     std::string_view buf2(partialHeaders);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf2, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
@@ -226,7 +226,7 @@ void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     // 测试空请求
     const std::string emptyRequest;
     std::string_view buf1(emptyRequest);
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
     ParseState state = http::ParseRequest(buf1, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 
@@ -234,7 +234,7 @@ void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     longUrl.append(2048, 'a');
     longUrl += " HTTP/1.1\r\n\r\n";
     std::string_view buf2(longUrl);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf2, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
 
@@ -244,7 +244,7 @@ void ProtocolParserUnittest::TestHttpParserEdgeCases() {
     }
     manyHeaders += "\r\n";
     std::string_view buf3(manyHeaders);
-    result = std::make_shared<HttpRecord>(nullptr);
+    result = std::make_shared<HttpRecord>(nullptr, nullptr);
     state = http::ParseRequest(buf3, result, true);
     APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 }
@@ -291,7 +291,7 @@ const std::string RESP_MSG = "HTTP/1.1 200 OK\r\n"
                              "4444444444444444444444444444444444444444444444444444444444444444\r\n\r\n";
 
 void ProtocolParserUnittest::RequestBenchmark() {
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -321,7 +321,7 @@ void ProtocolParserUnittest::RequestWithoutBodyBenchmark() {
 }
 
 void ProtocolParserUnittest::ResponseBenchmark() {
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
         std::string_view respBuf(RESP_MSG);
@@ -333,7 +333,7 @@ void ProtocolParserUnittest::ResponseBenchmark() {
 }
 
 void ProtocolParserUnittest::ChunkedResponseBenchmark() {
-    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr);
+    std::shared_ptr<HttpRecord> result = std::make_shared<HttpRecord>(nullptr, nullptr);
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000000; i++) {
         std::string_view respBuf(CHUNKED_RESP_MSG);
