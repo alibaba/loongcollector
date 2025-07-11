@@ -26,10 +26,10 @@ namespace logtail::ebpf {
 
 class HttpRetryableEvent : public RetryableEvent {
 public:
-    explicit HttpRetryableEvent(int retryLimit, const std::shared_ptr<L7Record>& record, moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-        : RetryableEvent(retryLimit),
-          mRecord(record),
-          mCommonEventQueue(queue) {}
+    explicit HttpRetryableEvent(int retryLimit,
+                                const std::shared_ptr<L7Record>& record,
+                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+        : RetryableEvent(retryLimit), mRecord(record), mCommonEventQueue(queue) {}
 
     virtual ~HttpRetryableEvent() = default;
 
@@ -46,7 +46,7 @@ private:
     bool attachContainerMeta(bool isRetry);
     bool attachK8sPodMeta(bool isRetry);
     bool flushEvent();
-    
+
     // record ...
     std::shared_ptr<L7Record> mRecord;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;

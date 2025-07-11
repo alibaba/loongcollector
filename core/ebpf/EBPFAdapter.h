@@ -97,7 +97,7 @@ private:
     std::atomic_bool mInited = false;
     std::shared_ptr<DynamicLibLoader> mLib;
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
-    // 
+    //
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
     std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
     std::array<std::atomic_bool, (int)PluginType::MAX> mRunning = {};

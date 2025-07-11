@@ -154,7 +154,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
           10240,
           [](std::unique_ptr<AppMetricData>& base, L7Record* other) {
               if (base == nullptr) {
-                return;
+                  return;
               }
               int statusCode = other->GetStatusCode();
               if (statusCode >= 500) {
@@ -235,7 +235,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
           10240,
           [](std::unique_ptr<NetMetricData>& base, ConnStatsRecord* other) {
               if (base == nullptr) {
-                return;
+                  return;
               }
               base->mDropCount += other->mDropCount;
               base->mRetransCount += other->mRetransCount;
@@ -314,7 +314,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
           4096, // 1024 span per second
           [](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               if (base == nullptr) {
-                return;
+                  return;
               }
               base->mRecords.push_back(other);
           },
@@ -325,7 +325,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
           4096, // 1024 log per second
           [](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               if (base == nullptr) {
-                return;
+                  return;
               }
               base->mRecords.push_back(other);
           },
@@ -574,7 +574,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
             ADD_COUNTER(pushLogGroupTotal, 1);
             mLogEventGroups.emplace_back(std::move(eventGroup));
         }
-        
+
 #else
         if (init && needPush) {
             auto eventSize = eventGroup.GetEvents().size();
@@ -959,7 +959,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
             ADD_COUNTER(pushMetricGroupTotal, 1);
             mMetricEventGroups.emplace_back(std::move(eventGroup));
         }
-        
+
 #else
         if (init) {
             ADD_COUNTER(pushMetricsTotal, eventSize);
@@ -1111,7 +1111,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
             ADD_COUNTER(pushSpanGroupTotal, 1);
             mSpanEventGroups.emplace_back(std::move(eventGroup));
         }
-        
+
 #else
         if (init && needPush) {
             ADD_COUNTER(pushSpansTotal, eventSize);
@@ -1613,7 +1613,8 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
     // AcceptDataEvent is called in poller thread, PollPerfBuffer will copy app config before do callback ...
     const auto& appDetail = getAppConfigFromReplica(conn);
     if (appDetail == nullptr) {
-        LOG_DEBUG(sLogger, ("failed to find app detail for conn", conn->DumpConnection())("cidKey", conn->GetContainerIdKey()));
+        LOG_DEBUG(sLogger,
+                  ("failed to find app detail for conn", conn->DumpConnection())("cidKey", conn->GetContainerIdKey()));
         return;
     }
 

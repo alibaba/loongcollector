@@ -78,13 +78,15 @@ protected:
                                                                      retryableEventCacheSize);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
-        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "pipeline", "project", PluginStateOperation::kAddPipeline, mManager);
+        EBPFServer::GetInstance()->updatePluginState(
+            PluginType::NETWORK_OBSERVE, "pipeline", "project", PluginStateOperation::kAddPipeline, mManager);
     }
 
     void TearDown() override {
         AsynCurlRunner::GetInstance()->Stop();
         mManager->Destroy();
-        EBPFServer::GetInstance()->updatePluginState(PluginType::NETWORK_OBSERVE, "", "", PluginStateOperation::kRemoveAll, nullptr);
+        EBPFServer::GetInstance()->updatePluginState(
+            PluginType::NETWORK_OBSERVE, "", "", PluginStateOperation::kRemoveAll, nullptr);
     }
 
 private:
@@ -94,10 +96,9 @@ private:
 
     int HandleEvents() {
         std::array<std::shared_ptr<CommonEvent>, 4096> items;
-        size_t count
-            = mEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
+        size_t count = mEventQueue.wait_dequeue_bulk_timed(items.data(), items.size(), std::chrono::milliseconds(200));
         LOG_WARNING(sLogger, ("count", count));
-        for (size_t i = 0; i < count; i ++) {
+        for (size_t i = 0; i < count; i++) {
             if (items[i] == nullptr) {
                 LOG_WARNING(sLogger, ("event is null", ""));
                 continue;
@@ -503,7 +504,7 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
         APSARA_TEST_FALSE(cnn->IsL4MetaAttachReady());
 
         APSARA_TEST_EQUAL(0, HandleEvents());
-        
+
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
@@ -518,8 +519,8 @@ void NetworkObserverManagerUnittest::TestRollbackProcessing() {
 
         APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
         APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 100);
-        
-        
+
+
         // APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
 
         LOG_INFO(sLogger, ("before handle cache", ""));

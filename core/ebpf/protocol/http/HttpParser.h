@@ -94,8 +94,8 @@ public:
     std::shared_ptr<AbstractProtocolParser> Create() override { return std::make_shared<HTTPProtocolParser>(); }
 
     std::vector<std::shared_ptr<L7Record>> Parse(struct conn_data_event_t* dataEvent,
-                                                       const std::shared_ptr<Connection>& conn,
-                                                       const std::shared_ptr<AppDetail>& appDetail) override;
+                                                 const std::shared_ptr<Connection>& conn,
+                                                 const std::shared_ptr<AppDetail>& appDetail) override;
 };
 
 REGISTER_PROTOCOL_PARSER(support_proto_e::ProtoHTTP, HTTPProtocolParser)

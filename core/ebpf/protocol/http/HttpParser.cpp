@@ -28,8 +28,8 @@ inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
 std::vector<std::shared_ptr<L7Record>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
-                                                                       const std::shared_ptr<Connection>& conn,
-                                                                       const std::shared_ptr<AppDetail>& appDetail) {
+                                                                 const std::shared_ptr<Connection>& conn,
+                                                                 const std::shared_ptr<AppDetail>& appDetail) {
     auto record = std::make_shared<HttpRecord>(conn, appDetail);
     record->SetEndTsNs(dataEvent->end_ts);
     record->SetStartTsNs(dataEvent->start_ts);

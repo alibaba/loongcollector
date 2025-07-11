@@ -24,7 +24,9 @@ public:
                  uint16_t dport,
                  uint32_t netNs)
         : CommonEvent(type),
-          mPid(pid), mKtime(ktime), mTimestamp(timestamp),
+          mPid(pid),
+          mKtime(ktime),
+          mTimestamp(timestamp),
           mProtocol(protocol),
           mFamily(family),
           mSport(sport),

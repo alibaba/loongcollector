@@ -46,7 +46,8 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<ProcessEventGroup> {
+          [](const std::shared_ptr<CommonEvent>& in,
+             [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<ProcessEventGroup> {
               auto* processEvent = static_cast<ProcessEvent*>(in.get());
               if (processEvent) {
                   return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);

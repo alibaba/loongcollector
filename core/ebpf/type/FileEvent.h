@@ -18,7 +18,7 @@ public:
     FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, const std::string& path)
         : CommonEvent(type), mPid(pid), mKtime(ktime), mTimestamp(timestamp), mPath(path) {}
     [[nodiscard]] PluginType GetPluginType() const override { return PluginType::FILE_SECURITY; };
-    
+
     uint32_t mPid;
     uint64_t mKtime;
     uint64_t mTimestamp; // for kernel ts nano

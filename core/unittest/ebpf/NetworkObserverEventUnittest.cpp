@@ -35,7 +35,7 @@ public:
     void TestHttpRecordTimestamps();
     void TestHttpRecordStatus();
     void TestAbstractNetRecord();
-    
+
 
 protected:
     std::shared_ptr<AppDetail> createAppDetail() {

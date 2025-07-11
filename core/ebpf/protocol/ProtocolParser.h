@@ -49,9 +49,9 @@ public:
     std::set<support_proto_e> AvaliableProtocolTypes() const;
 
     std::vector<std::shared_ptr<L7Record>> Parse(support_proto_e type,
-                                                       const std::shared_ptr<Connection>& conn,
-                                                       struct conn_data_event_t* data,
-                                                       const std::shared_ptr<AppDetail>& appDetail);
+                                                 const std::shared_ptr<Connection>& conn,
+                                                 struct conn_data_event_t* data,
+                                                 const std::shared_ptr<AppDetail>& appDetail);
 
 private:
     ProtocolParserManager() {}

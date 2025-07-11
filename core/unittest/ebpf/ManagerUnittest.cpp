@@ -19,10 +19,10 @@
 #include <thread>
 
 #include "EBPFServer.h"
-#include "ebpf/plugin/ProcessCacheManager.h"
 #include "common/TimeUtil.h"
 #include "common/timer/Timer.h"
 #include "ebpf/EBPFAdapter.h"
+#include "ebpf/plugin/ProcessCacheManager.h"
 // #include "ebpf/plugin/file_security/FileSecurityManager.h"
 #include "ebpf/plugin/network_security/NetworkSecurityManager.h"
 #include "ebpf/plugin/process_security/ProcessSecurityManager.h"
@@ -97,7 +97,9 @@ void ManagerUnittest::TestProcessSecurityManagerBasic() {
     APSARA_TEST_EQUAL(manager->Init(), 0);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
     APSARA_TEST_EQUAL(manager->Suspend(), 0);
@@ -177,8 +179,7 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
 // }
 
 void ManagerUnittest::TestManagerConcurrency() {
-    auto processManager
-        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto processManager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
     // auto fileManager = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue,
     // nullptr);
 
@@ -186,7 +187,8 @@ void ManagerUnittest::TestManagerConcurrency() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(processManager->Init(), 0);
-    processManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    processManager->AddOrUpdateConfig(
+        &ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
     // fileManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
     std::vector<std::thread> threads;
@@ -242,7 +244,9 @@ void ManagerUnittest::TestNetworkSecurityManagerBasic() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
     // 测试暂停
@@ -263,7 +267,9 @@ void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
 
     // 测试TCP连接事件
     auto connectEvent
@@ -322,7 +328,9 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
-    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
 
     // 创建多个相关的网络事件
     std::vector<std::shared_ptr<NetworkEvent>> events;

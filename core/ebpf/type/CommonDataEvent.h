@@ -45,6 +45,7 @@ public:
     [[nodiscard]] virtual PluginType GetPluginType() const = 0;
     [[nodiscard]] virtual KernelEventType GetKernelEventType() const { return mEventType; }
     KernelEventType mEventType;
+
 private:
     CommonEvent() = delete;
 };
