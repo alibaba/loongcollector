@@ -99,6 +99,24 @@ const std::string ProcessCollector::sName = "process";
 const std::string kMetricLabelProcess = "valueTag";
 const std::string kMetricLabelMode = "mode";
 
+std::string GetPathBase(std::string filePath) {
+    if (filePath.empty()) {
+        return ".";
+    }
+
+    if (filePath.back() == '\\' || filePath.back() == '/') {
+        filePath.pop_back();
+    }
+    if (!filePath.empty()) {
+        std::filesystem::path path{filePath};
+        if (path.has_filename()) {
+            return path.filename().string();
+        }
+    }
+
+    const char sep = std::filesystem::path::preferred_separator;
+    return {&sep, &sep + 1};
+}
 
 ProcessCollector::ProcessCollector() {
     Init(INT32_FLAG(process_total_count), INT32_FLAG(process_report_top_N));
@@ -232,9 +250,9 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     std::vector<std::string> vmNames = {
-        "vm_process_minimum",
-        "vm_process_maximum",
-        "vm_process_average",
+        "vm_process_min",
+        "vm_process_max",
+        "vm_process_avg",
     };
     std::vector<double> vmValues = {
         minVMProcessNum.vmProcessNum,
@@ -259,65 +277,33 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         pid_t pid = pushMerticList[i].pid;
         // cpu percent
         value = static_cast<double>(mAvgProcessCpuPercent.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_cpu_average"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_cpu_avg"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // mem percent
         value = static_cast<double>(mAvgProcessMemPercent.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_memory_average"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_memory_avg"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // open file number
         value = static_cast<double>(mAvgProcessFd.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_openfile_average"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_openfile_avg"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // process number
         value = static_cast<double>(mAvgProcessNumThreads.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_average"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_number_avg"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(mMaxProcessNumThreads.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_maximum"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_number_max"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(mMinProcessNumThreads.find(pid)->second);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_minimum"),
+        multiDoubleValuesEachPid->SetValue(std::string("process_number_min"),
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         metricEventEachPid->SetTag("pid", std::to_string(pid));
         metricEventEachPid->SetTag("name", pushMerticList[i].name);
         metricEventEachPid->SetTag("user", pushMerticList[i].user);
         metricEventEachPid->SetTag(std::string("m"), std::string("system.process"));
-    }
-
-    // 打包记录，process_expand
-    // average record
-    for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
-        MetricEvent* metricEventEachPidExpand = group->AddMetricEvent(true);
-        metricEventEachPidExpand->SetTimestamp(now, 0);
-        metricEventEachPidExpand->SetValue<UntypedMultiDoubleValues>(metricEventEachPidExpand);
-        auto* multiDoubleValuesEachPidExpand = metricEventEachPidExpand->MutableValue<UntypedMultiDoubleValues>();
-        double value = 0.0;
-        pid_t pid = pushMerticList[i].pid;
-        // cpu
-        value = static_cast<double>(pushMerticList[i].cpuPercent);
-        multiDoubleValuesEachPidExpand->SetValue(
-            std::string("process_expand_cpu_percent"),
-            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
-        // mem
-        value = static_cast<double>(pushMerticList[i].memPercent);
-        multiDoubleValuesEachPidExpand->SetValue(
-            std::string("process_expand_memory_percent"),
-            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
-        // openfile
-        value = static_cast<double>(pushMerticList[i].fdNum);
-        multiDoubleValuesEachPidExpand->SetValue(
-            std::string("process_expand_openfile_number"),
-            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
-
-        metricEventEachPidExpand->SetTag("pid", std::to_string(pid));
-        metricEventEachPidExpand->SetTag("name", pushMerticList[i].name);
-        metricEventEachPidExpand->SetTag("user", pushMerticList[i].user);
-        metricEventEachPidExpand->SetTag("args", pushMerticList[i].args);
-        metricEventEachPidExpand->SetTag("path", pushMerticList[i].path);
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失
@@ -450,6 +436,10 @@ int ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
     }
 
     processInfo.path = GetExecutablePath(pid);
+    processCredName.name = GetPathBase(processInfo.path);
+    if (processCredName.name == ".") {
+        processCredName.name = "unknown";
+    }
 
     processInfo.pid = pid;
     processInfo.name = processCredName.name;
