@@ -736,7 +736,8 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
 
     // 验证旧容器配置已被清除
     APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 0);
-    APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 0); // 确保旧workload的容器被清除
+    APSARA_TEST_EQUAL(mManager->mWorkloadConfigs.count(workload1Key), 0);
+    // APSARA_TEST_EQUAL(wlConfig.containerIds.size(), 0); // 确保旧workload的容器被清除
 
     /******************** 测试用例6: 添加新配置 ********************/
     CollectionPipelineContext context2;
@@ -907,6 +908,7 @@ void NetworkObserverManagerUnittest::TestSaeScenario() {
     APSARA_TEST_EQUAL(appInfo->mWorkspace, "test-workspace");
 
     K8sMetadata::GetInstance().mEnable = true;
+    free(dataEvent);
 }
 
 
