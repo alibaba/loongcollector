@@ -121,6 +121,50 @@ private:
         ++mMockCalledCount;
         return true;
     }
+    bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        cmdline.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processMemory.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processCredName.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        executePath.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processFd.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
 
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
