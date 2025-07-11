@@ -39,7 +39,7 @@ int suspend_plugin(logtail::ebpf::PluginType);
 int resume_plugin(logtail::ebpf::PluginConfig* arg);
 
 // 1,2,3,4,5 ==> 2,3,4,5,6
-// input::stop() -> suspend_plugin() ==> clear enable pids 
+// input::stop() -> suspend_plugin() ==> clear enable pids
 // input::start() -> update_plugin() ==> enable 2,3,4,5,6 ==> resume_plugin()
 
 // data plane
