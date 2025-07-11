@@ -152,8 +152,6 @@ private:
     std::array<size_t, 2> generateAggKeyForNetMetric(ConnStatsRecord*,
                                                      const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
-    // void processRecord(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& currentContainerConfigs,
-    //                    const std::shared_ptr<AbstractRecord>& record);
     void processRecordAsLog(const std::shared_ptr<CommonEvent>& record,
                             const std::shared_ptr<logtail::ebpf::AppDetail>&);
     void processRecordAsSpan(const std::shared_ptr<CommonEvent>& record,

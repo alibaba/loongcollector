@@ -63,7 +63,6 @@ private:
     std::atomic_int mMaxConnections;
 
     std::atomic_bool mEnableConnStats = false;
-    // ConnStatsHandler mConnStatsHandler = nullptr;
 
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects

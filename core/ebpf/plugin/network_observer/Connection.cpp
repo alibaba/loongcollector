@@ -95,21 +95,6 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     this->RecordLastUpdateTs(event->ts);
 }
 
-// bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in) {
-//     auto* record = static_cast<ConnStatsRecord*>(in.get());
-//     if (!record) {
-//         return false;
-//     }
-
-//     record->mRecvPackets = (mCurrStats.mRecvPackets == 0) ? 0 : mCurrStats.mRecvPackets;
-//     record->mSendPackets = (mCurrStats.mSendPackets == 0) ? 0 : mCurrStats.mSendPackets;
-//     record->mRecvBytes = (mCurrStats.mRecvBytes == 0) ? 0 : mCurrStats.mRecvBytes;
-//     record->mSendBytes = (mCurrStats.mSendBytes == 0) ? 0 : mCurrStats.mSendBytes;
-//     mCurrStats.Clear();
-
-//     return true;
-// }
-
 void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) {
     if (IsL7MetaAttachReady()) {
         return;
