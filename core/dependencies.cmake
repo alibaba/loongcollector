@@ -365,7 +365,22 @@ macro(link_crypto target_name)
     if (crypto_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${crypto_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")
+        # Check if we're on ARM and building a shared library
+        # TODO：armv8使用了汇编优化，尝试多种方法编译成fPIC失败，所以当需要编译成动态库时，使用crypto动态库
+        set(use_shared_crypto FALSE)
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+            # Check if the target itself is a shared library
+            get_target_property(target_type ${target_name} TYPE)
+            if (target_type STREQUAL "SHARED_LIBRARY")
+                set(use_shared_crypto TRUE)
+            endif()
+        endif()
+        
+        if (use_shared_crypto)
+            target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.so")
+        else()
+            target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")
+        endif()
     elseif (MSVC)
         #target_link_libraries (${target_name}
         #   debug "libcurl-d"
