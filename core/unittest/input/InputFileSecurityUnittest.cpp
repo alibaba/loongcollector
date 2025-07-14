@@ -126,6 +126,36 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter2.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter2.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter2.mFilePathList[2]);
+
+    // test deduplication
+    configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/etc/passwd",
+                    "/bin",
+                    "/bin"
+                ]
+            }
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputFileSecurity());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
+    logtail::ebpf::SecurityFileFilter thisFilter3
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
+    // 验证去重后只有3个唯一路径
+    APSARA_TEST_EQUAL(3, thisFilter3.mFilePathList.size());
+    APSARA_TEST_EQUAL("/etc/passwd", thisFilter3.mFilePathList[0]);
+    APSARA_TEST_EQUAL("/etc/shadow", thisFilter3.mFilePathList[1]);
+    APSARA_TEST_EQUAL("/bin", thisFilter3.mFilePathList[2]);
 }
 
 void InputFileSecurityUnittest::OnFailedInit() {
@@ -219,7 +249,7 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
@@ -249,12 +279,12 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     // APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
+        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
     serverPipelineName

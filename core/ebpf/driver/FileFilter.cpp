@@ -40,7 +40,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                                 const std::string& callName,
                                 const std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> config) {
     ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-             "[CreateFilterForCallname] EnableCallName:%s, idx:%ld, hold:%d \n",
+             "[CreateFilterForCallname] EnableCallName:%s, idx:%ld, hold:%d",
              callName.c_str(),
              config.index(),
              std::holds_alternative<SecurityFileFilter>(config));
@@ -61,11 +61,11 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         int idx = IdAllocator::GetInstance()->GetNextId<StringPrefixMap>();
         if (idx == ERR_LIMIT_EXCEEDED) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CreateFilterForCallname][IDAllocator] Failed to get next id, reach max %d\n",
+                     "\n[CreateFilterForCallname][IDAllocator] Failed to get next id, reach max %d",
                      IdAllocator::GetInstance()->GetMaxId<StringPrefixMap>());
             return kErrDriverInvalidParam;
         }
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
                  "[CreateFilterForCallname] Get index %d for %s\n",
                  idx,
                  callName.c_str());
@@ -80,9 +80,16 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
         kernelFilters.filter_count = 1;
         kernelFilters.filters[0] = kFilter;
 
+        // Calculate dynamic max_entries based on the actual number of filters
+        auto maxEntries = static_cast<uint32_t>(filter->mFilePathList.size());
+        
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                 "[CreateFilterForCallname] Creating inner map with %u entries for %s",
+                 maxEntries,
+                 callName.c_str());
+
         // LOG(INFO) << "filter not empty!";
-        for (int i = 0; i < (int)filter->mFilePathList.size() && i < STRING_MAPS_INNER_MAX_ENTRIES; i++) {
-            const auto& origin = filter->mFilePathList[i];
+        for (const auto & origin : filter->mFilePathList) {
             std::string truncatedPath;
             if (origin.length() > STRING_PREFIX_MAX_LENGTH - 1) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
@@ -108,7 +115,7 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
                      prefixTrie.data,
                      prefixTrie.prefixlen);
             ret = wrapper->UpdateInnerMapElem<StringPrefixMap>(
-                std::string("string_prefix_maps"), &idx, &prefixTrie, &val, 0);
+                std::string("string_prefix_maps"), &idx, &prefixTrie, &val, 0, maxEntries);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "[CreateFilterForCallname][update failed] prefix trie data: %s, prefix_len: %u",
