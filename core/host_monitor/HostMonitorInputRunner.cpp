@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+#include "SystemInterface.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
@@ -35,6 +36,7 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
@@ -55,6 +57,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<ProcessEntityCollector>();
     RegisterCollector<CPUCollector>();
     RegisterCollector<SystemCollector>();
+    RegisterCollector<MemCollector>();
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
