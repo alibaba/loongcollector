@@ -1,4 +1,4 @@
-# Copyright 2021 iLogtail Authors
+# Copyright 2023 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.6 AS build
+cmake_minimum_required(VERSION 3.22)
+project(forward_unittest)
 
-USER root
-WORKDIR /src
-COPY . .
+add_executable(grpc_runner_unittest GrpcRunnerUnittest.cpp)
+target_link_libraries(grpc_runner_unittest ${UT_BASE_TARGET})
 
-ARG HOST_OS=Linux
-ARG VERSION=0.0.1
-
-RUN --mount=type=ssh sh generated_files/gen_build.sh
+include(GoogleTest)
+gtest_discover_tests(grpc_runner_unittest)
