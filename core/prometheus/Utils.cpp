@@ -1,11 +1,10 @@
 #include "prometheus/Utils.h"
 
-#include <xxhash/xxhash.h>
-
 #include <iomanip>
 
 #include "common/StringTools.h"
 #include "common/StringView.h"
+#include "common/HashUtil.h"
 #include "http/HttpResponse.h"
 
 using namespace std;
@@ -133,7 +132,7 @@ uint64_t GetRandSleepMilliSec(const std::string& key, uint64_t intervalSeconds, 
     // Pre-compute the inverse of the maximum value of uint64_t
     static constexpr double sInverseMaxUint64 = 1.0 / static_cast<double>(std::numeric_limits<uint64_t>::max());
 
-    uint64_t h = XXH64(key.c_str(), key.length(), 0);
+    int64_t h = HashString(key);
 
     // Normalize the hash to the range [0, 1]
     double normalizedH = static_cast<double>(h) * sInverseMaxUint64;
