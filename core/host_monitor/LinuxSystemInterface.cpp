@@ -221,4 +221,96 @@ bool LinuxSystemInterface::GetCPUCoreNumInformationOnce(CpuCoreNumInformation& c
     return true;
 }
 
+static inline double Diff(double a, double b) {
+    return a - b > 0 ? a - b : 0;
+}
+
+uint64_t LinuxSystemInterface::GetMemoryValue(char unit, uint64_t value) {
+    if (unit == 'k' || unit == 'K') {
+        value *= 1024;
+    } else if (unit == 'm' || unit == 'M') {
+        value *= 1024 * 1024;
+    }
+    return value;
+}
+
+/*
+样例: /proc/meminfo:
+MemTotal:        4026104 kB
+MemFree:         2246280 kB
+MemAvailable:    3081592 kB
+Buffers:          124380 kB
+Cached:          1216756 kB
+SwapCached:            0 kB
+Active:           417452 kB
+Inactive:        1131312 kB
+ */
+bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& meminfo) {
+    auto memInfoStat = PROCESS_DIR / PROCESS_MEMINFO;
+    std::vector<std::string> memInfoStr;
+    const uint64_t mb = 1024 * 1024;
+
+    std::ifstream file(static_cast<std::string>(memInfoStat));
+
+    if (!file.is_open()) {
+        LOG_ERROR(sLogger, ("open meminfo file", "fail")("file", memInfoStat));
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        memInfoStr.push_back(line);
+    }
+
+    file.close();
+
+    int count = 0;
+
+    /* 字符串处理，处理成对应的类型以及值*/
+    for (size_t i = 0; i < memInfoStr.size() && count < 5; i++) {
+        std::vector<std::string> words;
+        boost::algorithm::split(words, memInfoStr[i], boost::is_any_of(" "), boost::token_compress_on);
+        // words-> MemTotal: / 12344 / kB
+        if (words.size() < 2) {
+            continue;
+        }
+        double val;
+        uint64_t orival;
+        if (words.size() == 2) {
+            if (!StringTo(words[1], val)) {
+                val = 0.0;
+            }
+        } else if (words.back().size() > 0 && StringTo(words[1], orival)) {
+            val = GetMemoryValue(words.back()[0], orival);
+        }
+        if (words[0] == "MemTotal:") {
+            meminfo.memStat.total = val;
+            count++;
+        } else if (words[0] == "MemFree:") {
+            meminfo.memStat.free = val;
+            count++;
+        } else if (words[0] == "MemAvailable:") {
+            meminfo.memStat.available = val;
+            count++;
+        } else if (words[0] == "Buffers:") {
+            meminfo.memStat.buffers = val;
+            count++;
+        } else if (words[0] == "Cached:") {
+            meminfo.memStat.cached = val;
+            count++;
+        }
+    }
+    meminfo.memStat.used = Diff(meminfo.memStat.total, meminfo.memStat.free);
+    meminfo.memStat.actualUsed = Diff(meminfo.memStat.total, meminfo.memStat.available);
+    meminfo.memStat.actualFree = meminfo.memStat.available;
+    meminfo.memStat.ram = meminfo.memStat.total / mb;
+
+    double diff = Diff(meminfo.memStat.total, meminfo.memStat.actualFree);
+    meminfo.memStat.usedPercent = meminfo.memStat.total > 0 ? diff * 100 / meminfo.memStat.total : 0.0;
+    diff = Diff(meminfo.memStat.total, meminfo.memStat.actualUsed);
+    meminfo.memStat.freePercent = meminfo.memStat.total > 0 ? diff * 100 / meminfo.memStat.total : 0.0;
+    return true;
+}
+
+
 } // namespace logtail

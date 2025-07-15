@@ -114,6 +114,17 @@ bool SystemInterface::GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNum
         errorType);
 }
 
+bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
+    const std::string errorType = "mem";
+    return MemoizedCall(
+        mMemInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetHostMemInformationStatOnce(static_cast<MemoryInformation&>(info));
+        },
+        meminfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {

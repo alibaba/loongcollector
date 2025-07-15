@@ -34,7 +34,6 @@
 
 #include "common/StringView.h"
 
-
 namespace logtail {
 
 inline bool StartWith(const std::string& input, StringView pattern) {
