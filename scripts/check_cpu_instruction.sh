@@ -178,3 +178,4 @@ else
     echo -e "\033[0;32mAll CPU instruction checks passed\033[0m"
     echo -e "\033[0;32mNo unwanted instructions (AVX-512, AVX2) found\033[0m"
 fi 
+
