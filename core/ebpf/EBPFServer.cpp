@@ -486,7 +486,14 @@ void EBPFServer::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        mProcessCacheManager->PollPerfBuffers();
+        
+        int processCacheEvents = mProcessCacheManager->PollPerfBuffers();
+        
+        int currentMaxWaitTime = kDefaultMaxWaitTimeMS;
+        if (processCacheEvents == 0) {
+            currentMaxWaitTime = kDefaultMaxWaitTimeMS / 2;
+        }
+        
         for (int i = 0; i < int(PluginType::MAX); i++) {
             auto type = PluginType(i);
             auto& pluginState = getPluginState(type);
@@ -496,10 +503,14 @@ void EBPFServer::pollPerfBuffers() {
             std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
             auto& plugin = pluginState.mManager;
             if (plugin) {
-                int cnt = plugin->PollPerfBuffer();
+                int cnt = plugin->PollPerfBuffer(currentMaxWaitTime);
                 LOG_DEBUG(sLogger,
                           ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
-                                                                                        plugin->IsRunning()));
+                                                                                        plugin->IsRunning())("wait_time", currentMaxWaitTime));
+                
+                if (cnt == 0 && currentMaxWaitTime > 1) {
+                    currentMaxWaitTime = currentMaxWaitTime / 2;
+                }
             }
         }
     }

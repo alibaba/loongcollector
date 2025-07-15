@@ -53,7 +53,7 @@ public:
 
     bool Init();
     void Stop();
-    void PollPerfBuffers();
+    int PollPerfBuffers();
 
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);

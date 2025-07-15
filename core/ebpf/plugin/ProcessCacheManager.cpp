@@ -432,8 +432,9 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     return res;
 }
 
-void ProcessCacheManager::PollPerfBuffers() {
+int ProcessCacheManager::PollPerfBuffers() {
     int zero = 0;
+    int ret = 0;
     mIsPolling = true;
     // mIsPolling must be set before mInited check to ensure
     // when stopping, mIsPolling == false can ensure no more events will be processed
@@ -445,7 +446,7 @@ void ProcessCacheManager::PollPerfBuffers() {
             SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
         }
         // poll after retry to avoid instant retry
-        auto ret = mEBPFAdapter->PollPerfBuffers(
+        ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
         LOG_DEBUG(sLogger,
                         ("process cache poll buffer", "")("cnt", ret));
@@ -464,6 +465,7 @@ void ProcessCacheManager::PollPerfBuffers() {
         }
     }
     mIsPolling = false;
+    return ret;
 }
 
 } // namespace logtail::ebpf

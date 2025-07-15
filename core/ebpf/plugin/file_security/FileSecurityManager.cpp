@@ -258,7 +258,7 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
     AttrHashCombine(result[1], strHasher(event->mPath));
     return result;
 }
-int FileSecurityManager::PollPerfBuffer() {
+int FileSecurityManager::PollPerfBuffer(int maxWaitTimeMs) {
     auto now = TimeKeeper::GetInstance()->NowSec();
     if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
         EventCache().HandleEvents();
@@ -268,7 +268,7 @@ int FileSecurityManager::PollPerfBuffer() {
     }
     int zero = 0;
     return mEBPFAdapter->PollPerfBuffers(
-        PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+        PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {

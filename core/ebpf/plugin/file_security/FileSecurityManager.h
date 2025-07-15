@@ -62,7 +62,7 @@ public:
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
     int SendEvents() override;
-    int PollPerfBuffer() override;
+    int PollPerfBuffer(int maxWaitTimeMs) override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
