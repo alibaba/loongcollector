@@ -49,10 +49,10 @@ struct ApmConfig {
 };
 
 struct ObserverNetworkOption {
-    L7Config mL7Config;
-    L4Config mL4Config;
-    ApmConfig mApmConfig;
-    std::vector<WorkloadSelector> mSelectors;
+    L7Config mL7Config; // L7 层配置，必填
+    L4Config mL4Config; // L4 层配置，必填
+    ApmConfig mApmConfig; // 应用配置
+    std::vector<WorkloadSelector> mSelectors; // 非必填
 };
 
 struct PerfBufferSpec {

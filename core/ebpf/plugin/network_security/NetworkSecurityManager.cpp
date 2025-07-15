@@ -223,7 +223,6 @@ int NetworkSecurityManager::SendEvents() {
         });
     }
     {
-        ReadLock lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }
@@ -300,23 +299,17 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
 
     mConfigName = ctx->GetConfigName();
     mMetricMgr = metricMgr;
-    {
-        WriteLock lk(mContextMutex);
-        mPluginIndex = index;
-        mPipelineCtx = ctx;
-        mQueueKey = ctx->GetProcessQueueKey();
-    }
+    mPluginIndex = index;
+    mPipelineCtx = ctx;
+    mQueueKey = ctx->GetProcessQueueKey();
 
     return 0;
 }
 
 int NetworkSecurityManager::RemoveConfig(const std::string&) {
-    {
-        ReadLock lk(mContextMutex);
-        for (auto& item : mRefAndLabels) {
-            if (mMetricMgr) {
-                mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
-            }
+    for (auto& item : mRefAndLabels) {
+        if (mMetricMgr) {
+            mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
         }
     }
     return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;

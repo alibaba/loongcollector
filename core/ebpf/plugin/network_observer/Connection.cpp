@@ -49,9 +49,10 @@ bool Connection::IsLocalhost() const {
 }
 
 // only called by poller thread ...
-void Connection::UpdateConnState(struct conn_ctrl_event_t* event) {
+void Connection::UpdateConnState(struct conn_ctrl_event_t* event, bool& isClose) {
     if (EventClose == event->type) {
         MarkClose();
+        isClose = true;
     } else if (EventConnect == event->type) {
         // a new connection established, do nothing...
     }

@@ -90,8 +90,6 @@ private:
     PluginMetricManagerPtr mMetricMgr;
     std::string mConfigName;
 
-    // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    ReadWriteLock mContextMutex;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};

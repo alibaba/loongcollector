@@ -79,9 +79,9 @@ public:
     // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
-    std::string GetSubpath() const { return mSubpath; }
+    const std::string& GetSubpath() const { return mSubpath; }
 
-    std::string GetWorkspace() const { return mWorkspace; }
+    const std::string& GetWorkspace() const { return mWorkspace; }
 
     std::string mProject;
     std::string mLogstore;

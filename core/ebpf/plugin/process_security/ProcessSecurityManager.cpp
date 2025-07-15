@@ -88,23 +88,17 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     }
 
     mMetricMgr = metricMgr;
-    {
-        WriteLock lk(mContextMutex);
-        mPluginIndex = index;
-        mPipelineCtx = ctx;
-        mQueueKey = ctx->GetProcessQueueKey();
-    }
+    mPluginIndex = index;
+    mPipelineCtx = ctx;
+    mQueueKey = ctx->GetProcessQueueKey();
 
     return 0;
 }
 
 int ProcessSecurityManager::RemoveConfig(const std::string&) {
-    {
-        ReadLock lk(mContextMutex);
-        for (auto& item : mRefAndLabels) {
-            if (mMetricMgr) {
-                mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
-            }
+    for (auto& item : mRefAndLabels) {
+        if (mMetricMgr) {
+            mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
         }
     }
     auto processCacheMgr = GetProcessCacheManager();
@@ -249,7 +243,6 @@ int ProcessSecurityManager::SendEvents() {
         });
     }
     {
-        ReadLock lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }

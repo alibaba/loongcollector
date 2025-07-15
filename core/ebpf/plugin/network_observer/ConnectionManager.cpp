@@ -14,6 +14,7 @@
 
 #include "ebpf/plugin/network_observer/ConnectionManager.h"
 
+#include "TimeKeeper.h"
 #include "logger/Logger.h"
 
 extern "C" {
@@ -63,7 +64,11 @@ void ConnectionManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
         return;
     }
 
-    conn->UpdateConnState(event);
+    bool isClose = false;
+    conn->UpdateConnState(event, isClose);
+    if (isClose) {
+        mClosedConnections[0].push_back(connId);
+    }
     conn->RecordActive();
 }
 
@@ -101,7 +106,33 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
     conn->RecordActive();
 }
 
+void ConnectionManager::cleanClosedConnections() {
+    for (const auto& connId : mClosedConnections[kConnectionEpoch - 1]) {
+        const auto& it = mConnections.find(connId);
+        if (it == mConnections.end()) {
+            // connection is already removed
+            continue;
+        }
+        deleteConnection(connId);
+        LOG_DEBUG(sLogger,
+                  ("delete connections caused by close, pid", connId.tgid)("fd", connId.fd)("start", connId.start));
+    }
+
+    for (size_t i = kConnectionEpoch - 1; i >= 1; i--) {
+        std::swap(mClosedConnections[i], mClosedConnections[i - 1]);
+    }
+
+    mClosedConnections[0].clear();
+}
+
 void ConnectionManager::Iterations() {
+    cleanClosedConnections();
+    auto nowMs = TimeKeeper::GetInstance()->NowMs();
+    if (nowMs - mLastGcTimeMs < mGcIntervalMs) {
+        return;
+    }
+    mLastGcTimeMs = nowMs;
+
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
     LOG_DEBUG(sLogger,
               ("[Iterations] conn tracker map size", mConnections.size())("total count", mConnectionTotal.load()));

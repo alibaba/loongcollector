@@ -38,10 +38,6 @@ int stop_plugin(logtail::ebpf::PluginType);
 int suspend_plugin(logtail::ebpf::PluginType);
 int resume_plugin(logtail::ebpf::PluginConfig* arg);
 
-// 1,2,3,4,5 ==> 2,3,4,5,6
-// input::stop() -> suspend_plugin() ==> clear enable pids
-// input::start() -> update_plugin() ==> enable 2,3,4,5,6 ==> resume_plugin()
-
 // data plane
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms);
 

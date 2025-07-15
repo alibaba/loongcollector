@@ -204,10 +204,9 @@ private:
         std::set<std::string> containerIds;
     };
 
-    mutable ReadWriteLock
-        mAppConfigLock; // protect mConfigVersion/mWorkloadConfigs/mContainerConfigs/mConfigToWorkloads
-    int mConfigVersion = 0;
-    int mLastConfigVersion = -1;
+    mutable ReadWriteLock mAppConfigLock;
+    std::atomic_int mConfigVersion = 0;
+    std::atomic_int mLastConfigVersion = -1;
     std::unordered_map<size_t, WorkloadConfig> mWorkloadConfigs; // workloadKey => {config, containers}
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigs; // containerKey => config
     std::unordered_map<std::string, std::set<size_t>> mConfigToWorkloads; // configName => workloadKeys

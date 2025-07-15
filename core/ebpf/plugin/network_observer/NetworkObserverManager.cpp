@@ -311,7 +311,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               return data;
           }),
       mSpanAggregator(
-          4096, // 1024 span per second
+          4096,
           [](std::unique_ptr<AppSpanGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               if (base == nullptr) {
                   return;
@@ -322,7 +322,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               return std::make_unique<AppSpanGroup>();
           }),
       mLogAggregator(
-          4096, // 1024 log per second
+          4096,
           [](std::unique_ptr<AppLogGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               if (base == nullptr) {
                   return;
@@ -1546,13 +1546,10 @@ int NetworkObserverManager::PollPerfBuffer() {
 
     // 2. do perf callback ==> update cache, generate record(if not ready, add to mRetryableEventCache, else add to
     // aggregator) poll stats -> ctrl -> info
-    {
+    if (mLastConfigVersion != mConfigVersion) {
         ReadLock lk(mAppConfigLock);
-        // deep copy app config ...
-        if (mLastConfigVersion != mConfigVersion) {
-            mContainerConfigsReplica = mContainerConfigs;
-            mLastConfigVersion = mConfigVersion;
-        }
+        mContainerConfigsReplica = mContainerConfigs;
+        mLastConfigVersion.store(mConfigVersion);
     }
 
     int32_t flag = 0;

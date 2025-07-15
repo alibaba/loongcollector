@@ -56,6 +56,8 @@ public:
 private:
     explicit ConnectionManager(int maxConnections) : mMaxConnections(maxConnections), mConnectionTotal(0) {}
 
+    void cleanClosedConnections();
+
     std::shared_ptr<Connection> getOrCreateConnection(const ConnId&);
     void deleteConnection(const ConnId&);
     std::shared_ptr<Connection> getConnection(const ConnId&);
@@ -64,13 +66,17 @@ private:
 
     std::atomic_bool mEnableConnStats = false;
 
+    int mLastGcTimeMs = INT_MIN; // frequency control ...
+    int mGcIntervalMs = 5000; // 5s
+
+    std::array<std::vector<ConnId>, kConnectionEpoch> mClosedConnections;
+
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects
     // lock used to protect conn_trackers map
     // mutable ReadWriteLock mReadWriteLock;
     std::unordered_map<ConnId, std::shared_ptr<Connection>> mConnections;
 
-    int64_t mLastReportTs = -1;
     friend class NetworkObserverManager;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;

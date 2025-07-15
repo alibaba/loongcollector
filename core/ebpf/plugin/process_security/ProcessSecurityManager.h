@@ -88,8 +88,6 @@ private:
 
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
-    // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    ReadWriteLock mContextMutex;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};

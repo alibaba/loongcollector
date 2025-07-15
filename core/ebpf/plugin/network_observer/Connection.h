@@ -34,6 +34,8 @@ extern "C" {
 
 namespace logtail::ebpf {
 
+inline constexpr int kConnectionEpoch = 3;
+
 struct ConnStatsData {
 public:
     void Clear() { ::memset(this, 0, sizeof(ConnStatsData)); }
@@ -56,7 +58,7 @@ public:
     Connection& operator=(Connection&&) = delete;
     explicit Connection(const ConnId& connId) : mConnId(connId) {}
     void UpdateConnStats(struct conn_stats_event_t* event);
-    void UpdateConnState(struct conn_ctrl_event_t* event);
+    void UpdateConnState(struct conn_ctrl_event_t* event, bool& isClose);
 
     [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
 
@@ -129,7 +131,7 @@ public:
     }
 
     void RecordActive() {
-        this->mEpoch = 4;
+        this->mEpoch = kConnectionEpoch;
         auto now = std::chrono::steady_clock::now();
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
@@ -206,7 +208,7 @@ private:
 
     size_t mCidKey = 0;
 
-    std::atomic_int mEpoch = 4;
+    std::atomic_int mEpoch = kConnectionEpoch;
     std::atomic_bool mIsClose = false;
     std::chrono::time_point<std::chrono::steady_clock> mMarkCloseTime;
     int64_t mLastUpdateTs = 0;
