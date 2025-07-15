@@ -48,6 +48,11 @@ private:
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
 
     uint64_t GetMemoryValue(char unit, uint64_t value);
+    bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
+    bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override;
+    bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) override;
+    bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) override;
+    bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) override;
 
     ProcParser mProcParser;
 };
