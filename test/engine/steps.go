@@ -39,6 +39,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	// chaos
 	ctx.Given(`^network delay package \{(\d+)\}ms for ip \{(.*)\}`, chaos.NetworkDelay)
 	ctx.Given(`^network lost package \{(\d+)\}% for ip \{(.*)\}`, chaos.NetworkLoss)
+	ctx.Given(`^cpu fullload for \{(\d+)\} seconds$`, chaos.CpuFullLoad)
+	ctx.Given(`^mem high for \{(\d+)\} seconds$`, chaos.MemHigh)
 	ctx.Given(`^clean all chaos$`, cleanup.DestoryAllChaos)
 	// ------------------------------------------
 
