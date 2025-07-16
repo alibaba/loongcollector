@@ -57,8 +57,8 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
         return true;
     }
 
-    SystemStat minSys, maxSys, avgSys, lastSys;
-    mCalculate.Stat(maxSys, minSys, avgSys, &lastSys);
+    SystemStat minSys, maxSys, avgSys;
+    mCalculate.Stat(maxSys, minSys, avgSys);
 
     mCount = 0;
     mCalculate.Reset();

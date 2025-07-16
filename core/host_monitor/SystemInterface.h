@@ -93,12 +93,12 @@ struct ProcessInformation : public BaseInformation {
 
 // /proc/loadavg
 struct SystemStat {
-    double load1;
-    double load5;
-    double load15;
-    double load1PerCore;
-    double load5PerCore;
-    double load15PerCore;
+    double load1 = 0.0;
+    double load5 = 0.0;
+    double load15 = 0.0;
+    double load1PerCore = 0.0;
+    double load5PerCore = 0.0;
+    double load15PerCore = 0.0;
 
     // Define the field descriptors
     static inline const FieldName<SystemStat> systemMetricFields[] = {
@@ -232,10 +232,10 @@ struct InterfaceConfig {
 
 // TCP各种状态下的连接数
 struct ResTCPStat {
-    uint64_t tcpEstablished;
-    uint64_t tcpListen;
-    uint64_t tcpTotal;
-    uint64_t tcpNonEstablished;
+    uint64_t tcpEstablished = 0;
+    uint64_t tcpListen = 0;
+    uint64_t tcpTotal = 0;
+    uint64_t tcpNonEstablished = 0;
 
     static inline const FieldName<ResTCPStat, uint64_t> resTCPStatFields[] = {
         FIELD_ENTRY(ResTCPStat, tcpEstablished),
@@ -254,14 +254,14 @@ struct ResTCPStat {
 
 // 每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
 struct ResNetRatePerSec {
-    double rxPackRate;
-    double txPackRate;
-    double rxByteRate;
-    double txByteRate;
-    double txErrorRate;
-    double rxErrorRate;
-    double rxDropRate;
-    double txDropRate;
+    double rxPackRate = 0.0;
+    double txPackRate = 0.0;
+    double rxByteRate = 0.0;
+    double txByteRate = 0.0;
+    double txErrorRate = 0.0;
+    double rxErrorRate = 0.0;
+    double rxDropRate = 0.0;
+    double txDropRate = 0.0;
 
 
     static inline const FieldName<ResNetRatePerSec> resRatePerSecFields[] = {

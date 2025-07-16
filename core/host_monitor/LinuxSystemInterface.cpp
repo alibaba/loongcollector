@@ -580,7 +580,7 @@ bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& memi
         if (words.size() < 2) {
             continue;
         }
-        double val;
+        double val = 0.0;
         uint64_t orival;
         if (words.size() == 2) {
             if (!StringTo(words[1], val)) {
