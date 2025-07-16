@@ -48,13 +48,11 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         return false;
     }
     TCPStatInformation resTCPStat;
-    NetRateInformation netInterfaceMetrics;
     NetInterfaceInformation netInterfaces;
 
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
     if (!(SystemInterface::GetInstance()->GetTCPStatInformation(resTCPStat)
-          && SystemInterface::GetInstance()->GetNetRateInformation(netInterfaceMetrics)
           && SystemInterface::GetInstance()->GetNetInterfaceInformation(netInterfaces))) {
         mLastTime = start;
         return false;
@@ -79,7 +77,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     mTCPCal.AddValue(resTCPStat.stat);
 
     // rate
-    for (auto& netInterfaceMetric : netInterfaceMetrics.metrics) {
+    for (auto& netInterfaceMetric : netInterfaces.metrics) {
         if (netInterfaceMetric.name.empty()) {
             continue;
         }

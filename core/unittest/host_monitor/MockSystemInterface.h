@@ -95,15 +95,6 @@ private:
         return true;
     }
 
-    bool GetNetRateInformationOnce(NetRateInformation& netRateInfo) override {
-        if (mBlockTime > 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
-        }
-        netRateInfo.collectTime = std::chrono::steady_clock::now();
-        ++mMockCalledCount;
-        return true;
-    }
-
     bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) override {
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));

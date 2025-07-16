@@ -19,6 +19,7 @@
 #include "MetricEvent.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "unittest/Unittest.h"
 
@@ -29,6 +30,8 @@ namespace logtail {
 class NetCollectorUnittest : public ::testing::Test {
 public:
     void TestCollect() const;
+    void TestIpv6FileNoExist() const;
+    void TestDevNoExist() const;
 
 protected:
     void SetUp() override {
@@ -78,8 +81,8 @@ protected:
                 "colls carrier compressed\n";
         ofs3 << "     lo: 1538516774 9633892    0    0    0     0          0         0 1538516774 9633892    0    0    "
                 "0     0       0          0\n";
-        ofs3 << "   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0    0 "
-                "   0     0       0          0\n";
+        // ofs3 << "   eth0: 9338508096 24973536    0    0    0     0          0         0 42362852159 11767669    0 0 "
+        //         "   0     0       0          0\n";
 
         ofs3.close();
 
@@ -88,7 +91,7 @@ protected:
         // 00000000000000000000000000000001 01 80 10 80       lo
         // fe800000000000009c156afffe89f929 05 40 20 80 veth1305bc9
         ofstream ofs4("./net/if_inet6");
-        ofs4 << "fe8000000000000002163efffe250097 02 40 20 80     eth0";
+        // ofs4 << "fe8000000000000002163efffe250097 02 40 20 80     eth0";
         ofs4 << "00000000000000000000000000000001 01 80 10 80       lo";
         PROCESS_DIR = ".";
     }
@@ -104,10 +107,10 @@ void NetCollectorUnittest::TestCollect() const {
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
 
-    APSARA_TEST_EQUAL_FATAL(6UL, group.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
 
     vector<string> device_names = {
-        "eth0",
+        // "eth0",
         "lo",
     };
 
@@ -156,7 +159,94 @@ void NetCollectorUnittest::TestCollect() const {
     }
 }
 
+void NetCollectorUnittest::TestIpv6FileNoExist() const {
+    // 删除单个文件
+    std::error_code ec;
+    bool success = std::filesystem::remove("./net/sockstat6", ec);
+    if (!success && ec) {
+        // 处理错误，比如文件不存在或权限不足
+        std::cerr << "Failed to delete file: " << ec.message() << std::endl;
+    }
+
+    success = std::filesystem::remove("./net/if_inet6", ec);
+    if (!success && ec) {
+        // 处理错误，比如文件不存在或权限不足
+        std::cerr << "Failed to delete file: " << ec.message() << std::endl;
+    }
+
+    uint64_t tcp;
+    APSARA_TEST_FALSE(LinuxSystemInterface::GetInstance()->ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, tcp));
+
+    auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
+    NetCollector collector = NetCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+
+    APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
+
+    vector<string> device_names = {
+        // "eth0",
+        "lo",
+    };
+
+    vector<string> rate_names = {
+        "networkin_droppackages_avg",   "networkin_droppackages_max",   "networkin_droppackages_min",
+        "networkin_errorpackages_avg",  "networkin_errorpackages_max",  "networkin_errorpackages_min",
+        "networkin_rate_avg",           "networkin_rate_max",           "networkin_rate_min",
+        "networkin_packages_avg",       "networkin_packages_max",       "networkin_packages_min",
+        "networkout_droppackages_avg",  "networkout_droppackages_max",  "networkout_droppackages_min",
+        "networkout_errorpackages_avg", "networkout_errorpackages_max", "networkout_errorpackages_min",
+        "networkout_packages_avg",      "networkout_packages_max",      "networkout_packages_min",
+        "networkout_rate_avg",          "networkout_rate_max",          "networkout_rate_min",
+    };
+
+    for (size_t j = 0; j < device_names.size(); j++) {
+        auto event = group.GetEvents()[j].Cast<MetricEvent>();
+        auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
+        APSARA_TEST_EQUAL_FATAL(device_names[j], event.GetTag("device"));
+        APSARA_TEST_EQUAL_FATAL(hostname, event.GetTag("hostname"));
+        APSARA_TEST_EQUAL_FATAL(std::string("system.net_original"), event.GetTag("m"));
+        for (size_t i = 0; i < rate_names.size(); ++i) {
+            APSARA_TEST_TRUE(maps.find(rate_names[i]) != maps.end());
+            EXPECT_NEAR(0.0, maps[rate_names[i]].Value, 1e-6);
+        }
+    }
+
+    vector<string> tcp_names = {
+        "LISTEN",
+        "ESTABLISHED",
+        "NON_ESTABLISHED",
+        "TCP_TOTAL",
+    };
+    vector<string> tcp_cnt_names = {
+        "net_tcpconnection_avg",
+        "net_tcpconnection_max",
+        "net_tcpconnection_min",
+    };
+    for (size_t j = 0; j < tcp_names.size(); j++) {
+        auto event = group.GetEvents()[j + device_names.size()].Cast<MetricEvent>();
+        auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
+        APSARA_TEST_EQUAL_FATAL(tcp_names[j], event.GetTag("state"));
+        APSARA_TEST_EQUAL_FATAL(std::string("system.tcp"), event.GetTag("m"));
+        for (size_t i = 0; i < tcp_cnt_names.size(); ++i) {
+            APSARA_TEST_TRUE(maps.find(tcp_cnt_names[i]) != maps.end());
+        }
+    }
+}
+
+void NetCollectorUnittest::TestDevNoExist() const {
+    InterfaceConfig ifConfig;
+    std::string devName = "devNoExist";
+    APSARA_TEST_FALSE(LinuxSystemInterface::GetInstance()->GetInterfaceConfig(ifConfig, devName));
+}
+
 UNIT_TEST_CASE(NetCollectorUnittest, TestCollect);
+UNIT_TEST_CASE(NetCollectorUnittest, TestIpv6FileNoExist);
+UNIT_TEST_CASE(NetCollectorUnittest, TestDevNoExist);
 
 } // namespace logtail
 

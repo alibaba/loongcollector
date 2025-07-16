@@ -32,7 +32,6 @@ const extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
 const extern std::filesystem::path PROCESS_NET_DEV;
 const extern std::filesystem::path PROCESS_NET_IF_INET6;
 const extern int64_t SYSTEM_HERTZ;
-const extern int NET_INTERFACE_LIST_MAX;
 
 #ifdef __ENTERPRISE__
 inline constexpr StringView DEFAULT_INSTANCE_ID_LABEL = "instance_id";

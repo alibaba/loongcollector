@@ -139,17 +139,6 @@ bool SystemInterface::GetTCPStatInformation(TCPStatInformation& tcpStatInfo) {
         errorType);
 }
 
-bool SystemInterface::GetNetRateInformation(NetRateInformation& netRateInfo) {
-    const std::string errorType = "Net rate";
-    return MemoizedCall(
-        mNetRateInformationCache,
-        [this](BaseInformation& info) {
-            return this->GetNetRateInformationOnce(static_cast<NetRateInformation&>(info));
-        },
-        netRateInfo,
-        errorType);
-}
-
 bool SystemInterface::GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo) {
     const std::string errorType = "Net interface";
     return MemoizedCall(
@@ -290,7 +279,7 @@ bool SystemInterface::SystemInformationCache<InfoT>::GC() {
 
 std::string MacString(const unsigned char* mac) {
     std::string str;
-    if (mac != nullptr) {
+    if (mac != nullptr && sizeof(mac) >= 6) {
         str = fmt::format("{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         // str = fmt::sprintf("%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }

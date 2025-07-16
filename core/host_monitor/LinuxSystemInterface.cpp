@@ -32,7 +32,7 @@ using namespace std::chrono;
 
 namespace logtail {
 
-bool GetHostSystemStat(vector<string>& lines, string& errorMessage) {
+bool LinuxSystemInterface::GetHostSystemStat(vector<string>& lines, string& errorMessage) {
     errorMessage.clear();
     if (!CheckExistance(PROCESS_DIR / PROCESS_STAT)) {
         errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_STAT).string();
@@ -59,7 +59,21 @@ double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) {
     return value;
 }
 
-bool GetHostLoadavg(vector<string>& lines, string& errorMessage) {
+unsigned int Hex2Int(const std::string& s) {
+    std::istringstream in(s);
+    in >> std::hex;
+    unsigned int res;
+    in >> res;
+    bool success = !in.fail();
+    return success ? res : 0;
+}
+
+bool IsInterfaceExists(const std::string& interfaceName) {
+    std::filesystem::path interfacePath = "/sys/class/net/" + interfaceName;
+    return std::filesystem::exists(interfacePath);
+}
+
+bool LinuxSystemInterface::GetHostLoadavg(vector<string>& lines, string& errorMessage) {
     errorMessage.clear();
     if (!CheckExistance(PROCESS_DIR / PROCESS_LOADAVG)) {
         errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_LOADAVG).string();
@@ -72,7 +86,7 @@ bool GetHostLoadavg(vector<string>& lines, string& errorMessage) {
     }
     return true;
 }
-bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp) {
+bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp) {
     tcp = 0;
     if (!path.empty()) {
         std::vector<std::string> sockstatLines;
@@ -100,7 +114,7 @@ bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp) {
     return true;
 }
 
-bool ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
+bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
     static std::atomic_int sequence_number = 1;
     int fd;
     // struct inet_diag_msg *r;
@@ -161,7 +175,7 @@ bool ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
     iov.iov_len = sizeof(buf);
 
     uint64_t received_count = 0;
-    uint64_t MAX_RECV_COUNT = std::numeric_limits<uint64_t>::max();
+    uint64_t MAX_RECV_COUNT = 10000;
     while (received_count < MAX_RECV_COUNT) {
         received_count++;
         // struct nlmsghdr *h;
@@ -221,7 +235,7 @@ bool ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
     return true;
 }
 
-bool GetNetStateByNetLink(NetState& netState) {
+bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
     if (ReadNetLink(tcpStateCount) == false) {
         return false;
@@ -248,7 +262,7 @@ bool GetNetStateByNetLink(NetState& netState) {
     return true;
 }
 
-bool GetHostNetDev(vector<string>& lines, string& errorMessage) {
+bool LinuxSystemInterface::GetHostNetDev(vector<string>& lines, string& errorMessage) {
     errorMessage.clear();
     if (!CheckExistance(PROCESS_DIR / PROCESS_NET_DEV)) {
         errorMessage = "file does not exist: " + (PROCESS_DIR / PROCESS_NET_DEV).string();
@@ -262,16 +276,13 @@ bool GetHostNetDev(vector<string>& lines, string& errorMessage) {
     return true;
 }
 
-unsigned int Hex2Int(const std::string& s) {
-    std::istringstream in(s);
-    in >> std::hex;
-    unsigned int res;
-    in >> res;
-    bool success = !in.fail();
-    return success ? res : 0;
-}
 
-bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name) {
+bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name) {
+    // 检查网络接口是否存在
+    if (!IsInterfaceExists(name)) {
+        LOG_WARNING(sLogger, ("Interface does not exist.", name));
+        return false;
+    }
     int sock;
     ifreq ifr{};
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -316,12 +327,15 @@ bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& nam
     // ipv6
     std::vector<std::string> netInet6Lines = {};
     std::string errorMessage;
-    int ret = GetFileLines(PROCESS_DIR / PROCESS_NET_IF_INET6, netInet6Lines, true, &errorMessage);
-    if (ret != 0 || netInet6Lines.empty()) {
-        // Failure should not be returned without "/proc/net/if_inet6"
-        close(sock);
-        return false;
+    if (std::filesystem::exists(PROCESS_DIR / PROCESS_NET_IF_INET6)) {
+        int ret = GetFileLines(PROCESS_DIR / PROCESS_NET_IF_INET6, netInet6Lines, true, &errorMessage);
+        if (ret != 0 || netInet6Lines.empty()) {
+            // Failure should not be returned without "/proc/net/if_inet6"
+            close(sock);
+            return false;
+        }
     }
+
 
     enum {
         Inet6Address, // 长度为32的16进制IPv6地址
@@ -340,12 +354,15 @@ bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& nam
                 auto* addr6 = (unsigned char*)&(interfaceConfig.address6.addr.in6);
 
                 std::string addr = netInet6Metric[Inet6Address];
-                const char* ptr = const_cast<char*>(addr.c_str());
-                const char* ptrEnd = ptr + addr.size();
 
                 constexpr const int addrLen = 16;
-                for (int i = 0; i < addrLen && ptr + 1 < ptrEnd; i++, ptr += 2) {
-                    addr6[i] = (unsigned char)Hex2Int(std::string{ptr, ptr + 2});
+                for (size_t i = 0; i < addrLen; ++i) {
+                    // 确保不会越界
+                    if (i * 2 + 1 >= addr.size()) {
+                        break; // 或者处理错误情况
+                    }
+                    std::string byteStr = addr.substr(i * 2, 2); // 提取两个字符
+                    addr6[i] = static_cast<unsigned char>(Hex2Int(byteStr)); // 转换为字节
                 }
             }
             if (Inet6PrefixLen < netInet6Metric.size()) {
@@ -618,51 +635,6 @@ bool LinuxSystemInterface::GetTCPStatInformationOnce(TCPStatInformation& tcpStat
     return ret;
 }
 
-bool LinuxSystemInterface::GetNetRateInformationOnce(NetRateInformation& netRateInfo) {
-    //  /proc/net/dev
-    std::vector<std::string> netDevLines = {};
-    std::string errorMessage;
-    bool ret = GetHostNetDev(netDevLines, errorMessage);
-    if (!ret || netDevLines.empty()) {
-        return false;
-    }
-
-    for (size_t i = 2; i < netDevLines.size(); ++i) {
-        auto pos = netDevLines[i].find_first_of(':');
-        std::string devCounterStr = netDevLines[i].substr(pos + 1);
-        std::string devName = netDevLines[i].substr(0, pos);
-        std::vector<std::string> netDevMetric;
-        boost::algorithm::trim(devCounterStr);
-        boost::split(netDevMetric, devCounterStr, boost::is_any_of(" "), boost::token_compress_on);
-
-        if (netDevMetric.size() >= 16) {
-            NetInterfaceMetric information;
-            int index = 0;
-            boost::algorithm::trim(devName);
-            information.name = devName;
-            information.rxBytes = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.rxPackets = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.rxErrors = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.rxDropped = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.rxOverruns = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.rxFrame = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            // skip compressed multicast
-            index += 2;
-            information.txBytes = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txPackets = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txErrors = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txDropped = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txOverruns = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txCollisions = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-            information.txCarrier = boost::lexical_cast<uint64_t>(netDevMetric[index++]);
-
-            information.speed = -1;
-            netRateInfo.metrics.push_back(information);
-        }
-    }
-    return true;
-}
-
 bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) {
     //  /proc/net/dev
     std::vector<std::string> netDevLines = {};
@@ -671,10 +643,14 @@ bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformatio
     if (!ret || netDevLines.empty()) {
         return false;
     }
+
+    // netInterfaceInfo.configs
     for (size_t i = 2; i < netDevLines.size(); ++i) {
         auto pos = netDevLines[i].find_first_of(':');
         std::string devCounterStr = netDevLines[i].substr(pos + 1);
         std::string devName = netDevLines[i].substr(0, pos);
+
+        // netInterfaceInfo.configs
         boost::algorithm::trim(devName);
         InterfaceConfig ifConfig;
         ret = GetInterfaceConfig(ifConfig, devName);
@@ -682,8 +658,37 @@ bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformatio
             break;
         }
         netInterfaceInfo.configs.push_back(ifConfig);
-    }
 
+        // netInterfaceInfo.metrics
+        std::vector<std::string> netDevMetric;
+        boost::algorithm::trim(devCounterStr);
+        boost::split(netDevMetric, devCounterStr, boost::is_any_of(" "), boost::token_compress_on);
+
+        if (netDevMetric.size() >= 16) {
+            NetInterfaceMetric information;
+            int index = 0;
+            uint64_t value = 0;
+            information.name = devName;
+            information.rxBytes = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.rxPackets = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.rxErrors = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.rxDropped = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.rxOverruns = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.rxFrame = StringTo(netDevMetric[index++], value) ? value : 0;
+            // skip compressed multicast
+            index += 2;
+            information.txBytes = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txPackets = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txErrors = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txDropped = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txOverruns = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txCollisions = StringTo(netDevMetric[index++], value) ? value : 0;
+            information.txCarrier = StringTo(netDevMetric[index++], value) ? value : 0;
+
+            information.speed = -1;
+            netInterfaceInfo.metrics.push_back(information);
+        }
+    }
 
     return ret;
 }

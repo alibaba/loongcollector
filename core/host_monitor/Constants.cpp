@@ -29,6 +29,5 @@ const std::filesystem::path PROCESS_NET_SOCKSTAT6 = "net/sockstat6";
 const std::filesystem::path PROCESS_NET_DEV = "net/dev";
 const std::filesystem::path PROCESS_NET_IF_INET6 = "net/if_inet6";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
-const int NET_INTERFACE_LIST_MAX = 20;
 
 } // namespace logtail

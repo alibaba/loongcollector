@@ -293,11 +293,8 @@ struct TCPStatInformation : public BaseInformation {
     ResTCPStat stat;
 };
 
-struct NetRateInformation : public BaseInformation {
-    std::vector<NetInterfaceMetric> metrics;
-};
-
 struct NetInterfaceInformation : public BaseInformation {
+    std::vector<NetInterfaceMetric> metrics;
     std::vector<InterfaceConfig> configs;
 };
 
@@ -406,7 +403,6 @@ public:
     bool GetHostMemInformationStat(MemoryInformation& meminfo);
 
     bool GetTCPStatInformation(TCPStatInformation& tcpStatInfo);
-    bool GetNetRateInformation(NetRateInformation& netRateInfo);
     bool GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo);
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -418,7 +414,6 @@ public:
           mCPUCoreNumInformationCache(ttl),
           mMemInformationCache(ttl),
           mTCPStatInformationCache(ttl),
-          mNetRateInformationCache(ttl),
           mNetInterfaceInformationCache(ttl) {}
     virtual ~SystemInterface() = default;
 
@@ -438,7 +433,6 @@ private:
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
     virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
-    virtual bool GetNetRateInformationOnce(NetRateInformation& netRateInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
 
     SystemInformation mSystemInformationCache;
@@ -449,7 +443,6 @@ private:
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
     SystemInformationCache<MemoryInformation> mMemInformationCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
-    SystemInformationCache<NetRateInformation> mNetRateInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
