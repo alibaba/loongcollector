@@ -29,7 +29,6 @@ namespace logtail::ebpf {
 
 class FileSecurityManager : public AbstractManager {
 public:
-    static const std::string sPathKey;
     static const std::string sMmapValue;
     static const std::string sTruncateValue;
     static const std::string sPermissionValue;

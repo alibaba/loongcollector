@@ -30,7 +30,6 @@ namespace ebpf {
 
 class EBPFServer;
 
-const std::string FileSecurityManager::sPathKey = "path";
 const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
 const std::string FileSecurityManager::sTruncateValue = "security_path_truncate";
 const std::string FileSecurityManager::sPermissionValue = "security_file_permission";
@@ -156,7 +155,7 @@ int FileSecurityManager::SendEvents() {
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
-                logEvent->SetContent(FileSecurityManager::sPathKey, group->mPath);
+                logEvent->SetContent(kFilePath.LogKey(), group->mPath);
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
