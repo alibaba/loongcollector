@@ -117,6 +117,7 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
     // update role
     if (mRole == IsUnknown && role != IsUnknown) {
         mRole = role;
+        mTags.Set<kTraceRole>(std::string(magic_enum::enum_name(mRole)));
     }
 
     if (mProtocol == support_proto_e::ProtoUnknown && protocol != support_proto_e::ProtoUnknown) {
