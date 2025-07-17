@@ -32,11 +32,37 @@ const (
 )
 
 const (
-	k8sDomain  = "k8s"
-	ackCluster = "ack"
-	oneCluster = "one"
-	asiCluster = "asi"
+	entityServerIdFieldName     = "server_id"
+	entityServerRegionFieldName = "region_id"
+	entityServerIPFieldName     = "ip"
+	entityServerSourceFieldName = "source"
+	crossDomainSameAs           = "same_as"
+)
+
+const (
+	k8sDomain      = "k8s"
+	infraDomain    = "infra"
+	acsDomain      = "acs"
+	infraServer    = "infra.server"
+	k8sNode        = "k8s.node"
+	acsEcsInstance = "acs.ecs.instance"
+	acsAckCluster  = "acs.ack.cluster"
+	ackCluster     = "ack"
+	oneCluster     = "one"
+	asiCluster     = "asi"
+
+	AliyunCloudProvider = "alibaba_cloud"
 
 	clusterTypeName   = "cluster"
 	containerTypeName = "container"
+
+	aliyunInstanceIDLabel = "alibabacloud.com/ecs-instance-id"
+	aliyunNodeIDLabel     = "alibabacloud.com/nodepool-id"
+	topologyRegion        = "topology.kubernetes.io/region" //aliyun、aws、zure、gce
+
+	aliyunSource = "aliyun"
+	awsSource    = "aws"
+	azureSource  = "azure"
+	gceSource    = "gce"
+	customSource = "custom"
 )
