@@ -30,12 +30,9 @@ using namespace std;
 
 namespace logtail {
 
-const string PROTOCOL_KEY_TIME = "time";
-const string PROTOCOL_KEY_CONTENT = "contents";
-const string PROTOCOL_KEY_TAG = "tags";
-
-const string TAG_PREFIX = "__tag__:";
-
+const string kProtocolKeyTime = "time";
+const string kProtocolKeyContent = "contents";
+const string kProtocolKeyTag = "tags";
 
 bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
     if (group.mEvents.empty()) {
@@ -55,21 +52,16 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
 
         writer.StartObject();
 
-        writer.Key(PROTOCOL_KEY_TIME.c_str());
+        writer.Key(kProtocolKeyTime.c_str());
         writer.Uint(event->GetTimestamp());
 
-        writer.Key(PROTOCOL_KEY_CONTENT.c_str());
+        writer.Key(kProtocolKeyContent.c_str());
         writer.StartObject();
 
         switch (event->GetType()) {
             case PipelineEvent::Type::LOG: {
                 const auto& logEvent = event.Cast<LogEvent>();
                 for (const auto& kv : logEvent) {
-                    if (kv.first.size() >= TAG_PREFIX.length()
-                        && strncmp(kv.first.data(), TAG_PREFIX.c_str(), TAG_PREFIX.length()) == 0) {
-                        continue;
-                    }
-
                     writer.Key(kv.first.data(), kv.first.size());
                     writer.String(kv.second.data(), kv.second.size());
                 }
@@ -90,6 +82,14 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
                         writer.String(to_string(it->second.Value).c_str());
                     }
                 }
+
+                writer.Key("metric_tags");
+                writer.StartObject();
+                for (auto it = metricEvent.TagsBegin(); it != metricEvent.TagsEnd(); ++it) {
+                    writer.Key(it->first.data(), it->first.size());
+                    writer.String(it->second.data(), it->second.size());
+                }
+                writer.EndObject();
                 break;
             }
             case PipelineEvent::Type::SPAN: {
@@ -142,7 +142,7 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
         writer.EndObject();
 
 
-        writer.Key(PROTOCOL_KEY_TAG.c_str());
+        writer.Key(kProtocolKeyTag.c_str());
         writer.StartObject();
 
 
@@ -150,27 +150,6 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
             if (!tag.first.empty()) {
                 writer.Key(tag.first.data(), tag.first.size());
                 writer.String(tag.second.data(), tag.second.size());
-            }
-        }
-
-
-        if (event->GetType() == PipelineEvent::Type::LOG) {
-            const auto& logEvent = event.Cast<LogEvent>();
-            for (const auto& kv : logEvent) {
-                if (kv.first.size() > TAG_PREFIX.length()
-                    && strncmp(kv.first.data(), TAG_PREFIX.c_str(), TAG_PREFIX.length()) == 0) {
-                    StringView tagName(kv.first.data() + TAG_PREFIX.length(), kv.first.size() - TAG_PREFIX.length());
-                    if (tagName != "__user_defined_id__" && !tagName.empty()) {
-                        writer.Key(tagName.data(), tagName.size());
-                        writer.String(kv.second.data(), kv.second.size());
-                    }
-                }
-            }
-        } else if (event->GetType() == PipelineEvent::Type::METRIC) {
-            const auto& metricEvent = event.Cast<MetricEvent>();
-            for (auto it = metricEvent.TagsBegin(); it != metricEvent.TagsEnd(); ++it) {
-                writer.Key(it->first.data(), it->first.size());
-                writer.String(it->second.data(), it->second.size());
             }
         }
 
