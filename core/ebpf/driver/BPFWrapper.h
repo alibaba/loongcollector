@@ -347,6 +347,10 @@ public:
         return perf_buffer__poll((struct perf_buffer*)pb, timeoutMs);
     }
 
+    int GetPerfBufferEpollFd(void* pb) {
+        return perf_buffer__epoll_fd((struct perf_buffer*)pb);
+    }
+
     void* CreatePerfBuffer(
         const std::string& name, int pageCnt, void* ctx, perf_buffer_sample_fn dataCb, perf_buffer_lost_fn lossCb) {
         int mapFd = SearchMapFd(name);

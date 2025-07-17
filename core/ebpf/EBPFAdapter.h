@@ -55,6 +55,7 @@ public:
     bool CheckPluginRunning(PluginType pluginType);
 
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
+    std::vector<int> GetPerfBufferEpollFds(PluginType pluginType);
 
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
     bool SetNetworkObserverCidFilter(const std::string&, bool update);
@@ -91,6 +92,7 @@ private:
 
         // operations
         EBPF_MAP_UPDATE_ELEM,
+        EBPF_GET_PLUGIN_PB_EPOLL_FDS,
         EBPF_FUNC_MAX,
     };
 

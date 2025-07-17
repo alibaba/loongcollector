@@ -20,6 +20,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <variant>
+#include <sys/epoll.h>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -132,6 +133,12 @@ private:
     void handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& items, size_t count);
     void sendEvents();
 
+    // Unified epoll monitoring methods
+    void initUnifiedEpollMonitoring();
+    void registerPluginPerfBuffers(PluginType type);
+    void unregisterPluginPerfBuffers(PluginType type);
+    void cleanupUnifiedEpollMonitoring();
+
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
 
     std::array<PluginState, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
@@ -157,6 +164,10 @@ private:
 
     FrequencyManager mFrequencyMgr;
 
+    // Unified epoll monitoring for all perf buffers
+    int mUnifiedEpollFd = -1;
+    std::map<int, PluginType> mEpollFdToPluginType; 
+    std::vector<struct epoll_event> mEpollEvents; 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif

@@ -188,10 +188,12 @@ EBPFServer::EBPFServer()
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
+    initUnifiedEpollMonitoring();
 }
 
 EBPFServer::~EBPFServer() {
     Stop();
+    cleanupUnifiedEpollMonitoring();
 }
 
 void EBPFServer::Init() {
@@ -356,6 +358,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
     pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
+    registerPluginPerfBuffers(type);
     return true;
 }
 
@@ -409,6 +412,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipelineName));
     auto& pluginManager = pluginState.mManager;
     if (pluginManager) {
+        unregisterPluginPerfBuffers(type);
         pluginManager->UpdateContext(nullptr, -1, -1);
         int ret = pluginManager->Destroy();
         if (ret != 0) {
@@ -487,30 +491,37 @@ void EBPFServer::pollPerfBuffers() {
             mFrequencyMgr.Reset(now);
         }
         
-        int processCacheEvents = mProcessCacheManager->PollPerfBuffers();
-        
-        int currentMaxWaitTime = kDefaultMaxWaitTimeMS;
-        if (processCacheEvents == 0) {
-            currentMaxWaitTime = kDefaultMaxWaitTimeMS / 2;
-        }
-        
-        for (int i = 0; i < int(PluginType::MAX); i++) {
-            auto type = PluginType(i);
-            auto& pluginState = getPluginState(type);
-            if (!pluginState.mValid.load(std::memory_order_acquire)) {
-                continue;
-            }
-            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-            auto& plugin = pluginState.mManager;
-            if (plugin) {
-                int cnt = plugin->PollPerfBuffer(currentMaxWaitTime);
-                LOG_DEBUG(sLogger,
-                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
-                                                                                        plugin->IsRunning())("wait_time", currentMaxWaitTime));
+        mProcessCacheManager->PollPerfBuffers();
+
+        if (mUnifiedEpollFd >= 0 && !mEpollFdToPluginType.empty()) {
+            int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), 10);
+            
+            if (numEvents > 0) {
+                LOG_DEBUG(sLogger, ("Unified epoll detected events", numEvents));
                 
-                if (cnt == 0 && currentMaxWaitTime > 1) {
-                    currentMaxWaitTime = currentMaxWaitTime / 2;
+                for (int i = 0; i < numEvents; i++) {
+                    int activeFd = mEpollEvents[i].data.fd;
+                    auto it = mEpollFdToPluginType.find(activeFd);
+                    
+                    if (it != mEpollFdToPluginType.end()) {
+                        PluginType type = it->second;
+                        auto& pluginState = getPluginState(type);
+                        
+                        if (pluginState.mValid.load(std::memory_order_acquire)) {
+                            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+                            auto& plugin = pluginState.mManager;
+                            
+                            if (plugin) {
+                                int cnt = plugin->PollPerfBuffer(1);
+                                LOG_DEBUG(sLogger, 
+                                    ("Event-driven poll for", magic_enum::enum_name(type))
+                                    ("cnt", cnt)("fd", activeFd));
+                            }
+                        }
+                    }
                 }
+            } else if (numEvents < 0 && errno != EINTR) {
+                LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));
             }
         }
     }
@@ -626,5 +637,68 @@ void EBPFServer::sendEvents() {
             plugin->SendEvents();
         }
     }
+}
+
+void EBPFServer::initUnifiedEpollMonitoring() {
+    mUnifiedEpollFd = epoll_create1(EPOLL_CLOEXEC);
+    if (mUnifiedEpollFd < 0) {
+        LOG_ERROR(sLogger, ("Failed to create unified epoll fd", strerror(errno)));
+        return;
+    }
+    
+    mEpollEvents.resize(1024);
+    
+    LOG_INFO(sLogger, ("Unified epoll monitoring initialized", mUnifiedEpollFd));
+}
+
+void EBPFServer::registerPluginPerfBuffers(PluginType type) {
+    if (mUnifiedEpollFd < 0 || type == PluginType::PROCESS_SECURITY) {
+        return;
+    }
+    
+    auto epollFds = mEBPFAdapter->GetPerfBufferEpollFds(type);
+    
+    for (int epollFd : epollFds) {
+        if (epollFd >= 0) {
+            struct epoll_event event;
+            event.events = EPOLLIN;
+            event.data.fd = epollFd;
+            
+            if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event) == 0) {
+                mEpollFdToPluginType[epollFd] = type;
+                LOG_DEBUG(sLogger, ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            } else {
+                LOG_ERROR(sLogger, ("Failed to register perf buffer epoll fd", epollFd)("error", strerror(errno)));
+            }
+        }
+    }
+}
+
+void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
+    if (mUnifiedEpollFd < 0|| type == PluginType::PROCESS_SECURITY) {
+        return;
+    }
+    
+    auto it = mEpollFdToPluginType.begin();
+    while (it != mEpollFdToPluginType.end()) {
+        if (it->second == type) {
+            int epollFd = it->first;
+            epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, epollFd, nullptr);
+            LOG_DEBUG(sLogger, ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            it = mEpollFdToPluginType.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void EBPFServer::cleanupUnifiedEpollMonitoring() {
+    if (mUnifiedEpollFd >= 0) {
+        close(mUnifiedEpollFd);
+        mUnifiedEpollFd = -1;
+    }
+    mEpollFdToPluginType.clear();
+    mEpollEvents.clear();
+    LOG_INFO(sLogger, ("Unified epoll monitoring cleaned up", ""));
 }
 } // namespace logtail::ebpf
