@@ -143,9 +143,6 @@ if (LINUX)
         host_monitor host_monitor/collector forward forward/loongsuite
         )
 elseif(MSVC)
-    if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
-    endif()
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
@@ -233,6 +230,12 @@ add_subdirectory(common)
 # Build eBPF dependencies
 set(EBPF_DIRVER_TARGET "eBPFDriver")
 add_subdirectory(ebpf/driver)
+if(MSVC)
+    if (ENABLE_ENTERPRISE)
+        add_subdirectory(windows/daemon)
+        add_subdirectory(windows/installer)
+    endif()
+endif()
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
