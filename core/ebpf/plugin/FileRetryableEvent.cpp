@@ -83,7 +83,7 @@ bool FileRetryableEvent::flushEvent() {
     if (!mFlushFileEvent) {
         return true;
     }
-    if (!mEventQueue.try_enqueue(mFileEvent)) {
+    if (!mCommonEventQueue.try_enqueue(mFileEvent)) {
         LOG_DEBUG(sLogger,
                    ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
                     "ktime", mFileEvent->mKtime));
@@ -109,14 +109,6 @@ void FileRetryableEvent::OnDrop() {
     if (mFileEvent && !IsTaskCompleted(kFlushEvent)){
         flushEvent();
     }
-}
-
-bool FileRetryableEvent::CanRetry() const {
-    if(!RetryableEvent::CanRetry()) {
-        LOG_WARNING(sLogger, ("about to drop after too many retries", "")("type", "file security")("file", mFileEvent->mPath));
-        return false;
-    }
-    return true;
 }
 
 } // namespace logtail::ebpf

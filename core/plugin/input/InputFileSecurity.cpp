@@ -26,10 +26,6 @@ namespace logtail {
 const std::string InputFileSecurity::sName = "input_file_security";
 
 bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    ebpf::EBPFServer::GetInstance()->Init();
-    ebpf::EBPFServer::GetInstance()->SetPluginLifecycleState(logtail::ebpf::PluginType::FILE_SECURITY,
-                                                             mContext->GetConfigName(),
-                                                             logtail::ebpf::LifecycleState::INITIALIZED);
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
@@ -45,12 +41,10 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
 }
 
 bool InputFileSecurity::Start() {
+    ebpf::EBPFServer::GetInstance()->Init();
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY)) {
         return false;
     }
-    ebpf::EBPFServer::GetInstance()->SetPluginLifecycleState(logtail::ebpf::PluginType::FILE_SECURITY,
-                                                             mContext->GetConfigName(),
-                                                             logtail::ebpf::LifecycleState::RUNNING);
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
                                                          logtail::ebpf::PluginType::FILE_SECURITY,
@@ -61,30 +55,12 @@ bool InputFileSecurity::Start() {
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        if(!ebpf::EBPFServer::GetInstance()->IsPluginInited(logtail::ebpf::PluginType::FILE_SECURITY, mContext->GetConfigName())) {
-            // The input plugin type has been changed in the updated configuration,
-            // so the plugin is disabled
-            LOG_INFO(sLogger, ("detect plugin type change, disable ebpf file plugin, config", mContext->GetConfigName()));
-            ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
-                                                          logtail::ebpf::PluginType::FILE_SECURITY);
-            ebpf::EBPFServer::GetInstance()->SetPluginLifecycleState(logtail::ebpf::PluginType::FILE_SECURITY,
-                                                                     mContext->GetConfigName(),
-                                                                     logtail::ebpf::LifecycleState::STOPPED);
-        } else {
-            LOG_INFO(sLogger, ("suspend ebpf file plugin for config update, config", mContext->GetConfigName()));
-            ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
-                                                       logtail::ebpf::PluginType::FILE_SECURITY);
-            ebpf::EBPFServer::GetInstance()->SetPluginLifecycleState(logtail::ebpf::PluginType::FILE_SECURITY,
-                                                                     mContext->GetConfigName(),
-                                                                     logtail::ebpf::LifecycleState::SUSPENDED);
-        }
+        ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
+                                                    logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
     // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
     ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
-    ebpf::EBPFServer::GetInstance()->SetPluginLifecycleState(logtail::ebpf::PluginType::FILE_SECURITY,
-                                                             mContext->GetConfigName(),
-                                                             logtail::ebpf::LifecycleState::STOPPED);
     return true;
 }
 

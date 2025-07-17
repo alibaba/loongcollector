@@ -291,7 +291,9 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         return false;
     }
 
+    bool isNeedProcessCache = false;
     if (type != PluginType::NETWORK_OBSERVE) {
+        isNeedProcessCache = true;
         if (mProcessCacheManager->Init()) {
             LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
         } else {
@@ -345,8 +347,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     if (pluginMgr->Init(options) != 0) {
         LOG_ERROR(sLogger, ("plugin manager init failed", ""));
-        if ((type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
-            || type == PluginType::FILE_SECURITY) && checkIfNeedStopProcessCacheManager()) {
+        if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
             LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
             mProcessCacheManager->Stop();
         }
@@ -486,14 +487,12 @@ void EBPFServer::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        
-        int processCacheEvents = mProcessCacheManager->PollPerfBuffers();
-        
         int currentMaxWaitTime = kDefaultMaxWaitTimeMS;
-        if (processCacheEvents == 0) {
-            currentMaxWaitTime = kDefaultMaxWaitTimeMS / 2;
-        }
-        
+        auto starttime = std::chrono::steady_clock::now();
+        mProcessCacheManager->PollPerfBuffers();
+        auto endtime = std::chrono::steady_clock::now();
+        currentMaxWaitTime -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
+
         for (int i = 0; i < int(PluginType::MAX); i++) {
             auto type = PluginType(i);
             auto& pluginState = getPluginState(type);
@@ -503,14 +502,17 @@ void EBPFServer::pollPerfBuffers() {
             std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
             auto& plugin = pluginState.mManager;
             if (plugin) {
+                if (currentMaxWaitTime < 1) {
+                    currentMaxWaitTime = 1;
+                }
+                starttime = std::chrono::steady_clock::now();
                 int cnt = plugin->PollPerfBuffer(currentMaxWaitTime);
                 LOG_DEBUG(sLogger,
                           ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
                                                                                         plugin->IsRunning())("wait_time", currentMaxWaitTime));
                 
-                if (cnt == 0 && currentMaxWaitTime > 1) {
-                    currentMaxWaitTime = currentMaxWaitTime / 2;
-                }
+                endtime = std::chrono::steady_clock::now();
+                currentMaxWaitTime -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
             }
         }
     }
@@ -540,26 +542,6 @@ void EBPFServer::updatePluginState(PluginType type,
     mPlugins[static_cast<int>(type)].mProject = project;
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
-}
-
-void EBPFServer::SetPluginLifecycleState(PluginType type,
-                                         const std::string& pipelineName,
-                                         LifecycleState state) 
-{
-    if (type >= PluginType::MAX) {
-        return;
-    }
-    mPlugins[static_cast<int>(type)].mStatePipelineName = pipelineName;
-    mPlugins[static_cast<int>(type)].mLifecycleState = state;
-
-    LOG_DEBUG(sLogger, ("update plugin lifestate", "")("type", magic_enum::enum_name(type).data())("pipeline", pipelineName)("lifestate", magic_enum::enum_name(state).data()));
-}
-
-bool EBPFServer::IsPluginInited(PluginType type, const std::string& pipelineName) {
-    if (type >= PluginType::MAX) {
-        return false;
-    }
-    return mPlugins[static_cast<int>(type)].mLifecycleState == LifecycleState::INITIALIZED && mPlugins[static_cast<int>(type)].mStatePipelineName == pipelineName;
 }
 
 void EBPFServer::handlerEvents() {

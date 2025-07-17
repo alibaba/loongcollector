@@ -34,7 +34,7 @@ public:
         : RetryableEvent(retryLimit),
           mRawEvent(&event),
           mProcessCache(processCache), 
-          mEventQueue(eventQueue), 
+          mCommonEventQueue(eventQueue), 
           mFlushFileEvent(flushFileEvent) {}
     
     virtual ~FileRetryableEvent() = default;
@@ -42,7 +42,6 @@ public:
     bool HandleMessage() override;
     bool OnRetry() override;
     void OnDrop() override;
-    [[nodiscard]] bool CanRetry() const override;
 
 private:
     bool findProcess();
@@ -50,7 +49,7 @@ private:
 
     const file_data_t* mRawEvent = nullptr;
     ProcessCache& mProcessCache;
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mEventQueue;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<FileEvent> mFileEvent;
     bool mFlushFileEvent;
 };

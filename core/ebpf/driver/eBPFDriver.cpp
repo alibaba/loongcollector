@@ -152,7 +152,7 @@ void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
     for (auto* pb : pbs) {
         auto* perfbuffer = static_cast<perf_buffer*>(pb);
         if (perfbuffer) {
-            perf_buffer__free(perfbuffer);
+            gWrapper->DeletePerfBuffer(perfbuffer);
         }
     }
 }
