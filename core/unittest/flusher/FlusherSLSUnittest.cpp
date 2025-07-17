@@ -15,6 +15,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <utility>
 
 #include "json/json.h"
 
@@ -38,6 +39,7 @@
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
+#include "plugin/flusher/sls/EnterpriseCredentialsProvider.h"
 #include "unittest/flusher/SLSNetworkRequestMock.h"
 #endif
 
@@ -71,7 +73,6 @@ protected:
 #ifdef __ENTERPRISE__
         EnterpriseSLSClientManager::GetInstance()->mDoProbeNetwork = ProbeNetworkMock::DoProbeNetwork;
         EnterpriseSLSClientManager::GetInstance()->mGetEndpointRealIp = GetRealIpMock::GetEndpointRealIp;
-        EnterpriseSLSClientManager::GetInstance()->mGetAccessKeyFromSLS = GetAccessKeyMock::DoGetAccessKey;
 #endif
     }
 
@@ -852,8 +853,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
     }
-    EnterpriseSLSClientManager::GetInstance()->SetAccessKey(
-        "1234567890", SLSClientManager::AuthType::ANONYMOUS, "test_ak", "test_sk");
+    auto provider = std::make_unique<StaticCredentialsProvider>("test_ak", "test_sk");
+    provider->SetAuthType(AuthType::ANONYMOUS);
+    EnterpriseSLSClientManager::GetInstance()->SetCredentialsProvider("1234567890", std::move(provider));
     {
         // no available host, uninitialized
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
@@ -880,6 +882,10 @@ void FlusherSLSUnittest::TestBuildRequest() {
     // log telemetry type
     {
         // normal
+        auto provider = std::make_unique<StaticCredentialsProvider>(STRING_FLAG(default_access_key_id),
+                                                                    STRING_FLAG(default_access_key));
+        provider->SetAuthType(AuthType::AK);
+        SLSClientManager::GetInstance()->mCredentialsProvider = std::move(provider);
         SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
         APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
