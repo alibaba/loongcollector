@@ -17,10 +17,6 @@
 #include <cstdlib>
 #include <rapidjson/document.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 #include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/serializer/CustomSingleSerializer.h"
 #include "common/JsonUtil.h"
@@ -42,6 +38,7 @@ public:
     void TestSerializeEmptyEventGroup();
     void TestHostTags();
     void TestSpecialFields();
+    void TestMetricTags();
 
 protected:
     static void SetUpTestCase() { sFlusher = make_unique<FlusherMock>(); }
@@ -69,6 +66,7 @@ private:
                                  const std::map<string, double>& expectedValues);
     void ValidateSpanEventJSON(const rapidjson::Value& logObj, const SpanEvent* expectedSpan);
     void ValidateRawEventJSON(const rapidjson::Value& logObj, const string& expectedContent = "raw log content");
+    void ValidateMetricTagsJSON(const rapidjson::Value& logObj);
 
     static unique_ptr<FlusherMock> sFlusher;
     CollectionPipelineContext mCtx;
@@ -111,6 +109,7 @@ void CustomSingleSerializerUnittest::TestSerializeMetricEvents() {
         rapidjson::Document doc;
         doc.Parse(res.c_str());
         ValidateMetricEventJSON(doc, "test_metric", {{"__value__", 0.85}});
+        ValidateMetricTagsJSON(doc);
     }
     {
         string res;
@@ -122,7 +121,43 @@ void CustomSingleSerializerUnittest::TestSerializeMetricEvents() {
         rapidjson::Document doc;
         doc.Parse(res.c_str());
         ValidateMetricEventJSON(doc, "test_metric", {{"value1", 10.0}, {"value2", 20.0}});
+        ValidateMetricTagsJSON(doc);
     }
+}
+
+void CustomSingleSerializerUnittest::TestMetricTags() {
+    CustomSingleSerializer serializer(sFlusher.get());
+    string res;
+    string errorMsg;
+    auto batch = CreateBatchedMetricEvents();
+    APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+
+    rapidjson::Document doc;
+    doc.Parse(res.c_str());
+    APSARA_TEST_FALSE(doc.HasParseError());
+    APSARA_TEST_TRUE(doc.IsObject());
+
+
+    APSARA_TEST_TRUE(doc.HasMember("tags"));
+    const rapidjson::Value& tags = doc["tags"];
+    APSARA_TEST_TRUE(tags.IsObject());
+    APSARA_TEST_TRUE(tags.HasMember(DEFAULT_LOG_TAG_HOST_NAME.data()));
+    APSARA_TEST_EQUAL(string("test-host"), string(tags[DEFAULT_LOG_TAG_HOST_NAME.data()].GetString()));
+
+
+    APSARA_TEST_TRUE(doc.HasMember("contents"));
+    const rapidjson::Value& contents = doc["contents"];
+    APSARA_TEST_TRUE(contents.HasMember("metric_tags"));
+    const rapidjson::Value& metricTags = contents["metric_tags"];
+    APSARA_TEST_TRUE(metricTags.IsObject());
+    APSARA_TEST_TRUE(metricTags.HasMember("instance"));
+    APSARA_TEST_EQUAL(string("localhost"), string(metricTags["instance"].GetString()));
+    APSARA_TEST_TRUE(metricTags.HasMember("job"));
+    APSARA_TEST_EQUAL(string("test-job"), string(metricTags["job"].GetString()));
+
+
+    APSARA_TEST_FALSE(tags.HasMember("instance"));
+    APSARA_TEST_FALSE(tags.HasMember("job"));
 }
 
 void CustomSingleSerializerUnittest::TestSerializeSpanEvents() {
@@ -202,15 +237,30 @@ void CustomSingleSerializerUnittest::TestSpecialFields() {
 
     APSARA_TEST_TRUE(contents.HasMember("__log_topic__"));
     APSARA_TEST_EQUAL(string("test-topic"), string(contents["__log_topic__"].GetString()));
+
+
+    APSARA_TEST_TRUE(contents.HasMember("__tag__:__path__"));
+    APSARA_TEST_EQUAL(string("/var/log/test.log"), string(contents["__tag__:__path__"].GetString()));
+
+
     APSARA_TEST_FALSE(tags.HasMember("log.topic"));
-
-
-    APSARA_TEST_TRUE(tags.HasMember("__path__"));
-    APSARA_TEST_EQUAL(string("/var/log/test.log"), string(tags["__path__"].GetString()));
-    APSARA_TEST_FALSE(contents.HasMember("__tag__:__path__"));
-
-
+    APSARA_TEST_FALSE(tags.HasMember("__path__"));
     APSARA_TEST_FALSE(tags.HasMember("__user_defined_id__"));
+}
+
+void CustomSingleSerializerUnittest::ValidateMetricTagsJSON(const rapidjson::Value& logObj) {
+    APSARA_TEST_TRUE(logObj.HasMember("contents"));
+    const rapidjson::Value& contents = logObj["contents"];
+
+    APSARA_TEST_TRUE(contents.HasMember("metric_tags"));
+    const rapidjson::Value& metricTags = contents["metric_tags"];
+    APSARA_TEST_TRUE(metricTags.IsObject());
+
+    APSARA_TEST_TRUE(metricTags.HasMember("instance"));
+    APSARA_TEST_EQUAL(string("localhost"), string(metricTags["instance"].GetString()));
+
+    APSARA_TEST_TRUE(metricTags.HasMember("job"));
+    APSARA_TEST_EQUAL(string("test-job"), string(metricTags["job"].GetString()));
 }
 
 BatchedEvents CustomSingleSerializerUnittest::CreateBatchedLogEvents(bool withTags, bool withSpecialFields) {
@@ -390,7 +440,8 @@ void CustomSingleSerializerUnittest::ValidateMetricEventJSON(const rapidjson::Va
         }
     }
 
-    APSARA_TEST_EQUAL(expectedValues.size() + 1, contents.MemberCount());
+
+    APSARA_TEST_EQUAL(expectedValues.size() + 2, contents.MemberCount());
     APSARA_TEST_EQUAL(expectedValues.size(), foundCount);
 }
 
@@ -450,6 +501,7 @@ UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeRawEvents)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeEmptyEventGroup)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestHostTags)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSpecialFields)
+UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestMetricTags)
 
 } // namespace logtail
 
