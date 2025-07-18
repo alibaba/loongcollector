@@ -145,7 +145,12 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		addressStr, _ := json.Marshal(obj.Status.Addresses)
 		log.Contents.Add("addresses", string(addressStr))
 		log.Contents.Add("provider_id", obj.Spec.ProviderID)
-		return []models.PipelineEvent{log}
+		log.SetName(m.genEntityTypeKey(obj.Kind)) // used to determine whether a link need to be estabilished with cluster, only k8s.node requires it, infra.server link doest not
+
+		serverId := m.generateInfraServerKeyId(obj)
+		// generate k8s.node -> infra.server link
+		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverId)
+		return []models.PipelineEvent{log, logNodeInfraLink}
 	}
 	return nil
 }
@@ -209,6 +214,7 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("kind", obj.Kind)
 		log.Contents.Add("name", obj.Name)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		return []models.PipelineEvent{log}
 	}
 	return nil

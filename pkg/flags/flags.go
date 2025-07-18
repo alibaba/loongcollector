@@ -144,6 +144,7 @@ var (
 	ClusterName          = flag.String("GLOBAL_CLUSTER_NAME", "", "cluster name")
 	ClusterRegion        = flag.String("GLOBAL_CLUSTER_REGION", "", "cluster region")
 	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "k8s", "cluster domain, configurable: k8s (default)")
+	ClusterProvider      = flag.String("GLOBAL_CLUSTER_PROVIDER", "", "cluster provider, link cluster entity to cluster provider cluster")
 )
 
 // lookupFlag returns the flag.Flag for the given name, or an error if not found
@@ -348,6 +349,7 @@ func init() {
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_NAME", ClusterName, *ClusterName)
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_REGION", ClusterRegion, *ClusterRegion)
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_TYPE", ClusterType, *ClusterType)
+	_ = util.InitFromEnvString("GLOBAL_CLUSTER_PROVIDER", ClusterProvider, *ClusterProvider)
 
 	if len(*DefaultRegion) == 0 {
 		*DefaultRegion = util.GuessRegionByEndpoint(*LogServiceEndpoint, "cn-hangzhou")

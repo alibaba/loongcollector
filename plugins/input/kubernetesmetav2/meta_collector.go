@@ -203,12 +203,15 @@ func (m *metaCollector) Stop() error {
 	return nil
 }
 
-func canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta) (bool, string) {
+func (m *metaCollector) canClusterLinkDirectly(resourceType string, serviceK8sMeta *ServiceK8sMeta, logType string) (bool, string) {
 	if strings.ToLower(resourceType) == "namespace" && serviceK8sMeta.Namespace && serviceK8sMeta.Cluster2Namespace != "" {
 		return true, serviceK8sMeta.Cluster2Namespace
 	}
 	if strings.ToLower(resourceType) == "node" && serviceK8sMeta.Node && serviceK8sMeta.Cluster2Node != "" {
-		return true, serviceK8sMeta.Cluster2Node
+		if logType == m.genEntityTypeKey("Node") {
+			return true, serviceK8sMeta.Cluster2Node
+		}
+		return false, ""
 	}
 	if strings.ToLower(resourceType) == "persistentvolume" && serviceK8sMeta.PersistentVolume && serviceK8sMeta.Cluster2PersistentVolume != "" {
 		return true, serviceK8sMeta.Cluster2PersistentVolume
@@ -242,7 +245,7 @@ func (m *metaCollector) handleAddOrUpdate(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Update")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			linkClusterDirectly, linkRelationType := m.canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta, log.GetName())
 			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
 				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
@@ -256,7 +259,7 @@ func (m *metaCollector) handleDelete(event *k8smeta.K8sMetaEvent) {
 		logs := processor(event.Object, "Expire")
 		for _, log := range logs {
 			m.send(log, isEntity(event.Object.ResourceType))
-			linkClusterDirectly, linkRelationType := canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta)
+			linkClusterDirectly, linkRelationType := m.canClusterLinkDirectly(event.Object.ResourceType, m.serviceK8sMeta, log.GetName())
 			if isEntity(event.Object.ResourceType) && linkClusterDirectly {
 				link := m.generateEntityClusterLink(log, linkRelationType)
 				m.send(link, true)
@@ -355,6 +358,10 @@ func (m *metaCollector) sendInBackground() {
 	// send cluster entity as soon as k8s meta collector started
 	clusterEntity := m.generateClusterEntity()
 	m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
+	if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
+		clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
+		m.collector.AddRawLog(convertPipelineEvent2Log(clusterAcsLink))
+	}
 
 	for {
 		select {
@@ -386,6 +393,11 @@ func (m *metaCollector) sendInBackground() {
 
 			clusterEntity := m.generateClusterEntity()
 			m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
+
+			if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
+				clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
+				m.collector.AddRawLog(convertPipelineEvent2Log(clusterAcsLink))
+			}
 			lastSendClusterTime = time.Now()
 		}
 	}
@@ -393,6 +405,11 @@ func (m *metaCollector) sendInBackground() {
 
 func (m *metaCollector) genKey(kind, namespace, name string) string {
 	key := m.serviceK8sMeta.clusterID + kind + namespace + name
+	// #nosec G401
+	return fmt.Sprintf("%x", md5.Sum([]byte(key)))
+}
+
+func (m *metaCollector) genOtherKey(key string) string {
 	// #nosec G401
 	return fmt.Sprintf("%x", md5.Sum([]byte(key)))
 }
@@ -412,6 +429,28 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	log.Contents.Add(entityClusterIDFieldName, m.serviceK8sMeta.clusterID)
 	log.Contents.Add(entityClusterNameFieldName, m.serviceK8sMeta.clusterName)
 	log.Contents.Add(entityClusterRegionFieldName, m.serviceK8sMeta.clusterRegion)
+	return log
+}
+
+func (m *metaCollector) generateClusterEntityLinkWithAcsAckCluster() models.PipelineEvent {
+	log := &models.Log{}
+	log.Contents = models.NewLogContents()
+	log.Contents.Add(entityLinkSrcDomainFieldName, acsDomain)
+	log.Contents.Add(entityLinkSrcEntityTypeFieldName, acsAckCluster)
+	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genOtherKey(m.serviceK8sMeta.clusterID))
+
+	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
+	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
+	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey(clusterTypeName, "", ""))
+
+	log.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs)
+	log.Contents.Add(entityMethodFieldName, "Update")
+
+	log.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
+	log.Contents.Add(entityLastObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
+	log.Contents.Add(entityKeepAliveSecondsFieldName, strconv.FormatInt(int64(m.serviceK8sMeta.Interval*2), 10))
+	log.Contents.Add(entityCategoryFieldName, defaultEntityLinkCategory)
+	log.Timestamp = uint64(time.Now().Unix())
 	return log
 }
 
@@ -448,7 +487,7 @@ func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
-					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k)
+					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k, "raw", modelLog)
 					continue
 				} else {
 					v = strconv.Itoa(intValue)

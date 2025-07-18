@@ -505,6 +505,12 @@ func (g *LinkGenerator) getPodNamespaceLink(podList []*K8sMetaEvent) []*K8sMetaE
 		if !ok {
 			continue
 		}
+		if g.ifNotStandAlonePod(pod) {
+			// If a Pod can be associated with a Namespace indirectly through controllers like Job/Deployment/DaemonSet,
+			// there is no need to explicitly establish a direct association between the Pod and Namespace,
+			// as the association can already be achieved indirectly.
+			continue
+		}
 		nsList := g.metaCache[NAMESPACE].Get([]string{generateNameWithNamespaceKey("", pod.Namespace)})
 		for _, ns := range nsList {
 			for _, n := range ns {
@@ -524,6 +530,13 @@ func (g *LinkGenerator) getPodNamespaceLink(podList []*K8sMetaEvent) []*K8sMetaE
 		}
 	}
 	return result
+}
+
+func (g *LinkGenerator) ifNotStandAlonePod(pod *v1.Pod) bool {
+	if pod.OwnerReferences == nil || len(pod.OwnerReferences) == 0 {
+		return false
+	}
+	return true
 }
 
 func (g *LinkGenerator) getServiceNamespaceLink(serviceList []*K8sMetaEvent) []*K8sMetaEvent {
