@@ -96,7 +96,8 @@ private:
     std::string GetBufferFileHeader();
     bool CheckBufferMetaValidation(const std::string& filename, const sls_logs::LogtailBufferMeta& bufferMeta);
 
-    bool PartialReadAndValidateAliuid(FILE* fin, int32_t encodedInfoSize, bool isPbMeta, const std::string& filename);
+    bool
+    PartialReadAndValidateKeyFields(FILE* fin, int32_t encodedInfoSize, bool isPbMeta, const std::string& filename);
 
     SafeQueue<SenderQueueItem*> mQueue;
 

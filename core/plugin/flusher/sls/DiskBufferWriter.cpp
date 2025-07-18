@@ -47,7 +47,7 @@
 
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
 DEFINE_FLAG_INT32(buffer_file_alive_interval, "the max alive time of a bufferfile, 5 minutes", 300);
-DEFINE_FLAG_INT32(log_expire_time, "log expire time", 24 * 3600);
+DEFINE_FLAG_INT32(log_expire_time, "log expire time", 1000 * 24 * 3600);
 DEFINE_FLAG_INT32(quota_exceed_wait_interval, "when daemon buffer thread get quotaExceed error, sleep 5 seconds", 5);
 DEFINE_FLAG_INT32(secondary_buffer_count_limit, "data ready for write buffer file", 20);
 DEFINE_FLAG_INT32(send_retry_sleep_interval, "sleep microseconds when sync send fail, 50ms", 50000);
@@ -415,9 +415,9 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
         return true;
     }
 
-    // if encodedInfoSize > BUFFER_DATA_MAX_SIZE, then read encodedInfoSize bytes from file, and validate aliuid
+    // if encodedInfoSize > BUFFER_DATA_MAX_SIZE, then read encodedInfoSize bytes from file, and validate fields
     if (encodedInfoSize > BUFFER_DATA_MAX_SIZE) {
-        if (!PartialReadAndValidateAliuid(fin, encodedInfoSize, pbMeta, filename)) {
+        if (!PartialReadAndValidateKeyFields(fin, encodedInfoSize, pbMeta, filename)) {
             fseek(fin, encodedInfoSize + meta.mEncryptionSize, SEEK_CUR);
             fclose(fin);
             return true;
@@ -980,24 +980,31 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     }
 }
 
-bool DiskBufferWriter::PartialReadAndValidateAliuid(FILE* fin,
-                                                    int32_t encodedInfoSize,
-                                                    bool isPbMeta,
-                                                    const std::string& filename) {
+bool DiskBufferWriter::PartialReadAndValidateKeyFields(FILE* fin,
+                                                       int32_t encodedInfoSize,
+                                                       bool isPbMeta,
+                                                       const std::string& filename) {
     if (!isPbMeta) {
         return true;
     }
 
-    static int aliuid_field_number = -1;
-    if (aliuid_field_number == -1) {
-        // use reflection to get aliuid field number, avoid hard code
+    static int projectFieldNumber = -1;
+    static int regionFieldNumber = -1;
+    static int aliuidFieldNumber = -1;
+
+    if (projectFieldNumber == -1) {
         const google::protobuf::Descriptor* descriptor = sls_logs::LogtailBufferMeta::descriptor();
-        const google::protobuf::FieldDescriptor* aliuid_field = descriptor->FindFieldByName("aliuid");
-        if (!aliuid_field) {
-            LOG_ERROR(sLogger, ("aliuid field not found in protobuf descriptor", filename));
+        const google::protobuf::FieldDescriptor* projectField = descriptor->FindFieldByName("project");
+        const google::protobuf::FieldDescriptor* regionField = descriptor->FindFieldByName("region");
+        const google::protobuf::FieldDescriptor* aliuidField = descriptor->FindFieldByName("aliuid");
+
+        if (!projectField || !regionField || !aliuidField) {
+            LOG_ERROR(sLogger, ("key fields not found in protobuf descriptor", filename));
             return true;
         }
-        aliuid_field_number = aliuid_field->number();
+        projectFieldNumber = projectField->number();
+        regionFieldNumber = regionField->number();
+        aliuidFieldNumber = aliuidField->number();
     }
 
     int32_t readSize = std::min(encodedInfoSize, PARTIAL_PREREAD_SIZE);
@@ -1007,31 +1014,55 @@ bool DiskBufferWriter::PartialReadAndValidateAliuid(FILE* fin,
 
     bool result = true;
     if (nbytes == static_cast<size_t>(readSize)) {
-        google::protobuf::io::ArrayInputStream array_input(partialBuffer, readSize);
-        google::protobuf::io::CodedInputStream coded_input(&array_input);
+        google::protobuf::io::ArrayInputStream arrayInput(partialBuffer, readSize);
+        google::protobuf::io::CodedInputStream codedInput(&arrayInput);
 
         uint32_t tag;
-        while ((tag = coded_input.ReadTag()) != 0) {
-            int field_number = google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag);
-            google::protobuf::internal::WireFormatLite::WireType wire_type
+        while ((tag = codedInput.ReadTag()) != 0) {
+            int fieldNumber = google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag);
+            google::protobuf::internal::WireFormatLite::WireType wireType
                 = google::protobuf::internal::WireFormatLite::GetTagWireType(tag);
 
-            if (field_number == aliuid_field_number
-                && wire_type == google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-                // find aliuid field
+            if (wireType == google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
                 uint32_t length;
-                if (coded_input.ReadVarint32(&length)) {
-                    if (length > 16) {
-                        LOG_WARNING(sLogger, ("aliuid field exceeds size limit", length)("max_allowed", 16));
+                if (codedInput.ReadVarint32(&length)) {
+                    bool fieldOversized = false;
+                    std::string fieldName;
+                    uint32_t maxAllowed = 0;
+
+                    if (fieldNumber == projectFieldNumber) {
+                        fieldName = "project";
+                        maxAllowed = 1024;
+                        fieldOversized = (length > maxAllowed);
+                    } else if (fieldNumber == regionFieldNumber) {
+                        fieldName = "region";
+                        maxAllowed = 1024;
+                        fieldOversized = (length > maxAllowed);
+                    } else if (fieldNumber == aliuidFieldNumber) {
+                        fieldName = "aliuid";
+                        maxAllowed = 16;
+                        fieldOversized = (length > maxAllowed);
+                    }
+
+                    if (fieldOversized) {
+                        LOG_WARNING(sLogger,
+                                    ("field exceeds size limit", fieldName)("field_number", fieldNumber)(
+                                        "length", length)("max_allowed", maxAllowed));
                         result = false;
+                        break;
+                    }
+
+                    if (!codedInput.Skip(length)) {
+                        LOG_ERROR(sLogger, ("failed to skip field content during partial parsing", fieldNumber));
+                        break;
                     }
                 } else {
-                    LOG_ERROR(sLogger, ("failed to read aliuid length from partial data", filename));
+                    LOG_ERROR(sLogger, ("failed to read field length from partial data", filename));
+                    break;
                 }
-                break;
             } else {
-                if (!google::protobuf::internal::WireFormatLite::SkipField(&coded_input, tag)) {
-                    LOG_ERROR(sLogger, ("failed to skip field during partial parsing", field_number));
+                if (!google::protobuf::internal::WireFormatLite::SkipField(&codedInput, tag)) {
+                    LOG_ERROR(sLogger, ("failed to skip field during partial parsing", fieldNumber));
                     break;
                 }
             }
@@ -1039,17 +1070,17 @@ bool DiskBufferWriter::PartialReadAndValidateAliuid(FILE* fin,
 
         if (!result) {
             LOG_WARNING(sLogger,
-                        ("skip large buffer data due to oversized aliuid",
+                        ("skip large buffer data due to oversized key fields",
                          filename)("encodedInfoSize", encodedInfoSize)("BUFFER_DATA_MAX_SIZE", BUFFER_DATA_MAX_SIZE));
 
             AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
-                                                   "skip buffer data with oversized aliuid, filename: " + filename
+                                                   "skip buffer data with oversized key fields, filename: " + filename
                                                        + ", encodedInfoSize: " + ToString(encodedInfoSize));
         }
     } else {
-        LOG_WARNING(
-            sLogger,
-            ("failed to read partial data for aliuid validation", filename)("expected", readSize)("actual", nbytes));
+        LOG_WARNING(sLogger,
+                    ("failed to read partial data for key fields validation", filename)("expected", readSize)("actual",
+                                                                                                              nbytes));
     }
 
     delete[] partialBuffer;
