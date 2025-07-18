@@ -50,12 +50,16 @@ public:
     virtual int SendEvents() = 0;
 
     virtual int PollPerfBuffer() {
+        return PollPerfBuffer(kDefaultMaxWaitTimeMS);
+    }
+
+    virtual int PollPerfBuffer(int maxWaitTimeMs) {
         int zero = 0;
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
         return mEBPFAdapter->PollPerfBuffers(
-            GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+            GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
     bool IsRunning() { return mInited && !mSuspendFlag; }
@@ -71,6 +75,9 @@ public:
     virtual int Suspend() {
         WriteLock lock(mMtx);
         mSuspendFlag = true;
+        if(GetPluginType() == PluginType::PROCESS_SECURITY) {
+            return 0;
+        }
         bool ret = mEBPFAdapter->SuspendPlugin(GetPluginType());
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(GetPluginType())));

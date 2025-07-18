@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputFileSecurity.h"
 
+// #include "ebpf/security/SecurityServer.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
+
 
 using namespace std;
 
 namespace logtail {
 
-const std::string InputProcessSecurity::sName = "input_process_security";
+const std::string InputFileSecurity::sName = "input_file_security";
 
-bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     static const std::unordered_map<std::string, MetricType> metricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
@@ -35,30 +37,31 @@ bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optional
 
     mPluginMetricPtr = std::make_shared<PluginMetricManager>(
         GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
-    return mSecurityOptions.Init(ebpf::SecurityProbeType::PROCESS, config, mContext, sName);
+    return mSecurityOptions.Init(ebpf::SecurityProbeType::FILE, config, mContext, sName);
 }
 
-bool InputProcessSecurity::Start() {
+bool InputFileSecurity::Start() {
     ebpf::EBPFServer::GetInstance()->Init();
-    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY)) {
+    if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY)) {
         return false;
     }
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
-                                                         logtail::ebpf::PluginType::PROCESS_SECURITY,
+                                                         logtail::ebpf::PluginType::FILE_SECURITY,
                                                          mContext,
                                                          &mSecurityOptions,
                                                          mPluginMetricPtr);
 }
 
-bool InputProcessSecurity::Stop(bool isPipelineRemoving) {
+bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
-                                                    logtail::ebpf::PluginType::PROCESS_SECURITY);
+                                                    logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
-    return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
-                                                          logtail::ebpf::PluginType::PROCESS_SECURITY);
+    // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
+    ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), logtail::ebpf::PluginType::FILE_SECURITY);
+    return true;
 }
 
 } // namespace logtail
