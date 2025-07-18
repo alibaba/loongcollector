@@ -15,6 +15,10 @@
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 
 #include <cstddef>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/wire_format_lite.h>
 
 #include "Flags.h"
 #include "app_config/AppConfig.h"
@@ -105,6 +109,8 @@ static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compress
 
 const int32_t DiskBufferWriter::BUFFER_META_BASE_SIZE = 65536;
 const size_t DiskBufferWriter::BUFFER_META_MAX_SIZE = 1 * 1024 * 1024;
+const int32_t DiskBufferWriter::BUFFER_DATA_MAX_SIZE = 16 * 1024 * 1024; // 16MB
+const int32_t DiskBufferWriter::PARTIAL_PREREAD_SIZE = 16 * 1024; // 16KB
 
 void DiskBufferWriter::Init() {
     mBufferDivideTime = time(NULL);
@@ -407,6 +413,15 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
                                                    "buffer file timeout (1day), delete file: " + filename);
         }
         return true;
+    }
+
+    // if encodedInfoSize > BUFFER_DATA_MAX_SIZE, then read encodedInfoSize bytes from file, and validate aliuid
+    if (encodedInfoSize > BUFFER_DATA_MAX_SIZE) {
+        if (!PartialReadAndValidateAliuid(fin, encodedInfoSize, pbMeta, filename)) {
+            fseek(fin, encodedInfoSize + meta.mEncryptionSize, SEEK_CUR);
+            fclose(fin);
+            return true;
+        }
     }
 
     char* buffer = new char[encodedInfoSize + 1];
@@ -965,6 +980,84 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     }
 }
 
+bool DiskBufferWriter::PartialReadAndValidateAliuid(FILE* fin,
+                                                    int32_t encodedInfoSize,
+                                                    bool isPbMeta,
+                                                    const std::string& filename) {
+    if (!isPbMeta) {
+        return true;
+    }
+
+    static int aliuid_field_number = -1;
+    if (aliuid_field_number == -1) {
+        // use reflection to get aliuid field number, avoid hard code
+        const google::protobuf::Descriptor* descriptor = sls_logs::LogtailBufferMeta::descriptor();
+        const google::protobuf::FieldDescriptor* aliuid_field = descriptor->FindFieldByName("aliuid");
+        if (!aliuid_field) {
+            LOG_ERROR(sLogger, ("aliuid field not found in protobuf descriptor", filename));
+            return true;
+        }
+        aliuid_field_number = aliuid_field->number();
+    }
+
+    int32_t readSize = std::min(encodedInfoSize, PARTIAL_PREREAD_SIZE);
+    long currentPos = ftell(fin);
+    char* partialBuffer = new char[readSize];
+    size_t nbytes = fread(partialBuffer, sizeof(char), readSize, fin);
+
+    bool result = true;
+    if (nbytes == static_cast<size_t>(readSize)) {
+        google::protobuf::io::ArrayInputStream array_input(partialBuffer, readSize);
+        google::protobuf::io::CodedInputStream coded_input(&array_input);
+
+        uint32_t tag;
+        while ((tag = coded_input.ReadTag()) != 0) {
+            int field_number = google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag);
+            google::protobuf::internal::WireFormatLite::WireType wire_type
+                = google::protobuf::internal::WireFormatLite::GetTagWireType(tag);
+
+            if (field_number == aliuid_field_number
+                && wire_type == google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+                // find aliuid field
+                uint32_t length;
+                if (coded_input.ReadVarint32(&length)) {
+                    if (length > 16) {
+                        LOG_WARNING(sLogger, ("aliuid field exceeds size limit", length)("max_allowed", 16));
+                        result = false;
+                    }
+                } else {
+                    LOG_ERROR(sLogger, ("failed to read aliuid length from partial data", filename));
+                }
+                break;
+            } else {
+                if (!google::protobuf::internal::WireFormatLite::SkipField(&coded_input, tag)) {
+                    LOG_ERROR(sLogger, ("failed to skip field during partial parsing", field_number));
+                    break;
+                }
+            }
+        }
+
+        if (!result) {
+            LOG_WARNING(sLogger,
+                        ("skip large buffer data due to oversized aliuid",
+                         filename)("encodedInfoSize", encodedInfoSize)("BUFFER_DATA_MAX_SIZE", BUFFER_DATA_MAX_SIZE));
+
+            AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
+                                                   "skip buffer data with oversized aliuid, filename: " + filename
+                                                       + ", encodedInfoSize: " + ToString(encodedInfoSize));
+        }
+    } else {
+        LOG_WARNING(
+            sLogger,
+            ("failed to read partial data for aliuid validation", filename)("expected", readSize)("actual", nbytes));
+    }
+
+    delete[] partialBuffer;
+    // restore the file pointer to the original position
+    fseek(fin, currentPos, SEEK_SET);
+    return result;
+}
+
 bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
                                                  const sls_logs::LogtailBufferMeta& bufferMeta) {
     if (bufferMeta.project().empty()) {
@@ -977,6 +1070,17 @@ bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
                                                                         filename)("size", bufferMeta.aliuid().size()));
         return false;
     }
+
+    const std::string& aliuid = bufferMeta.aliuid();
+    for (size_t i = 0; i < aliuid.size(); ++i) {
+        if (!isdigit(static_cast<unsigned char>(aliuid[i]))) {
+            LOG_ERROR(sLogger,
+                      ("send disk buffer fail", "aliuid contains non-digit character")("filename", filename)("aliuid",
+                                                                                                             aliuid));
+            return false;
+        }
+    }
+
     if (sizeof(bufferMeta) > BUFFER_META_MAX_SIZE) {
         LOG_ERROR(
             sLogger,
