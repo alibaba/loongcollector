@@ -36,7 +36,6 @@ public:
     void TestSerializeSpanEvents();
     void TestSerializeRawEvents();
     void TestSerializeEmptyEventGroup();
-    void TestHostTags();
     void TestSpecialFields();
     void TestMetricTags();
 
@@ -51,10 +50,10 @@ protected:
     }
 
 private:
-    BatchedEvents CreateBatchedLogEvents(bool withTags = true, bool withSpecialFields = false);
-    BatchedEvents CreateBatchedMetricEvents(bool withTags = true, bool withMultiValue = false);
-    BatchedEvents CreateBatchedSpanEvents(bool withTags = true);
-    BatchedEvents CreateBatchedRawEvents(bool withTags = true);
+    BatchedEvents CreateBatchedLogEvents(bool withSpecialFields = false);
+    BatchedEvents CreateBatchedMetricEvents(bool withMultiValue = false);
+    BatchedEvents CreateBatchedSpanEvents();
+    BatchedEvents CreateBatchedRawEvents();
     BatchedEvents CreateBatchedEmptyEvents();
 
     void ValidateCustomSingleJSON(const string& jsonStr, size_t expectedCount);
@@ -66,7 +65,6 @@ private:
                                  const std::map<string, double>& expectedValues);
     void ValidateSpanEventJSON(const rapidjson::Value& logObj, const SpanEvent* expectedSpan);
     void ValidateRawEventJSON(const rapidjson::Value& logObj, const string& expectedContent = "raw log content");
-    void ValidateMetricTagsJSON(const rapidjson::Value& logObj);
 
     static unique_ptr<FlusherMock> sFlusher;
     CollectionPipelineContext mCtx;
@@ -89,7 +87,7 @@ void CustomSingleSerializerUnittest::TestSerializeLogEvents() {
     {
         string res;
         string errorMsg;
-        auto batch = CreateBatchedLogEvents(true, true);
+        auto batch = CreateBatchedLogEvents(true);
         APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
         APSARA_TEST_FALSE(res.empty());
         APSARA_TEST_EQUAL("", errorMsg);
@@ -109,19 +107,17 @@ void CustomSingleSerializerUnittest::TestSerializeMetricEvents() {
         rapidjson::Document doc;
         doc.Parse(res.c_str());
         ValidateMetricEventJSON(doc, "test_metric", {{"__value__", 0.85}});
-        ValidateMetricTagsJSON(doc);
     }
     {
         string res;
         string errorMsg;
-        auto batch = CreateBatchedMetricEvents(true, true);
+        auto batch = CreateBatchedMetricEvents(true);
         APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
         APSARA_TEST_FALSE(res.empty());
         APSARA_TEST_EQUAL("", errorMsg);
         rapidjson::Document doc;
         doc.Parse(res.c_str());
         ValidateMetricEventJSON(doc, "test_metric", {{"value1", 10.0}, {"value2", 20.0}});
-        ValidateMetricTagsJSON(doc);
     }
 }
 
@@ -199,77 +195,34 @@ void CustomSingleSerializerUnittest::TestSerializeEmptyEventGroup() {
     APSARA_TEST_EQUAL("empty event group", errorMsg);
 }
 
-void CustomSingleSerializerUnittest::TestHostTags() {
-    CustomSingleSerializer serializer(sFlusher.get());
-    string res;
-    string errorMsg;
-    auto batch = CreateBatchedLogEvents();
-    APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
-
-    rapidjson::Document doc;
-    doc.Parse(res.c_str());
-    APSARA_TEST_FALSE(doc.HasParseError());
-    APSARA_TEST_TRUE(doc.IsObject());
-    APSARA_TEST_TRUE(doc.HasMember("tags"));
-    const rapidjson::Value& tags = doc["tags"];
-    APSARA_TEST_TRUE(tags.IsObject());
-    APSARA_TEST_TRUE(tags.HasMember(DEFAULT_LOG_TAG_HOST_NAME.data()));
-    APSARA_TEST_EQUAL(string("test-host"), string(tags[DEFAULT_LOG_TAG_HOST_NAME.data()].GetString()));
-    APSARA_TEST_TRUE(tags.HasMember(LOG_RESERVED_KEY_SOURCE.data()));
-    APSARA_TEST_EQUAL(string("test-source"), string(tags[LOG_RESERVED_KEY_SOURCE.data()].GetString()));
-}
-
 void CustomSingleSerializerUnittest::TestSpecialFields() {
     CustomSingleSerializer serializer(sFlusher.get());
 
     string res;
     string errorMsg;
-    auto batch = CreateBatchedLogEvents(true, true);
+    auto batch = CreateBatchedLogEvents(true);
     APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
 
     rapidjson::Document doc;
     doc.Parse(res.c_str());
     APSARA_TEST_FALSE(doc.HasParseError());
 
-    const rapidjson::Value& tags = doc["tags"];
     const rapidjson::Value& contents = doc["contents"];
 
 
     APSARA_TEST_TRUE(contents.HasMember("__log_topic__"));
     APSARA_TEST_EQUAL(string("test-topic"), string(contents["__log_topic__"].GetString()));
 
-
     APSARA_TEST_TRUE(contents.HasMember("__tag__:__path__"));
     APSARA_TEST_EQUAL(string("/var/log/test.log"), string(contents["__tag__:__path__"].GetString()));
-
-
-    APSARA_TEST_FALSE(tags.HasMember("log.topic"));
-    APSARA_TEST_FALSE(tags.HasMember("__path__"));
-    APSARA_TEST_FALSE(tags.HasMember("__user_defined_id__"));
 }
 
-void CustomSingleSerializerUnittest::ValidateMetricTagsJSON(const rapidjson::Value& logObj) {
-    APSARA_TEST_TRUE(logObj.HasMember("contents"));
-    const rapidjson::Value& contents = logObj["contents"];
-
-    APSARA_TEST_TRUE(contents.HasMember("metric_tags"));
-    const rapidjson::Value& metricTags = contents["metric_tags"];
-    APSARA_TEST_TRUE(metricTags.IsObject());
-
-    APSARA_TEST_TRUE(metricTags.HasMember("instance"));
-    APSARA_TEST_EQUAL(string("localhost"), string(metricTags["instance"].GetString()));
-
-    APSARA_TEST_TRUE(metricTags.HasMember("job"));
-    APSARA_TEST_EQUAL(string("test-job"), string(metricTags["job"].GetString()));
-}
-
-BatchedEvents CustomSingleSerializerUnittest::CreateBatchedLogEvents(bool withTags, bool withSpecialFields) {
+BatchedEvents CustomSingleSerializerUnittest::CreateBatchedLogEvents(bool withSpecialFields) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
 
-    if (withTags) {
-        group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
-        group.SetTag(LOG_RESERVED_KEY_SOURCE, "test-source");
-    }
+
+    group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
+    group.SetTag(LOG_RESERVED_KEY_SOURCE, "test-source");
 
     LogEvent* e = group.AddLogEvent();
     e->SetContent(string("method"), string("GET"));
@@ -291,12 +244,11 @@ BatchedEvents CustomSingleSerializerUnittest::CreateBatchedLogEvents(bool withTa
     return batch;
 }
 
-BatchedEvents CustomSingleSerializerUnittest::CreateBatchedMetricEvents(bool withTags, bool withMultiValue) {
+BatchedEvents CustomSingleSerializerUnittest::CreateBatchedMetricEvents(bool withMultiValue) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
 
-    if (withTags) {
-        group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
-    }
+
+    group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
 
     MetricEvent* e = group.AddMetricEvent();
     e->SetName("test_metric");
@@ -321,12 +273,11 @@ BatchedEvents CustomSingleSerializerUnittest::CreateBatchedMetricEvents(bool wit
     return batch;
 }
 
-BatchedEvents CustomSingleSerializerUnittest::CreateBatchedSpanEvents(bool withTags) {
+BatchedEvents CustomSingleSerializerUnittest::CreateBatchedSpanEvents() {
     PipelineEventGroup group(make_shared<SourceBuffer>());
 
-    if (withTags) {
-        group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
-    }
+
+    group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
 
     SpanEvent* e = group.AddSpanEvent();
     e->SetName("test-span");
@@ -347,12 +298,11 @@ BatchedEvents CustomSingleSerializerUnittest::CreateBatchedSpanEvents(bool withT
     return batch;
 }
 
-BatchedEvents CustomSingleSerializerUnittest::CreateBatchedRawEvents(bool withTags) {
+BatchedEvents CustomSingleSerializerUnittest::CreateBatchedRawEvents() {
     PipelineEventGroup group(make_shared<SourceBuffer>());
 
-    if (withTags) {
-        group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
-    }
+
+    group.SetTag(DEFAULT_LOG_TAG_HOST_NAME, "test-host");
 
     RawEvent* e = group.AddRawEvent();
     e->SetContent(string("raw log content"));
@@ -499,7 +449,6 @@ UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeMetricEvents)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeSpanEvents)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeRawEvents)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSerializeEmptyEventGroup)
-UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestHostTags)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestSpecialFields)
 UNIT_TEST_CASE(CustomSingleSerializerUnittest, TestMetricTags)
 
