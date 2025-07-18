@@ -59,6 +59,9 @@ if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
 endif()
 
+add_definitions(-DXXH_DISPATCH_AVX2=0)
+add_definitions(-DXXH_DISPATCH_AVX512=0)
+
 # Default C/CXX flags.
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
