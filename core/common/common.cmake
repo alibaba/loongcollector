@@ -21,9 +21,9 @@ file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/*.c ${CMAKE_SOURCE_DIR}/c
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 # add xxhash in common
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    #file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/*.c ${CMAKE_SOURCE_DIR}/common/xxhash/*.h)
+    file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/*.c ${CMAKE_SOURCE_DIR}/common/xxhash/*.h)
 else ()
-    #file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.c ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.h)
+    file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.c ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.h)
 endif ()
 list(APPEND THIS_SOURCE_FILES_LIST ${XX_HASH_SOURCE_FILES})
 # add memory in common
