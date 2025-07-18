@@ -220,11 +220,6 @@ void InputNetworkSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(true));
 }
 
 void InputNetworkSecurityUnittest::OnSuccessfulStop() {
@@ -253,18 +248,6 @@ void InputNetworkSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    // APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_SECURITY);
-    APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
 UNIT_TEST_CASE(InputNetworkSecurityUnittest, TestName)

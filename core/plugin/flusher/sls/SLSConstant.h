@@ -29,6 +29,9 @@ extern const std::string APM_METRICS_URL;
 extern const std::string APM_TRACES_URL;
 extern const std::string APM_AGENTINFOS_URL;
 
+extern const std::string CMS_HEADER_WORKSPACE;
+extern const std::string APM_HEADER_PROJECT;
+
 extern const std::string CONTENT_MD5;
 
 extern const std::string LOGTAIL_USER_AGENT;

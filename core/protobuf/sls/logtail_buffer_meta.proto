@@ -38,4 +38,5 @@ message LogtailBufferMeta
     optional EndpointMode endpointmode = 10;
     optional string endpoint = 11;
     optional string subpath = 12;
+    optional string workspace = 13;
 }
