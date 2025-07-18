@@ -57,8 +57,8 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
         return true;
     }
 
-    SystemStat minSys, maxSys, avgSys, lastSys;
-    mCalculate.Stat(maxSys, minSys, avgSys, &lastSys);
+    SystemStat minSys, maxSys, avgSys;
+    mCalculate.Stat(maxSys, minSys, avgSys);
 
     mCount = 0;
     mCalculate.Reset();
@@ -110,6 +110,7 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
     }
     metricEvent->SetTimestamp(now, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+    metricEvent->SetTag(std::string("m"), std::string("system.load"));
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     for (size_t i = 0; i < names.size(); ++i) {
         multiDoubleValues->SetValue(std::string(names[i]),

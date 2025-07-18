@@ -27,6 +27,9 @@ target_link_libraries(cpu_collector_unittest ${UT_BASE_TARGET})
 add_executable(system_collector_unittest SystemCollectorUnittest.cpp)
 target_link_libraries(system_collector_unittest ${UT_BASE_TARGET})
 
+add_executable(net_collector_unittest NetCollectorUnittest.cpp)
+target_link_libraries(net_collector_unittest ${UT_BASE_TARGET})
+
 add_executable(metric_calculate_unittest MetricCalculateUnittest.cpp)
 target_link_libraries(metric_calculate_unittest ${UT_BASE_TARGET})
 
@@ -51,3 +54,4 @@ if (LINUX)
 endif()
 gtest_discover_tests(system_collector_unittest)
 gtest_discover_tests(mem_collector_unittest)
+gtest_discover_tests(net_collector_unittest)

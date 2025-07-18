@@ -16,6 +16,9 @@
 
 #include "host_monitor/SystemInterface.h"
 
+#include <boost/asio.hpp>
+#include <boost/asio/ip/address_v4.hpp>
+#include <boost/asio/ip/address_v6.hpp>
 #include <chrono>
 #include <mutex>
 #include <tuple>
@@ -122,6 +125,28 @@ bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
             return this->GetHostMemInformationStatOnce(static_cast<MemoryInformation&>(info));
         },
         meminfo,
+        errorType);
+}
+
+bool SystemInterface::GetTCPStatInformation(TCPStatInformation& tcpStatInfo) {
+    const std::string errorType = "TCP stat";
+    return MemoizedCall(
+        mTCPStatInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetTCPStatInformationOnce(static_cast<TCPStatInformation&>(info));
+        },
+        tcpStatInfo,
+        errorType);
+}
+
+bool SystemInterface::GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo) {
+    const std::string errorType = "Net interface";
+    return MemoizedCall(
+        mNetInterfaceInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetNetInterfaceInformationOnce(static_cast<NetInterfaceInformation&>(info));
+        },
+        netInterfaceInfo,
         errorType);
 }
 
@@ -250,6 +275,49 @@ template <typename InfoT>
 bool SystemInterface::SystemInformationCache<InfoT>::GC() {
     // no need to GC for single cache
     return true;
+}
+
+std::string MacString(const unsigned char* mac) {
+    std::string str;
+    if (mac != nullptr && sizeof(mac) >= 6) {
+        str = fmt::format("{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        // str = fmt::sprintf("%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+    return str;
+}
+
+std::string IPv4String(uint32_t address) {
+    using namespace boost::asio::ip;
+    // address = boost::endian::big_to_native(address);
+    address_v4 v4(*(address_v4::bytes_type*)(&address));
+    return v4.to_string();
+}
+
+std::string IPv6String(const uint32_t address[4]) {
+    using namespace boost::asio::ip;
+    // address = boost::endian::big_to_native(address);
+    address_v6 v6(*(address_v6::bytes_type*)(address));
+    return v6.to_string();
+}
+
+NetAddress::NetAddress() {
+    memset(this, 0, sizeof(*this));
+}
+
+static const auto& mapNetAddressStringer = *new std::map<int, std::function<std::string(const NetAddress*)>>{
+    {NetAddress::SI_AF_UNSPEC, [](const NetAddress* me) { return std::string{}; }},
+    {NetAddress::SI_AF_INET, [](const NetAddress* me) { return IPv4String(me->addr.in); }},
+    {NetAddress::SI_AF_INET6, [](const NetAddress* me) { return IPv6String(me->addr.in6); }},
+    {NetAddress::SI_AF_LINK, [](const NetAddress* me) { return MacString(me->addr.mac); }},
+};
+
+std::string NetAddress::str() const {
+    std::string name;
+    auto it = mapNetAddressStringer.find(this->family);
+    if (it != mapNetAddressStringer.end()) {
+        name = it->second(this);
+    }
+    return name;
 }
 
 } // namespace logtail
