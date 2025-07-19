@@ -169,6 +169,84 @@ struct MemoryInformation : public BaseInformation {
     MemoryStat memStat;
 };
 
+enum FileSystemType {
+    FILE_SYSTEM_TYPE_UNKNOWN = 0,
+    FILE_SYSTEM_TYPE_NONE,
+    FILE_SYSTEM_TYPE_LOCAL_DISK,
+    FILE_SYSTEM_TYPE_NETWORK,
+    FILE_SYSTEM_TYPE_RAM_DISK,
+    FILE_SYSTEM_TYPE_CDROM,
+    FILE_SYSTEM_TYPE_SWAP,
+    FILE_SYSTEM_TYPE_MAX
+};
+
+struct FileSystem {
+    std::string dirName;
+    std::string devName;
+    std::string typeName;
+    std::string sysTypeName;
+    std::string options;
+    FileSystemType type = FILE_SYSTEM_TYPE_UNKNOWN;
+    unsigned long flags = 0;
+};
+
+struct FileSystemListInformation : public BaseInformation {
+    // mounted file systems
+    std::vector<FileSystem> fileSystemList;
+};
+
+struct SystemUptimeInformation : public BaseInformation {
+    double uptime;
+};
+
+struct SerialIdInformation : public BaseInformation {
+    std::string serialId;
+};
+
+enum class EnumDiskState {
+    major,
+    minor,
+    devName,
+
+    reads,
+    readsMerged,
+    readSectors,
+    rMillis,
+
+    writes,
+    writesMerged,
+    writeSectors,
+    wMillis,
+
+    ioCount,
+    rwMillis, // 输入输出花费的毫秒数
+    qMillis, // 输入/输出操作花费的加权毫秒数
+
+    count, // 这个用于收尾，不是实际的列号。
+};
+static_assert((int)EnumDiskState::count == 14, "EnumDiskState::count unexpected");
+
+struct DiskState {
+    unsigned int major;
+    unsigned int minor;
+
+    uint64_t reads;
+    uint64_t readBytes;
+    uint64_t rTime;
+
+    uint64_t writes;
+    uint64_t writeBytes;
+    uint64_t wTime;
+
+    uint64_t time; // 输入输出花费的毫秒数
+    uint64_t qTime; // 输入/输出操作花费的加权毫秒数
+
+};
+
+struct DiskStateInformation : public BaseInformation {
+    std::vector<DiskState> diskStats;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -223,6 +301,10 @@ public:
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
     bool GetHostMemInformationStat(MemoryInformation& meminfo);
+    bool GetFileSystemListInformation(FileSystemListInformation& fileSystemListInfo);
+    bool GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo);
+    bool GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo);
+    bool GetDiskStateInformation(DiskStateInformation& diskStateInfo);
 
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
@@ -232,7 +314,11 @@ public:
           mProcessInformationCache(ttl),
           mSystemLoadInformationCache(ttl),
           mCPUCoreNumInformationCache(ttl),
-          mMemInformationCache(ttl) {}
+          mMemInformationCache(ttl),
+          mFileSystemListInformationCache(ttl),
+          mSystemUptimeInformationCache(ttl),
+          mSerialIdInformationCache(ttl),
+          mDiskStateInformationCache(ttl) {}
 
     virtual ~SystemInterface() = default;
 
@@ -251,6 +337,10 @@ private:
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
     virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
+    virtual bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) = 0;
+    virtual bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) = 0;
+    virtual bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) = 0;
+    virtual bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -259,6 +349,10 @@ private:
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
     SystemInformationCache<MemoryInformation> mMemInformationCache;
+    SystemInformationCache<FileSystemListInformation> mFileSystemListInformationCache;
+    SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
+    SystemInformationCache<SerialIdInformation, std::string> mSerialIdInformationCache;
+    SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

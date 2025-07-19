@@ -125,6 +125,51 @@ bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
         errorType);
 }
 
+bool SystemInterface::GetFileSystemListInformation(FileSystemListInformation& fileSystemListInfo) {
+    const std::string errorType = "filesystem list";
+    return MemoizedCall(
+        mFileSystemListInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetFileSystemListInformationOnce(static_cast<FileSystemListInformation&>(info));
+        },
+        fileSystemListInfo,
+        errorType);
+}
+
+bool SystemInterface::GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo) {
+    const std::string errorType = "system uptime";
+    return MemoizedCall(
+        mSystemUptimeInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetSystemUptimeInformationOnce(static_cast<SystemUptimeInformation&>(info));
+        },
+        systemUptimeInfo,
+        errorType);
+}
+
+bool SystemInterface::GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo) {
+    const std::string errorType = "SerialId";
+    return MemoizedCall(
+        mSerialIdInformationCache,
+        [this](BaseInformation& info, std::string diskName) {
+            return this->GetDiskSerialIdInformationOnce(diskName, static_cast<SerialIdInformation&>(info));
+        },
+        serialIdInfo,
+        errorType,
+        diskName);
+}
+
+bool SystemInterface::GetDiskStateInformation(DiskStateInformation& diskStateInfo) {
+    const std::string errorType = "disk state";
+    return MemoizedCall(
+        mDiskStateInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetDiskStateInformationOnce(static_cast<DiskStateInformation&>(info));
+        },
+        diskStateInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {

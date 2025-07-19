@@ -21,6 +21,8 @@
 using namespace std;
 using namespace std::chrono;
 
+#include <mntent.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 
@@ -312,5 +314,238 @@ bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& memi
     return true;
 }
 
+// 已知文件系统
+const auto& knownFileSystem = *new std::unordered_map<std::string, FileSystemType>{
+    {"adfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"affs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"anon-inode FS", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"befs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"bfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"btrfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"ecryptfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"efs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"futexfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"gpfs", FILE_SYSTEM_TYPE_NETWORK},
+    {"hpfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"hfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"isofs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"k-afs", FILE_SYSTEM_TYPE_NETWORK},
+    {"lustre", FILE_SYSTEM_TYPE_NETWORK},
+    {"nilfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"openprom", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"reiserfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"vzfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"xfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"xiafs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+
+    // CommonFileSystem
+    {"ntfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"smbfs", FILE_SYSTEM_TYPE_NETWORK},
+    {"smb", FILE_SYSTEM_TYPE_NETWORK},
+    {"swap", FILE_SYSTEM_TYPE_SWAP},
+    {"afs", FILE_SYSTEM_TYPE_NETWORK},
+    {"iso9660", FILE_SYSTEM_TYPE_CDROM},
+    {"cvfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"cifs", FILE_SYSTEM_TYPE_NETWORK},
+    {"msdos", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"minix", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"vxfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"vfat", FILE_SYSTEM_TYPE_LOCAL_DISK},
+    {"zfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+};
+const struct {
+    const char* prefix;
+    const FileSystemType fsType;
+} knownFileSystemPrefix[] = {{"ext", FILE_SYSTEM_TYPE_LOCAL_DISK},
+                             {"gfs", FILE_SYSTEM_TYPE_NETWORK},
+                             {"jffs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+                             {"jfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+                             {"minix", FILE_SYSTEM_TYPE_LOCAL_DISK},
+                             {"ocfs", FILE_SYSTEM_TYPE_NETWORK},
+                             {"psfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
+                             {"nfs", FILE_SYSTEM_TYPE_NETWORK},
+                             {"fat", FILE_SYSTEM_TYPE_LOCAL_DISK}};
+
+const struct {
+    FileSystemType fs;
+    const char* name;
+} fsTypeNames[] = {
+    {FILE_SYSTEM_TYPE_UNKNOWN, "unknown"},
+    {FILE_SYSTEM_TYPE_NONE, "none"},
+    {FILE_SYSTEM_TYPE_LOCAL_DISK, "local"},
+    {FILE_SYSTEM_TYPE_NETWORK, "remote"},
+    {FILE_SYSTEM_TYPE_RAM_DISK, "ram"},
+    {FILE_SYSTEM_TYPE_CDROM, "cdrom"},
+    {FILE_SYSTEM_TYPE_SWAP, "swap"},
+};
+constexpr size_t fsTypeNamesCount = sizeof(fsTypeNames) / sizeof(fsTypeNames[0]);
+static_assert(FILE_SYSTEM_TYPE_MAX == fsTypeNamesCount, "fsTypeNames size not matched");
+std::string GetName(FileSystemType fs) {
+    int idx = static_cast<int>(fs);
+    if (0 <= idx && (size_t)idx < fsTypeNamesCount && fsTypeNames[idx].fs == fs) {
+        return fsTypeNames[idx].name;
+    }
+    return "";
+}
+bool GetFileSystemType(const std::string& fsTypeName, FileSystemType& fsType, std::string& fsTypeDisplayName) {
+    bool found = fsType != FILE_SYSTEM_TYPE_UNKNOWN;
+    if (!found) {
+        auto it = knownFileSystem.find(fsTypeName);
+        found = it != knownFileSystem.end();
+        if (found) {
+            fsType = it->second;
+        } else {
+            for (auto& entry : knownFileSystemPrefix) {
+                found = StartWith(fsTypeName, entry.prefix);
+                if (found) {
+                    fsType = entry.fsType;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!found || fsType >= FILE_SYSTEM_TYPE_MAX) {
+        fsType = FILE_SYSTEM_TYPE_NONE;
+    }
+    fsTypeDisplayName = GetName(fsType);
+
+    return found;
+}
+bool LinuxSystemInterface::GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) {
+    FILE* fp;
+
+    // MOUNTED: /etc/mtab, defined in /usr/include/paths.h
+    auto mountedDir = ETC_DIR / ETC_MTAB;
+    if (!(fp = setmntent(mountedDir.c_str(), "r"))) {
+        return false;
+    }
+    // defer(endmntent(fp));
+
+    mntent ent{};
+    std::vector<char> buffer((size_t)4096);
+    while (getmntent_r(fp, &ent, &buffer[0], buffer.size())) {
+        FileSystem fileSystem;
+        fileSystem.type = FILE_SYSTEM_TYPE_UNKNOWN;
+        fileSystem.dirName = ent.mnt_dir;
+        fileSystem.devName = ent.mnt_fsname;
+        fileSystem.sysTypeName = ent.mnt_type;
+        fileSystem.options = ent.mnt_opts;
+
+        GetFileSystemType(fileSystem.sysTypeName, fileSystem.type, fileSystem.typeName);
+        fileSystemListInfo.fileSystemList.push_back(fileSystem);
+    }
+
+    return true;
+}
+
+/*
+> cat /proc/uptime
+183857.30 1969716.84
+第一列: 系统启动到现在的时间（以秒为单位）；
+第二列: 系统空闲的时间（以秒为单位）。
+*/
+bool LinuxSystemInterface::GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) {
+    std::vector<std::string> uptimeLines;
+    std::string errorMessage;
+
+    if (!CheckExistance(PROCESS_DIR / PROCESS_UPTIME)) {
+        return false;
+    }
+
+    int ret = GetFileLines(PROCESS_DIR / PROCESS_UPTIME, uptimeLines, true, &errorMessage);
+    if (ret != 0 || uptimeLines.empty()) {
+        return false;
+    }
+
+    std::vector<std::string> uptimeMetric;
+    boost::split(uptimeMetric,
+                 (uptimeLines.empty() ? "" : uptimeLines.front()),
+                 boost::is_any_of(" "),
+                 boost::token_compress_on);
+    systemUptimeInfo.uptime = std::stod(uptimeMetric.front());
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) {
+    std::vector<std::string> serialIdLines = {};
+    std::string errorMessage;
+    auto sysSerialId = SYSTEM_BLOCK_DIR / diskName / SERIAL;
+
+    int ret = GetFileLines(sysSerialId, serialIdLines, true, &errorMessage);
+    if (ret != 0 || serialIdLines.empty()) {
+        return false;
+    }
+
+    serialIdInfo.serialId = serialIdLines[0];
+    return true;
+}
+
+bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) {
+    std::vector<std::string> diskLines = {};
+    std::string errorMessage;
+
+    int ret = GetFileLines(PROCESS_DIR / PROCESS_DISKSTATS, diskLines, true, &errorMessage);
+    if (ret != 0 || diskLines.empty()) {
+        return false;
+    } else {
+        for (auto const& diskLine : diskLines) {
+            DiskState diskStat;
+            std::vector<std::string> diskMetric;
+            boost::split(diskMetric,
+                         boost::algorithm::trim_left_copy(diskLine),
+                         boost::is_any_of(" "),
+                         boost::token_compress_on);
+            if (diskMetric.size() < (size_t)EnumDiskState::count) {
+                continue;
+            }
+            try {
+                auto get_int = [&](EnumDiskState key) -> uint64_t {
+                    const std::string& s = diskMetric[(int)key];
+                    return static_cast<uint64_t>(std::stoull(s));
+                };
+                // int currentIndex = 0;
+                // 1  major number
+                uint64_t majorVal = get_int(EnumDiskState::major);
+                uint64_t minorVal = get_int(EnumDiskState::minor);
+                diskStat.major = static_cast<unsigned int>(majorVal);
+                diskStat.minor = static_cast<unsigned int>(minorVal);
+                // 2  minor number
+                // 3  device name
+                // ++currentIndex;
+                // 4  reads completed successfully
+                diskStat.reads = get_int(EnumDiskState::reads);
+                // 5  reads merged
+                // ++currentIndex;
+                // 6  sectors read
+                diskStat.readBytes = get_int(EnumDiskState::readSectors) * 512;
+                // 7  time spent reading (ms)
+                diskStat.rTime = get_int(EnumDiskState::rMillis);
+                // 8  writes completed
+                diskStat.writes = get_int(EnumDiskState::writes);
+                // 9  writes merged
+                // ++currentIndex;
+                // 10  sectors written
+                diskStat.writeBytes = get_int(EnumDiskState::writeSectors) * 512;
+                // 11  time spent writing (ms)
+                diskStat.wTime = get_int(EnumDiskState::wMillis);
+                // 12  I/Os currently in progress
+                // ++currentIndex;
+                // 13  time spent doing I/Os (ms)
+                diskStat.time = get_int(EnumDiskState::rwMillis);
+                // 14  weighted time spent doing I/Os (ms)
+                diskStat.qTime = get_int(EnumDiskState::qMillis);
+
+            } catch (...) {
+                LOG_ERROR(sLogger, ("failed to parse number in diskstats", diskLine));
+                return false;
+            }
+            diskStateInfo.diskStats.push_back(diskStat);
+        }
+    }
+
+    return true;
+}
 
 } // namespace logtail

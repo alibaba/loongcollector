@@ -23,9 +23,15 @@
 namespace logtail {
 
 extern std::filesystem::path PROCESS_DIR;
+extern std::filesystem::path SYSTEM_BLOCK_DIR;
+extern std::filesystem::path ETC_DIR;
 const extern std::filesystem::path PROCESS_STAT;
 const extern std::filesystem::path PROCESS_LOADAVG;
 const extern std::filesystem::path PROCESS_MEMINFO;
+const extern std::filesystem::path ETC_MTAB;
+const extern std::filesystem::path PROCESS_UPTIME;
+const extern std::filesystem::path SERIAL;
+const extern std::filesystem::path PROCESS_DISKSTATS;
 const extern int64_t SYSTEM_HERTZ;
 
 #ifdef __ENTERPRISE__
