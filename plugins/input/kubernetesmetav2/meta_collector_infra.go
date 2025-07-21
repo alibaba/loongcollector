@@ -15,7 +15,7 @@ func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj 
 	logInfraLink := &models.Log{}
 	logInfraLink.Contents = models.NewLogContents()
 	logInfraLink.Timestamp = uint64(time.Now().Unix())
-	logInfraLink.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs) //same as
+	logInfraLink.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs) // same as
 
 	logInfraLink.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain) // e.g. scr is k8s.node
 	logInfraLink.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(obj.Kind))
@@ -33,33 +33,33 @@ func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj 
 	return logInfraLink
 }
 
-func (m *metaCollector) generateInfraServerKeyId(nodeObj *v1.Node) string {
+func (m *metaCollector) generateInfraServerKeyID(nodeObj *v1.Node) string {
 
-	serverId := nodeObj.Name
+	serverID := nodeObj.Name
 
 	// (1) replace server_id by provider_id
 	if nodeObj.Spec.ProviderID != "" {
 		// if node belong to azure, aws, gce, return providerID as infra.server id
 		if strings.HasPrefix(nodeObj.Spec.ProviderID, "azure") || strings.HasPrefix(nodeObj.Spec.ProviderID, "aws") || strings.HasPrefix(nodeObj.Spec.ProviderID, "gce") {
-			serverId = nodeObj.Spec.ProviderID
+			serverID = nodeObj.Spec.ProviderID
 		}
 	}
 
 	// (2) if aliyunInstanceIDLabel exist in labels, return aliyunInstanceIDLabel value
 	if nodeObj.Labels != nil && nodeObj.Labels[aliyunInstanceIDLabel] != "" {
-		serverId = nodeObj.Labels[aliyunInstanceIDLabel]
-		return serverId
+		serverID = nodeObj.Labels[aliyunInstanceIDLabel]
+		return serverID
 	}
 
 	// (3) if node status has host name filed, using hostname instead
 	if nodeObj.Status.Addresses != nil && len(nodeObj.Status.Addresses) > 0 {
 		for _, addr := range nodeObj.Status.Addresses {
 			if addr.Type == v1.NodeHostName {
-				serverId = addr.Address
+				serverID = addr.Address
 				break
 			}
 		}
 	}
 	// (4) Ensure the value not empty
-	return serverId
+	return serverID
 }
