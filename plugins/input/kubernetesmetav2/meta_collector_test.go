@@ -14,18 +14,18 @@ func TestGenEntityTypeKeyAcs(t *testing.T) {
 	}
 	*flags.ClusterType = ackCluster
 	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "acs.k8s.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "acs.ack.cluster", m.genEntityTypeKey("cluster"))
+	assert.Equal(t, "ack.pod", m.genEntityTypeKey("pod"))
+	assert.Equal(t, "ack.cluster", m.genEntityTypeKey("cluster"))
 
 	*flags.ClusterType = oneCluster
 	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "acs.k8s.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "acs.one.cluster", m.genEntityTypeKey("cluster"))
+	assert.Equal(t, "one.pod", m.genEntityTypeKey("pod"))
+	assert.Equal(t, "one.cluster", m.genEntityTypeKey("cluster"))
 
 	*flags.ClusterType = asiCluster
 	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "acs.k8s.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "acs.asi.cluster", m.genEntityTypeKey("cluster"))
+	assert.Equal(t, "asi.pod", m.genEntityTypeKey("pod"))
+	assert.Equal(t, "asi.cluster", m.genEntityTypeKey("cluster"))
 }
 
 func TestGenEntityTypeKeyInfra(t *testing.T) {
@@ -34,8 +34,8 @@ func TestGenEntityTypeKeyInfra(t *testing.T) {
 	}
 	*flags.ClusterType = "k8s"
 	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "infra.k8s.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "infra.k8s.cluster", m.genEntityTypeKey("cluster"))
+	assert.Equal(t, "k8s.pod", m.genEntityTypeKey("pod"))
+	assert.Equal(t, "k8s.cluster", m.genEntityTypeKey("cluster"))
 }
 
 func TestGenEntityTypeKeyEmpty(t *testing.T) {
@@ -43,6 +43,6 @@ func TestGenEntityTypeKeyEmpty(t *testing.T) {
 		serviceK8sMeta: &ServiceK8sMeta{},
 	}
 	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "infra.k8s.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "infra.k8s.cluster", m.genEntityTypeKey("cluster"))
+	assert.Equal(t, "k8s.pod", m.genEntityTypeKey("pod"))
+	assert.Equal(t, "k8s.cluster", m.genEntityTypeKey("cluster"))
 }

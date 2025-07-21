@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,19 @@
  * limitations under the License.
  */
 
-#include "host_monitor/Constants.h"
+#pragma once
 
-#include <unistd.h>
+#include "json/value.h"
 
 namespace logtail {
 
-std::filesystem::path PROCESS_DIR = "/proc";
-const std::filesystem::path PROCESS_STAT = "stat";
-const std::filesystem::path PROCESS_LOADAVG = "loadavg";
-const std::filesystem::path PROCESS_MEMINFO = "meminfo";
-const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
+class BaseService {
+public:
+    virtual ~BaseService() = default;
 
-} // namespace logtail
+    virtual bool Update(std::string configName, const Json::Value& config) = 0;
+    virtual bool Remove(std::string configName) = 0;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
+};
+
+}; // namespace logtail

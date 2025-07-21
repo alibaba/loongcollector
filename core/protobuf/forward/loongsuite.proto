@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include "host_monitor/Constants.h"
+syntax = "proto3";
+package logtail;
 
-#include <unistd.h>
+service LoongSuiteForwardService {
+    rpc Forward(LoongSuiteForwardRequest) returns (LoongSuiteForwardResponse) {}
+}
 
-namespace logtail {
+message LoongSuiteForwardRequest {
+    bytes data = 1;
+}
 
-std::filesystem::path PROCESS_DIR = "/proc";
-const std::filesystem::path PROCESS_STAT = "stat";
-const std::filesystem::path PROCESS_LOADAVG = "loadavg";
-const std::filesystem::path PROCESS_MEMINFO = "meminfo";
-const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
-
-} // namespace logtail
+message LoongSuiteForwardResponse {
+}
