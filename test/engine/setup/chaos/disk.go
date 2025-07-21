@@ -24,7 +24,7 @@ import (
 func DiskFull(ctx context.Context, time int) (context.Context, error) {
 	switch setup.Env.GetType() {
 	case "host":
-		command := "/opt/chaosblade/blade create disk fill --path /usr/local/ilogtail/ --size 4096000 --timeout " + strconv.FormatInt(int64(time), 10)
+		command := "/opt/chaosblade/blade create disk fill --path /usr/local/ilogtail/ --size 10240000 --timeout " + strconv.FormatInt(int64(time), 10)
 		_, err := setup.Env.ExecOnLoongCollector(command)
 		if err != nil {
 			return ctx, err
