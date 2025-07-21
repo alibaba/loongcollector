@@ -239,11 +239,11 @@ func (m *k8sMetaCache) preProcessCommon(obj interface{}) interface{} {
 }
 
 func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
-	m.preProcessCommon(obj)
-	pod, ok := obj.(*v1.Pod)
+	processedObj := m.preProcessCommon(obj)
+	pod, ok := processedObj.(*v1.Pod)
 	if !ok {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod", obj)
-		return obj
+		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod after common preprocessing", processedObj)
+		return processedObj
 	}
 	pod.ManagedFields = nil
 	pod.Status.Conditions = nil
