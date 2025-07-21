@@ -45,8 +45,8 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Timestamp = log.Timestamp
 
 				containerLog.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
-				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerTypeName))
-				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerTypeName, obj.Namespace, obj.Name+container.Name))
+				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerKindName))
+				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerKindName, obj.Namespace, obj.Name+container.Name))
 				containerLog.Contents.Add(entityMethodFieldName, method)
 
 				containerLog.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(data.FirstObservedTime, 10))

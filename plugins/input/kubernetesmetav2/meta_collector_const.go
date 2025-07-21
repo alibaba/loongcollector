@@ -53,8 +53,8 @@ const (
 
 	AliyunCloudProvider = "alibaba_cloud"
 
-	clusterTypeName   = "cluster"
-	containerTypeName = "container"
+	clusterKindName   = "cluster"
+	containerKindName = "container"
 
 	aliyunInstanceIDLabel = "alibabacloud.com/ecs-instance-id"
 )

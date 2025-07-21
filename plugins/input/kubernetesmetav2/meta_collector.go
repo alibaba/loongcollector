@@ -419,8 +419,8 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	log.Contents = models.NewLogContents()
 	log.Timestamp = uint64(time.Now().Unix())
 	log.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityIDFieldName, m.genKey(clusterTypeName, "", ""))
+	log.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(clusterKindName))
+	log.Contents.Add(entityIDFieldName, m.genKey(clusterKindName, "", ""))
 	log.Contents.Add(entityMethodFieldName, "Update")
 	log.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
 	log.Contents.Add(entityLastObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
@@ -440,8 +440,8 @@ func (m *metaCollector) generateClusterEntityLinkWithAcsAckCluster() models.Pipe
 	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genOtherKey(m.serviceK8sMeta.clusterID))
 
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey(clusterTypeName, "", ""))
+	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterKindName))
+	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey(clusterKindName, "", ""))
 
 	log.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs)
 	log.Contents.Add(entityMethodFieldName, "Update")
@@ -459,8 +459,8 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
 	log.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterTypeName))
-	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey(clusterTypeName, "", "")) // e.g c1e86abc378fe43ff93e4e636537c436fcluster
+	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterKindName))
+	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey(clusterKindName, "", "")) // e.g c1e86abc378fe43ff93e4e636537c436fcluster
 	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkDestEntityTypeFieldName, content.Get(entityTypeFieldName))
 	log.Contents.Add(entityLinkDestEntityIDFieldName, content.Get(entityIDFieldName))
