@@ -29,13 +29,11 @@ public:
         int retryLimit, 
         const file_data_t& event,
         ProcessCache& processCache,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue,
-        bool flushFileEvent)
+        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue)
         : RetryableEvent(retryLimit),
           mRawEvent(&event),
           mProcessCache(processCache), 
-          mCommonEventQueue(eventQueue), 
-          mFlushFileEvent(flushFileEvent) {}
+          mCommonEventQueue(eventQueue) {}
     
     virtual ~FileRetryableEvent() = default;
 
@@ -51,7 +49,6 @@ private:
     ProcessCache& mProcessCache;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<FileEvent> mFileEvent;
-    bool mFlushFileEvent;
 };
 
 } // namespace logtail::ebpf

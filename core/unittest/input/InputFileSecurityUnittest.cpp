@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "json/json.h"
-
-#include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
@@ -41,9 +38,9 @@ public:
 
 protected:
     void SetUp() override {
-        p.mName = "test_config";
-        ctx.SetConfigName("test_config");
-        ctx.SetPipeline(p);
+        mPipeline.mName = "test_config";
+        mContex.SetConfigName("test_config");
+        mContex.SetPipeline(mPipeline);
         ebpf::EBPFServer::GetInstance()->Init();
     }
 
@@ -54,8 +51,8 @@ protected:
     }
 
 private:
-    CollectionPipeline p;
-    CollectionPipelineContext ctx;
+    CollectionPipeline mPipeline;
+    CollectionPipelineContext mContex;
 };
 
 void InputFileSecurityUnittest::TestName() {
@@ -72,8 +69,10 @@ void InputFileSecurityUnittest::TestSupportAck() {
 
 void InputFileSecurityUnittest::OnSuccessfulInit() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     // only mandatory param
     configStr = R"(
@@ -90,7 +89,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -116,7 +115,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -145,14 +144,14 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter3
         = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(3, thisFilter3.mFilePathList.size());
+    APSARA_TEST_EQUAL(static_cast<size_t>(3), thisFilter3.mFilePathList.size());
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter3.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter3.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter3.mFilePathList[2]);
@@ -160,8 +159,10 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
 
 void InputFileSecurityUnittest::OnFailedInit() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     // invalid mandatory param
     configStr = R"(
@@ -175,7 +176,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -199,7 +200,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -219,7 +220,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -230,8 +231,10 @@ void InputFileSecurityUnittest::OnFailedInit() {
 
 void InputFileSecurityUnittest::OnSuccessfulStart() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     configStr = R"(
         {
@@ -247,7 +250,7 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -261,8 +264,10 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
 
 void InputFileSecurityUnittest::OnSuccessfulStop() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     configStr = R"(
         {
@@ -278,7 +283,7 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();

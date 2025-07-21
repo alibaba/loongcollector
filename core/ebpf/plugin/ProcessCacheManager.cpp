@@ -432,7 +432,7 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     return res;
 }
 
-int ProcessCacheManager::PollPerfBuffers() {
+int ProcessCacheManager::PollPerfBuffers(int maxWaitTimeMs) {
     int zero = 0;
     int ret = 0;
     mIsPolling = true;
@@ -447,7 +447,7 @@ int ProcessCacheManager::PollPerfBuffers() {
         }
         // poll after retry to avoid instant retry
         ret = mEBPFAdapter->PollPerfBuffers(
-            PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+            PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
         LOG_DEBUG(sLogger,
                         ("process cache poll buffer", "")("cnt", ret));
         if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {

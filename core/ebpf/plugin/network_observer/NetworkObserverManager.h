@@ -74,7 +74,7 @@ public:
 
     int SendEvents() override { return 0; };
 
-    int PollPerfBuffer() override { return 0; }
+    int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
 
     void RecordEventLost(enum callback_type_e type, uint64_t lostCount);
 

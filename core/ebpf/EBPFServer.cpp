@@ -489,7 +489,7 @@ void EBPFServer::pollPerfBuffers() {
         }
         int currentMaxWaitTime = kDefaultMaxWaitTimeMS;
         auto starttime = std::chrono::steady_clock::now();
-        mProcessCacheManager->PollPerfBuffers();
+        mProcessCacheManager->PollPerfBuffers(currentMaxWaitTime);
         auto endtime = std::chrono::steady_clock::now();
         currentMaxWaitTime -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
 

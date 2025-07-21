@@ -50,7 +50,7 @@ std::shared_ptr<ProcessCacheValue> ProcessCache::Lookup(const data_event_id& key
     }
     
     std::shared_ptr<ProcessCacheValue> result = nullptr;
-    size_t found = mCache->visit(key, [&result](const auto& element) {
+    size_t found = mCache->cvisit(key, [&result](const auto& element) {
         result = element.second;
     });
     

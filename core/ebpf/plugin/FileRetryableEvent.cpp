@@ -42,12 +42,11 @@ bool FileRetryableEvent::HandleMessage() {
             return false;
     }
 
-    std::string path = &mRawEvent->path[4];
     mFileEvent = std::make_shared<FileEvent>(static_cast<uint32_t>(mRawEvent->key.pid), 
                                              static_cast<uint64_t>(mRawEvent->key.ktime),
                                              type,
                                              static_cast<uint64_t>(mRawEvent->timestamp),
-                                             path);
+                                             StringView(&mRawEvent->path[4]));
     mRawEvent = nullptr;
     // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime));
 
@@ -66,7 +65,7 @@ bool FileRetryableEvent::HandleMessage() {
 }
 
 bool FileRetryableEvent::findProcess() {
-    if(mFileEvent->mPid <= 0 || mFileEvent->mPid <= 0) {
+    if (mFileEvent->mPid <= 0 || mFileEvent->mKtime <= 0) {
         LOG_WARNING(sLogger, ("file event", "not process pid or ktime"));
         return true;
     }
@@ -80,9 +79,6 @@ bool FileRetryableEvent::findProcess() {
     return true;
 }
 bool FileRetryableEvent::flushEvent() {
-    if (!mFlushFileEvent) {
-        return true;
-    }
     if (!mCommonEventQueue.try_enqueue(mFileEvent)) {
         LOG_DEBUG(sLogger,
                    ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(

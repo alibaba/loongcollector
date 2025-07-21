@@ -302,11 +302,11 @@ void NetworkObserverManagerUnittest::TestPerfBufferOperations() {
     options.mEnableProtocols = {"HTTP"};
     mManager->Init(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
 
-    int result = mManager->PollPerfBuffer();
+    int result = mManager->PollPerfBuffer(kDefaultMaxWaitTimeMS);
     EXPECT_EQ(result, 0);
 
     for (int i = 0; i < 5; i++) {
-        result = mManager->PollPerfBuffer();
+        result = mManager->PollPerfBuffer(kDefaultMaxWaitTimeMS);
         EXPECT_EQ(result, 0);
     }
 }
