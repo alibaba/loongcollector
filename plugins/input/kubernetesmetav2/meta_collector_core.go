@@ -147,9 +147,9 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		log.Contents.Add("provider_id", obj.Spec.ProviderID)
 		log.SetName(m.genEntityTypeKey(obj.Kind)) // used to determine whether a link need to be estabilished with cluster, only k8s.node requires it, infra.server link doest not
 
-		serverId := m.generateInfraServerKeyID(obj)
+		serverID := m.generateInfraServerKeyID(obj)
 		// generate k8s.node -> infra.server link
-		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverId)
+		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverID)
 		return []models.PipelineEvent{log, logNodeInfraLink}
 	}
 	return nil

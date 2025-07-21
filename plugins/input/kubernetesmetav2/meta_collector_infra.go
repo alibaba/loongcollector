@@ -10,7 +10,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj *v1.Node, method, serverId string) *models.Log {
+func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj *v1.Node, method, serverID string) *models.Log {
 	// generate infra.server entity from k8s.node
 	logInfraLink := &models.Log{}
 	logInfraLink.Contents = models.NewLogContents()
@@ -23,7 +23,7 @@ func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj 
 
 	logInfraLink.Contents.Add(entityLinkDestDomainFieldName, infraDomain) // dest is infra.server
 	logInfraLink.Contents.Add(entityLinkDestEntityTypeFieldName, infraServer)
-	logInfraLink.Contents.Add(entityLinkDestEntityIDFieldName, m.genOtherKey(serverId)) // dest key id
+	logInfraLink.Contents.Add(entityLinkDestEntityIDFieldName, m.genOtherKey(serverID)) // dest key id
 	logInfraLink.Contents.Add(entityMethodFieldName, method)
 
 	logInfraLink.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(data.FirstObservedTime, 10))
