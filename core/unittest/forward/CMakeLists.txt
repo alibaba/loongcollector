@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.7
+cmake_minimum_required(VERSION 3.22)
+project(forward_unittest)
 
-USER root
-WORKDIR /src
+add_executable(grpc_runner_unittest GrpcRunnerUnittest.cpp)
+target_link_libraries(grpc_runner_unittest ${UT_BASE_TARGET})
 
-CMD ["bash", "-c", "gcovr --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*sdk.*\" -e \".*logger.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*protobuf.*\" -e \".*runner.*\""]
+include(GoogleTest)
+gtest_discover_tests(grpc_runner_unittest)
