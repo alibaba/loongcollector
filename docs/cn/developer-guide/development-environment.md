@@ -84,7 +84,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.7",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.8",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -190,7 +190,7 @@ cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output
 ```bash
 docker run --name loongcollector-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.7 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.8 \
   bash -c "sleep infinity"
 ```
 
