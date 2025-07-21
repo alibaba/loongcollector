@@ -32,14 +32,6 @@ const (
 )
 
 const (
-	entityServerIdFieldName     = "server_id"
-	entityServerRegionFieldName = "region_id"
-	entityServerIPFieldName     = "ip"
-	entityServerSourceFieldName = "source"
-	crossDomainSameAs           = "same_as"
-)
-
-const (
 	k8sDomain      = "k8s"
 	infraDomain    = "infra"
 	acsDomain      = "acs"
@@ -55,6 +47,7 @@ const (
 
 	clusterKindName   = "cluster"
 	containerKindName = "container"
+	crossDomainSameAs = "same_as"
 
 	aliyunInstanceIDLabel = "alibabacloud.com/ecs-instance-id"
 )
