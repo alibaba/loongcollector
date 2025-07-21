@@ -57,12 +57,4 @@ const (
 	containerTypeName = "container"
 
 	aliyunInstanceIDLabel = "alibabacloud.com/ecs-instance-id"
-	aliyunNodeIDLabel     = "alibabacloud.com/nodepool-id"
-	topologyRegion        = "topology.kubernetes.io/region" //aliyun、aws、zure、gce
-
-	aliyunSource = "aliyun"
-	awsSource    = "aws"
-	azureSource  = "azure"
-	gceSource    = "gce"
-	customSource = "custom"
 )

@@ -21,7 +21,7 @@ func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj 
 	logInfraLink.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(obj.Kind))
 	logInfraLink.Contents.Add(entityLinkSrcEntityIDFieldName, m.genKey(obj.Kind, "", obj.Name))
 
-	logInfraLink.Contents.Add(entityLinkDestDomainFieldName, infraDomain) //dest is infra.server
+	logInfraLink.Contents.Add(entityLinkDestDomainFieldName, infraDomain) // dest is infra.server
 	logInfraLink.Contents.Add(entityLinkDestEntityTypeFieldName, infraServer)
 	logInfraLink.Contents.Add(entityLinkDestEntityIDFieldName, m.genOtherKey(serverId)) // dest key id
 	logInfraLink.Contents.Add(entityMethodFieldName, method)
