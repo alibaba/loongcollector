@@ -365,22 +365,7 @@ macro(link_crypto target_name)
     if (crypto_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${crypto_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        # Check if we're on ARM and building a shared library
-        # TODO：armv8使用了汇编优化，尝试多种方法编译成fPIC失败，所以当需要编译成动态库时，使用crypto动态库
-        set(use_shared_crypto FALSE)
-        if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
-            # Check if the target itself is a shared library
-            get_target_property(target_type ${target_name} TYPE)
-            if (target_type STREQUAL "SHARED_LIBRARY")
-                set(use_shared_crypto TRUE)
-            endif()
-        endif()
-        
-        if (use_shared_crypto)
-            target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.so")
-        else()
-            target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")
-        endif()
+        target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")
     elseif (MSVC)
         #target_link_libraries (${target_name}
         #   debug "libcurl-d"
@@ -424,6 +409,8 @@ endmacro()
 # grpc
 macro(link_grpc target_name)
     if (UNIX)
+        set(OPENSSL_USE_STATIC_LIBS ON)
+        set(OPENSSL_ROOT_DIR ${DEFAULT_DEPS_ROOT})
         find_package(re2 QUIET PATHS ${DEPS_ROOT}/lib64/cmake/re2 NO_DEFAULT_PATH)
         if(NOT re2_FOUND)
             message(FATAL_ERROR "re2 not found, please upgrade your development image to compile!")
