@@ -11,6 +11,7 @@ import (
 	networking "k8s.io/api/networking/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -245,9 +246,9 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod after common preprocessing", processedObj)
 		return processedObj
 	}
-	pod.ManagedFields = nil
-	pod.Status.Conditions = nil
-	pod.Spec.Tolerations = nil
+	pod.ManagedFields = []metav1.ManagedFieldsEntry{}
+	pod.Status.Conditions = []v1.PodCondition{}
+	pod.Spec.Tolerations = []v1.Toleration{}
 	return pod
 }
 

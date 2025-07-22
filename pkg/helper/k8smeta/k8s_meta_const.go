@@ -58,6 +58,15 @@ const (
 	//revive:disable:var-naming
 )
 
+const (
+	K8S_DEPLOYMENT_TYPE  = "Deployment"
+	K8S_REPLICASET_TYPE  = "ReplicaSet"
+	K8S_STATEFULSET_TYPE = "StatefulSet"
+	K8S_DAEMONSET_TYPE   = "DaemonSet"
+	K8S_CRONJOB_TYPE     = "CronJob"
+	K8S_JOB_TYPE         = "Job"
+)
+
 var AllResources = []string{
 	POD,
 	SERVICE,

@@ -119,7 +119,7 @@ func (g *LinkGenerator) getPodDeploymentLink(podList []*K8sMetaEvent) []*K8sMeta
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != "ReplicaSet" {
+		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != K8S_REPLICASET_TYPE {
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
@@ -130,7 +130,7 @@ func (g *LinkGenerator) getPodDeploymentLink(podList []*K8sMetaEvent) []*K8sMeta
 		for _, rs := range rsList {
 			for _, r := range rs {
 				replicaSet, ok := r.Raw.(*app.ReplicaSet)
-				if !ok || len(replicaSet.OwnerReferences) == 0 || replicaSet.OwnerReferences[0].Kind != "Deployment" {
+				if !ok || len(replicaSet.OwnerReferences) == 0 || replicaSet.OwnerReferences[0].Kind != K8S_DEPLOYMENT_TYPE {
 					continue
 				}
 				deploymentName := replicaSet.OwnerReferences[0].Name
@@ -166,7 +166,7 @@ func (g *LinkGenerator) getReplicaSetDeploymentLink(rsList []*K8sMetaEvent) []*K
 	result := make([]*K8sMetaEvent, 0)
 	for _, event := range rsList {
 		replicaset, ok := event.Object.Raw.(*app.ReplicaSet)
-		if !ok || len(replicaset.OwnerReferences) == 0 || replicaset.OwnerReferences[0].Kind != "Deployment" {
+		if !ok || len(replicaset.OwnerReferences) == 0 || replicaset.OwnerReferences[0].Kind != K8S_DEPLOYMENT_TYPE {
 			continue
 		}
 		deploymentName := replicaset.OwnerReferences[0].Name
@@ -200,7 +200,7 @@ func (g *LinkGenerator) getPodReplicaSetLink(podList []*K8sMetaEvent) []*K8sMeta
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != "ReplicaSet" {
+		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != K8S_REPLICASET_TYPE {
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
@@ -234,7 +234,7 @@ func (g *LinkGenerator) getPodStatefulSetLink(podList []*K8sMetaEvent) []*K8sMet
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != "StatefulSet" {
+		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != K8S_STATEFULSET_TYPE {
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
@@ -268,7 +268,7 @@ func (g *LinkGenerator) getPodDaemonSetLink(podList []*K8sMetaEvent) []*K8sMetaE
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != "DaemonSet" {
+		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != K8S_DAEMONSET_TYPE {
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
@@ -302,7 +302,7 @@ func (g *LinkGenerator) getPodJobLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range podList {
 		pod, ok := data.Object.Raw.(*v1.Pod)
-		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != "Job" {
+		if !ok || len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].Kind != K8S_JOB_TYPE {
 			continue
 		}
 		parentName := pod.OwnerReferences[0].Name
@@ -336,7 +336,7 @@ func (g *LinkGenerator) getJobCronJobLink(jobList []*K8sMetaEvent) []*K8sMetaEve
 	result := make([]*K8sMetaEvent, 0)
 	for _, data := range jobList {
 		job, ok := data.Object.Raw.(*batch.Job)
-		if !ok || len(job.OwnerReferences) == 0 || job.OwnerReferences[0].Kind != "CronJob" {
+		if !ok || len(job.OwnerReferences) == 0 || job.OwnerReferences[0].Kind != K8S_CRONJOB_TYPE {
 			continue
 		}
 		cronJobName := job.OwnerReferences[0].Name
