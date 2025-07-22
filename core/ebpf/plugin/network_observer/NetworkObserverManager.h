@@ -82,7 +82,8 @@ public:
 
     int Destroy() override;
 
-    void UpdateWhitelists(std::vector<std::string>&& enableCids, std::vector<std::string>&& disableCids);
+    void UpdateWhitelists(std::vector<std::pair<std::string, uint64_t>>&& enableCids,
+                          std::vector<std::string>&& disableCids);
 
     int HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& event) override;
 
@@ -180,7 +181,8 @@ private:
     SIZETAggTree<AppSpanGroup, std::shared_ptr<CommonEvent>> mSpanAggregator;
     SIZETAggTree<AppLogGroup, std::shared_ptr<CommonEvent>> mLogAggregator;
 
-    void updateConfigVersionAndWhitelist(std::vector<std::string>&& newCids, std::vector<std::string>&& expiredCids) {
+    void updateConfigVersionAndWhitelist(std::vector<std::pair<std::string, uint64_t>>&& newCids,
+                                         std::vector<std::string>&& expiredCids) {
         if (!newCids.empty() || !expiredCids.empty()) {
             mConfigVersion++;
             UpdateWhitelists(std::move(newCids), std::move(expiredCids));
@@ -244,7 +246,7 @@ private:
     int mRollbackRecordTotal = 0;
     int mDropRecordTotal = 0;
 
-    std::vector<std::string> mEnableCids;
+    std::vector<std::pair<std::string, uint64_t>> mEnableCids;
     std::vector<std::string> mDisableCids;
 
     std::atomic_int mExecTimes = 0;

@@ -294,16 +294,16 @@ void NetworkObserverManagerUnittest::TestWhitelistManagement() {
     ObserverNetworkOption options;
     mManager->Init();
 
-    std::vector<std::string> enableCids = {"container1", "container2"};
+    std::vector<std::pair<std::string, uint64_t>> enableCids = {{"container1", 1}, {"container2", 2}};
     std::vector<std::string> disableCids;
     mManager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
 
     enableCids.clear();
-    disableCids = {"container3", "container4"};
+    disableCids = {{"container3", 3}, {"container4", 4}};
     mManager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
 
-    enableCids = {"container5"};
-    disableCids = {"container6"};
+    enableCids = {{"container5", 5}};
+    disableCids = {{"container6", 6}};
     mManager->UpdateWhitelists(std::move(enableCids), std::move(disableCids));
 }
 

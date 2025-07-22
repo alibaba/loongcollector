@@ -277,7 +277,7 @@ bool EBPFAdapter::SetNetworkObserverConfig(int32_t key, int32_t value) {
 #endif
 }
 
-bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
+bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool update, uint64_t cidKey) {
     if (!dynamicLibSuccess()) {
         return false;
     }
@@ -290,7 +290,7 @@ bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool updat
     return true;
 #else
     auto func = (set_networkobserver_cid_filter_func)f;
-    func(cid.c_str(), cid.size(), update);
+    func(cid.c_str(), cid.size(), update, cidKey);
     return true;
 #endif
 }

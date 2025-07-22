@@ -14,6 +14,8 @@
 
 #include "ebpf/plugin/network_observer/NetworkObserverManager.h"
 
+#include <cstdint>
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
@@ -1454,7 +1456,7 @@ bool NetworkObserverManager::UploadHostMetadataUpdateTask() {
 
 // called by curl thread, async update configs for container ...
 void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
-    std::vector<std::string> newContainerIds;
+    std::vector<std::pair<std::string, uint64_t>> newContainerIds;
     std::vector<std::string> expiredContainerIds;
 
     WriteLock lk(mAppConfigLock);
@@ -1476,8 +1478,8 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
 
         // check if is new container
         if (!wIt->second.containerIds.count(cid)) {
-            newContainerIds.push_back(cid);
             size_t cidKey = GenerateContainerKey(cid);
+            newContainerIds.emplace_back(cid, static_cast<uint64_t>(cidKey));
             mContainerConfigs[cidKey] = wIt->second.config;
         }
 
@@ -1726,7 +1728,7 @@ int NetworkObserverManager::Destroy() {
     return 0;
 }
 
-void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableCids,
+void NetworkObserverManager::UpdateWhitelists(std::vector<std::pair<std::string, uint64_t>>&& enableCids,
                                               std::vector<std::string>&& disableCids) {
 #ifdef APSARA_UNIT_TEST_MAIN
     mEnableCids = enableCids;
@@ -1734,13 +1736,13 @@ void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableC
     return;
 #endif
     for (auto& cid : enableCids) {
-        LOG_INFO(sLogger, ("UpdateWhitelists cid", cid));
-        mEBPFAdapter->SetNetworkObserverCidFilter(cid, true);
+        LOG_INFO(sLogger, ("UpdateWhitelists cid", cid.first)("key", cid.second));
+        mEBPFAdapter->SetNetworkObserverCidFilter(cid.first, true, cid.second);
     }
 
     for (auto& cid : disableCids) {
         LOG_INFO(sLogger, ("UpdateBlacklists cid", cid));
-        mEBPFAdapter->SetNetworkObserverCidFilter(cid, false);
+        mEBPFAdapter->SetNetworkObserverCidFilter(cid, false, 0);
     }
 }
 
