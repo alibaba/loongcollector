@@ -348,7 +348,7 @@ func (m *metaCollector) sendInBackground() {
 	sendFunc := func(group *models.PipelineGroupEvents) {
 		for _, e := range group.Events {
 			// TODO: temporary convert from event group back to log, will fix after pipeline support Go input to C++ processor
-			log := convertPipelineEvent2Log(e)
+			log := m.convertPipelineEvent2Log(e)
 			m.collector.AddRawLog(log)
 		}
 		group.Events = group.Events[:0]
@@ -356,12 +356,7 @@ func (m *metaCollector) sendInBackground() {
 	lastSendClusterTime := time.Now()
 
 	// send cluster entity as soon as k8s meta collector started
-	clusterEntity := m.generateClusterEntity()
-	m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
-	if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
-		clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
-		m.collector.AddRawLog(convertPipelineEvent2Log(clusterAcsLink))
-	}
+	m.sendClusterAndLink(m.collector)
 
 	for {
 		select {
@@ -390,16 +385,20 @@ func (m *metaCollector) sendInBackground() {
 			return
 		}
 		if time.Since(lastSendClusterTime) > time.Duration(m.serviceK8sMeta.Interval)*time.Second {
-
-			clusterEntity := m.generateClusterEntity()
-			m.collector.AddRawLog(convertPipelineEvent2Log(clusterEntity))
-
-			if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
-				clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
-				m.collector.AddRawLog(convertPipelineEvent2Log(clusterAcsLink))
-			}
+			// send cluster entity and cluster link to acs.ack cluster if current provider is alibaba_cloud
+			m.sendClusterAndLink(m.collector)
 			lastSendClusterTime = time.Now()
 		}
+	}
+}
+
+func (m *metaCollector) sendClusterAndLink(collector pipeline.Collector) {
+	clusterEntity := m.generateClusterEntity()
+	collector.AddRawLog(m.convertPipelineEvent2Log(clusterEntity))
+
+	if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
+		clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
+		collector.AddRawLog(m.convertPipelineEvent2Log(clusterAcsLink))
 	}
 }
 
@@ -480,13 +479,21 @@ func (m *metaCollector) genEntityTypeKey(kind string) string {
 	return m.serviceK8sMeta.domain + "." + strings.ToLower(kind)
 }
 
-func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
+func (m *metaCollector) updateProcessEventFailCounter() {
+	m.serviceK8sMeta.metaManager.UpdateProcessEventFailCounter()
+}
+func (m *metaCollector) updateConvertLogFailCounter() {
+	m.serviceK8sMeta.metaManager.UpdateConvertEventToLogFailCounter()
+}
+
+func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 	if modelLog, ok := event.(*models.Log); ok {
 		log := &protocol.Log{}
 		log.Contents = make([]*protocol.Log_Content, 0)
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
+					m.updateConvertLogFailCounter()
 					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k)
 					continue
 				} else {

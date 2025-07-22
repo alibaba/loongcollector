@@ -22,6 +22,8 @@ func (m *metaCollector) processIngressEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		return []models.PipelineEvent{log}
+	} else {
+		m.updateProcessEventFailCounter()
 	}
 	return nil
 }
@@ -34,6 +36,8 @@ func (m *metaCollector) processIngressServiceLink(data *k8smeta.ObjectWrapper, m
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Ingress2Service)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
+	} else {
+		m.updateProcessEventFailCounter()
 	}
 	return nil
 }
@@ -46,6 +50,8 @@ func (m *metaCollector) processIngressNamespaceLink(data *k8smeta.ObjectWrapper,
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Ingress)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
+	} else {
+		m.updateProcessEventFailCounter()
 	}
 	return nil
 }

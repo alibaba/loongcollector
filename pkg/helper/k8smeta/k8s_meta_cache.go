@@ -31,6 +31,8 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
+
+	informerWatchFailCount int64
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -40,6 +42,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.stopCh = stopCh
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
+	m.informerWatchFailCount = 0
 	m.schema = runtime.NewScheme()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
@@ -65,6 +68,16 @@ func (m *k8sMetaCache) GetSize() int {
 
 func (m *k8sMetaCache) GetQueueSize() int {
 	return len(m.eventCh)
+}
+
+func (m *k8sMetaCache) GetMetaStoreFailCount() int64 {
+	return m.metaStore.GetMetaStoreFailCount()
+}
+func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
+	return m.metaStore.GetMetaStoreFailCount()
+}
+func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
+	m.informerWatchFailCount += 1
 }
 
 func (m *k8sMetaCache) List() []*ObjectWrapper {
@@ -181,9 +194,14 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	case INGRESS:
 		informer = factory.Networking().V1().Ingresses().Informer()
 	default:
-		logger.Error(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", m.resourceType)
+		logger.Error(context.Background(), "K8S_META_ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", m.resourceType)
 		return factory, nil
 	}
+	// add watch error handler
+	informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+		m.UpdateInformerWatchFailCount()
+		logger.Error(context.Background(), "K8S_META_WATCH_ERROR_HANDLER", "ResourceType", m.resourceType, "watch error", err)
+	})
 	return factory, informer
 }
 

@@ -31,6 +31,8 @@ func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, m
 			log.Contents.Add("volume_binding_mode", "")
 		}
 		return []models.PipelineEvent{log}
+	} else {
+		m.updateProcessEventFailCounter()
 	}
 	return nil
 }

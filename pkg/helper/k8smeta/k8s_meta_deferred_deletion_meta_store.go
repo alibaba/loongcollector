@@ -41,9 +41,10 @@ type DeferredDeletionMetaStore struct {
 	lock  sync.RWMutex
 
 	// timer
-	gracePeriod  int64
-	registerLock sync.RWMutex
-	sendFuncs    map[string]*SendFuncWithStopCh
+	gracePeriod          int64
+	registerLock         sync.RWMutex
+	sendFuncs            map[string]*SendFuncWithStopCh
+	metaStoreFailCounter int64
 }
 
 type TimerEvent struct {
@@ -67,8 +68,9 @@ func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan stru
 		Items: make(map[string]*ObjectWrapper),
 		Index: make(map[string]IndexItem),
 
-		gracePeriod: gracePeriod,
-		sendFuncs:   make(map[string]*SendFuncWithStopCh),
+		gracePeriod:          gracePeriod,
+		sendFuncs:            make(map[string]*SendFuncWithStopCh),
+		metaStoreFailCounter: 0,
 	}
 	return m
 }
@@ -77,6 +79,12 @@ func (m *DeferredDeletionMetaStore) Start() {
 	go m.handleEvent()
 }
 
+func (m *DeferredDeletionMetaStore) UpdateMetaStoreFailCounter() {
+	m.metaStoreFailCounter += 1
+}
+func (m *DeferredDeletionMetaStore) GetMetaStoreFailCount() int64 {
+	return m.metaStoreFailCounter
+}
 func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrapper {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -91,10 +99,12 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 				if obj.Raw != nil {
 					result[k] = append(result[k], obj)
 				} else {
-					logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "raw object not found", realKey)
+					m.UpdateMetaStoreFailCounter()
+					logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "raw object not found", realKey)
 				}
 			} else {
-				logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "key not found", realKey)
+				m.UpdateMetaStoreFailCounter()
+				logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "key not found", realKey)
 			}
 		}
 	}
@@ -211,7 +221,8 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
+		m.UpdateMetaStoreFailCounter()
+		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
 		return
 	}
 	idxKeys := m.getIdxKeys(event.Object)
@@ -246,7 +257,8 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
+		m.UpdateMetaStoreFailCounter()
+		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
 		return
 	}
 	m.lock.Lock()
@@ -273,7 +285,8 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "handleDeferredDeleteEvent keyFunc error", err)
+		m.UpdateMetaStoreFailCounter()
+		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handleDeferredDeleteEvent keyFunc error", err)
 		return
 	}
 	idxKeys := m.getIdxKeys(event.Object)
@@ -322,7 +335,8 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 	for _, rule := range m.indexRules {
 		idxKeys, err := rule(obj.Raw)
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with idx rules error", err)
+			m.UpdateMetaStoreFailCounter()
+			logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with idx rules error", err)
 			return nil
 		}
 		result = append(result, idxKeys...)
