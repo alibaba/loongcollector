@@ -67,16 +67,15 @@ type ServiceK8sMeta struct {
 	Cluster2StorageClass     string
 
 	// other
-	context         pipeline.Context
-	metaManager     *k8smeta.MetaManager
-	collector       pipeline.Collector
-	metaCollector   *metaCollector
-	configName      string
-	clusterID       string
-	clusterName     string
-	clusterRegion   string
-	domain          string
-	clusterProvider string
+	context       pipeline.Context
+	metaManager   *k8smeta.MetaManager
+	collector     pipeline.Collector
+	metaCollector *metaCollector
+	configName    string
+	clusterID     string
+	clusterName   string
+	clusterRegion string
+	domain        string
 
 	// self metric
 	entityCount selfmonitor.CounterMetric
@@ -133,11 +132,10 @@ func (s *ServiceK8sMeta) initDomain() {
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
-			Interval:        60,
-			clusterID:       *flags.ClusterID,
-			clusterName:     *flags.ClusterName,
-			clusterRegion:   *flags.ClusterRegion,
-			clusterProvider: *flags.ClusterProvider,
+			Interval:      60,
+			clusterID:     *flags.ClusterID,
+			clusterName:   *flags.ClusterName,
+			clusterRegion: *flags.ClusterRegion,
 		}
 	}
 }

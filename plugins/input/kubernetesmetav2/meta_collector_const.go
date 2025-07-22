@@ -40,8 +40,6 @@ const (
 	acsEcsInstance = "acs.ecs.instance"
 	acsAckCluster  = "acs.ack.cluster"
 
-	AliyunCloudProvider = "alibaba_cloud"
-
 	clusterKindName   = "cluster"
 	containerKindName = "container"
 	crossDomainSameAs = "same_as"

@@ -50,7 +50,7 @@ const (
 	MetricRunnerK8sMetaProcessEventFailTotal      = "process_event_fail_total"
 	MetricRunnerK8sMetaConvertEventToLogFailTotal = "convert_event_to_log_fail_total"
 	MetricRunnerK8sMetaStoreFailTotal             = "metastore_handle_fail_total"
-	MetricRunnerK8sMetaWatchFailTotal             = "inform_watch_fail_total"
+	MetricRunnerK8sMetaWatchFailTotal             = "informer_watch_fail_total"
 	MetricRunnerK8sMetaCacheSize                  = "cache_size"
 	MetricRunnerK8sMetaQueueSize                  = "queue_size"
 	MetricRunnerK8sMetaHTTPRequestTotal           = "http_request_total"

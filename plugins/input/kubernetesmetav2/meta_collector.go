@@ -356,7 +356,7 @@ func (m *metaCollector) sendInBackground() {
 	lastSendClusterTime := time.Now()
 
 	// send cluster entity as soon as k8s meta collector started
-	m.sendClusterAndLink(m.collector)
+	m.sendClusterEntity(m.collector)
 
 	for {
 		select {
@@ -385,21 +385,16 @@ func (m *metaCollector) sendInBackground() {
 			return
 		}
 		if time.Since(lastSendClusterTime) > time.Duration(m.serviceK8sMeta.Interval)*time.Second {
-			// send cluster entity and cluster link to acs.ack cluster if current provider is alibaba_cloud
-			m.sendClusterAndLink(m.collector)
+			// send cluster entity
+			m.sendClusterEntity(m.collector)
 			lastSendClusterTime = time.Now()
 		}
 	}
 }
 
-func (m *metaCollector) sendClusterAndLink(collector pipeline.Collector) {
+func (m *metaCollector) sendClusterEntity(collector pipeline.Collector) {
 	clusterEntity := m.generateClusterEntity()
 	collector.AddRawLog(m.convertPipelineEvent2Log(clusterEntity))
-
-	if m.serviceK8sMeta.clusterProvider == AliyunCloudProvider {
-		clusterAcsLink := m.generateClusterEntityLinkWithAcsAckCluster()
-		collector.AddRawLog(m.convertPipelineEvent2Log(clusterAcsLink))
-	}
 }
 
 func (m *metaCollector) genKey(kind, namespace, name string) string {
@@ -428,28 +423,6 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 	log.Contents.Add(entityClusterIDFieldName, m.serviceK8sMeta.clusterID)
 	log.Contents.Add(entityClusterNameFieldName, m.serviceK8sMeta.clusterName)
 	log.Contents.Add(entityClusterRegionFieldName, m.serviceK8sMeta.clusterRegion)
-	return log
-}
-
-func (m *metaCollector) generateClusterEntityLinkWithAcsAckCluster() models.PipelineEvent {
-	log := &models.Log{}
-	log.Contents = models.NewLogContents()
-	log.Contents.Add(entityLinkSrcDomainFieldName, acsDomain)
-	log.Contents.Add(entityLinkSrcEntityTypeFieldName, acsAckCluster)
-	log.Contents.Add(entityLinkSrcEntityIDFieldName, m.genOtherKey(m.serviceK8sMeta.clusterID))
-
-	log.Contents.Add(entityLinkDestDomainFieldName, m.serviceK8sMeta.domain)
-	log.Contents.Add(entityLinkDestEntityTypeFieldName, m.genEntityTypeKey(clusterKindName))
-	log.Contents.Add(entityLinkDestEntityIDFieldName, m.genKey(clusterKindName, "", ""))
-
-	log.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs)
-	log.Contents.Add(entityMethodFieldName, "Update")
-
-	log.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
-	log.Contents.Add(entityLastObservedTimeFieldName, strconv.FormatInt(time.Now().Unix(), 10))
-	log.Contents.Add(entityKeepAliveSecondsFieldName, strconv.FormatInt(int64(m.serviceK8sMeta.Interval*2), 10))
-	log.Contents.Add(entityCategoryFieldName, defaultEntityLinkCategory)
-	log.Timestamp = uint64(time.Now().Unix())
 	return log
 }
 
