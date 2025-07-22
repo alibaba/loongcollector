@@ -487,7 +487,7 @@ func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
-					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k, "raw", modelLog)
+					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k)
 					continue
 				} else {
 					v = strconv.Itoa(intValue)

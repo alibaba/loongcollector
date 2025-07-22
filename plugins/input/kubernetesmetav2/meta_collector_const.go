@@ -39,9 +39,6 @@ const (
 	k8sNode        = "k8s.node"
 	acsEcsInstance = "acs.ecs.instance"
 	acsAckCluster  = "acs.ack.cluster"
-	ackCluster     = "ack"
-	oneCluster     = "one"
-	asiCluster     = "asi"
 
 	AliyunCloudProvider = "alibaba_cloud"
 
