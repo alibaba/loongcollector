@@ -160,6 +160,8 @@ public:
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
     friend class NetworkObserverManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
 #endif
 };
 

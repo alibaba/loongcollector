@@ -290,7 +290,7 @@ bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool updat
     return true;
 #else
     auto func = (set_networkobserver_cid_filter_func)f;
-    func(cid.c_str(), cid.size(), update, cidKey);
+    func(cid.c_str(), cid.size(), cidKey, update);
     return true;
 #endif
 }

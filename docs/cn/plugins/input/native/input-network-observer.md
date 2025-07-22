@@ -67,9 +67,9 @@ inputs:
         Workspace: test-workspace
         ServiceId: test-service-id
       WorkloadSelectors:
-        WorkloadName: test-workload
-        Namespace: default
-        WorkloadKind: Deployment
+        - WorkloadName: test-workload
+          Namespace: default
+          WorkloadKind: Deployment
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

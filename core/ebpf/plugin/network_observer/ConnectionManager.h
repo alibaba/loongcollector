@@ -81,6 +81,8 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
 #endif
 };
 

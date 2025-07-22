@@ -39,7 +39,6 @@ public:
     void TestWhitelistManagement();
     void TestPerfBufferOperations();
     void TestRecordProcessing();
-    void TestRollbackProcessing();
     void TestConfigUpdate();
     void TestErrorHandling();
     void TestPluginLifecycle();
@@ -429,123 +428,6 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags.size(), 1UL);
 }
 
-// TEST RollBack mechanism
-void NetworkObserverManagerUnittest::TestRollbackProcessing() {
-    LOG_INFO(sLogger, ("TestRollbackProcessing", "start"));
-    {
-        mManager = CreateManager();
-        ObserverNetworkOption options;
-        options.mL7Config.mEnable = true;
-        options.mL7Config.mEnableLog = true;
-        options.mL7Config.mEnableMetric = true;
-        options.mL7Config.mEnableSpan = true;
-
-        options.mApmConfig.mAppId = "test-app-id";
-        options.mApmConfig.mAppName = "test-app-name";
-        options.mApmConfig.mWorkspace = "test-workspace";
-        options.mApmConfig.mServiceId = "test-service-id";
-
-        options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
-
-        mManager->Init();
-        CollectionPipelineContext ctx;
-        ctx.SetConfigName("test-config-networkobserver");
-        ctx.SetProcessQueueKey(1);
-        mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
-
-        auto podInfo = std::make_shared<K8sPodInfo>();
-        podInfo->mContainerIds = {"1", "2"};
-        podInfo->mPodIp = "test-pod-ip";
-        podInfo->mPodName = "test-pod-name";
-        podInfo->mNamespace = "test-namespace";
-        podInfo->mWorkloadKind = "Deployment";
-        podInfo->mWorkloadName = "test-workloadname";
-
-        LOG_INFO(sLogger, ("step", "0-0"));
-        K8sMetadata::GetInstance().mContainerCache.insert(
-            "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
-
-        auto peerPodInfo = std::make_shared<K8sPodInfo>();
-        peerPodInfo->mContainerIds = {"3", "4"};
-        peerPodInfo->mPodIp = "peer-pod-ip";
-        peerPodInfo->mPodName = "peer-pod-name";
-        peerPodInfo->mNamespace = "peer-namespace";
-        K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
-        mManager->HandleHostMetadataUpdate({"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106"});
-
-        APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 0);
-        // copy current
-        mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
-
-        // Generate 10 records
-        for (size_t i = 0; i < 100; i++) {
-            auto* dataEvent = CreateHttpDataEvent(i);
-            auto cnn = mManager->mConnectionManager->AcceptNetDataEvent(dataEvent);
-            cnn->mCidKey = GenerateContainerKey("80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106");
-            LOG_INFO(sLogger, ("cidKey", cnn->mCidKey));
-            APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
-            APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
-            APSARA_TEST_FALSE(cnn->IsPeerMetaAttachReady());
-            APSARA_TEST_FALSE(cnn->IsSelfMetaAttachReady());
-            APSARA_TEST_FALSE(cnn->IsL4MetaAttachReady());
-            APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 1);
-            mManager->AcceptDataEvent(dataEvent);
-            free(dataEvent);
-        }
-
-        APSARA_TEST_EQUAL(mManager->mConnectionManager->ConnectionTotal(), 1);
-        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 100);
-
-        auto cnn = mManager->mConnectionManager->getConnection({0, 2, 1});
-        APSARA_TEST_FALSE(cnn->IsMetaAttachReadyForAppRecord());
-        APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
-        APSARA_TEST_FALSE(cnn->IsPeerMetaAttachReady());
-        APSARA_TEST_FALSE(cnn->IsSelfMetaAttachReady());
-        APSARA_TEST_FALSE(cnn->IsL4MetaAttachReady());
-
-        APSARA_TEST_EQUAL(0, HandleEvents());
-
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-        // conn stats arrive
-        auto statsEvent = CreateConnStatsEvent();
-        mManager->AcceptNetStatsEvent(&statsEvent);
-        APSARA_TEST_TRUE(cnn != nullptr);
-        APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
-        APSARA_TEST_TRUE(cnn->IsPeerMetaAttachReady());
-        APSARA_TEST_TRUE(cnn->IsSelfMetaAttachReady());
-        APSARA_TEST_TRUE(cnn->IsL4MetaAttachReady());
-
-        APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
-        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 100);
-
-
-        // APSARA_TEST_EQUAL(mManager->mRollbackRecordTotal, 100);
-
-        LOG_INFO(sLogger, ("before handle cache", ""));
-        mManager->mRetryableEventCache.HandleEvents();
-        APSARA_TEST_EQUAL(100, HandleEvents());
-        LOG_INFO(sLogger, ("after handle cache", ""));
-
-        // std::this_thread::sleep_for(std::chrono::seconds(5));
-        // APSARA_TEST_EQUAL(mManager->mDropRecordTotal, 0);
-        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 0);
-
-        // Generate 10 records
-        for (size_t i = 0; i < 100; i++) {
-            auto* dataEvent = CreateHttpDataEvent(i);
-            mManager->AcceptDataEvent(dataEvent);
-            free(dataEvent);
-        }
-
-        APSARA_TEST_EQUAL(100, HandleEvents());
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        APSARA_TEST_EQUAL(mManager->mRetryableEventCache.Size(), 0);
-    }
-    LOG_INFO(sLogger, ("TestRollbackProcessing", "stop"));
-}
-
 size_t GenerateContainerIdHash(const std::string& cid) {
     std::hash<std::string> hasher;
     size_t key = 0;
@@ -925,7 +807,6 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRollbackProcessing);
 
 } // namespace ebpf
 } // namespace logtail

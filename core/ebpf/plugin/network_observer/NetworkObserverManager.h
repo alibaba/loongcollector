@@ -231,6 +231,7 @@ private:
     int64_t mSendSpanIntervalMs = 2000;
     int64_t mSendLogIntervalMs = 2000;
     int64_t mSendMetricIntervalMs = 15000;
+    int64_t mSendAgentInfoIntervalMs = 60000;
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;
@@ -239,6 +240,8 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
     std::vector<PipelineEventGroup> mMetricEventGroups;
     std::vector<PipelineEventGroup> mLogEventGroups;
     std::vector<PipelineEventGroup> mSpanEventGroups;

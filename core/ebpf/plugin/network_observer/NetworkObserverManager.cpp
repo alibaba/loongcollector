@@ -57,7 +57,7 @@ namespace logtail::ebpf {
 
 inline constexpr int kNetObserverMaxBatchConsumeSize = 4096;
 inline constexpr int kNetObserverMaxWaitTimeMS = 0;
-
+inline constexpr size_t kGlobalWorkloadKey = 0;
 static constexpr uint32_t kAppIdIndex = kConnTrackerTable.ColIndex(kAppId.Name());
 static constexpr uint32_t kAppNameIndex = kConnTrackerTable.ColIndex(kAppName.Name());
 static constexpr uint32_t kHostNameIndex = kConnTrackerTable.ColIndex(kHostName.Name());
@@ -140,7 +140,7 @@ GetAppDetail(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& curre
         return it->second;
     }
 
-    const auto it2 = currentContainerConfigs.find(0); // for global config
+    const auto it2 = currentContainerConfigs.find(kGlobalWorkloadKey); // for global config
     if (it2 != currentContainerConfigs.end()) {
         LOG_DEBUG(sLogger, ("use cluster default config, origin containerIdKey", key));
         return it2->second;
@@ -1311,8 +1311,6 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     const std::string& configName = ctx->GetConfigName();
 
     if (option->mSelectors.empty()) {
-        const size_t defaultKey = 0;
-
         // clean old config
         if (auto it = mConfigToWorkloads.find(configName); it != mConfigToWorkloads.end()) {
             for (auto key : it->second) {
@@ -1329,9 +1327,9 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         // setup new config
         WorkloadConfig defaultConfig;
         defaultConfig.config = newConfig;
-        mWorkloadConfigs[defaultKey] = defaultConfig;
-        mConfigToWorkloads[configName] = {defaultKey};
-        mContainerConfigs.insert({0, newConfig});
+        mWorkloadConfigs[kGlobalWorkloadKey] = defaultConfig;
+        mConfigToWorkloads[configName] = {kGlobalWorkloadKey};
+        mContainerConfigs.insert({kGlobalWorkloadKey, newConfig});
 
         updateConfigVersionAndWhitelist({}, std::move(expiredCids));
         return 0;
@@ -1403,9 +1401,8 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
         return 0;
     }
 
-    if (configIt->second.empty()) {
-        const size_t defaultKey = 0;
-        mContainerConfigs.erase(defaultKey);
+    if (configIt->second.empty() || (configIt->second.size() == 1 && configIt->second.count(kGlobalWorkloadKey))) {
+        mContainerConfigs.erase(kGlobalWorkloadKey);
     }
 
     std::vector<std::string> expiredCids;
@@ -1414,6 +1411,8 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
         if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
             for (const auto& cid : wIt->second.containerIds) {
                 expiredCids.push_back(cid);
+                // clean up container configs ...
+                mContainerConfigs.erase(GenerateContainerKey(cid));
             }
             mWorkloadConfigs.erase(wIt);
         }
@@ -1457,6 +1456,7 @@ bool NetworkObserverManager::UploadHostMetadataUpdateTask() {
 // called by curl thread, async update configs for container ...
 void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec) {
     std::vector<std::pair<std::string, uint64_t>> newContainerIds;
+    std::map<size_t, std::shared_ptr<AppDetail>> newCidConfigs;
     std::vector<std::string> expiredContainerIds;
 
     WriteLock lk(mAppConfigLock);
@@ -1477,11 +1477,12 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
         currentWorkloadCids[workloadKey].insert(cid);
 
         // check if is new container
+        size_t cidKey = GenerateContainerKey(cid);
         if (!wIt->second.containerIds.count(cid)) {
-            size_t cidKey = GenerateContainerKey(cid);
             newContainerIds.emplace_back(cid, static_cast<uint64_t>(cidKey));
-            mContainerConfigs[cidKey] = wIt->second.config;
         }
+        newCidConfigs[cidKey] = wIt->second.config;
+        // mContainerConfigs[cidKey] = wIt->second.config;
 
         LOG_DEBUG(sLogger,
                   ("appId", wIt->second.config->mAppId)("appName", wIt->second.config->mAppName)(
@@ -1513,6 +1514,10 @@ void NetworkObserverManager::HandleHostMetadataUpdate(const std::vector<std::str
                 wConfig.containerIds.insert(cid);
             }
         }
+    }
+
+    for (const auto& it : newCidConfigs) {
+        mContainerConfigs[it.first] = it.second;
     }
 
     updateConfigVersionAndWhitelist(std::move(newContainerIds), std::move(expiredContainerIds));
