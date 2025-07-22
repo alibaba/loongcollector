@@ -94,7 +94,7 @@ private:
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
 
-    std::atomic_int mRegisteredConfigCount = 0;
+    int mRegisteredConfigCount = 0;
     // plugin metrics, guarded by mContextMutex
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;

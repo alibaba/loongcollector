@@ -90,7 +90,7 @@ private:
     PluginMetricManagerPtr mMetricMgr;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
-    std::atomic_int mRegisteredConfigCount = 0;
+    int mRegisteredConfigCount = 0;
     uint32_t mPluginIndex{0};
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
