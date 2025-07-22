@@ -5,9 +5,10 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/models"
-	v1 "k8s.io/api/core/v1"
 )
 
 func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj *v1.Node, method, serverID string) *models.Log {
