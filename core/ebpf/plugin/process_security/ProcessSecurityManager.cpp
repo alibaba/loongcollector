@@ -92,6 +92,8 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
 
+    mRegisteredConfigCount++;
+
     return 0;
 }
 
@@ -107,6 +109,7 @@ int ProcessSecurityManager::RemoveConfig(const std::string&) {
         return 1;
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
+    mRegisteredConfigCount--;
     return 0;
 }
 

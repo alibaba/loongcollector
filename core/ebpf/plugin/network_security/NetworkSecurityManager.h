@@ -56,7 +56,7 @@ public:
 
     int SendEvents() override;
 
-    int RegisteredConfigCount() override { return 0; }
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
     void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
@@ -93,6 +93,8 @@ private:
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
     uint32_t mPluginIndex{0};
+
+    std::atomic_int mRegisteredConfigCount = 0;
     // plugin metrics, guarded by mContextMutex
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;

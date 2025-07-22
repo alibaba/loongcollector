@@ -60,7 +60,7 @@ public:
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer() override { return 0; }
 
-    int RegisteredConfigCount() override { return 0; }
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
@@ -90,6 +90,7 @@ private:
     PluginMetricManagerPtr mMetricMgr;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
     logtail::QueueKey mQueueKey = 0;
+    std::atomic_int mRegisteredConfigCount = 0;
     uint32_t mPluginIndex{0};
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
