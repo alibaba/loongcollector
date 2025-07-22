@@ -13,8 +13,9 @@
 // limitations under the License.
 
 #include "ebpf/plugin/FileRetryableEvent.h"
-#include "logger/Logger.h"
+
 #include "ebpf/plugin/ProcessCache.h"
+#include "logger/Logger.h"
 
 namespace logtail::ebpf {
 
@@ -42,13 +43,14 @@ bool FileRetryableEvent::HandleMessage() {
             return false;
     }
 
-    mFileEvent = std::make_shared<FileEvent>(static_cast<uint32_t>(mRawEvent->key.pid), 
+    mFileEvent = std::make_shared<FileEvent>(static_cast<uint32_t>(mRawEvent->key.pid),
                                              static_cast<uint64_t>(mRawEvent->key.ktime),
                                              type,
                                              static_cast<uint64_t>(mRawEvent->timestamp),
                                              StringView(&mRawEvent->path[4]));
     mRawEvent = nullptr;
-    // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime));
+    // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid",
+    // mFileEvent->mPid)("ktime", mFileEvent->mKtime));
 
     if (!IsTaskCompleted(kFindProcess) && findProcess()) {
         CompleteTask(kFindProcess);
@@ -72,7 +74,9 @@ bool FileRetryableEvent::findProcess() {
 
     auto cacheValue = mProcessCache.Lookup({mFileEvent->mPid, mFileEvent->mKtime});
     if (!cacheValue) {
-        LOG_DEBUG(sLogger, ("file event", "process cache not found")("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)("path", mFileEvent->mPath));
+        LOG_DEBUG(sLogger,
+                  ("file event", "process cache not found")("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)(
+                      "path", mFileEvent->mPath));
         return false;
     }
 
@@ -81,8 +85,8 @@ bool FileRetryableEvent::findProcess() {
 bool FileRetryableEvent::flushEvent() {
     if (!mCommonEventQueue.try_enqueue(mFileEvent)) {
         LOG_DEBUG(sLogger,
-                   ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
-                    "ktime", mFileEvent->mKtime));
+                  ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
+                      "ktime", mFileEvent->mKtime));
         return false;
     }
     return true;
@@ -102,7 +106,7 @@ bool FileRetryableEvent::OnRetry() {
 }
 
 void FileRetryableEvent::OnDrop() {
-    if (mFileEvent && !IsTaskCompleted(kFlushEvent)){
+    if (mFileEvent && !IsTaskCompleted(kFlushEvent)) {
         flushEvent();
     }
 }

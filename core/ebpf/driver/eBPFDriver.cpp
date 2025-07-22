@@ -528,7 +528,8 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
 int stop_plugin(logtail::ebpf::PluginType pluginType) {
     if (pluginType >= logtail::ebpf::PluginType::MAX) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "[stop_plugin] invalid plugin type: %d\n", static_cast<int>(pluginType));
+                 "[stop_plugin] invalid plugin type: %d\n",
+                 static_cast<int>(pluginType));
         return -1;
     }
 

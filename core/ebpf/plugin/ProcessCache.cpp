@@ -26,11 +26,7 @@
 namespace logtail {
 
 ProcessCache::ProcessCache(size_t maxCacheSize, ProcParser& procParser) : mProcParser(procParser) {
-     mCache = std::make_unique<ExecveEventMap>(
-        maxCacheSize,
-        ebpf::DataEventIdHash{}, 
-        ebpf::DataEventIdEqual{}
-    );
+    mCache = std::make_unique<ExecveEventMap>(maxCacheSize, ebpf::DataEventIdHash{}, ebpf::DataEventIdEqual{});
 }
 
 ProcessCache::~ProcessCache() = default;
@@ -39,8 +35,7 @@ bool ProcessCache::Contains(const data_event_id& key) const {
     if (!mCache) {
         return false;
     }
-    size_t found = mCache->cvisit(key, [](const auto& /* element */) {
-    });
+    size_t found = mCache->cvisit(key, [](const auto& /* element */) {});
     return found == 1;
 }
 
@@ -48,12 +43,10 @@ std::shared_ptr<ProcessCacheValue> ProcessCache::Lookup(const data_event_id& key
     if (!mCache) {
         return nullptr;
     }
-    
+
     std::shared_ptr<ProcessCacheValue> result = nullptr;
-    size_t found = mCache->cvisit(key, [&result](const auto& element) {
-        result = element.second;
-    });
-    
+    size_t found = mCache->cvisit(key, [&result](const auto& element) { result = element.second; });
+
     return (found == 1) ? result : nullptr;
 }
 
@@ -151,11 +144,11 @@ void ProcessCache::ForceShrink() {
     if (!mCache) {
         return;
     }
-    
+
     auto validProcs = mProcParser.GetAllPids();
     auto minKtime = TimeKeeper::GetInstance()->KtimeNs()
         - std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::minutes(2)).count();
-    
+
     std::vector<data_event_id> cacheToRemove;
     mCache->visit_all([&](const auto& element) {
         const auto& [k, v] = element;
@@ -163,12 +156,12 @@ void ProcessCache::ForceShrink() {
             cacheToRemove.emplace_back(k);
         }
     });
-    
+
     for (const auto& key : cacheToRemove) {
         mCache->erase(key);
         LOG_ERROR(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
     }
-    
+
     mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec();
 }
 

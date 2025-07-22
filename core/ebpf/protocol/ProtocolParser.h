@@ -15,9 +15,9 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <vector>
-#include <set>
 
 #include "AbstractParser.h"
 #include "ParserRegistry.h"

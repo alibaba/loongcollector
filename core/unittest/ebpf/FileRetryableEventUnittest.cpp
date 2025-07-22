@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstring>
 #include <gtest/gtest.h>
 
 #include <memory>
 #include <string>
-#include <cstring>
 
+#include "common/queue/blockingconcurrentqueue.h"
+#include "coolbpf/security/type.h"
 #include "ebpf/plugin/FileRetryableEvent.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "unittest/Unittest.h"
 #include "unittest/ebpf/ProcessCacheManagerWrapper.h"
-#include "common/queue/blockingconcurrentqueue.h"
-#include "coolbpf/security/type.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
@@ -49,14 +49,13 @@ public:
     void TestOnDrop();
     void TestRetryLimit();
     void TestHandleMessageWithFlushFailure();
+
 protected:
     void SetUp() override {
         mCommonEventQueue = std::make_unique<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>>(1);
     }
 
-    void TearDown() override { 
-        mWrapper.Clear(); 
-    }
+    void TearDown() override { mWrapper.Clear(); }
 
 private:
     ProcessCacheManagerWrapper mWrapper;
@@ -65,14 +64,14 @@ private:
 
 void FileRetryableEventUnittest::TestHandleMessageWithProcessFound() {
     file_data_t event = CreateStubFileEvent();
-    
+
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
     mWrapper.mProcessCacheManager->mProcessCache.AddCache({event.key.pid, event.key.ktime}, cacheValue);
-    
+
     FileRetryableEvent fileEvent(3, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
-    
+
     bool result = fileEvent.HandleMessage();
     APSARA_TEST_TRUE(result);
     APSARA_TEST_TRUE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFindProcess));
@@ -81,9 +80,9 @@ void FileRetryableEventUnittest::TestHandleMessageWithProcessFound() {
 
 void FileRetryableEventUnittest::TestHandleMessageWithProcessNotFound() {
     file_data_t event = CreateStubFileEvent();
-    
+
     FileRetryableEvent fileEvent(3, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
-    
+
     bool result = fileEvent.HandleMessage();
     APSARA_TEST_FALSE(result);
     APSARA_TEST_FALSE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFindProcess));
@@ -92,20 +91,20 @@ void FileRetryableEventUnittest::TestHandleMessageWithProcessNotFound() {
 
 void FileRetryableEventUnittest::TestOnRetry() {
     file_data_t event = CreateStubFileEvent();
-    
+
     FileRetryableEvent fileEvent(3, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
-    
+
     bool result = fileEvent.HandleMessage();
     APSARA_TEST_FALSE(result);
-    
+
     result = fileEvent.OnRetry();
     APSARA_TEST_FALSE(result);
-    
+
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
     mWrapper.mProcessCacheManager->mProcessCache.AddCache({event.key.pid, event.key.ktime}, cacheValue);
-    
+
     result = fileEvent.OnRetry();
     APSARA_TEST_TRUE(result);
     APSARA_TEST_TRUE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFindProcess));
@@ -115,7 +114,7 @@ void FileRetryableEventUnittest::TestOnRetry() {
     bool newDequeueResult = mCommonEventQueue->try_dequeue(newEvent);
     APSARA_TEST_TRUE(newDequeueResult);
     APSARA_TEST_TRUE(newEvent != nullptr);
-    
+
     auto fileEventPtr = std::dynamic_pointer_cast<FileEvent>(newEvent);
     APSARA_TEST_TRUE(fileEventPtr != nullptr);
     APSARA_TEST_EQUAL(fileEventPtr->mPid, static_cast<uint32_t>(event.key.pid));
@@ -125,7 +124,7 @@ void FileRetryableEventUnittest::TestOnRetry() {
 
 void FileRetryableEventUnittest::TestOnDrop() {
     file_data_t event = CreateStubFileEvent();
-    
+
     FileRetryableEvent fileEvent(3, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
 
     bool result = fileEvent.HandleMessage();
@@ -136,7 +135,7 @@ void FileRetryableEventUnittest::TestOnDrop() {
 
 void FileRetryableEventUnittest::TestRetryLimit() {
     file_data_t event = CreateStubFileEvent();
-    
+
     FileRetryableEvent fileEvent(0, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
     fileEvent.HandleMessage();
     APSARA_TEST_FALSE(fileEvent.CanRetry());
@@ -144,27 +143,28 @@ void FileRetryableEventUnittest::TestRetryLimit() {
 
 void FileRetryableEventUnittest::TestHandleMessageWithFlushFailure() {
     file_data_t event = CreateStubFileEvent();
-    
+
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
     mWrapper.mProcessCacheManager->mProcessCache.AddCache({event.key.pid, event.key.ktime}, cacheValue);
-    
+
     auto dummyEvent = std::make_shared<FileEvent>(999, 999, KernelEventType::FILE_PERMISSION_EVENT, 999, "/dummy");
-    while(mCommonEventQueue->try_enqueue(dummyEvent)) {}
+    while (mCommonEventQueue->try_enqueue(dummyEvent)) {
+    }
 
     FileRetryableEvent fileEvent(3, event, mWrapper.mProcessCacheManager->mProcessCache, *mCommonEventQueue);
     bool result = fileEvent.HandleMessage();
     APSARA_TEST_FALSE(result);
     APSARA_TEST_TRUE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFindProcess));
     APSARA_TEST_FALSE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFlushEvent));
-    
+
     std::shared_ptr<CommonEvent> consumedEvent;
     bool dequeueResult = mCommonEventQueue->try_dequeue(consumedEvent);
     APSARA_TEST_TRUE(dequeueResult);
-    
-    while(mCommonEventQueue->try_dequeue(consumedEvent)) {
-        if(mCommonEventQueue->try_enqueue(dummyEvent)) {
+
+    while (mCommonEventQueue->try_dequeue(consumedEvent)) {
+        if (mCommonEventQueue->try_enqueue(dummyEvent)) {
             break;
         }
     }
@@ -172,7 +172,6 @@ void FileRetryableEventUnittest::TestHandleMessageWithFlushFailure() {
     APSARA_TEST_TRUE(retryResult);
     APSARA_TEST_TRUE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFindProcess));
     APSARA_TEST_TRUE(fileEvent.IsTaskCompleted(FileRetryableEvent::kFlushEvent));
-
 }
 
 UNIT_TEST_CASE(FileRetryableEventUnittest, TestHandleMessageWithProcessFound);
@@ -182,4 +181,4 @@ UNIT_TEST_CASE(FileRetryableEventUnittest, TestOnDrop);
 UNIT_TEST_CASE(FileRetryableEventUnittest, TestRetryLimit);
 UNIT_TEST_CASE(FileRetryableEventUnittest, TestHandleMessageWithFlushFailure);
 
-UNIT_TEST_MAIN 
+UNIT_TEST_MAIN

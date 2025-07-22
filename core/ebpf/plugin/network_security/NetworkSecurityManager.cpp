@@ -264,7 +264,7 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
 
     auto res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
     LOG_INFO(sLogger, ("start network probe, status", res));
-    if(!res) {
+    if (!res) {
         LOG_WARNING(sLogger, ("failed to start file probe", ""));
         return 1;
     }

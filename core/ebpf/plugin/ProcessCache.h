@@ -21,8 +21,8 @@
 #include <memory>
 #include <mutex>
 
-#include "common/ProcParser.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/ProcParser.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessDataMap.h"
 
@@ -64,8 +64,10 @@ private:
     void enqueueExpiredEntry(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
 
     ProcParser mProcParser;
-    using ExecveEventMap = boost::unordered::
-        concurrent_flat_map<data_event_id, std::shared_ptr<ProcessCacheValue>, ebpf::DataEventIdHash, ebpf::DataEventIdEqual>;
+    using ExecveEventMap = boost::unordered::concurrent_flat_map<data_event_id,
+                                                                 std::shared_ptr<ProcessCacheValue>,
+                                                                 ebpf::DataEventIdHash,
+                                                                 ebpf::DataEventIdEqual>;
     std::unique_ptr<ExecveEventMap> mCache;
 
     struct ExitedEntry {

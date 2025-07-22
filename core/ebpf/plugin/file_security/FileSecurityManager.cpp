@@ -73,7 +73,7 @@ void FileSecurityManager::RecordFileEvent(file_data_t* rawEvent) {
     if (event == nullptr) {
         LOG_WARNING(sLogger, ("FileRetryableEvent is null", "file retry event lost"));
         return;
-    } 
+    }
     if (!event->HandleMessage()) {
         EventCache().AddEvent(std::move(event));
     }
@@ -145,7 +145,7 @@ int FileSecurityManager::SendEvents() {
             if (!hit) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }
-            
+
             auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
@@ -169,17 +169,20 @@ int FileSecurityManager::SendEvents() {
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::kPermissionValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT_WRITE: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::kPermissionWriteValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionWriteValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT_READ: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::kPermissionReadValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionReadValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
@@ -232,7 +235,7 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
 
     auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
     LOG_INFO(sLogger, ("start file probe, status", res));
-    if(!res) {
+    if (!res) {
         LOG_WARNING(sLogger, ("failed to start file probe", ""));
         return 1;
     }
@@ -264,8 +267,7 @@ int FileSecurityManager::PollPerfBuffer(int maxWaitTimeMs) {
         LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
     }
     int zero = 0;
-    return mEBPFAdapter->PollPerfBuffers(
-        PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
+    return mEBPFAdapter->PollPerfBuffers(PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
@@ -297,7 +299,7 @@ int FileSecurityManager::Destroy() {
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
     LOG_INFO(sLogger, ("stop file plugin, status", res));
     mRetryableEventCache.Clear();
-    return res ?  0 : 1;
+    return res ? 0 : 1;
 }
 
 } // namespace ebpf

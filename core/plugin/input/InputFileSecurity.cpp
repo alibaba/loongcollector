@@ -56,7 +56,7 @@ bool InputFileSecurity::Start() {
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
-                                                    logtail::ebpf::PluginType::FILE_SECURITY);
+                                                       logtail::ebpf::PluginType::FILE_SECURITY);
         return true;
     }
     // SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);

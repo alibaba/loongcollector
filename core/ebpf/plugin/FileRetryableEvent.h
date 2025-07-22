@@ -14,27 +14,23 @@
 
 #pragma once
 
-#include "ebpf/plugin/ProcessCache.h"
 #include "FileEvent.h"
-#include "ebpf/plugin/RetryableEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
+#include "ebpf/plugin/ProcessCache.h"
+#include "ebpf/plugin/RetryableEvent.h"
 
 namespace logtail::ebpf {
 
 class FileRetryableEvent : public RetryableEvent {
 public:
     enum TaskId { kFindProcess, kFlushEvent, kDone };
-    explicit FileRetryableEvent(
-        int retryLimit, 
-        const file_data_t& event,
-        ProcessCache& processCache,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue)
-        : RetryableEvent(retryLimit),
-          mRawEvent(&event),
-          mProcessCache(processCache), 
-          mCommonEventQueue(eventQueue) {}
-    
+    explicit FileRetryableEvent(int retryLimit,
+                                const file_data_t& event,
+                                ProcessCache& processCache,
+                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue)
+        : RetryableEvent(retryLimit), mRawEvent(&event), mProcessCache(processCache), mCommonEventQueue(eventQueue) {}
+
     virtual ~FileRetryableEvent() = default;
 
     bool HandleMessage() override;

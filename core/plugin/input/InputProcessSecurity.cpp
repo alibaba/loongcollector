@@ -54,7 +54,7 @@ bool InputProcessSecurity::Start() {
 bool InputProcessSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
-                                                    logtail::ebpf::PluginType::PROCESS_SECURITY);
+                                                       logtail::ebpf::PluginType::PROCESS_SECURITY);
         return true;
     }
     return ebpf::EBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),

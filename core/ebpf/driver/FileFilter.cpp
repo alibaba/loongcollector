@@ -82,20 +82,20 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
 
         // Calculate dynamic max_entries based on the actual number of filters
         auto maxEntries = static_cast<uint32_t>(filter->mFilePathList.size());
-        
+
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
                  "[CreateFilterForCallname] Creating inner map with %u entries for %s",
                  maxEntries,
                  callName.c_str());
 
         // LOG(INFO) << "filter not empty!";
-        for (const auto & origin : filter->mFilePathList) {
+        for (const auto& origin : filter->mFilePathList) {
             std::string truncatedPath;
             if (origin.length() > STRING_PREFIX_MAX_LENGTH - 1) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                    "[CreateFilterForCallname] filter path is too long, truncating to %d bytes: %s",
-                    STRING_PREFIX_MAX_LENGTH,
-                    origin.c_str());
+                         "[CreateFilterForCallname] filter path is too long, truncating to %d bytes: %s",
+                         STRING_PREFIX_MAX_LENGTH,
+                         origin.c_str());
                 truncatedPath = origin.substr(0, STRING_PREFIX_MAX_LENGTH - 1);
             }
             const auto& x = truncatedPath.empty() ? origin : truncatedPath;
@@ -125,9 +125,9 @@ int CreateFileFilterForCallname(std::shared_ptr<logtail::ebpf::BPFWrapper<securi
             }
 
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-                    "[CreateFilterForCallname][update succeed] prefix trie data: %s, prefix_len: %u",
-                    prefixTrie.data,
-                    prefixTrie.prefixlen);
+                     "[CreateFilterForCallname][update succeed] prefix trie data: %s, prefix_len: %u",
+                     prefixTrie.data,
+                     prefixTrie.prefixlen);
         }
 
         // udpate filter_map

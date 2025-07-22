@@ -508,11 +508,12 @@ void EBPFServer::pollPerfBuffers() {
                 starttime = std::chrono::steady_clock::now();
                 int cnt = plugin->PollPerfBuffer(currentMaxWaitTime);
                 LOG_DEBUG(sLogger,
-                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
-                                                                                        plugin->IsRunning())("wait_time", currentMaxWaitTime));
-                
+                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)(
+                              "running status", plugin->IsRunning())("wait_time", currentMaxWaitTime));
+
                 endtime = std::chrono::steady_clock::now();
-                currentMaxWaitTime -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
+                currentMaxWaitTime
+                    -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
             }
         }
     }

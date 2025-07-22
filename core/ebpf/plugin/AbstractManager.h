@@ -54,8 +54,7 @@ public:
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
-        return mEBPFAdapter->PollPerfBuffers(
-            GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
+        return mEBPFAdapter->PollPerfBuffers(GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
     bool IsRunning() { return mInited && !mSuspendFlag; }

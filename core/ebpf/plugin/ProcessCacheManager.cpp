@@ -448,8 +448,7 @@ int ProcessCacheManager::PollPerfBuffers(int maxWaitTimeMs) {
         // poll after retry to avoid instant retry
         ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
-        LOG_DEBUG(sLogger,
-                        ("process cache poll buffer", "")("cnt", ret));
+        LOG_DEBUG(sLogger, ("process cache poll buffer", "")("cnt", ret));
         if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {
             mProcessCache.ClearExpiredCache();
             mLastProcessCacheClearTime = now;
