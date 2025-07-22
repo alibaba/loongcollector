@@ -187,11 +187,31 @@ void ProcessCacheUnittest::TestForceShrink() {
         mProcessCache.AddCache(key, cacheValue);
     }
 
+    // mLastForceShrinkTimeSec is 0
+    APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
+    mProcessCache.ForceShrink();
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
+
+    // interval within 2min
+    for (int i = 0; i < 5; i++) {
+        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        auto cacheValue = std::make_shared<ProcessCacheValue>();
+        cacheValue->SetContent<kProcessId>(StringView("1234"));
+        cacheValue->SetContent<kKtime>(StringView("5678"));
+        cacheValue->SetContent<kUid>(StringView("1000"));
+        cacheValue->SetContent<kBinary>(StringView("test_binary"));
+        mProcessCache.AddCache(key, cacheValue);
+    }
+    APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
+    mProcessCache.mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec() - 110;
+    mProcessCache.ForceShrink();
     APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
 
+    // interval exceeding 2 minutes
+    mProcessCache.mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec() - 130;
     mProcessCache.ForceShrink();
 
-    APSARA_TEST_TRUE(mProcessCache.Size() >= 0);
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
 }
 
 void ProcessCacheUnittest::TestPrintDebugInfo() {

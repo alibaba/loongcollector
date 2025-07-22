@@ -138,7 +138,7 @@ void ProcessCache::ClearExpiredCache() {
 }
 
 void ProcessCache::ForceShrink() {
-    if (mLastForceShrinkTimeSec < TimeKeeper::GetInstance()->NowSec() - 120) {
+    if (mLastForceShrinkTimeSec != 0 && mLastForceShrinkTimeSec > TimeKeeper::GetInstance()->NowSec() - 120) {
         return;
     }
     if (!mCache) {

@@ -68,7 +68,10 @@ void FileSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
 
 void FileSecurityManager::RecordFileEvent(file_data_t* rawEvent) {
     ADD_COUNTER(mRecvKernelEventsTotal, 1);
-
+    if (rawEvent == nullptr) {
+        LOG_WARNING(sLogger, ("rawEvent is null", "file event lost"));
+        return;
+    }
     std::unique_ptr<FileRetryableEvent> event(CreateFileRetryableEvent(rawEvent));
     if (event == nullptr) {
         LOG_WARNING(sLogger, ("FileRetryableEvent is null", "file retry event lost"));
@@ -216,6 +219,7 @@ int FileSecurityManager::SendEvents() {
             }
         }
     }
+    mLastSendTimeMs = nowMs;
     return 0;
 }
 
