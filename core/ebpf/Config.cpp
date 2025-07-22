@@ -238,7 +238,7 @@ void InitSecurityFileFilter(const Json::Value& config,
 
         const auto maxFilterCount = static_cast<unsigned int>(INT32_FLAG(ebpf_file_filter_max_num));
         for (const auto& path : thisFileFilter.mFilePathList) {
-            if (uniquePaths.size() > maxFilterCount) {
+            if (uniquePaths.size() >= maxFilterCount) {
                 LOG_WARNING(sLogger, ("file filter count exceeds limit", maxFilterCount));
                 break;
             }

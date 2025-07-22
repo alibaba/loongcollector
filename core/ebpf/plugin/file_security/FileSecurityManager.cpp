@@ -271,6 +271,9 @@ int FileSecurityManager::PollPerfBuffer(int maxWaitTimeMs) {
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
+    if (!event) {
+        return 1;
+    }
     auto* fileEvent = static_cast<FileEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(

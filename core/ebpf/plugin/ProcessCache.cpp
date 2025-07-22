@@ -167,7 +167,6 @@ void ProcessCache::ForceShrink() {
 
 void ProcessCache::PrintDebugInfo() {
     if (mCache) {
-        // 使用 cvisit_all 遍历所有元素进行调试输出
         mCache->cvisit_all([](const auto& element) {
             const auto& [key, value] = element;
             LOG_ERROR(sLogger, ("[DUMP CACHE] pid", key.pid)("ktime", key.time));

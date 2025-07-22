@@ -32,7 +32,7 @@ public:
     void TestSupportAck();
     void OnSuccessfulInit();
     void OnFailedInit();
-    void OnSuccessfulStart();
+    void OnStart();
     void OnSuccessfulStop();
     // void OnPipelineUpdate();
 
@@ -155,6 +155,41 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter3.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter3.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter3.mFilePathList[2]);
+
+    // test excessive filters
+    stringstream ss;
+    ss << R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [)";
+
+    for (int i = 0; i < 70; i++) {
+        if (i > 0) {
+            ss << ",";
+        }
+        ss << "\"/test/path" << i << "\"";
+    }
+
+    ss << R"(
+                ]
+            }
+        }
+    )";
+
+    configStr = ss.str();
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputFileSecurity());
+    input->SetContext(mContex);
+    input->CreateMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
+    logtail::ebpf::SecurityFileFilter thisFilter
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
+    // the portion exceeding 64 has been discarded.
+    APSARA_TEST_EQUAL(64UL, thisFilter.mFilePathList.size());
 }
 
 void InputFileSecurityUnittest::OnFailedInit() {
@@ -229,7 +264,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(3UL, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
 }
 
-void InputFileSecurityUnittest::OnSuccessfulStart() {
+void InputFileSecurityUnittest::OnStart() {
     unique_ptr<InputFileSecurity> input;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
@@ -260,6 +295,14 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
+
+    // simulate an unsupported environment
+    auto& envMgr = ebpf::EBPFServer::GetInstance()->mEnvMgr;
+    envMgr.mArchSupport = false;
+    envMgr.mBTFSupport = false;
+    APSARA_TEST_FALSE(input->Start());
+    envMgr.mArchSupport = true;
+    envMgr.mBTFSupport = true;
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStop() {
@@ -292,7 +335,7 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    // APSARA_TEST_TRUE(input->Stop(false));
+    APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
@@ -306,7 +349,7 @@ UNIT_TEST_CASE(InputFileSecurityUnittest, TestName)
 UNIT_TEST_CASE(InputFileSecurityUnittest, TestSupportAck)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnFailedInit)
-UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStart)
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnStart)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStop)
 // UNIT_TEST_CASE(InputFileSecurityUnittest, OnPipelineUpdate)
 
