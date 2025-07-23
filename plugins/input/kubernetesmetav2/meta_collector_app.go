@@ -203,9 +203,8 @@ func (m *metaCollector) processPodDaemonSetLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.DaemonSet2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
