@@ -143,8 +143,8 @@ void CustomSingleSerializerUnittest::TestMetricTags() {
 
     APSARA_TEST_TRUE(doc.HasMember("contents"));
     const rapidjson::Value& contents = doc["contents"];
-    APSARA_TEST_TRUE(contents.HasMember("metric_tags"));
-    const rapidjson::Value& metricTags = contents["metric_tags"];
+    APSARA_TEST_TRUE(contents.HasMember("labels"));
+    const rapidjson::Value& metricTags = contents["labels"];
     APSARA_TEST_TRUE(metricTags.IsObject());
     APSARA_TEST_TRUE(metricTags.HasMember("instance"));
     APSARA_TEST_EQUAL(string("localhost"), string(metricTags["instance"].GetString()));

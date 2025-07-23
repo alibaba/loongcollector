@@ -41,7 +41,6 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
     }
 
     res.clear();
-    res.reserve(group.mEvents.size() * 512);
 
     rapidjson::StringBuffer jsonBuffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(jsonBuffer);
@@ -83,7 +82,7 @@ bool CustomSingleSerializer::Serialize(BatchedEvents&& group, string& res, strin
                     }
                 }
 
-                writer.Key("metric_tags");
+                writer.Key("labels");
                 writer.StartObject();
                 for (auto it = metricEvent.TagsBegin(); it != metricEvent.TagsEnd(); ++it) {
                     writer.Key(it->first.data(), it->first.size());
