@@ -48,3 +48,16 @@ func TestPreProcessPod(t *testing.T) {
 	assert.Equal(t, processedPod.Status.Conditions, []v1.PodCondition{})
 	assert.Equal(t, processedPod.Spec.Tolerations, []v1.Toleration{})
 }
+
+func TestPreProcessPod_NilInput(t *testing.T) {
+	cache := newK8sMetaCache(make(chan struct{}), "Pod")
+	result := cache.preProcessPod(nil)
+	assert.Nil(t, result)
+}
+
+func TestPreProcessPod_NonPodObject(t *testing.T) {
+	cache := newK8sMetaCache(make(chan struct{}), "Pod")
+	service := &v1.Service{}
+	result := cache.preProcessPod(service)
+	assert.Equal(t, service, result)
+}
