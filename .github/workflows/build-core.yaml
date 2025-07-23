@@ -73,7 +73,7 @@ jobs:
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
-        run: make dist && scripts/check_glibc.sh && scripts/check_cpu_instruction.sh
+        run: make dist && scripts/check_glibc.sh && scripts/check_cpu_instruction.sh && scripts/check_dependencies.sh
 
   actions-timeline:
     needs: [BuildCore]
