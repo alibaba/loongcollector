@@ -87,6 +87,76 @@ private:
 
 const std::string InputMock::sName = "input_mock";
 
+class InputSingletonMock1 : public Input {
+public:
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+        if (config.isMember("SupportAck")) {
+            mSupportAck = config["SupportAck"].asBool();
+        }
+        auto processor = PluginRegistry::GetInstance()->CreateProcessor(
+            ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        processor->Init(Json::Value(), *mContext);
+        mInnerProcessors.emplace_back(std::move(processor));
+        return true;
+    }
+    bool Start() override { return true; }
+    bool Stop(bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return true;
+    }
+    bool SupportAck() const override { return mSupportAck; }
+
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
+    bool mSupportAck = true;
+
+private:
+    std::atomic_bool mBlockFlag = false;
+};
+
+const std::string InputSingletonMock1::sName = "input_singleton_mock_1";
+
+class InputSingletonMock2 : public Input {
+public:
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+        if (config.isMember("SupportAck")) {
+            mSupportAck = config["SupportAck"].asBool();
+        }
+        auto processor = PluginRegistry::GetInstance()->CreateProcessor(
+            ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        processor->Init(Json::Value(), *mContext);
+        mInnerProcessors.emplace_back(std::move(processor));
+        return true;
+    }
+    bool Start() override { return true; }
+    bool Stop(bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return true;
+    }
+    bool SupportAck() const override { return mSupportAck; }
+
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
+    bool mSupportAck = true;
+
+private:
+    std::atomic_bool mBlockFlag = false;
+};
+
+const std::string InputSingletonMock2::sName = "input_singleton_mock_2";
+
 const std::string PROCESSOR_MOCK_LOCAL_CONTENT_KEY = "processor_mock_local_content_key";
 const std::string PROCESSOR_MOCK_LOCAL_CONTENT_VALUE = "processor_mock_local_content_value";
 
@@ -213,6 +283,8 @@ const std::string TaskMock::sName = "task_mock";
 
 void LoadPluginMock() {
     PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
+    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputSingletonMock1>(), true);
+    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputSingletonMock2>(), true);
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorInnerMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
