@@ -37,7 +37,6 @@ const (
 	acsDomain      = "acs"
 	infraServer    = "infra.server"
 	acsEcsInstance = "acs.ecs.instance"
-	acsAckCluster  = "acs.ack.cluster"
 
 	clusterKindName   = "cluster"
 	containerKindName = "container"
