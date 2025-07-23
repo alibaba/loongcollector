@@ -198,12 +198,15 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 		return factory, nil
 	}
 	// add watch error handler
-	informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
 		if err != nil {
 			m.UpdateInformerWatchFailCount()
 			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
 		}
 	})
+	if err != nil {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to handle watch error handler", err)
+	}
 	return factory, informer
 }
 
