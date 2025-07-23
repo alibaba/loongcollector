@@ -42,5 +42,5 @@ const (
 	containerKindName = "container"
 	crossDomainSameAs = "same_as"
 
-	aliyunInstanceIDLabel = "alibabacloud.com/ecs-instance-id"
+	aliyunInstanceIDLabel = "ecs-instance-id"
 )

@@ -47,7 +47,12 @@ func (m *metaCollector) generateInfraServerKeyID(nodeObj *v1.Node) string {
 	}
 
 	// (2) if aliyunInstanceIDLabel exist in labels, return aliyunInstanceIDLabel value
-	if nodeObj.Labels != nil && nodeObj.Labels[aliyunInstanceIDLabel] != "" {
+	if nodeObj.Labels != nil {
+		for label, value := range nodeObj.Labels {
+			if strings.Contains(label, aliyunInstanceIDLabel) {
+				return value
+			}
+		}
 		serverID = nodeObj.Labels[aliyunInstanceIDLabel]
 		return serverID
 	}
