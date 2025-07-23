@@ -45,9 +45,6 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         // should not happen
         errorMsg = "unsupported event type in event group";
         return false;
-    } else if (eventType == PipelineEvent::Type::SPAN) {
-        errorMsg = "invalid event type, span type is not yet supported";
-        return false;
     }
 
     // Create reusable StringBuffer and Writer
@@ -134,6 +131,52 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 // content
                 writer.Key(DEFAULT_CONTENT_KEY.c_str());
                 writer.String(e.GetContent().to_string().c_str());
+                writer.EndObject();
+                res.append(jsonBuffer.GetString());
+                res.append("\n");
+            }
+            break;
+        case PipelineEvent::Type::SPAN:
+            for (const auto& item : group.mEvents) {
+                const auto& e = item.Cast<SpanEvent>();
+
+                resetBuffer();
+
+                writer.StartObject();
+                SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
+
+                writer.Key("trace_id");
+                writer.String(e.GetTraceId().data(), e.GetTraceId().size());
+                writer.Key("span_id");
+                writer.String(e.GetSpanId().data(), e.GetSpanId().size());
+                writer.Key("parent_span_id");
+                writer.String(e.GetParentSpanId().data(), e.GetParentSpanId().size());
+                writer.Key("name");
+                writer.String(e.GetName().data(), e.GetName().size());
+
+                writer.Key("start_time");
+                writer.Uint64(e.GetStartTimeNs());
+                writer.Key("end_time");
+                writer.Uint64(e.GetEndTimeNs());
+                writer.Key("duration");
+                writer.Uint64(e.GetEndTimeNs() - e.GetStartTimeNs());
+
+                writer.Key("__attributes__");
+                writer.StartObject();
+                for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
+                    writer.Key(it->first.data(), it->first.size());
+                    writer.String(it->second.data(), it->second.size());
+                }
+                writer.EndObject();
+
+                writer.Key("__scope__");
+                writer.StartObject();
+                for (auto it = e.ScopeTagsBegin(); it != e.ScopeTagsEnd(); ++it) {
+                    writer.Key(it->first.data(), it->first.size());
+                    writer.String(it->second.data(), it->second.size());
+                }
+                writer.EndObject();
+
                 writer.EndObject();
                 res.append(jsonBuffer.GetString());
                 res.append("\n");
