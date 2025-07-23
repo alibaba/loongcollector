@@ -77,7 +77,7 @@ func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
 	return m.informerWatchFailCount
 }
 func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
-	m.informerWatchFailCount += 1
+	m.informerWatchFailCount++
 }
 
 func (m *k8sMetaCache) List() []*ObjectWrapper {
@@ -145,7 +145,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 	// wait infinite for first cache sync success
 	for {
 		if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-			logger.Error(context.Background(), "K8S_META_CACHE_SYNC_TIMEOUT", "service cache sync timeout")
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout")
 			time.Sleep(1 * time.Second)
 		} else {
 			break
@@ -194,13 +194,13 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	case INGRESS:
 		informer = factory.Networking().V1().Ingresses().Informer()
 	default:
-		logger.Error(context.Background(), "K8S_META_ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", m.resourceType)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", m.resourceType)
 		return factory, nil
 	}
 	// add watch error handler
 	informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
 		m.UpdateInformerWatchFailCount()
-		logger.Error(context.Background(), "K8S_META_WATCH_ERROR_HANDLER", "ResourceType", m.resourceType, "watch error", err)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
 	})
 	return factory, informer
 }
@@ -230,19 +230,19 @@ func (m *k8sMetaCache) preProcess(obj interface{}) interface{} {
 func (m *k8sMetaCache) preProcessCommon(obj interface{}) interface{} {
 	runtimeObj, ok := obj.(runtime.Object)
 	if !ok {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not runtime object", obj)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "object is not runtime object", obj)
 		return obj
 	}
 	metaObj, err := meta.Accessor(runtimeObj)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not meta object", err)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "object is not meta object", err)
 		return obj
 	}
 	// fill empty kind
 	if runtimeObj.GetObjectKind().GroupVersionKind().Empty() {
 		gvk, err := apiutil.GVKForObject(runtimeObj, m.schema)
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "get GVK for object error", err)
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "get GVK for object error", err)
 			return obj
 		}
 		runtimeObj.GetObjectKind().SetGroupVersionKind(gvk)
@@ -260,7 +260,7 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 	m.preProcessCommon(obj)
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod", obj)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "object is not pod", obj)
 		return obj
 	}
 	pod.ManagedFields = nil

@@ -80,7 +80,7 @@ func (m *DeferredDeletionMetaStore) Start() {
 }
 
 func (m *DeferredDeletionMetaStore) UpdateMetaStoreFailCounter() {
-	m.metaStoreFailCounter += 1
+	m.metaStoreFailCounter++
 }
 func (m *DeferredDeletionMetaStore) GetMetaStoreFailCount() int64 {
 	return m.metaStoreFailCounter
@@ -100,11 +100,11 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 					result[k] = append(result[k], obj)
 				} else {
 					m.UpdateMetaStoreFailCounter()
-					logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "raw object not found", realKey)
+					logger.Error(context.Background(), K8sMetaUnifyErrorCode, "raw object not found", realKey)
 				}
 			} else {
 				m.UpdateMetaStoreFailCounter()
-				logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "key not found", realKey)
+				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "key not found", realKey)
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 			case EventTypeTimer:
 				m.handleTimerEvent(event)
 			default:
-				logger.Error(context.Background(), "unknown event type", event.EventType)
+				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "unknown event type", event.EventType)
 			}
 		case <-m.stopCh:
 			m.registerLock.Lock()
