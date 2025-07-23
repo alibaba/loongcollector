@@ -14,13 +14,14 @@
 
 #pragma once
 
+#include <sys/epoll.h>
+
 #include <array>
 #include <atomic>
 #include <future>
 #include <memory>
 #include <shared_mutex>
 #include <variant>
-#include <sys/epoll.h>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -158,8 +159,8 @@ private:
     FrequencyManager mFrequencyMgr;
 
     int mUnifiedEpollFd = -1;
-    std::map<int, PluginType> mEpollFdToPluginType; 
-    std::vector<struct epoll_event> mEpollEvents; 
+    std::map<int, PluginType> mEpollFdToPluginType;
+    std::vector<struct epoll_event> mEpollEvents;
 
     RetryableEventCache mRetryableEventCache;
     IntGaugePtr mRetryableEventCacheSize;

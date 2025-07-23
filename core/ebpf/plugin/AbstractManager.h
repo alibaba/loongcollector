@@ -57,9 +57,7 @@ public:
         return mEBPFAdapter->PollPerfBuffers(GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
-    virtual int ConsumePerfBufferData(){
-        return mEBPFAdapter->ConsumePerfBufferData(GetPluginType());
-    }
+    virtual int ConsumePerfBufferData() { return mEBPFAdapter->ConsumePerfBufferData(GetPluginType()); }
 
     bool IsRunning() { return mInited && !mSuspendFlag; }
 

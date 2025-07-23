@@ -440,27 +440,25 @@ int ProcessCacheManager::PollPerfBuffers(int maxWaitTimeMs) {
     if (mInited) {
         ret = mEBPFAdapter->PollPerfBuffers(
             PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
-        LOG_DEBUG(sLogger,
-                        ("process cache poll buffer", "")("cnt", ret));
+        LOG_DEBUG(sLogger, ("process cache poll buffer", "")("cnt", ret));
     }
     mIsPolling = false;
     return ret;
 }
 
-int ProcessCacheManager::ConsumePerfBufferData(){
+int ProcessCacheManager::ConsumePerfBufferData() {
     int ret = 0;
     mIsPolling = true;
     if (mInited) {
         mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
-        LOG_DEBUG(sLogger,
-                        ("process cache consume buffer", "")("cnt", ret));
+        LOG_DEBUG(sLogger, ("process cache consume buffer", "")("cnt", ret));
     }
     mIsPolling = false;
 
     return ret;
 }
 
-void ProcessCacheManager::ClearProcessExpiredCache(){
+void ProcessCacheManager::ClearProcessExpiredCache() {
     if (mInited) {
         auto now = TimeKeeper::GetInstance()->NowSec();
         if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {

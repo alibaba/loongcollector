@@ -22,9 +22,9 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
-#include "common/TimeKeeper.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
@@ -340,8 +340,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
-                pluginMgr
-                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager, mRetryableEventCache);
+                pluginMgr = FileSecurityManager::Create(
+                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager, mRetryableEventCache);
             }
             break;
         }
@@ -531,9 +531,7 @@ void EBPFServer::handleEpollEvents() {
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         if (pluginState.mManager) {
             const int cnt = pluginState.mManager->ConsumePerfBufferData();
-            LOG_DEBUG(sLogger, 
-                ("Event-driven consume for", magic_enum::enum_name(type))
-                ("cnt", cnt)("fd", activeFd));
+            LOG_DEBUG(sLogger, ("Event-driven consume for", magic_enum::enum_name(type))("cnt", cnt)("fd", activeFd));
         }
     }
 }
@@ -549,7 +547,7 @@ void EBPFServer::pollPerfBuffers() {
             mFrequencyMgr.Reset(now);
         }
 
-        handleEventCache();    
+        handleEventCache();
         handleEpollEvents();
         mProcessCacheManager->ClearProcessExpiredCache();
     }
@@ -653,9 +651,9 @@ void EBPFServer::initUnifiedEpollMonitoring() {
         LOG_ERROR(sLogger, ("Failed to create unified epoll fd", strerror(errno)));
         return;
     }
-    
+
     mEpollEvents.resize(1024);
-    
+
     LOG_INFO(sLogger, ("Unified epoll monitoring initialized", mUnifiedEpollFd));
 }
 
@@ -663,18 +661,19 @@ void EBPFServer::registerPluginPerfBuffers(PluginType type) {
     if (mUnifiedEpollFd < 0) {
         return;
     }
-    
+
     auto epollFds = mEBPFAdapter->GetPerfBufferEpollFds(type);
-    
+
     for (int epollFd : epollFds) {
         if (epollFd >= 0) {
             struct epoll_event event;
             event.events = EPOLLIN;
             event.data.fd = epollFd;
-            
+
             if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event) == 0) {
                 mEpollFdToPluginType[epollFd] = type;
-                LOG_DEBUG(sLogger, ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+                LOG_DEBUG(sLogger,
+                          ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
                 LOG_ERROR(sLogger, ("Failed to register perf buffer epoll fd", epollFd)("error", strerror(errno)));
             }
@@ -686,13 +685,14 @@ void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
     if (mUnifiedEpollFd < 0) {
         return;
     }
-    
+
     auto it = mEpollFdToPluginType.begin();
     while (it != mEpollFdToPluginType.end()) {
         if (it->second == type) {
             int epollFd = it->first;
             epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, epollFd, nullptr);
-            LOG_DEBUG(sLogger, ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            LOG_DEBUG(sLogger,
+                      ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             it = mEpollFdToPluginType.erase(it);
         } else {
             ++it;

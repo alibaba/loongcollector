@@ -472,7 +472,8 @@ std::vector<int> EBPFAdapter::GetPerfBufferEpollFds(PluginType pluginType) {
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_GET_PLUGIN_PB_EPOLL_FDS)];
     if (!f) {
         LOG_ERROR(sLogger,
-                  ("failed to load dynamic lib, get perf buffer epoll fds func ptr is null", magic_enum::enum_name(pluginType)));
+                  ("failed to load dynamic lib, get perf buffer epoll fds func ptr is null",
+                   magic_enum::enum_name(pluginType)));
         return {};
     }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -490,7 +491,8 @@ int32_t EBPFAdapter::ConsumePerfBufferData(PluginType pluginType) {
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_CONSUME_PLUGIN_PB_DATA)];
     if (!f) {
         LOG_ERROR(sLogger,
-                  ("failed to load dynamic lib, consume perf buffer data func ptr is null", magic_enum::enum_name(pluginType)));
+                  ("failed to load dynamic lib, consume perf buffer data func ptr is null",
+                   magic_enum::enum_name(pluginType)));
         return -1;
     }
 #ifdef APSARA_UNIT_TEST_MAIN

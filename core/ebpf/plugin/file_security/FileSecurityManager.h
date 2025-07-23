@@ -48,7 +48,8 @@ public:
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            const PluginMetricManagerPtr& metricMgr,
            RetryableEventCache& retryableEventCache) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr, retryableEventCache);
+        return std::make_shared<FileSecurityManager>(
+            processCacheManager, eBPFAdapter, queue, metricMgr, retryableEventCache);
     }
 
     ~FileSecurityManager() {}

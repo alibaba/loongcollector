@@ -664,10 +664,6 @@ int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* k
 
 std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type) {
     std::vector<int> epollFds;
-    
-    if (!gPluginStatus[int(type)]) {
-        return epollFds;
-    }
 
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         // Network observe uses coolbpf, different handling needed
@@ -676,11 +672,10 @@ std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type) {
     }
 
     // Find perf buffers for this plugin type
-    std::vector<void*> pbs = gPluginPbs[int(type)];
+    std::vector<void*> pbs = gPluginPbs[static_cast<size_t>(type)];
 
     if (pbs.empty()) {
-        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, 
-                 "no pbs registered for type:%d \n", int(type));
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
         return epollFds;
     }
 
@@ -692,27 +687,22 @@ std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type) {
         if (epollFd >= 0) {
             epollFds.push_back(epollFd);
         } else {
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, 
-                     "failed to get epoll fd for perf buffer\n");
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "failed to get epoll fd for perf buffer\n");
         }
     }
-    
+
     return epollFds;
 }
 
 int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
-    if (!gPluginStatus[int(type)]) {
-        return 0;
-    }
-
     // find pbs
-    std::vector<void*> pbs = gPluginPbs[int(type)];
+    std::vector<void*> pbs = gPluginPbs[static_cast<size_t>(type)];
 
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
         return 0;
     }
-    
+
     int cnt = 0;
     for (auto& pb : pbs) {
         if (!pb) {

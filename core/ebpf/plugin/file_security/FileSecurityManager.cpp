@@ -99,7 +99,7 @@ FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManag
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          const PluginMetricManagerPtr& metricManager,
                                          RetryableEventCache& retryableEventCache)
-    : AbstractManager(baseMgr, eBPFAdapter, queue, metricManager),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
       mRetryableEventCache(retryableEventCache),
       mAggregateTree(
           4096,
@@ -296,7 +296,7 @@ int FileSecurityManager::Destroy() {
 
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
     LOG_INFO(sLogger, ("stop file plugin, status", res));
-    return res ?  0 : 1;
+    return res ? 0 : 1;
 }
 
 } // namespace ebpf
