@@ -25,6 +25,9 @@
 #include "plugin/input/InputHostMonitor.h"
 
 namespace logtail {
+#ifndef HZ
+#define HZ 100
+#endif
 
 extern const uint32_t kHostMonitorMinInterval;
 extern const uint32_t kHostMonitorDefaultInterval;
@@ -187,8 +190,7 @@ private:
     int GetDiskStat(dev_t rDev, const std::string& dirName, DiskUsage& disk, DiskUsage& deviceUsage);
     int CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage);
     int GetDiskUsage(DiskUsage& diskUsage, std::string dirName);
-    int
-    GetIOstat(std::string& dirName, DiskUsage& disk, std::shared_ptr<IODev>& ioDev, DiskUsage& deviceUsage);
+    int GetIOstat(std::string& dirName, DiskUsage& disk, std::shared_ptr<IODev>& ioDev, DiskUsage& deviceUsage);
     std::shared_ptr<IODev> GetIODev(std::string& dirName);
     void RefreshLocalDisk();
     void CalcDiskMetric(const DiskStat& current, const DiskStat& last, double interval, DiskMetric& diskMetric);

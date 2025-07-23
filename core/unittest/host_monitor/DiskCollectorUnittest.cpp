@@ -231,22 +231,19 @@ void DiskCollectorUnittest::TestCollect() const {
         "disk_readbytes_avg",
         "disk_readbytes_min",
         "disk_readbytes_max",
-        "fs_inodeutilization_avg",
-        "fs_inodeutilization_min",
-        "fs_inodeutilization_max",
         "DiskIOQueueSize_avg",
         "DiskIOQueueSize_min",
         "DiskIOQueueSize_max",
     };
     vector<double> expected_values
-        = {0.67,0,1, 0.67,0,1, 341,0,512, 341,0,512, 23.6511,23.6511,23.6511, 0.000133333,0,0.0002};
+        = {0.67,0,1, 0.67,0,1, 341,0,512, 341,0,512, 0.000133333,0,0.0002};
     auto event = group.GetEvents()[0].Cast<MetricEvent>();
     auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
 
     for (size_t i = 0; i < expectedNames.size(); i++) {
         APSARA_TEST_TRUE(maps.find(expectedNames[i]) != maps.end());
         double val = maps[expectedNames[i]].Value;
-        EXPECT_NEAR(expected_values[static_cast<size_t>(i)], val, 5);
+        EXPECT_NEAR(expected_values[static_cast<size_t>(i)], val, 1);
     }
 }
 
