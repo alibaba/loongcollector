@@ -36,7 +36,6 @@ const (
 	infraDomain    = "infra"
 	acsDomain      = "acs"
 	infraServer    = "infra.server"
-	k8sNode        = "k8s.node"
 	acsEcsInstance = "acs.ecs.instance"
 	acsAckCluster  = "acs.ack.cluster"
 
