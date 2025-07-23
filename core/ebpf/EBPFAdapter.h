@@ -55,6 +55,7 @@ public:
     bool CheckPluginRunning(PluginType pluginType);
 
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
+    int32_t ConsumePerfBufferData(PluginType pluginType);
     std::vector<int> GetPerfBufferEpollFds(PluginType pluginType);
 
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
@@ -87,6 +88,7 @@ private:
         EBPF_SUSPEND_PLUGIN,
         EBPF_RESUME_PLUGIN,
         EBPF_POLL_PLUGIN_PBS,
+        EBPF_CONSUME_PLUGIN_PB_DATA,
         EBPF_SET_NETWORKOBSERVER_CONFIG,
         EBPF_SET_NETWORKOBSERVER_CID_FILTER,
 

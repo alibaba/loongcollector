@@ -95,8 +95,10 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                         const PluginMetricManagerPtr& metricManager)
+                                         const PluginMetricManagerPtr& metricManager,
+                                         RetryableEventCache& retryableEventCache)
     : AbstractManager(baseMgr, eBPFAdapter, queue, metricManager),
+      mRetryableEventCache(retryableEventCache),
       mAggregateTree(
           4096,
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -257,18 +259,6 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
     AttrHashCombine(result[1], strHasher(event->mPath));
     return result;
 }
-int FileSecurityManager::PollPerfBuffer(int maxWaitTimeMs) {
-    auto now = TimeKeeper::GetInstance()->NowSec();
-    if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
-        EventCache().HandleEvents();
-        mLastEventCacheRetryTime = now;
-        SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
-        LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
-    }
-    int zero = 0;
-    return mEBPFAdapter->PollPerfBuffers(
-        PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
-}
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     auto* fileEvent = static_cast<FileEvent*>(event.get());
@@ -299,7 +289,6 @@ int FileSecurityManager::Destroy() {
 
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
     LOG_INFO(sLogger, ("stop file plugin, status", res));
-    mRetryableEventCache.Clear();
     return res ?  0 : 1;
 }
 

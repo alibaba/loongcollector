@@ -347,6 +347,10 @@ public:
         return perf_buffer__poll((struct perf_buffer*)pb, timeoutMs);
     }
 
+    int ConsumePerfBuffer(void* pb) {
+        return perf_buffer__consume((struct perf_buffer*)pb);
+    }
+
     int GetPerfBufferEpollFd(void* pb) {
         return perf_buffer__epoll_fd((struct perf_buffer*)pb);
     }

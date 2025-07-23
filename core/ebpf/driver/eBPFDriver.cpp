@@ -714,3 +714,31 @@ std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type) {
     
     return epollFds;
 }
+
+int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
+    if (!gPluginStatus[int(type)]) {
+        return 0;
+    }
+
+    // find pbs
+    std::vector<void*> pbs = gPluginPbs[int(type)];
+
+    if (pbs.empty()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
+        return 0;
+    }
+    
+    int cnt = 0;
+    for (auto& pb : pbs) {
+        if (!pb) {
+            continue;
+        }
+        int ret = gWrapper->ConsumePerfBuffer(pb);
+        if (ret < 0) {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "consume perf buffer data failed ...\n");
+        } else {
+            cnt += ret;
+        }
+    }
+    return cnt;
+}

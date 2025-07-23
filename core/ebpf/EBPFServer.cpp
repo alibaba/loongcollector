@@ -22,6 +22,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
+#include "common/TimeKeeper.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/http/AsynCurlRunner.h"
@@ -171,7 +172,7 @@ EBPFServer::EBPFServer()
     auto processCacheMissTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
     auto processCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
     auto processDataMapSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
-    auto retryableEventCacheSize = mMetricsRecordRef.CreateIntGauge(
+    mRetryableEventCacheSize = mMetricsRecordRef.CreateIntGauge(
         METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE); // TODO: shoud be shared across network connection retry
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
@@ -184,7 +185,7 @@ EBPFServer::EBPFServer()
                                                                  processCacheMissTotal,
                                                                  processCacheSize,
                                                                  processDataMapSize,
-                                                                 retryableEventCacheSize);
+                                                                 mRetryableEventCache);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
@@ -233,6 +234,7 @@ void EBPFServer::Stop() {
                       magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", pipelineName)("ret", ret));
         }
     }
+    mRetryableEventCache.Clear();
 
     bool alarmOnce = false;
     while (mPoller.valid()) {
@@ -295,6 +297,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     if (type != PluginType::NETWORK_OBSERVE) {
         if (mProcessCacheManager->Init()) {
+            registerPluginPerfBuffers(PluginType::PROCESS_SECURITY);
             LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
         } else {
             LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
@@ -336,7 +339,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr
-                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+                    = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager, mRetryableEventCache);
             }
             break;
         }
@@ -351,6 +354,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             || type == PluginType::FILE_SECURITY) && checkIfNeedStopProcessCacheManager()) {
             LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
             mProcessCacheManager->Stop();
+            unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
         }
         pluginMgr.reset();
         return false;
@@ -426,6 +430,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
             if (checkIfNeedStopProcessCacheManager()) {
                 LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
                 mProcessCacheManager->Stop();
+                unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
             }
         }
     } else {
@@ -479,6 +484,58 @@ bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
     return true;
 }
 
+void EBPFServer::handleEventCache() {
+    auto now = TimeKeeper::GetInstance()->NowSec();
+    if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
+        EventCache().HandleEvents();
+        mLastEventCacheRetryTime = now;
+        SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
+        LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
+    }
+}
+
+void EBPFServer::handleEpollEvents() {
+    if (mUnifiedEpollFd < 0 || mEpollFdToPluginType.empty()) {
+        return;
+    }
+
+    int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), 100);
+    if (numEvents <= 0) {
+        if (numEvents < 0 && errno != EINTR) {
+            LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));
+        }
+        return;
+    }
+
+    LOG_DEBUG(sLogger, ("Unified epoll detected events", numEvents));
+
+    for (int i = 0; i < numEvents; ++i) {
+        const auto activeFd = mEpollEvents[i].data.fd;
+        const auto it = mEpollFdToPluginType.find(activeFd);
+        if (it == mEpollFdToPluginType.end()) {
+            continue;
+        }
+
+        const PluginType type = it->second;
+        if (type == PluginType::PROCESS_SECURITY) {
+            mProcessCacheManager->ConsumePerfBufferData();
+            continue;
+        }
+
+        auto& pluginState = getPluginState(type);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
+
+        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+        if (pluginState.mManager) {
+            const int cnt = pluginState.mManager->ConsumePerfBufferData();
+            LOG_DEBUG(sLogger, 
+                ("Event-driven consume for", magic_enum::enum_name(type))
+                ("cnt", cnt)("fd", activeFd));
+        }
+    }
+}
 void EBPFServer::pollPerfBuffers() {
     mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
@@ -490,40 +547,10 @@ void EBPFServer::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        
-        mProcessCacheManager->PollPerfBuffers();
 
-        if (mUnifiedEpollFd >= 0 && !mEpollFdToPluginType.empty()) {
-            int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), 10);
-            
-            if (numEvents > 0) {
-                LOG_DEBUG(sLogger, ("Unified epoll detected events", numEvents));
-                
-                for (int i = 0; i < numEvents; i++) {
-                    int activeFd = mEpollEvents[i].data.fd;
-                    auto it = mEpollFdToPluginType.find(activeFd);
-                    
-                    if (it != mEpollFdToPluginType.end()) {
-                        PluginType type = it->second;
-                        auto& pluginState = getPluginState(type);
-                        
-                        if (pluginState.mValid.load(std::memory_order_acquire)) {
-                            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-                            auto& plugin = pluginState.mManager;
-                            
-                            if (plugin) {
-                                int cnt = plugin->PollPerfBuffer(1);
-                                LOG_DEBUG(sLogger, 
-                                    ("Event-driven poll for", magic_enum::enum_name(type))
-                                    ("cnt", cnt)("fd", activeFd));
-                            }
-                        }
-                    }
-                }
-            } else if (numEvents < 0 && errno != EINTR) {
-                LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));
-            }
-        }
+        handleEventCache();    
+        handleEpollEvents();
+        mProcessCacheManager->ClearProcessExpiredCache();
     }
 }
 
@@ -652,7 +679,7 @@ void EBPFServer::initUnifiedEpollMonitoring() {
 }
 
 void EBPFServer::registerPluginPerfBuffers(PluginType type) {
-    if (mUnifiedEpollFd < 0 || type == PluginType::PROCESS_SECURITY) {
+    if (mUnifiedEpollFd < 0) {
         return;
     }
     
@@ -675,7 +702,7 @@ void EBPFServer::registerPluginPerfBuffers(PluginType type) {
 }
 
 void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
-    if (mUnifiedEpollFd < 0|| type == PluginType::PROCESS_SECURITY) {
+    if (mUnifiedEpollFd < 0) {
         return;
     }
     

@@ -39,14 +39,16 @@ public:
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        const PluginMetricManagerPtr& metricManager);
+                        const PluginMetricManagerPtr& metricManager,
+                        RetryableEventCache& retryableEventCache);
 
     static std::shared_ptr<FileSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           const PluginMetricManagerPtr& metricMgr,
+           RetryableEventCache& retryableEventCache) {
+        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr, retryableEventCache);
     }
 
     ~FileSecurityManager() {}
@@ -61,7 +63,6 @@ public:
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
     int SendEvents() override;
-    int PollPerfBuffer(int maxWaitTimeMs) override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
@@ -86,10 +87,7 @@ public:
 private:
     void markFileEventFlushStatus(bool isFlush) { mFlushFileEvent = isFlush; }
     
-    RetryableEventCache mRetryableEventCache;
-    IntGaugePtr mRetryableEventCacheSize;
-    int64_t mLastEventCacheRetryTime = 0;
-
+    RetryableEventCache& mRetryableEventCache;
     std::atomic_bool mFlushFileEvent = false;
 
     ReadWriteLock mLock;

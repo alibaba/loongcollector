@@ -113,7 +113,8 @@ void FileRetryableEvent::OnDrop() {
 
 bool FileRetryableEvent::CanRetry() const {
     if(!RetryableEvent::CanRetry()) {
-        LOG_WARNING(sLogger, ("about to drop after too many retries", "")("type", "file security")("file", mFileEvent->mPath));
+        LOG_WARNING(sLogger, ("about to drop after too many retries", "")("type", "file security")
+        ("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)("file", mFileEvent->mPath));
         return false;
     }
     return true;

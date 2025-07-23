@@ -109,6 +109,7 @@ public:
 
     void SetPluginLifecycleState(PluginType type, const std::string& pipelineName, LifecycleState state);
     bool IsPluginInited(PluginType type, const std::string& pipelineName);
+    RetryableEventCache& EventCache() { return mRetryableEventCache; }
 
 private:
     bool startPluginInternal(const std::string& pipelineName,
@@ -132,6 +133,8 @@ private:
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
     void handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& items, size_t count);
     void sendEvents();
+    void handleEventCache();
+    void handleEpollEvents();
 
     // Unified epoll monitoring methods
     void initUnifiedEpollMonitoring();
@@ -164,10 +167,13 @@ private:
 
     FrequencyManager mFrequencyMgr;
 
-    // Unified epoll monitoring for all perf buffers
     int mUnifiedEpollFd = -1;
     std::map<int, PluginType> mEpollFdToPluginType; 
     std::vector<struct epoll_event> mEpollEvents; 
+
+    RetryableEventCache mRetryableEventCache;
+    IntGaugePtr mRetryableEventCacheSize;
+    int64_t mLastEventCacheRetryTime = 0;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif

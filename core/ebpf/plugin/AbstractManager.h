@@ -62,6 +62,10 @@ public:
             GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
+    virtual int ConsumePerfBufferData(){
+        return mEBPFAdapter->ConsumePerfBufferData(GetPluginType());
+    }
+
     bool IsRunning() { return mInited && !mSuspendFlag; }
 
     bool IsExists() { return mInited; }
