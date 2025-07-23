@@ -19,12 +19,14 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
 #include "common/StringView.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
+#include "common/version.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
@@ -98,6 +100,7 @@ const static StringView kEBPFValue = "ebpf";
 const static StringView kMetricValue = "metric";
 const static StringView kTraceValue = "trace";
 const static StringView kLogValue = "log";
+const static StringView kAgentInfoValue = "agent_info";
 
 const static StringView kSpanTagKeyApp = "app";
 
@@ -579,25 +582,13 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
 #else
         if (init && needPush) {
-            auto eventSize = eventGroup.GetEvents().size();
-            ADD_COUNTER(pushLogsTotal, eventSize);
-            ADD_COUNTER(pushLogGroupTotal, 1);
-            LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-            std::unique_ptr<ProcessQueueItem> item
-                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-            for (size_t times = 0; times < 5; times++) {
-                auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-                if (QueueStatus::OK != result) {
-                    LOG_WARNING(sLogger,
-                                ("configName", configName)("pluginIdx", pluginIdx)(
-                                    "[NetworkObserver] push log to queue failed!", magic_enum::enum_name(result)));
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                } else {
-                    LOG_DEBUG(sLogger, ("NetworkObserver push log successful, events:", eventSize));
-                    break;
-                }
-            }
-
+            pushEventsWithRetry(EventDataType::LOG,
+                                std::move(eventGroup),
+                                configName,
+                                queueKey,
+                                pluginIdx,
+                                pushLogsTotal,
+                                pushLogGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push log ", ""));
         }
@@ -649,7 +640,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         // every node represent an instance of an arms app ...
 
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
-        std::shared_ptr<SourceBuffer> sourceBuffer = node->mSourceBuffer;
+        std::shared_ptr<SourceBuffer>& sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
         eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
@@ -760,29 +751,18 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
                 metricsEvent->SetTagNoCopy(kPeerWorkloadName.MetricKey(), group->mTags.Get<kPeerWorkloadName>());
             }
         });
-        auto eventSize = eventGroup.GetEvents().size();
 #ifdef APSARA_UNIT_TEST_MAIN
-        ADD_COUNTER(pushMetricsTotal, eventSize);
+        ADD_COUNTER(pushMetricsTotal, eventGroup.GetEvents().size());
         ADD_COUNTER(pushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        ADD_COUNTER(pushMetricsTotal, eventSize);
-        ADD_COUNTER(pushMetricGroupTotal, 1);
-        LOG_DEBUG(sLogger, ("net event group size", eventGroup.GetEvents().size()));
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-
-        for (size_t times = 0; times < 5; times++) {
-            auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-            if (QueueStatus::OK != result) {
-                LOG_WARNING(sLogger,
-                            ("configName", configName)("pluginIdx", pluginIdx)(
-                                "[NetworkObserver] push net metric queue failed!", magic_enum::enum_name(result)));
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            } else {
-                LOG_DEBUG(sLogger, ("NetworkObserver push net metric successful, events:", eventSize));
-                break;
-            }
-        }
+        pushEventsWithRetry(EventDataType::NET_METRIC,
+                            std::move(eventGroup),
+                            configName,
+                            queueKey,
+                            pluginIdx,
+                            pushMetricsTotal,
+                            pushMetricGroupTotal);
 #endif
     }
     return true;
@@ -816,7 +796,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         // convert to a item and push to process queue
         // every node represent an instance of an arms app ...
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
-        std::shared_ptr<SourceBuffer> sourceBuffer = node->mSourceBuffer;
+        std::shared_ptr<SourceBuffer>& sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
         eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
@@ -954,34 +934,21 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 metricsEvent->SetTagNoCopy(kDestId.MetricKey(), group->mTags.Get<kDestId>());
             }
         });
-        auto eventSize = eventGroup.GetEvents().size();
 #ifdef APSARA_UNIT_TEST_MAIN
         if (init) {
-            ADD_COUNTER(pushMetricsTotal, eventSize);
+            ADD_COUNTER(pushMetricsTotal, eventGroup.GetEvents().size());
             ADD_COUNTER(pushMetricGroupTotal, 1);
             mMetricEventGroups.emplace_back(std::move(eventGroup));
         }
-
 #else
         if (init) {
-            ADD_COUNTER(pushMetricsTotal, eventSize);
-            ADD_COUNTER(pushMetricGroupTotal, 1);
-            LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-            std::unique_ptr<ProcessQueueItem> item
-                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-
-            for (size_t times = 0; times < 5; times++) {
-                auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-                if (QueueStatus::OK != result) {
-                    LOG_WARNING(sLogger,
-                                ("configName", configName)("pluginIdx", pluginIdx)(
-                                    "[NetworkObserver] push app metric queue failed!", magic_enum::enum_name(result)));
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                } else {
-                    LOG_DEBUG(sLogger, ("NetworkObserver push app metric successful, events:", eventSize));
-                    break;
-                }
-            }
+            pushEventsWithRetry(EventDataType::APP_METRIC,
+                                std::move(eventGroup),
+                                configName,
+                                queueKey,
+                                pluginIdx,
+                                pushMetricsTotal,
+                                pushMetricGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("appid is empty, no need to push", ""));
         }
@@ -1106,34 +1073,22 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 needPush = true;
             }
         });
-        auto eventSize = eventGroup.GetEvents().size();
 #ifdef APSARA_UNIT_TEST_MAIN
         if (needPush) {
-            ADD_COUNTER(pushSpansTotal, eventSize);
+            ADD_COUNTER(pushSpansTotal, eventGroup.GetEvents().size());
             ADD_COUNTER(pushSpanGroupTotal, 1);
             mSpanEventGroups.emplace_back(std::move(eventGroup));
         }
 
 #else
         if (init && needPush) {
-            ADD_COUNTER(pushSpansTotal, eventSize);
-            ADD_COUNTER(pushSpanGroupTotal, 1);
-            LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-            std::unique_ptr<ProcessQueueItem> item
-                = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-
-            for (size_t times = 0; times < 5; times++) {
-                auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-                if (QueueStatus::OK != result) {
-                    LOG_WARNING(sLogger,
-                                ("configName", configName)("pluginIdx", pluginIdx)(
-                                    "[NetworkObserver] push span queue failed!", magic_enum::enum_name(result)));
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                } else {
-                    LOG_DEBUG(sLogger, ("NetworkObserver push span successful, events:", eventSize));
-                    break;
-                }
-            }
+            pushEventsWithRetry(EventDataType::APP_SPAN,
+                                std::move(eventGroup),
+                                configName,
+                                queueKey,
+                                pluginIdx,
+                                pushSpansTotal,
+                                pushSpanGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
         }
@@ -1307,7 +1262,6 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
 
     WriteLock lk(mAppConfigLock);
     std::vector<std::string> expiredCids;
-    std::set<size_t> currentWorkloadKeys;
     const std::string& configName = ctx->GetConfigName();
 
     if (option->mSelectors.empty()) {
@@ -1315,9 +1269,8 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         if (auto it = mConfigToWorkloads.find(configName); it != mConfigToWorkloads.end()) {
             for (auto key : it->second) {
                 if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
-                    for (const auto& cid : wIt->second.containerIds) {
-                        expiredCids.push_back(cid);
-                    }
+                    expiredCids.insert(
+                        expiredCids.end(), wIt->second.containerIds.begin(), wIt->second.containerIds.end());
                     mWorkloadConfigs.erase(wIt);
                 }
             }
@@ -1335,6 +1288,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         return 0;
     }
 
+    std::set<size_t> currentWorkloadKeys;
     // collect current workload keys
     for (const auto& selector : option->mSelectors) {
         auto key = GenerateWorkloadKey(selector.mNamespace, selector.mWorkloadKind, selector.mWorkloadName);
@@ -1547,6 +1501,7 @@ int NetworkObserverManager::PollPerfBuffer() {
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
     // 1. listen host pod info // every 5 seconds
     if (K8sMetadata::GetInstance().Enable() && nowMs - mLastUpdateHostMetaTimeMs >= 5000) { // 5s
+        // TODO (qianlu.kk) instead of using cri interface ...
         UploadHostMetadataUpdateTask();
         mLastUpdateHostMetaTimeMs = nowMs;
     }
@@ -1661,23 +1616,147 @@ int NetworkObserverManager::SendEvents() {
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
     // consume log agg tree -- 2000ms
     if (nowMs - mLastSendLogTimeMs >= mSendLogIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "log"));
+        LOG_DEBUG(sLogger, ("begin consume log agg tree", "log"));
         ConsumeLogAggregateTree();
+        mLastSendLogTimeMs = nowMs;
     }
 
     // consume span agg tree -- 2000ms
     if (nowMs - mLastSendSpanTimeMs >= mSendSpanIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "span"));
+        LOG_DEBUG(sLogger, ("begin consume span agg tree", "span"));
         ConsumeSpanAggregateTree();
+        mLastSendSpanTimeMs = nowMs;
     }
 
     // consume metric agg trees -- 15000ms
     if (nowMs - mLastSendMetricTimeMs >= mSendMetricIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "metric"));
+        LOG_DEBUG(sLogger, ("begin consume metric agg tree", "metric"));
         ConsumeMetricAggregateTree();
-        // ConsumeNetMetricAggregateTree();
+        mLastSendMetricTimeMs = nowMs;
     }
+
+    if (nowMs - mLastSendAgentInfoTimeMs >= mSendMetricIntervalMs) {
+        LOG_DEBUG(sLogger, ("begin report agent info", "metric"));
+        ReportAgentInfo();
+        mLastSendAgentInfoTimeMs = nowMs;
+    }
+
     return 0;
+}
+
+const static std::string kAgentInfoAppIdKey = "pid";
+const static std::string kAgentInfoIpKey = "ip";
+const static std::string kAgentInfoHostnameKey = "hostname";
+const static std::string kAgentInfoAppnameKey = "appName";
+const static std::string kAgentInfoAgentVersionKey = "agentVersion";
+const static std::string kAgentInfoStartTsKey = "startTimestamp";
+
+void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
+                                                 PipelineEventGroup&& eventGroup,
+                                                 const StringView& configName,
+                                                 QueueKey queueKey,
+                                                 uint32_t pluginIdx,
+                                                 CounterPtr& eventCounter,
+                                                 CounterPtr& eventGroupCounter,
+                                                 size_t retryTimes) {
+    size_t eventsSize = eventGroup.GetEvents().size();
+    if (eventsSize > 0) {
+        // push
+        ADD_COUNTER(eventCounter, eventsSize);
+        ADD_COUNTER(eventGroupCounter, 1);
+        LOG_DEBUG(sLogger, ("agentinfo group size", eventsSize));
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
+        for (size_t times = 0; times < retryTimes; times++) {
+            auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
+            if (QueueStatus::OK != result) {
+                LOG_WARNING(
+                    sLogger,
+                    ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
+                        "[NetworkObserver] push to queue failed!", magic_enum::enum_name(result)));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } else {
+                LOG_DEBUG(sLogger,
+                          ("NetworkObserver push events successful, eventSize:",
+                           eventsSize)("dataType", magic_enum::enum_name(dataType)));
+                break;
+            }
+        }
+    }
+}
+
+void NetworkObserverManager::ReportAgentInfo() {
+    int cnt = 0;
+    const time_t now = time(nullptr);
+    for (const auto& configToWorkload : mConfigToWorkloads) {
+        const auto& workloadKeys = configToWorkload.second;
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        for (const auto& workloadKey : workloadKeys) {
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
+            const auto& it = mWorkloadConfigs.find(workloadKey);
+            if (it == mWorkloadConfigs.end()) {
+                continue;
+            }
+
+            auto& workloadConfig = it->second;
+            auto& appConfig = workloadConfig.config;
+            if (appConfig == nullptr) {
+                continue;
+            }
+
+            for (const auto& containerId : workloadConfig.containerIds) {
+                // report agent info
+                // generate for k8s ---- POD Level
+                if (K8sMetadata::GetInstance().Enable()) {
+                    auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
+                    if (podMeta == nullptr) {
+                        LOG_DEBUG(sLogger, ("failed to fetch containerId", containerId));
+                        continue;
+                    }
+
+                    auto* event = eventGroup.AddLogEvent();
+                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+                    event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
+                    event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
+                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+                    event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
+                    event->SetTimestamp(now, 0);
+                    cnt++;
+                } else {
+                    // generate for other ...
+                    // Instance Level
+                    auto* event = eventGroup.AddLogEvent();
+                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+                    if (Connection::gSelfPodIp.empty()) {
+                        event->SetContent(kAgentInfoHostnameKey, GetHostIp());
+                    } else {
+                        event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
+                    }
+
+                    if (Connection::gSelfPodName.empty()) {
+                        event->SetContent(kAgentInfoHostnameKey, GetHostName());
+                    } else {
+                        event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
+                    }
+                    event->SetTimestamp(now, 0);
+                    cnt++;
+                }
+            }
+
+            pushEventsWithRetry(EventDataType::AGENT_INFO,
+                                std::move(eventGroup),
+                                appConfig->mConfigName,
+                                appConfig->mQueueKey,
+                                appConfig->mPluginIndex,
+                                appConfig->mPushLogsTotal,
+                                appConfig->mPushLogGroupTotal);
+        }
+    }
+
+    LOG_DEBUG(sLogger, ("ReportAgentInfo count:", cnt));
 }
 
 int NetworkObserverManager::HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& commonEvent) {

@@ -131,6 +131,7 @@ public:
     bool ConsumeSpanAggregateTree();
     bool ConsumeNetMetricAggregateTree();
     bool UploadHostMetadataUpdateTask();
+    void ReportAgentInfo();
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
 
@@ -160,6 +161,23 @@ private:
     void processRecordAsMetric(L7Record* record, const std::shared_ptr<logtail::ebpf::AppDetail>&);
 
     bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
+
+    enum class EventDataType {
+        AGENT_INFO,
+        APP_METRIC,
+        NET_METRIC,
+        APP_SPAN,
+        LOG,
+    };
+
+    void pushEventsWithRetry(EventDataType dataType,
+                             PipelineEventGroup&& eventGroup,
+                             const StringView& configName,
+                             QueueKey queueKey,
+                             uint32_t pluginIdx,
+                             CounterPtr& eventCounter,
+                             CounterPtr& eventGroupCounter,
+                             size_t retryTimes = 5);
 
     std::unique_ptr<ConnectionManager> mConnectionManager; // hold connection cache ...
 
@@ -227,6 +245,7 @@ private:
     int64_t mLastSendSpanTimeMs = INT_MIN;
     int64_t mLastSendMetricTimeMs = INT_MIN;
     int64_t mLastSendLogTimeMs = INT_MIN;
+    int64_t mLastSendAgentInfoTimeMs = INT_MIN;
 
     int64_t mSendSpanIntervalMs = 2000;
     int64_t mSendLogIntervalMs = 2000;

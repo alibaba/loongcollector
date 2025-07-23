@@ -210,9 +210,9 @@ void Connection::updatePeerPodMetaForLocalhost() {
 }
 
 void Connection::updateSelfPodMetaForEnv() {
-    mTags.SetNoCopy<kPodIp>(kGetSelfPodIp());
-    mTags.SetNoCopy<kHostName>(kGetSelfPodName());
-    mTags.SetNoCopy<kPodName>(kGetSelfPodName());
+    mTags.SetNoCopy<kPodIp>(gSelfPodIp);
+    mTags.SetNoCopy<kHostName>(gSelfPodName);
+    mTags.SetNoCopy<kPodName>(gSelfPodName);
 }
 
 void Connection::updateSelfPodMetaForUnknown() {
@@ -339,20 +339,14 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
     }
 }
 
-StringView Connection::kGetSelfPodName() {
-    static const std::string kSelfPodName = [] {
-        const char* podName = std::getenv("POD_NAME");
-        return podName ? podName : "";
-    }();
-    return StringView(kSelfPodName);
-}
+std::string Connection::gSelfPodName = [] {
+    const char* podName = std::getenv("POD_NAME");
+    return podName ? podName : "";
+}();
 
-StringView Connection::kGetSelfPodIp() {
-    static const std::string kSelfPodIp = [] {
-        const char* podIp = std::getenv("POD_IP");
-        return podIp ? podIp : "";
-    }();
-    return StringView(kSelfPodIp);
-}
+std::string Connection::gSelfPodIp = [] {
+    const char* podIp = std::getenv("POD_IP");
+    return podIp ? podIp : "";
+}();
 
 } // namespace logtail::ebpf

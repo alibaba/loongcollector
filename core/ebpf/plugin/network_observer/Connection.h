@@ -156,6 +156,9 @@ public:
 
     void MarkConnDeleted() { mMetaFlags.fetch_or(kSFlagConnDeleted, std::memory_order_release); }
 
+    static std::string gSelfPodName;
+    static std::string gSelfPodIp;
+
 private:
     void updateL4Meta(struct conn_stats_event_t* event);
     // peer pod meta
@@ -167,8 +170,6 @@ private:
     void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void updateSelfPodMetaForUnknown();
     void updateSelfPodMetaForEnv();
-    static StringView kGetSelfPodName();
-    static StringView kGetSelfPodIp();
 
     using Flag = unsigned int;
 
@@ -217,6 +218,7 @@ private:
     static std::regex mContainerIdRegex;
 
     ConnStatsData mCurrStats;
+
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
