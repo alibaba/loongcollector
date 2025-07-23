@@ -108,9 +108,8 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 			}
 		}
 		return result
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -153,9 +152,8 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		// generate k8s.node -> infra.server link
 		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverID)
 		return []models.PipelineEvent{log, logNodeInfraLink}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -185,9 +183,8 @@ func (m *metaCollector) processServiceEntity(data *k8smeta.ObjectWrapper, method
 		}
 		log.Contents.Add("ports", m.processEntityJSONArray(ports))
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -204,9 +201,8 @@ func (m *metaCollector) processConfigMapEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -224,9 +220,8 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
 		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -261,9 +256,8 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 			log.Contents.Add("fsType", "")
 		}
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -288,9 +282,8 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 		}
 		log.Contents.Add("volume_name", obj.Spec.VolumeName)
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -302,9 +295,8 @@ func (m *metaCollector) processPodNodeLink(data *k8smeta.ObjectWrapper, method s
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Node2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -316,9 +308,8 @@ func (m *metaCollector) processPodPVCLink(data *k8smeta.ObjectWrapper, method st
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2PersistentVolumeClaim)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -330,9 +321,8 @@ func (m *metaCollector) processPodConfigMapLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2ConfigMap)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -344,9 +334,8 @@ func (m *metaCollector) processPodServiceLink(data *k8smeta.ObjectWrapper, metho
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Service2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -358,9 +347,8 @@ func (m *metaCollector) processPodContainerLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Pod2Container)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -372,9 +360,8 @@ func (m *metaCollector) processPodNamespaceLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -386,9 +373,8 @@ func (m *metaCollector) processServiceNamespaceLink(data *k8smeta.ObjectWrapper,
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Service)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -400,9 +386,8 @@ func (m *metaCollector) processConfigMapNamespaceLink(data *k8smeta.ObjectWrappe
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Configmap)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -414,8 +399,7 @@ func (m *metaCollector) processPVCNamespaceLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2PersistentVolumeClaim)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }

@@ -35,9 +35,8 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 		log.Contents.Add("backoff_limit", safeGetInt32String(obj.Spec.BackoffLimit))
 		log.Contents.Add("completion", safeGetInt32String(obj.Spec.Completions))
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -56,9 +55,8 @@ func (m *metaCollector) processCronJobEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("schedule", obj.Spec.Schedule)
 		log.Contents.Add("suspend", safeGetBoolString(obj.Spec.Suspend))
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -70,9 +68,8 @@ func (m *metaCollector) processJobCronJobLink(data *k8smeta.ObjectWrapper, metho
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.CronJob2Job)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -84,9 +81,8 @@ func (m *metaCollector) processPodJobLink(data *k8smeta.ObjectWrapper, method st
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Job2Pod)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -98,9 +94,8 @@ func (m *metaCollector) processJobNamespaceLink(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2Job)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -112,8 +107,7 @@ func (m *metaCollector) processCronJobNamespaceLink(data *k8smeta.ObjectWrapper,
 		log.Contents.Add(entityLinkRelationTypeFieldName, m.serviceK8sMeta.Namespace2CronJob)
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
-	} else {
-		m.updateProcessEventFailCounter()
 	}
+	m.updateProcessEventFailCounter()
 	return nil
 }

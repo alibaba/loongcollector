@@ -74,7 +74,7 @@ func (m *k8sMetaCache) GetMetaStoreFailCount() int64 {
 	return m.metaStore.GetMetaStoreFailCount()
 }
 func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
-	return m.metaStore.GetMetaStoreFailCount()
+	return m.informerWatchFailCount
 }
 func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
 	m.informerWatchFailCount += 1

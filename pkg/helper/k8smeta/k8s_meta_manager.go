@@ -194,10 +194,16 @@ func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
 }
 
 func (m *MetaManager) UpdateProcessEventFailCounter() {
+	if m.processEventFailCount == nil {
+		m.processEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaProcessEventFailTotal)
+	}
 	m.processEventFailCount.Add(1)
 }
 
 func (m *MetaManager) UpdateConvertEventToLogFailCounter() {
+	if m.convertEventFailCount == nil {
+		m.convertEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaConvertEventToLogFailTotal)
+	}
 	m.convertEventFailCount.Add(1)
 }
 func GetMetaManagerMetrics() []map[string]string {
