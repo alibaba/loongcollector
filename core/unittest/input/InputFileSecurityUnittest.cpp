@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "json/json.h"
-
-#include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/JsonUtil.h"
@@ -35,15 +32,15 @@ public:
     void TestSupportAck();
     void OnSuccessfulInit();
     void OnFailedInit();
-    void OnSuccessfulStart();
+    void OnStart();
     void OnSuccessfulStop();
     // void OnPipelineUpdate();
 
 protected:
     void SetUp() override {
-        p.mName = "test_config";
-        ctx.SetConfigName("test_config");
-        ctx.SetPipeline(p);
+        mPipeline.mName = "test_config";
+        mContex.SetConfigName("test_config");
+        mContex.SetPipeline(mPipeline);
         ebpf::EBPFServer::GetInstance()->Init();
     }
 
@@ -54,8 +51,8 @@ protected:
     }
 
 private:
-    CollectionPipeline p;
-    CollectionPipelineContext ctx;
+    CollectionPipeline mPipeline;
+    CollectionPipelineContext mContex;
 };
 
 void InputFileSecurityUnittest::TestName() {
@@ -72,8 +69,10 @@ void InputFileSecurityUnittest::TestSupportAck() {
 
 void InputFileSecurityUnittest::OnSuccessfulInit() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     // only mandatory param
     configStr = R"(
@@ -90,7 +89,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -116,7 +115,7 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -145,23 +144,60 @@ void InputFileSecurityUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_file_security");
     logtail::ebpf::SecurityFileFilter thisFilter3
         = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
-    APSARA_TEST_EQUAL(3, thisFilter3.mFilePathList.size());
+    APSARA_TEST_EQUAL(static_cast<size_t>(3), thisFilter3.mFilePathList.size());
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter3.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter3.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter3.mFilePathList[2]);
+
+    // test excessive filters
+    stringstream ss;
+    ss << R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [)";
+
+    for (int i = 0; i < 70; i++) {
+        if (i > 0) {
+            ss << ",";
+        }
+        ss << "\"/test/path" << i << "\"";
+    }
+
+    ss << R"(
+                ]
+            }
+        }
+    )";
+
+    configStr = ss.str();
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputFileSecurity());
+    input->SetContext(mContex);
+    input->CreateMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
+    logtail::ebpf::SecurityFileFilter thisFilter
+        = std::get<logtail::ebpf::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].mFilter);
+    // the portion exceeding 64 has been discarded.
+    APSARA_TEST_EQUAL(64UL, thisFilter.mFilePathList.size());
 }
 
 void InputFileSecurityUnittest::OnFailedInit() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     // invalid mandatory param
     configStr = R"(
@@ -175,7 +211,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -199,7 +235,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -219,7 +255,7 @@ void InputFileSecurityUnittest::OnFailedInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -228,10 +264,12 @@ void InputFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(3UL, input->mSecurityOptions.mOptionList[0].mCallNames.size()); // default callname
 }
 
-void InputFileSecurityUnittest::OnSuccessfulStart() {
+void InputFileSecurityUnittest::OnStart() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     configStr = R"(
         {
@@ -247,7 +285,7 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -257,12 +295,22 @@ void InputFileSecurityUnittest::OnSuccessfulStart() {
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
+
+    // simulate an unsupported environment
+    auto& envMgr = ebpf::EBPFServer::GetInstance()->mEnvMgr;
+    envMgr.mArchSupport = false;
+    envMgr.mBTFSupport = false;
+    APSARA_TEST_FALSE(input->Start());
+    envMgr.mArchSupport = true;
+    envMgr.mBTFSupport = true;
 }
 
 void InputFileSecurityUnittest::OnSuccessfulStop() {
     unique_ptr<InputFileSecurity> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    string configStr;
+    string errorMsg;
 
     configStr = R"(
         {
@@ -278,7 +326,7 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputFileSecurity());
-    input->SetContext(ctx);
+    input->SetContext(mContex);
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
@@ -287,7 +335,7 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    // APSARA_TEST_TRUE(input->Stop(false));
+    APSARA_TEST_TRUE(input->Stop(false));
     serverPipelineName
         = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
@@ -301,7 +349,7 @@ UNIT_TEST_CASE(InputFileSecurityUnittest, TestName)
 UNIT_TEST_CASE(InputFileSecurityUnittest, TestSupportAck)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnFailedInit)
-UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStart)
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnStart)
 UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStop)
 // UNIT_TEST_CASE(InputFileSecurityUnittest, OnPipelineUpdate)
 

@@ -30,11 +30,11 @@ namespace ebpf {
 
 class EBPFServer;
 
-const std::string FileSecurityManager::sMmapValue = "security_mmap_file";
-const std::string FileSecurityManager::sTruncateValue = "security_path_truncate";
-const std::string FileSecurityManager::sPermissionValue = "security_file_permission";
-const std::string FileSecurityManager::sPermissionReadValue = "read";
-const std::string FileSecurityManager::sPermissionWriteValue = "write";
+const std::string FileSecurityManager::kMmapValue = "security_mmap_file";
+const std::string FileSecurityManager::kTruncateValue = "security_path_truncate";
+const std::string FileSecurityManager::kPermissionValue = "security_file_permission";
+const std::string FileSecurityManager::kPermissionReadValue = "read";
+const std::string FileSecurityManager::kPermissionWriteValue = "write";
 
 void HandleFileKernelEvent(void* ctx, int, void* data, __u32) {
     if (!ctx) {
@@ -68,12 +68,15 @@ void FileSecurityManager::UpdateLossKernelEventsTotal(uint64_t cnt) {
 
 void FileSecurityManager::RecordFileEvent(file_data_t* rawEvent) {
     ADD_COUNTER(mRecvKernelEventsTotal, 1);
-
+    if (rawEvent == nullptr) {
+        LOG_WARNING(sLogger, ("rawEvent is null", "file event lost"));
+        return;
+    }
     std::unique_ptr<FileRetryableEvent> event(CreateFileRetryableEvent(rawEvent));
     if (event == nullptr) {
         LOG_WARNING(sLogger, ("FileRetryableEvent is null", "file retry event lost"));
         return;
-    } 
+    }
     if (!event->HandleMessage()) {
         EventCache().AddEvent(std::move(event));
     }
@@ -88,11 +91,10 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
     return new FileRetryableEvent(std::max(1, INT32_FLAG(ebpf_event_retry_limit)),
                                   *eventPtr,
                                   processCacheMgr->GetProcessCache(),
-                                  mCommonEventQueue,
-                                  mFlushFileEvent);
+                                  mCommonEventQueue);
 }
 
-FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
+FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                          const PluginMetricManagerPtr& metricManager,
@@ -149,6 +151,7 @@ int FileSecurityManager::SendEvents() {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }
 
+            auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
                 // attach process tags
@@ -157,31 +160,34 @@ int FileSecurityManager::SendEvents() {
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
-                logEvent->SetContent(kFilePath.LogKey(), group->mPath);
+                logEvent->SetContentNoCopy(kFilePath.LogKey(), StringView(pathSb.data, pathSb.size));
                 // set callnames
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sTruncateValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::kTruncateValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_MMAP: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sMmapValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::kMmapValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT_WRITE: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionWriteValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionWriteValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
                     case KernelEventType::FILE_PERMISSION_EVENT_READ: {
-                        logEvent->SetContentNoCopy(kCallName.LogKey(), StringView(FileSecurityManager::sPermissionReadValue));
+                        logEvent->SetContentNoCopy(kCallName.LogKey(),
+                                                   StringView(FileSecurityManager::kPermissionReadValue));
                         logEvent->SetContentNoCopy(kEventType.LogKey(), StringView(AbstractManager::kKprobeValue));
                         break;
                     }
@@ -215,14 +221,11 @@ int FileSecurityManager::SendEvents() {
             }
         }
     }
+    mLastSendTimeMs = nowMs;
     return 0;
 }
 
 int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    // set init flag ...
-    mInited = true;
-    markFileEventFlushStatus(true);
-
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;
     FileSecurityConfig config;
@@ -237,11 +240,13 @@ int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetwo
     pc->mConfig = std::move(config);
 
     auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
-    LOG_INFO(sLogger, ("start file plugin, status", res));
-    if(!res) {
-        mInited = false;
+    LOG_INFO(sLogger, ("start file probe, status", res));
+    if (!res) {
+        LOG_WARNING(sLogger, ("failed to start file probe", ""));
         return 1;
     }
+
+    mInited = true;
     return 0;
 }
 
@@ -261,6 +266,9 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
+    if (!event) {
+        return 1;
+    }
     auto* fileEvent = static_cast<FileEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(
@@ -285,7 +293,6 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 
 int FileSecurityManager::Destroy() {
     mInited = false;
-    markFileEventFlushStatus(false);
 
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
     LOG_INFO(sLogger, ("stop file plugin, status", res));

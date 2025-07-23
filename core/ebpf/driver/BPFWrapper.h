@@ -213,13 +213,17 @@ public:
     int UpdateInnerMapElem(
         const std::string& outterMapName, void* outterKey, void* innerKey, void* innerValue, uint64_t flag) {
         // Use default max_entries from traits
-        return UpdateInnerMapElem<MapInMapType>(outterMapName, outterKey, innerKey, innerValue, flag, 
-                                                BPFMapTraits<MapInMapType>::inner_max_entries);
+        return UpdateInnerMapElem<MapInMapType>(
+            outterMapName, outterKey, innerKey, innerValue, flag, BPFMapTraits<MapInMapType>::inner_max_entries);
     }
 
     template <typename MapInMapType>
-    int UpdateInnerMapElem(
-        const std::string& outterMapName, void* outterKey, void* innerKey, void* innerValue, uint64_t flag, uint32_t max_entries) {
+    int UpdateInnerMapElem(const std::string& outterMapName,
+                           void* outterKey,
+                           void* innerKey,
+                           void* innerValue,
+                           uint64_t flag,
+                           uint32_t max_entries) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,

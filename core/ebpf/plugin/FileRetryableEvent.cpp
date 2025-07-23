@@ -13,8 +13,9 @@
 // limitations under the License.
 
 #include "ebpf/plugin/FileRetryableEvent.h"
-#include "logger/Logger.h"
+
 #include "ebpf/plugin/ProcessCache.h"
+#include "logger/Logger.h"
 
 namespace logtail::ebpf {
 
@@ -42,14 +43,14 @@ bool FileRetryableEvent::HandleMessage() {
             return false;
     }
 
-    std::string path = &mRawEvent->path[4];
-    mFileEvent = std::make_shared<FileEvent>(static_cast<uint32_t>(mRawEvent->key.pid), 
+    mFileEvent = std::make_shared<FileEvent>(static_cast<uint32_t>(mRawEvent->key.pid),
                                              static_cast<uint64_t>(mRawEvent->key.ktime),
                                              type,
                                              static_cast<uint64_t>(mRawEvent->timestamp),
-                                             path);
+                                             StringView(&mRawEvent->path[4]));
     mRawEvent = nullptr;
-    // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime));
+    // LOG_DEBUG(sLogger, ("event", "file")("action", "HandleMessage")("path", mFileEvent->mPath)("pid",
+    // mFileEvent->mPid)("ktime", mFileEvent->mKtime));
 
     if (!IsTaskCompleted(kFindProcess) && findProcess()) {
         CompleteTask(kFindProcess);
@@ -66,27 +67,26 @@ bool FileRetryableEvent::HandleMessage() {
 }
 
 bool FileRetryableEvent::findProcess() {
-    if(mFileEvent->mPid <= 0 || mFileEvent->mPid <= 0) {
+    if (mFileEvent->mPid <= 0 || mFileEvent->mKtime <= 0) {
         LOG_WARNING(sLogger, ("file event", "not process pid or ktime"));
         return true;
     }
 
     auto cacheValue = mProcessCache.Lookup({mFileEvent->mPid, mFileEvent->mKtime});
     if (!cacheValue) {
-        LOG_DEBUG(sLogger, ("file event", "process cache not found")("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)("path", mFileEvent->mPath));
+        LOG_DEBUG(sLogger,
+                  ("file event", "process cache not found")("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)(
+                      "path", mFileEvent->mPath));
         return false;
     }
 
     return true;
 }
 bool FileRetryableEvent::flushEvent() {
-    if (!mFlushFileEvent) {
-        return true;
-    }
-    if (!mEventQueue.try_enqueue(mFileEvent)) {
+    if (!mCommonEventQueue.try_enqueue(mFileEvent)) {
         LOG_DEBUG(sLogger,
-                   ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
-                    "ktime", mFileEvent->mKtime));
+                  ("event", "Failed to enqueue file event. retrying soon")("pid", mFileEvent->mPid)(
+                      "ktime", mFileEvent->mKtime));
         return false;
     }
     return true;
@@ -106,18 +106,9 @@ bool FileRetryableEvent::OnRetry() {
 }
 
 void FileRetryableEvent::OnDrop() {
-    if (mFileEvent && !IsTaskCompleted(kFlushEvent)){
+    if (mFileEvent && !IsTaskCompleted(kFlushEvent)) {
         flushEvent();
     }
-}
-
-bool FileRetryableEvent::CanRetry() const {
-    if(!RetryableEvent::CanRetry()) {
-        LOG_WARNING(sLogger, ("about to drop after too many retries", "")("type", "file security")
-        ("pid", mFileEvent->mPid)("ktime", mFileEvent->mKtime)("file", mFileEvent->mPath));
-        return false;
-    }
-    return true;
 }
 
 } // namespace logtail::ebpf

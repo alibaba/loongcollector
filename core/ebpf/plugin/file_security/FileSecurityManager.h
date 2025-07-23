@@ -29,14 +29,14 @@ namespace logtail::ebpf {
 
 class FileSecurityManager : public AbstractManager {
 public:
-    static const std::string sMmapValue;
-    static const std::string sTruncateValue;
-    static const std::string sPermissionValue;
-    static const std::string sPermissionReadValue;
-    static const std::string sPermissionWriteValue;
+    static const std::string kMmapValue;
+    static const std::string kTruncateValue;
+    static const std::string kPermissionValue;
+    static const std::string kPermissionReadValue;
+    static const std::string kPermissionWriteValue;
 
     FileSecurityManager() = delete;
-    FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& baseMgr,
+    FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                         const PluginMetricManagerPtr& metricManager,
@@ -85,10 +85,7 @@ public:
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
 
 private:
-    void markFileEventFlushStatus(bool isFlush) { mFlushFileEvent = isFlush; }
-    
     RetryableEventCache& mRetryableEventCache;
-    std::atomic_bool mFlushFileEvent = false;
 
     ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;

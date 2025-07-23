@@ -295,7 +295,9 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         return false;
     }
 
+    bool isNeedProcessCache = false;
     if (type != PluginType::NETWORK_OBSERVE) {
+        isNeedProcessCache = true;
         if (mProcessCacheManager->Init()) {
             registerPluginPerfBuffers(PluginType::PROCESS_SECURITY);
             LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
@@ -350,8 +352,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     if (pluginMgr->Init(options) != 0) {
         LOG_ERROR(sLogger, ("plugin manager init failed", ""));
-        if ((type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
-            || type == PluginType::FILE_SECURITY) && checkIfNeedStopProcessCacheManager()) {
+        if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
             LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
             mProcessCacheManager->Stop();
             unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
@@ -578,26 +579,6 @@ void EBPFServer::updatePluginState(PluginType type,
     mPlugins[static_cast<int>(type)].mProject = project;
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
-}
-
-void EBPFServer::SetPluginLifecycleState(PluginType type,
-                                         const std::string& pipelineName,
-                                         LifecycleState state) 
-{
-    if (type >= PluginType::MAX) {
-        return;
-    }
-    mPlugins[static_cast<int>(type)].mStatePipelineName = pipelineName;
-    mPlugins[static_cast<int>(type)].mLifecycleState = state;
-
-    LOG_DEBUG(sLogger, ("update plugin lifestate", "")("type", magic_enum::enum_name(type).data())("pipeline", pipelineName)("lifestate", magic_enum::enum_name(state).data()));
-}
-
-bool EBPFServer::IsPluginInited(PluginType type, const std::string& pipelineName) {
-    if (type >= PluginType::MAX) {
-        return false;
-    }
-    return mPlugins[static_cast<int>(type)].mLifecycleState == LifecycleState::INITIALIZED && mPlugins[static_cast<int>(type)].mStatePipelineName == pipelineName;
 }
 
 void EBPFServer::handlerEvents() {

@@ -66,7 +66,6 @@ int bump_memlock_rlimit(void) {
 }
 
 std::array<std::vector<void*>, size_t(logtail::ebpf::PluginType::MAX)> gPluginPbs;
-std::array<std::atomic_bool, size_t(logtail::ebpf::PluginType::MAX)> gPluginStatus = {};
 
 std::array<std::vector<std::string>, size_t(logtail::ebpf::PluginType::MAX)> gPluginCallNames;
 
@@ -152,7 +151,7 @@ void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
     for (auto* pb : pbs) {
         auto* perfbuffer = static_cast<perf_buffer*>(pb);
         if (perfbuffer) {
-            perf_buffer__free(perfbuffer);
+            gWrapper->DeletePerfBuffer(perfbuffer);
         }
     }
 }
@@ -239,10 +238,10 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // update filter config
-            std::vector<logtail::ebpf::AttachProgOps> attach_ops;
+            std::vector<logtail::ebpf::AttachProgOps> attachProgOps;
             for (const auto& opt : config->mOptions) {
                 for (const auto& cn : opt.mCallNames) {
-                    attach_ops.emplace_back("kprobe_" + cn, true);
+                    attachProgOps.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
                     int ret = logtail::ebpf::CreateFileFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
@@ -256,7 +255,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = gWrapper->DynamicAttachBPFObject(attach_ops);
+            ret = gWrapper->DynamicAttachBPFObject(attachProgOps);
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
@@ -289,10 +288,10 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             }
 
             // update filter config
-            std::vector<logtail::ebpf::AttachProgOps> attach_ops;
+            std::vector<logtail::ebpf::AttachProgOps> attachProgOps;
             for (const auto& opt : config->mOptions) {
                 for (const auto& cn : opt.mCallNames) {
-                    attach_ops.emplace_back("kprobe_" + cn, true);
+                    attachProgOps.emplace_back("kprobe_" + cn, true);
                     gPluginCallNames[int(arg->mPluginType)].push_back(cn);
                     int ret = logtail::ebpf::CreateNetworkFilterForCallname(gWrapper, cn, opt.mFilter);
                     if (ret) {
@@ -306,7 +305,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 }
             }
             // dynamic instrument
-            ret = gWrapper->DynamicAttachBPFObject(attach_ops);
+            ret = gWrapper->DynamicAttachBPFObject(attachProgOps);
             if (ret) {
                 EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
@@ -375,15 +374,10 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                      "[start plugin] unknown plugin type, please check. \n");
         }
     }
-    gPluginStatus[int(arg->mPluginType)] = true;
     return 0;
 }
 
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms) {
-    if (!gPluginStatus[int(type)]) {
-        return 0;
-    }
-
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
     }
@@ -464,7 +458,6 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
                      "[resume plugin] unknown plugin type, please check. \n");
         }
     }
-    gPluginStatus[int(arg->mPluginType)] = true;
     return 0;
 }
 
@@ -535,17 +528,10 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
 int stop_plugin(logtail::ebpf::PluginType pluginType) {
     if (pluginType >= logtail::ebpf::PluginType::MAX) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                 "[stop_plugin] invalid plugin type: %d\n", static_cast<int>(pluginType));
+                 "[stop_plugin] invalid plugin type: %d\n",
+                 static_cast<int>(pluginType));
         return -1;
     }
-    
-    if (!gPluginStatus[int(pluginType)]) {
-        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-                 "[stop_plugin] plugin already stopped, type: %d\n", static_cast<int>(pluginType));
-        return 0; 
-    }
-
-    gPluginStatus[int(pluginType)] = false;
 
     switch (pluginType) {
         case logtail::ebpf::PluginType::NETWORK_OBSERVE:
@@ -631,7 +617,6 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
 
 // do prog detach
 int suspend_plugin(logtail::ebpf::PluginType pluginType) {
-    gPluginStatus[int(pluginType)] = false;
     switch (pluginType) {
         case logtail::ebpf::PluginType::NETWORK_SECURITY: {
             auto callNames = gPluginCallNames[int(pluginType)];

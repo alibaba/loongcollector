@@ -14,35 +14,28 @@
 
 #pragma once
 
-#include "ebpf/plugin/ProcessCache.h"
 #include "FileEvent.h"
-#include "ebpf/plugin/RetryableEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
+#include "ebpf/plugin/ProcessCache.h"
+#include "ebpf/plugin/RetryableEvent.h"
 
 namespace logtail::ebpf {
 
 class FileRetryableEvent : public RetryableEvent {
 public:
     enum TaskId { kFindProcess, kFlushEvent, kDone };
-    explicit FileRetryableEvent(
-        int retryLimit, 
-        const file_data_t& event,
-        ProcessCache& processCache,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue,
-        bool flushFileEvent)
-        : RetryableEvent(retryLimit),
-          mRawEvent(&event),
-          mProcessCache(processCache), 
-          mEventQueue(eventQueue), 
-          mFlushFileEvent(flushFileEvent) {}
-    
+    explicit FileRetryableEvent(int retryLimit,
+                                const file_data_t& event,
+                                ProcessCache& processCache,
+                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue)
+        : RetryableEvent(retryLimit), mRawEvent(&event), mProcessCache(processCache), mCommonEventQueue(eventQueue) {}
+
     virtual ~FileRetryableEvent() = default;
 
     bool HandleMessage() override;
     bool OnRetry() override;
     void OnDrop() override;
-    [[nodiscard]] bool CanRetry() const override;
 
 private:
     bool findProcess();
@@ -50,9 +43,8 @@ private:
 
     const file_data_t* mRawEvent = nullptr;
     ProcessCache& mProcessCache;
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mEventQueue;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
     std::shared_ptr<FileEvent> mFileEvent;
-    bool mFlushFileEvent;
 };
 
 } // namespace logtail::ebpf
