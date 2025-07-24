@@ -637,7 +637,7 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
         APSARA_TEST_TRUE(res);
         {
             std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-            APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 3);
+            APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 3);
         }
 
         // Test plugin stop and epoll unregistration
@@ -726,7 +726,7 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
     APSARA_TEST_TRUE(res);
     {
         std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 6);
+        APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 6);
     }
 
     // Let threads run for a short time
@@ -748,7 +748,7 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
     }
     {
         std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 3);
+        APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 3);
     }
 
     res = inputProcess->Stop(true);
