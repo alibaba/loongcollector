@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/client-go/tools/cache"
@@ -80,10 +81,11 @@ func (m *DeferredDeletionMetaStore) Start() {
 }
 
 func (m *DeferredDeletionMetaStore) UpdateMetaStoreFailCounter() {
-	m.metaStoreFailCounter++
+	atomic.AddInt64(&m.metaStoreFailCounter, 1)
 }
 func (m *DeferredDeletionMetaStore) GetMetaStoreFailCount() int64 {
-	return m.metaStoreFailCounter
+	value := atomic.LoadInt64(&m.metaStoreFailCounter)
+	return value
 }
 func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrapper {
 	m.lock.RLock()
