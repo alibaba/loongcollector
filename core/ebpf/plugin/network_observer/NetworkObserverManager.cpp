@@ -1689,28 +1689,51 @@ void NetworkObserverManager::ReportAgentInfo() {
     const time_t now = time(nullptr);
     for (const auto& configToWorkload : mConfigToWorkloads) {
         const auto& workloadKeys = configToWorkload.second;
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
         for (const auto& workloadKey : workloadKeys) {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
-            const auto& it = mWorkloadConfigs.find(workloadKey);
+            const auto& it = mWorkloadConfigs.find(kGlobalWorkloadKey);
             if (it == mWorkloadConfigs.end()) {
+                LOG_DEBUG(sLogger, ("[AgentInfo] failed to find workloadKey from mWorkloadConfigs", workloadKey));
                 continue;
             }
-
             auto& workloadConfig = it->second;
             auto& appConfig = workloadConfig.config;
             if (appConfig == nullptr) {
+                LOG_DEBUG(sLogger,
+                          ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
                 continue;
             }
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
+            if (workloadKey == kGlobalWorkloadKey) {
+                // instance level ...
+                auto* event = eventGroup.AddLogEvent();
+                event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+                event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+                event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+                if (Connection::gSelfPodIp.empty()) {
+                    event->SetContent(kAgentInfoIpKey, GetHostIp());
+                } else {
+                    event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
+                }
 
-            for (const auto& containerId : workloadConfig.containerIds) {
-                // report agent info
-                // generate for k8s ---- POD Level
-                if (K8sMetadata::GetInstance().Enable()) {
+                if (Connection::gSelfPodName.empty()) {
+                    event->SetContent(kAgentInfoHostnameKey, GetHostName());
+                } else {
+                    event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
+                }
+                event->SetTimestamp(now, 0);
+                cnt++;
+            } else {
+                if (!K8sMetadata::GetInstance().Enable()) {
+                    continue;
+                }
+
+                for (const auto& containerId : workloadConfig.containerIds) {
+                    // generate for k8s ---- POD Level
                     auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
                     if (podMeta == nullptr) {
-                        LOG_DEBUG(sLogger, ("failed to fetch containerId", containerId));
+                        LOG_DEBUG(sLogger, ("[AgentInfo] failed to fetch containerId", containerId));
                         continue;
                     }
 
@@ -1721,26 +1744,6 @@ void NetworkObserverManager::ReportAgentInfo() {
                     event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
                     event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
                     event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
-                    event->SetTimestamp(now, 0);
-                    cnt++;
-                } else {
-                    // generate for other ...
-                    // Instance Level
-                    auto* event = eventGroup.AddLogEvent();
-                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
-                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
-                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-                    if (Connection::gSelfPodIp.empty()) {
-                        event->SetContent(kAgentInfoHostnameKey, GetHostIp());
-                    } else {
-                        event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
-                    }
-
-                    if (Connection::gSelfPodName.empty()) {
-                        event->SetContent(kAgentInfoHostnameKey, GetHostName());
-                    } else {
-                        event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
-                    }
                     event->SetTimestamp(now, 0);
                     cnt++;
                 }
@@ -1756,7 +1759,7 @@ void NetworkObserverManager::ReportAgentInfo() {
         }
     }
 
-    LOG_DEBUG(sLogger, ("ReportAgentInfo count:", cnt));
+    LOG_DEBUG(sLogger, ("[AgentInfo] ReportAgentInfo count:", cnt));
 }
 
 int NetworkObserverManager::HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& commonEvent) {
