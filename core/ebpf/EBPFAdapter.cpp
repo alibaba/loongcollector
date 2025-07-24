@@ -346,6 +346,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
+    mRunning[int(pluginType)] = true;
     return true;
 #else
     auto startF = (start_plugin_func)f;
@@ -432,6 +433,7 @@ bool EBPFAdapter::StopPlugin(PluginType pluginType) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
+    mRunning[int(pluginType)] = false;
     return true;
 #else
     auto stopF = (stop_plugin_func)f;
@@ -477,7 +479,7 @@ std::vector<int> EBPFAdapter::GetPerfBufferEpollFds(PluginType pluginType) {
         return {};
     }
 #ifdef APSARA_UNIT_TEST_MAIN
-    return {};
+    return {0, 1, 2};
 #else
     auto getEpollFdsFunc = (get_plugin_pb_epoll_fds_func)f;
     return getEpollFdsFunc(pluginType);

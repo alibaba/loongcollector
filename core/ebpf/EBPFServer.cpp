@@ -363,7 +363,9 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
     pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-    registerPluginPerfBuffers(type);
+    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+        registerPluginPerfBuffers(type);
+    }
     return true;
 }
 
@@ -682,7 +684,9 @@ void EBPFServer::registerPluginPerfBuffers(PluginType type) {
                 LOG_DEBUG(sLogger,
                           ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
-                LOG_ERROR(sLogger, ("Failed to register perf buffer epoll fd", epollFd)("error", strerror(errno)));
+                LOG_ERROR(sLogger,
+                          ("Failed to register perf buffer epoll fd",
+                           epollFd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
             }
         }
     }
