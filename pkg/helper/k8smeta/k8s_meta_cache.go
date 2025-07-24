@@ -75,7 +75,8 @@ func (m *k8sMetaCache) GetMetaStoreFailCount() int64 {
 	return m.metaStore.GetMetaStoreFailCount()
 }
 func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
-	return m.informerWatchFailCount
+	value := atomic.LoadInt64(&m.informerWatchFailCount)
+	return value
 }
 func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
 	atomic.AddInt64(&m.informerWatchFailCount, 1)
