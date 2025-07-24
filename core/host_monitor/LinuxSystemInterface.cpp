@@ -327,7 +327,7 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
     // ipv6
     std::vector<std::string> netInet6Lines = {};
     std::string errorMessage;
-    if (std::filesystem::exists(PROCESS_DIR / PROCESS_NET_IF_INET6)) {
+    if (CheckExistance(PROCESS_DIR / PROCESS_NET_IF_INET6)) {
         int ret = GetFileLines(PROCESS_DIR / PROCESS_NET_IF_INET6, netInet6Lines, true, &errorMessage);
         if (ret != 0 || netInet6Lines.empty()) {
             // Failure should not be returned without "/proc/net/if_inet6"
