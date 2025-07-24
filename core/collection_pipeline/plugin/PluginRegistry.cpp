@@ -17,11 +17,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if !defined(_MSC_VER)
-#include <dirent.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#endif
 
 #include <string>
 
