@@ -86,19 +86,20 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        
+
         // Check if input type has changed to determine stop behavior
         bool shouldCompletelyStop = false;
         if (!config.mInputs.empty()) {
             string newInputType = (*config.mInputs[0])["Type"].asString();
             string oldInputType = iter->second->GetConfig()["inputs"][0]["Type"].asString();
             if (newInputType != oldInputType) {
-                LOG_INFO(sLogger, ("input type changed, completely stopping old pipeline", "")
-                        ("old_type", oldInputType)("new_type", newInputType)("config", config.mName));
+                LOG_INFO(sLogger,
+                         ("input type changed, completely stopping old pipeline",
+                          "")("old_type", oldInputType)("new_type", newInputType)("config", config.mName));
                 shouldCompletelyStop = true;
             }
         }
-        
+
         iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
