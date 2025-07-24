@@ -64,7 +64,7 @@ func (m *metaCollector) Start() error {
 		k8smeta.POD_CONTAINER:            m.processPodContainerLink,
 		k8smeta.INGRESS_SERVICE:          m.processIngressServiceLink,
 
-		// add namesapce to xx link processor
+		// add namespace to xx link processor
 		k8smeta.POD_NAMESPACE:                   m.processPodNamespaceLink,
 		k8smeta.SERVICE_NAMESPACE:               m.processServiceNamespaceLink,
 		k8smeta.DEPLOYMENT_NAMESPACE:            m.processDeploymentNamespaceLink,

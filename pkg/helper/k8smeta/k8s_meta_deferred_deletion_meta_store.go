@@ -171,6 +171,7 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 
 		m.eventCh <- event
 		ticker := time.NewTicker(time.Duration(interval) * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:

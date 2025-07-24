@@ -174,9 +174,15 @@ func (m *metaCollector) processServiceEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("cluster_ip", obj.Spec.ClusterIP)
 		ports := make([]map[string]string, 0)
 		for _, port := range obj.Spec.Ports {
+			targetPort := ""
+			if port.TargetPort.Type == 0 { // IntOrString type, 0 means int
+				targetPort = strconv.FormatInt(int64(port.TargetPort.IntVal), 10)
+			} else {
+				targetPort = port.TargetPort.StrVal
+			}
 			portInfo := map[string]string{
 				"port":       strconv.FormatInt(int64(port.Port), 10),
-				"targetPort": strconv.FormatInt(int64(port.TargetPort.IntVal), 10),
+				"targetPort": targetPort,
 				"protocol":   string(port.Protocol),
 			}
 			ports = append(ports, portInfo)
