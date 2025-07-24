@@ -602,7 +602,6 @@ func (g *LinkGenerator) getPodNamespaceLink(podList []*K8sMetaEvent) []*K8sMetaE
 }
 
 func (g *LinkGenerator) ifNotStandAlonePod(pod *v1.Pod) bool {
-
 	return len(pod.OwnerReferences) != 0
 }
 
