@@ -84,6 +84,11 @@ protected:
     void TestAddCache();
     void TestRefCount();
     void TestClearExpiredCache();
+    void TestForceShrink();
+    void TestPrintDebugInfo();
+    void TestCacheSize();
+    void TestCacheContains();
+    void TestClearCache();
 
 private:
     ProcParser mProcParser;
@@ -171,8 +176,118 @@ void ProcessCacheUnittest::TestClearExpiredCache() {
     APSARA_TEST_EQUAL(ProcessCacheValue::LifeStage::kDeleted, cacheValue->LifeStage());
 }
 
+void ProcessCacheUnittest::TestForceShrink() {
+    for (int i = 0; i < 5; i++) {
+        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        auto cacheValue = std::make_shared<ProcessCacheValue>();
+        cacheValue->SetContent<kProcessId>(StringView("1234"));
+        cacheValue->SetContent<kKtime>(StringView("5678"));
+        cacheValue->SetContent<kUid>(StringView("1000"));
+        cacheValue->SetContent<kBinary>(StringView("test_binary"));
+        mProcessCache.AddCache(key, cacheValue);
+    }
+
+    // mLastForceShrinkTimeSec is 0
+    APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
+    mProcessCache.ForceShrink();
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
+
+    // interval within 2min
+    for (int i = 0; i < 5; i++) {
+        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        auto cacheValue = std::make_shared<ProcessCacheValue>();
+        cacheValue->SetContent<kProcessId>(StringView("1234"));
+        cacheValue->SetContent<kKtime>(StringView("5678"));
+        cacheValue->SetContent<kUid>(StringView("1000"));
+        cacheValue->SetContent<kBinary>(StringView("test_binary"));
+        mProcessCache.AddCache(key, cacheValue);
+    }
+    APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
+    mProcessCache.mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec() - 110;
+    mProcessCache.ForceShrink();
+    APSARA_TEST_EQUAL(5UL, mProcessCache.Size());
+
+    // interval exceeding 2 minutes
+    mProcessCache.mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec() - 130;
+    mProcessCache.ForceShrink();
+
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
+}
+
+void ProcessCacheUnittest::TestPrintDebugInfo() {
+    data_event_id key{12345, 1234567890};
+    auto cacheValue = std::make_shared<ProcessCacheValue>();
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    cacheValue->SetContent<kKtime>(StringView("5678"));
+    cacheValue->SetContent<kUid>(StringView("1000"));
+    cacheValue->SetContent<kBinary>(StringView("test_binary"));
+    mProcessCache.AddCache(key, cacheValue);
+
+    cacheValue = std::make_shared<ProcessCacheValue>();
+    cacheValue->SetContent<kProcessId>(StringView("4321"));
+    cacheValue->SetContent<kKtime>(StringView("8765"));
+    cacheValue->SetContent<kUid>(StringView("1001"));
+    cacheValue->SetContent<kBinary>(StringView("dec_binary"));
+    mProcessCache.AddCache(key, cacheValue);
+    mProcessCache.DecRef(key, cacheValue);
+
+    mProcessCache.PrintDebugInfo();
+}
+
+void ProcessCacheUnittest::TestCacheSize() {
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
+
+    data_event_id key{12345, 1234567890};
+    auto cacheValue = std::make_shared<ProcessCacheValue>();
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    mProcessCache.AddCache(key, cacheValue);
+
+    APSARA_TEST_EQUAL(1UL, mProcessCache.Size());
+
+    data_event_id key2{12346, 1234567891};
+    auto cacheValue2 = std::make_shared<ProcessCacheValue>();
+    cacheValue2->SetContent<kProcessId>(StringView("1235"));
+    mProcessCache.AddCache(key2, cacheValue2);
+
+    APSARA_TEST_EQUAL(2UL, mProcessCache.Size());
+}
+
+void ProcessCacheUnittest::TestCacheContains() {
+    data_event_id key{12345, 1234567890};
+    APSARA_TEST_FALSE(mProcessCache.Contains(key));
+
+    auto cacheValue = std::make_shared<ProcessCacheValue>();
+    cacheValue->SetContent<kProcessId>(StringView("1234"));
+    mProcessCache.AddCache(key, cacheValue);
+
+    APSARA_TEST_TRUE(mProcessCache.Contains(key));
+
+    data_event_id nonExistentKey{99999, 9999999999};
+    APSARA_TEST_FALSE(mProcessCache.Contains(nonExistentKey));
+}
+
+void ProcessCacheUnittest::TestClearCache() {
+    for (int i = 0; i < 3; i++) {
+        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        auto cacheValue = std::make_shared<ProcessCacheValue>();
+        cacheValue->SetContent<kProcessId>(StringView("1234"));
+        mProcessCache.AddCache(key, cacheValue);
+    }
+
+    APSARA_TEST_EQUAL(3UL, mProcessCache.Size());
+
+    mProcessCache.Clear();
+
+    APSARA_TEST_EQUAL(0UL, mProcessCache.Size());
+}
+
 UNIT_TEST_CASE(ProcessCacheUnittest, TestAddCache);
 UNIT_TEST_CASE(ProcessCacheUnittest, TestRefCount);
 UNIT_TEST_CASE(ProcessCacheUnittest, TestClearExpiredCache);
+UNIT_TEST_CASE(ProcessCacheUnittest, TestForceShrink);
+UNIT_TEST_CASE(ProcessCacheUnittest, TestPrintDebugInfo);
+UNIT_TEST_CASE(ProcessCacheUnittest, TestCacheSize);
+UNIT_TEST_CASE(ProcessCacheUnittest, TestCacheContains);
+UNIT_TEST_CASE(ProcessCacheUnittest, TestClearCache);
 
 UNIT_TEST_MAIN

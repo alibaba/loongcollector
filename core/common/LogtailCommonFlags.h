@@ -56,3 +56,7 @@ DECLARE_FLAG_STRING(logs_dir);
 DECLARE_FLAG_STRING(data_dir);
 DECLARE_FLAG_STRING(run_dir);
 DECLARE_FLAG_STRING(third_party_dir);
+
+// ebpf event retry flags
+DECLARE_FLAG_INT32(ebpf_event_retry_interval_sec);
+DECLARE_FLAG_INT32(ebpf_event_retry_limit);

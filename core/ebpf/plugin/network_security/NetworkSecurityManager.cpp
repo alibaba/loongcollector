@@ -245,8 +245,6 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
         return -1;
     }
 
-    mInited = true;
-
     std::shared_ptr<ScheduleConfig> scheduleConfig
         = std::make_shared<ScheduleConfig>(PluginType::NETWORK_SECURITY, std::chrono::seconds(2));
     ScheduleNext(std::chrono::steady_clock::now(), scheduleConfig);
@@ -264,7 +262,15 @@ int NetworkSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNe
             [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
     pc->mConfig = std::move(config);
 
-    return mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc)) ? 0 : 1;
+    auto res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
+    LOG_INFO(sLogger, ("start network probe, status", res));
+    if (!res) {
+        LOG_WARNING(sLogger, ("failed to start file probe", ""));
+        return 1;
+    }
+
+    mInited = true;
+    return 0;
 }
 
 int NetworkSecurityManager::Destroy() {
