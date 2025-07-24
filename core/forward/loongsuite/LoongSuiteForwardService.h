@@ -103,7 +103,7 @@ private:
 
     RetryTimeController mRetryTimeController;
 
-    void AddToIndex(const std::string& configName, ForwardConfig&& config);
+    bool AddToIndex(const std::string& configName, ForwardConfig&& config, std::string& errorMsg);
     void RemoveFromIndex(const std::string& configName);
     bool FindMatchingConfig(grpc::CallbackServerContext* context, ForwardConfig& config) const;
     void ProcessForwardRequest(const LoongSuiteForwardRequest* request,
@@ -111,7 +111,8 @@ private:
                                int32_t retryTimes,
                                grpc::Status& status);
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class GrpcRunnerUnittest;
+    friend class GrpcInputManagerUnittest;
+    friend class LoongSuiteForwardServiceUnittest;
 #endif
 };
 

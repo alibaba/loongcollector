@@ -119,7 +119,7 @@ private:
     std::unordered_map<std::string, GrpcListenInput> mListenAddressToInputMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class GrpcRunnerUnittest;
+    friend class GrpcInputManagerUnittest;
 #endif
 };
 

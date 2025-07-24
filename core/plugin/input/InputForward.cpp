@@ -72,27 +72,36 @@ bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     const char* key = "MatchRule";
     const Json::Value* itr = config.find(key, key + strlen(key));
     if (itr && itr->isObject()) {
-        if (!GetOptionalStringParam(*itr, "Key", mMatchRule.key, errorMsg)) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
+        if (!GetMandatoryStringParam(*itr, "Key", mMatchRule.key, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
 
-        if (!GetOptionalStringParam(*itr, "Value", mMatchRule.value, errorMsg)) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
+        if (!GetMandatoryStringParam(*itr, "Value", mMatchRule.value, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
+    } else {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "Param MatchRule is required",
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
     }
 
     mConfigName = mContext->GetConfigName();

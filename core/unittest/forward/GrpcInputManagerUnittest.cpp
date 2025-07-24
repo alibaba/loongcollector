@@ -30,7 +30,7 @@ DECLARE_FLAG_INT32(grpc_server_stop_timeout);
 
 namespace logtail {
 
-class GrpcRunnerUnittest : public ::testing::Test {
+class GrpcInputManagerUnittest : public ::testing::Test {
 public:
     void TestUpdateListenInputNewAddressSuccess() const;
     void TestUpdateListenInputExistingAddressSameTypeUpdateConfig() const;
@@ -48,7 +48,7 @@ protected:
     void SetUp() override { GrpcInputManager::GetInstance()->Stop(); }
 };
 
-void GrpcRunnerUnittest::TestUpdateListenInputNewAddressSuccess() const {
+void GrpcInputManagerUnittest::TestUpdateListenInputNewAddressSuccess() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -67,7 +67,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputNewAddressSuccess() const {
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfig() const {
+void GrpcInputManagerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfig() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -89,7 +89,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdateConfi
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError() const {
+void GrpcInputManagerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError() const {
     MockServiceImpl mockService;
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
@@ -111,7 +111,7 @@ void GrpcRunnerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError(
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestRemoveListenInputNormalRemove() const {
+void GrpcInputManagerUnittest::TestRemoveListenInputNormalRemove() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -124,7 +124,7 @@ void GrpcRunnerUnittest::TestRemoveListenInputNormalRemove() const {
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestRemoveListenInputAddressNotFoundError() const {
+void GrpcInputManagerUnittest::TestRemoveListenInputAddressNotFoundError() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     const std::string address = "0.0.0.0:50055";
@@ -134,7 +134,7 @@ void GrpcRunnerUnittest::TestRemoveListenInputAddressNotFoundError() const {
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestRemoveListenInputAddressWithMultipleConfigs() const {
+void GrpcInputManagerUnittest::TestRemoveListenInputAddressWithMultipleConfigs() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -163,14 +163,14 @@ void GrpcRunnerUnittest::TestRemoveListenInputAddressWithMultipleConfigs() const
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestHasRegisteredPluginsEmpty() const {
+void GrpcInputManagerUnittest::TestHasRegisteredPluginsEmpty() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestHasRegisteredPluginsNotEmpty() const {
+void GrpcInputManagerUnittest::TestHasRegisteredPluginsNotEmpty() const {
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -180,7 +180,7 @@ void GrpcRunnerUnittest::TestHasRegisteredPluginsNotEmpty() const {
     runner->Stop();
 }
 
-void GrpcRunnerUnittest::TestShutdownGrpcServer() const {
+void GrpcInputManagerUnittest::TestShutdownGrpcServer() const {
     INT32_FLAG(grpc_server_stop_timeout) = 1;
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
@@ -204,15 +204,15 @@ void GrpcRunnerUnittest::TestShutdownGrpcServer() const {
     runner->Stop();
 }
 
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestUpdateListenInputNewAddressSuccess);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestUpdateListenInputExistingAddressSameTypeUpdateConfig);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestUpdateListenInputExistingAddressDifferentTypeError);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputNormalRemove);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputAddressNotFoundError);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestRemoveListenInputAddressWithMultipleConfigs);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestHasRegisteredPluginsEmpty);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestHasRegisteredPluginsNotEmpty);
-UNIT_TEST_CASE(GrpcRunnerUnittest, TestShutdownGrpcServer);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestUpdateListenInputNewAddressSuccess);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestUpdateListenInputExistingAddressSameTypeUpdateConfig);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestUpdateListenInputExistingAddressDifferentTypeError);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestRemoveListenInputNormalRemove);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestRemoveListenInputAddressNotFoundError);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestRemoveListenInputAddressWithMultipleConfigs);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestHasRegisteredPluginsEmpty);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestHasRegisteredPluginsNotEmpty);
+UNIT_TEST_CASE(GrpcInputManagerUnittest, TestShutdownGrpcServer);
 
 } // namespace logtail
 
