@@ -345,15 +345,15 @@ public:
         return 0;
     }
 
-    void DeletePerfBuffer(void* pb) { perf_buffer__free((struct perf_buffer*)pb); }
+    void DeletePerfBuffer(void* pb) { perf_buffer__free(static_cast<struct perf_buffer*>(pb)); }
 
     int PollPerfBuffer(void* pb, int /*maxEvents*/, int timeoutMs) {
-        return perf_buffer__poll((struct perf_buffer*)pb, timeoutMs);
+        return perf_buffer__poll(static_cast<struct perf_buffer*>(pb), timeoutMs);
     }
 
-    int ConsumePerfBuffer(void* pb) { return perf_buffer__consume((struct perf_buffer*)pb); }
+    int ConsumePerfBuffer(void* pb) { return perf_buffer__consume(static_cast<struct perf_buffer*>(pb)); }
 
-    int GetPerfBufferEpollFd(void* pb) { return perf_buffer__epoll_fd((struct perf_buffer*)pb); }
+    int GetPerfBufferEpollFd(void* pb) { return perf_buffer__epoll_fd(static_cast<struct perf_buffer*>(pb)); }
 
     void* CreatePerfBuffer(
         const std::string& name, int pageCnt, void* ctx, perf_buffer_sample_fn dataCb, perf_buffer_lost_fn lossCb) {
