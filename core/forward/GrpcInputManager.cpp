@@ -34,20 +34,15 @@
 #endif
 
 DEFINE_FLAG_INT32(grpc_server_stop_timeout, "grpc server stop timeout, second", 3);
+DEFINE_FLAG_INT32(grpc_server_forward_max_retry_times, "grpc server forward max retry times", 100);
 
 namespace logtail {
 
 void GrpcInputManager::Init() {
-    if (mIsStarted.exchange(true)) {
-        return;
-    }
     LOG_INFO(sLogger, ("GrpcInputManager", "Start"));
 }
 
 void GrpcInputManager::Stop() {
-    if (!mIsStarted.exchange(false)) {
-        return;
-    }
     {
         std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
         for (auto& it : mListenAddressToInputMap) {
@@ -118,6 +113,7 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
         builder.AddListeningPort(address, grpc::InsecureServerCredentials());
         // TODO: multi-service server is complex and lacks isolation, only support one service per server for now
         builder.RegisterService(service.get());
+        LOG_ERROR(sLogger, ("service", service->Name()));
         auto server = builder.BuildAndStart();
         if (!server) {
             LOG_ERROR(sLogger,

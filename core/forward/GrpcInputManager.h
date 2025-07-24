@@ -24,6 +24,7 @@
 
 #include "json/value.h"
 
+#include "Logger.h"
 #include "forward/BaseService.h"
 #include "grpcpp/server.h"
 #include "grpcpp/support/interceptor.h"
@@ -116,8 +117,6 @@ private:
 
     mutable std::mutex mListenAddressToInputMapMutex;
     std::unordered_map<std::string, GrpcListenInput> mListenAddressToInputMap;
-
-    std::atomic_bool mIsStarted = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class GrpcRunnerUnittest;

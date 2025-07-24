@@ -33,6 +33,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputForward.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
@@ -155,6 +156,7 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     RegisterInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputForward>());
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
