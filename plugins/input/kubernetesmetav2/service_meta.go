@@ -46,7 +46,7 @@ type ServiceK8sMeta struct {
 	Pod2PersistentVolumeClaim string
 	Pod2ConfigMap             string
 
-	// add link for namesapce
+	// add link for namespace
 	Namespace2Pod                   string
 	Namespace2Service               string
 	Namespace2Deployment            string
