@@ -41,10 +41,9 @@ type DeferredDeletionMetaStore struct {
 	lock  sync.RWMutex
 
 	// timer
-	gracePeriod          int64
-	registerLock         sync.RWMutex
-	sendFuncs            map[string]*SendFuncWithStopCh
-	metaStoreFailCounter int64
+	gracePeriod  int64
+	registerLock sync.RWMutex
+	sendFuncs    map[string]*SendFuncWithStopCh
 }
 
 type TimerEvent struct {
@@ -68,9 +67,8 @@ func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan stru
 		Items: make(map[string]*ObjectWrapper),
 		Index: make(map[string]IndexItem),
 
-		gracePeriod:          gracePeriod,
-		sendFuncs:            make(map[string]*SendFuncWithStopCh),
-		metaStoreFailCounter: 0,
+		gracePeriod: gracePeriod,
+		sendFuncs:   make(map[string]*SendFuncWithStopCh),
 	}
 	return m
 }

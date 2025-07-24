@@ -59,21 +59,9 @@ func (m *metaCollector) generateInfraServerKeyID(nodeObj *v1.Node) string {
 
 	// (3) replace server_id by provider_id
 	if nodeObj.Spec.ProviderID != "" {
-		// if node belong to azure, aws, gce, return providerID as infra.server id
-		if strings.HasPrefix(nodeObj.Spec.ProviderID, "azure") || strings.HasPrefix(nodeObj.Spec.ProviderID, "aws") || strings.HasPrefix(nodeObj.Spec.ProviderID, "gce") {
-			serverID = nodeObj.Spec.ProviderID
-		}
+		serverID = nodeObj.Spec.ProviderID
 	}
 
-	// (3) if node status has host name filed, using hostname instead
-	if nodeObj.Status.Addresses != nil && len(nodeObj.Status.Addresses) > 0 {
-		for _, addr := range nodeObj.Status.Addresses {
-			if addr.Type == v1.NodeHostName {
-				serverID = addr.Address
-				break
-			}
-		}
-	}
 	// (4) Ensure the value not empty
 	return serverID
 }

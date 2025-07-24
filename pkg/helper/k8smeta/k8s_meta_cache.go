@@ -32,8 +32,6 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
-
-	informerWatchFailCount int64
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -43,7 +41,6 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.stopCh = stopCh
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
-	m.informerWatchFailCount = 0
 	m.schema = runtime.NewScheme()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
