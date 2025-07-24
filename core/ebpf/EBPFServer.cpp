@@ -496,7 +496,7 @@ void EBPFServer::handleEventCache() {
 }
 
 void EBPFServer::handleEpollEvents() {
-    if (mUnifiedEpollFd < 0 || mEpollFdToPluginType.empty()) {
+    if (mUnifiedEpollFd < 0) {
         return;
     }
 
@@ -512,12 +512,16 @@ void EBPFServer::handleEpollEvents() {
 
     for (int i = 0; i < numEvents; ++i) {
         const auto activeFd = mEpollEvents[i].data.fd;
+
+        std::shared_lock<std::shared_mutex> epollMapLock(mEpollFdMutex);
         const auto it = mEpollFdToPluginType.find(activeFd);
         if (it == mEpollFdToPluginType.end()) {
+            epollMapLock.unlock();
             continue;
         }
-
         const PluginType type = it->second;
+        epollMapLock.unlock();
+
         if (type == PluginType::PROCESS_SECURITY) {
             mProcessCacheManager->ConsumePerfBufferData();
             continue;
@@ -527,7 +531,6 @@ void EBPFServer::handleEpollEvents() {
         if (!pluginState.mValid.load(std::memory_order_acquire)) {
             continue;
         }
-
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         if (pluginState.mManager) {
             const int cnt = pluginState.mManager->ConsumePerfBufferData();
@@ -666,12 +669,16 @@ void EBPFServer::registerPluginPerfBuffers(PluginType type) {
 
     for (int epollFd : epollFds) {
         if (epollFd >= 0) {
-            struct epoll_event event;
+            struct epoll_event event {};
             event.events = EPOLLIN;
             event.data.fd = epollFd;
 
             if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event) == 0) {
-                mEpollFdToPluginType[epollFd] = type;
+                {
+                    std::unique_lock<std::shared_mutex> lock(mEpollFdMutex);
+                    mEpollFdToPluginType[epollFd] = type;
+                }
+
                 LOG_DEBUG(sLogger,
                           ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
@@ -685,6 +692,8 @@ void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
     if (mUnifiedEpollFd < 0) {
         return;
     }
+
+    std::unique_lock<std::shared_mutex> lock(mEpollFdMutex);
 
     auto it = mEpollFdToPluginType.begin();
     while (it != mEpollFdToPluginType.end()) {
@@ -705,7 +714,12 @@ void EBPFServer::cleanupUnifiedEpollMonitoring() {
         close(mUnifiedEpollFd);
         mUnifiedEpollFd = -1;
     }
-    mEpollFdToPluginType.clear();
+
+    {
+        std::unique_lock<std::shared_mutex> lock(mEpollFdMutex);
+        mEpollFdToPluginType.clear();
+    }
+
     mEpollEvents.clear();
     LOG_INFO(sLogger, ("Unified epoll monitoring cleaned up", ""));
 }

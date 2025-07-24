@@ -159,7 +159,8 @@ private:
     FrequencyManager mFrequencyMgr;
 
     int mUnifiedEpollFd = -1;
-    std::map<int, PluginType> mEpollFdToPluginType;
+    std::map<int, PluginType> mEpollFdToPluginType; // fd -> plugin type mapping
+    mutable std::shared_mutex mEpollFdMutex;
     std::vector<struct epoll_event> mEpollEvents;
 
     RetryableEventCache mRetryableEventCache;
