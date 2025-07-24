@@ -14,6 +14,7 @@
 
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/SystemInterface.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "models/MetricEvent.h"
 #include "unittest/Unittest.h"
@@ -23,7 +24,13 @@ using namespace std;
 namespace logtail {
 class CPUCollectorUnittest : public testing::Test {
 public:
-    void TestCollect() const;
+    void TestCollectNormal() const;
+    void TestCpuValue0() const;
+    void TestjiffiesDeltaNegative() const;
+    void TestCpuCount0() const;
+    void TestGetCPUInformation() const;
+    void TestGetCPUInformationInterface() const;
+    void TestGroupNull() const;
 
 protected:
     void SetUp() override {
@@ -37,7 +44,7 @@ protected:
     }
 };
 
-void CPUCollectorUnittest::TestCollect() const {
+void CPUCollectorUnittest::TestCollectNormal() const {
     auto collector = CPUCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
     HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
@@ -110,7 +117,111 @@ void CPUCollectorUnittest::TestCollect() const {
     }
 }
 
-UNIT_TEST_CASE(CPUCollectorUnittest, TestCollect);
+void CPUCollectorUnittest::TestCpuValue0() const {
+    auto collector = CPUCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    ofstream ofs("./stat", std::ios::trunc);
+    ofs << "cpu  0 0 0 0 0 0 0 0 0 0 \n";
+    ofs << "cpu0 0 0 0 0 0 0 0 0 0 0 \n";
+    ofs.close();
+
+    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectConfig, &group));
+}
+
+void CPUCollectorUnittest::TestjiffiesDeltaNegative() const {
+    auto collector = CPUCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    ofstream ofs("./stat", std::ios::trunc);
+    ofs << "cpu  2 2 2 2 2 2 2 2 2 2 \n";
+    ofs << "cpu0 2 2 2 2 2 2 2 2 2 2 \n";
+    ofs.close();
+    PROCESS_DIR = ".";
+    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
+    ofstream ofs1("./stat", std::ios::trunc);
+    ofs1 << "cpu 1 1 1 1 1 1 1 1 1 1\n";
+    ofs1 << "cpu0 1 1 1 1 1 1 1 1 1 1\n";
+
+    ofs1.close();
+    PROCESS_DIR = ".";
+
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectConfig, &group));
+}
+
+void CPUCollectorUnittest::TestCpuCount0() const {
+    CPUInformation cpuInfo;
+    auto collector = CPUCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    ofstream ofs2("./stat", std::ios::trunc);
+    ofs2 << "cpu  0 0 0 0 0 0 0 0 0 0\n";
+    ofs2.close();
+    PROCESS_DIR = ".";
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
+
+    APSARA_TEST_TRUE(SystemInterface::GetInstance()->GetCPUInformation(cpuInfo));
+
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectConfig, &group));
+}
+
+void CPUCollectorUnittest::TestGetCPUInformation() const {
+    auto collector = CPUCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    ofstream ofs3("./stat", std::ios::trunc);
+    ofs3 << "cpua a b c \n";
+    ofs3.close();
+    PROCESS_DIR = ".";
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectConfig, &group));
+}
+
+void CPUCollectorUnittest::TestGetCPUInformationInterface() const {
+    CPUInformation cpuInfo;
+    auto collector = CPUCollector();
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    ofstream ofs4("./stat", std::ios::trunc);
+    ofs4 << "";
+    ofs4.close();
+    PROCESS_DIR = ".";
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)}); // wait system interface cache stale
+
+    APSARA_TEST_FALSE_FATAL(SystemInterface::GetInstance()->GetCPUInformation(cpuInfo));
+}
+
+void CPUCollectorUnittest::TestGroupNull() const {
+    auto collector = CPUCollector();
+    PipelineEventGroup* group = nullptr;
+
+    HostMonitorTimerEvent::CollectConfig collectConfig(CPUCollector::sName, 0, 0, std::chrono::seconds(1));
+
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectConfig, group));
+}
+
+UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectNormal);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestCpuValue0);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestjiffiesDeltaNegative);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestCpuCount0);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestGetCPUInformation);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestGetCPUInformationInterface);
+UNIT_TEST_CASE(CPUCollectorUnittest, TestGroupNull);
 
 } // namespace logtail
 

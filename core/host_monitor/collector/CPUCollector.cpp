@@ -35,6 +35,7 @@ int CPUCollector::Init(int totalCount) {
 }
 bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
     if (group == nullptr) {
+        LOG_ERROR(sLogger, ("PipelineEventGroup got nullptr", "skip"));
         return false;
     }
     CPUInformation cpuInfo;
@@ -42,6 +43,12 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     if (!SystemInterface::GetInstance()->GetCPUInformation(cpuInfo)) {
         return false;
     }
+
+    if (cpuInfo.stats.size() <= 1) {
+        LOG_ERROR(sLogger, ("cpu count is negative", cpuInfo.stats.size()));
+        return false;
+    }
+
     const time_t now = time(nullptr);
 
     for (const auto& cpu : cpuInfo.stats) {
@@ -119,7 +126,7 @@ bool CPUCollector::CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& currentC
     jiffiesDelta = currentJiffies - lastJiffies;
 
     if (jiffiesDelta <= 0) {
-        LOG_DEBUG(sLogger, ("jiffies delta is negative", "skip"));
+        LOG_ERROR(sLogger, ("jiffies delta is negative", "skip"));
         return false;
     }
 

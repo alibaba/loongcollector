@@ -99,6 +99,7 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
     std::vector<std::string> cpuLines;
     std::string errorMessage;
     if (!GetHostSystemStat(cpuLines, errorMessage)) {
+        LOG_ERROR(sLogger, ("failed to get CPU information", errorMessage));
         return false;
     }
     // cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0

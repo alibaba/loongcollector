@@ -66,8 +66,6 @@ public:
     const std::string& Name() const override { return sName; }
 
 private:
-    bool GetHostSystemCPUStat(std::vector<CPUStat>& cpus);
-    double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const;
     bool CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& cpu);
 
 private:
