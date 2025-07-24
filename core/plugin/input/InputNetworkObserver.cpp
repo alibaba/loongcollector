@@ -57,7 +57,6 @@ bool InputNetworkObserver::Start() {
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
-        // TODO @qianlu.kk
         ebpf::EBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(),
                                                        logtail::ebpf::PluginType::NETWORK_OBSERVE);
         return true;

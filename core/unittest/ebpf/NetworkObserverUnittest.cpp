@@ -35,7 +35,6 @@ class NetworkObserverManagerUnittest : public ::testing::Test {
 public:
     void TestInitialization();
     void TestEventHandling();
-    void TestDataEventProcessing();
     void TestWhitelistManagement();
     void TestPerfBufferOperations();
     void TestRecordProcessing();
@@ -235,57 +234,6 @@ conn_stats_event_t CreateConnStatsEvent() {
         = "/machine.slice/libpod-80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106.scope";
     memcpy(statsEvent.docker_id, testCid.c_str(), testCid.size());
     return statsEvent;
-}
-
-void NetworkObserverManagerUnittest::TestDataEventProcessing() {
-    // auto mManager = CreateManager();
-    // ObserverNetworkOption options;
-    // mManager->Init();
-    // mManager->Destroy();
-
-    // auto statsEvent = CreateConnStatsEvent();
-    // mManager->AcceptNetStatsEvent(&statsEvent);
-
-    // auto* dataEvent = CreateHttpDataEvent();
-    // // TODO @qianlu.kk
-    // mManager->AcceptDataEvent(dataEvent);
-    // free(dataEvent);
-
-    // std::vector<std::shared_ptr<AbstractRecord>> items(10, nullptr);
-    // size_t count = mManager->mRollbackQueue.wait_dequeue_bulk_timed(items.data(), 1024,
-    // std::chrono::milliseconds(200)); APSARA_TEST_EQUAL(count, 1UL); APSARA_TEST_TRUE(items[0] != nullptr);
-
-    // AbstractAppRecord* record = static_cast<AbstractAppRecord*>(items[0].get());
-    // APSARA_TEST_TRUE(record != nullptr);
-    // auto conn = record->GetConnection();
-    // APSARA_TEST_TRUE(conn != nullptr);
-
-    // APSARA_TEST_TRUE(mManager->mConnectionManager->getConnection(conn->GetConnId()) != nullptr);
-
-    // // destroy connection
-    // conn->MarkClose();
-    // for (size_t i = 0; i < 12; i++) {
-    //     mManager->mConnectionManager->Iterations();
-    // }
-
-    // // connection that record holds still available
-    // APSARA_TEST_TRUE(mManager->mConnectionManager->getConnection(conn->GetConnId()) == nullptr);
-
-    // // verify attributes
-    // HttpRecord* httpRecord = static_cast<HttpRecord*>(record);
-    // // http attrs
-    // APSARA_TEST_EQUAL(httpRecord->GetPath(), "/index.html");
-    // APSARA_TEST_EQUAL(httpRecord->GetSpanName(), "/index.html");
-    // APSARA_TEST_EQUAL(httpRecord->GetStatusCode(), 200);
-    // APSARA_TEST_EQUAL(httpRecord->GetStartTimeStamp(), 1UL);
-    // APSARA_TEST_EQUAL(httpRecord->GetEndTimeStamp(), 2UL);
-
-    // auto& attrs = httpRecord->GetConnection()->GetConnTrackerAttrs();
-    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kLocalAddr.Name())], "127.0.0.1:8080");
-    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRemoteAddr.Name())], "192.168.1.1:80");
-    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kRpcType.Name())], "25");
-    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallKind.Name())], "http_client");
-    // APSARA_TEST_EQUAL(attrs[kConnTrackerTable.ColIndex(kCallType.Name())], "http_client");
 }
 
 void NetworkObserverManagerUnittest::TestWhitelistManagement() {
@@ -799,7 +747,6 @@ void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {
 
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
-UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestDataEventProcessing);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestPerfBufferOperations);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestRecordProcessing);

@@ -23,7 +23,7 @@
 |  ProbeConfig.L7Config.SampleRate  |  float  |  否  |  0.1  |  采样率  |
 |  ProbeConfig.L7Config.EnableMetric  |  bool  |  否  |  false  |  是否开启指标上报  |
 |  ProbeConfig.L7Config.EnableLog  |  bool  |  否  |  false  |  是否开启日志上报  |
-|  ProbeConfig.L7Config.EnableSpan  |  bool  |  否  |  false  |  是否开启日志上报  |
+|  ProbeConfig.L7Config.EnableSpan  |  bool  |  否  |  false  |  是否开启链路追踪上报  |
 |  ProbeConfig.L4Config  |  object  |  是  |  /  |  Layer4 配置  |
 |  ProbeConfig.L4Config.Enable  |  bool  |  否  |  false  |  是否开启  |
 |  ProbeConfig.ApmConfig  |  object  |  是  |  /  |  应用相关配置  |
