@@ -356,7 +356,7 @@ func (m *metaCollector) sendInBackground() {
 	lastSendClusterTime := time.Now()
 
 	// send cluster entity as soon as k8s meta collector started
-	m.sendClusterEntity(m.collector)
+	m.sendClusterEntity()
 
 	for {
 		select {
@@ -386,15 +386,15 @@ func (m *metaCollector) sendInBackground() {
 		}
 		if time.Since(lastSendClusterTime) > time.Duration(m.serviceK8sMeta.Interval)*time.Second {
 			// send cluster entity
-			m.sendClusterEntity(m.collector)
+			m.sendClusterEntity()
 			lastSendClusterTime = time.Now()
 		}
 	}
 }
 
-func (m *metaCollector) sendClusterEntity(collector pipeline.Collector) {
+func (m *metaCollector) sendClusterEntity() {
 	clusterEntity := m.generateClusterEntity()
-	collector.AddRawLog(m.convertPipelineEvent2Log(clusterEntity))
+	m.collector.AddRawLog(m.convertPipelineEvent2Log(clusterEntity))
 }
 
 func (m *metaCollector) genKey(kind, namespace, name string) string {
