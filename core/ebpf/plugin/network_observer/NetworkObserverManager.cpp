@@ -1635,7 +1635,7 @@ int NetworkObserverManager::SendEvents() {
         mLastSendMetricTimeMs = nowMs;
     }
 
-    if (nowMs - mLastSendAgentInfoTimeMs >= mSendMetricIntervalMs) {
+    if (nowMs - mLastSendAgentInfoTimeMs >= mSendAgentInfoIntervalMs) {
         LOG_DEBUG(sLogger, ("begin report agent info", "metric"));
         ReportAgentInfo();
         mLastSendAgentInfoTimeMs = nowMs;
@@ -1689,8 +1689,8 @@ void NetworkObserverManager::ReportAgentInfo() {
     const time_t now = time(nullptr);
     for (const auto& configToWorkload : mConfigToWorkloads) {
         const auto& workloadKeys = configToWorkload.second;
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
         for (const auto& workloadKey : workloadKeys) {
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
             PipelineEventGroup eventGroup(sourceBuffer);
             eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
             const auto& it = mWorkloadConfigs.find(workloadKey);
