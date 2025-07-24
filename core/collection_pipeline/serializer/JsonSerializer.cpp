@@ -17,6 +17,10 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "constants/SpanConstants.h"
+#include "models/MetricValue.h"
+#include "protobuf/sls/LogGroupSerializer.h"
+
 using namespace std;
 
 namespace logtail {
@@ -89,7 +93,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 writer.StartObject();
                 SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
                 // __labels__
-                writer.Key("__labels__");
+                writer.Key(METRIC_RESERVED_KEY_LABELS.c_str());
                 writer.StartObject();
                 for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
                     writer.Key(tag->first.to_string().c_str());
@@ -97,10 +101,10 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 writer.EndObject();
                 // __name__
-                writer.Key("__name__");
+                writer.Key(METRIC_RESERVED_KEY_NAME.c_str());
                 writer.String(e.GetName().to_string().c_str());
                 // __value__
-                writer.Key("__value__");
+                writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
                 if (e.Is<UntypedSingleValue>()) {
                     writer.Double(e.GetValue<UntypedSingleValue>()->mValue);
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
@@ -145,23 +149,23 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 writer.StartObject();
                 SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
 
-                writer.Key("trace_id");
+                writer.Key(DEFAULT_TRACE_TAG_TRACE_ID.data(), DEFAULT_TRACE_TAG_TRACE_ID.size());
                 writer.String(e.GetTraceId().data(), e.GetTraceId().size());
-                writer.Key("span_id");
+                writer.Key(DEFAULT_TRACE_TAG_SPAN_ID.data(), DEFAULT_TRACE_TAG_SPAN_ID.size());
                 writer.String(e.GetSpanId().data(), e.GetSpanId().size());
-                writer.Key("parent_span_id");
+                writer.Key(DEFAULT_TRACE_TAG_PARENT_ID.data(), DEFAULT_TRACE_TAG_PARENT_ID.size());
                 writer.String(e.GetParentSpanId().data(), e.GetParentSpanId().size());
-                writer.Key("name");
+                writer.Key(DEFAULT_TRACE_TAG_SPAN_NAME.data(), DEFAULT_TRACE_TAG_SPAN_NAME.size());
                 writer.String(e.GetName().data(), e.GetName().size());
 
-                writer.Key("start_time");
+                writer.Key(DEFAULT_TRACE_TAG_START_TIME_NANO.data(), DEFAULT_TRACE_TAG_START_TIME_NANO.size());
                 writer.Uint64(e.GetStartTimeNs());
-                writer.Key("end_time");
+                writer.Key(DEFAULT_TRACE_TAG_END_TIME_NANO.data(), DEFAULT_TRACE_TAG_END_TIME_NANO.size());
                 writer.Uint64(e.GetEndTimeNs());
-                writer.Key("duration");
+                writer.Key(DEFAULT_TRACE_TAG_DURATION.data(), DEFAULT_TRACE_TAG_DURATION.size());
                 writer.Uint64(e.GetEndTimeNs() - e.GetStartTimeNs());
 
-                writer.Key("__attributes__");
+                writer.Key(DEFAULT_TRACE_TAG_ATTRIBUTES.data(), DEFAULT_TRACE_TAG_ATTRIBUTES.size());
                 writer.StartObject();
                 for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
                     writer.Key(it->first.data(), it->first.size());
@@ -169,7 +173,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 }
                 writer.EndObject();
 
-                writer.Key("__scope__");
+                writer.Key(DEFAULT_TRACE_TAG_SCOPE.data(), DEFAULT_TRACE_TAG_SCOPE.size());
                 writer.StartObject();
                 for (auto it = e.ScopeTagsBegin(); it != e.ScopeTagsEnd(); ++it) {
                     writer.Key(it->first.data(), it->first.size());

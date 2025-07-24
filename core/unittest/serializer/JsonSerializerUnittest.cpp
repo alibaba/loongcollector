@@ -152,18 +152,18 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
                 = "{\"__machine_uuid__\":\"aaa\",\"__pack_id__\":\"bbb\",\"__source__\":\"source\",\"__topic__\":"
                   "\"topic\","
                   "\"__time__\":1234567890,"
-                  "\"trace_id\":\"trace-1-2-3-4-5\","
-                  "\"span_id\":\"span-1-2-3-4-5\","
-                  "\"parent_span_id\":\"parent-1-2-3-4-5\","
-                  "\"name\":\"/oneagent/qianlu/local/1\","
-                  "\"start_time\":1000,"
-                  "\"end_time\":2000,"
+                  "\"traceId\":\"trace-1-2-3-4-5\","
+                  "\"spanId\":\"span-1-2-3-4-5\","
+                  "\"parentSpanId\":\"parent-1-2-3-4-5\","
+                  "\"spanName\":\"/oneagent/qianlu/local/1\","
+                  "\"startTime\":1000,"
+                  "\"endTime\":2000,"
                   "\"duration\":1000,"
-                  "\"__attributes__\":{\"callType\":\"http-client\",\"host\":\"10.54.0.33\",\"rpc\":\"/oneagent/qianlu/"
+                  "\"attributes\":{\"callType\":\"http-client\",\"host\":\"10.54.0.33\",\"rpc\":\"/oneagent/qianlu/"
                   "local/"
                   "1\",\"rpcType\":\"25\",\"source_ip\":\"10.54.0.33\",\"statusCode\":\"200\",\"version\":\"HTTP1.1\","
                   "\"workloadKind\":\"faceless\",\"workloadName\":\"arms-oneagent-test-ql\"},"
-                  "\"__scope__\":{\"scope-tag-0\":\"scope-value-0\"}}\n";
+                  "\"scope\":{\"scope-tag-0\":\"scope-value-0\"}}\n";
             APSARA_TEST_EQUAL(expectedJson, res);
         }
         { // span - empty attributes and scope
@@ -195,15 +195,15 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
             const string expectedEmptyJson = "{\"__machine_uuid__\":\"aaa\",\"__pack_id__\":\"bbb\",\"__source__\":"
                                              "\"source\",\"__topic__\":\"topic\","
                                              "\"__time__\":1234567890,"
-                                             "\"trace_id\":\"trace-123\","
-                                             "\"span_id\":\"span-123\","
-                                             "\"parent_span_id\":\"parent-123\","
-                                             "\"name\":\"test-span\","
-                                             "\"start_time\":1000,"
-                                             "\"end_time\":2000,"
+                                             "\"traceId\":\"trace-123\","
+                                             "\"spanId\":\"span-123\","
+                                             "\"parentSpanId\":\"parent-123\","
+                                             "\"spanName\":\"test-span\","
+                                             "\"startTime\":1000,"
+                                             "\"endTime\":2000,"
                                              "\"duration\":1000,"
-                                             "\"__attributes__\":{},"
-                                             "\"__scope__\":{}}\n";
+                                             "\"attributes\":{},"
+                                             "\"scope\":{}}\n";
             APSARA_TEST_EQUAL(expectedEmptyJson, res);
         }
     }
