@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -77,7 +78,7 @@ func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
 	return m.informerWatchFailCount
 }
 func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
-	m.informerWatchFailCount++
+	atomic.AddInt64(&m.informerWatchFailCount, 1)
 }
 
 func (m *k8sMetaCache) List() []*ObjectWrapper {

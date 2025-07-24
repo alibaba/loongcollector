@@ -194,9 +194,6 @@ func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
 }
 
 func (m *MetaManager) UpdateProcessEventFailCounter() {
-	if m.processEventFailCount == nil {
-		m.processEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaProcessEventFailTotal)
-	}
 	m.processEventFailCount.Add(1)
 }
 
@@ -264,4 +261,10 @@ func (m *MetaManager) runServer() {
 
 func isEntity(resourceType string) bool {
 	return !strings.Contains(resourceType, LINK_SPLIT_CHARACTER)
+}
+
+func (m *MetaManager) InitProcessEventFailCounter() {
+	if m.processEventFailCount == nil {
+		m.processEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaProcessEventFailTotal)
+	}
 }
