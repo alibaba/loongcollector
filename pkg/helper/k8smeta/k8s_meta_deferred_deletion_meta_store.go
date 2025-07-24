@@ -247,7 +247,7 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
 	m.lock.Lock()
@@ -274,7 +274,7 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handleDeferredDeleteEvent keyFunc error", err)
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "handleDeferredDeleteEvent keyFunc error", err)
 		return
 	}
 	idxKeys := m.getIdxKeys(event.Object)
