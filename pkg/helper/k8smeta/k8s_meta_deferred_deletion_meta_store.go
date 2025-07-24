@@ -323,7 +323,7 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 	for _, rule := range m.indexRules {
 		idxKeys, err := rule(obj.Raw)
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with idx rules error", err)
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with idx rules error", err)
 			return nil
 		}
 		result = append(result, idxKeys...)
