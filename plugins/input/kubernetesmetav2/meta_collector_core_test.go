@@ -153,8 +153,6 @@ func TestProcessPodReplicasetLinkNoOwner(t *testing.T) {
 			Interval: 10,
 		},
 	}
-	collector.serviceK8sMeta.metaManager = k8smeta.GetMetaManagerInstance()
-	collector.serviceK8sMeta.metaManager.InitProcessEventFailCounter()
 	log := collector.processPodReplicaSetLink(objWrapper, "create")
 	assert.Nilf(t, log, "log should not be nil")
 }

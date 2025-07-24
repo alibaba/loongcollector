@@ -36,7 +36,6 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 		log.Contents.Add("completion", safeGetInt32String(obj.Spec.Completions))
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -56,7 +55,6 @@ func (m *metaCollector) processCronJobEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("suspend", safeGetBoolString(obj.Spec.Suspend))
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -69,7 +67,6 @@ func (m *metaCollector) processJobCronJobLink(data *k8smeta.ObjectWrapper, metho
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -82,7 +79,6 @@ func (m *metaCollector) processPodJobLink(data *k8smeta.ObjectWrapper, method st
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -95,7 +91,6 @@ func (m *metaCollector) processJobNamespaceLink(data *k8smeta.ObjectWrapper, met
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -108,6 +103,5 @@ func (m *metaCollector) processCronJobNamespaceLink(data *k8smeta.ObjectWrapper,
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }

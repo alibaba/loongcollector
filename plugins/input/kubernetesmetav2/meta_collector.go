@@ -452,13 +452,6 @@ func (m *metaCollector) genEntityTypeKey(kind string) string {
 	return m.serviceK8sMeta.domain + "." + strings.ToLower(kind)
 }
 
-func (m *metaCollector) updateProcessEventFailCounter() {
-	m.serviceK8sMeta.metaManager.UpdateProcessEventFailCounter()
-}
-func (m *metaCollector) updateConvertLogFailCounter() {
-	m.serviceK8sMeta.metaManager.UpdateConvertEventToLogFailCounter()
-}
-
 func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 	if modelLog, ok := event.(*models.Log); ok {
 		log := &protocol.Log{}
@@ -466,7 +459,6 @@ func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *pr
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
-					m.updateConvertLogFailCounter()
 					logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "convert event to log fail, value is not string", v, "key", k)
 					continue
 				} else {

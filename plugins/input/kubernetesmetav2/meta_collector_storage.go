@@ -32,6 +32,5 @@ func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, m
 		}
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }

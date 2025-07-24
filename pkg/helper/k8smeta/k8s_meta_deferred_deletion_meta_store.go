@@ -3,7 +3,6 @@ package k8smeta
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/client-go/tools/cache"
@@ -80,13 +79,6 @@ func (m *DeferredDeletionMetaStore) Start() {
 	go m.handleEvent()
 }
 
-func (m *DeferredDeletionMetaStore) UpdateMetaStoreFailCounter() {
-	atomic.AddInt64(&m.metaStoreFailCounter, 1)
-}
-func (m *DeferredDeletionMetaStore) GetMetaStoreFailCount() int64 {
-	value := atomic.LoadInt64(&m.metaStoreFailCounter)
-	return value
-}
 func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrapper {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -101,11 +93,9 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 				if obj.Raw != nil {
 					result[k] = append(result[k], obj)
 				} else {
-					m.UpdateMetaStoreFailCounter()
 					logger.Error(context.Background(), K8sMetaUnifyErrorCode, "raw object not found", realKey)
 				}
 			} else {
-				m.UpdateMetaStoreFailCounter()
 				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "key not found", realKey)
 			}
 		}
@@ -224,7 +214,6 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		m.UpdateMetaStoreFailCounter()
 		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
@@ -260,7 +249,6 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		m.UpdateMetaStoreFailCounter()
 		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
 		return
 	}
@@ -288,7 +276,6 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		m.UpdateMetaStoreFailCounter()
 		logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handleDeferredDeleteEvent keyFunc error", err)
 		return
 	}
@@ -338,7 +325,6 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 	for _, rule := range m.indexRules {
 		idxKeys, err := rule(obj.Raw)
 		if err != nil {
-			m.UpdateMetaStoreFailCounter()
 			logger.Error(context.Background(), "K8S_META_STORE_HANDLE_ALARM", "handle k8s meta with idx rules error", err)
 			return nil
 		}

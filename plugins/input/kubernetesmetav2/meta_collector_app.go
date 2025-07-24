@@ -41,7 +41,6 @@ func (m *metaCollector) processDeploymentEntity(data *k8smeta.ObjectWrapper, met
 
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -73,7 +72,6 @@ func (m *metaCollector) processDaemonSetEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("containers", m.processEntityJSONArray(containerInfos))
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -106,7 +104,6 @@ func (m *metaCollector) processStatefulSetEntity(data *k8smeta.ObjectWrapper, me
 		log.Contents.Add("containers", m.processEntityJSONArray(containerInfos))
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -139,7 +136,6 @@ func (m *metaCollector) processReplicaSetEntity(data *k8smeta.ObjectWrapper, met
 		log.Contents.Add("containers", m.processEntityJSONArray(containerInfos))
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -152,7 +148,6 @@ func (m *metaCollector) processPodDeploymentLink(data *k8smeta.ObjectWrapper, me
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -165,7 +160,6 @@ func (m *metaCollector) processPodReplicaSetLink(data *k8smeta.ObjectWrapper, me
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -178,7 +172,6 @@ func (m *metaCollector) processReplicaSetDeploymentLink(data *k8smeta.ObjectWrap
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -191,7 +184,6 @@ func (m *metaCollector) processPodStatefulSetLink(data *k8smeta.ObjectWrapper, m
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -204,7 +196,6 @@ func (m *metaCollector) processPodDaemonSetLink(data *k8smeta.ObjectWrapper, met
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -217,7 +208,6 @@ func (m *metaCollector) processDeploymentNamespaceLink(data *k8smeta.ObjectWrapp
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -230,7 +220,6 @@ func (m *metaCollector) processDaemonSetNamespaceLink(data *k8smeta.ObjectWrappe
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }
 
@@ -243,6 +232,5 @@ func (m *metaCollector) processStatefulNamespaceSetLink(data *k8smeta.ObjectWrap
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
-	m.updateProcessEventFailCounter()
 	return nil
 }

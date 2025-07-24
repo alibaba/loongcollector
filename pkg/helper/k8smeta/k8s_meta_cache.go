@@ -3,7 +3,6 @@ package k8smeta
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -70,17 +69,6 @@ func (m *k8sMetaCache) GetSize() int {
 
 func (m *k8sMetaCache) GetQueueSize() int {
 	return len(m.eventCh)
-}
-
-func (m *k8sMetaCache) GetMetaStoreFailCount() int64 {
-	return m.metaStore.GetMetaStoreFailCount()
-}
-func (m *k8sMetaCache) GetInformerWatchFailCount() int64 {
-	value := atomic.LoadInt64(&m.informerWatchFailCount)
-	return value
-}
-func (m *k8sMetaCache) UpdateInformerWatchFailCount() {
-	atomic.AddInt64(&m.informerWatchFailCount, 1)
 }
 
 func (m *k8sMetaCache) List() []*ObjectWrapper {
@@ -203,7 +191,6 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	// add watch error handler
 	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
 		if err != nil {
-			m.UpdateInformerWatchFailCount()
 			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
 		}
 	})

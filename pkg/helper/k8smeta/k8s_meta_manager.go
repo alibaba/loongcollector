@@ -26,8 +26,6 @@ type MetaCache interface {
 	Get(key []string) map[string][]*ObjectWrapper
 	GetSize() int
 	GetQueueSize() int
-	GetMetaStoreFailCount() int64
-	GetInformerWatchFailCount() int64
 	List() []*ObjectWrapper
 	Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper
 	RegisterSendFunc(key string, sendFunc SendFunc, interval int)
@@ -54,20 +52,16 @@ type MetaManager struct {
 	registerLock    sync.RWMutex
 
 	// self metrics
-	projectNames           map[string]int
-	metricRecord           selfmonitor.MetricsRecord
-	addEventCount          selfmonitor.CounterMetric
-	updateEventCount       selfmonitor.CounterMetric
-	deleteEventCount       selfmonitor.CounterMetric
-	processEventFailCount  selfmonitor.CounterMetric
-	convertEventFailCount  selfmonitor.CounterMetric
-	informerWatchFailGauge selfmonitor.GaugeMetric
-	metaStoreFailGauge     selfmonitor.GaugeMetric
-	cacheResourceGauge     selfmonitor.GaugeMetric
-	queueSizeGauge         selfmonitor.GaugeMetric
-	httpRequestCount       selfmonitor.CounterMetric
-	httpAvgDelayMs         selfmonitor.CounterMetric
-	httpMaxDelayMs         selfmonitor.GaugeMetric
+	projectNames       map[string]int
+	metricRecord       selfmonitor.MetricsRecord
+	addEventCount      selfmonitor.CounterMetric
+	updateEventCount   selfmonitor.CounterMetric
+	deleteEventCount   selfmonitor.CounterMetric
+	cacheResourceGauge selfmonitor.GaugeMetric
+	queueSizeGauge     selfmonitor.GaugeMetric
+	httpRequestCount   selfmonitor.CounterMetric
+	httpAvgDelayMs     selfmonitor.CounterMetric
+	httpMaxDelayMs     selfmonitor.GaugeMetric
 }
 
 func GetMetaManagerInstance() *MetaManager {
@@ -114,10 +108,6 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	m.httpRequestCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPRequestTotal)
 	m.httpAvgDelayMs = selfmonitor.NewAverageMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPAvgDelayMs)
 	m.httpMaxDelayMs = selfmonitor.NewMaxMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaHTTPMaxDelayMs)
-	m.processEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaProcessEventFailTotal)
-	m.convertEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaConvertEventToLogFailTotal)
-	m.metaStoreFailGauge = selfmonitor.NewGaugeMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaStoreFailTotal)
-	m.informerWatchFailGauge = selfmonitor.NewGaugeMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaWatchFailTotal)
 
 	go func() {
 		startTime := time.Now()
@@ -193,16 +183,6 @@ func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
 	m.registerLock.Unlock()
 }
 
-func (m *MetaManager) UpdateProcessEventFailCounter() {
-	m.processEventFailCount.Add(1)
-}
-
-func (m *MetaManager) UpdateConvertEventToLogFailCounter() {
-	if m.convertEventFailCount == nil {
-		m.convertEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaConvertEventToLogFailTotal)
-	}
-	m.convertEventFailCount.Add(1)
-}
 func GetMetaManagerMetrics() []map[string]string {
 	manager := GetMetaManagerInstance()
 	if manager == nil || !manager.IsReady() {
@@ -211,18 +191,12 @@ func GetMetaManagerMetrics() []map[string]string {
 	// cache
 	queueSize := 0
 	cacheSize := 0
-	var cacheHandleFailCount int64
-	var informerWatchFailCount int64
 	for _, cache := range manager.cacheMap {
 		queueSize += cache.GetQueueSize()
 		cacheSize += cache.GetSize()
-		cacheHandleFailCount += cache.GetMetaStoreFailCount()
-		informerWatchFailCount += cache.GetInformerWatchFailCount()
 	}
 	manager.queueSizeGauge.Set(float64(queueSize))
 	manager.cacheResourceGauge.Set(float64(cacheSize))
-	manager.metaStoreFailGauge.Set(float64(cacheHandleFailCount))
-	manager.informerWatchFailGauge.Set(float64(informerWatchFailCount))
 	// set labels
 	manager.registerLock.RLock()
 	projectName := make([]string, 0)
@@ -261,10 +235,4 @@ func (m *MetaManager) runServer() {
 
 func isEntity(resourceType string) bool {
 	return !strings.Contains(resourceType, LINK_SPLIT_CHARACTER)
-}
-
-func (m *MetaManager) InitProcessEventFailCounter() {
-	if m.processEventFailCount == nil {
-		m.processEventFailCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaProcessEventFailTotal)
-	}
 }
