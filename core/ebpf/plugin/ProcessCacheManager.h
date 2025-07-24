@@ -53,7 +53,6 @@ public:
 
     bool Init();
     void Stop();
-    int PollPerfBuffers(int maxWaitTimeMs);
     int ConsumePerfBufferData();
 
     void UpdateRecvEventTotal(uint64_t count = 1);
@@ -77,10 +76,10 @@ private:
     int syncAllProc();
     std::vector<std::shared_ptr<Proc>> listRunningProcs();
     int writeProcToBPFMap(const std::shared_ptr<Proc>& proc);
-    void waitForPollingFinished();
+    void waitForConsumeFinished();
 
     std::atomic_bool mInited = false;
-    std::atomic_bool mIsPolling = false;
+    std::atomic_bool mIsConsume = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
     std::filesystem::path mHostPathPrefix;

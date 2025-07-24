@@ -175,17 +175,17 @@ void ProcessCacheManager::Stop() {
         return;
     }
     mInited = false;
-    waitForPollingFinished();
+    waitForConsumeFinished();
     auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);
     LOG_INFO(sLogger, ("stop process probes, status", res));
     mProcessCache.Clear();
     mProcessDataMap.Clear();
 }
 
-void ProcessCacheManager::waitForPollingFinished() {
+void ProcessCacheManager::waitForConsumeFinished() {
     int64_t startTime = TimeKeeper::GetInstance()->NowSec();
     bool alarmOnce = false;
-    while (mIsPolling) {
+    while (mIsConsume) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms
         int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
         if (!alarmOnce && duration > 10) { // 10s
@@ -431,29 +431,14 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     return res;
 }
 
-int ProcessCacheManager::PollPerfBuffers(int maxWaitTimeMs) {
-    int zero = 0;
-    int ret = 0;
-    mIsPolling = true;
-    // mIsPolling must be set before mInited check to ensure
-    // when stopping, mIsPolling == false can ensure no more events will be processed
-    if (mInited) {
-        ret = mEBPFAdapter->PollPerfBuffers(
-            PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
-        LOG_DEBUG(sLogger, ("process cache poll buffer", "")("cnt", ret));
-    }
-    mIsPolling = false;
-    return ret;
-}
-
 int ProcessCacheManager::ConsumePerfBufferData() {
     int ret = 0;
-    mIsPolling = true;
+    mIsConsume = true;
     if (mInited) {
         mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
         LOG_DEBUG(sLogger, ("process cache consume buffer", "")("cnt", ret));
     }
-    mIsPolling = false;
+    mIsConsume = false;
 
     return ret;
 }
