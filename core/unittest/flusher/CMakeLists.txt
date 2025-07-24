@@ -21,6 +21,9 @@ if (ENABLE_ENTERPRISE)
 endif ()
 target_link_libraries(flusher_sls_unittest ${UT_BASE_TARGET})
 
+add_executable(flusher_kafka_unittest FlusherKafkaUnittest.cpp)
+target_link_libraries(flusher_kafka_unittest ${UT_BASE_TARGET})
+
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
 target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
 
@@ -37,6 +40,7 @@ endif ()
 
 include(GoogleTest)
 gtest_discover_tests(flusher_sls_unittest)
+gtest_discover_tests(flusher_kafka_unittest)
 gtest_discover_tests(pack_id_manager_unittest)
 gtest_discover_tests(sls_client_manager_unittest)
 if (ENABLE_ENTERPRISE)

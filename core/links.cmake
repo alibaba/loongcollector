@@ -23,6 +23,7 @@ macro(all_link target_name)
     link_grpc(${target_name})
     link_ssl(${target_name}) # must after link_spl
     link_crypto(${target_name}) # must after link_spl
+    link_rdkafka(${target_name})
     if (UNIX)
         target_link_libraries(${target_name} dl)
         if (ENABLE_COMPATIBLE_MODE)
