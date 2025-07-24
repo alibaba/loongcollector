@@ -35,6 +35,9 @@ enum class KernelEventType {
 
     L7_RECORD,
     CONN_STATS_RECORD,
+    
+    FILE_PERMISSION_EVENT_WRITE,
+    FILE_PERMISSION_EVENT_READ,
 };
 
 class CommonEvent {

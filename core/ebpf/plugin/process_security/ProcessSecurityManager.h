@@ -58,7 +58,7 @@ public:
     int SendEvents() override;
 
     // process perfbuffer was polled by processCacheManager ...
-    int PollPerfBuffer() override { return 0; }
+    int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
 
     int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 

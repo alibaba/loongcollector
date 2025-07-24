@@ -31,7 +31,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-// #include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
@@ -315,14 +315,14 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 break;
             }
 
-            // case PluginType::FILE_SECURITY: {
-            //     if (!pluginMgr) {
-            //         pluginMgr
-            //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
-            //             metricManager);
-            //     }
-            //     break;
-            // }
+            case PluginType::FILE_SECURITY: {
+                if (!pluginMgr) {
+                    auto mgr = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
             default:
                 LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
                 return false;
@@ -470,7 +470,12 @@ void EBPFServer::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        mProcessCacheManager->PollPerfBuffers();
+        int currentMaxWaitTime = kDefaultMaxWaitTimeMS;
+        auto starttime = std::chrono::steady_clock::now();
+        mProcessCacheManager->PollPerfBuffers(currentMaxWaitTime);
+        auto endtime = std::chrono::steady_clock::now();
+        currentMaxWaitTime -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
+
         for (int i = 0; i < int(PluginType::MAX); i++) {
             auto type = PluginType(i);
             auto& pluginState = getPluginState(type);
@@ -480,10 +485,18 @@ void EBPFServer::pollPerfBuffers() {
             std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
             auto& plugin = pluginState.mManager;
             if (plugin) {
-                int cnt = plugin->PollPerfBuffer();
+                if (currentMaxWaitTime < 1) {
+                    currentMaxWaitTime = 1;
+                }
+                starttime = std::chrono::steady_clock::now();
+                int cnt = plugin->PollPerfBuffer(currentMaxWaitTime);
                 LOG_DEBUG(sLogger,
-                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
-                                                                                        plugin->IsRunning()));
+                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)(
+                              "running status", plugin->IsRunning())("wait_time", currentMaxWaitTime));
+
+                endtime = std::chrono::steady_clock::now();
+                currentMaxWaitTime
+                    -= std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
             }
         }
     }

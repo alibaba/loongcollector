@@ -1369,7 +1369,7 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getConfigMapNamesapceLink(configmapList)
+	results := linkGenerator.getConfigMapNamespaceLink(configmapList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*ConfigMapNamespace).Namespace.Name)
 	assert.Equal(t, "configmap1", results[0].Object.Raw.(*ConfigMapNamespace).ConfigMap.Name)
@@ -1429,7 +1429,7 @@ func TestGetJobNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getJobNamesapceLink(jobList)
+	results := linkGenerator.getJobNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*JobNamespace).Namespace.Name)
 	assert.Equal(t, "job1", results[0].Object.Raw.(*JobNamespace).Job.Name)
@@ -1489,7 +1489,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getCronJobNamesapceLink(jobList)
+	results := linkGenerator.getCronJobNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*CronJobNamespace).Namespace.Name)
 	assert.Equal(t, "cronjob1", results[0].Object.Raw.(*CronJobNamespace).CronJob.Name)
@@ -1549,7 +1549,7 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 		NAMESPACE:             namespaceCache,
 	})
 
-	results := linkGenerator.getPVCNamesapceLink(jobList)
+	results := linkGenerator.getPVCNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*PersistentVolumeClaimNamespace).Namespace.Name)
 	assert.Equal(t, "pvc1", results[0].Object.Raw.(*PersistentVolumeClaimNamespace).PersistentVolumeClaim.Name)
@@ -1609,7 +1609,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getIngressNamesapceLink(jobList)
+	results := linkGenerator.getIngressNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*IngressNamespace).Namespace.Name)
 	assert.Equal(t, "ingress1", results[0].Object.Raw.(*IngressNamespace).Ingress.Name)
@@ -1623,7 +1623,7 @@ func generateMockNamespace(namespaceName string) *ObjectWrapper {
 		Raw: &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      namespaceName,
-				Namespace: "", // namesapce itself without namesapce
+				Namespace: "", // namespace itself without namespace
 			},
 		},
 	}

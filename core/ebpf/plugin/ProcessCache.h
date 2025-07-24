@@ -17,8 +17,11 @@
 
 #include <coolbpf/security/data_msg.h>
 
+#include <boost/unordered/concurrent_flat_map_fwd.hpp>
+#include <memory>
 #include <mutex>
 
+#include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessDataMap.h"
@@ -28,6 +31,7 @@ namespace logtail {
 class ProcessCache {
 public:
     explicit ProcessCache(size_t maxCacheSize, ProcParser& procParser);
+    ~ProcessCache();
 
     // thread-safe
     bool Contains(const data_event_id& key) const;
@@ -37,15 +41,14 @@ public:
 
     size_t Size() const;
 
-    // thread-safe, only single write call, but contention with read
-    // will init ref count to 1
+    // thread-safe concurrent access, will init ref count to 1
     void AddCache(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
 
     // will inc ref count by 1
     void IncRef(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
     // will dec ref count by 1, and if ref count is 0, will enqueueExpiredEntry
     void DecRef(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
-    // thread-safe, only single write call, but contention with read
+    // thread-safe concurrent access
     void Clear();
     // NOT thread-safe, only single write call, no contention with read
     void ClearExpiredCache();
@@ -55,16 +58,17 @@ public:
     void PrintDebugInfo();
 
 private:
-    // thread-safe, only single write call, but contention with read
+    // thread-safe concurrent access
     void removeCache(const data_event_id& key);
     // NOT thread-safe, only single write call, no contention with read
     void enqueueExpiredEntry(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value);
 
     ProcParser mProcParser;
-    using ExecveEventMap = std::
-        unordered_map<data_event_id, std::shared_ptr<ProcessCacheValue>, ebpf::DataEventIdHash, ebpf::DataEventIdEqual>;
-    mutable std::mutex mCacheMutex;
-    ExecveEventMap mCache;
+    using ExecveEventMap = boost::unordered::concurrent_flat_map<data_event_id,
+                                                                 std::shared_ptr<ProcessCacheValue>,
+                                                                 ebpf::DataEventIdHash,
+                                                                 ebpf::DataEventIdEqual>;
+    std::unique_ptr<ExecveEventMap> mCache;
 
     struct ExitedEntry {
         data_event_id key;

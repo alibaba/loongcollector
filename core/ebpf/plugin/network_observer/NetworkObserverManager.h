@@ -89,9 +89,8 @@ public:
 
     int SendEvents() override;
 
-    int PollPerfBuffer() override;
-
     int RegisteredConfigCount() override { return mConfigToWorkloads.size(); }
+    int PollPerfBuffer(int maxWaitTimeMs) override;
 
     void RecordEventLost(enum callback_type_e type, uint64_t lostCount);
     void AcceptNetCtrlEvent(struct conn_ctrl_event_t* event);

@@ -17,11 +17,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if !defined(_MSC_VER)
-#include <dirent.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#endif
 
 #include <string>
 
@@ -53,6 +48,7 @@
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputNetworkObserver.h"
@@ -72,7 +68,7 @@
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
 
 using namespace std;
@@ -152,9 +148,9 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     }
-    // if (BOOL_FLAG(enable_ebpf_file_secure)) {
-    //     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
-    // }
+    if (BOOL_FLAG(enable_ebpf_file_secure)) {
+        RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }

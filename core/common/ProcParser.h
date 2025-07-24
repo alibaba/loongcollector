@@ -93,7 +93,7 @@ struct ProcessStat {
     int priority = 0;
     int nice = 0;
     int numThreads = 0;
-    int64_t startTicks = 0;
+    uint64_t startTicks = 0;
 
     uint64_t utimeTicks{0};
     uint64_t stimeTicks{0};

@@ -23,6 +23,7 @@
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/EBPFAdapter.h"
+#include "ebpf/plugin/FileRetryableEvent.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/plugin/ProcessCloneRetryableEvent.h"
 #include "ebpf/plugin/ProcessExecveRetryableEvent.h"
@@ -52,7 +53,7 @@ public:
 
     bool Init();
     void Stop();
-    void PollPerfBuffers();
+    int PollPerfBuffers(int maxWaitTimeMs);
 
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);
@@ -61,12 +62,14 @@ public:
     ProcessExecveRetryableEvent* CreateProcessExecveRetryableEvent(msg_execve_event* eventPtr);
     ProcessCloneRetryableEvent* CreateProcessCloneRetryableEvent(msg_clone_event* eventPtr);
     ProcessExitRetryableEvent* CreateProcessExitRetryableEvent(msg_exit* eventPtr);
+
     void RecordDataEvent(msg_data* eventPtr);
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
     bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
+    ProcessCache& GetProcessCache() { return mProcessCache; }
 
 private:
     int syncAllProc();

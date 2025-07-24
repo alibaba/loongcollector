@@ -1497,7 +1497,7 @@ void NetworkObserverManager::processRecordAsMetric(L7Record* record,
     LOG_DEBUG(sLogger, ("agg res", res)("node count", mAppAggregator.NodeCount()));
 }
 
-int NetworkObserverManager::PollPerfBuffer() {
+int NetworkObserverManager::PollPerfBuffer(int) {
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
     // 1. listen host pod info // every 5 seconds
     if (K8sMetadata::GetInstance().Enable() && nowMs - mLastUpdateHostMetaTimeMs >= 5000) { // 5s

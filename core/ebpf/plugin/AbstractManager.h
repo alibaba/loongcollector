@@ -58,13 +58,12 @@ public:
 
     virtual int SendEvents() = 0;
 
-    virtual int PollPerfBuffer() {
+    virtual int PollPerfBuffer(int maxWaitTimeMs) {
         int zero = 0;
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
-        return mEBPFAdapter->PollPerfBuffers(
-            GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+        return mEBPFAdapter->PollPerfBuffers(GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
     bool IsRunning() { return mInited && !mSuspendFlag; }

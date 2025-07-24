@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "ebpf/type/CommonDataEvent.h"
+#include "CommonDataEvent.h"
+#include "common/StringView.h"
 
 namespace logtail::ebpf {
 
@@ -15,8 +17,8 @@ class FileEvent : public CommonEvent {
 public:
     FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
         : CommonEvent(type), mPid(pid), mKtime(ktime), mTimestamp(timestamp) {}
-    FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, const std::string& path)
-        : CommonEvent(type), mPid(pid), mKtime(ktime), mTimestamp(timestamp), mPath(path) {}
+    FileEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp, StringView path)
+        : CommonEvent(type), mPid(pid), mKtime(ktime), mTimestamp(timestamp), mPath(path.data(), path.size()) {}
     [[nodiscard]] PluginType GetPluginType() const override { return PluginType::FILE_SECURITY; };
 
     uint32_t mPid;

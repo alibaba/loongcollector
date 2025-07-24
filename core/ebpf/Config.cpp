@@ -36,6 +36,7 @@ DEFINE_FLAG_INT32(ebpf_socket_probe_config_max_raw_record_per_sec, "ebpf socket 
 DEFINE_FLAG_INT32(ebpf_profile_probe_config_profile_sample_rate, "ebpf profile probe profile sample rate", 10);
 DEFINE_FLAG_INT32(ebpf_profile_probe_config_profile_upload_duration, "ebpf profile probe profile upload duration", 10);
 DEFINE_FLAG_BOOL(ebpf_process_probe_config_enable_oom_detect, "if ebpf process probe enable oom detect", false);
+DEFINE_FLAG_INT32(ebpf_file_filter_max_num, "ebpf file filter max num", 64);
 
 namespace logtail::ebpf {
 
@@ -308,7 +309,34 @@ void InitSecurityFileFilter(const Json::Value& config,
     } else if (!GetOptionalListFilterParam<std::string>(
                    config, "FilePathFilter", thisFileFilter.mFilePathList, errorMsg)) {
         // FilePathFilter has element of wrong type
+    } else {
+        // FilePathFilter succeeded, deduplication
+        size_t originalSize = thisFileFilter.mFilePathList.size();
+        std::unordered_set<std::string> uniquePaths;
+        std::vector<std::string> deduplicatedPaths;
+        deduplicatedPaths.reserve(originalSize);
+
+        const auto maxFilterCount = static_cast<unsigned int>(INT32_FLAG(ebpf_file_filter_max_num));
+        for (const auto& path : thisFileFilter.mFilePathList) {
+            if (uniquePaths.size() >= maxFilterCount) {
+                LOG_WARNING(sLogger, ("file filter count exceeds limit", maxFilterCount));
+                break;
+            }
+
+            if (uniquePaths.insert(path).second) {
+                deduplicatedPaths.push_back(path);
+            }
+        }
+
+        if (originalSize > deduplicatedPaths.size()) {
+            LOG_INFO(sLogger,
+                     ("FilePathFilter deduplicated", originalSize - deduplicatedPaths.size())(
+                         "original_count", originalSize)("deduplicated_count", deduplicatedPaths.size()));
+        }
+
+        thisFileFilter.mFilePathList = std::move(deduplicatedPaths);
     }
+
     if (!errorMsg.empty()) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
