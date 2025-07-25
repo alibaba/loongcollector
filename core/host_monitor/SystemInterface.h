@@ -44,6 +44,22 @@ struct SystemInformation : public BaseInformation {
     int64_t bootTime;
 };
 
+class ScopeGuard {
+    std::function<void()> fn;
+public:
+    explicit ScopeGuard(std::function<void()> f)
+            : fn(std::move(f)) {
+    }
+
+    ~ScopeGuard() {
+        fn();
+    }
+};
+
+#define defer3(ln, statement) ScopeGuard __ ## ln ## _defer_([&](){statement;})
+#define defer2(ln, statement) defer3(ln, statement)
+#define defer(statement) defer2(__LINE__, statement)
+
 // man proc: https://man7.org/linux/man-pages/man5/proc.5.html
 // search key: /proc/stat
 enum class EnumCpuKey : int {

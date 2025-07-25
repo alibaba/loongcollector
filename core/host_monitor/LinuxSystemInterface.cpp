@@ -420,7 +420,7 @@ bool LinuxSystemInterface::GetFileSystemListInformationOnce(FileSystemListInform
     if (!(fp = setmntent(mountedDir.c_str(), "r"))) {
         return false;
     }
-    // defer(endmntent(fp));
+    defer(endmntent(fp));
 
     mntent ent{};
     std::vector<char> buffer((size_t)4096);
@@ -473,6 +473,11 @@ bool LinuxSystemInterface::GetDiskSerialIdInformationOnce(std::string diskName, 
     std::string errorMessage;
     auto sysSerialId = SYSTEM_BLOCK_DIR / diskName / SERIAL;
 
+    if (!CheckExistance(SYSTEM_BLOCK_DIR / diskName / SERIAL)) {
+        LOG_ERROR(sLogger, ("file does not exist", (SYSTEM_BLOCK_DIR / diskName / SERIAL).string()));
+        return false;
+    }
+
     int ret = GetFileLines(sysSerialId, serialIdLines, true, &errorMessage);
     if (ret != 0 || serialIdLines.empty()) {
         return false;
@@ -486,6 +491,10 @@ bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& dis
     std::vector<std::string> diskLines = {};
     std::string errorMessage;
 
+    if (!CheckExistance(PROCESS_DIR / PROCESS_DISKSTATS)) {
+        LOG_ERROR(sLogger, ("file does not exist", (PROCESS_DIR / PROCESS_DISKSTATS).string()));
+        return false;
+    }
     int ret = GetFileLines(PROCESS_DIR / PROCESS_DISKSTATS, diskLines, true, &errorMessage);
     if (ret != 0 || diskLines.empty()) {
         return false;
