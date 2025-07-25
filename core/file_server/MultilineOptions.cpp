@@ -128,14 +128,15 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
                         ("problem encountered in config parsing",
                          "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is not")(
                             "action", "ignore multiline config")("module", pluginType)("config", ctx.GetConfigName()));
-            ctx.GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
-                                     "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is "
-                                     "not: ignore multiline config, module: "
-                                         + pluginType + ", config: " + ctx.GetConfigName(),
-                                     ctx.GetRegion(),
-                                     ctx.GetProjectName(),
-                                     ctx.GetConfigName(),
-                                     ctx.GetLogstoreName());
+            ctx.GetAlarm().SendAlarmWarning(
+                CATEGORY_CONFIG_ALARM,
+                "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is "
+                "not: ignore multiline config, module: "
+                    + pluginType + ", config: " + ctx.GetConfigName(),
+                ctx.GetRegion(),
+                ctx.GetProjectName(),
+                ctx.GetConfigName(),
+                ctx.GetLogstoreName());
         } else if (mStartPatternRegPtr && mContinuePatternRegPtr && mEndPatternRegPtr) {
             mContinuePatternRegPtr.reset();
             LOG_WARNING(
@@ -144,7 +145,7 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
                  "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty")(
                     "action", "ignore param Multiline.ContinuePattern")("module", pluginType)("config",
                                                                                               ctx.GetConfigName()));
-            ctx.GetAlarm().SendAlarm(
+            ctx.GetAlarm().SendAlarmWarning(
                 CATEGORY_CONFIG_ALARM,
                 "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty: "
                 "ignore param Multiline.ContinuePattern, module: "

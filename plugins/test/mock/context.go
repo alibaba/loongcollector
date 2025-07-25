@@ -151,7 +151,7 @@ func (p *EmptyContext) GetCheckPointObject(key string, obj interface{}) (exist b
 	}
 	err := json.Unmarshal(val, obj)
 	if err != nil {
-		logger.Error(p.ctx, "CHECKPOINT_INVALID_ALARM", "invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
+		logger.Warning(p.ctx, "CHECKPOINT_INVALID_ALARM", "invalid checkpoint, key", key, "val", util.CutString(string(val), 1024), "error", err)
 		return false
 	}
 	return true

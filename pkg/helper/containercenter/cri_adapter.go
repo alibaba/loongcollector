@@ -74,7 +74,7 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 
 	client, err := NewRuntimeServiceClient(defaultContextTimeout, maxMsgSize)
 	if err != nil {
-		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
+		logger.Warningf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 		return nil, err
 	} else if len(containerResp.Containers) == 0 {
 		err = errors.New("remote cri-runtime has no container")
-		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Remote cri-runtime is invalid: %v", err)
+		logger.Warningf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Remote cri-runtime is invalid: %v", err)
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 			foundInfo = true
 			ci, err = parseContainerInfo(info)
 			if err != nil {
-				logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to parse container info, containerId: %s, data: %s, error: %v", containerID, info, err)
+				logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to parse container info, containerId: %s, data: %s, error: %v", containerID, info, err)
 			}
 		}
 	}
@@ -272,11 +272,11 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 
 		dockerContainer, _, _, err := cw.createContainerInfo(c.ID)
 		if err != nil {
-			logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
+			logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
 			continue
 		}
 		if dockerContainer == nil || dockerContainer.ContainerInfo.ContainerJSONBase == nil {
-			logger.Error(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info:%+v", c)
+			logger.Warning(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info:%+v", c)
 			continue
 		}
 		if dockerContainer.Status() != ContainerStatusRunning {
@@ -328,7 +328,7 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 			return
 		case <-ticker.C:
 			if err := cw.syncContainers(); err != nil {
-				logger.Errorf(context.Background(), "SYNC_CONTAINERD_ALARM", "syncContainers error: %v", err)
+				logger.Criticalf(context.Background(), "SYNC_CONTAINERD_ALARM", "syncContainers error: %v", err)
 			}
 		}
 	}
@@ -371,7 +371,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 			continue
 		}
 		if err := cw.fetchOne(id); err != nil {
-			logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to createContainerInfo, containerId: %s, error: %v", id, err)
+			logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to createContainerInfo, containerId: %s, error: %v", id, err)
 		}
 	}
 

@@ -280,14 +280,14 @@ bool LogInput::ReadLocalEvents() {
             sLogger,
             ("process local event, dir", source)("file name", object)("config", configName)(
                 "project", readerConfig.second->GetProjectName())("logstore", readerConfig.second->GetLogstoreName()));
-        AlarmManager::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
-                                               string("process local event, dir:") + source + ", file name:" + object
-                                                   + ", config:" + configName
-                                                   + ", file count:" + ToString(objList.size()),
-                                               readerConfig.second->GetRegion(),
-                                               readerConfig.second->GetProjectName(),
-                                               readerConfig.second->GetConfigName(),
-                                               readerConfig.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOAD_LOCAL_EVENT_ALARM,
+                                                      string("process local event, dir:") + source
+                                                          + ", file name:" + object + ", config:" + configName
+                                                          + ", file count:" + ToString(objList.size()),
+                                                      readerConfig.second->GetRegion(),
+                                                      readerConfig.second->GetProjectName(),
+                                                      readerConfig.second->GetConfigName(),
+                                                      readerConfig.second->GetLogstoreName());
 
         HistoryFileImporter* importer = HistoryFileImporter::GetInstance();
         importer->PushEvent(historyFileEvent);

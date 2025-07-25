@@ -193,7 +193,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 							}
 						}
 					default:
-						logger.Error(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition action type error, type", typeName)
+						logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition action type error, type", typeName)
 						return fmt.Errorf("init condition action type error,type is %v", typeName)
 					}
 				}

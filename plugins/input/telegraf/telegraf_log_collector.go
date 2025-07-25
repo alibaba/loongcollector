@@ -66,7 +66,7 @@ func newTelegrafLogReader(agentDirPath string, logPath string, drop bool) *helpe
 
 	reader, err := helper.NewLogFileReader(telegrafManager.GetContext(), checkPoint, helper.DefaultLogFileReaderConfig, new(Processor))
 	if err != nil {
-		logger.Error(telegrafManager.GetContext(), TelegrafAlarmType, "path", checkPoint.Path, "create telegraf log reader error", err)
+		logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "path", checkPoint.Path, "create telegraf log reader error", err)
 		return nil
 	}
 	return reader

@@ -34,105 +34,105 @@
 #define PARAM_ERROR_RETURN(logger, alarm, msg, module, config, project, logstore, region) \
     if (module.empty()) { \
         LOG_ERROR(logger, ("failed to parse config", msg)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": abort, config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmError(CATEGORY_CONFIG_ALARM, \
+                             std::string(msg) + ": abort, config: " + config, \
+                             region, \
+                             project, \
+                             config, \
+                             logstore); \
     } else { \
         LOG_ERROR(logger, ("failed to parse config", msg)("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": abort, module: " + module + ", config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmError(CATEGORY_CONFIG_ALARM, \
+                             std::string(msg) + ": abort, module: " + module + ", config: " + config, \
+                             region, \
+                             project, \
+                             config, \
+                             logstore); \
     } \
     return false
 #define PARAM_WARNING_IGNORE(logger, alarm, msg, module, config, project, logstore, region) \
     if (module.empty()) { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", msg)("action", "ignore param")("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": ignore param, config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": ignore param, config: " + config, \
+                               region, \
+                               project, \
+                               config, \
+                               logstore); \
     } else { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", \
                      msg)("action", "ignore param")("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": ignore param, module: " + module + ", config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": ignore param, module: " + module + ", config: " + config, \
+                               region, \
+                               project, \
+                               config, \
+                               logstore); \
     }
 #define PARAM_WARNING_DEFAULT(logger, alarm, msg, val, module, config, project, logstore, region) \
     if (module.empty()) { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", \
                      msg)("action", "use default value instead")("default value", ToString(val))("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": use default value instead, default value: " + ToString(val) \
-                            + ", config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": use default value instead, default value: " + ToString(val) \
+                                   + ", config: " + config, \
+                               region, \
+                               project, \
+                               config, \
+                               logstore); \
     } else { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", msg)("action", "use default value instead")( \
                         "default value", ToString(val))("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": use default value instead, default value: " + ToString(val) \
-                            + ", module: " + module + ", config: " + config, \
-                        region, \
-                        project, \
-                        config, \
-                        logstore); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": use default value instead, default value: " + ToString(val) \
+                                   + ", module: " + module + ", config: " + config, \
+                               region, \
+                               project, \
+                               config, \
+                               logstore); \
     }
 
 #define TASK_PARAM_ERROR_RETURN(logger, alarm, msg, module, config) \
     if (module.empty()) { \
         LOG_ERROR(logger, ("failed to parse config", msg)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, std::string(msg) + ": abort, config: " + config); \
+        alarm.SendAlarmError(CATEGORY_CONFIG_ALARM, std::string(msg) + ": abort, config: " + config); \
     } else { \
         LOG_ERROR(logger, ("failed to parse config", msg)("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": abort, module: " + module + ", config: " + config); \
+        alarm.SendAlarmError(CATEGORY_CONFIG_ALARM, \
+                             std::string(msg) + ": abort, module: " + module + ", config: " + config); \
     } \
     return false
 #define TASK_PARAM_WARNING_IGNORE(logger, alarm, msg, module, config) \
     if (module.empty()) { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", msg)("action", "ignore param")("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, std::string(msg) + ": ignore param, config: " + config); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, std::string(msg) + ": ignore param, config: " + config); \
     } else { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", \
                      msg)("action", "ignore param")("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": ignore param, module: " + module + ", config: " + config); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": ignore param, module: " + module + ", config: " + config); \
     }
 #define TASK_PARAM_WARNING_DEFAULT(logger, alarm, msg, val, module, config) \
     if (module.empty()) { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", \
                      msg)("action", "use default value instead")("default value", ToString(val))("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": use default value instead, default value: " + ToString(val) \
-                            + ", config: " + config); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": use default value instead, default value: " + ToString(val) \
+                                   + ", config: " + config); \
     } else { \
         LOG_WARNING(logger, \
                     ("problem encountered in config parsing", msg)("action", "use default value instead")( \
                         "default value", ToString(val))("module", module)("config", config)); \
-        alarm.SendAlarm(CATEGORY_CONFIG_ALARM, \
-                        std::string(msg) + ": use default value instead, default value: " + ToString(val) \
-                            + ", module: " + module + ", config: " + config); \
+        alarm.SendAlarmWarning(CATEGORY_CONFIG_ALARM, \
+                               std::string(msg) + ": use default value instead, default value: " + ToString(val) \
+                                   + ", module: " + module + ", config: " + config); \
     }
 
 namespace logtail {

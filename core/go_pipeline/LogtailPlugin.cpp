@@ -153,8 +153,8 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
         auto stopAllCost = GetCurrentTimeInMilliSeconds() - stopAllStart;
         LOG_INFO(sLogger, ("Go pipelines stop all", "succeeded")("cost", ToString(stopAllCost) + "ms"));
         if (stopAllCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                                   "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
+            AlarmManager::GetInstance()->SendAlarmError(
+                HOLD_ON_TOO_SLOW_ALARM, "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
         }
     }
 #else
@@ -174,7 +174,7 @@ void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
         auto stopCost = GetCurrentTimeInMilliSeconds() - stopStart;
         LOG_INFO(sLogger, ("Go pipelines stop", "succeeded")("config", configName)("cost", ToString(stopCost) + "ms"));
         if (stopCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 HOLD_ON_TOO_SLOW_ALARM, "Stopping Go pipeline " + configName + " took " + ToString(stopCost) + "ms");
         }
     }

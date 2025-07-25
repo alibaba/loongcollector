@@ -89,7 +89,7 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 	f.context = context
 	// Validate config of flusher
 	if err := f.Validate(); err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher fail, error", err)
 		return err
 	}
 	// Set default value while not set
@@ -102,7 +102,7 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 	// Init converter
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher converter fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher converter fail, error", err)
 		return err
 	}
 	f.converter = convert
@@ -110,7 +110,7 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 	// Init index keys
 	indexKeys, isDynamicIndex, err := f.getIndexKeys()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher index fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher index fail, error", err)
 		return err
 	}
 	f.indexKeys = indexKeys
@@ -121,13 +121,13 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 	}
 	if err = f.Authentication.ConfigureAuthenticationAndHTTP(f.HTTPConfig, &cfg); err != nil {
 		err = fmt.Errorf("configure authenticationfailed, err: %w", err)
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher error", err)
 		return err
 	}
 
 	f.esClient, err = elasticsearch.NewClient(cfg)
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "create elasticsearch client error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "create elasticsearch client error", err)
 		return err
 	}
 	return nil
@@ -140,7 +140,7 @@ func (f *FlusherElasticSearch) Description() string {
 func (f *FlusherElasticSearch) Validate() error {
 	if f.Addresses == nil || len(f.Addresses) == 0 {
 		var err = fmt.Errorf("elasticsearch addrs is nil")
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher error", err)
 		return err
 	}
 	return nil
@@ -191,7 +191,7 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.indexKeys)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch convert log fail, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch convert log fail, error", err)
 			return err
 		}
 		var buffer []string
@@ -201,7 +201,7 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 				valueMap := values[index]
 				ESIndex, err = fmtstr.FormatIndex(valueMap, f.Index, uint32(nowTime.Unix()))
 				if err != nil {
-					logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch format index fail, error", err)
+					logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch format index fail, error", err)
 					return err
 				}
 			}
@@ -219,16 +219,16 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 
 		res, err := req.Do(context.Background(), f.esClient)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request fail, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request fail, error", err)
 			return err
 		}
 		defer res.Body.Close()
 
 		if res.StatusCode >= 400 && res.StatusCode <= 499 {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request client error", res)
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request client error", res)
 			return fmt.Errorf("err status returned: %v", res.Status())
 		} else if res.StatusCode >= 500 && res.StatusCode <= 599 {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request server error", res)
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request server error", res)
 			return fmt.Errorf("err status returned: %v", res.Status())
 		}
 		logger.Debug(f.context.GetRuntimeContext(), "elasticsearch success send events: messageID")

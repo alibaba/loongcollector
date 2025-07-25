@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package selfmonitor
 
 import (
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var GlobalAlarm *Alarm
-var mu sync.Mutex
+var alarmMutex sync.Mutex
 
 var RegisterAlarms map[string]*Alarm
 var regMu sync.Mutex
@@ -49,72 +52,92 @@ func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
 }
 
 type AlarmItem struct {
-	Message string
-	Count   int
+	AlarmType AlarmType
+	Level     AlarmLevel
+	Message   string
+	Count     int
 }
 
 type Alarm struct {
 	AlarmMap map[string]*AlarmItem
 	Project  string
 	Logstore string
+	Config   string
 }
 
-func (p *Alarm) Init(project, logstore string) {
-	mu.Lock()
+func (p *Alarm) Init(project, logstore, config string) {
+	alarmMutex.Lock()
 	p.AlarmMap = make(map[string]*AlarmItem)
 	p.Project = project
 	p.Logstore = logstore
-	mu.Unlock()
+	p.Config = config
+	alarmMutex.Unlock()
 }
 
-func (p *Alarm) Update(project, logstore string) {
-	mu.Lock()
-	defer mu.Unlock()
+func (p *Alarm) Update(project, logstore, config string) {
+	alarmMutex.Lock()
+	defer alarmMutex.Unlock()
 	p.Project = project
 	p.Logstore = logstore
+	p.Config = config
 }
 
-func (p *Alarm) Record(alarmType, message string) {
+func (p *Alarm) Record(alarmType AlarmType, level AlarmLevel, message string) {
 	// donot record empty alarmType
-	if len(alarmType) == 0 {
+	if len(alarmType) == 0 || !level.IsValid() {
 		return
 	}
-	mu.Lock()
-	alarmItem, existFlag := p.AlarmMap[alarmType]
+	alarmMutex.Lock()
+
+	alarmKey := alarmType.String() + "_" + level.String()
+	alarmItem, existFlag := p.AlarmMap[alarmKey]
 	if !existFlag {
-		alarmItem = &AlarmItem{}
-		p.AlarmMap[alarmType] = alarmItem
+		alarmItem = &AlarmItem{
+			AlarmType: alarmType,
+			Level:     level,
+		}
+		p.AlarmMap[alarmKey] = alarmItem
 	}
 	alarmItem.Message = message
 	alarmItem.Count++
-	mu.Unlock()
+	alarmMutex.Unlock()
 }
 
 func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 	nowTime := time.Now()
-	mu.Lock()
-	for alarmType, item := range p.AlarmMap {
+	alarmMutex.Lock()
+	for _, item := range p.AlarmMap {
 		if item.Count == 0 {
 			continue
 		}
 		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project_name", Value: p.Project})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: p.Logstore})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: alarmType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: item.AlarmType.String()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_level", Value: item.Level.String()})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: GetIPAddress()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "os", Value: runtime.GOOS})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ver", Value: config.BaseVersion})
+		if p.Project != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project_name", Value: p.Project})
+		}
+		if p.Logstore != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: p.Logstore})
+		}
+		if p.Config != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "config", Value: p.Config})
+		}
 		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		logGroup.Logs = append(logGroup.Logs, log)
 		// clear after serialize
 		item.Count = 0
 		item.Message = ""
 	}
-	mu.Unlock()
+	alarmMutex.Unlock()
 }
 
 func init() {
 	GlobalAlarm = new(Alarm)
-	GlobalAlarm.Init("", "")
+	GlobalAlarm.Init("", "", "")
 	RegisterAlarms = make(map[string]*Alarm)
 }

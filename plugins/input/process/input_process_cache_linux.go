@@ -45,12 +45,12 @@ type processCacheLinux struct {
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
 	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
-		logger.Error(context.Background(), "OPEN_PROCFS_ALARM", "error", err)
+		logger.Warning(context.Background(), "OPEN_PROCFS_ALARM", "error", err)
 		return nil, err
 	}
 	procs, err := fs.AllProcs()
 	if err != nil {
-		logger.Error(context.Background(), "PROCESS_LIST_ALARM", "error", err)
+		logger.Warning(context.Background(), "PROCESS_LIST_ALARM", "error", err)
 		return nil, err
 	}
 	if len(procs) == 0 {

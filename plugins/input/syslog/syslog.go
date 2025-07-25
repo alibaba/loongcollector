@@ -126,7 +126,7 @@ func (s *Syslog) Start(collector pipeline.Collector) error {
 	if s.isStream {
 		l, err := net.Listen(scheme, host)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_INIT_ALARM", "net.Listen error", err,
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_INIT_ALARM", "net.Listen error", err,
 				"Address", s.Address, "scheme", scheme, "host", host)
 			return err
 		}
@@ -138,7 +138,7 @@ func (s *Syslog) Start(collector pipeline.Collector) error {
 	} else {
 		l, err := net.ListenPacket(scheme, host)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_INIT_ALARM", "net.ListenPacket error", err,
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_INIT_ALARM", "net.ListenPacket error", err,
 				"Address", s.Address, "scheme", scheme, "host", host)
 			return err
 		}
@@ -160,7 +160,7 @@ func (s *Syslog) Stop() error {
 
 	if s.Closer != nil {
 		if err := s.Close(); err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "Syslog.Close error", err,
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "Syslog.Close error", err,
 				"Address", s.Address)
 		}
 	}
@@ -171,12 +171,12 @@ func (s *Syslog) Stop() error {
 	if s.isUnix {
 		_, host, err := getAddressParts(s.Address)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "getAddressParts error", err,
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "getAddressParts error", err,
 				"Address", s.Address)
 		}
 		err = os.Remove(host)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "os.Remove error", err,
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_CLOSE_ALARM", "os.Remove error", err,
 				"Host", host)
 		}
 	}
@@ -257,7 +257,7 @@ Loop:
 			}
 
 			// Alarm and sleep (with backoff).
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "accept error", err)
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "accept error", err)
 			if s.sleepWithChan(backoff.Next()) {
 				break
 			}
@@ -277,7 +277,7 @@ Loop:
 		s.connectionsMu.Unlock()
 
 		if err := s.setKeepAlive(tcpConn); err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "setKeepAlive error", err)
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "setKeepAlive error", err)
 		}
 
 		s.connectionsWg.Add(1)
@@ -323,7 +323,7 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
 				continue
 			}
 
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "scan error", err)
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM", "scan error", err)
 			if s.sleepWithChan(backoff.Next()) || backoff.CanQuit() {
 				break
 			}
@@ -339,7 +339,7 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
 		s.resetTimeout(conn)
 	}
 	if err := scanner.Err(); err != nil {
-		logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM",
+		logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_STREAM_ALARM",
 			"quit stream connection because of scan error out of loop", err)
 	}
 	logger.Info(s.context.GetRuntimeContext(), "handle for connection", conn.RemoteAddr().String(), "quit")
@@ -375,7 +375,7 @@ func (s *Syslog) listenPacket(collector pipeline.Collector) {
 				continue
 			}
 
-			logger.Error(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_PACKET_ALARM", "read from error", err)
+			logger.Warning(s.context.GetRuntimeContext(), "SERVICE_SYSLOG_PACKET_ALARM", "read from error", err)
 			if s.sleepWithChan(backoff.Next()) {
 				break
 			}

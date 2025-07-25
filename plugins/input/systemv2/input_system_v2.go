@@ -83,7 +83,7 @@ func (r *InputSystem) CommonInit(context pipeline.Context) (int, error) {
 	if r.ExcludeDiskFsType != "" {
 		reg, err := regexp.Compile(r.ExcludeDiskFsType)
 		if err != nil {
-			logger.Error(r.context.GetRuntimeContext(), "COMPILE_REGEXP_ALARM", "err", err)
+			logger.Warning(r.context.GetRuntimeContext(), "COMPILE_REGEXP_ALARM", "err", err)
 			return 0, err
 		}
 		r.excludeDiskFsTypeRegex = reg
@@ -91,7 +91,7 @@ func (r *InputSystem) CommonInit(context pipeline.Context) (int, error) {
 	if r.ExcludeDiskPath != "" {
 		reg, err := regexp.Compile(r.ExcludeDiskPath)
 		if err != nil {
-			logger.Error(r.context.GetRuntimeContext(), "COMPILE_REGEXP_ALARM", "err", err)
+			logger.Warning(r.context.GetRuntimeContext(), "COMPILE_REGEXP_ALARM", "err", err)
 			return 0, err
 		}
 		r.excludeDiskPathRegex = reg
@@ -145,7 +145,7 @@ func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
 		if len(cpushareEnv) > 0 {
 			cpuRequest, err := strconv.Atoi(cpushareEnv)
 			if err != nil || cpuRequest <= 0 || ncpus == 0 {
-				logger.Error(r.context.GetRuntimeContext(), "GET_SIGMA_ENV_ERROR", "get sigma env failed",
+				logger.Warning(r.context.GetRuntimeContext(), "GET_SIGMA_ENV_ERROR", "get sigma env failed",
 					"error", err,
 					"ncpus", ncpus,
 					"SIGMA_CPU_REQUEST", cpushareEnv)
@@ -387,7 +387,7 @@ func (r *InputSystem) Collect(collector pipeline.Collector) error {
 			return nil
 		})
 		if err != nil {
-			logger.Error(r.context.GetRuntimeContext(), "READ_DISK_ALARM", "read disk metrics timeout, would skip disk collection", err)
+			logger.Warning(r.context.GetRuntimeContext(), "READ_DISK_ALARM", "read disk metrics timeout, would skip disk collection", err)
 			r.Disk = false
 		}
 	}

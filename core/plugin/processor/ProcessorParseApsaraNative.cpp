@@ -150,12 +150,12 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
             }
         }
 
-        GetContext().GetAlarm().SendAlarm(PARSE_TIME_FAIL_ALARM,
-                                          bufOut.to_string() + " $ " + ToString(logTime),
-                                          GetContext().GetRegion(),
-                                          GetContext().GetProjectName(),
-                                          GetContext().GetConfigName(),
-                                          GetContext().GetLogstoreName());
+        GetContext().GetAlarm().SendAlarmWarning(PARSE_TIME_FAIL_ALARM,
+                                                 bufOut.to_string() + " $ " + ToString(logTime),
+                                                 GetContext().GetRegion(),
+                                                 GetContext().GetProjectName(),
+                                                 GetContext().GetConfigName(),
+                                                 GetContext().GetLogstoreName());
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         sourceEvent.DelContent(mSourceKey);
         if (mCommonParserOptions.ShouldAddSourceContent(false)) {
@@ -185,13 +185,13 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                         "project", GetContext().GetProjectName())("logstore", GetContext().GetLogstoreName())(
                         "config", GetContext().GetConfigName())("file", logPath));
             }
-            GetContext().GetAlarm().SendAlarm(OUTDATED_LOG_ALARM,
-                                              std::string("logTime: ") + ToString(logTime)
-                                                  + ", log:" + bufOut.to_string(),
-                                              GetContext().GetRegion(),
-                                              GetContext().GetProjectName(),
-                                              GetContext().GetConfigName(),
-                                              GetContext().GetLogstoreName());
+            GetContext().GetAlarm().SendAlarmWarning(OUTDATED_LOG_ALARM,
+                                                     std::string("logTime: ") + ToString(logTime)
+                                                         + ", log:" + bufOut.to_string(),
+                                                     GetContext().GetRegion(),
+                                                     GetContext().GetProjectName(),
+                                                     GetContext().GetConfigName(),
+                                                     GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mHistoryFailureTotal, 1);
         ADD_COUNTER(mDiscardedEventsTotal, 1);

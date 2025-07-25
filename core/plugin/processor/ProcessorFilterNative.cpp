@@ -268,12 +268,12 @@ bool ProcessorFilterNative::IsMatched(const LogEvent& contents, const LogFilterR
             if (!exception.empty()) {
                 LOG_ERROR(GetContext().GetLogger(), ("regex_match in Filter fail", exception));
                 if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
-                    GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                                      "regex_match in Filter fail:" + exception,
-                                                      GetContext().GetRegion(),
-                                                      GetContext().GetProjectName(),
-                                                      GetContext().GetConfigName(),
-                                                      GetContext().GetLogstoreName());
+                    GetContext().GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
+                                                             "regex_match in Filter fail:" + exception,
+                                                             GetContext().GetRegion(),
+                                                             GetContext().GetProjectName(),
+                                                             GetContext().GetConfigName(),
+                                                             GetContext().GetLogstoreName());
                 }
             }
             return false;
@@ -467,12 +467,12 @@ bool RegexFilterValueNode::Match(const LogEvent& contents, const CollectionPipel
     if (!result && !exception.empty() && AppConfig::GetInstance()->IsLogParseAlarmValid()) {
         LOG_ERROR(mContext.GetLogger(), ("regex_match in Filter fail", exception));
         if (mContext.GetAlarm().IsLowLevelAlarmValid()) {
-            mContext.GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                          "regex_match in Filter fail:" + exception,
-                                          mContext.GetRegion(),
-                                          mContext.GetProjectName(),
-                                          mContext.GetConfigName(),
-                                          mContext.GetLogstoreName());
+            mContext.GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
+                                                 "regex_match in Filter fail:" + exception,
+                                                 mContext.GetRegion(),
+                                                 mContext.GetProjectName(),
+                                                 mContext.GetConfigName(),
+                                                 mContext.GetLogstoreName());
         }
     }
     return result;

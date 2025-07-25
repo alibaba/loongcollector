@@ -103,14 +103,14 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	if m.JDKPath != "" {
 		abs, err := filepath.Abs(filepath.Clean(m.JDKPath))
 		if err != nil {
-			logger.Error(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk path illegal", m.JDKPath)
+			logger.Warning(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk path illegal", m.JDKPath)
 			return 0, err
 		}
 		javaCmd := abs + "/bin/java"
 		stat, err := os.Stat(javaCmd)
 		// 73: 000 001 001 001
 		if err != nil || stat.IsDir() || stat.Mode().Perm()&os.FileMode(73) == 0 {
-			logger.Error(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk cmd path illegal", javaCmd)
+			logger.Warning(m.context.GetRuntimeContext(), "PATH_ALARM", "the configured jdk cmd path illegal", javaCmd)
 			return 0, err
 		}
 	}

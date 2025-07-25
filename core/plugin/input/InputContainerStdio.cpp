@@ -157,12 +157,12 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
                             "stderr logs at the same time, there may be issues with merging multiple lines";
         LOG_WARNING(sLogger, ("warning", warningMsg)("config", mContext->GetConfigName()));
         warningMsg = "warning msg: " + warningMsg + "\tconfig: " + mContext->GetConfigName();
-        mContext->GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
-                                       warningMsg,
-                                       GetContext().GetRegion(),
-                                       GetContext().GetProjectName(),
-                                       GetContext().GetConfigName(),
-                                       GetContext().GetLogstoreName());
+        mContext->GetAlarm().SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                              warningMsg,
+                                              GetContext().GetRegion(),
+                                              GetContext().GetProjectName(),
+                                              GetContext().GetConfigName(),
+                                              GetContext().GetLogstoreName());
     }
 
     // init PluginMetricManager
@@ -249,14 +249,15 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
             sLogger,
             ("failed to set container base dir", "container log path not existed")("container id", containerInfo.mID)(
                 "container log path", containerInfo.mLogPath)("input", sName)("config", ctx->GetPipeline().Name()));
-        ctx->GetAlarm().SendAlarm(INVALID_CONTAINER_PATH_ALARM,
-                                  "failed to set container base dir: container log path not existed\tcontainer id: "
-                                      + ToString(containerInfo.mID) + "\tcontainer log path: " + containerInfo.mLogPath
-                                      + "\tconfig: " + ctx->GetPipeline().Name(),
-                                  ctx->GetRegion(),
-                                  ctx->GetProjectName(),
-                                  ctx->GetPipeline().Name(),
-                                  ctx->GetLogstoreName());
+        ctx->GetAlarm().SendAlarmWarning(
+            INVALID_CONTAINER_PATH_ALARM,
+            "failed to set container base dir: container log path not existed\tcontainer id: "
+                + ToString(containerInfo.mID) + "\tcontainer log path: " + containerInfo.mLogPath
+                + "\tconfig: " + ctx->GetPipeline().Name(),
+            ctx->GetRegion(),
+            ctx->GetProjectName(),
+            ctx->GetPipeline().Name(),
+            ctx->GetLogstoreName());
         return false;
     }
     size_t pos = realPath.find_last_of('/');

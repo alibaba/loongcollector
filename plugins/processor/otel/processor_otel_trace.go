@@ -57,7 +57,7 @@ func (p *ProcessorOtelTraceParser) ProcessLogs(logArray []*protocol.Log) []*prot
 	var logs = make([]*protocol.Log, 0)
 	for _, log := range logArray {
 		if l, err := p.processLog(log); err != nil {
-			logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_TRACE_PARSER_ALARM", "parser otel trace error %v", err)
+			logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_TRACE_PARSER_ALARM", "parser otel trace error %v", err)
 		} else {
 			logs = append(logs, l...)
 		}

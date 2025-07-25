@@ -126,9 +126,9 @@ func (sj *ServiceJournal) SaveCheckpoint(forceFlag bool) {
 		sj.ResetIntervalSecond = defaultResetInterval
 	}
 	if cursor, err := sj.journal.GetCursor(); err != nil {
-		logger.Error(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "get cursor error", err)
+		logger.Warning(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "get cursor error", err)
 	} else if err := sj.context.SaveCheckPoint(checkPointKey, []byte(cursor)); err != nil {
-		logger.Error(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "save checkpoint error", err)
+		logger.Warning(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "save checkpoint error", err)
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const LogTailMeta LogtailMetaKey = "LogtailContextMeta"
@@ -30,7 +30,7 @@ type LogtailContextMeta struct {
 	logstore     string
 	configName   string
 	loggerHeader string
-	alarm        *util.Alarm
+	alarm        *selfmonitor.Alarm
 }
 
 type LogtailMetaKey string
@@ -41,14 +41,14 @@ func NewLogtailContextMeta(project, logstore, configName string) (context.Contex
 		project:    project,
 		logstore:   logstore,
 		configName: config.GetRealConfigName(configName),
-		alarm:      new(util.Alarm),
+		alarm:      new(selfmonitor.Alarm),
 	}
 	if len(logstore) == 0 {
 		meta.loggerHeader = "[" + configName + "]\t"
 	} else {
 		meta.loggerHeader = "[" + configName + "," + logstore + "]\t"
 	}
-	meta.alarm.Init(project, logstore)
+	meta.alarm.Init(project, logstore, configName)
 	ctx := context.WithValue(context.Background(), LogTailMeta, meta)
 	return ctx, meta
 }
@@ -84,13 +84,13 @@ func (c *LogtailContextMeta) GetConfigName() string {
 	return c.configName
 }
 
-func (c *LogtailContextMeta) GetAlarm() *util.Alarm {
+func (c *LogtailContextMeta) GetAlarm() *selfmonitor.Alarm {
 	return c.alarm
 }
 
-func (c *LogtailContextMeta) RecordAlarm(alarmType, msg string) {
+func (c *LogtailContextMeta) RecordAlarm(alarmType selfmonitor.AlarmType, alarmLevel selfmonitor.AlarmLevel, msg string) {
 	if c.alarm == nil {
 		return
 	}
-	c.alarm.Record(alarmType, msg)
+	c.alarm.Record(alarmType, alarmLevel, msg)
 }

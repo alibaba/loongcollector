@@ -100,8 +100,8 @@ EventDispatcher::EventDispatcher() : mWatchNum(0), mInotifyWatchNum(0), mEventLi
     // #endif
     if (!AppConfig::GetInstance()->NoInotify()) {
         if (!mEventListener->Init()) {
-            AlarmManager::GetInstance()->SendAlarm(EPOLL_ERROR_ALARM,
-                                                   string("faild to init inotify fd, errno:") + ToString(GetErrno()));
+            AlarmManager::GetInstance()->SendAlarmCritical(
+                EPOLL_ERROR_ALARM, string("faild to init inotify fd, errno:") + ToString(GetErrno()));
             LOG_ERROR(sLogger, ("faild to init inotify fd, errno:", errno));
         }
     } else {
@@ -159,13 +159,13 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
     if (!fsutil::PathStat::stat(path, statBuf)) {
         if (errno != EEXIST) {
             LOG_WARNING(sLogger, ("call stat() on path fail", path)("errno", errno));
-            AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
-                                                   "call stat() on path fail" + string(path)
-                                                       + ", errno: " + ToString(errno) + ", will not be monitored",
-                                                   config.second->GetRegion(),
-                                                   config.second->GetProjectName(),
-                                                   config.second->GetConfigName(),
-                                                   config.second->GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(
+                REGISTER_INOTIFY_FAIL_ALARM,
+                "call stat() on path fail" + string(path) + ", errno: " + ToString(errno) + ", will not be monitored",
+                config.second->GetRegion(),
+                config.second->GetProjectName(),
+                config.second->GetConfigName(),
+                config.second->GetLogstoreName());
         }
         LOG_DEBUG(sLogger, ("call stat() on path fail", path)("errno", errno));
         return false;
@@ -214,14 +214,14 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
     if (mWatchNum >= INT32_FLAG(max_watch_dir_count)) {
         LOG_WARNING(sLogger,
                     ("fail to monitor dir, max_watch_dir_count", INT32_FLAG(max_watch_dir_count))("dir", path));
-        AlarmManager::GetInstance()->SendAlarm(DIR_EXCEED_LIMIT_ALARM,
-                                               string("dir: ") + path
-                                                   + " will not monitored, dir count should less than "
-                                                   + ToString(INT32_FLAG(max_watch_dir_count)),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmError(DIR_EXCEED_LIMIT_ALARM,
+                                                    string("dir: ") + path
+                                                        + " will not monitored, dir count should less than "
+                                                        + ToString(INT32_FLAG(max_watch_dir_count)),
+                                                    config.second->GetRegion(),
+                                                    config.second->GetProjectName(),
+                                                    config.second->GetConfigName(),
+                                                    config.second->GetLogstoreName());
         return false;
     }
 
@@ -230,12 +230,12 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
         LOG_INFO(sLogger,
                  ("failed to add inotify watcher for dir", path)("max allowed inotify watchers",
                                                                  INT32_FLAG(default_max_inotify_watch_num)));
-        AlarmManager::GetInstance()->SendAlarm(INOTIFY_DIR_NUM_LIMIT_ALARM,
-                                               string("failed to register inotify watcher for dir") + path,
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmError(INOTIFY_DIR_NUM_LIMIT_ALARM,
+                                                    string("failed to register inotify watcher for dir") + path,
+                                                    config.second->GetRegion(),
+                                                    config.second->GetProjectName(),
+                                                    config.second->GetConfigName(),
+                                                    config.second->GetLogstoreName());
     } else {
         // need check mEventListener valid
         if (mEventListener->IsInit() && !AppConfig::GetInstance()->IsInInotifyBlackList(path)) {
@@ -249,35 +249,36 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
                     LOG_ERROR(sLogger,
                               ("failed to register dir", path)("errno", errno)("error", str)("force exit",
                                                                                              "wait 10 seconds."));
-                    AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
-                                                           string("Failed to register dir:  ") + path + ", errno: "
-                                                               + ToString(errno) + ", error: " + str + ", force exit",
-                                                           config.second->GetRegion(),
-                                                           config.second->GetProjectName(),
-                                                           config.second->GetConfigName(),
-                                                           config.second->GetLogstoreName());
+                    AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM,
+                                                                   string("Failed to register dir:  ") + path
+                                                                       + ", errno: " + ToString(errno)
+                                                                       + ", error: " + str + ", force exit",
+                                                                   config.second->GetRegion(),
+                                                                   config.second->GetProjectName(),
+                                                                   config.second->GetConfigName(),
+                                                                   config.second->GetLogstoreName());
                     AlarmManager::GetInstance()->ForceToSend();
                     sleep(10);
                     _exit(1);
                 }
 #endif
                 if (config.first->IsTimeout(path))
-                    AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
-                                                           string("Failed to register dir: ") + path + ", reason: "
-                                                               + str + ", project: " + config.second->GetProjectName()
-                                                               + ", logstore: " + config.second->GetLogstoreName(),
-                                                           config.second->GetRegion(),
-                                                           config.second->GetProjectName(),
-                                                           config.second->GetConfigName(),
-                                                           config.second->GetLogstoreName());
+                    AlarmManager::GetInstance()->SendAlarmWarning(
+                        REGISTER_INOTIFY_FAIL_ALARM,
+                        string("Failed to register dir: ") + path + ", reason: " + str + ", project: "
+                            + config.second->GetProjectName() + ", logstore: " + config.second->GetLogstoreName(),
+                        config.second->GetRegion(),
+                        config.second->GetProjectName(),
+                        config.second->GetConfigName(),
+                        config.second->GetLogstoreName());
                 else
-                    AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
-                                                           string("Failed to register dir: ") + path
-                                                               + ", reason: " + str + ", no timeout",
-                                                           config.second->GetRegion(),
-                                                           config.second->GetProjectName(),
-                                                           config.second->GetConfigName(),
-                                                           config.second->GetLogstoreName());
+                    AlarmManager::GetInstance()->SendAlarmWarning(REGISTER_INOTIFY_FAIL_ALARM,
+                                                                  string("Failed to register dir: ") + path
+                                                                      + ", reason: " + str + ", no timeout",
+                                                                  config.second->GetRegion(),
+                                                                  config.second->GetProjectName(),
+                                                                  config.second->GetConfigName(),
+                                                                  config.second->GetLogstoreName());
             } else {
                 // recheck inode, wd is relevance to inode
                 if (mWdDirInfoMap.find(wd) != mWdDirInfoMap.end()) {
@@ -561,7 +562,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             ("delete checkpoint", "cannot find the file because of full find cache")("config", checkpoint->mConfigName)(
                 "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
                 "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmWarning(
             CHECKPOINT_ALARM,
             string("cannot find the file because of full find cache, delete the checkpoint, log reader queue name: ")
                 + filePath + ", real file path: " + realFilePath,
@@ -935,8 +936,8 @@ void EventDispatcher::PropagateTimeout(const std::string& path) {
     auto pathpos = mPathWdMap.find(path);
     if (pathpos == mPathWdMap.end()) {
         // walkarond of bug#5760293, should find the scenarios
-        AlarmManager::GetInstance()->SendAlarm(INVALID_MEMORY_ACCESS_ALARM,
-                                               "PropagateTimeout access invalid key of mPathWdMap, path : " + path);
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            INVALID_MEMORY_ACCESS_ALARM, "PropagateTimeout access invalid key of mPathWdMap, path : " + path);
         LOG_ERROR(sLogger, ("PropagateTimeout access invalid key of mPathWdMap, path", path));
         return;
     }

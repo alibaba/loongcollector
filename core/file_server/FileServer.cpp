@@ -48,8 +48,8 @@ void FileServer::Start() {
     ConfigManager::GetInstance()->RegisterHandlers();
     auto costMs = GetCurrentTimeInMilliSeconds() - start;
     if (costMs >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(REGISTER_HANDLERS_TOO_SLOW_ALARM,
-                                               "Registering handlers took " + ToString(costMs) + " ms");
+        AlarmManager::GetInstance()->SendAlarmWarning(REGISTER_HANDLERS_TOO_SLOW_ALARM,
+                                                      "Registering handlers took " + ToString(costMs) + " ms");
         LOG_WARNING(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
     } else {
         LOG_INFO(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
@@ -90,8 +90,8 @@ void FileServer::PauseInner() {
     LogInput::GetInstance()->HoldOn();
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                               "Pausing file server took " + ToString(holdOnCost) + "ms");
+        AlarmManager::GetInstance()->SendAlarmError(HOLD_ON_TOO_SLOW_ALARM,
+                                                    "Pausing file server took " + ToString(holdOnCost) + "ms");
     }
     LOG_INFO(sLogger, ("file server pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));
 }

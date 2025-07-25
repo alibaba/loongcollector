@@ -120,7 +120,7 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	} else {
 		selector, err := labels.Parse(in.LabelSelectors)
 		if err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_LABEL_SELECTOR_ERROR", "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_LABEL_SELECTOR_ERROR", "error", err)
 			selector = labels.Everything()
 		}
 		in.selector = selector
@@ -202,7 +202,7 @@ func (in *InputKubernetesMeta) Collect(collector pipeline.Collector) error {
 	for _, c := range in.collectors {
 		nodes, err := c.collect(c.lister, in.selector)
 		if err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_COLLECT_ERROR", "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_COLLECT_ERROR", "error", err)
 			continue
 		}
 		if len(nodes) == 0 {

@@ -246,7 +246,7 @@ func (idf *InputDockerFile) addMappingToLogtail(info *containercenter.DockerInfo
 		return
 	}
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFile, "cmd", cmdBuf, "error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -258,7 +258,7 @@ func (idf *InputDockerFile) deleteMappingFromLogtail(id string) {
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerDeleteFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerDeleteFile, "cmd", cmdBuf, "error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerDeleteFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -270,7 +270,7 @@ func (idf *InputDockerFile) notifyStopToLogtail(id string) {
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerStopFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerStopFile, "cmd", cmdBuf, "error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerStopFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -280,7 +280,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 	cmdBuf, _ := json.Marshal(allCmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFileAll, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFileAll, "cmd", cmdBuf, "error", err)
+		logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFileAll, "cmd", cmdBuf, "error", err)
 	}
 }
 

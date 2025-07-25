@@ -46,7 +46,7 @@ void logDatabaseError(const std::string& op, const std::string& key, const level
     std::string msg;
     msg.append("op:").append(op).append(", key:").append(key).append(", status:").append(s.ToString());
     LOG_ERROR(sLogger, (title, msg));
-    AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_V2_ALARM, title + ", " + msg);
+    AlarmManager::GetInstance()->SendAlarmWarning(CHECKPOINT_V2_ALARM, title + ", " + msg);
 }
 
 // Range key is represented by data pointer and size to avoid copy.

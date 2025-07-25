@@ -29,7 +29,7 @@ func ContainerProcessAlive(pid int) bool {
 	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
 	exist, err := util.PathExists(procStatPath)
 	if err != nil {
-		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
+		logger.Warning(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
 	} else if !exist {
 		return false
 	}

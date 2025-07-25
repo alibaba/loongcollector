@@ -38,7 +38,7 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             LOG_WARNING(
                 sLogger,
                 ("failed to build task for existing config", "keep current task running")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build task for existing config: keep current task running, config: " + config.mName);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
@@ -60,9 +60,9 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build task for new config", "skip current object")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "failed to build task for new config: skip current object, config: "
-                                                       + config.mName);
+            AlarmManager::GetInstance()->SendAlarmError(
+                CATEGORY_CONFIG_ALARM,
+                "failed to build task for new config: skip current object, config: " + config.mName);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;

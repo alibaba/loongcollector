@@ -157,14 +157,14 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                         LOG_WARNING(pipeline->GetContext().GetLogger(),
                                     ("failed to serialize event group",
                                      errorMsg)("action", "discard data")("config", configName));
-                        pipeline->GetContext().GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                                                    "failed to serialize event group: " + errorMsg
-                                                                        + "\taction: discard data\tconfig: "
-                                                                        + configName,
-                                                                    pipeline->GetContext().GetRegion(),
-                                                                    pipeline->GetContext().GetProjectName(),
-                                                                    configName,
-                                                                    pipeline->GetContext().GetLogstoreName());
+                        pipeline->GetContext().GetAlarm().SendAlarmWarning(
+                            SERIALIZE_FAIL_ALARM,
+                            "failed to serialize event group: " + errorMsg
+                                + "\taction: discard data\tconfig: " + configName,
+                            pipeline->GetContext().GetRegion(),
+                            pipeline->GetContext().GetProjectName(),
+                            configName,
+                            pipeline->GetContext().GetLogstoreName());
                         continue;
                     }
                     LogtailPlugin::GetInstance()->ProcessLogGroup(

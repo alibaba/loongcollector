@@ -29,7 +29,7 @@ func (in *InputKubernetesMeta) collectStorageClass(lister interface{}, selector 
 	}
 	storageClasses, err := lister.(storage.StorageClassLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	nodes = make([]*helper.MetaNode, 0, len(storageClasses))

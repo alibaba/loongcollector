@@ -88,7 +88,7 @@ bool AdhocJobCheckpoint::Load(const std::string& path) {
         std::ifstream ifs(path);
         if (!ifs.is_open()) {
             LOG_ERROR(sLogger, ("open adhoc check point file error when load, file path", path));
-            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file failed");
+            AlarmManager::GetInstance()->SendAlarmWarning(CHECKPOINT_ALARM, "open check point file failed");
             return false;
         }
 
@@ -159,7 +159,7 @@ void AdhocJobCheckpoint::Dump(const std::string& path, bool isAutoDump) {
 
     if (!Mkdirs(ParentPath(path))) {
         LOG_ERROR(sLogger, ("open adhoc check point file dir error when dump, file path", path));
-        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open adhoc check point file dir failed");
+        AlarmManager::GetInstance()->SendAlarmWarning(CHECKPOINT_ALARM, "open adhoc check point file dir failed");
         return;
     }
 
@@ -211,7 +211,7 @@ void AdhocJobCheckpoint::Dump(const std::string& path, bool isAutoDump) {
     std::ofstream ofs(path);
     if (!ofs.is_open()) {
         LOG_ERROR(sLogger, ("open adhoc check point file error, file path", path));
-        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open adhoc check point file failed");
+        AlarmManager::GetInstance()->SendAlarmWarning(CHECKPOINT_ALARM, "open adhoc check point file failed");
         return;
     }
     ofs << jsonString;

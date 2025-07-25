@@ -155,12 +155,12 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
                                 "logstore", GetContext().GetLogstoreName())("config", GetContext().GetConfigName())(
                                 "file", logPath));
             }
-            AlarmManager::GetInstance()->SendAlarm(OUTDATED_LOG_ALARM,
-                                                   std::string("logTime: ") + ToString(logTime.tv_sec),
-                                                   GetContext().GetRegion(),
-                                                   GetContext().GetProjectName(),
-                                                   GetContext().GetConfigName(),
-                                                   GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(OUTDATED_LOG_ALARM,
+                                                          std::string("logTime: ") + ToString(logTime.tv_sec),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mHistoryFailureTotal, 1);
         ADD_COUNTER(mDiscardedEventsTotal, 1);
@@ -212,12 +212,12 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
                             ("parse time fail", curTimeStr)("project", GetContext().GetProjectName())(
                                 "logstore", GetContext().GetLogstoreName())("file", logPath));
             }
-            AlarmManager::GetInstance()->SendAlarm(PARSE_TIME_FAIL_ALARM,
-                                                   curTimeStr.to_string() + " " + mSourceFormat,
-                                                   GetContext().GetRegion(),
-                                                   GetContext().GetProjectName(),
-                                                   GetContext().GetConfigName(),
-                                                   GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_TIME_FAIL_ALARM,
+                                                          curTimeStr.to_string() + " " + mSourceFormat,
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
         }
         return false;
     }

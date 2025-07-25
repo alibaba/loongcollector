@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // ManagerMeta is designed for a special input plugin to log self telemetry data, such as telegraf.
@@ -75,19 +75,23 @@ func (b *ManagerMeta) Delete(prj, logstore, cfg string) {
 }
 
 func (b *ManagerMeta) UpdateAlarm() {
-	var prjSlice, logstoresSlice []string
+	var prjSlice, logstoresSlice, configSlice []string
 	for prj, logstores := range b.Metas {
-		for logstore := range logstores {
+		for logstore, configs := range logstores {
 			logstoresSlice = append(logstoresSlice, logstore)
+			for config := range configs {
+				configSlice = append(configSlice, config)
+			}
 		}
 		prjSlice = append(prjSlice, prj)
 	}
 	sort.Strings(prjSlice)
 	sort.Strings(logstoresSlice)
-	b.meta.GetAlarm().Update(strings.Join(prjSlice, ","), strings.Join(logstoresSlice, ","))
+	sort.Strings(configSlice)
+	b.meta.GetAlarm().Update(strings.Join(prjSlice, ","), strings.Join(logstoresSlice, ","), strings.Join(configSlice, ","))
 }
 
-func (b *ManagerMeta) GetAlarm() *util.Alarm {
+func (b *ManagerMeta) GetAlarm() *selfmonitor.Alarm {
 	return b.meta.GetAlarm()
 }
 
