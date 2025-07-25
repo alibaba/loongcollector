@@ -661,3 +661,58 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
 int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* key, void* value, uint64_t flag) {
     return gWrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
 }
+
+std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type) {
+    std::vector<int> epollFds;
+    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE || type == logtail::ebpf::PluginType::MAX) {
+        return epollFds;
+    }
+
+    std::vector<void*> pbs = gPluginPbs[int(type)];
+
+    if (pbs.empty()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
+        return epollFds;
+    }
+
+    for (auto& pb : pbs) {
+        if (!pb) {
+            continue;
+        }
+        int epollFd = gWrapper->GetPerfBufferEpollFd(pb);
+        if (epollFd >= 0) {
+            epollFds.push_back(epollFd);
+        } else {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "failed to get epoll fd for perf buffer\n");
+        }
+    }
+
+    return epollFds;
+}
+
+int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
+    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE || type == logtail::ebpf::PluginType::MAX) {
+        return 0;
+    }
+
+    std::vector<void*> pbs = gPluginPbs[int(type)];
+
+    if (pbs.empty()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
+        return 0;
+    }
+
+    int cnt = 0;
+    for (auto& pb : pbs) {
+        if (!pb) {
+            continue;
+        }
+        int ret = gWrapper->ConsumePerfBuffer(pb);
+        if (ret < 0) {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "consume perf buffer data failed ...\n");
+        } else {
+            cnt += ret;
+        }
+    }
+    return cnt;
+}

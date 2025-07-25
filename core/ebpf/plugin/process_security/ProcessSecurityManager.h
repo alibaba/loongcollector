@@ -61,6 +61,7 @@ public:
 
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
+    int ConsumePerfBufferData() override { return 0; }
 
     bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
         return true;

@@ -59,6 +59,7 @@ public:
 
 protected:
     void SetUp() override {
+        mEBPFAdapter = std::make_shared<EBPFAdapter>();
         mEventQueue = std::make_unique<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>>();
 
         WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricRef,
@@ -73,20 +74,23 @@ protected:
             MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricRef);
 
-        mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager,
-                                                         nullptr, // EBPFAdapter
-                                                         *mEventQueue,
-                                                         mPluginMetricPtr);
+        mManager = std::make_shared<FileSecurityManager>(
+            mWrapper.mProcessCacheManager, mEBPFAdapter, *mEventQueue, mPluginMetricPtr, mRetryableEventCache);
     }
 
-    void TearDown() override { mWrapper.Clear(); }
+    void TearDown() override {
+        mWrapper.Clear();
+        mRetryableEventCache.Clear();
+    }
 
 private:
+    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     ProcessCacheManagerWrapper mWrapper;
     std::unique_ptr<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>> mEventQueue;
     std::shared_ptr<FileSecurityManager> mManager;
     MetricsRecordRef mMetricRef;
     PluginMetricManagerPtr mPluginMetricPtr;
+    RetryableEventCache mRetryableEventCache;
 };
 
 void FileSecurityManagerUnittest::TestConstructor() {
@@ -111,17 +115,19 @@ void FileSecurityManagerUnittest::TestRecordFileEvent() {
     // ProcessCacheManager is null
     file_data_t event = CreateMockFileEvent();
     mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                     nullptr, // EBPFAdapter
+                                                     mEBPFAdapter,
                                                      *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     mPluginMetricPtr,
+                                                     mRetryableEventCache);
     mManager->RecordFileEvent(&event);
     APSARA_TEST_EQUAL(0UL, mManager->EventCache().Size());
 
     // success
     mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
-                                                     nullptr, // EBPFAdapter
+                                                     mEBPFAdapter,
                                                      *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     mPluginMetricPtr,
+                                                     mRetryableEventCache);
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
@@ -169,9 +175,10 @@ void FileSecurityManagerUnittest::TestSendEvents() {
         1234, 123456789, KernelEventType::FILE_PERMISSION_EVENT, 1234567890123ULL, StringView("/etc/passwd"));
     // ProcessCacheManager is null
     mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                     nullptr, // EBPFAdapter
+                                                     mEBPFAdapter,
                                                      *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     mPluginMetricPtr,
+                                                     mRetryableEventCache);
     mManager->mInited = true;
     mManager->HandleEvent(fileEvent);
     result = mManager->SendEvents();
@@ -179,9 +186,10 @@ void FileSecurityManagerUnittest::TestSendEvents() {
 
     // failed to finalize process tags
     mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
-                                                     nullptr, // EBPFAdapter
+                                                     mEBPFAdapter,
                                                      *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     mPluginMetricPtr,
+                                                     mRetryableEventCache);
     mManager->mInited = true;
     mManager->HandleEvent(fileEvent);
     result = mManager->SendEvents();

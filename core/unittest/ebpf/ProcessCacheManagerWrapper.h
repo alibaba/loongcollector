@@ -51,7 +51,6 @@ public:
         auto processCacheMissTotal = mMetricRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
         auto processCacheSize = mMetricRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
         auto processDataMapSize = mMetricRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
-        auto retryableEventCacheSize = mMetricRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricRef);
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                      "test_host",
@@ -62,13 +61,14 @@ public:
                                                                      processCacheMissTotal,
                                                                      processCacheSize,
                                                                      processDataMapSize,
-                                                                     retryableEventCacheSize);
+                                                                     mRetryableEventCache);
     }
     ~ProcessCacheManagerWrapper() { std::filesystem::remove_all(mTestRoot); }
 
     void Clear() {
         mEventQueue = moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>();
         std::filesystem::remove_all(mTestRoot);
+        mRetryableEventCache.Clear();
     }
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
@@ -77,4 +77,5 @@ public:
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::filesystem::path mTestRoot;
     std::filesystem::path mProcDir;
+    RetryableEventCache mRetryableEventCache;
 };
