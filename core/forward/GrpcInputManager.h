@@ -106,7 +106,6 @@ public:
 
     template <typename T>
     bool AddListenInput(const std::string& configName, const std::string& address, const Json::Value& config);
-    template <typename T>
     bool RemoveListenInput(const std::string& address, const std::string& configName);
 
 private:

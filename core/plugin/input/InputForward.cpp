@@ -140,8 +140,7 @@ bool InputForward::Start() {
 }
 
 bool InputForward::Stop(bool isPipelineRemoving) {
-    bool result
-        = GrpcInputManager::GetInstance()->RemoveListenInput<LoongSuiteForwardServiceImpl>(mEndpoint, mConfigName);
+    bool result = GrpcInputManager::GetInstance()->RemoveListenInput(mEndpoint, mConfigName);
 
     if (result) {
         LOG_INFO(sLogger, ("InputForward stopped successfully", mEndpoint)("config", mConfigName));

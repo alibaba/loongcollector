@@ -133,7 +133,6 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
 }
 
 // Remove an address from the listen inputs
-template <typename T>
 bool GrpcInputManager::RemoveListenInput(const std::string& address, const std::string& configName) {
     std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
     auto it = mListenAddressToInputMap.find(address);
@@ -183,12 +182,10 @@ bool GrpcInputManager::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<
 template bool GrpcInputManager::AddListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
                                                                              const std::string&,
                                                                              const Json::Value&);
-template bool GrpcInputManager::RemoveListenInput<LoongSuiteForwardServiceImpl>(const std::string&, const std::string&);
 
 #ifdef APSARA_UNIT_TEST_MAIN
 template bool
 GrpcInputManager::AddListenInput<MockServiceImpl>(const std::string&, const std::string&, const Json::Value&);
-template bool GrpcInputManager::RemoveListenInput<MockServiceImpl>(const std::string&, const std::string&);
 #endif
 
 } // namespace logtail
