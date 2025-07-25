@@ -206,6 +206,8 @@ const (
 	EventTypeDelete         = "delete"
 	EventTypeDeferredDelete = "deferredDelete"
 	EventTypeTimer          = "timer"
+
+	K8sMetaUnifyErrorCode = "K8S_META_COLLECTOR_ERROR"
 )
 
 type PodMetadata struct {
