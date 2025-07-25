@@ -163,7 +163,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 		m.linkRegisterMap[configName] = append(m.linkRegisterMap[configName], resourceType)
 		m.registerLock.Unlock()
 	} else {
-		logger.Warning(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", resourceType)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", resourceType)
 	}
 }
 
