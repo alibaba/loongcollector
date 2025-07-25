@@ -237,7 +237,7 @@ func InitHTTPServer() {
 				logger.Info(context.Background(), "#####################################")
 				logger.Info(context.Background(), "start http server for logtail plugin profile or control")
 				logger.Info(context.Background(), "#####################################")
-				logger.Error(context.Background(), "INIT_HTTP_SERVER_ALARM", "err", http.ListenAndServe(*flags.HTTPAddr, mux)) //nolint
+				logger.Critical(context.Background(), "INIT_HTTP_SERVER_ALARM", "err", http.ListenAndServe(*flags.HTTPAddr, mux)) //nolint
 			}()
 		}
 	})

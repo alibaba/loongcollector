@@ -119,13 +119,13 @@ func LoadGlobalConfig(jsonStr string) int {
 			for _, log := range flags.LogsWaitToPrint {
 				switch log.LogType {
 				case flags.LogTypeError:
-					logger.Error(context.Background(), log.Content)
+					logger.Error(context.Background(), "", log.Content)
 				case flags.LogTypeInfo:
 					logger.Info(context.Background(), log.Content)
 				case flags.LogTypeDebug:
 					logger.Debug(context.Background(), log.Content)
 				case flags.LogTypeWarning:
-					logger.Warning(context.Background(), log.Content)
+					logger.Warning(context.Background(), "", log.Content)
 				}
 			}
 			logger.Info(context.Background(), "load global config", jsonStr)
@@ -150,7 +150,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		if err := recover(); err != nil {
 			trace := make([]byte, 2048)
 			runtime.Stack(trace, true)
-			logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "panicked", err, "stack", string(trace))
+			logger.Critical(context.Background(), "PLUGIN_RUNTIME_ALARM", "panicked", err, "stack", string(trace))
 		}
 	}()
 
@@ -159,7 +159,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		// Make deep copy if you want to save it in Go in the future.
 		logstoreKey, jsonStr)
 	if err != nil {
-		logger.Error(context.Background(), "CONFIG_LOAD_ALARM", "load config error, project",
+		logger.Critical(context.Background(), "CONFIG_LOAD_ALARM", "load config error, project",
 			project, "logstore", logstore, "config", configName, "error", err)
 		return 1
 	}
@@ -193,7 +193,7 @@ func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
 	config, flag := pluginmanager.LogtailConfig[configName]
 	pluginmanager.LogtailConfigLock.RUnlock()
 	if !flag {
-		logger.Error(context.Background(), "PLUGIN_ALARM", "config not found", configName)
+		logger.Critical(context.Background(), "PLUGIN_ALARM", "config not found", configName)
 		return -1
 	}
 	return config.ProcessLogGroup(logBytes, util.StringDeepCopy(packID))
@@ -344,14 +344,14 @@ func initPluginBase(cfgStr string) int {
 			instance := k8smeta.GetMetaManagerInstance()
 			err := instance.Init("")
 			if err != nil {
-				logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+				logger.Critical(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
 				return
 			}
 			stopCh := make(chan struct{})
 			instance.Run(stopCh)
 		}
 		if err := pluginmanager.Init(); err != nil {
-			logger.Error(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
+			logger.Critical(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
 			rst = 1
 		}
 		if pluginmanager.AlarmConfig != nil {
