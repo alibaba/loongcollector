@@ -103,6 +103,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
+- [github.com/aws/aws-sdk-go](https://pkg.go.dev/github.com/aws/aws-sdk-go?tab=licenses)
+- [github.com/jmespath/go-jmespath](https://pkg.go.dev/github.com/jmespath/go-jmespath?tab=licenses)
 
 ## BSD licenses
 
