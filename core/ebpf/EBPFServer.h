@@ -153,7 +153,6 @@ private:
     std::future<void> mIterator; // used to iterate bpf maps
 
     FrequencyManager mFrequencyMgr;
-    FrequencyManager mIteratorFrequencyMgr;
 
     // metrics
     CounterPtr mRecvKernelEventsTotal;
