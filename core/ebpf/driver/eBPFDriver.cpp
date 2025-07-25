@@ -80,8 +80,8 @@ void SetCoolBpfConfig(int32_t opt, int32_t value) {
     ebpf_config(opt, 0, 1, (void**)params, paramsLen);
 }
 
-void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update) {
-    ebpf_set_cid_filter(container_id, length, update);
+void set_networkobserver_cid_filter(const char* container_id, size_t length, uint64_t cid_key, bool update) {
+    ebpf_set_cid_filter(container_id, length, cid_key, update);
 }
 
 void set_networkobserver_config(int32_t opt, int32_t value) {

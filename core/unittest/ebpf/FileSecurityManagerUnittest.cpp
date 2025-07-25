@@ -75,8 +75,7 @@ protected:
 
         mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager,
                                                          nullptr, // EBPFAdapter
-                                                         *mEventQueue,
-                                                         mPluginMetricPtr);
+                                                         *mEventQueue);
     }
 
     void TearDown() override { mWrapper.Clear(); }
@@ -112,16 +111,14 @@ void FileSecurityManagerUnittest::TestRecordFileEvent() {
     file_data_t event = CreateMockFileEvent();
     mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
                                                      nullptr, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     *mEventQueue);
     mManager->RecordFileEvent(&event);
     APSARA_TEST_EQUAL(0UL, mManager->EventCache().Size());
 
     // success
     mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
                                                      nullptr, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     *mEventQueue);
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
@@ -170,8 +167,7 @@ void FileSecurityManagerUnittest::TestSendEvents() {
     // ProcessCacheManager is null
     mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
                                                      nullptr, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     *mEventQueue);
     mManager->mInited = true;
     mManager->HandleEvent(fileEvent);
     result = mManager->SendEvents();
@@ -180,8 +176,7 @@ void FileSecurityManagerUnittest::TestSendEvents() {
     // failed to finalize process tags
     mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
                                                      nullptr, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     mPluginMetricPtr);
+                                                     *mEventQueue);
     mManager->mInited = true;
     mManager->HandleEvent(fileEvent);
     result = mManager->SendEvents();
@@ -203,7 +198,7 @@ void FileSecurityManagerUnittest::TestSendEvents() {
     mManager->HandleEvent(fileEvent);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
-    mManager->UpdateContext(&ctx, 123, 1);
+    // mManager->UpdateContext(&ctx, 123, 1);
     result = mManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
@@ -221,7 +216,7 @@ void FileSecurityManagerUnittest::TestSendEvents() {
 
     QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("test_config");
     ctx.SetProcessQueueKey(queueKey);
-    mManager->UpdateContext(&ctx, queueKey, 1);
+    // mManager->UpdateContext(&ctx, queueKey, 1);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
     result = mManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);

@@ -21,11 +21,8 @@
 #include <random>
 
 #include "common/timer/Timer.h"
-#include "common/timer/TimerEvent.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
-#include "ebpf/type/ProcessEvent.h"
 #include "ebpf/util/AggregateTree.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -176,16 +173,17 @@ void AggregatorUnittest::TestAggregator() {
             LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime)("path", group->mPath));
             for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
-                if (innerEvent->mTimestamp == 9) {
+                auto* fe = static_cast<NetworkEvent*>(innerEvent.get());
+                if (fe->mTimestamp == 9) {
                     APSARA_TEST_EQUAL(group->mPid, 1U);
                     FileEvent* fe = static_cast<FileEvent*>(innerEvent.get());
                     APSARA_TEST_EQUAL(fe->mPath, "path-2");
                 }
                 auto* logEvent = eventGroup.AddLogEvent();
-                auto ts = innerEvent->mTimestamp;
+                auto ts = fe->mTimestamp;
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(ts));
                 logEvent->SetTimestamp(seconds.count(), ts);
-                if (innerEvent->mTimestamp) {
+                if (fe->mTimestamp) {
                 }
                 switch (innerEvent->mEventType) {
                     case KernelEventType::FILE_PATH_TRUNCATE: {
@@ -212,35 +210,6 @@ void AggregatorUnittest::TestAggregator() {
     APSARA_TEST_EQUAL(globalEventCnt, 10);
     APSARA_TEST_EQUAL(globalNodeCnt, 5);
     this->mAggregateTree->Reset();
-}
-
-void AggregatorUnittest::TestAggManager() {
-    // std::unique_ptr<AggregateEvent> event = std::make_unique<AggregateEvent>(
-    //     1,
-    //     [this](const std::chrono::steady_clock::time_point& execTime) { // handler
-    //         if (!this->mFlag) {
-    //             return false;
-    //         }
-    //         this->mVec.push_back(1);
-    //         return true;
-    //     },
-    //     [this]() { // validator
-    //         auto isStop = !this->mFlag.load();
-    //         if (isStop) {
-    //             LOG_INFO(sLogger, ("stop schedule, mflag", this->mFlag));
-    //         }
-    //         return isStop;
-    //     });
-
-    // Timer::GetInstance()->PushEvent(std::move(event));
-
-    // std::this_thread::sleep_for(std::chrono::seconds(4));
-    // mFlag = false;
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
-    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
-    // mFlag = true;
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
-    // APSARA_TEST_EQUAL(mVec.size(), 3UL);
 }
 
 void AggregatorUnittest::TestBasicAgg() {
@@ -279,7 +248,6 @@ void AggregatorUnittest::TestGetAndReset() {
 
 UNIT_TEST_CASE(AggregatorUnittest, TestBasicAgg);
 UNIT_TEST_CASE(AggregatorUnittest, TestGetAndReset);
-// UNIT_TEST_CASE(AggregatorUnittest, TestAggManager);
 UNIT_TEST_CASE(AggregatorUnittest, TestAggregator);
 
 

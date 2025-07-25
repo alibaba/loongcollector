@@ -57,7 +57,7 @@ public:
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
 
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
-    bool SetNetworkObserverCidFilter(const std::string&, bool update);
+    bool SetNetworkObserverCidFilter(const std::string&, bool update, uint64_t cidKey);
 
     // for bpf object operations ...
     bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);

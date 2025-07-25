@@ -34,8 +34,7 @@ extern "C" {
 
 namespace logtail::ebpf {
 
-class AbstractRecord;
-class ConnStatsRecord;
+inline constexpr int kConnectionEpoch = 3;
 
 struct ConnStatsData {
 public:
@@ -59,7 +58,9 @@ public:
     Connection& operator=(Connection&&) = delete;
     explicit Connection(const ConnId& connId) : mConnId(connId) {}
     void UpdateConnStats(struct conn_stats_event_t* event);
-    void UpdateConnState(struct conn_ctrl_event_t* event);
+    void UpdateConnState(struct conn_ctrl_event_t* event, bool& isClose);
+
+    [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
@@ -130,7 +131,7 @@ public:
     }
 
     void RecordActive() {
-        this->mEpoch = 4;
+        this->mEpoch = kConnectionEpoch;
         auto now = std::chrono::steady_clock::now();
         mLastActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
@@ -147,13 +148,16 @@ public:
     void TryAttachSelfMeta();
     void TryAttachPeerMeta(int family = -1, uint32_t ip = std::numeric_limits<uint32_t>::max());
 
-    bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
+    // bool GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in);
 
     [[nodiscard]] support_role_e GetRole() const { return mRole; }
 
     [[nodiscard]] unsigned int GetMetaFlags() const { return mMetaFlags.load(); }
 
     void MarkConnDeleted() { mMetaFlags.fetch_or(kSFlagConnDeleted, std::memory_order_release); }
+
+    static std::string gSelfPodName;
+    static std::string gSelfPodIp;
 
 private:
     void updateL4Meta(struct conn_stats_event_t* event);
@@ -165,6 +169,7 @@ private:
     // self pod meta
     void updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod);
     void updateSelfPodMetaForUnknown();
+    void updateSelfPodMetaForEnv();
 
     using Flag = unsigned int;
 
@@ -202,7 +207,9 @@ private:
 
     StaticDataRow<&kConnTrackerTable> mTags;
 
-    std::atomic_int mEpoch = 4;
+    size_t mCidKey = 0;
+
+    std::atomic_int mEpoch = kConnectionEpoch;
     std::atomic_bool mIsClose = false;
     std::chrono::time_point<std::chrono::steady_clock> mMarkCloseTime;
     int64_t mLastUpdateTs = 0;
@@ -211,6 +218,7 @@ private:
     static std::regex mContainerIdRegex;
 
     ConnStatsData mCurrStats;
+
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "Connection.h"
+#include "ebpf/plugin/network_observer/Connection.h"
 
 #include <cctype>
 
@@ -22,6 +22,7 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "metadata/K8sMetadata.h"
+#include "plugin/network_observer/NetworkObserverManager.h"
 
 extern "C" {
 #include <coolbpf/net.h>
@@ -48,9 +49,10 @@ bool Connection::IsLocalhost() const {
 }
 
 // only called by poller thread ...
-void Connection::UpdateConnState(struct conn_ctrl_event_t* event) {
+void Connection::UpdateConnState(struct conn_ctrl_event_t* event, bool& isClose) {
     if (EventClose == event->type) {
         MarkClose();
+        isClose = true;
     } else if (EventConnect == event->type) {
         // a new connection established, do nothing...
     }
@@ -94,21 +96,6 @@ void Connection::UpdateConnStats(struct conn_stats_event_t* event) {
     this->RecordLastUpdateTs(event->ts);
 }
 
-bool Connection::GenerateConnStatsRecord(const std::shared_ptr<AbstractRecord>& in) {
-    auto* record = static_cast<ConnStatsRecord*>(in.get());
-    if (!record) {
-        return false;
-    }
-
-    record->mRecvPackets = (mCurrStats.mRecvPackets == 0) ? 0 : mCurrStats.mRecvPackets;
-    record->mSendPackets = (mCurrStats.mSendPackets == 0) ? 0 : mCurrStats.mSendPackets;
-    record->mRecvBytes = (mCurrStats.mRecvBytes == 0) ? 0 : mCurrStats.mRecvBytes;
-    record->mSendBytes = (mCurrStats.mSendBytes == 0) ? 0 : mCurrStats.mSendBytes;
-    mCurrStats.Clear();
-
-    return true;
-}
-
 void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) {
     if (IsL7MetaAttachReady()) {
         return;
@@ -148,6 +135,7 @@ void Connection::updateL4Meta(struct conn_stats_event_t* event) {
             cidTrim = match.str(0);
         }
     }
+    mCidKey = GenerateContainerKey(cidTrim);
 
     // handle socket info ...
     struct socket_info& si = event->si;
@@ -188,8 +176,6 @@ void Connection::updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         workloadKind[0] = std::toupper(workloadKind[0]); // upper case
     }
 
-    mTags.Set<kAppId>(pod->mAppId);
-    mTags.Set<kAppName>(pod->mAppName);
     mTags.Set<kPodName>(pod->mPodName);
     mTags.Set<kPodIp>(pod->mPodIp);
     mTags.Set<kWorkloadName>(pod->mWorkloadName);
@@ -199,7 +185,6 @@ void Connection::updateSelfPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
 }
 
 void Connection::updatePeerPodMetaForExternal() {
-    mTags.SetNoCopy<kPeerAppName>(kExternalStr);
     mTags.SetNoCopy<kPeerPodName>(kExternalStr);
     mTags.SetNoCopy<kPeerPodIp>(kExternalStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kExternalStr);
@@ -214,7 +199,6 @@ void Connection::updatePeerPodMetaForExternal() {
 }
 
 void Connection::updatePeerPodMetaForLocalhost() {
-    mTags.SetNoCopy<kPeerAppName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerPodName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerPodIp>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kLocalhostStr);
@@ -225,9 +209,13 @@ void Connection::updatePeerPodMetaForLocalhost() {
     }
 }
 
+void Connection::updateSelfPodMetaForEnv() {
+    mTags.SetNoCopy<kPodIp>(gSelfPodIp);
+    mTags.SetNoCopy<kHostName>(gSelfPodName);
+    mTags.SetNoCopy<kPodName>(gSelfPodName);
+}
+
 void Connection::updateSelfPodMetaForUnknown() {
-    mTags.SetNoCopy<kAppName>(kUnknownStr);
-    mTags.SetNoCopy<kAppId>(kUnknownStr);
     mTags.SetNoCopy<kPodIp>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadName>(kUnknownStr);
     mTags.SetNoCopy<kWorkloadKind>(kUnknownStr);
@@ -246,7 +234,6 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
         peerWorkloadKind[0] = std::toupper(peerWorkloadKind[0]);
     }
 
-    mTags.Set<kPeerAppName>(pod->mAppName.size() ? pod->mAppName : kUnknownStr);
     mTags.Set<kPeerPodName>(pod->mPodName.size() ? pod->mPodName : kUnknownStr);
     mTags.Set<kPeerPodIp>(pod->mPodIp.size() ? pod->mPodIp : kUnknownStr);
     mTags.Set<kPeerWorkloadName>(pod->mWorkloadName.size() ? pod->mWorkloadName : kUnknownStr);
@@ -276,6 +263,7 @@ void Connection::TryAttachSelfMeta() {
     }
     if (!K8sMetadata::GetInstance().Enable()) {
         // set self metadata ...
+        updateSelfPodMetaForEnv();
         MarkSelfMetaAttached();
         return;
     }
@@ -350,5 +338,15 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
         K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::IpInfo, dip);
     }
 }
+
+std::string Connection::gSelfPodName = [] {
+    const char* podName = std::getenv("POD_NAME");
+    return podName ? podName : "";
+}();
+
+std::string Connection::gSelfPodIp = [] {
+    const char* podIp = std::getenv("POD_IP");
+    return podIp ? podIp : "";
+}();
 
 } // namespace logtail::ebpf

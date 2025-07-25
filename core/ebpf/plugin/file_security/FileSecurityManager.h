@@ -38,19 +38,17 @@ public:
     FileSecurityManager() = delete;
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        const PluginMetricManagerPtr& metricManager);
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
 
     static std::shared_ptr<FileSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
+        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue);
     }
 
     ~FileSecurityManager() {}
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
     void RecordFileEvent(file_data_t* event);
@@ -63,11 +61,21 @@ public:
     int SendEvents() override;
     int PollPerfBuffer(int maxWaitTimeMs) override;
 
-    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
-        return true;
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+        mLossKernelEventsTotal = std::move(lossEventsTotal);
     }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
+
+    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -87,10 +95,27 @@ private:
     RetryableEventCache mRetryableEventCache;
     int64_t mLastEventCacheRetryTime = 0;
 
+    std::vector<MetricLabels> mRefAndLabels;
+    PluginMetricManagerPtr mMetricMgr;
+    std::string mConfigName;
+
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    uint32_t mPluginIndex{0};
+
+    int mRegisteredConfigCount = 0;
+
     ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
+
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+
+    // runner metrics
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
 };
 
 } // namespace logtail::ebpf

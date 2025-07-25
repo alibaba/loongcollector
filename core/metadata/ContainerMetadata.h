@@ -18,9 +18,9 @@
 
 #include <mutex>
 
-#include "ContainerInfo.h"
 #include "common/LRUCache.h"
 #include "common/StringView.h"
+#include "metadata/ContainerInfo.h"
 
 namespace logtail {
 

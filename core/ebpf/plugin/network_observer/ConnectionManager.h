@@ -24,9 +24,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "Connection.h"
 #include "common/Lock.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
+#include "ebpf/plugin/network_observer/Connection.h"
 extern "C" {
 #include <coolbpf/net.h>
 };
@@ -40,7 +40,7 @@ public:
         return std::unique_ptr<ConnectionManager>(new ConnectionManager(maxConnections));
     }
 
-    using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
+    // using ConnStatsHandler = std::function<void(std::shared_ptr<AbstractRecord>& record)>;
 
     ~ConnectionManager() {}
 
@@ -50,15 +50,13 @@ public:
 
     void Iterations();
 
-    void SetConnStatsStatus(bool enable) { mEnableConnStats = enable; }
-
-    void RegisterConnStatsFunc(ConnStatsHandler fn) { mConnStatsHandler = fn; }
-
     int64_t ConnectionTotal() const { return mConnectionTotal.load(); }
     void UpdateMaxConnectionThreshold(int max) { mMaxConnections = max; }
 
 private:
     explicit ConnectionManager(int maxConnections) : mMaxConnections(maxConnections), mConnectionTotal(0) {}
+
+    void cleanClosedConnections();
 
     std::shared_ptr<Connection> getOrCreateConnection(const ConnId&);
     void deleteConnection(const ConnId&);
@@ -67,7 +65,11 @@ private:
     std::atomic_int mMaxConnections;
 
     std::atomic_bool mEnableConnStats = false;
-    ConnStatsHandler mConnStatsHandler = nullptr;
+
+    int mLastGcTimeMs = INT_MIN; // frequency control ...
+    int mGcIntervalMs = 5000; // 5s
+
+    std::array<std::vector<ConnId>, kConnectionEpoch> mClosedConnections;
 
     std::atomic_int64_t mConnectionTotal;
     // object pool, used for cache some conn_tracker objects
@@ -75,11 +77,12 @@ private:
     // mutable ReadWriteLock mReadWriteLock;
     std::unordered_map<ConnId, std::shared_ptr<Connection>> mConnections;
 
-    int64_t mLastReportTs = -1;
     friend class NetworkObserverManager;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
 #endif
 };
 
