@@ -1301,6 +1301,8 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                                                     SLSClientManager::AuthType type,
                                                                     SLSSenderQueueItem* item) const {
     map<string, string> header;
+    header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
+    header.insert({APM_HEADER_PROJECT, mProject});
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  type,
