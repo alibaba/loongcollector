@@ -19,6 +19,7 @@
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "runner/ProcessorRunner.h"
 
 namespace logtail {
 
@@ -59,7 +60,9 @@ bool ProcessorParseRegexNative::Init(const Json::Value& config) {
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    mReg = boost::regex(mRegex);
+    for (int i = 0; i < AppConfig::GetInstance()->GetProcessThreadCount(); ++i) {
+        mReg.emplace_back(mRegex);
+    }
     mIsWholeLineMode = mRegex == "(.*)";
 
     // Keys
@@ -142,7 +145,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
     if (mIsWholeLineMode) {
         parseSuccess = WholeLineModeParser(sourceEvent, mKeys.empty() ? DEFAULT_CONTENT_KEY : mKeys[0]);
     } else {
-        parseSuccess = RegexLogLineParser(sourceEvent, mReg, mKeys, logPath);
+        parseSuccess = RegexLogLineParser(sourceEvent, mReg[ProcessorRunner::GetThreadNo()], mKeys, logPath);
     }
 
     if (!parseSuccess || !mSourceKeyOverwritten) {
