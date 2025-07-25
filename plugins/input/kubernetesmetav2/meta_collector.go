@@ -233,7 +233,7 @@ func (m *metaCollector) handleEvent(event []*k8smeta.K8sMetaEvent) {
 			m.handleDelete(e)
 		}
 	default:
-		logger.Error(context.Background(), "UNKNOWN_EVENT_TYPE", "unknown event type", event[0].EventType)
+		logger.Warning(context.Background(), "UNKNOWN_EVENT_TYPE", "unknown event type", event[0].EventType)
 	}
 }
 
@@ -307,7 +307,7 @@ func (m *metaCollector) processEntityJSONObject(obj interface{}) string {
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
-		logger.Error(context.Background(), "PROCESS_ENTITY_JSON_OBJECT_FAIL", "process entity json object fail", err)
+		logger.Warning(context.Background(), "PROCESS_ENTITY_JSON_OBJECT_FAIL", "process entity json object fail", err)
 		return emptyJSONObjectString
 	}
 	return string(objStr)
@@ -319,7 +319,7 @@ func (m *metaCollector) processEntityJSONArray(obj []map[string]string) string {
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
-		logger.Error(context.Background(), "PROCESS_ENTITY_JSON_ARRAY_FAIL", "process entity json array fail", err)
+		logger.Warning(context.Background(), "PROCESS_ENTITY_JSON_ARRAY_FAIL", "process entity json array fail", err)
 		return "[]"
 	}
 	return string(objStr)
@@ -335,7 +335,7 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	select {
 	case buffer <- event:
 	case <-time.After(3 * time.Second):
-		logger.Error(context.Background(), "SEND_EVENT_TIMEOUT", "send event timeout, isEntity", entity)
+		logger.Warning(context.Background(), "SEND_EVENT_TIMEOUT", "send event timeout, isEntity", entity)
 	}
 }
 
@@ -448,7 +448,7 @@ func convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
-					logger.Error(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k)
+					logger.Warning(context.Background(), "COVERT_EVENT_TO_LOG_FAIL", "convert event to log fail, value is not string", v, "key", k)
 					continue
 				} else {
 					v = strconv.Itoa(intValue)

@@ -43,7 +43,7 @@ func (m *MeterHandler) Collect(srv agent.MeterReportService_CollectServer) error
 			if err == io.EOF {
 				return srv.SendAndClose(&v3.Commands{})
 			}
-			logger.Error(m.context.GetRuntimeContext(), "SKYWALKING_METER_GRPC_ERROR", "error", err)
+			logger.Warning(m.context.GetRuntimeContext(), "SKYWALKING_METER_GRPC_ERROR", "error", err)
 			return err
 		}
 		// logger.Info("service", service, "serviceInstance", serviceInstance, "meter", meterData.String())
