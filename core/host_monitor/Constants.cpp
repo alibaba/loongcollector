@@ -21,9 +21,15 @@
 namespace logtail {
 
 std::filesystem::path PROCESS_DIR = "/proc";
+std::filesystem::path ETC_DIR = "/etc";
+std::filesystem::path SYSTEM_BLOCK_DIR = "/sys/class/block";
 const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";
 const std::filesystem::path PROCESS_MEMINFO = "meminfo";
+const std::filesystem::path ETC_MTAB = "mtab";
+const std::filesystem::path PROCESS_UPTIME = "uptime";
+const std::filesystem::path SERIAL = "serial";
+const std::filesystem::path PROCESS_DISKSTATS = "diskstats";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 
 } // namespace logtail

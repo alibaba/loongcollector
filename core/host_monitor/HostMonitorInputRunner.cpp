@@ -36,6 +36,7 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
@@ -58,6 +59,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<CPUCollector>();
     RegisterCollector<SystemCollector>();
     RegisterCollector<MemCollector>();
+    RegisterCollector<DiskCollector>();
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0

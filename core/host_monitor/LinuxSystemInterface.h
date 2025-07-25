@@ -44,6 +44,11 @@ private:
     bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
 
+    bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) override;
+    bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) override;
+    bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override;
+    bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override;
+
     uint64_t GetMemoryValue(char unit, uint64_t value);
 
     ProcParser mProcParser;
