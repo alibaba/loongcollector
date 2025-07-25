@@ -52,7 +52,7 @@ func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string)
 		if err != nil {
 			logger.Debug(context.Background(), "parse statsd error", err)
 			if time.Since(d.Time).Seconds() > 10 {
-				logger.Error(context.Background(), "STATSD_PARSE_ALARM", "parse err", err)
+				logger.Warning(context.Background(), "STATSD_PARSE_ALARM", "parse err", err)
 				d.Time = time.Now()
 			}
 			continue

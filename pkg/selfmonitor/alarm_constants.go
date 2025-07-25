@@ -42,7 +42,7 @@ func (a AlarmLevel) IsValid() bool {
 }
 
 const (
-	AlarmLevelWaring   AlarmLevel = "1"
-	AlarmLevelError    AlarmLevel = "2"
-	AlarmLevelCritical AlarmLevel = "3"
+	AlarmLevelWaring   AlarmLevel = "1" // 单点报错，不影响整体流程
+	AlarmLevelError    AlarmLevel = "2" // 对主要流程有影响，如果不优化处理可能导致风险
+	AlarmLevelCritical AlarmLevel = "3" // 采集配置/重要模块不可用;对Agent稳定性造成影响;导致资损（数据丢失等）
 )

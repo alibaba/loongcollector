@@ -182,7 +182,7 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	case INGRESS:
 		informer = factory.Networking().V1().Ingresses().Informer()
 	default:
-		logger.Error(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", m.resourceType)
+		logger.Warning(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", m.resourceType)
 		return factory, nil
 	}
 	return factory, informer
@@ -213,19 +213,19 @@ func (m *k8sMetaCache) preProcess(obj interface{}) interface{} {
 func (m *k8sMetaCache) preProcessCommon(obj interface{}) interface{} {
 	runtimeObj, ok := obj.(runtime.Object)
 	if !ok {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not runtime object", obj)
+		logger.Warning(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not runtime object", obj)
 		return obj
 	}
 	metaObj, err := meta.Accessor(runtimeObj)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not meta object", err)
+		logger.Warning(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not meta object", err)
 		return obj
 	}
 	// fill empty kind
 	if runtimeObj.GetObjectKind().GroupVersionKind().Empty() {
 		gvk, err := apiutil.GVKForObject(runtimeObj, m.schema)
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "get GVK for object error", err)
+			logger.Warning(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "get GVK for object error", err)
 			return obj
 		}
 		runtimeObj.GetObjectKind().SetGroupVersionKind(gvk)
@@ -243,7 +243,7 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 	processedObj := m.preProcessCommon(obj)
 	pod, ok := processedObj.(*v1.Pod)
 	if !ok {
-		logger.Error(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod after common preprocessing", processedObj)
+		logger.Warning(context.Background(), "K8S_META_PRE_PROCESS_ERROR", "object is not pod after common preprocessing", processedObj)
 		return processedObj
 	}
 	pod.ManagedFields = []metav1.ManagedFieldsEntry{}
