@@ -57,6 +57,7 @@
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #endif
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "plugin/processor/ProcessorSPL.h"
@@ -162,6 +163,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseFromPBNative>());
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());

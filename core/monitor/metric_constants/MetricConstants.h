@@ -208,6 +208,12 @@ extern const std::string METRIC_PLUGIN_PARSE_STDERR_TOTAL;
 extern const std::string METRIC_PLUGIN_PARSE_STDOUT_TOTAL;
 
 /**********************************************************
+ *   processor_parse_from_pb_native
+ **********************************************************/
+extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL;
+extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL;
+
+/**********************************************************
  *   flusher_sls
  **********************************************************/
 extern const std::string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL;
