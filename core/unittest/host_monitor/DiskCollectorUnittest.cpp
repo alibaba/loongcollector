@@ -235,8 +235,7 @@ void DiskCollectorUnittest::TestCollect() const {
         "DiskIOQueueSize_min",
         "DiskIOQueueSize_max",
     };
-    vector<double> expected_values
-        = {0.67,0,1, 0.67,0,1, 341,0,512, 341,0,512, 0.000133333,0,0.0002};
+    vector<double> expected_values = {0.67, 0, 1, 0.67, 0, 1, 341, 0, 512, 341, 0, 512, 0.000133333, 0, 0.0002};
     auto event = group.GetEvents()[0].Cast<MetricEvent>();
     auto maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
 

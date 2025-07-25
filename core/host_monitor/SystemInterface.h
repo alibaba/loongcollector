@@ -46,17 +46,14 @@ struct SystemInformation : public BaseInformation {
 
 class ScopeGuard {
     std::function<void()> fn;
-public:
-    explicit ScopeGuard(std::function<void()> f)
-            : fn(std::move(f)) {
-    }
 
-    ~ScopeGuard() {
-        fn();
-    }
+public:
+    explicit ScopeGuard(std::function<void()> f) : fn(std::move(f)) {}
+
+    ~ScopeGuard() { fn(); }
 };
 
-#define defer3(ln, statement) ScopeGuard __ ## ln ## _defer_([&](){statement;})
+#define defer3(ln, statement) ScopeGuard __##ln##_defer_([&]() { statement; })
 #define defer2(ln, statement) defer3(ln, statement)
 #define defer(statement) defer2(__LINE__, statement)
 
@@ -256,7 +253,6 @@ struct DiskState {
 
     uint64_t time; // 输入输出花费的毫秒数
     uint64_t qTime; // 输入/输出操作花费的加权毫秒数
-
 };
 
 struct DiskStateInformation : public BaseInformation {
