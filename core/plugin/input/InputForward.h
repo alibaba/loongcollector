@@ -26,14 +26,12 @@ namespace logtail {
 struct MatchRule {
     std::string key;
     std::string value;
-    
+
     bool IsMatch(const std::string& inputKey, const std::string& inputValue) const {
         return key == inputKey && value == inputValue;
     }
-    
-    bool IsEmpty() const {
-        return key.empty() && value.empty();
-    }
+
+    bool IsEmpty() const { return key.empty() && value.empty(); }
 };
 
 class InputForward : public Input {
@@ -59,4 +57,4 @@ private:
 #endif
 };
 
-} // namespace logtail 
+} // namespace logtail
