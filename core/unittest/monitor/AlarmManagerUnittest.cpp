@@ -48,7 +48,7 @@ void AlarmManagerUnittest::TestSendAlarm() {
         std::string category = "TestCategory";
         AlarmType alarmType = USER_CONFIG_ALARM; // Assuming USER_CONFIG_ALARM is valid
 
-        AlarmManager::GetInstance()->SendAlarm(alarmType, message, region, projectName, config, category);
+        AlarmManager::GetInstance()->SendAlarmWarning(alarmType, message, region, projectName, config, category);
         // Assuming we have a method to retrieve alarms for testing
         AlarmManager::AlarmVector& alarmBufferVec
             = *AlarmManager::GetInstance()->MakesureLogtailAlarmMapVecUnlocked(region);
@@ -69,8 +69,8 @@ void AlarmManagerUnittest::TestSendAlarm() {
 void AlarmManagerUnittest::TestFlushAllRegionAlarm() {
     AlarmManager::GetInstance()->mAllAlarmMap.clear();
     // Simulate adding some alarms
-    AlarmManager::GetInstance()->SendAlarm(USER_CONFIG_ALARM, "Test1", "Region1", "Project1", "Config1", "Cat1");
-    AlarmManager::GetInstance()->SendAlarm(GLOBAL_CONFIG_ALARM, "Test2", "Region2", "Project2", "Config2", "Cat2");
+    AlarmManager::GetInstance()->SendAlarmWarning(USER_CONFIG_ALARM, "Test1", "Region1", "Project1", "Config1", "Cat1");
+    AlarmManager::GetInstance()->SendAlarmWarning(GLOBAL_CONFIG_ALARM, "Test2", "Region2", "Project2", "Config2", "Cat2");
 
     std::vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);

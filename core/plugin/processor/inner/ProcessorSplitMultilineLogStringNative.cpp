@@ -115,13 +115,13 @@ bool ProcessorSplitMultilineLogStringNative::IsSupportedEvent(const PipelineEven
     }
     LOG_ERROR(mContext->GetLogger(),
               ("unexpected error", "unsupported log event")("processor", sName)("config", mContext->GetConfigName()));
-    mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                   "unexpected error: unsupported log event.\tprocessor: " + sName
-                                       + "\tconfig: " + mContext->GetConfigName(),
-                                   mContext->GetRegion(),
-                                   mContext->GetProjectName(),
-                                   mContext->GetConfigName(),
-                                   mContext->GetLogstoreName());
+    mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                          "unexpected error: unsupported log event.\tprocessor: " + sName
+                                              + "\tconfig: " + mContext->GetConfigName(),
+                                          mContext->GetRegion(),
+                                          mContext->GetProjectName(),
+                                          mContext->GetConfigName(),
+                                          mContext->GetLogstoreName());
     return false;
 }
 
@@ -147,13 +147,13 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
         newEvents.emplace_back(std::move(e));
         LOG_ERROR(mContext->GetLogger(),
                   ("unexpected error", errorMsg)("processor", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                       "unexpected error: " + errorMsg + ".\tprocessor: " + sName
-                                           + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mContext->GetLogstoreName());
+        mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                              "unexpected error: " + errorMsg + ".\tprocessor: " + sName
+                                                  + "\tconfig: " + mContext->GetConfigName(),
+                                              mContext->GetRegion(),
+                                              mContext->GetProjectName(),
+                                              mContext->GetConfigName(),
+                                              mContext->GetLogstoreName());
         return;
     }
 
@@ -368,7 +368,7 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
                         "first line:", sourceVal.substr(0, fisrtLogSize).to_string())("filepath", logPath.to_string())(
                         "processor", sName)("config", mContext->GetConfigName())("total lines", totalLines)(
                         "log bytes", sourceVal.size() + 1));
-        mContext->GetAlarm().SendAlarm(
+        mContext->GetAlarm().SendAlarmWarning(
             SPLIT_LOG_FAIL_ALARM,
             "unmatched log string, first line:" + sourceVal.substr(0, fisrtLogSize).to_string() + "\taction: "
                 + UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment) + "\tfilepath: "

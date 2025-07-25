@@ -100,13 +100,13 @@ bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& 
     LOG_ERROR(
         mContext->GetLogger(),
         ("unexpected error", "some events are not supported")("processor", sName)("config", mContext->GetConfigName()));
-    mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                   "unexpected error: some events are not supported.\tprocessor: " + sName
-                                       + "\tconfig: " + mContext->GetConfigName(),
-                                   mContext->GetRegion(),
-                                   mContext->GetProjectName(),
-                                   mContext->GetConfigName(),
-                                   mContext->GetLogstoreName());
+    mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                          "unexpected error: some events are not supported.\tprocessor: " + sName
+                                              + "\tconfig: " + mContext->GetConfigName(),
+                                          mContext->GetRegion(),
+                                          mContext->GetProjectName(),
+                                          mContext->GetConfigName(),
+                                          mContext->GetLogstoreName());
     return false;
 }
 
@@ -204,14 +204,14 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
             LOG_ERROR(mContext->GetLogger(),
                       ("unexpected error", "Some events do not have the SourceKey.")("processor", sName)(
                           "SourceKey", mSourceKey)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                           "unexpected error: some events do not have the sourceKey.\tSourceKey: "
-                                               + mSourceKey + "\tprocessor: " + sName
-                                               + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(
+                SPLIT_LOG_FAIL_ALARM,
+                "unexpected error: some events do not have the sourceKey.\tSourceKey: " + mSourceKey
+                    + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName(),
+                mContext->GetRegion(),
+                mContext->GetProjectName(),
+                mContext->GetConfigName(),
+                mContext->GetLogstoreName());
             return;
         }
         StringView sourceVal = sourceEvent->GetContent(mSourceKey);
@@ -366,7 +366,7 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
                     "action", UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment))(
                     "first 1KB", sourceVal.substr(0, 1024).to_string())("filepath", logPath.to_string())(
                     "processor", sName)("config", GetContext().GetConfigName())("log bytes", sourceVal.size() + 1));
-            GetContext().GetAlarm().SendAlarm(
+            GetContext().GetAlarm().SendAlarmWarning(
                 SPLIT_LOG_FAIL_ALARM,
                 "unmatched log line, first 1KB:" + sourceVal.substr(0, 1024).to_string() + "\taction: "
                     + UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment) + "\tfilepath: "
