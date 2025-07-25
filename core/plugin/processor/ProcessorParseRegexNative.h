@@ -57,7 +57,7 @@ private:
 
     bool mSourceKeyOverwritten = false;
     bool mIsWholeLineMode = false;
-    boost::regex mReg;
+    std::vector<boost::regex> mReg;
 
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;
