@@ -175,17 +175,10 @@ public:
     const std::string& Name() const override { return sName; }
 
 private:
-    static std::string FormatDir(const std::string& dir);
     int GetDeviceMountMap(std::map<std::string, DeviceMountInfo>& mountMap);
     int GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>& diskCollectStatMap);
     int GetFileSystemInfos(std::vector<FileSystemInfo>& fileSystemInfos);
     int GetFileSystemStat(const std::string& dirName, FileSystemUsage& fileSystemUsage);
-    void GetDiskMetricData(const std::string& metricName,
-                           const std::string& devName,
-                           const std::string& diskSerialId,
-                           double value,
-                           const std::string& ns,
-                           MetricData& metricData);
     std::string GetDiskName(const std::string& dev);
     int GetDiskStat(dev_t rDev, const std::string& dirName, DiskUsage& disk, DiskUsage& deviceUsage);
     int CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage);

@@ -288,20 +288,7 @@ void DiskCollector::CalcDiskMetric(const DiskStat& current,
     diskMetric.avgrq_sz = (rd_ios + wr_ios) > 0 ? (rd_sec + wr_sec) / (rd_ios + wr_ios) : 0.0;
     diskMetric.util = tick / (10.0 * interval);
 }
-void DiskCollector::GetDiskMetricData(const std::string& metricName,
-                                      const std::string& devName,
-                                      const std::string& diskSerialId,
-                                      double value,
-                                      const std::string& ns,
-                                      MetricData& metricData) {
-    metricData.tagMap["metricName"] = metricName;
-    metricData.tagMap["diskname"] = devName;
-    metricData.valueMap["metricValue"] = value;
-    metricData.tagMap["ns"] = ns;
-    if (!diskSerialId.empty()) {
-        metricData.tagMap["id_serial"] = diskSerialId;
-    }
-}
+
 int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>& diskCollectStatMap) {
     std::map<std::string, DeviceMountInfo> deviceMountMap;
     int num = GetDeviceMountMap(deviceMountMap);
@@ -619,15 +606,6 @@ int DiskCollector::GetFileSystemInfos(std::vector<FileSystemInfo>& fileSystemInf
         fileSystemInfos.push_back(fileSystemInfo);
     }
     return 0;
-}
-
-std::string DiskCollector::FormatDir(const std::string& dir) {
-    std::string newDir = dir;
-    const char sep = '/';
-    if (!newDir.empty() && *newDir.rbegin() != sep) {
-        newDir += sep;
-    }
-    return newDir;
 }
 
 // 获取设备的名称
