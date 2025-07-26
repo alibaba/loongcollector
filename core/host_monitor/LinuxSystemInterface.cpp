@@ -315,7 +315,7 @@ bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& memi
 }
 
 // 已知文件系统
-const auto& knownFileSystem = *new std::unordered_map<std::string, FileSystemType>{
+static const auto& knownFileSystem = *new std::unordered_map<std::string, FileSystemType>{
     {"adfs", FILE_SYSTEM_TYPE_LOCAL_DISK},
     {"affs", FILE_SYSTEM_TYPE_LOCAL_DISK},
     {"anon-inode FS", FILE_SYSTEM_TYPE_LOCAL_DISK},
