@@ -40,6 +40,7 @@ const extern std::filesystem::path PROCESS_CWD;
 const extern std::filesystem::path PROCESS_UPTIME;
 const extern int EXECUTE_SUCCESS;
 const extern int EXECUTE_FAIL;
+const extern std::filesystem::path PROCESS_NET_IF_INET6;
 const extern int64_t SYSTEM_HERTZ;
 
 #ifdef __ENTERPRISE__

@@ -45,8 +45,8 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Timestamp = log.Timestamp
 
 				containerLog.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
-				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerTypeName))
-				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerTypeName, obj.Namespace, obj.Name+container.Name))
+				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerKindName))
+				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerKindName, obj.Namespace, obj.Name+container.Name))
 				containerLog.Contents.Add(entityMethodFieldName, method)
 
 				containerLog.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(data.FirstObservedTime, 10))
@@ -145,7 +145,12 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		addressStr, _ := json.Marshal(obj.Status.Addresses)
 		log.Contents.Add("addresses", string(addressStr))
 		log.Contents.Add("provider_id", obj.Spec.ProviderID)
-		return []models.PipelineEvent{log}
+		log.SetName(m.genEntityTypeKey(obj.Kind)) // used to determine whether a link need to be estabilished with cluster, only k8s.node requires it, infra.server link doest not
+
+		serverID := m.generateInfraServerKeyID(obj)
+		// generate k8s.node -> infra.server link
+		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverID)
+		return []models.PipelineEvent{log, logNodeInfraLink}
 	}
 	return nil
 }
@@ -167,9 +172,15 @@ func (m *metaCollector) processServiceEntity(data *k8smeta.ObjectWrapper, method
 		log.Contents.Add("cluster_ip", obj.Spec.ClusterIP)
 		ports := make([]map[string]string, 0)
 		for _, port := range obj.Spec.Ports {
+			targetPort := ""
+			if port.TargetPort.Type == 0 { // IntOrString type, 0 means int
+				targetPort = strconv.FormatInt(int64(port.TargetPort.IntVal), 10)
+			} else {
+				targetPort = port.TargetPort.StrVal
+			}
 			portInfo := map[string]string{
 				"port":       strconv.FormatInt(int64(port.Port), 10),
-				"targetPort": strconv.FormatInt(int64(port.TargetPort.IntVal), 10),
+				"targetPort": targetPort,
 				"protocol":   string(port.Protocol),
 			}
 			ports = append(ports, portInfo)
@@ -209,6 +220,7 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("kind", obj.Kind)
 		log.Contents.Add("name", obj.Name)
 		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
 		return []models.PipelineEvent{log}
 	}
 	return nil

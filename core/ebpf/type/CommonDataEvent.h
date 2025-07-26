@@ -32,6 +32,8 @@ enum class KernelEventType {
     FILE_PATH_TRUNCATE,
     FILE_MMAP,
     FILE_PERMISSION_EVENT,
+    FILE_PERMISSION_EVENT_WRITE,
+    FILE_PERMISSION_EVENT_READ,
 };
 
 class CommonEvent {
