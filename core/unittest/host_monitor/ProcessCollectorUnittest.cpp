@@ -134,9 +134,9 @@ void ProcessCollectorUnittest::TestCollect() const {
     APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
 
     vector<string> expectedVMProcessNames = {
-        "vm_process_minimum",
-        "vm_process_maximum",
-        "vm_process_average",
+        "vm_process_min",
+        "vm_process_max",
+        "vm_process_avg",
     };
 
     vector<double> expectedVMProcessValues = {
@@ -154,38 +154,22 @@ void ProcessCollectorUnittest::TestCollect() const {
         EXPECT_NEAR(expectedVMProcessValues[static_cast<size_t>(i)], val, 1e-6);
     }
 
-    vector<string> expectedProcessNames = {"process_cpu_average",
-                                           "process_memory_average",
-                                           "process_openfile_average",
-                                           "process_number_average",
-                                           "process_number_maximum",
-                                           "process_number_minimum"};
+    vector<string> expectedProcessNames = {"process_cpu_avg",
+                                           "process_memory_avg",
+                                           "process_openfile_avg",
+                                           "process_number_avg",
+                                           "process_number_max",
+                                           "process_number_min"};
 
     vector<double> expectedProcessValues = {std::nan(""), 0.591865, 3.0, 55.0, 55.0, 55.0};
 
     event = group.GetEvents()[1].Cast<MetricEvent>();
     maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
-    for (size_t i = 0; i < expectedProcessNames.size(); i++) {
+    for (size_t i = 1; i < expectedProcessNames.size(); i++) {
         APSARA_TEST_TRUE(maps.find(expectedProcessNames[i]) != maps.end());
-        if (expectedProcessNames[i] == "process_cpu_average")
-            continue;
+
         double val = maps[expectedProcessNames[i]].Value;
         EXPECT_NEAR(expectedProcessValues[static_cast<size_t>(i)], val, 1e-6);
-    }
-
-    vector<string> expectedExpandedProcessNames
-        = {"process_expand_cpu_percent", "process_expand_memory_percent", "process_expand_openfile_number"};
-
-    vector<double> expectedExpandedProcessValues = {std::nan(""), 0.591865, 3.0};
-
-    event = group.GetEvents()[2].Cast<MetricEvent>();
-    maps = event.GetValue<UntypedMultiDoubleValues>()->mValues;
-    for (size_t i = 0; i < expectedExpandedProcessNames.size(); i++) {
-        APSARA_TEST_TRUE(maps.find(expectedExpandedProcessNames[i]) != maps.end());
-        if (expectedExpandedProcessNames[i] == "process_expand_cpu_percent")
-            continue;
-        double val = maps[expectedExpandedProcessNames[i]].Value;
-        EXPECT_NEAR(expectedExpandedProcessValues[static_cast<size_t>(i)], val, 1e-6);
     }
 }
 

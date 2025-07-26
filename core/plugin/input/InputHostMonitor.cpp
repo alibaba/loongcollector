@@ -21,8 +21,8 @@
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
-#include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/NetCollector.h"
+#include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 
 namespace logtail {
@@ -124,7 +124,7 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     if (enableProcess) {
         mCollectors.push_back(ProcessCollector::sName);
     }
-    
+
     // net
     bool enableNet = true;
     if (!GetOptionalBoolParam(config, "EnableNet", enableNet, errorMsg)) {
