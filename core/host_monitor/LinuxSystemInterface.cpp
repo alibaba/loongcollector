@@ -715,8 +715,6 @@ bool LinuxSystemInterface::GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdline
         cmdline.cmdline.push_back(line);
     }
 
-    file.close();
-
     return true;
 }
 
@@ -762,37 +760,38 @@ bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformati
 
 bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) {
     auto processStatus = PROCESS_DIR / std::to_string(pid) / PROCESS_STATUS;
-    std::vector<std::string> processStatusString;
+
     std::vector<std::string> metric;
 
     std::ifstream file(static_cast<std::string>(processStatus));
 
     if (!file.is_open()) {
         LOG_ERROR(sLogger, ("open process status file", "fail")("file", processStatus));
+        return false;
     }
 
     std::string line;
-    while (std::getline(file, line)) {
-        processStatusString.push_back(line);
-    }
-    file.close();
-
     ProcessCred cred{};
+    bool getUID = false;
+    bool getGID = false;
+    bool getName = false;
+    while (std::getline(file, line) && !(getUID && getGID && getName)) {
+        boost::algorithm::split(metric, line, boost::algorithm::is_any_of("\t"), boost::algorithm::token_compress_on);
 
-    for (size_t i = 0; i < processStatusString.size(); ++i) {
-        boost::algorithm::split(
-            metric, processStatusString[i], boost::algorithm::is_any_of("\t"), boost::algorithm::token_compress_on);
         if (metric.front() == "Name:") {
             processCredName.name = metric[1];
+            getName = true;
         }
         if (metric.size() >= 3 && metric.front() == "Uid:") {
             int index = 1;
             cred.uid = static_cast<uint64_t>(std::stoull(metric[index++]));
             cred.euid = static_cast<uint64_t>(std::stoull(metric[index]));
+            getUID = true;
         } else if (metric.size() >= 3 && metric.front() == "Gid:") {
             int index = 1;
             cred.gid = static_cast<uint64_t>(std::stoull(metric[index++]));
             cred.egid = static_cast<uint64_t>(std::stoull(metric[index]));
+            getGID = true;
         }
     }
 
@@ -800,18 +799,18 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     passwd pwbuffer;
     char buffer[2048];
     if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0) {
-        return EXECUTE_FAIL;
+        return false;
     }
     if (pw == nullptr) {
-        return EXECUTE_FAIL;
+        return false;
     }
     processCredName.user = pw->pw_name;
 
     group* grp = nullptr;
     group grpbuffer{};
     char groupBuffer[2048];
-    if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp)) {
-        return EXECUTE_FAIL;
+    if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp) != 0) {
+        return false;
     }
 
     if (grp != nullptr && grp->gr_name != nullptr) {

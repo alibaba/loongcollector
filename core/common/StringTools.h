@@ -35,7 +35,7 @@
 #include "common/StringView.h"
 
 // C++11定义的空白符
-#define SPACE_CHARS " \f\n\r\t\v"
+const std::string SPACE_CHARS = " \f\n\r\t\v";
 
 namespace logtail {
 
@@ -391,21 +391,6 @@ inline std::string TrimLeftSpace(const std::string& str) {
 
 inline std::string TrimRightSpace(const std::string& str) {
     return TrimRight(str, SPACE_CHARS);
-}
-
-struct SplitOpt {
-    const bool bTrim;
-    const bool enableEmptyLine;
-
-    SplitOpt(bool t, bool e = false) : bTrim(t), enableEmptyLine(e) {} // NOLINT(*-explicit-constructor)
-};
-
-// 根据chars中的任意字符进行切分
-std::vector<std::string> split(const std::string& src, const std::string& chars, const SplitOpt& opt);
-
-// 根据给定的字符进行切分
-inline std::vector<std::string> split(const std::string& s, char delim, const SplitOpt& opt) {
-    return split(s, std::string{&delim, &delim + 1}, opt);
 }
 
 
