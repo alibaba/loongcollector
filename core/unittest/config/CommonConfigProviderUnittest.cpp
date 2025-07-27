@@ -53,12 +53,14 @@ public:
     string ilogtailConfigPath;
 
     bool writeJsonToFile(const std::string& jsonString, const std::string& filePath) {
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value root;
+        std::string errorMsg;
 
-        bool parsingSuccessful = reader.parse(jsonString, root);
+        bool parsingSuccessful = reader->parse(jsonString.c_str(), jsonString.c_str() + jsonString.size(), &root, &errorMsg);
         if (!parsingSuccessful) {
-            std::cout << "Failed to parse configuration\n" << reader.getFormattedErrorMessages();
+            std::cout << "Failed to parse configuration\n" << errorMsg;
             return false;
         }
 

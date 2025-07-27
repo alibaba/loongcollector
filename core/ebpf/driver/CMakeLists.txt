@@ -19,7 +19,19 @@ if (LINUX)
     set(ENABLE_PROFILE OFF)
     set(BUILD_TESTING OFF)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
+    
+    # Save the original C flags
+    set(ORIGINAL_CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+    
+    # Remove -Werror for coolbpf compilation
+    string(REPLACE "-Werror" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+    
+    # Now add the coolbpf subdirectory
     add_subdirectory(${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf)
+    
+    # Restore the original C flags for the rest of the build
+    set(CMAKE_C_FLAGS ${ORIGINAL_CMAKE_C_FLAGS})
+    
     add_custom_target(
         install_coolbpf ALL
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf

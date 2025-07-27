@@ -379,14 +379,12 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
 
     {
         auto item1 = GenerateItem();
-        auto p1 = item1.get();
         sProcessQueueManager->PushQueue(key, std::move(item1));
 
         sProcessQueueManager->DisablePop("test_config_1", false);
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
 
         auto item2 = GenerateItem();
-        auto p2 = item2.get();
         sProcessQueueManager->PushQueue(key, std::move(item2));
 
         auto pipeline3 = make_shared<CollectionPipeline>();
@@ -396,7 +394,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         APSARA_TEST_FALSE((*sProcessQueueManager->mQueues[key].first)->mValidToPop);
 
         auto item3 = GenerateItem();
-        auto p3 = item3.get();
         sProcessQueueManager->PushQueue(key, std::move(item3));
 
         sProcessQueueManager->DisablePop("test_config_1", true);
@@ -407,11 +404,9 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
     }
     {
         auto item1 = GenerateItem();
-        auto p1 = item1.get();
         sProcessQueueManager->PushQueue(1, std::move(item1));
 
         auto item2 = GenerateItem();
-        auto p2 = item2.get();
         sProcessQueueManager->PushQueue(2, std::move(item2));
 
         sProcessQueueManager->DisablePop("test_config_2", false);
@@ -419,11 +414,9 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
 
         auto item3 = GenerateItem();
-        auto p3 = item3.get();
         sProcessQueueManager->PushQueue(1, std::move(item3));
 
         auto item4 = GenerateItem();
-        auto p4 = item4.get();
         sProcessQueueManager->PushQueue(2, std::move(item4));
 
         auto pipeline3 = make_shared<CollectionPipeline>();
@@ -434,11 +427,10 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
 
         auto item5 = GenerateItem();
-        auto p5 = item5.get();
         sProcessQueueManager->PushQueue(1, std::move(item5));
 
         auto item6 = GenerateItem();
-        auto p6 = item6.get();
+        // auto p6 = item6.get(); // Fix unused variable warning
         sProcessQueueManager->PushQueue(2, std::move(item6));
 
         sProcessQueueManager->DisablePop("test_config_2", true);
