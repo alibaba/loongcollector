@@ -662,15 +662,11 @@ int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* k
 }
 
 int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t maxCount) {
-    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE || type == logtail::ebpf::PluginType::MAX) {
-        return 0;
-    }
-
     if (fds == nullptr || maxCount == 0) {
         return -1;
     }
 
-    std::vector<void*> pbs = gPluginPbs.at(static_cast<size_t>(type));
+    std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
         return 0;
@@ -699,11 +695,7 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t m
 }
 
 int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
-    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE || type == logtail::ebpf::PluginType::MAX) {
-        return 0;
-    }
-
-    std::vector<void*> pbs = gPluginPbs.at(static_cast<size_t>(type));
+    std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
         return 0;
