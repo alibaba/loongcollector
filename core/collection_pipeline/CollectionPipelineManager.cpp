@@ -93,23 +93,19 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             auto oldConfig = iter->second->GetConfig();
             auto oldInputs = oldConfig["inputs"];
 
-            if (config.mInputs.size() != oldInputs.size()) {
+            std::set<string> newInputTypes;
+            std::set<string> oldInputTypes;
+            for (const auto& input : config.mInputs) {
+                newInputTypes.insert((*input)["Type"].asString());
+            }
+            for (const auto& oldInput : oldInputs) {
+                oldInputTypes.insert(oldInput["Type"].asString());
+            }
+
+            if (newInputTypes != oldInputTypes) {
                 LOG_INFO(sLogger,
-                         ("input count changed, completely stopping old pipeline", "")("old_count", oldInputs.size())(
-                             "new_count", config.mInputs.size())("config", config.mName));
+                         ("input type set changed, completely stopping old pipeline", "")("config", config.mName));
                 shouldCompletelyStop = true;
-            } else {
-                for (size_t i = 0; i < config.mInputs.size(); ++i) {
-                    string newInputType = (*config.mInputs[i])["Type"].asString();
-                    string oldInputType = oldInputs[static_cast<Json::ArrayIndex>(i)]["Type"].asString();
-                    if (newInputType != oldInputType) {
-                        LOG_INFO(sLogger,
-                                 ("input type changed, completely stopping old pipeline", "")("index", i)(
-                                     "old_type", oldInputType)("new_type", newInputType)("config", config.mName));
-                        shouldCompletelyStop = true;
-                        break;
-                    }
-                }
             }
         }
 
