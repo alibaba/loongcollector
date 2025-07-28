@@ -89,24 +89,21 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 
         // Check if input type has changed to determine stop behavior
         bool shouldCompletelyStop = false;
-        if (!config.mInputs.empty()) {
-            auto oldConfig = iter->second->GetConfig();
-            auto oldInputs = oldConfig["inputs"];
+        auto oldConfig = iter->second->GetConfig();
+        auto oldInputs = oldConfig["inputs"];
 
-            std::set<string> newInputTypes;
-            std::set<string> oldInputTypes;
-            for (const auto& input : config.mInputs) {
-                newInputTypes.insert((*input)["Type"].asString());
-            }
-            for (const auto& oldInput : oldInputs) {
-                oldInputTypes.insert(oldInput["Type"].asString());
-            }
+        std::set<string> newInputTypes;
+        std::set<string> oldInputTypes;
+        for (const auto& input : config.mInputs) {
+            newInputTypes.insert((*input)["Type"].asString());
+        }
+        for (const auto& oldInput : oldInputs) {
+            oldInputTypes.insert(oldInput["Type"].asString());
+        }
 
-            if (newInputTypes != oldInputTypes) {
-                LOG_INFO(sLogger,
-                         ("input type set changed, completely stopping old pipeline", "")("config", config.mName));
-                shouldCompletelyStop = true;
-            }
+        if (newInputTypes != oldInputTypes) {
+            LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", config.mName));
+            shouldCompletelyStop = true;
         }
 
         iter->second->Stop(shouldCompletelyStop);
