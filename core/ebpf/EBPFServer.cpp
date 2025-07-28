@@ -40,7 +40,6 @@
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
                   4019000000);
-DEFINE_FLAG_INT32(epoll_wait_timeout_ms, "the maximum wait time for eBPF epoll", 200);
 
 namespace logtail::ebpf {
 
@@ -505,8 +504,7 @@ void EBPFServer::handleEpollEvents() {
         return;
     }
 
-    int numEvents
-        = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), INT32_FLAG(epoll_wait_timeout_ms));
+    int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), kDefaultMaxWaitTimeMS);
     if (numEvents <= 0) {
         if (numEvents < 0 && errno != EINTR) {
             LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));
