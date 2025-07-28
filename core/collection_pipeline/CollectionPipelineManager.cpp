@@ -92,8 +92,8 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
         auto oldConfig = iter->second->GetConfig();
         const Json::Value& oldInputs = oldConfig["inputs"];
 
-        std::set<string> newInputTypes;
-        std::set<string> oldInputTypes;
+        std::set<std::string> newInputTypes;
+        std::set<std::string> oldInputTypes;
         for (const auto& input : config.mInputs) {
             newInputTypes.insert((*input)["Type"].asString());
         }
