@@ -205,7 +205,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 				logger.Info(context.Background(), "overwrite symbol link success, from", fileNo, "to", filePath, "max", maxFileNo)
 				maxFileNo = fileNo
 			} else {
-				logger.Warning(context.Background(), "overwrite symbol link error, from", fileNo, "to", filePath, "error", err, "max", maxFileNo)
+				logger.Warning(context.Background(), selfmonitor.ContainerCenterAlarm, "overwrite symbol link error, from", fileNo, "to", filePath, "error", err, "max", maxFileNo)
 			}
 		}
 	}
