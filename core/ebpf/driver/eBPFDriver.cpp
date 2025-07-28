@@ -661,7 +661,7 @@ int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* k
     return gWrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
 }
 
-int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t maxCount) {
+int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCount) {
     if (fds == nullptr || maxCount == 0) {
         return -1;
     }
@@ -672,13 +672,13 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t m
         return 0;
     }
 
-    uint32_t count = 0;
+    int count = 0;
     for (auto& pb : pbs) {
         if (!pb) {
             continue;
         }
         if (count >= maxCount) {
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "too many epoll fds, max_count:%u\n", maxCount);
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "too many epoll fds, max_count:%d\n", maxCount);
             break;
         }
 
@@ -691,7 +691,7 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t m
         }
     }
 
-    return static_cast<int>(count);
+    return count;
 }
 
 int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
