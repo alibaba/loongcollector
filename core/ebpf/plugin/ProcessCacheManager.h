@@ -79,7 +79,7 @@ private:
     void waitForConsumeFinished();
 
     std::atomic_bool mInited = false;
-    std::atomic_bool mIsConsume = false;
+    std::atomic_bool mIsConsuming = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
     std::filesystem::path mHostPathPrefix;

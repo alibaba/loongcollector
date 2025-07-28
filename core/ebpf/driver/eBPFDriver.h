@@ -27,7 +27,7 @@ using consume_plugin_pb_data_func = int (*)(logtail::ebpf::PluginType);
 using set_networkobserver_config_func = void (*)(int32_t, int32_t);
 using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, bool);
 using update_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*, uint64_t);
-using get_plugin_pb_epoll_fds_func = std::vector<int> (*)(logtail::ebpf::PluginType);
+using get_plugin_pb_epoll_fds_func = int (*)(logtail::ebpf::PluginType, int*, uint32_t);
 
 extern "C" {
 int set_logger(logtail::ebpf::eBPFLogHandler fn);
@@ -50,5 +50,5 @@ void set_networkobserver_cid_filter(const char* container_id, size_t length, boo
 
 // oprations
 int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
-std::vector<int> get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type);
+int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, uint32_t maxCount);
 }

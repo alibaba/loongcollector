@@ -482,7 +482,15 @@ std::vector<int> EBPFAdapter::GetPerfBufferEpollFds(PluginType pluginType) {
     return {0, 1, 2};
 #else
     auto getEpollFdsFunc = (get_plugin_pb_epoll_fds_func)f;
-    return getEpollFdsFunc(pluginType);
+    const uint32_t maxFds = 8;
+    int fds[maxFds];
+    int count = getEpollFdsFunc(pluginType, static_cast<int*>(fds), maxFds);
+
+    std::vector<int> result;
+    if (count > 0) {
+        result.assign(static_cast<int*>(fds), static_cast<int*>(fds) + count);
+    }
+    return result;
 #endif
 }
 

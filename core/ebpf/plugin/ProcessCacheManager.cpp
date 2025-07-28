@@ -185,7 +185,7 @@ void ProcessCacheManager::Stop() {
 void ProcessCacheManager::waitForConsumeFinished() {
     int64_t startTime = TimeKeeper::GetInstance()->NowSec();
     bool alarmOnce = false;
-    while (mIsConsume) {
+    while (mIsConsuming) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms
         int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
         if (!alarmOnce && duration > 10) { // 10s
@@ -433,12 +433,12 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
 
 int ProcessCacheManager::ConsumePerfBufferData() {
     int ret = 0;
-    mIsConsume = true;
+    mIsConsuming = true;
     if (mInited) {
         mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
         LOG_DEBUG(sLogger, ("process cache consume buffer", "")("cnt", ret));
     }
-    mIsConsume = false;
+    mIsConsuming = false;
 
     return ret;
 }

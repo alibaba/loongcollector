@@ -605,49 +605,34 @@ void eBPFServerUnittest::TestEbpfParameters() {
 void eBPFServerUnittest::TestUnifiedEpoll() {
     auto* server = ebpf::EBPFServer::GetInstance();
     APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
-    APSARA_TEST_TRUE(server->mEpollFdToPluginType.empty());
 
-    {
-        std::string configStr = R"(
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
             {
-                "Type": "input_file_security",
-                "ProbeConfig":
-                {
-                    "FilePathFilter": [
-                        "/tmp/test"
-                    ]
-                }
+                "FilePathFilter": [
+                    "/tmp/test"
+                ]
             }
-        )";
-        ctx.SetConfigName("test-unified-epoll-file");
-        std::shared_ptr<InputFileSecurity> inputFile(new InputFileSecurity());
-        inputFile->SetContext(ctx);
-        inputFile->CreateMetricsRecordRef("test_file", "1");
-
-        std::string errorMsg;
-        Json::Value configJson;
-        Json::Value optionalGoPipeline;
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        auto initStatus = inputFile->Init(configJson, optionalGoPipeline);
-        inputFile->CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(initStatus);
-
-        // Test plugin init and epoll registration
-        auto res = inputFile->Start();
-        APSARA_TEST_TRUE(res);
-        {
-            std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-            APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 3);
         }
+    )";
+    ctx.SetConfigName("test-unified-epoll-file");
+    std::shared_ptr<InputFileSecurity> inputFile(new InputFileSecurity());
+    inputFile->SetContext(ctx);
+    inputFile->CreateMetricsRecordRef("test_file", "1");
 
-        // Test plugin stop and epoll unregistration
-        res = inputFile->Stop(true);
-        APSARA_TEST_TRUE(res);
-        {
-            std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-            APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 0);
-        }
-    }
+    std::string errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    auto initStatus = inputFile->Init(configJson, optionalGoPipeline);
+    inputFile->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
+
+    // Test plugin init and epoll registration
+    auto res = inputFile->Start();
+    APSARA_TEST_TRUE(res);
 
     // Create test eventfds to simulate perf buffer file descriptors
     std::vector<int> testFds;
@@ -662,20 +647,10 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
     for (int testFd : testFds) {
         struct epoll_event event {};
         event.events = EPOLLIN;
-        event.data.fd = testFd;
+        event.data.u32 = static_cast<uint32_t>(pluginType);
 
         int ret = epoll_ctl(server->mUnifiedEpollFd, EPOLL_CTL_ADD, testFd, &event);
         APSARA_TEST_EQUAL(ret, 0);
-
-        {
-            std::unique_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-            server->mEpollFdToPluginType[testFd] = pluginType;
-        }
-    }
-
-    {
-        std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 3);
     }
 
     // Test multi-threaded access to epoll structures
@@ -704,7 +679,7 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
     });
 
     // test epoll registration when epoll handle
-    std::string configStr = R"(
+    configStr = R"(
         {
             "Type": "input_process_security"
         }
@@ -714,20 +689,13 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
     inputProcess->SetContext(ctx);
     inputProcess->CreateMetricsRecordRef("test_process", "2");
 
-    std::string errorMsg;
-    Json::Value configJson;
-    Json::Value optionalGoPipeline;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    auto initStatus = inputProcess->Init(configJson, optionalGoPipeline);
+    initStatus = inputProcess->Init(configJson, optionalGoPipeline);
     inputProcess->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(initStatus);
 
-    auto res = inputProcess->Start();
+    res = inputProcess->Start();
     APSARA_TEST_TRUE(res);
-    {
-        std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 6);
-    }
 
     // Let threads run for a short time
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -740,23 +708,14 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
 
     for (int testFd : testFds) {
         epoll_ctl(server->mUnifiedEpollFd, EPOLL_CTL_DEL, testFd, nullptr);
-        {
-            std::unique_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-            server->mEpollFdToPluginType.erase(testFd);
-        }
         close(testFd);
     }
-    {
-        std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_LE(server->mEpollFdToPluginType.size(), 3);
-    }
 
+    // Test plugin stop and epoll unregistration
+    res = inputFile->Stop(true);
+    APSARA_TEST_TRUE(res);
     res = inputProcess->Stop(true);
     APSARA_TEST_TRUE(res);
-    {
-        std::shared_lock<std::shared_mutex> lock(server->mEpollFdMutex);
-        APSARA_TEST_EQUAL(server->mEpollFdToPluginType.size(), 0);
-    }
 }
 
 void eBPFServerUnittest::TestRetryCache() {
