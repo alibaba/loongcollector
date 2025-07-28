@@ -120,6 +120,7 @@ private:
                            std::shared_ptr<AbstractManager>);
     PluginState& getPluginState(PluginType type);
     bool checkIfNeedStopProcessCacheManager() const;
+    void stopProcessCacheManager();
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
     void handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& items, size_t count);

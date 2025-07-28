@@ -40,6 +40,7 @@
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
                   4019000000);
+DEFINE_FLAG_INT32(epoll_wait_timeout_ms, "the maximum wait time for eBPF epoll", 200);
 
 namespace logtail::ebpf {
 
@@ -353,9 +354,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     if (pluginMgr->Init(options) != 0) {
         LOG_ERROR(sLogger, ("plugin manager init failed", ""));
         if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
-            LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
-            mProcessCacheManager->Stop();
-            unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
+            stopProcessCacheManager();
         }
         pluginMgr.reset();
         return false;
@@ -402,6 +401,12 @@ bool EBPFServer::checkIfNeedStopProcessCacheManager() const {
     return true;
 }
 
+void EBPFServer::stopProcessCacheManager() {
+    LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
+    mProcessCacheManager->Stop();
+    unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
+}
+
 bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
@@ -431,9 +436,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
             || type == PluginType::FILE_SECURITY) {
             // check if we need stop ProcessCacheManager
             if (checkIfNeedStopProcessCacheManager()) {
-                LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
-                mProcessCacheManager->Stop();
-                unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
+                stopProcessCacheManager();
             }
         }
     } else {
@@ -502,7 +505,8 @@ void EBPFServer::handleEpollEvents() {
         return;
     }
 
-    int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), kDefaultMaxWaitTimeMS);
+    int numEvents
+        = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), INT32_FLAG(epoll_wait_timeout_ms));
     if (numEvents <= 0) {
         if (numEvents < 0 && errno != EINTR) {
             LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));

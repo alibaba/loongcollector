@@ -666,6 +666,11 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCou
         return -1;
     }
 
+    if (static_cast<size_t>(type) >= gPluginPbs.size()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "invalid plugin type: %d\n", int(type));
+        return -1;
+    }
+
     std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
@@ -695,6 +700,10 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCou
 }
 
 int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
+    if (static_cast<size_t>(type) >= gPluginPbs.size()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "invalid plugin type: %d\n", int(type));
+        return -1;
+    }
     std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
