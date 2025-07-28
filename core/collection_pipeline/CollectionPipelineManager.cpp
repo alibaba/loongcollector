@@ -89,7 +89,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 
         // Check if input type has changed to determine stop behavior
         bool shouldCompletelyStop = false;
-        auto oldConfig = iter->second->GetConfig();
+        const Json::Value& oldConfig = iter->second->GetConfig();
         const Json::Value& oldInputs = oldConfig["inputs"];
 
         std::set<std::string> newInputTypes;
