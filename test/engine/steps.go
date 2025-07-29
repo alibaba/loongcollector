@@ -27,6 +27,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^loongcollector container mount \{(.*)\} to \{(.*)\}`, setup.MountVolume)
 	ctx.Given(`^loongcollector expose port \{(.*)\} to \{(.*)\}`, setup.ExposePort)
 	ctx.Given(`^\{(.*)\} local config as below`, control.AddLocalConfig)
+	ctx.Given(`^remove local config \{(.*)\}`, control.RemoveLocalConfig)
 	ctx.Given(`^\{(.*)\} remote config as below`, control.AddRemoteConfig)
 	ctx.Given(`^\{(.*)\} http config as below`, control.AddHTTPConfig)
 	ctx.Given(`^remove http config \{(.*)\}`, control.RemoveHTTPConfig)
