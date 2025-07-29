@@ -327,10 +327,12 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     auto res = input->Init(configJson, optionalGoPipeline);
+    LOG_INFO(sLogger, ("test start 1", "FILE_SECURITY"));
     res = input->Start();
     EXPECT_TRUE(res);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     // suspend
+    LOG_INFO(sLogger, ("test suspend", "FILE_SECURITY"));
     res = input->Stop(false);
     EXPECT_TRUE(res);
 
@@ -353,13 +355,58 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     res = input->Init(configJson, optionalGoPipeline);
     input->CommitMetricsRecordRef();
     EXPECT_TRUE(res);
+    LOG_INFO(sLogger, ("test update", "FILE_SECURITY"));
     res = input->Start();
     EXPECT_TRUE(res);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
+    LOG_INFO(sLogger, ("test real stop", "FILE_SECURITY"));
+
     res = input->Stop(true);
     EXPECT_TRUE(res);
+
+    {
+        LOG_INFO(sLogger, ("test restart", "FILE_SECURITY"));
+        std::string configStr = R"(
+            {
+                "Type": "input_file_security",
+                "ProbeConfig":
+                {
+                    "FilePathFilter": [
+                        "/etc/passwd",
+                        "/etc/shadow",
+                        "/bin"
+                    ]
+                }
+            }
+        )";
+
+        std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+
+        std::string errorMsg;
+        Json::Value configJson;
+        Json::Value optionalGoPipeline;
+
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef("test", "1");
+        auto initStatus = input->Init(configJson, optionalGoPipeline);
+        input->CommitMetricsRecordRef();
+        APSARA_TEST_TRUE(initStatus);
+
+        ctx.SetConfigName("test-1");
+        auto res = input->Start();
+        EXPECT_TRUE(res);
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        // stop
+        res = input->Stop(true);
+        EXPECT_TRUE(res);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }
 
 void eBPFServerUnittest::TestUpdateNetworkSecurity() {

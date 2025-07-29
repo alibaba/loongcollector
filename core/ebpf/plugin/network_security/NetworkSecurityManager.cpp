@@ -302,7 +302,7 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
-    mRegisteredConfigCount++;
+    mRegisteredConfigCount = 1;
 
     return 0;
 }
@@ -313,7 +313,7 @@ int NetworkSecurityManager::RemoveConfig(const std::string&) {
             mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
         }
     }
-    mRegisteredConfigCount--;
+    mRegisteredConfigCount = 0;
     return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
 }
 

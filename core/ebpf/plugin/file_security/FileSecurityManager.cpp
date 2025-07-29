@@ -283,7 +283,7 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
-    mRegisteredConfigCount++;
+    mRegisteredConfigCount = 1;
 
     return 0;
 }
@@ -294,15 +294,15 @@ int FileSecurityManager::RemoveConfig(const std::string&) {
             mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
         }
     }
-    mRegisteredConfigCount--;
+    mRegisteredConfigCount = 0;
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
-    LOG_INFO(sLogger, ("stop file plugin, status", res));
+    LOG_INFO(sLogger, ("stop file plugin, status", res)("configCount", mRegisteredConfigCount));
     mRetryableEventCache.Clear();
     return res ? 0 : 1;
 }
 
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
-    FileEvent* event = static_cast<FileEvent*>(ce.get());
+    auto* event = static_cast<FileEvent*>(ce.get());
     // calculate agg key
     std::array<size_t, 2> result{};
     result.fill(0UL);
@@ -344,6 +344,7 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 
 int FileSecurityManager::Destroy() {
     mInited = false;
+    LOG_INFO(sLogger, ("FileSecurityManager destroy", ""));
     return 0;
 }
 
