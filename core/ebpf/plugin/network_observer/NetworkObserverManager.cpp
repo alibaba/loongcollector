@@ -1502,7 +1502,7 @@ void NetworkObserverManager::processRecordAsMetric(L7Record* record,
     LOG_DEBUG(sLogger, ("agg res", res)("node count", mAppAggregator.NodeCount()));
 }
 
-int NetworkObserverManager::PollPerfBuffer(int timeoutMs) {
+int NetworkObserverManager::PollPerfBuffer(int timeout) {
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
     // 1. listen host pod info // every 5 seconds
     if (K8sMetadata::GetInstance().Enable() && nowMs - mLastUpdateHostMetaTimeMs >= 5000) { // 5s
@@ -1520,8 +1520,8 @@ int NetworkObserverManager::PollPerfBuffer(int timeoutMs) {
     }
 
     int32_t flag = 0;
-    int ret
-        = mEBPFAdapter->PollPerfBuffers(PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, timeoutMs);
+    int ret = mEBPFAdapter->PollPerfBuffers(
+        PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, timeout); // 0 means non-blocking
     if (ret < 0) {
         LOG_WARNING(sLogger, ("poll event err, ret", ret));
     }

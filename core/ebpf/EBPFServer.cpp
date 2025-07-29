@@ -46,7 +46,6 @@ namespace logtail::ebpf {
 static const uint16_t kKernelVersion310 = 3010; // for centos7
 static const std::string kKernelNameCentos = "CentOS";
 static const uint16_t kKernelCentosMinVersion = 7006;
-constexpr int kNetworkObserverMinTimeoutMs = 80;
 
 bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
@@ -529,6 +528,7 @@ void EBPFServer::handleEpollEvents() {
         }
     }
 }
+
 void EBPFServer::pollPerfBuffers() {
     mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
@@ -541,16 +541,9 @@ void EBPFServer::pollPerfBuffers() {
             mFrequencyMgr.Reset(now);
         }
 
-        int64_t beginMs = TimeKeeper::GetInstance()->NowMs();
-
         handleEventCache();
         handleEpollEvents();
         mProcessCacheManager->ClearProcessExpiredCache();
-
-        int64_t afterMs = TimeKeeper::GetInstance()->NowMs();
-
-        int timeoutMs = (afterMs - beginMs) > mFrequencyMgr.Period().count() ? afterMs - beginMs : 0;
-        timeoutMs = std::max(timeoutMs, kNetworkObserverMinTimeoutMs);
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
         auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
@@ -559,8 +552,8 @@ void EBPFServer::pollPerfBuffers() {
         }
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         if (pluginState.mManager) {
-            NetworkObserverManager* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
-            mgr->PollPerfBuffer(static_cast<int>(timeoutMs));
+            auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
+            mgr->PollPerfBuffer(0); // 0 means non-blocking r(ef: https://libbpf.readthedocs.io/en/latest/api.html)
         }
     }
 }
