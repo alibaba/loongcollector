@@ -666,9 +666,6 @@ int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCou
         return -1;
     }
 
-    if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
-    }
-
     if (static_cast<size_t>(type) >= gPluginPbs.size()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "invalid plugin type: %d\n", int(type));
         return -1;
