@@ -27,6 +27,9 @@ const string APM_METRICS_URL = "/apm/metric/arms/v1/metric_log/metricstore-apm-m
 const string APM_TRACES_URL = "/apm/trace/arms/v1/trace_log/logstore-tracing";
 const string APM_AGENTINFOS_URL = "/apm/meta/arms/v1/meta_log/AgentInfo/metricstore-apm-metrics";
 
+const string CMS_HEADER_WORKSPACE = "x-cms-workspace";
+const string APM_HEADER_PROJECT = "x-arms-project";
+
 const string LOGTAIL_USER_AGENT = "ali-log-logtail";
 
 const string CONTENT_MD5 = "Content-MD5";

@@ -6,15 +6,19 @@
 #include <memory>
 #include <vector>
 
-#include "CommonDataEvent.h"
+#include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {
 
 class ProcessEvent : public CommonEvent {
 public:
     ProcessEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
-        : CommonEvent(pid, ktime, type, timestamp) {}
+        : CommonEvent(type), mPid(pid), mKtime(ktime), mTimestamp(timestamp) {}
     [[nodiscard]] PluginType GetPluginType() const override { return PluginType::PROCESS_SECURITY; }
+
+    uint32_t mPid;
+    uint64_t mKtime;
+    uint64_t mTimestamp; // for kernel ts nano
 };
 
 class ProcessExitEvent : public ProcessEvent {
