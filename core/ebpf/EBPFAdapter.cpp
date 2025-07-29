@@ -513,4 +513,3 @@ int32_t EBPFAdapter::ConsumePerfBufferData(PluginType pluginType) {
 }
 
 } // namespace logtail::ebpf
-

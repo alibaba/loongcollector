@@ -327,7 +327,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
             case PluginType::FILE_SECURITY: {
                 if (!pluginMgr) {
-                    auto mgr = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, mRetryableEventCache);
+                    auto mgr = FileSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, mRetryableEventCache);
                     mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
                     pluginMgr = mgr;
                 }
@@ -340,6 +341,9 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
         if (pluginMgr->Init() != 0) {
             pluginMgr.reset();
+            if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
+                stopProcessCacheManager();
+            }
             LOG_WARNING(sLogger, ("Failed to init plugin, type", magic_enum::enum_name(type)));
             return false;
         }

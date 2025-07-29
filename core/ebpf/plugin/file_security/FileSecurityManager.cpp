@@ -245,15 +245,15 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
 
     if (mConfigName.size()) {
         // update
-        LOG_DEBUG(sLogger, ("NetworkSecurity Update", ""));
+        LOG_DEBUG(sLogger, ("FileSecurity Update", ""));
         // update config (BPF tailcall, filter map etc.)
         if (Update(options)) {
-            LOG_WARNING(sLogger, ("NetworkSecurity Update failed", ""));
+            LOG_WARNING(sLogger, ("FileSecurity Update failed", ""));
             return 1;
         }
         // resume
         if (Resume(options)) {
-            LOG_WARNING(sLogger, ("NetworkSecurity Resume failed", ""));
+            LOG_WARNING(sLogger, ("FileSecurity Resume failed", ""));
             return 1;
         }
     } else {

@@ -346,12 +346,12 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump span tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 9UL);
+    APSARA_TEST_EQUAL(tags.size(), 10UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
-    APSARA_TEST_EQUAL(tags["arms.app.type"], "ebpf");
+    APSARA_TEST_EQUAL(tags["arms.app.type"], "apm");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
     LOG_INFO(sLogger, ("====== consume metric ======", ""));
@@ -362,12 +362,13 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 8UL);
+    APSARA_TEST_EQUAL(tags.size(), 9UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
-    APSARA_TEST_EQUAL(tags["source"], "ebpf");
+    APSARA_TEST_EQUAL(tags["source"], "apm");
+    APSARA_TEST_EQUAL(tags["technology"], "ebpf");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
     LOG_INFO(sLogger, ("====== consume log ======", ""));
     APSARA_TEST_TRUE(mManager->ConsumeLogAggregateTree());

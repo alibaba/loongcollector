@@ -252,7 +252,7 @@ inline constexpr DataElement kAppName = {
 inline constexpr DataElement kWorkspace = {
     "workspace",
     "acs_cms_workspace", // metric
-    "acs_cms_workspace", // span
+    "acs.cms.workspace", // span
     "acs.cms.workspace", // log
     "cms workspace",
 };
@@ -260,7 +260,7 @@ inline constexpr DataElement kWorkspace = {
 inline constexpr DataElement kArmsServiceId = {
     "service_id",
     "acs_arms_service_id", // metric
-    "acs_arms_service_id", // span
+    "acs.arms.service.id", // span
     "acs.arms.serviceid", // log
     "arms serviceid",
 };

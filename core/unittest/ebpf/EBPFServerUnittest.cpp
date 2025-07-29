@@ -773,19 +773,21 @@ void eBPFServerUnittest::TestEnvManager() {
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
-UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 
+// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
+
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+
+UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV2);
 UNIT_TEST_CASE(eBPFServerUnittest, TestUnifiedEpoll);
 UNIT_TEST_CASE(eBPFServerUnittest, TestRetryCache);
-UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager)
+UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager);
 
 } // namespace ebpf
 } // namespace logtail

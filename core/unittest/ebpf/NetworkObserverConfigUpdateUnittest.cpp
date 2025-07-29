@@ -59,7 +59,7 @@ public:
                                                                      processCacheMissTotal,
                                                                      processCacheSize,
                                                                      processDataMapSize,
-                                                                     retryableEventCacheSize);
+                                                                     mRetryableEventCache);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
         EBPFServer::GetInstance()->updatePluginState(
@@ -125,6 +125,7 @@ public:
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::shared_ptr<NetworkObserverManager> mManager;
+    RetryableEventCache mRetryableEventCache;
 };
 
 void NetworkObserverConfigUpdateUnittest::AddConfig() {

@@ -97,6 +97,7 @@ const static std::string kMetricNameTcpSentPktsTotal = "arms_npm_sent_packets_to
 const static std::string kMetricNameTcpSentBytesTotal = "arms_npm_sent_bytes_total";
 
 const static StringView kEBPFValue = "ebpf";
+const static StringView kAPMValue = "apm";
 const static StringView kMetricValue = "metric";
 const static StringView kTraceValue = "trace";
 const static StringView kLogValue = "log";
@@ -110,6 +111,7 @@ const static StringView kTagV1Value = "v1";
 const static StringView kTagResourceIdKey = "resourceid";
 const static StringView kTagVersionKey = "version";
 const static StringView kTagClusterIdKey = "clusterId";
+const static StringView kTagTechnology = "technology";
 const static StringView kTagWorkloadNameKey = "workloadName";
 const static StringView kTagWorkloadKindKey = "workloadKind";
 const static StringView kTagNamespaceKey = "namespace";
@@ -642,7 +644,8 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
         std::shared_ptr<SourceBuffer>& sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
+        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kAPMValue);
+        eventGroup.SetTagNoCopy(kTagTechnology, kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
         eventGroup.SetTag(kTagClusterIdKey, mClusterId);
 
@@ -798,7 +801,8 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         // auto sourceBuffer = std::make_shared<SourceBuffer>();
         std::shared_ptr<SourceBuffer>& sourceBuffer = node->mSourceBuffer;
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
-        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kEBPFValue);
+        eventGroup.SetTagNoCopy(kAppType.MetricKey(), kAPMValue);
+        eventGroup.SetTagNoCopy(kTagTechnology, kEBPFValue);
         eventGroup.SetTagNoCopy(kDataType.MetricKey(), kMetricValue);
 
         bool init = false;
@@ -1019,7 +1023,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kHostIp.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
                     COPY_AND_SET_TAG(
                         eventGroup, sourceBuffer, kHostName.SpanKey(), ctAttrs.Get<kPodName>()); // pod name
-                    eventGroup.SetTagNoCopy(kAppType.SpanKey(), kEBPFValue);
+                    eventGroup.SetTagNoCopy(kAppType.SpanKey(), kAPMValue);
+                    eventGroup.SetTagNoCopy(kTagTechnology, kEBPFValue);
                     eventGroup.SetTagNoCopy(kDataType.SpanKey(), kTraceValue);
                     for (auto tag = eventGroup.GetTags().begin(); tag != eventGroup.GetTags().end(); tag++) {
                         LOG_DEBUG(sLogger, ("record span tags", "")(std::string(tag->first), std::string(tag->second)));
@@ -1515,8 +1520,8 @@ int NetworkObserverManager::PollPerfBuffer(int timeoutMs) {
     }
 
     int32_t flag = 0;
-    int ret = mEBPFAdapter->PollPerfBuffers(
-        PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, timeoutMs);
+    int ret
+        = mEBPFAdapter->PollPerfBuffers(PluginType::NETWORK_OBSERVE, kNetObserverMaxBatchConsumeSize, &flag, timeoutMs);
     if (ret < 0) {
         LOG_WARNING(sLogger, ("poll event err, ret", ret));
     }
@@ -1636,7 +1641,7 @@ int NetworkObserverManager::SendEvents() {
     }
 
     if (nowMs - mLastSendAgentInfoTimeMs >= mSendAgentInfoIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin report agent info", "metric"));
+        LOG_DEBUG(sLogger, ("begin report agent info", "agentinfo"));
         ReportAgentInfo();
         mLastSendAgentInfoTimeMs = nowMs;
     }
