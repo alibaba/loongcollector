@@ -38,13 +38,16 @@ public:
     FileSecurityManager() = delete;
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        RetryableEventCache& retryableEventCache);
+
 
     static std::shared_ptr<FileSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           RetryableEventCache& retryableEventCache) {
+        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, retryableEventCache);
     }
 
     ~FileSecurityManager() {}
@@ -59,7 +62,6 @@ public:
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
     int SendEvents() override;
-    int PollPerfBuffer(int maxWaitTimeMs) override;
 
     int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
@@ -92,8 +94,7 @@ public:
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
 
 private:
-    RetryableEventCache mRetryableEventCache;
-    int64_t mLastEventCacheRetryTime = 0;
+    RetryableEventCache& mRetryableEventCache;
 
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;

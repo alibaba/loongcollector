@@ -246,7 +246,7 @@ func TestProcessEmptyNode(t *testing.T) {
 	}
 	events := collector.processNodeEntity(&data, "Update")
 	assert.NotNil(t, events)
-	assert.Len(t, events, 1)
+	assert.Len(t, events, 2)
 }
 
 func TestProcessEmptyConfigMap(t *testing.T) {

@@ -140,14 +140,72 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
         }
     }
     { // span
-        string res;
-        string errorMsg;
-        auto events = createBatchedSpanEvents();
-        APSARA_TEST_EQUAL(events.mEvents.size(), 1U);
-        APSARA_TEST_TRUE(events.mEvents[0]->GetType() == PipelineEvent::Type::SPAN);
-        APSARA_TEST_FALSE(serializer.DoSerialize(std::move(events), res, errorMsg));
-        APSARA_TEST_EQUAL("", res);
-        APSARA_TEST_EQUAL("invalid event type, span type is not yet supported", errorMsg);
+        {
+            string res;
+            string errorMsg;
+            auto events = createBatchedSpanEvents();
+            APSARA_TEST_EQUAL(events.mEvents.size(), 1U);
+            APSARA_TEST_TRUE(events.mEvents[0]->GetType() == PipelineEvent::Type::SPAN);
+            APSARA_TEST_TRUE(serializer.DoSerialize(std::move(events), res, errorMsg));
+            APSARA_TEST_EQUAL("", errorMsg);
+            const string expectedJson
+                = "{\"__machine_uuid__\":\"aaa\",\"__pack_id__\":\"bbb\",\"__source__\":\"source\",\"__topic__\":"
+                  "\"topic\","
+                  "\"__time__\":1234567890,"
+                  "\"traceId\":\"trace-1-2-3-4-5\","
+                  "\"spanId\":\"span-1-2-3-4-5\","
+                  "\"parentSpanId\":\"parent-1-2-3-4-5\","
+                  "\"spanName\":\"/oneagent/qianlu/local/1\","
+                  "\"startTime\":1000,"
+                  "\"endTime\":2000,"
+                  "\"duration\":1000,"
+                  "\"attributes\":{\"callType\":\"http-client\",\"host\":\"10.54.0.33\",\"rpc\":\"/oneagent/qianlu/"
+                  "local/"
+                  "1\",\"rpcType\":\"25\",\"source_ip\":\"10.54.0.33\",\"statusCode\":\"200\",\"version\":\"HTTP1.1\","
+                  "\"workloadKind\":\"faceless\",\"workloadName\":\"arms-oneagent-test-ql\"},"
+                  "\"scope\":{\"scope-tag-0\":\"scope-value-0\"}}\n";
+            APSARA_TEST_EQUAL(expectedJson, res);
+        }
+        { // span - empty attributes and scope
+            string res;
+            string errorMsg;
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+            group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
+            group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "aaa");
+            group.SetTag(LOG_RESERVED_KEY_PACKAGE_ID, "bbb");
+            StringBuffer b = group.GetSourceBuffer()->CopyString(string("pack_id"));
+            group.SetMetadataNoCopy(EventGroupMetaKey::SOURCE_ID, StringView(b.data, b.size));
+            group.SetExactlyOnceCheckpoint(RangeCheckpointPtr(new RangeCheckpoint));
+            SpanEvent* spanEvent = group.AddSpanEvent();
+            spanEvent->SetName("test-span");
+            spanEvent->SetTraceId("trace-123");
+            spanEvent->SetSpanId("span-123");
+            spanEvent->SetParentSpanId("parent-123");
+            spanEvent->SetStartTimeNs(1000);
+            spanEvent->SetEndTimeNs(2000);
+            spanEvent->SetTimestamp(1234567890);
+            BatchedEvents batch(std::move(group.MutableEvents()),
+                                std::move(group.GetSizedTags()),
+                                std::move(group.GetSourceBuffer()),
+                                group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                                std::move(group.GetExactlyOnceCheckpoint()));
+            APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+            APSARA_TEST_EQUAL("", errorMsg);
+            const string expectedEmptyJson = "{\"__machine_uuid__\":\"aaa\",\"__pack_id__\":\"bbb\",\"__source__\":"
+                                             "\"source\",\"__topic__\":\"topic\","
+                                             "\"__time__\":1234567890,"
+                                             "\"traceId\":\"trace-123\","
+                                             "\"spanId\":\"span-123\","
+                                             "\"parentSpanId\":\"parent-123\","
+                                             "\"spanName\":\"test-span\","
+                                             "\"startTime\":1000,"
+                                             "\"endTime\":2000,"
+                                             "\"duration\":1000,"
+                                             "\"attributes\":{},"
+                                             "\"scope\":{}}\n";
+            APSARA_TEST_EQUAL(expectedEmptyJson, res);
+        }
     }
     { // raw
         { // nano second disabled, and set
@@ -324,10 +382,6 @@ BatchedEvents JsonSerializerUnittest::createBatchedSpanEvents() {
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
     group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "aaa");
     group.SetTag(LOG_RESERVED_KEY_PACKAGE_ID, "bbb");
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-    // auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
     StringBuffer b = group.GetSourceBuffer()->CopyString(string("pack_id"));
     group.SetMetadataNoCopy(EventGroupMetaKey::SOURCE_ID, StringView(b.data, b.size));
     group.SetExactlyOnceCheckpoint(RangeCheckpointPtr(new RangeCheckpoint));
@@ -362,7 +416,7 @@ BatchedEvents JsonSerializerUnittest::createBatchedSpanEvents() {
     spanEvent->SetTraceState("test-state");
     spanEvent->SetStartTimeNs(1000);
     spanEvent->SetEndTimeNs(2000);
-    spanEvent->SetTimestamp(seconds);
+    spanEvent->SetTimestamp(1234567890);
     BatchedEvents batch(std::move(group.MutableEvents()),
                         std::move(group.GetSizedTags()),
                         std::move(group.GetSourceBuffer()),

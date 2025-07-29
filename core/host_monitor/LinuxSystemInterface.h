@@ -40,11 +40,20 @@ private:
     bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) override;
     bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) override;
     bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) override;
+    bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) override;
+    bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) override;
 
     bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
 
     uint64_t GetMemoryValue(char unit, uint64_t value);
+    bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
+    bool GetHostLoadavg(std::vector<std::string>& lines, std::string& errorMessage);
+    bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp);
+    bool ReadNetLink(std::vector<uint64_t>& tcpStateCount);
+    bool GetNetStateByNetLink(NetState& netState);
+    bool GetHostNetDev(std::vector<std::string>& lines, std::string& errorMessage);
+    bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name);
 
     ProcParser mProcParser;
 };

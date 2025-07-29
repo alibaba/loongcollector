@@ -48,12 +48,12 @@ public:
                         CounterPtr processCacheMissTotal,
                         IntGaugePtr processCacheSize,
                         IntGaugePtr processDataMapSize,
-                        IntGaugePtr processEventCacheSize);
+                        RetryableEventCache& retryableEventCache);
     ~ProcessCacheManager() = default;
 
     bool Init();
     void Stop();
-    int PollPerfBuffers(int maxWaitTimeMs);
+    int ConsumePerfBufferData();
 
     void UpdateRecvEventTotal(uint64_t count = 1);
     void UpdateLossEventTotal(uint64_t count);
@@ -70,22 +70,23 @@ public:
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
     ProcessCache& GetProcessCache() { return mProcessCache; }
+    void ClearProcessExpiredCache();
 
 private:
     int syncAllProc();
     std::vector<std::shared_ptr<Proc>> listRunningProcs();
     int writeProcToBPFMap(const std::shared_ptr<Proc>& proc);
-    void waitForPollingFinished();
+    void waitForConsumeFinished();
 
     std::atomic_bool mInited = false;
-    std::atomic_bool mIsPolling = false;
+    std::atomic_bool mIsConsuming = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter = nullptr;
 
     std::filesystem::path mHostPathPrefix;
     ProcParser mProcParser;
     ProcessCache mProcessCache;
     ProcessDataMap mProcessDataMap;
-    RetryableEventCache mRetryableEventCache;
+    RetryableEventCache& mRetryableEventCache;
 
     std::string mHostName;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
@@ -95,11 +96,9 @@ private:
     CounterPtr mProcessCacheMissTotal;
     IntGaugePtr mProcessCacheSize;
     IntGaugePtr mProcessDataMapSize;
-    IntGaugePtr mRetryableEventCacheSize;
 
     std::atomic_bool mFlushProcessEvent = false;
     int64_t mLastProcessCacheClearTime = 0;
-    int64_t mLastEventCacheRetryTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessCacheManagerUnittest;

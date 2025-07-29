@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <sys/epoll.h>
+
 #include <array>
 #include <atomic>
 #include <future>
@@ -104,6 +106,8 @@ public:
     // TODO(qianlu): remove this function when network observer use unified threads
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
 
+    RetryableEventCache& EventCache() { return mRetryableEventCache; }
+
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,
@@ -123,10 +127,19 @@ private:
                            std::shared_ptr<AbstractManager>);
     PluginState& getPluginState(PluginType type);
     bool checkIfNeedStopProcessCacheManager() const;
+    void stopProcessCacheManager();
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
     void handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& items, size_t count);
     void sendEvents();
+    void handleEventCache();
+    void handleEpollEvents();
+
+    // Unified epoll monitoring methods
+    void initUnifiedEpollMonitoring();
+    void registerPluginPerfBuffers(PluginType type);
+    void unregisterPluginPerfBuffers(PluginType type);
+    void cleanupUnifiedEpollMonitoring();
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
 
@@ -159,6 +172,12 @@ private:
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionCacheSize;
 
+    int mUnifiedEpollFd = -1;
+    std::vector<struct epoll_event> mEpollEvents;
+
+    RetryableEventCache mRetryableEventCache;
+    IntGaugePtr mRetryableEventCacheSize;
+    int64_t mLastEventCacheRetryTime = 0;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif

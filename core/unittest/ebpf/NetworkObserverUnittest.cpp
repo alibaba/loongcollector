@@ -62,7 +62,6 @@ protected:
         auto processCacheMissTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
         auto processCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
         auto processDataMapSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
-        auto retryableEventCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mRef);
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                      "test_host",
@@ -73,7 +72,7 @@ protected:
                                                                      processCacheMissTotal,
                                                                      processCacheSize,
                                                                      processDataMapSize,
-                                                                     retryableEventCacheSize);
+                                                                     mRetryableEventCache);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
         EBPFServer::GetInstance()->updatePluginState(
@@ -85,6 +84,7 @@ protected:
         mManager->Destroy();
         EBPFServer::GetInstance()->updatePluginState(
             PluginType::NETWORK_OBSERVE, "", "", PluginStateOperation::kRemoveAll, nullptr);
+        mRetryableEventCache.Clear();
     }
 
 private:
@@ -111,6 +111,7 @@ private:
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
     std::shared_ptr<NetworkObserverManager> mManager;
+    RetryableEventCache mRetryableEventCache;
 };
 
 void NetworkObserverManagerUnittest::TestInitialization() {

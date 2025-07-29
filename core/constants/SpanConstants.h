@@ -36,6 +36,7 @@ extern const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE;
 extern const std::string DEFAULT_TRACE_TAG_SPAN_KIND;
 extern const std::string DEFAULT_TRACE_TAG_TRACE_STATE;
 extern const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME;
+extern const std::string DEFAULT_TRACE_TAG_SCOPE;
 #ifdef __ENTERPRISE__
 // for arms
 extern const std::string DEFAULT_TRACE_TAG_APP_ID;

@@ -34,6 +34,7 @@ const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE = "statusMessage";
 const std::string DEFAULT_TRACE_TAG_SPAN_KIND = "kind";
 const std::string DEFAULT_TRACE_TAG_TRACE_STATE = "traceState";
 const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME = "name";
+const std::string DEFAULT_TRACE_TAG_SCOPE = "scope";
 #ifdef __ENTERPRISE__
 // for arms
 const std::string DEFAULT_TRACE_TAG_APP_ID = "pid";

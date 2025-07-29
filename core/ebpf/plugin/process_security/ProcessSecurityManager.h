@@ -59,6 +59,7 @@ public:
 
     // process perfbuffer was polled by processCacheManager ...
     int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
+    int ConsumePerfBufferData() override { return 0; }
 
     int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 

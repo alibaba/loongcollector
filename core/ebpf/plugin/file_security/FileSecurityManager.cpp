@@ -96,8 +96,11 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
 
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         RetryableEventCache& retryableEventCache)
     : AbstractManager(processCacheManager, eBPFAdapter, queue),
+
+      mRetryableEventCache(retryableEventCache),
       mAggregateTree(
           4096,
           [](std::unique_ptr<FileEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -311,17 +314,6 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
     std::hash<std::string> strHasher;
     AttrHashCombine(result[1], strHasher(event->mPath));
     return result;
-}
-
-int FileSecurityManager::PollPerfBuffer(int maxWaitTimeMs) {
-    auto now = TimeKeeper::GetInstance()->NowSec();
-    if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
-        EventCache().HandleEvents();
-        mLastEventCacheRetryTime = now;
-        LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
-    }
-    int zero = 0;
-    return mEBPFAdapter->PollPerfBuffers(PluginType::FILE_SECURITY, kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
 }
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
