@@ -32,6 +32,7 @@ const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES = "queue.buffering.max
 const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES = "queue.buffering.max.messages";
 const std::string KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES = "message.send.max.retries";
 const std::string KAFKA_CONFIG_RETRY_BACKOFF_MS = "retry.backoff.ms";
+const std::string KAFKA_CONFIG_REQUEST_TIMEOUT_MS = "request.timeout.ms";
 
 
 const std::string KAFKA_ERROR_UNKNOWN = "UNKNOWN";
