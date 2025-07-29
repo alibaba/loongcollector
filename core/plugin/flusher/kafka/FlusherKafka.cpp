@@ -40,9 +40,7 @@ FlusherKafka::FlusherKafka()
       mBatchNumMessages(KAFKA_DEFAULT_BATCH_NUM_MESSAGES),
       mLingerMs(KAFKA_DEFAULT_LINGER_MS),
       mProducer(nullptr),
-      mKafkaTopic(nullptr),
       mKafkaConf(nullptr),
-      mTopicConf(nullptr),
       mIsRunning(false) {
 }
 
@@ -81,6 +79,13 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     GetOptionalUIntParam(config, "Retries", mRetries, errorMsg);
     GetOptionalUIntParam(config, "BatchNumMessages", mBatchNumMessages, errorMsg);
     GetOptionalUIntParam(config, "LingerMs", mLingerMs, errorMsg);
+
+    if (config.isMember("Kafka") && config["Kafka"].isObject()) {
+        const Json::Value& kafkaConfig = config["Kafka"];
+        for (const auto& key : kafkaConfig.getMemberNames()) {
+            mKafkaOptions[key] = kafkaConfig[key].asString();
+        }
+    }
 
     if (!InitKafkaProducer()) {
         return false;
@@ -144,13 +149,13 @@ bool FlusherKafka::Stop(bool isPipelineRemoving) {
         }
     }
 
-    {
-        std::lock_guard<std::mutex> lock(mProducerMutex);
-        if (mProducer) {
-            LOG_INFO(mContext->GetLogger(), ("kafka flushing messages before shutdown", "")("timeout_ms", mTimeoutMs));
-            rd_kafka_flush(mProducer, mTimeoutMs);
-        }
+
+    std::lock_guard<std::mutex> lock(mProducerMutex);
+    if (mProducer) {
+        LOG_INFO(mContext->GetLogger(), ("kafka flushing messages before shutdown", "")("timeout_ms", mTimeoutMs));
+        rd_kafka_flush(mProducer, mTimeoutMs);
     }
+
 
     return Flusher::Stop(isPipelineRemoving);
 }
@@ -175,13 +180,29 @@ bool FlusherKafka::FlushAll() {
     return Flush(0);
 }
 
-bool FlusherKafka::InitKafkaProducer() {
+bool FlusherKafka::SetKafkaConfig(rd_kafka_conf_t* conf, const char* key, const std::string& value) {
     char errstr[512];
+    if (rd_kafka_conf_set(conf, key, value.c_str(), errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
+        LOG_ERROR(mContext->GetLogger(), ("failed to set kafka config", errstr)("key", key)("value", value));
+        return false;
+    }
+    return true;
+}
 
+bool FlusherKafka::InitKafkaProducer() {
     mKafkaConf = rd_kafka_conf_new();
     if (!mKafkaConf) {
         LOG_ERROR(mContext->GetLogger(), ("failed to create kafka configuration", ""));
         return false;
+    }
+
+
+    for (const auto& kv : mKafkaOptions) {
+        if (!SetKafkaConfig(mKafkaConf, kv.first.c_str(), kv.second)) {
+            rd_kafka_conf_destroy(mKafkaConf);
+            mKafkaConf = nullptr;
+            return false;
+        }
     }
 
     std::string brokersStr = KafkaUtil::BrokersToString(mBrokers);
@@ -190,77 +211,41 @@ bool FlusherKafka::InitKafkaProducer() {
         return false;
     }
 
-    if (rd_kafka_conf_set(
-            mKafkaConf, KAFKA_CONFIG_BOOTSTRAP_SERVERS.c_str(), brokersStr.c_str(), errstr, sizeof(errstr))
-        != RD_KAFKA_CONF_OK) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to set bootstrap servers", errstr));
+
+    if (!SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_BOOTSTRAP_SERVERS.c_str(), brokersStr)
+        || !SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_CLIENT_ID.c_str(), mClientID)
+        || !SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_RETRIES.c_str(), std::to_string(mRetries))
+        || !SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_REQUEST_TIMEOUT_MS.c_str(), std::to_string(mTimeoutMs))
+        || !SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_BATCH_NUM_MESSAGES.c_str(), std::to_string(mBatchNumMessages))
+        || !SetKafkaConfig(mKafkaConf, KAFKA_CONFIG_LINGER_MS.c_str(), std::to_string(mLingerMs))) {
         return false;
     }
 
-    if (rd_kafka_conf_set(mKafkaConf, KAFKA_CONFIG_CLIENT_ID.c_str(), mClientID.c_str(), errstr, sizeof(errstr))
-        != RD_KAFKA_CONF_OK) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to set client id", errstr));
-        return false;
-    }
 
     rd_kafka_conf_set_dr_msg_cb(mKafkaConf, DeliveryReportCallback);
     rd_kafka_conf_set_opaque(mKafkaConf, this);
 
-    std::string retriesStr = std::to_string(mRetries);
-    if (rd_kafka_conf_set(mKafkaConf, KAFKA_CONFIG_RETRIES.c_str(), retriesStr.c_str(), errstr, sizeof(errstr))
-        != RD_KAFKA_CONF_OK) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to set retries", errstr));
-        return false;
-    }
 
-    std::string batchNumStr = std::to_string(mBatchNumMessages);
-    if (rd_kafka_conf_set(
-            mKafkaConf, KAFKA_CONFIG_BATCH_NUM_MESSAGES.c_str(), batchNumStr.c_str(), errstr, sizeof(errstr))
-        != RD_KAFKA_CONF_OK) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to set batch.num.messages", errstr));
-        return false;
-    }
-
-    std::string lingerMsStr = std::to_string(mLingerMs);
-    if (rd_kafka_conf_set(mKafkaConf, KAFKA_CONFIG_LINGER_MS.c_str(), lingerMsStr.c_str(), errstr, sizeof(errstr))
-        != RD_KAFKA_CONF_OK) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to set linger.ms", errstr));
-        return false;
-    }
-
+    char errstr[512];
     mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mKafkaConf, errstr, sizeof(errstr));
     if (!mProducer) {
         LOG_ERROR(mContext->GetLogger(), ("failed to create kafka producer", errstr));
+        mKafkaConf = nullptr;
         return false;
     }
-
     mKafkaConf = nullptr;
 
-    mTopicConf = rd_kafka_topic_conf_new();
-    if (!mTopicConf) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to create topic configuration", ""));
-        return false;
-    }
-
-    mKafkaTopic = rd_kafka_topic_new(mProducer, mTopic.c_str(), mTopicConf);
-    if (!mKafkaTopic) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to create kafka topic", mTopic));
-        return false;
-    }
-
-    mTopicConf = nullptr;
-
-    LOG_INFO(mContext->GetLogger(),
-             ("kafka producer initialized successfully", "")("topic", mTopic)("brokers", brokersStr));
-
+    LOG_INFO(
+        mContext->GetLogger(),
+        ("kafka producer initialized successfully", "")("topic", mTopic)("brokers", brokersStr)("retries", mRetries));
     return true;
 }
 
 bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     std::lock_guard<std::mutex> lock(mProducerMutex);
 
-    if (!mProducer || !mKafkaTopic) {
-        LOG_ERROR(mContext->GetLogger(), ("kafka producer or topic not initialized", ""));
+    if (!mProducer) {
+        LOG_ERROR(mContext->GetLogger(), ("kafka producer not initialized", ""));
         return false;
     }
 
@@ -284,71 +269,33 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         return false;
     }
 
-    uint32_t attemptCount = 0;
-    rd_kafka_resp_err_t err = RD_KAFKA_RESP_ERR_NO_ERROR;
+    mSendCnt->Add(1);
+
+    rd_kafka_resp_err_t err = rd_kafka_producev(mProducer,
+                                                RD_KAFKA_V_TOPIC(mTopic.c_str()),
+                                                RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                                RD_KAFKA_V_VALUE(serializedData.data(), serializedData.size()),
+                                                RD_KAFKA_V_OPAQUE(nullptr),
+                                                RD_KAFKA_V_END);
+
+    if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+        LOG_ERROR(mContext->GetLogger(),
+                  ("kafka producev failed", rd_kafka_err2str(err))("error_code", static_cast<int>(err)));
 
 
-    for (uint32_t attempt = 0; attempt <= mRetries; ++attempt) {
-        mSendCnt->Add(1);
-
-
-        char* payload = static_cast<char*>(malloc(serializedData.size()));
-        if (!payload) {
-            LOG_ERROR(mContext->GetLogger(), ("failed to allocate memory for kafka message", "out of memory"));
-            mOtherErrorCnt->Add(1);
-            return false;
-        }
-        std::memcpy(payload, serializedData.data(), serializedData.size());
-
-        int result = rd_kafka_produce(mKafkaTopic,
-                                      RD_KAFKA_PARTITION_UA,
-                                      RD_KAFKA_MSG_F_FREE,
-                                      payload,
-                                      serializedData.size(),
-                                      nullptr,
-                                      0,
-                                      nullptr);
-
-        if (result != -1) {
-            return true;
-        }
-
-
-        free(payload);
-
-        err = rd_kafka_last_error();
-
-        if (err == RD_KAFKA_RESP_ERR__QUEUE_FULL && attempt < mRetries) {
-            uint32_t backoffMs = KAFKA_RETRY_BACKOFF_BASE_MS * (1 << attempt);
-            LOG_WARNING(mContext->GetLogger(),
-                        ("kafka queue is full, attempting to retry", rd_kafka_err2str(err))("attempt", attempt + 1)(
-                            "max_retries", mRetries)("backoff_ms", backoffMs));
-
-            attemptCount = attempt + 1;
-
-            rd_kafka_poll(mProducer, KAFKA_POLL_INTERVAL_MS);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
-            continue;
-        } else if (err != RD_KAFKA_RESP_ERR__QUEUE_FULL) {
-            LOG_WARNING(mContext->GetLogger(),
-                        ("kafka error not retriable", rd_kafka_err2str(err))("error_code", static_cast<int>(err)));
-            break;
-        } else {
-            LOG_WARNING(mContext->GetLogger(),
-                        ("kafka queue is full, max retries reached", rd_kafka_err2str(err))("max_retries", mRetries));
-            break;
-        }
+        HandleProduceError(err);
+        return false;
     }
 
-    LOG_ERROR(mContext->GetLogger(),
-              ("failed to produce message to kafka",
-               rd_kafka_err2str(err))("topic", mTopic)("attempts", attemptCount + 1)("max_retries", mRetries));
+    return true;
+}
+
+void FlusherKafka::HandleProduceError(rd_kafka_resp_err_t err) {
     switch (err) {
         case RD_KAFKA_RESP_ERR__QUEUE_FULL:
+            LOG_WARNING(mContext->GetLogger(), ("kafka internal queue is full", "consider reducing send rate"));
             mContext->GetAlarm().SendAlarm(DISCARD_DATA_ALARM,
-                                           "failed to produce to kafka: queue is full after "
-                                               + std::to_string(attemptCount + 1) + " attempts\taction: discard data",
+                                           "kafka internal queue is full, message discarded",
                                            mContext->GetRegion(),
                                            mContext->GetProjectName(),
                                            mContext->GetConfigName(),
@@ -356,6 +303,69 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
             mDiscardCnt->Add(1);
             break;
 
+        case RD_KAFKA_RESP_ERR__AUTHENTICATION:
+        case RD_KAFKA_RESP_ERR_TOPIC_AUTHORIZATION_FAILED:
+        case RD_KAFKA_RESP_ERR_GROUP_AUTHORIZATION_FAILED:
+            mUnauthErrorCnt->Add(1);
+            break;
+
+        case RD_KAFKA_RESP_ERR_MSG_SIZE_TOO_LARGE:
+        case RD_KAFKA_RESP_ERR__INVALID_ARG:
+            mParamsErrorCnt->Add(1);
+            break;
+
+        default:
+            mOtherErrorCnt->Add(1);
+            break;
+    }
+}
+
+void FlusherKafka::DestroyKafkaResources() {
+    if (mProducer) {
+        rd_kafka_destroy(mProducer);
+        mProducer = nullptr;
+    }
+
+    if (mKafkaConf) {
+        rd_kafka_conf_destroy(mKafkaConf);
+        mKafkaConf = nullptr;
+    }
+}
+
+void FlusherKafka::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* message, void* opaque) {
+    auto* flusher = static_cast<FlusherKafka*>(opaque);
+    if (!flusher) {
+        return;
+    }
+
+    flusher->mSendDoneCnt->Add(1);
+
+    if (message->err) {
+        const std::string errStr = rd_kafka_err2str(message->err);
+        LOG_ERROR(flusher->mContext->GetLogger(),
+                  ("kafka message delivery failed",
+                   errStr)("topic", rd_kafka_topic_name(message->rkt))("partition", message->partition));
+
+
+        flusher->HandleDeliveryError(message->err);
+
+        flusher->mContext->GetAlarm().SendAlarm(SEND_DATA_FAIL_ALARM,
+                                                "Kafka delivery error after retries: " + errStr,
+                                                flusher->mContext->GetRegion(),
+                                                flusher->mContext->GetProjectName(),
+                                                flusher->mContext->GetConfigName(),
+                                                flusher->mTopic);
+    } else {
+        flusher->mSuccessCnt->Add(1);
+        LOG_DEBUG(flusher->mContext->GetLogger(),
+                  ("kafka message delivered successfully", "")("topic", rd_kafka_topic_name(message->rkt))(
+                      "partition", message->partition)("offset", message->offset));
+    }
+}
+
+
+void FlusherKafka::HandleDeliveryError(rd_kafka_resp_err_t err) {
+    switch (err) {
         case RD_KAFKA_RESP_ERR__AUTHENTICATION:
         case RD_KAFKA_RESP_ERR_TOPIC_AUTHORIZATION_FAILED:
         case RD_KAFKA_RESP_ERR_GROUP_AUTHORIZATION_FAILED:
@@ -383,83 +393,6 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         default:
             mOtherErrorCnt->Add(1);
             break;
-    }
-    return false;
-}
-
-void FlusherKafka::DestroyKafkaResources() {
-    if (mKafkaTopic) {
-        rd_kafka_topic_destroy(mKafkaTopic);
-        mKafkaTopic = nullptr;
-    }
-
-    if (mProducer) {
-        rd_kafka_destroy(mProducer);
-        mProducer = nullptr;
-    }
-
-    if (mTopicConf) {
-        rd_kafka_topic_conf_destroy(mTopicConf);
-        mTopicConf = nullptr;
-    }
-
-    if (mKafkaConf) {
-        rd_kafka_conf_destroy(mKafkaConf);
-        mKafkaConf = nullptr;
-    }
-}
-
-void FlusherKafka::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* message, void* opaque) {
-    auto* flusher = static_cast<FlusherKafka*>(opaque);
-    if (!flusher) {
-        return;
-    }
-    flusher->mSendDoneCnt->Add(1);
-
-    if (message->err) {
-        const std::string errStr = rd_kafka_err2str(message->err);
-        LOG_ERROR(flusher->mContext->GetLogger(),
-                  ("kafka message delivery failed", errStr)("topic", rd_kafka_topic_name(message->rkt))(
-                      "partition", message->partition)("offset", message->offset));
-
-        switch (message->err) {
-            case RD_KAFKA_RESP_ERR__AUTHENTICATION:
-            case RD_KAFKA_RESP_ERR_TOPIC_AUTHORIZATION_FAILED:
-            case RD_KAFKA_RESP_ERR_GROUP_AUTHORIZATION_FAILED:
-                flusher->mUnauthErrorCnt->Add(1);
-                break;
-            case RD_KAFKA_RESP_ERR__TRANSPORT:
-            case RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN:
-            case RD_KAFKA_RESP_ERR__DESTROY:
-            case RD_KAFKA_RESP_ERR__TIMED_OUT:
-                flusher->mNetworkErrorCnt->Add(1);
-                break;
-            case RD_KAFKA_RESP_ERR_BROKER_NOT_AVAILABLE:
-            case RD_KAFKA_RESP_ERR_LEADER_NOT_AVAILABLE:
-            case RD_KAFKA_RESP_ERR_NOT_LEADER_FOR_PARTITION:
-                flusher->mServerErrorCnt->Add(1);
-                break;
-            case RD_KAFKA_RESP_ERR_MSG_SIZE_TOO_LARGE:
-            case RD_KAFKA_RESP_ERR__INVALID_ARG:
-                flusher->mParamsErrorCnt->Add(1);
-                break;
-            default:
-                flusher->mOtherErrorCnt->Add(1);
-                break;
-        }
-
-        flusher->mContext->GetAlarm().SendAlarm(SEND_DATA_FAIL_ALARM,
-                                                "Kafka delivery error: " + errStr,
-                                                flusher->mContext->GetRegion(),
-                                                flusher->mContext->GetProjectName(),
-                                                flusher->mContext->GetConfigName(),
-                                                flusher->mTopic);
-
-    } else {
-        flusher->mSuccessCnt->Add(1);
-        LOG_DEBUG(flusher->mContext->GetLogger(),
-                  ("kafka message delivered successfully", "")("topic", rd_kafka_topic_name(message->rkt))(
-                      "partition", message->partition)("offset", message->offset));
     }
 }
 

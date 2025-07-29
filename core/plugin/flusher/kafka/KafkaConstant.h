@@ -32,7 +32,7 @@ extern const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES;
 extern const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES;
 extern const std::string KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES;
 extern const std::string KAFKA_CONFIG_RETRY_BACKOFF_MS;
-
+extern const std::string KAFKA_CONFIG_REQUEST_TIMEOUT_MS;
 
 extern const std::string KAFKA_ERROR_UNKNOWN;
 extern const std::string KAFKA_ERROR_BROKER_NOT_AVAILABLE;

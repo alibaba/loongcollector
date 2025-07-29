@@ -19,6 +19,7 @@
 #include <librdkafka/rdkafka.h>
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -52,6 +53,9 @@ private:
     bool InitKafkaProducer();
     bool SerializeAndSend(PipelineEventGroup&& group);
     void DestroyKafkaResources();
+    void HandleProduceError(rd_kafka_resp_err_t err);
+    void HandleDeliveryError(rd_kafka_resp_err_t err);
+    bool SetKafkaConfig(rd_kafka_conf_t* conf, const char* key, const std::string& value);
 
     static void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque);
 
@@ -62,6 +66,7 @@ private:
     uint32_t mRetries;
     uint32_t mBatchNumMessages;
     uint32_t mLingerMs;
+    std::map<std::string, std::string> mKafkaOptions;
 
     std::unique_ptr<EventGroupSerializer> mSerializer;
 
@@ -75,11 +80,8 @@ private:
     CounterPtr mParamsErrorCnt;
     CounterPtr mOtherErrorCnt;
 
-
     rd_kafka_t* mProducer;
-    rd_kafka_topic_t* mKafkaTopic;
     rd_kafka_conf_t* mKafkaConf;
-    rd_kafka_topic_conf_t* mTopicConf;
 
     std::atomic<bool> mIsRunning;
     std::thread mPollThread;
