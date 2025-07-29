@@ -92,6 +92,10 @@ func (m *MetaManager) Init(configPath string) (err error) {
 		// 创建 Kubernetes 客户端配置
 		config = controllerConfig.GetConfigOrDie()
 	}
+	// set protobyuf support for config
+	config.AcceptContentTypes = "application/vnd. kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+
 	// 创建 Kubernetes 客户端
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
