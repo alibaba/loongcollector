@@ -44,6 +44,7 @@ extern const std::string X_LOG_SIGNATUREMETHOD;
 extern const std::string X_LOG_MODE;
 extern const std::string X_LOG_HOSTIP;
 extern const std::string X_LOG_REQUEST_ID;
+extern const std::string X_ACS_SECURITY_TOKEN;
 
 extern const std::string LOG_HEADSIGNATURE_PREFIX;
 extern const std::string LOG_API_VERSION;

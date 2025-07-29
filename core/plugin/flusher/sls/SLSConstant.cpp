@@ -42,6 +42,7 @@ const string X_LOG_SIGNATUREMETHOD = "x-log-signaturemethod";
 const string X_LOG_MODE = "x-log-mode";
 const string X_LOG_HOSTIP = "x-log-hostip";
 const string X_LOG_REQUEST_ID = "x-log-requestid";
+const string X_ACS_SECURITY_TOKEN = "x-acs-security-token";
 const string HMAC_SHA1 = "hmac-sha1";
 const string LOG_HEADSIGNATURE_PREFIX = "LOG ";
 const string LOG_API_VERSION = "0.6.0";
