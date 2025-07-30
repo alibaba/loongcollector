@@ -16,6 +16,7 @@
 
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 
+#include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
@@ -30,45 +31,73 @@ namespace logtail {
 
 const string ProcessorParseFromPBNative::sName = "processor_parse_from_pb_native";
 
+const std::vector<std::string> ProcessorParseFromPBNative::sSupportedProtocols = {
+    "LoongSuite",
+};
+
 // only for inner processor
-bool ProcessorParseFromPBNative::Init(const Json::Value&) {
+bool ProcessorParseFromPBNative::Init(const Json::Value& config) {
     mOutFailedEventGroupsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL);
     mOutSuccessfulEventGroupsTotal
         = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
+
+    std::string errMsg;
+    if (!GetMandatoryStringParam(config, "Protocol", mProtocol, errMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    auto it = std::find(sSupportedProtocols.begin(), sSupportedProtocols.end(), mProtocol);
+    if (it == sSupportedProtocols.end()) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "Unsupported protocol '" + mProtocol,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
     return true;
 }
 
 void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
     if (eventGroup.GetEvents().empty()) {
-        LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup is empty"));
-        return;
-    }
-    const auto& e = eventGroup.GetEvents().at(0);
-    if (!IsSupportedEvent(e)) {
-        LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup[0] is not a RawEvent"));
-        return;
-    }
-    const auto& sourceEvent = e.Cast<RawEvent>();
-
-    std::string errMsg;
-    models::PipelineEventGroup pbGroup;
-
-    if (pbGroup.ParseFromString(sourceEvent.GetContent().data())) {
-        eventGroup.MutableEvents().clear();
-        TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg);
-    } else {
-        eventGroup.MutableEvents().clear();
-        ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+        LOG_WARNING(sLogger, ("unsupported event group", "pipelineEventGroup is empty"));
         return;
     }
 
-    if (!errMsg.empty()) {
-        LOG_WARNING(sLogger, ("error transfer PB to PipelineEventGroup", errMsg));
-        ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
-        eventGroup.MutableEvents().clear();
-        return;
+    auto originalRawEvents = std::move(eventGroup.MutableEvents());
+    eventGroup.MutableEvents().clear();
+
+    for (const auto& e : originalRawEvents) {
+        if (!IsSupportedEvent(e)) {
+            LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup is not a RawEvent, will be discarded"));
+            ADD_COUNTER(mDiscardedEventsTotal, 1);
+            continue;
+        }
+        const auto& sourceEvent = e.Cast<RawEvent>();
+
+        std::string errMsg;
+        models::PipelineEventGroup pbGroup;
+        const auto& content = sourceEvent.GetContent();
+        if (!pbGroup.ParseFromArray(content.data(), content.size())
+            || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+            LOG_WARNING(sLogger, ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
+            ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+            continue;
+        }
+        ADD_COUNTER(mOutSuccessfulEventGroupsTotal, 1);
     }
-    ADD_COUNTER(mOutSuccessfulEventGroupsTotal, 1)
+    ADD_COUNTER(mOutSuccessfulEventsTotal, eventGroup.GetEvents().size());
 }
 
 bool ProcessorParseFromPBNative::IsSupportedEvent(const PipelineEventPtr& event) const {

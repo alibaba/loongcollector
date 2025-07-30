@@ -21,11 +21,14 @@
 #include "collection_pipeline/plugin/interface/Processor.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
+#include "models/RawEvent.h"
+#include "models/SpanEvent.h"
 
 namespace logtail {
 class ProcessorParseFromPBNative : public Processor {
 public:
     static const std::string sName;
+    static const std::vector<std::string> sSupportedProtocols;
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override;
@@ -35,8 +38,11 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
 
 private:
+    std::string mProtocol;
     CounterPtr mOutFailedEventGroupsTotal;
     CounterPtr mOutSuccessfulEventGroupsTotal;
+    CounterPtr mDiscardedEventsTotal;
+    CounterPtr mOutSuccessfulEventsTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseFromPBNativeUnittest;
