@@ -101,15 +101,15 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         ofstream fout(sConfigManager->mCheckpointFilePath);
         fout << R"({
             "old_config": {
-                "config_hash": 17947813715317768927,
+                "config_hash": 3197596144834030155,
                 "expire_time": 2500000000
             },
             "obsolete_config_1": {
-                "config_hash": 5643533951955847862,
+                "config_hash": 2700847987964709229,
                 "expire_time": 1000000000
             },
             "obsolete_config_2": {
-                "config_hash": 5643533951955847862,
+                "config_hash": 2700847987964709229,
                 "expire_time": 1000000000
             }
         })";
@@ -138,7 +138,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("old_config", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(2500000000U, config.mExpireTime);
+        APSARA_TEST_EQUAL(2500000000U, config.mExpireTime.value());
         APSARA_TEST_TRUE(config.mIsRunningBeforeStart);
         APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
                           sConfigManager->mConfigExpireTimeCheckpoint.find("old_config"));
