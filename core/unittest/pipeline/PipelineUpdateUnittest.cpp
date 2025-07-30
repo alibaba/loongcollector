@@ -2041,7 +2041,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -2115,7 +2114,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -2186,7 +2184,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
@@ -2257,7 +2254,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
@@ -2442,7 +2438,7 @@ void PipelineUpdateUnittest::TestPipelineRelease() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2458,7 +2454,7 @@ void PipelineUpdateUnittest::TestPipelineRelease() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, slowFlusherConfig);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);

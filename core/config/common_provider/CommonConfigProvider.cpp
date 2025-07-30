@@ -432,7 +432,6 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
                 info.name = config.name();
                 info.version = config.version();
                 info.status = ConfigFeedbackStatus::FAILED;
-                info.detail = config.detail();
                 mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
@@ -442,7 +441,6 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
                 info.name = config.name();
                 info.version = config.version();
                 info.status = ConfigFeedbackStatus::APPLYING;
-                info.detail = config.detail();
                 mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
             }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
@@ -480,7 +478,6 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
                 info.name = config.name();
                 info.version = config.version();
                 info.status = ConfigFeedbackStatus::FAILED;
-                info.detail = config.detail();
                 mInstanceConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
@@ -489,7 +486,6 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
                 ConfigInfo info;
                 info.name = config.name();
                 info.version = config.version();
-                info.detail = config.detail();
                 info.status = ConfigFeedbackStatus::APPLYING;
                 mInstanceConfigInfoMap[config.name()] = std::move(info);
             }

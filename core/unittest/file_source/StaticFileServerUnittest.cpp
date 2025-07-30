@@ -94,8 +94,9 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     InputStaticFile input;
     input.SetContext(ctx);
-    input.SetMetricsRecordRef(InputFile::sName, "1");
+    input.CreateMetricsRecordRef(InputFile::sName, "1");
     input.Init(configJson, optionalGoPipeline);
+    input.CommitMetricsRecordRef();
     input.Start();
 
     vector<filesystem::path> cptFiles;
