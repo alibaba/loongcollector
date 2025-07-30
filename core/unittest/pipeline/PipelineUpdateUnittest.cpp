@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "Application.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -63,6 +64,21 @@ class FlusherSLSMock : public FlusherSLS {
 public:
     static const std::string sName;
 
+    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+        string errorMsg;
+        uint32_t delay = 0;
+        GetOptionalUIntParam(config, "SendDelay", delay, errorMsg);
+        mSendDelay = std::chrono::milliseconds(delay);
+        return FlusherSLS::Init(config, optionalGoPipeline);
+    }
+
+    bool Send(PipelineEventGroup&& g) override {
+        if (mSendDelay > std::chrono::milliseconds(0)) {
+            std::this_thread::sleep_for(mSendDelay);
+        }
+        return FlusherSLS::Send(std::move(g));
+    }
+
     bool BuildRequest(SenderQueueItem* item,
                       std::unique_ptr<HttpSinkRequest>& req,
                       bool* keepItem,
@@ -73,6 +89,9 @@ public:
             "POST", false, "test-host", 80, "/test-operation", "", header, data->mData, item);
         return true;
     }
+
+private:
+    std::chrono::milliseconds mSendDelay = std::chrono::milliseconds(0);
 };
 
 const std::string FlusherSLSMock::sName = "flusher_sls_mock";
@@ -122,6 +141,7 @@ public:
     void TestPipelineUpdateManyCase8() const;
     void TestPipelineUpdateManyCase9() const;
     void TestPipelineUpdateManyCase10() const;
+    void TestPipelineRelease() const;
 
 protected:
     static void SetUpTestCase() {
@@ -143,24 +163,20 @@ protected:
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
     }
 
-    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
-
-    void SetUp() override {
-        LogInput::GetInstance()->CleanEnviroments();
-        ProcessorRunner::GetInstance()->Init();
-        isFileServerStart = false; // file server stop is not reentrant, so we stop it only when start it
+    static void TearDownTestCase() {
+        PluginRegistry::GetInstance()->UnloadPlugins();
+        Application::GetInstance()->SetSigTermSignalFlag(true);
+        FileServer::GetInstance()->Stop();
     }
 
+    void SetUp() override { ProcessorRunner::GetInstance()->Init(); }
+
     void TearDown() override {
-        LogInput::GetInstance()->CleanEnviroments();
         EventDispatcher::GetInstance()->CleanEnviroments();
         for (auto& pipeline : CollectionPipelineManager::GetInstance()->GetAllPipelines()) {
             pipeline.second->Stop(true);
         }
         CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
-        if (isFileServerStart) {
-            FileServer::GetInstance()->Stop();
-        }
         ProcessorRunner::GetInstance()->Stop();
         FlusherRunner::GetInstance()->Stop();
         HttpSink::GetInstance()->Stop();
@@ -240,7 +256,7 @@ private:
         processor->Unblock();
     }
 
-    void VerifyData(std::string logstore, size_t from, size_t to) const {
+    void VerifyData(std::string logstore, size_t from, size_t to, bool checkProcessorLocalData = false) const {
         size_t i = from;
         size_t j = 0;
         size_t retryTimes = 15;
@@ -255,7 +271,13 @@ private:
                     ++j;
                     continue;
                 }
-                if (content.find("test-data-" + to_string(i)) != string::npos) {
+                bool correctData = true;
+                correctData &= content.find("test-data-" + to_string(i)) != string::npos;
+                if (checkProcessorLocalData) {
+                    correctData &= content.find(PROCESSOR_MOCK_LOCAL_CONTENT_KEY) != string::npos;
+                    correctData &= content.find(PROCESSOR_MOCK_LOCAL_CONTENT_VALUE) != string::npos;
+                }
+                if (correctData) {
                     ++i;
                     continue;
                 }
@@ -326,6 +348,15 @@ private:
             "Region": "test_region",
             "Endpoint": "test_endpoint"
         })";
+    string slowFlusherConfig = R"(
+        {
+            "Type": "flusher_sls_mock",
+            "Project": "test_project",
+            "Logstore": "test_logstore_2",
+            "Region": "test_region",
+            "Endpoint": "test_endpoint",
+            "SendDelay": 1000
+        })";
     string nativeFlusherConfig3 = R"(
         {
             "Type": "flusher_sls_mock2",
@@ -380,7 +411,6 @@ private:
 };
 
 void PipelineUpdateUnittest::TestFileServerStart() {
-    isFileServerStart = true;
     Json::Value nativePipelineConfigJson
         = GeneratePipelineConfigJson(nativeInputFileConfig, nativeProcessorConfig, nativeFlusherConfig);
     Json::Value goPipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
@@ -1742,12 +1772,13 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
     result.get();
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     AddDataToProcessQueue(configName, "test-data-11");
@@ -1756,13 +1787,10 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
     VerifyData("test_logstore_1", 1, 3);
-    VerifyData("test_logstore_2", 4, 4);
-    VerifyData("test_logstore_3", 5, 13);
+    VerifyData("test_logstore_2", 4, 4, true);
+    VerifyData("test_logstore_3", 5, 13, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
@@ -1821,11 +1849,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -1835,13 +1864,10 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
     VerifyData("test_logstore_1", 1, 3);
-    VerifyData("test_logstore_2", 4, 4);
-    VerifyData("test_logstore_3", 5, 10);
+    VerifyData("test_logstore_2", 4, 4, true);
+    VerifyData("test_logstore_3", 5, 10, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
@@ -1900,11 +1926,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -1914,13 +1941,10 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
     VerifyData("test_logstore_1", 1, 3);
-    VerifyData("test_logstore_2", 4, 4);
-    VerifyData("test_logstore_3", 5, 10);
+    VerifyData("test_logstore_2", 4, 4, true);
+    VerifyData("test_logstore_3", 5, 10, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
@@ -1976,11 +2000,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -1990,13 +2015,10 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
     VerifyData("test_logstore_1", 1, 3);
-    VerifyData("test_logstore_2", 4, 4);
-    VerifyData("test_logstore_3", 5, 7);
+    VerifyData("test_logstore_2", 4, 4, true);
+    VerifyData("test_logstore_3", 5, 7, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
@@ -2053,11 +2075,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -2067,12 +2090,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
-    VerifyData("test_logstore_2", 1, 1);
-    VerifyData("test_logstore_3", 2, 10);
+    VerifyData("test_logstore_2", 1, 1, true);
+    VerifyData("test_logstore_3", 2, 10, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
@@ -2126,11 +2146,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -2140,12 +2161,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
-    VerifyData("test_logstore_2", 1, 1);
-    VerifyData("test_logstore_3", 2, 7);
+    VerifyData("test_logstore_2", 1, 1, true);
+    VerifyData("test_logstore_3", 2, 7, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
@@ -2199,11 +2217,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -2213,12 +2232,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
-    VerifyData("test_logstore_2", 1, 1);
-    VerifyData("test_logstore_3", 2, 7);
+    VerifyData("test_logstore_2", 1, 1, true);
+    VerifyData("test_logstore_3", 2, 7, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
@@ -2269,11 +2285,12 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
-        auto processor1
-            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline1->mProcessorLine[0].get()->mPlugin.get()));
-        processor1->Unblock();
+        auto processor2
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
+        processor2->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
@@ -2283,12 +2300,9 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
-    auto processor2
-        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline2->mProcessorLine[0].get()->mPlugin.get()));
-    processor2->Unblock();
     UnBlockProcessor(configName);
-    VerifyData("test_logstore_2", 1, 1);
-    VerifyData("test_logstore_3", 2, 4);
+    VerifyData("test_logstore_2", 1, 1, true);
+    VerifyData("test_logstore_3", 2, 4, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
@@ -2356,7 +2370,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     UnBlockProcessor(configName);
     VerifyData("test_logstore_1", 1, 3);
     VerifyData("test_logstore_2", 4, 6);
-    VerifyData("test_logstore_3", 7, 9);
+    VerifyData("test_logstore_3", 7, 9, true);
 }
 
 void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
@@ -2420,6 +2434,43 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     VerifyData("test_logstore_3", 4, 6);
 }
 
+void PipelineUpdateUnittest::TestPipelineRelease() const {
+    const std::string configName = "test1";
+    ProcessorRunner::GetInstance()->Stop();
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    AddDataToProcessQueue(configName, "test-data-1");
+    AddDataToProcessQueue(configName, "test-data-2");
+    AddDataToProcessQueue(configName, "test-data-3");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate2
+        = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, slowFlusherConfig);
+    CollectionConfigDiff diffUpdate2;
+    CollectionConfig pipelineConfigObjUpdate2
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+    pipelineConfigObjUpdate2.Parse();
+    diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
+    pipelineManager->UpdatePipelines(diffUpdate2);
+    APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
+
+    ProcessorRunner::GetInstance()->Init();
+    HttpSink::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData("test_logstore_2", 1, 3, true);
+    LOG_INFO(sLogger, ("test", "end"));
+}
+
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestFileServerStart)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase1)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase2)
@@ -2456,6 +2507,7 @@ UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineUpdateManyCase7)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineUpdateManyCase8)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineUpdateManyCase9)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineUpdateManyCase10)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineRelease)
 
 } // namespace logtail
 

@@ -39,6 +39,9 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	// chaos
 	ctx.Given(`^network delay package \{(\d+)\}ms for ip \{(.*)\}`, chaos.NetworkDelay)
 	ctx.Given(`^network lost package \{(\d+)\}% for ip \{(.*)\}`, chaos.NetworkLoss)
+	ctx.Given(`^disk full for \{(\d+)\} seconds$`, chaos.DiskFull)
+	ctx.Given(`^disk burn read for \{(\d+)\} seconds$`, chaos.DiskBurRead)
+	ctx.Given(`^disk burn write for \{(\d+)\} seconds$`, chaos.DiskBurWrite)
 	ctx.Given(`^clean all chaos$`, cleanup.DestoryAllChaos)
 	// ------------------------------------------
 
@@ -75,7 +78,12 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^change log rotate interval to \{(\d+)\}s$`, log.ChangeRotateInterval)
 
 	// ebpf
-	ctx.When(`^execute \{(\d+)\} commands to generate process security events`, ebpf.ProcessSecurityEvents)
+	ctx.When(`^execute \{(\d+)\} commands \{(.*)\} in parallel`, ebpf.ExecveCommandsParallel)
+	ctx.When(`^execute \{(\d+)\} commands \{(.*)\} in sequence`, ebpf.ExecveCommandsSerial)
+	ctx.When(`^create the shell script file \{(\S+)\} with the following content`, ebpf.CreateShellScript)
+	ctx.When(`^execute \{(\d+)\} the shell script file \{(\S+)\} in parallel`, ebpf.ExecuteShellScriptParallel)
+	ctx.When(`^execute \{(\d+)\} the shell script file \{(\S+)\} in sequence`, ebpf.ExecuteShellScriptSerial)
+	ctx.When(`^delete the shell script file \{(\S+)\}`, ebpf.RemoveShellScript)
 	ctx.When(`^execute \{(\d+)\} commands to generate network security events on url \{(.*)\}$`, ebpf.NetworksSecurityEvents)
 	ctx.When(`^execute \{(\d+)\} commands to generate file security events on files \{(.*)\}$`, ebpf.FileSecurityEvents)
 	ctx.When(`^generate \{(\d+)\} HTTP requests, with interval \{(\d+)\}ms, url: \{(.*)\}`, ebpf.HTTP)

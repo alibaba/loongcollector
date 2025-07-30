@@ -14,9 +14,16 @@
 
 #pragma once
 
-#include <stdarg.h>
+#include <coolbpf/bpf/libbpf.h>
+#include <cstdarg>
 
 #include "ebpf/include/export.h"
 
 void set_log_handler(logtail::ebpf::eBPFLogHandler log_fn);
 void ebpf_log(logtail::ebpf::eBPFLogType level, const char* format, ...);
+int libbpf_printf(enum libbpf_print_level level, const char* format, va_list args);
+
+#define EBPF_LOG(level, format, ...) \
+    do { \
+        ebpf_log(level, "%s:%d\t" format, __FILE__, __LINE__, ##__VA_ARGS__); \
+    } while (0)

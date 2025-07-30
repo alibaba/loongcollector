@@ -59,6 +59,9 @@ if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
 endif()
 
+add_definitions(-DXXH_DISPATCH_AVX2=0)
+add_definitions(-DXXH_DISPATCH_AVX512=0)
+
 # Default C/CXX flags.
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
@@ -82,11 +85,18 @@ elseif (MSVC)
     add_definitions(-DNOMINMAX)
     add_definitions(-DTARGETLIBS=Psapi.lib)
     add_definitions(-DPSAPI_VERSION=1)
+    # remove WinSock1
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /MP /Zi")
+    # /DEBUG will generate many "pdb not found" warnings.
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /MP")
+    add_compile_options("/std:c++17")
+    # for cross-platform, soure file all are utf8
+    add_compile_options("/utf-8")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif ()
 
 # To be compatible with low version Linux.
@@ -124,21 +134,19 @@ set(SUB_DIRECTORIES_LIST
         runner runner/sink/http
         task_pipeline
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
-        protobuf/sls protobuf/models
+        protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
-        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         parser
-        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
+        host_monitor host_monitor/collector forward forward/loongsuite
+        )
 elseif(MSVC)
-    if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
-    endif()
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
@@ -226,6 +234,12 @@ add_subdirectory(common)
 # Build eBPF dependencies
 set(EBPF_DIRVER_TARGET "eBPFDriver")
 add_subdirectory(ebpf/driver)
+if(MSVC)
+    if (ENABLE_ENTERPRISE)
+        add_subdirectory(windows/daemon)
+        add_subdirectory(windows/installer)
+    endif()
+endif()
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
@@ -235,7 +249,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
-    add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    if (LINUX)
+        add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    endif()
 endif()
 
 # Logtail UT.

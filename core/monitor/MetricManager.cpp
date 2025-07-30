@@ -35,14 +35,6 @@ WriteMetrics::~WriteMetrics() {
     Clear();
 }
 
-void WriteMetrics::PrepareMetricsRecordRef(MetricsRecordRef& ref,
-                                           const std::string& category,
-                                           MetricLabels&& labels,
-                                           DynamicMetricLabels&& dynamicLabels) {
-    CreateMetricsRecordRef(ref, category, std::move(labels), std::move(dynamicLabels));
-    CommitMetricsRecordRef(ref);
-}
-
 void WriteMetrics::CreateMetricsRecordRef(MetricsRecordRef& ref,
                                           const std::string& category,
                                           MetricLabels&& labels,
@@ -56,6 +48,7 @@ void WriteMetrics::CommitMetricsRecordRef(MetricsRecordRef& ref) {
     std::lock_guard<std::mutex> lock(mMutex);
     ref.mMetrics->SetNext(mHead);
     mHead = ref.mMetrics;
+    ref.mMetrics->MarkCommitted();
 }
 
 MetricsRecord* WriteMetrics::GetHead() {

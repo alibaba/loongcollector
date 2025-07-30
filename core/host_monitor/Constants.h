@@ -18,10 +18,26 @@
 
 #include <filesystem>
 
+#include "common/StringView.h"
+
 namespace logtail {
 
 extern std::filesystem::path PROCESS_DIR;
 const extern std::filesystem::path PROCESS_STAT;
+const extern std::filesystem::path PROCESS_LOADAVG;
+const extern std::filesystem::path PROCESS_MEMINFO;
+
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT;
+const extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
+const extern std::filesystem::path PROCESS_NET_DEV;
+const extern std::filesystem::path PROCESS_NET_IF_INET6;
 const extern int64_t SYSTEM_HERTZ;
+
+#ifdef __ENTERPRISE__
+inline constexpr StringView DEFAULT_INSTANCE_ID_LABEL = "instance_id";
+inline constexpr StringView DEFAULT_USER_ID_LABEL = "user_id";
+#else
+inline constexpr StringView DEFAULT_HOST_IP_LABEL = "host_ip";
+#endif
 
 } // namespace logtail

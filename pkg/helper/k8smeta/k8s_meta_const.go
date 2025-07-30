@@ -45,17 +45,26 @@ const (
 
 	// add namespace link
 	//revive:disable:var-naming
-	POD_NAMESPACE                   = "pod->namesapce"
-	SERVICE_NAMESPACE               = "service->namesapce"
-	DEPLOYMENT_NAMESPACE            = "deployment->namesapce"
-	DAEMONSET_NAMESPACE             = "daemonset->namesapce"
-	STATEFULSET_NAMESPACE           = "statefulset->namesapce"
-	CONFIGMAP_NAMESPACE             = "configmap->namesapce"
-	JOB_NAMESPACE                   = "job->namesapce"
-	CRONJOB_NAMESPACE               = "cronjob->namesapce"
-	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namesapce"
-	INGRESS_NAMESPACE               = "ingress->namesapce"
+	POD_NAMESPACE                   = "pod->namespace"
+	SERVICE_NAMESPACE               = "service->namespace"
+	DEPLOYMENT_NAMESPACE            = "deployment->namespace"
+	DAEMONSET_NAMESPACE             = "daemonset->namespace"
+	STATEFULSET_NAMESPACE           = "statefulset->namespace"
+	CONFIGMAP_NAMESPACE             = "configmap->namespace"
+	JOB_NAMESPACE                   = "job->namespace"
+	CRONJOB_NAMESPACE               = "cronjob->namespace"
+	PERSISTENTVOLUMECLAIM_NAMESPACE = "persistentvolumeclaim->namespace"
+	INGRESS_NAMESPACE               = "ingress->namespace"
 	//revive:disable:var-naming
+)
+
+const (
+	K8S_DEPLOYMENT_TYPE  = "Deployment"
+	K8S_REPLICASET_TYPE  = "ReplicaSet"
+	K8S_STATEFULSET_TYPE = "StatefulSet"
+	K8S_DAEMONSET_TYPE   = "DaemonSet"
+	K8S_CRONJOB_TYPE     = "CronJob"
+	K8S_JOB_TYPE         = "Job"
 )
 
 var AllResources = []string{
@@ -197,6 +206,8 @@ const (
 	EventTypeDelete         = "delete"
 	EventTypeDeferredDelete = "deferredDelete"
 	EventTypeTimer          = "timer"
+
+	K8sMetaUnifyErrorCode = "K8S_META_COLLECTOR_ERROR"
 )
 
 type PodMetadata struct {

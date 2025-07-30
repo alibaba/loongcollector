@@ -33,6 +33,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -53,7 +54,7 @@ protected:
         logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "ForceReadUnittest";
         utf8File = "utf8.txt";
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -72,6 +73,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+        std::string jsonLogPathDir = UnitTestHelper::JsonEscapeDirPath(logPathDir);
         // new pipeline
         configStr = R"(
             {
@@ -80,7 +82,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPathDir + R"(/utf8.txt"
+            + jsonLogPathDir + R"(/utf8.txt"
                         ]
                     }
                 ],

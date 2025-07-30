@@ -65,7 +65,7 @@ static void Base64Encoding(istream& is, ostream& os, char makeupChar, const char
     }
 }
 
-string Base64Enconde(const string& message) {
+string Base64Encode(const string& message) {
     istringstream iss(message);
     ostringstream oss;
     Base64Encoding(iss, oss, '=', "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");

@@ -26,7 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -83,7 +83,7 @@ static void setArrayKeyValue(KeyValue **a, KeyValue *s, int n) {
 }
 
 static PluginMetric** makePluginMetricArray(int size) {
-    return malloc(sizeof(KeyValue*) * size);
+    return malloc(sizeof(PluginMetric*) * size);
 }
 
 static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
@@ -247,7 +247,7 @@ func CtlCmd(configName string, cmdID int, cmdDetail string) {
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	logger.InitLogger()
-	meta := helper.GetContainerMeta(containerID)
+	meta := containercenter.GetContainerMeta(containerID)
 	if meta == nil {
 		logger.Debug(context.Background(), "get meta", "")
 		return nil
@@ -325,9 +325,13 @@ func GetGoMetrics(metricType string) *C.PluginMetrics {
 			cKeyValue.value = cValue
 
 			C.setArrayKeyValue(cMetric.keyValues, cKeyValue, C.int(j))
+			runtime.KeepAlive(cKeyValue)
+			runtime.KeepAlive(cKey)
+			runtime.KeepAlive(cValue)
 			j++
 		}
 		C.setArrayPluginMetric(cPluginMetrics.metrics, cMetric, C.int(i))
+		runtime.KeepAlive(cMetric)
 	}
 	return cPluginMetrics
 }
@@ -344,7 +348,7 @@ func initPluginBase(cfgStr string) int {
 			instance := k8smeta.GetMetaManagerInstance()
 			err := instance.Init("")
 			if err != nil {
-				logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+				logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "init k8s meta manager fail", err)
 				return
 			}
 			stopCh := make(chan struct{})

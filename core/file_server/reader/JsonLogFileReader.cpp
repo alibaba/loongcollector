@@ -35,7 +35,7 @@ int32_t JsonLogFileReader::RemoveLastIncompleteLog(char* buffer,
                 break;
             }
             // else impossible to be a valid json line, advance and skip
-            char* pos = strchr(buffer + beginIdx, '\n');
+            char* pos = static_cast<char*>(memchr(buffer + beginIdx, '\n', size - beginIdx));
             if (pos == NULL) {
                 break;
             }
@@ -45,6 +45,9 @@ int32_t JsonLogFileReader::RemoveLastIncompleteLog(char* buffer,
         beginIdx = endIdx + 1;
         buffer[endIdx] = '\0';
     } while (beginIdx < size);
+    if (beginIdx > size) {
+        beginIdx = size;
+    }
     readBytes = beginIdx;
 
     if (allowRollback) {

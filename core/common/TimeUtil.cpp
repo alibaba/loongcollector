@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TimeUtil.h"
+#include "common/TimeUtil.h"
 
 #include <cmath>
 #include <memory.h>
@@ -408,11 +408,6 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
         result = result.substr(result.length() - length, length);
     }
     return result;
-}
-
-long GetTicksPerSecond() {
-    static long sTicksPerSecond = sysconf(_SC_CLK_TCK);
-    return sTicksPerSecond;
 }
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic() {

@@ -17,37 +17,25 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
-#include <dlfcn.h>
-#include <unistd.h>
 
 #include <string>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
+#include "logger/Logger.h"
+#include "plugin/creator/CProcessor.h"
+#include "plugin/creator/DynamicCProcessorCreator.h"
+#include "plugin/creator/StaticFlusherCreator.h"
+#include "plugin/creator/StaticInputCreator.h"
+#include "plugin/creator/StaticProcessorCreator.h"
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
-#include "plugin/input/InputHostMeta.h"
-#include "plugin/input/InputHostMonitor.h"
-#include "plugin/input/InputPrometheus.h"
-#include "plugin/input/InputStaticFile.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-// #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
-#include "plugin/input/InputNetworkObserver.h"
-#include "plugin/input/InputNetworkSecurity.h"
-#include "plugin/input/InputProcessSecurity.h"
-#endif
-#include "collection_pipeline/plugin/creator/CProcessor.h"
-#include "collection_pipeline/plugin/creator/DynamicCProcessorCreator.h"
-#include "collection_pipeline/plugin/creator/StaticFlusherCreator.h"
-#include "collection_pipeline/plugin/creator/StaticInputCreator.h"
-#include "collection_pipeline/plugin/creator/StaticProcessorCreator.h"
-#include "logger/Logger.h"
+#include "plugin/input/InputStaticFile.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 #include "plugin/processor/ProcessorFilterNative.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
@@ -57,11 +45,20 @@
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
-#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
-#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputHostMeta.h"
+#include "plugin/input/InputHostMonitor.h"
+#include "plugin/input/InputNetworkObserver.h"
+#include "plugin/input/InputNetworkSecurity.h"
+#include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputPrometheus.h"
+#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
+#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "plugin/processor/ProcessorSPL.h"
 #endif
@@ -71,8 +68,8 @@
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
-DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", false);
-DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
+DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
 
 using namespace std;
@@ -151,21 +148,23 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 
 void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputFile>());
-    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
-    // RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
     // TODO: remove these gflag when plugin is stablized
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
-        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
-    }
-    if (BOOL_FLAG(enable_ebpf_network_secure)) {
-        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), false);
     }
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_file_secure)) {
+        RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_network_secure)) {
+        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
@@ -176,8 +175,11 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
+#if defined(__linux__) && !defined(__ANDROID__)
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
+#endif
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorTagNative>());
-
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseApsaraNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseDelimiterNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorDesensitizeNative>());
@@ -185,8 +187,6 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseRegexNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseTimestampNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
-    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
-    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
     if (BOOL_FLAG(enable_processor_spl)) {
         RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSPL>());

@@ -38,13 +38,13 @@ void ConfigProvider::Init(const string& dir) {
 
     error_code ec;
     filesystem::create_directories(mContinuousPipelineConfigDir, ec);
-    PipelineConfigWatcher::GetInstance()->AddSource(mContinuousPipelineConfigDir, &mContinuousPipelineMux);
+    PipelineConfigWatcher::GetInstance()->AddSource(mContinuousPipelineConfigDir.string(), &mContinuousPipelineMux);
 
     filesystem::create_directories(mOnetimePipelineConfigDir, ec);
     PipelineConfigWatcher::GetInstance()->AddSource(mOnetimePipelineConfigDir, &mOnetimePipelineMux);
 
     filesystem::create_directories(mInstanceSourceDir, ec);
-    InstanceConfigWatcher::GetInstance()->AddSource(mInstanceSourceDir, &mInstanceMux);
+    InstanceConfigWatcher::GetInstance()->AddSource(mInstanceSourceDir.string(), &mInstanceMux);
 }
 
 } // namespace logtail

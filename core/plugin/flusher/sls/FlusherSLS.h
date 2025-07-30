@@ -79,7 +79,9 @@ public:
     // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
-    std::string GetSubpath() const { return mSubpath; }
+    const std::string& GetSubpath() const { return mSubpath; }
+
+    const std::string& GetWorkspace() const { return mWorkspace; }
 
     std::string mProject;
     std::string mLogstore;
@@ -128,6 +130,10 @@ private:
                                                                    const std::string& accessKeySecret,
                                                                    SLSClientManager::AuthType type,
                                                                    SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostHostMetricsRequest(const std::string& accessKeyId,
+                                                                  const std::string& accessKeySecret,
+                                                                  SLSClientManager::AuthType type,
+                                                                  SLSSenderQueueItem* item) const;
     std::unique_ptr<HttpSinkRequest> CreatePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                                                       const std::string& accessKeySecret,
                                                                       SLSClientManager::AuthType type,
@@ -135,10 +141,12 @@ private:
     std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
                                                                  const std::string& accessKeySecret,
                                                                  SLSClientManager::AuthType type,
-                                                                 SLSSenderQueueItem* item,
-                                                                 const std::string& subPath) const;
+                                                                 SLSSenderQueueItem* item) const;
+    bool IsRawSLSTelemetryType() const;
+    bool IsMetricsTelemetryType() const;
 
     std::string mSubpath;
+    std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;

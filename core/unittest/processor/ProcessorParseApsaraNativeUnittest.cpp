@@ -30,6 +30,11 @@ namespace logtail {
 class ProcessorParseApsaraNativeUnittest : public ::testing::Test {
 public:
     void SetUp() override {
+#ifdef _MSC_VER
+        _putenv_s("TZ", "UTC");
+#else
+        setenv("TZ", "UTC", 1);
+#endif
         mContext.SetConfigName("project##config_0");
         BOOL_FLAG(ilogtail_discard_old_data) = false;
     }
@@ -572,8 +577,10 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         // run function ProcessorSplitMultilineLogStringNative
         ProcessorSplitMultilineLogStringNative processorSplitMultilineLogStringNative;
         processorSplitMultilineLogStringNative.SetContext(mContext);
-        processorSplitMultilineLogStringNative.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+        processorSplitMultilineLogStringNative.CreateMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName,
+                                                                      "1");
         APSARA_TEST_TRUE_FATAL(processorSplitMultilineLogStringNative.Init(config));
+        processorSplitMultilineLogStringNative.CommitMetricsRecordRef();
         processorSplitMultilineLogStringNative.Process(eventGroup);
 
         // run function ProcessorParseApsaraNative

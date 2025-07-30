@@ -20,6 +20,8 @@
 #include <unistd.h>
 #elif defined(_MSC_VER)
 #include <Psapi.h>
+
+#include "common/EncodingConverter.h"
 #endif
 #include <fstream>
 #include <functional>
@@ -63,6 +65,9 @@ string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
 string LoongCollectorMonitor::mStartTime;
+#ifndef LOGTAIL_NO_TC_MALLOC
+time_t gLastTcmallocReleaseMemTime = 0;
+#endif
 
 inline void CpuStat::Reset() {
 #if defined(__linux__)
@@ -201,6 +206,9 @@ void LogtailMonitor::Monitor() {
                 if (1 == mMemStat.mViolateNum) {
                     LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
                     LogInput::GetInstance()->SetForceClearFlag(true);
+#ifndef LOGTAIL_NO_TC_MALLOC
+                    gLastTcmallocReleaseMemTime = 0;
+#endif
                 }
                 // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
                 // or memory exceeds limit) // is greater or equal than limits (
@@ -619,7 +627,7 @@ void LoongCollectorMonitor::Init() {
         return EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
     });
 #endif
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_AGENT, std::move(labels), std::move(dynamicLabels));
     // init value
     mAgentCpu = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
@@ -628,6 +636,7 @@ void LoongCollectorMonitor::Init() {
     mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
     mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 void LoongCollectorMonitor::Stop() {

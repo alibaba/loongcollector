@@ -28,6 +28,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
@@ -809,6 +810,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
     bufferMeta.set_subpath(flusher->GetSubpath());
+    bufferMeta.set_workspace(flusher->GetWorkspace());
 #ifdef __ENTERPRISE__
     bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
 #endif
@@ -914,6 +916,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     switch (telemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             return PostLogStoreLogs(accessKeyId,
                                     accessKeySecret,
                                     type,
@@ -939,19 +942,23 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                        bufferMeta.rawsize());
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS: {
+            std::map<std::string, std::string> headers;
+            headers.insert({CMS_HEADER_WORKSPACE, bufferMeta.workspace()});
+            headers.insert({APM_HEADER_PROJECT, bufferMeta.project()});
             return PostAPMBackendLogs(accessKeyId,
                                       accessKeySecret,
                                       type,
                                       host,
                                       httpsFlag,
                                       bufferMeta.project(),
-                                      bufferMeta.logstore(),
                                       GetSLSCompressTypeString(bufferMeta.compresstype()),
                                       dataType,
                                       logData,
                                       bufferMeta.rawsize(),
-                                      bufferMeta.subpath());
+                                      bufferMeta.subpath(),
+                                      headers);
+        }
         default: {
             // should not happen
             LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));

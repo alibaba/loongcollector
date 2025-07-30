@@ -16,16 +16,12 @@
 
 #include <coolbpf/security/type.h>
 
-#include <atomic>
-#include <condition_variable>
-#include <mutex>
-#include <thread>
+#include <utility>
 
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/NetworkEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
 namespace logtail::ebpf {
 
@@ -37,33 +33,42 @@ public:
 
     NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
+        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue);
     }
 
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
     void RecordNetworkEvent(tcp_data_t* event);
 
     void UpdateLossKernelEventsTotal(uint64_t cnt);
 
-    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
-
     PluginType GetPluginType() override { return PluginType::NETWORK_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
+    int SendEvents() override;
+
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
+
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+        mLossKernelEventsTotal = std::move(lossEventsTotal);
+    }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
 
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -77,8 +82,26 @@ public:
     }
 
 private:
-    ReadWriteLock mLock;
+    int64_t mSendIntervalMs = 2000;
+    int64_t mLastSendTimeMs = 0;
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree; // guard by mLock
+
+    std::vector<MetricLabels> mRefAndLabels;
+    PluginMetricManagerPtr mMetricMgr;
+    std::string mConfigName;
+
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    uint32_t mPluginIndex{0};
+
+    int mRegisteredConfigCount = 0;
+    // plugin metrics, guarded by mContextMutex
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+
+    // runner metrics
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
 };
 
 } // namespace logtail::ebpf

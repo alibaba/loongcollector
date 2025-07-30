@@ -91,7 +91,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
     // thread local metrics should be initialized in each thread
     sThreadNo = threadNo;
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         sMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR},
@@ -100,6 +100,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
     sInEventsCnt = sMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_EVENTS_TOTAL);
     sInGroupDataSizeBytes = sMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_SIZE_BYTES);
     sLastRunTime = sMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(sMetricsRecordRef);
 
     static int32_t lastFlushBatchTime = 0;
     while (true) {
@@ -124,11 +125,8 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         ADD_COUNTER(sInGroupsCnt, 1);
         ADD_COUNTER(sInGroupDataSizeBytes, item->mEventGroup.DataSize());
 
-        shared_ptr<CollectionPipeline>& pipeline = item->mPipeline;
-        bool hasOldPipeline = pipeline != nullptr;
-        if (!hasOldPipeline) {
-            pipeline = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
-        }
+        const shared_ptr<CollectionPipeline>& pipeline
+            = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
         if (!pipeline) {
             LOG_INFO(sLogger,
                      ("pipeline not found during processing, perhaps due to config deletion",
@@ -140,17 +138,9 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
         vector<PipelineEventGroup> eventGroupList;
         eventGroupList.emplace_back(std::move(item->mEventGroup));
+        // TODO: use old pipeline input index to find inner processor in new pipeline, maybe cause some issues when
+        // there are multiple inputs
         pipeline->Process(eventGroupList, item->mInputIndex);
-        // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
-        if (hasOldPipeline) {
-            pipeline = CollectionPipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
-            if (!pipeline) {
-                LOG_INFO(sLogger,
-                         ("pipeline not found during processing, perhaps due to config deletion",
-                          "discard data")("config", configName));
-                continue;
-            }
-        }
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
             // TODO:

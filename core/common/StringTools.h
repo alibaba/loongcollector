@@ -16,18 +16,21 @@
 
 #pragma once
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#include "boost/lexical_cast.hpp"
-#pragma GCC diagnostic pop
 #include <charconv>
 
 #include <algorithm>
-#include <filesystem>
 #include <string>
 #include <vector>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
+#include "boost/lexical_cast.hpp"
 #include "boost/regex.hpp"
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #include "common/StringView.h"
 
@@ -171,8 +174,8 @@ static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f
 }
 
 // trim from both ends (returns a new string_view)
-static inline StringView Trim(StringView s) {
-    return Ltrim(Rtrim(s));
+static inline StringView Trim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    return Ltrim(Rtrim(s, blank), blank);
 }
 
 static constexpr StringView kNullSv("\0", 1);

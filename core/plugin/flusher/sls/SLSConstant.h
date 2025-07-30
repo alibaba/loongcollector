@@ -23,10 +23,14 @@ namespace logtail {
 extern const std::string LOGSTORES;
 extern const std::string METRICSTORES;
 extern const std::string HEALTH;
+extern const std::string HOSTMETRICS;
 
 extern const std::string APM_METRICS_URL;
 extern const std::string APM_TRACES_URL;
 extern const std::string APM_AGENTINFOS_URL;
+
+extern const std::string CMS_HEADER_WORKSPACE;
+extern const std::string APM_HEADER_PROJECT;
 
 extern const std::string CONTENT_MD5;
 

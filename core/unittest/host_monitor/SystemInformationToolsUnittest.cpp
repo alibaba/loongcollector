@@ -26,23 +26,28 @@ namespace logtail {
 
 class SystemInformationToolsUnittest : public testing::Test {
 public:
-    void TestGetHostSystemStat() const;
+    // void TestGetHostSystemStat() const;
+    void TestGetHostSystemStatWithPath() const;
 
 protected:
     void SetUp() override {
         bfs::create_directories("./1");
         ofstream ofs("./stat", std::ios::trunc);
         ofs << "btime 1731142542";
+        ofs.close();
+        PROCESS_DIR = ".";
     }
 };
 
-void SystemInformationToolsUnittest::TestGetHostSystemStat() const {
+void SystemInformationToolsUnittest::TestGetHostSystemStatWithPath() const {
     auto lines = vector<string>();
     std::string errorMessage;
-    APSARA_TEST_TRUE(GetHostSystemStat(lines, errorMessage));
+    APSARA_TEST_TRUE(GetHostSystemStatWithPath(lines, errorMessage, "./stat"));
     APSARA_TEST_EQUAL(1, lines.size());
     APSARA_TEST_EQUAL("btime 1731142542", lines[0]);
 }
+
+UNIT_TEST_CASE(SystemInformationToolsUnittest, TestGetHostSystemStatWithPath);
 
 } // namespace logtail
 

@@ -16,6 +16,16 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "json/json.h"
+
 #include "config/PipelineConfig.h"
 
 namespace logtail {

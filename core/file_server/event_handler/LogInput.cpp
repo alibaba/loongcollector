@@ -304,9 +304,9 @@ bool LogInput::ReadLocalEvents() {
 
 void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
     const string& source = ev->GetSource();
-    const string& object = ev->GetObject();
+    const string& object = ev->GetEventObject();
     LOG_DEBUG(sLogger,
-              ("process event, type", ev->GetTypeString())("dir", ev->GetSource())("filename", ev->GetObject())(
+              ("process event, type", ev->GetTypeString())("dir", ev->GetSource())("filename", ev->GetEventObject())(
                   "config", ev->GetConfigName()));
     if (ev->IsTimeout())
         dispatcher->UnregisterAllDir(source);
@@ -380,9 +380,9 @@ void LogInput::ProcessLoop() {
         Event* ev = PopEventQueue();
         if (ev != NULL) {
             ++mEventProcessCount;
-            if (mIdleFlag)
+            if (mIdleFlag) {
                 delete ev;
-            else
+            } else
                 ProcessEvent(dispatcher, ev);
         } else {
             unique_lock<mutex> lock(mFeedbackMux);
@@ -468,7 +468,7 @@ void LogInput::PushEventQueue(std::vector<Event*>& eventVec) {
         string key;
         key.append((*iter)->GetSource())
             .append(">")
-            .append((*iter)->GetObject())
+            .append((*iter)->GetEventObject())
             .append(">")
             .append(ToString((*iter)->GetDev()))
             .append(">")
@@ -493,7 +493,7 @@ void LogInput::PushEventQueue(Event* ev) {
     string key;
     key.append(ev->GetSource())
         .append(">")
-        .append(ev->GetObject())
+        .append(ev->GetEventObject())
         .append(">")
         .append(ToString(ev->GetDev()))
         .append(">")

@@ -16,11 +16,13 @@
 
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
-
 namespace logtail {
 
-bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
+bool GetHostSystemStatWithPath(std::vector<std::string>& lines,
+                               std::string& errorMessage,
+                               std::filesystem::path PROC_DIR);
 
 } // namespace logtail

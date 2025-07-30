@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
 
 #include <functional>
 #include <string>
@@ -32,4 +33,4 @@ public:
 };
 
 // 字段定义宏
-#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS>(#FIELD, &CLASS::FIELD)
+#define FIELD_ENTRY(CLASS, FIELD) FieldName<CLASS, decltype(CLASS::FIELD)>(#FIELD, &CLASS::FIELD)

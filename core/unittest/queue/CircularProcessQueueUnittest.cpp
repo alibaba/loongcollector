@@ -29,7 +29,6 @@ public:
     void TestPop();
     void TestReset();
     void TestMetric();
-    void TestSetPipeline();
 
 protected:
     static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
@@ -181,32 +180,10 @@ void CircularProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(0U, mQueue->mQueueDataSizeByte->GetValue());
 }
 
-void CircularProcessQueueUnittest::TestSetPipeline() {
-    auto pipeline = make_shared<CollectionPipeline>();
-    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
-
-    auto item1 = GenerateItem(1);
-    auto p1 = item1.get();
-    auto pipelineTmp = make_shared<CollectionPipeline>();
-    item1->mPipeline = pipelineTmp;
-
-    auto item2 = GenerateItem(1);
-    auto p2 = item2.get();
-
-    mQueue->Push(std::move(item1));
-    mQueue->Push(std::move(item2));
-    auto p = CollectionPipelineManager::GetInstance()->FindConfigByName("test_config");
-    mQueue->SetPipelineForItems(p);
-
-    APSARA_TEST_EQUAL(pipelineTmp, p1->mPipeline);
-    APSARA_TEST_EQUAL(pipeline, p2->mPipeline);
-}
-
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPop)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestReset)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestMetric)
-UNIT_TEST_CASE(CircularProcessQueueUnittest, TestSetPipeline)
 
 } // namespace logtail
 

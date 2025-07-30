@@ -14,26 +14,17 @@
 
 #pragma once
 
-#include <array>
 #include <atomic>
-#include <condition_variable>
-#include <queue>
-#include <set>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "common/Lock.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "common/timer/Timer.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/type/AggregateEvent.h"
 #include "ebpf/type/CommonDataEvent.h"
-#include "ebpf/util/AggregateTree.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
@@ -45,32 +36,41 @@ public:
     AbstractManager() = delete;
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                              const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             const PluginMetricManagerPtr& metricManager);
+                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue
+                             /*const PluginMetricManagerPtr& metricManager*/);
     virtual ~AbstractManager();
 
-    virtual int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
+    virtual int Init() = 0;
+
+    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
+                                  uint32_t,
+                                  const PluginMetricManagerPtr&,
+                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&)
+        = 0;
+
+    virtual int RemoveConfig(const std::string&) = 0;
+
+    virtual int RegisteredConfigCount() = 0;
 
     virtual int Destroy() = 0;
 
     virtual int HandleEvent(const std::shared_ptr<CommonEvent>& event) = 0;
 
-    virtual int PollPerfBuffer() {
+    virtual int SendEvents() = 0;
+
+    virtual int PollPerfBuffer(int maxWaitTimeMs) {
         int zero = 0;
         // TODO(@qianlu.kk): do we need to hold some events for a while and enqueue bulk??
         // the max_events doesn't work so far
         // and if there is no managers at all, this thread will occupy the cpu
-        return mEBPFAdapter->PollPerfBuffers(
-            GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
+        return mEBPFAdapter->PollPerfBuffers(GetPluginType(), kDefaultMaxBatchConsumeSize, &zero, maxWaitTimeMs);
     }
 
-    bool IsRunning() { return mFlag && !mSuspendFlag; }
+    virtual int ConsumePerfBufferData() { return mEBPFAdapter->ConsumePerfBufferData(GetPluginType()); }
 
-    bool IsExists() { return mFlag; }
+    bool IsRunning() { return mInited && !mSuspendFlag; }
 
-    virtual bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                              const std::shared_ptr<ScheduleConfig>& config)
-        = 0;
+    bool IsExists() { return mInited; }
 
     virtual PluginType GetPluginType() = 0;
 
@@ -104,17 +104,10 @@ public:
     virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
-            LOG_ERROR(sLogger, ("failed to resume plugin", magic_enum::enum_name(GetPluginType())));
+            LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));
             return 1;
         }
         return 0;
-    }
-
-    void UpdateContext(const CollectionPipelineContext* ctx, logtail::QueueKey key, uint32_t index) {
-        std::lock_guard lk(mContextMutex);
-        mPipelineCtx = ctx;
-        mQueueKey = key;
-        mPluginIndex = index;
     }
 
     std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
@@ -124,24 +117,10 @@ private:
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:
-    std::atomic<bool> mFlag = false;
+    std::atomic<bool> mInited = false;
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
-    PluginMetricManagerPtr mMetricMgr;
-
-    mutable std::mutex mContextMutex;
-    // mPipelineCtx/mQueueKey/mPluginIndex is guarded by mContextMutex
-    const CollectionPipelineContext* mPipelineCtx{nullptr};
-    logtail::QueueKey mQueueKey = 0;
-    uint32_t mPluginIndex{0};
-
-    CounterPtr mRecvKernelEventsTotal;
-    CounterPtr mLossKernelEventsTotal;
-    CounterPtr mPushLogsTotal;
-    CounterPtr mPushLogGroupTotal;
-
-    std::vector<MetricLabels> mRefAndLabels;
 };
 
 } // namespace logtail::ebpf
