@@ -41,7 +41,7 @@ void ConfigProvider::Init(const string& dir) {
     PipelineConfigWatcher::GetInstance()->AddSource(mContinuousPipelineConfigDir.string(), &mContinuousPipelineMux);
 
     filesystem::create_directories(mOnetimePipelineConfigDir, ec);
-    PipelineConfigWatcher::GetInstance()->AddSource(mOnetimePipelineConfigDir, &mOnetimePipelineMux);
+    PipelineConfigWatcher::GetInstance()->AddSource(mOnetimePipelineConfigDir.string(), &mOnetimePipelineMux);
 
     filesystem::create_directories(mInstanceSourceDir, ec);
     InstanceConfigWatcher::GetInstance()->AddSource(mInstanceSourceDir.string(), &mInstanceMux);
