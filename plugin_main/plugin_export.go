@@ -83,7 +83,7 @@ static void setArrayKeyValue(KeyValue **a, KeyValue *s, int n) {
 }
 
 static PluginMetric** makePluginMetricArray(int size) {
-    return malloc(sizeof(KeyValue*) * size);
+    return malloc(sizeof(PluginMetric*) * size);
 }
 
 static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
@@ -325,9 +325,13 @@ func GetGoMetrics(metricType string) *C.PluginMetrics {
 			cKeyValue.value = cValue
 
 			C.setArrayKeyValue(cMetric.keyValues, cKeyValue, C.int(j))
+			runtime.KeepAlive(cKeyValue)
+			runtime.KeepAlive(cKey)
+			runtime.KeepAlive(cValue)
 			j++
 		}
 		C.setArrayPluginMetric(cPluginMetrics.metrics, cMetric, C.int(i))
+		runtime.KeepAlive(cMetric)
 	}
 	return cPluginMetrics
 }
