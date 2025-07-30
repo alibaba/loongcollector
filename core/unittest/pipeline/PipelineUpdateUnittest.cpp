@@ -2438,7 +2438,8 @@ void PipelineUpdateUnittest::TestPipelineRelease() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
