@@ -14,7 +14,11 @@
 
 #include "plugin/input/InputStaticFile.h"
 
+#if defined(__linux__)
 #include <fnmatch.h>
+#else
+#include "common/StringTools.h"
+#endif
 
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"

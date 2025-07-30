@@ -20,22 +20,26 @@ namespace logtail {
 
 const string& FileStatusToString(FileStatus status) {
     switch (status) {
-        case FileStatus::WAITING:
+        case FileStatus::WAITING: {
             static const string kWaitingStr = "waiting";
             return kWaitingStr;
-        case FileStatus::READING:
+        }
+        case FileStatus::READING: {
             static const string kReadingStr = "reading";
             return kReadingStr;
-        case FileStatus::FINISHED:
+        }
+        case FileStatus::FINISHED: {
             static const string kFinishedStr = "finished";
             return kFinishedStr;
-        case FileStatus::ABORT:
+        }
+        case FileStatus::ABORT: {
             static const string kAbortStr = "abort";
             return kAbortStr;
-        default:
-            // should not happen
+        }
+        default: { // should not happen
             static const string kUnknownStr = "unknown";
             return kUnknownStr;
+        }
     }
 }
 
