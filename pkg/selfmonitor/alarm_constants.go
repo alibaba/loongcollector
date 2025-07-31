@@ -20,6 +20,7 @@ func (a AlarmType) String() string {
 	return string(a)
 }
 
+// todo: add more alarm type
 const (
 	InputCollectAlarm    AlarmType = "INPUT_COLLECT_ALARM"
 	CategoryConfigAlarm  AlarmType = "CATEGORY_CONFIG_ALARM"
