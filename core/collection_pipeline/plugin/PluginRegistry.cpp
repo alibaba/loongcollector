@@ -30,6 +30,7 @@
 #include "plugin/creator/StaticProcessorCreator.h"
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
+#include "plugin/flusher/kafka/FlusherKafka.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
@@ -183,6 +184,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif
