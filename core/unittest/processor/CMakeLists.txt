@@ -48,6 +48,12 @@ target_link_libraries(processor_desensitize_native_unittest ${UT_BASE_TARGET})
 add_executable(processor_merge_multiline_log_native_unittest ProcessorMergeMultilineLogNativeUnittest.cpp)
 target_link_libraries(processor_merge_multiline_log_native_unittest ${UT_BASE_TARGET})
 
+add_executable(processor_parse_from_pb_native_unittest ProcessorParseFromPBNativeUnittest.cpp)
+target_link_libraries(processor_parse_from_pb_native_unittest ${UT_BASE_TARGET})
+
+add_executable(parse_from_pb_native_benchmark ParseFromPBBenchmark.cpp)
+target_link_libraries(parse_from_pb_native_benchmark ${UT_BASE_TARGET})
+
 add_executable(boost_regex_benchmark BoostRegexBenchmark.cpp)
 target_link_libraries(boost_regex_benchmark ${UT_BASE_TARGET})
 
@@ -64,12 +70,6 @@ if (LINUX)
     add_executable(parse_container_log_benchmark ParseContainerLogBenchmark.cpp)
     target_link_libraries(parse_container_log_benchmark ${UT_BASE_TARGET})
 endif()
-
-add_executable(processor_parse_from_pb_native_unittest ProcessorParseFromPBNativeUnittest.cpp)
-target_link_libraries(processor_parse_from_pb_native_unittest unittest_base)
-
-add_executable(parse_from_pb_native_benchmark ParseFromPBBenchmark.cpp)
-target_link_libraries(parse_from_pb_native_benchmark ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(processor_split_log_string_native_unittest)
