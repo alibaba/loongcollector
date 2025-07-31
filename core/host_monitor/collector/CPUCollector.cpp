@@ -56,9 +56,9 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
             continue;
         }
 
-        CPUStat cpuTolal = cpu;
+        CPUStat cpuTotal = cpu;
         double cpuCores = cpuCount;
-        if (!CalculateCPUPercent(totalCpuPercent, cpuTolal)) {
+        if (!CalculateCPUPercent(totalCpuPercent, cpuTotal)) {
             return false;
         }
         // first time get cpu count and not calculate mCount
