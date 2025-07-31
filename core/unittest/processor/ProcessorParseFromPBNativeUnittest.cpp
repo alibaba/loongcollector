@@ -271,7 +271,7 @@
  
      pbSpan.set_traceid("cba78930fe0c2626bc60696a3453cc40");
      pbSpan.set_spanid("4083239a6a2e704e");
-     pbSpan.set_parentspanid("d42788c106b9c48e");
+     pbSpan.set_parentspanid("0000000000000000");
      pbSpan.set_name("/components/api/v1/http/success");
      pbSpan.set_kind(models::SpanEvent::SERVER); // kind=2 is SERVER
      pbSpan.set_starttime(1748313835253000000ULL);
@@ -347,7 +347,7 @@
  
      APSARA_TEST_EQUAL("cba78930fe0c2626bc60696a3453cc40", spanEvent.GetTraceId());
      APSARA_TEST_EQUAL("4083239a6a2e704e", spanEvent.GetSpanId());
-     APSARA_TEST_EQUAL("d42788c106b9c48e", spanEvent.GetParentSpanId());
+     APSARA_TEST_EQUAL("0000000000000000", spanEvent.GetParentSpanId());
      APSARA_TEST_EQUAL("/components/api/v1/http/success", spanEvent.GetName());
      APSARA_TEST_EQUAL(SpanEvent::Kind::Server, spanEvent.GetKind());
      APSARA_TEST_EQUAL(1748313835253000000ULL, spanEvent.GetStartTimeNs());
@@ -401,6 +401,7 @@
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestInit)
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessValidSpanData)
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessEmptyEventGroup)
+ UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessNonRawEventGroup)
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessInvalidProtobufData)
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessMultiValidSpanData)
  UNIT_TEST_CASE(ProcessorParseFromPBNativeUnittest, TestProcessMultiInvalidProtobufData)

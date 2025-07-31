@@ -68,6 +68,9 @@ endif()
 add_executable(processor_parse_from_pb_native_unittest ProcessorParseFromPBNativeUnittest.cpp)
 target_link_libraries(processor_parse_from_pb_native_unittest unittest_base)
 
+add_executable(parse_from_pb_native_benchmark ParseFromPBBenchmark.cpp)
+target_link_libraries(parse_from_pb_native_benchmark ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(processor_split_log_string_native_unittest)
 gtest_discover_tests(processor_split_multiline_log_string_native_unittest)
