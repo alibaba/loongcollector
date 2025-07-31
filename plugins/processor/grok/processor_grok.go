@@ -66,7 +66,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 		for _, path := range p.CustomPatternDir {
 			err = p.addPatternsFromPath(path)
 			if err != nil {
-				logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
+				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
 				return err
 			}
 		}
@@ -78,13 +78,13 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 
 	err = p.buildPatterns()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
 		return err
 	}
 
 	err = p.compileMatchs()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
 		return err
 	}
 

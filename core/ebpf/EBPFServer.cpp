@@ -247,7 +247,7 @@ void EBPFServer::Stop() {
         }
         if (!alarmOnce) {
             LOG_ERROR(sLogger, ("poller thread stop", "too slow"));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM, std::string("EBPFServer stop too slow"));
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM, std::string("EBPFServer stop too slow"));
             alarmOnce = true;
         }
     }
@@ -261,8 +261,8 @@ void EBPFServer::Stop() {
         }
         if (!alarmOnce) {
             LOG_ERROR(sLogger, ("handler thread ", " too slow"));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
-                                                   std::string("ProcessCacheManager stop too slow"));
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM,
+                                                        std::string("ProcessCacheManager stop too slow"));
             alarmOnce = true;
         }
     }

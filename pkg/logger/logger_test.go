@@ -31,7 +31,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -375,14 +375,14 @@ func TestWarn(t *testing.T) {
 	initNormalLogger()
 	type args struct {
 		ctx       context.Context
-		alarmType string
+		alarmType selfmonitor.AlarmType
 		kvPairs   []interface{}
 	}
 	tests := []struct {
 		name   string
 		args   args
 		want   string
-		getter func() *util.Alarm
+		getter func() *selfmonitor.Alarm
 	}{
 		{
 			name: "with-header",
@@ -392,7 +392,7 @@ func TestWarn(t *testing.T) {
 				kvPairs:   []interface{}{"a", "b"},
 			},
 			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\t\\[a b\\]:.*",
-			getter: func() *util.Alarm {
+			getter: func() *selfmonitor.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
@@ -404,8 +404,8 @@ func TestWarn(t *testing.T) {
 				kvPairs:   []interface{}{"a", "b"},
 			},
 			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\t\\[a b\\]:.*",
-			getter: func() *util.Alarm {
-				return util.GlobalAlarm
+			getter: func() *selfmonitor.Alarm {
+				return selfmonitor.GlobalAlarm
 			},
 		},
 	}
@@ -418,8 +418,9 @@ func TestWarn(t *testing.T) {
 			assert.True(t, regexp.MustCompile(tt.want).Match([]byte(log)), "want regexp %s, but got: %s", tt.want, log)
 			alarmMap := tt.getter().AlarmMap
 			assert.Equal(t, 1, len(alarmMap), "the size of alarm map; %d", len(alarmMap))
-			for at, item := range alarmMap {
-				assert.Equal(t, tt.args.alarmType, at)
+			for _, item := range alarmMap {
+				assert.Equal(t, tt.args.alarmType, item.AlarmType)
+				assert.Equal(t, selfmonitor.AlarmLevelWaring, item.Level)
 				fmt.Printf("got alarm msg %s: %+v\n", tt.args.alarmType, item)
 			}
 			for k := range alarmMap {
@@ -438,14 +439,14 @@ func TestWarnf(t *testing.T) {
 	type args struct {
 		ctx       context.Context
 		format    string
-		alarmType string
+		alarmType selfmonitor.AlarmType
 		params    []interface{}
 	}
 	tests := []struct {
 		name   string
 		args   args
 		want   string
-		getter func() *util.Alarm
+		getter func() *selfmonitor.Alarm
 	}{
 		{
 			name: "without-header",
@@ -456,8 +457,8 @@ func TestWarnf(t *testing.T) {
 				params:    []interface{}{"a"},
 			},
 			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\ttest \\[a\\].*",
-			getter: func() *util.Alarm {
-				return util.GlobalAlarm
+			getter: func() *selfmonitor.Alarm {
+				return selfmonitor.GlobalAlarm
 			},
 		},
 		{
@@ -470,7 +471,7 @@ func TestWarnf(t *testing.T) {
 			},
 			want: ".*\\[WRN\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\ttest \\[a\\].*",
 
-			getter: func() *util.Alarm {
+			getter: func() *selfmonitor.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
@@ -484,8 +485,9 @@ func TestWarnf(t *testing.T) {
 			assert.True(t, regexp.MustCompile(tt.want).Match([]byte(log)), "want regexp %s, but got: %s", tt.want, log)
 			alarmMap := tt.getter().AlarmMap
 			assert.Equal(t, 1, len(alarmMap), "the size of alarm map; %d", len(alarmMap))
-			for at, item := range alarmMap {
-				assert.Equal(t, tt.args.alarmType, at)
+			for _, item := range alarmMap {
+				assert.Equal(t, tt.args.alarmType, item.AlarmType)
+				assert.Equal(t, selfmonitor.AlarmLevelWaring, item.Level)
 				fmt.Printf("got alarm msg %s: %+v\n", tt.args.alarmType, item)
 			}
 			for k := range alarmMap {
@@ -505,14 +507,14 @@ func TestError(t *testing.T) {
 	initNormalLogger()
 	type args struct {
 		ctx       context.Context
-		alarmType string
+		alarmType selfmonitor.AlarmType
 		kvPairs   []interface{}
 	}
 	tests := []struct {
 		name   string
 		args   args
 		want   string
-		getter func() *util.Alarm
+		getter func() *selfmonitor.Alarm
 	}{
 		{
 			name: "with-header",
@@ -522,7 +524,7 @@ func TestError(t *testing.T) {
 				kvPairs:   []interface{}{"a", "b"},
 			},
 			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\t\\[a b\\]:.*",
-			getter: func() *util.Alarm {
+			getter: func() *selfmonitor.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
@@ -534,8 +536,8 @@ func TestError(t *testing.T) {
 				kvPairs:   []interface{}{"a", "b"},
 			},
 			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\t\\[a b\\]:.*",
-			getter: func() *util.Alarm {
-				return util.GlobalAlarm
+			getter: func() *selfmonitor.Alarm {
+				return selfmonitor.GlobalAlarm
 			},
 		},
 	}
@@ -548,8 +550,9 @@ func TestError(t *testing.T) {
 			assert.True(t, regexp.MustCompile(tt.want).Match([]byte(log)), "want regexp %s, but got: %s", tt.want, log)
 			alarmMap := tt.getter().AlarmMap
 			assert.Equal(t, 1, len(alarmMap), "the size of alarm map; %d", len(alarmMap))
-			for at, item := range alarmMap {
-				assert.Equal(t, tt.args.alarmType, at)
+			for _, item := range alarmMap {
+				assert.Equal(t, tt.args.alarmType, item.AlarmType)
+				assert.Equal(t, selfmonitor.AlarmLevelError, item.Level)
 				fmt.Printf("got alarm msg %s: %+v\n", tt.args.alarmType, item)
 			}
 			for k := range alarmMap {
@@ -568,14 +571,14 @@ func TestErrorf(t *testing.T) {
 	type args struct {
 		ctx       context.Context
 		format    string
-		alarmType string
+		alarmType selfmonitor.AlarmType
 		params    []interface{}
 	}
 	tests := []struct {
 		name   string
 		args   args
 		want   string
-		getter func() *util.Alarm
+		getter func() *selfmonitor.Alarm
 	}{
 		{
 			name: "without-header",
@@ -586,8 +589,8 @@ func TestErrorf(t *testing.T) {
 				params:    []interface{}{"a"},
 			},
 			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] AlarmType:WITHOUT_HEADER\ttest \\[a\\].*",
-			getter: func() *util.Alarm {
-				return util.GlobalAlarm
+			getter: func() *selfmonitor.Alarm {
+				return selfmonitor.GlobalAlarm
 			},
 		},
 		{
@@ -599,7 +602,7 @@ func TestErrorf(t *testing.T) {
 				params:    []interface{}{"a"},
 			},
 			want: ".*\\[ERR\\] \\[logger_test.go:\\d{1,}\\] \\[func\\d{1,}\\] \\[mock-configname,mock-logstore\\]\tAlarmType:WITH_HEADER\ttest \\[a\\].*",
-			getter: func() *util.Alarm {
+			getter: func() *selfmonitor.Alarm {
 				return ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 			},
 		},
@@ -613,8 +616,9 @@ func TestErrorf(t *testing.T) {
 			assert.True(t, regexp.MustCompile(tt.want).Match([]byte(log)), "want regexp %s, but got: %s", tt.want, log)
 			alarmMap := tt.getter().AlarmMap
 			assert.Equal(t, 1, len(alarmMap), "the size of alarm map; %d", len(alarmMap))
-			for at, item := range alarmMap {
-				assert.Equal(t, tt.args.alarmType, at)
+			for _, item := range alarmMap {
+				assert.Equal(t, tt.args.alarmType, item.AlarmType)
+				assert.Equal(t, selfmonitor.AlarmLevelError, item.Level)
 				fmt.Printf("got alarm msg %s: %+v\n", tt.args.alarmType, item)
 			}
 			for k := range alarmMap {
@@ -630,12 +634,12 @@ func TestOffRemote(t *testing.T) {
 	clean()
 	initTestLogger()
 	Warning(context.Background(), "ALARM_TYPE", "a", "b")
-	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
+	assert.Equal(t, 0, len(selfmonitor.GlobalAlarm.AlarmMap))
 	Error(context.Background(), "ALARM_TYPE", "a", "b")
-	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
+	assert.Equal(t, 0, len(selfmonitor.GlobalAlarm.AlarmMap))
 	Warningf(context.Background(), "ALARM_TYPE", "test %s", "b")
-	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
+	assert.Equal(t, 0, len(selfmonitor.GlobalAlarm.AlarmMap))
 	Errorf(context.Background(), "ALARM_TYPE", "test %s", "b")
-	assert.Equal(t, 0, len(util.GlobalAlarm.AlarmMap))
-	delete(util.GlobalAlarm.AlarmMap, "ALARM_TYPE")
+	assert.Equal(t, 0, len(selfmonitor.GlobalAlarm.AlarmMap))
+	delete(selfmonitor.GlobalAlarm.AlarmMap, "ALARM_TYPE")
 }

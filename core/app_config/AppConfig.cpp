@@ -743,10 +743,10 @@ void AppConfig::loadAppConfigLogtailMode(const std::string& ilogtailConfigFile) 
             confJson.clear();
             if (res == CONFIG_NOT_EXIST) {
                 LOG_ERROR(sLogger, ("can not find start config", ilogtailConfigFile));
-                AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "can not find start config");
+                AlarmManager::GetInstance()->SendAlarmWarning(LOGTAIL_CONFIG_ALARM, "can not find start config");
             } else if (res == CONFIG_INVALID_FORMAT) {
                 LOG_ERROR(sLogger, ("start config is not valid json", ilogtailConfigFile));
-                AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "start config is not valid json");
+                AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CONFIG_ALARM, "start config is not valid json");
             }
         }
     }

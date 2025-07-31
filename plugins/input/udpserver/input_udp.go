@@ -58,7 +58,7 @@ func (u *UDPServer) Init(context pipeline.Context) (int, error) {
 
 	host, portStr, err := net.SplitHostPort(u.Address)
 	if err != nil {
-		logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "illegal udp listening addr", u.Address, "err", err)
+		logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "illegal udp listening addr", u.Address, "err", err)
 		return 0, err
 	}
 	if host == "" {
@@ -67,13 +67,13 @@ func (u *UDPServer) Init(context pipeline.Context) (int, error) {
 
 	ip, err := net.ResolveIPAddr("ip", host)
 	if err != nil {
-		logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "unable resolve addr", u.Address, "err", err)
+		logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "unable resolve addr", u.Address, "err", err)
 		return 0, err
 	}
 
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port < 0 || port > 65535 {
-		logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "illegal port", portStr, "err", err)
+		logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "illegal port", portStr, "err", err)
 	}
 
 	u.addr = &net.UDPAddr{
@@ -99,7 +99,7 @@ func (u *UDPServer) doStart(dispatchFunc func(logs []*protocol.Log)) error {
 	var err error
 	u.conn, err = net.ListenUDP("udp", u.addr)
 	if err != nil {
-		logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "start udp server err", err)
+		logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "start udp server err", err)
 		return err
 	}
 	go func() {
@@ -115,12 +115,12 @@ func (u *UDPServer) doStart(dispatchFunc func(logs []*protocol.Log)) error {
 				if strings.HasSuffix(err.Error(), "use of closed network connection") {
 					return
 				}
-				logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "read record err", err)
+				logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "read record err", err)
 				return
 			}
 			logs, err := u.decoder.Decode(buf[:n], nil, nil)
 			if err != nil {
-				logger.Error(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "decode record err,some logs would be dropped", err)
+				logger.Warning(u.context.GetRuntimeContext(), "UDP_SERVER_ALARM", "decode record err,some logs would be dropped", err)
 			} else {
 				dispatchFunc(logs)
 			}

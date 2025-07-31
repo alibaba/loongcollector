@@ -80,7 +80,7 @@ func (t *TraceSegmentHandle) collectSegment(upstream *agent.UpstreamSegment) err
 		if otTrace := t.parseSpan(span, applicationInstance, traceID, convertUniIDToString(segment.TraceSegmentId)); otTrace != nil {
 			log, err := otTrace.ToLog()
 			if err != nil {
-				logger.Error(t.context.GetRuntimeContext(), "SKYWALKING_TO_OT_TRACE_ERR", "err", err)
+				logger.Warning(t.context.GetRuntimeContext(), "SKYWALKING_TO_OT_TRACE_ERR", "err", err)
 				return err
 			}
 			t.collector.AddRawLog(log)

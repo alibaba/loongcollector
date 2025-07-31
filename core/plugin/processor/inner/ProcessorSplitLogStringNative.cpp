@@ -88,13 +88,13 @@ bool ProcessorSplitLogStringNative::IsSupportedEvent(const PipelineEventPtr& e) 
     }
     LOG_ERROR(mContext->GetLogger(),
               ("unexpected error", "unsupported log event")("processor", sName)("config", mContext->GetConfigName()));
-    mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                   "unexpected error: unsupported log event.\tprocessor: " + sName
-                                       + "\tconfig: " + mContext->GetConfigName(),
-                                   mContext->GetRegion(),
-                                   mContext->GetProjectName(),
-                                   mContext->GetConfigName(),
-                                   mContext->GetLogstoreName());
+    mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                          "unexpected error: unsupported log event.\tprocessor: " + sName
+                                              + "\tconfig: " + mContext->GetConfigName(),
+                                          mContext->GetRegion(),
+                                          mContext->GetProjectName(),
+                                          mContext->GetConfigName(),
+                                          mContext->GetLogstoreName());
     return false;
 }
 
@@ -117,13 +117,13 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
         newEvents.emplace_back(std::move(e));
         LOG_ERROR(mContext->GetLogger(),
                   ("unexpected error", errorMsg)("processor", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                       "unexpected error: " + errorMsg + ".\tprocessor: " + sName
-                                           + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mContext->GetLogstoreName());
+        mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                              "unexpected error: " + errorMsg + ".\tprocessor: " + sName
+                                                  + "\tconfig: " + mContext->GetConfigName(),
+                                              mContext->GetRegion(),
+                                              mContext->GetProjectName(),
+                                              mContext->GetConfigName(),
+                                              mContext->GetLogstoreName());
         return;
     }
 

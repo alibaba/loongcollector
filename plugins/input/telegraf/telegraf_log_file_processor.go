@@ -53,7 +53,7 @@ func (p *Processor) Process(fileBlock []byte, noChangeInterval time.Duration) in
 		case 'W':
 			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "time", string(timePart), "log", string(thisLine))
 		case 'E':
-			logger.Error(telegrafManager.GetContext(), TelegrafAlarmType, "time", string(timePart), "log", string(thisLine))
+			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "time", string(timePart), "log", string(thisLine))
 		default:
 			logger.Warning(telegrafManager.GetContext(), TelegrafAlarmType, "illegal log", string(originalLine))
 		}

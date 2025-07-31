@@ -195,12 +195,12 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                                                                        GetContext().GetProjectName())(
                                   "logstore", GetContext().GetLogstoreName())("file", logPath));
                 }
-                GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                                  "errorlog:" + buffer.to_string() + " | exception:" + exception,
-                                                  GetContext().GetRegion(),
-                                                  GetContext().GetProjectName(),
-                                                  GetContext().GetConfigName(),
-                                                  GetContext().GetLogstoreName());
+                GetContext().GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
+                                                         "errorlog:" + buffer.to_string() + " | exception:" + exception,
+                                                         GetContext().GetRegion(),
+                                                         GetContext().GetProjectName(),
+                                                         GetContext().GetConfigName(),
+                                                         GetContext().GetLogstoreName());
             }
         } else {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -209,12 +209,12 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                 ("parse regex log fail", buffer)("project", GetContext().GetProjectName())(
                                     "logstore", GetContext().GetLogstoreName())("file", logPath));
                 }
-                GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                                  std::string("errorlog:") + buffer.to_string(),
-                                                  GetContext().GetRegion(),
-                                                  GetContext().GetProjectName(),
-                                                  GetContext().GetConfigName(),
-                                                  GetContext().GetLogstoreName());
+                GetContext().GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
+                                                         std::string("errorlog:") + buffer.to_string(),
+                                                         GetContext().GetRegion(),
+                                                         GetContext().GetProjectName(),
+                                                         GetContext().GetConfigName(),
+                                                         GetContext().GetLogstoreName());
             }
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
@@ -227,13 +227,13 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                              what.size())("parse regex log fail", buffer)("project", GetContext().GetProjectName())(
                                 "logstore", GetContext().GetLogstoreName())("file", logPath));
             }
-            GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                              "parse key count not match" + ToString(what.size())
-                                                  + "errorlog:" + buffer.to_string(),
-                                              GetContext().GetRegion(),
-                                              GetContext().GetProjectName(),
-                                              GetContext().GetConfigName(),
-                                              GetContext().GetLogstoreName());
+            GetContext().GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
+                                                     "parse key count not match" + ToString(what.size())
+                                                         + "errorlog:" + buffer.to_string(),
+                                                     GetContext().GetRegion(),
+                                                     GetContext().GetProjectName(),
+                                                     GetContext().GetConfigName(),
+                                                     GetContext().GetLogstoreName());
         }
         parseSuccess = false;
     }

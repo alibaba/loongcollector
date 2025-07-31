@@ -236,7 +236,7 @@ func (m *metaCollector) handleEvent(event []*k8smeta.K8sMetaEvent) {
 			m.handleDelete(e)
 		}
 	default:
-		logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "unknown event type", event[0].EventType)
+		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "unknown event type", event[0].EventType)
 	}
 }
 
@@ -310,7 +310,7 @@ func (m *metaCollector) processEntityJSONObject(obj interface{}) string {
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
-		logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "process entity json object fail", err)
+		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "process entity json object fail", err)
 		return emptyJSONObjectString
 	}
 	return string(objStr)
@@ -322,7 +322,7 @@ func (m *metaCollector) processEntityJSONArray(obj []map[string]string) string {
 	}
 	objStr, err := json.Marshal(obj)
 	if err != nil {
-		logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "process entity json array fail", err)
+		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "process entity json array fail", err)
 		return "[]"
 	}
 	return string(objStr)
@@ -338,7 +338,7 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	select {
 	case buffer <- event:
 	case <-time.After(3 * time.Second):
-		logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "send event timeout, isEntity", entity)
+		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "send event timeout, isEntity", entity)
 	}
 }
 
@@ -459,7 +459,7 @@ func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *pr
 		for k, v := range modelLog.Contents.Iterator() {
 			if _, ok := v.(string); !ok {
 				if intValue, ok := v.(int); !ok {
-					logger.Error(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "convert event to log fail, value is not string", v, "key", k)
+					logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "convert event to log fail, value is not string", v, "key", k)
 					continue
 				} else {
 					v = strconv.Itoa(intValue)

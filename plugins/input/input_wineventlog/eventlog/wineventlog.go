@@ -19,9 +19,10 @@ package eventlog
 
 import (
 	"fmt"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"io"
 	"syscall"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 
 	"github.com/elastic/beats/v7/winlogbeat/sys"
 	win "github.com/elastic/beats/v7/winlogbeat/sys/wineventlog"
@@ -113,14 +114,14 @@ func (w *winEventLog) Read() ([]Record, error) {
 			err = w.render(h, w.outputBuf)
 		}
 		if err != nil && w.outputBuf.Len() == 0 {
-			logger.Errorf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
+			logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
 				"%s Dropping event with rendering error. %v", w.logPrefix, err)
 			continue
 		}
 
 		r, err := w.buildRecordFromXML(w.outputBuf.Bytes(), err)
 		if err != nil {
-			logger.Errorf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
+			logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
 				"%s Dropping event. %v", w.logPrefix, err)
 			continue
 		}
