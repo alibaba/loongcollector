@@ -55,9 +55,9 @@
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
 #include "plugin/input/InputPrometheus.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
-#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #endif
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "plugin/processor/ProcessorSPL.h"
