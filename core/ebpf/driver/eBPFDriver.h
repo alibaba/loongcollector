@@ -23,9 +23,11 @@ using stop_plugin_func = int (*)(logtail::ebpf::PluginType);
 using suspend_plugin_func = int (*)(logtail::ebpf::PluginType);
 using resume_plugin_func = int (*)(logtail::ebpf::PluginConfig*);
 using poll_plugin_pbs_func = int (*)(logtail::ebpf::PluginType, int32_t, int32_t*, int);
+using consume_plugin_pb_data_func = int (*)(logtail::ebpf::PluginType);
 using set_networkobserver_config_func = void (*)(int32_t, int32_t);
-using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, bool);
+using set_networkobserver_cid_filter_func = void (*)(const char*, size_t, uint64_t, bool);
 using update_bpf_map_elem_func = int (*)(logtail::ebpf::PluginType, const char*, void*, void*, uint64_t);
+using get_plugin_pb_epoll_fds_func = int (*)(logtail::ebpf::PluginType, int*, int);
 
 extern "C" {
 int set_logger(logtail::ebpf::eBPFLogHandler fn);
@@ -40,11 +42,13 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg);
 
 // data plane
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms);
+int consume_plugin_pb_data(logtail::ebpf::PluginType type);
 
 // networkobserver 特有，后续采集配置改造后会
 void set_networkobserver_config(int32_t opt, int32_t value);
-void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update);
+void set_networkobserver_cid_filter(const char* container_id, size_t length, uint64_t cid_key, bool update);
 
 // oprations
 int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
+int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCount);
 }

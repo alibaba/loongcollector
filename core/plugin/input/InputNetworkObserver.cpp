@@ -26,25 +26,19 @@ namespace logtail {
 
 const std::string InputNetworkObserver::sName = "input_network_observer";
 
-bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    static const std::unordered_map<std::string, MetricType> metricKeys = {
+bool InputNetworkObserver::Init(const Json::Value& config, Json::Value&) {
+    static const std::unordered_map<std::string, MetricType> kMetricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
-        {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNECTION_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
-        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_KEY_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
-        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_META_ATTACH_SUCCESS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
     mPluginMetricPtr = std::make_shared<PluginMetricManager>(
-        GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+        GetMetricsRecordRef().GetLabels(), kMetricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 

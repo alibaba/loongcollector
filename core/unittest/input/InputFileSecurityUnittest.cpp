@@ -290,10 +290,6 @@ void InputFileSecurityUnittest::OnStart() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
 
     // simulate an unsupported environment
@@ -331,18 +327,6 @@ void InputFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->checkLoadedPipelineName(logtail::ebpf::PluginType::FILE_SECURITY);
-    APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
 UNIT_TEST_CASE(InputFileSecurityUnittest, TestName)

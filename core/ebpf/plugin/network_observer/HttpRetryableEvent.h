@@ -12,39 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include <memory>
 
 #include "common/queue/blockingconcurrentqueue.h"
-#include "coolbpf/security/type.h"
-#include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/plugin/RetryableEvent.h"
-#include "ebpf/type/FileEvent.h"
+#include "ebpf/plugin/network_observer/Connection.h"
+#include "ebpf/plugin/network_observer/Type.h"
+#include "ebpf/type/NetworkObserverEvent.h"
+
+#pragma once
 
 namespace logtail::ebpf {
 
-class FileRetryableEvent : public RetryableEvent {
+class HttpRetryableEvent : public RetryableEvent {
 public:
-    enum TaskId { kFindProcess, kFlushEvent, kDone };
-    explicit FileRetryableEvent(int retryLimit,
-                                const file_data_t& event,
-                                ProcessCache& processCache,
-                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& eventQueue)
-        : RetryableEvent(retryLimit), mRawEvent(&event), mProcessCache(processCache), mCommonEventQueue(eventQueue) {}
+    explicit HttpRetryableEvent(int retryLimit,
+                                const std::shared_ptr<L7Record>& record,
+                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
+        : RetryableEvent(retryLimit), mRecord(record), mCommonEventQueue(queue) {}
 
-    virtual ~FileRetryableEvent() = default;
+    virtual ~HttpRetryableEvent() = default;
 
+    // do process record ...
     bool HandleMessage() override;
+
     bool OnRetry() override;
+
     void OnDrop() override;
 
+    void MarkSample() { mRecord->MarkSample(); }
+
 private:
-    bool findProcess();
+    bool attachContainerMeta(bool isRetry);
+    bool attachK8sPodMeta(bool isRetry);
     bool flushEvent();
 
-    const file_data_t* mRawEvent = nullptr;
-    ProcessCache& mProcessCache;
+    // record ...
+    std::shared_ptr<L7Record> mRecord;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
-    std::shared_ptr<FileEvent> mFileEvent;
 };
 
 } // namespace logtail::ebpf

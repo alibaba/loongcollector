@@ -80,8 +80,8 @@ void SetCoolBpfConfig(int32_t opt, int32_t value) {
     ebpf_config(opt, 0, 1, (void**)params, paramsLen);
 }
 
-void set_networkobserver_cid_filter(const char* container_id, size_t length, bool update) {
-    ebpf_set_cid_filter(container_id, length, update);
+void set_networkobserver_cid_filter(const char* container_id, size_t length, uint64_t cid_key, bool update) {
+    ebpf_set_cid_filter(container_id, length, cid_key, update);
 }
 
 void set_networkobserver_config(int32_t opt, int32_t value) {
@@ -382,8 +382,7 @@ int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t*
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
     }
     // find pbs
-    std::vector<void*> pbs = gPluginPbs[int(type)];
-
+    std::vector<void*> pbs = gPluginPbs.at(static_cast<size_t>(type));
     if (pbs.empty()) {
         EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "no pbs registered for type:%d \n", type);
         return -1;
@@ -660,4 +659,68 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
 
 int update_bpf_map_elem(logtail::ebpf::PluginType, const char* map_name, void* key, void* value, uint64_t flag) {
     return gWrapper->UpdateBPFHashMap(std::string(map_name), key, value, flag);
+}
+
+int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCount) {
+    if (fds == nullptr || maxCount == 0) {
+        return -1;
+    }
+
+    if (static_cast<size_t>(type) >= gPluginPbs.size()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "invalid plugin type: %d\n", int(type));
+        return -1;
+    }
+
+    std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
+    if (pbs.empty()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
+        return 0;
+    }
+
+    int count = 0;
+    for (auto& pb : pbs) {
+        if (!pb) {
+            continue;
+        }
+        if (count >= maxCount) {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "too many epoll fds, max_count:%d\n", maxCount);
+            break;
+        }
+
+        int epollFd = gWrapper->GetPerfBufferEpollFd(pb);
+        if (epollFd >= 0) {
+            fds[count] = epollFd;
+            count++;
+        } else {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "failed to get epoll fd for perf buffer\n");
+        }
+    }
+
+    return count;
+}
+
+int consume_plugin_pb_data(logtail::ebpf::PluginType type) {
+    if (static_cast<size_t>(type) >= gPluginPbs.size()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "invalid plugin type: %d\n", int(type));
+        return -1;
+    }
+    std::vector<void*>& pbs = gPluginPbs.at(static_cast<size_t>(type));
+    if (pbs.empty()) {
+        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "no pbs registered for type:%d \n", int(type));
+        return 0;
+    }
+
+    int cnt = 0;
+    for (auto& pb : pbs) {
+        if (!pb) {
+            continue;
+        }
+        int ret = gWrapper->ConsumePerfBuffer(pb);
+        if (ret < 0) {
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "consume perf buffer data failed ...\n");
+        } else {
+            cnt += ret;
+        }
+    }
+    return cnt;
 }
