@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <librdkafka/rdkafka.h>
-
 #include <atomic>
 #include <map>
 #include <memory>
@@ -29,8 +27,8 @@
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "monitor/MetricManager.h"
-#include "plugin/flusher/kafka/KafkaConstant.h"
-#include "plugin/flusher/kafka/KafkaUtil.h"
+#include "plugin/flusher/kafka/KafkaConfig.h"
+#include "plugin/flusher/kafka/KafkaProducer.h"
 
 namespace logtail {
 
@@ -49,25 +47,16 @@ public:
     bool Flush(size_t key) override;
     bool FlushAll() override;
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    void SetProducerForTest(std::unique_ptr<KafkaProducer> producer) { mProducer = std::move(producer); }
+#endif
+
 private:
-    bool InitKafkaProducer();
     bool SerializeAndSend(PipelineEventGroup&& group);
-    void DestroyKafkaResources();
-    void HandleProduceError(rd_kafka_resp_err_t err);
-    void HandleDeliveryError(rd_kafka_resp_err_t err);
-    bool SetKafkaConfig(rd_kafka_conf_t* conf, const char* key, const std::string& value);
+    void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
 
-    static void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque);
-
-    std::vector<std::string> mBrokers;
-    std::string mTopic;
-    std::string mClientID;
-    uint32_t mTimeoutMs;
-    uint32_t mRetries;
-    uint32_t mBatchNumMessages;
-    uint32_t mLingerMs;
-    std::map<std::string, std::string> mKafkaOptions;
-
+    KafkaConfig mKafkaConfig;
+    std::unique_ptr<KafkaProducer> mProducer;
     std::unique_ptr<EventGroupSerializer> mSerializer;
 
     CounterPtr mSendCnt;
@@ -79,13 +68,6 @@ private:
     CounterPtr mUnauthErrorCnt;
     CounterPtr mParamsErrorCnt;
     CounterPtr mOtherErrorCnt;
-
-    rd_kafka_t* mProducer;
-    rd_kafka_conf_t* mKafkaConf;
-
-    std::atomic<bool> mIsRunning;
-    std::thread mPollThread;
-    std::mutex mProducerMutex;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherKafkaUnittest;
