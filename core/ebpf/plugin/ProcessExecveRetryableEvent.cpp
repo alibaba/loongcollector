@@ -272,6 +272,7 @@ bool ProcessExecveRetryableEvent::incrementParentRef() {
         if (!value) {
             return false;
         }
+        mProcessCacheValue->mParent = value;
         mProcessCache.IncRef(key, value);
         LOG_DEBUG(sLogger,
                   ("pid", mProcessCacheValue->Get<kProcessId>())("ktime", mProcessCacheValue->Get<kKtime>())(

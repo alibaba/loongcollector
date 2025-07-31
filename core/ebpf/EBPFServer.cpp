@@ -534,17 +534,7 @@ void EBPFServer::handleEpollEvents() {
     }
 }
 void EBPFServer::pollPerfBuffers() {
-    mFrequencyMgr.SetPeriod(std::chrono::milliseconds(100));
     while (mRunning) {
-        auto now = std::chrono::steady_clock::now();
-        auto nextWindow = mFrequencyMgr.Next();
-        if (!mFrequencyMgr.Expired(now)) {
-            std::this_thread::sleep_until(nextWindow);
-            mFrequencyMgr.Reset(nextWindow);
-        } else {
-            mFrequencyMgr.Reset(now);
-        }
-
         handleEventCache();
         handleEpollEvents();
         mProcessCacheManager->ClearProcessExpiredCache();

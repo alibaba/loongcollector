@@ -311,7 +311,7 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
         logEvent.SetContentNoCopy(kPodName.LogKey(), StringView(podName.data, podName.size));
     }
 
-    auto parentProcPtr = mProcessCache.Lookup({proc.mPPid, proc.mPKtime});
+    auto& parentProcPtr = proc.mParent;
     // for parent
     if (!parentProcPtr) {
         return true;

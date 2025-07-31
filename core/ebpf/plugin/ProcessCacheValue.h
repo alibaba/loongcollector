@@ -32,7 +32,7 @@ class ProcessCacheValue {
 public:
     enum class LifeStage { kInUse, kDeletePending, kDeleteReady, kDeleted };
 
-    ProcessCacheValue* CloneContents();
+    ProcessCacheValue* ShallowCopyContents();
 
     template <const ebpf::DataElement& key>
     const StringView& Get() const {
@@ -123,6 +123,7 @@ public:
 
     uint32_t mPPid = 0;
     uint64_t mPKtime = 0;
+    std::shared_ptr<ProcessCacheValue> mParent;
 
 private:
     ebpf::StaticDataRow<&ebpf::kProcessCacheTable> mContents;
