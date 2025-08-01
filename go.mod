@@ -8,6 +8,7 @@ require (
 	github.com/VictoriaMetrics/VictoriaMetrics v1.83.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/apache/pulsar-client-go v0.10.0
+	github.com/aws/aws-sdk-go v1.43.31
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
@@ -26,6 +27,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/snappy v0.0.4
+	github.com/google/uuid v1.3.0
 	github.com/gosnmp/gosnmp v1.34.0
 	github.com/grafana/loki-client-go v0.0.0-20230116142646-e7494d0ef70c
 	github.com/hashicorp/golang-lru/v2 v2.0.2
@@ -152,7 +154,6 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grafana/regexp v0.0.0-20220304095617-2e8d9baf4ac2 // indirect
@@ -178,6 +179,7 @@ require (
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
