@@ -25,6 +25,7 @@
 #include "common/timer/Timer.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
+#include "file_server/StaticFileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -185,6 +186,12 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
         res.push_back(item.first);
     }
     return res;
+}
+
+void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
+    for (auto& item : mInputRunners) {
+        item->ClearUnusedCheckpoints();
+    }
 }
 
 void CollectionPipelineManager::StopAllPipelines() {

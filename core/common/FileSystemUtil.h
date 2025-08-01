@@ -108,6 +108,7 @@ int GetFileLines(const std::filesystem::path& filename,
 
 // OverwriteFile overwrides @fileName with @content.
 bool OverwriteFile(const std::string& fileName, const std::string& content);
+bool UpdateFileContent(const std::filesystem::path& filepath, const std::string& content, std::string& errMsg);
 
 bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg);
 

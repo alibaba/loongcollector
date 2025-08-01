@@ -554,14 +554,12 @@ void NetworkObserverConfigUpdateUnittest::SelectorChangeAffectsContainer() {
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
     opt.mSelectors = {{"workload1", "kind1", "ns1"}};
     mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &opt);
-    size_t key1 = GenWorkloadKey("ns1", "kind1", "workload1");
     std::vector<std::string> cids1 = {"cid1", "cid2"};
     AddPodInfo("ns1", "kind1", "workload1", cids1);
     mManager->HandleHostMetadataUpdate(cids1);
     // selector 变更，workload1->workload2
     opt.mSelectors = {{"workload2", "kind2", "ns2"}};
     mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &opt);
-    size_t key2 = GenWorkloadKey("ns2", "kind2", "workload2");
     std::vector<std::string> cids2 = {"cid3"};
     AddPodInfo("ns2", "kind2", "workload2", cids2);
     mManager->HandleHostMetadataUpdate(cids2);
@@ -662,7 +660,6 @@ void NetworkObserverConfigUpdateUnittest::PartialFieldUpdate() {
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
     opt.mSelectors = {{"workload1", "kind1", "ns1"}};
     mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &opt);
-    size_t key = GenWorkloadKey("ns1", "kind1", "workload1");
     std::vector<std::string> cids = {"cid1"};
     AddPodInfo("ns1", "kind1", "workload1", cids);
     mManager->HandleHostMetadataUpdate(cids);

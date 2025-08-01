@@ -287,11 +287,9 @@ void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
     CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline1;
 
     auto item1 = GenerateProcessItem();
-    auto p1 = item1.get();
     sManager->PushProcessQueue(1, std::move(item1));
 
     auto item2 = GenerateProcessItem();
-    auto p2 = item2.get();
     sManager->PushProcessQueue(2, std::move(item2));
 
     sManager->DisablePopProcessQueue("test_config", false);
@@ -299,11 +297,9 @@ void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
     APSARA_TEST_FALSE(ExactlyOnceQueueManager::GetInstance()->mProcessQueues[2]->mValidToPop);
 
     auto item3 = GenerateProcessItem();
-    auto p3 = item3.get();
     sManager->PushProcessQueue(1, std::move(item3));
 
     auto item4 = GenerateProcessItem();
-    auto p4 = item4.get();
     sManager->PushProcessQueue(2, std::move(item4));
 
     auto pipeline2 = make_shared<CollectionPipeline>();
@@ -314,11 +310,9 @@ void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
     APSARA_TEST_FALSE(sManager->mProcessQueues[2]->mValidToPop);
 
     auto item5 = GenerateProcessItem();
-    auto p5 = item5.get();
     sManager->PushProcessQueue(1, std::move(item5));
 
     auto item6 = GenerateProcessItem();
-    auto p6 = item6.get();
     sManager->PushProcessQueue(2, std::move(item6));
 
     sManager->DisablePopProcessQueue("test_config", true);
