@@ -263,9 +263,16 @@ func (m *Metric) GetSize() int64 {
 
 	// also check the length here, otherwise nil tags Iterator will cause 1 allocation.
 	if m.Tags != nil && m.Tags.Len() > 0 {
-		for k, v := range m.Tags.Iterator() {
-			size += int64(len(k)) // tag name
-			size += int64(len(v)) // tag value
+		if m.Tags.IsSorted() {
+			for _, v := range m.Tags.ToArray() {
+				size += int64(len(v.Key))   // tag name
+				size += int64(len(v.Value)) // tag value
+			}
+		} else {
+			for k, v := range m.Tags.Iterator() {
+				size += int64(len(k)) // tag name
+				size += int64(len(v)) // tag value
+			}
 		}
 	}
 

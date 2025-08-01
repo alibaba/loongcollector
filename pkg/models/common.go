@@ -85,6 +85,10 @@ type KeyValues[TValue string | float64 | *TypedValue | any] interface {
 
 	Iterator() map[string]TValue
 
+	ToArray() []KeyValue[TValue]
+
+	IsSorted() bool
+
 	SortTo(buf []KeyValue[TValue]) []KeyValue[TValue]
 
 	Len() int
@@ -158,6 +162,17 @@ func (kv *keyValuesImpl[TValue]) Iterator() map[string]TValue {
 	return nil
 }
 
+func (kv *keyValuesImpl[TValue]) ToArray() []KeyValue[TValue] {
+	if values, ok := kv.values(); ok {
+		array := make([]KeyValue[TValue], 0, len(values))
+		for k, v := range values {
+			array = append(array, KeyValue[TValue]{Key: k, Value: v})
+		}
+		return array
+	}
+	return nil
+}
+
 func (kv *keyValuesImpl[TValue]) Len() int {
 	if values, ok := kv.values(); ok {
 		return len(values)
@@ -166,6 +181,10 @@ func (kv *keyValuesImpl[TValue]) Len() int {
 }
 
 func (kv *keyValuesImpl[TValue]) IsNil() bool {
+	return false
+}
+
+func (kv *keyValuesImpl[TValue]) IsSorted() bool {
 	return false
 }
 
@@ -217,11 +236,19 @@ func (kv *keyValuesNil[TValue]) Iterator() map[string]TValue {
 	return kv.m
 }
 
+func (kv *keyValuesNil[TValue]) ToArray() []KeyValue[TValue] {
+	return nil
+}
+
 func (kv *keyValuesNil[TValue]) Len() int {
 	return 0
 }
 
 func (kv *keyValuesNil[TValue]) IsNil() bool {
+	return true
+}
+
+func (kv *keyValuesNil[TValue]) IsSorted() bool {
 	return true
 }
 
@@ -233,4 +260,126 @@ func NewKeyValues[TValue string | float64 | *TypedValue | any]() KeyValues[TValu
 	return &keyValuesImpl[TValue]{
 		keyValues: make(map[string]TValue),
 	}
+}
+
+var _ KeyValues[string] = (*sortedKeyValues)(nil)
+
+type sortedKeyValues struct {
+	kvs []KeyValue[string] // kvs is sorted by key ascending.
+}
+
+func NewSortedKeyValues() KeyValues[string] {
+	return &sortedKeyValues{}
+}
+
+// NewSortedKeyValuesFrom creates a new sortedKeyValues from the given kvs.
+// If sorted is true, the kvs is assumed to be sorted.
+// For many cases, like influxdb, prometheus, the kvs is already sorted, so we can avoid sorting it again.
+func NewSortedKeyValuesFrom(kvs []KeyValue[string], sorted bool) KeyValues[string] {
+	s := &sortedKeyValues{kvs: kvs}
+	if sorted {
+		return s
+	}
+	sort.Sort(KeyValueSlice[string](s.kvs))
+	return s
+}
+
+func (s *sortedKeyValues) Add(key string, value string) {
+	// In most cases, we add kvs lexicographically, which should directly append to the end of the slice.
+	if len(s.kvs) == 0 || s.kvs[len(s.kvs)-1].Key < key {
+		s.kvs = append(s.kvs, KeyValue[string]{Key: key, Value: value})
+		return
+	}
+
+	// binary search the first key that is greater than or equal to key.
+	index := sort.Search(len(s.kvs), func(i int) bool {
+		return s.kvs[i].Key >= key
+	})
+
+	if s.kvs[index].Key == key {
+		s.kvs[index].Value = value
+	} else {
+		// insert the key-value pair at the index.
+		if cap(s.kvs) == len(s.kvs) {
+			newKvs := make([]KeyValue[string], len(s.kvs)+1)
+			copy(newKvs, s.kvs[:index])
+			newKvs[index] = KeyValue[string]{Key: key, Value: value}
+			copy(newKvs[index+1:], s.kvs[index:])
+			s.kvs = newKvs
+		} else {
+			s.kvs = s.kvs[:len(s.kvs)+1]
+			copy(s.kvs[index+1:], s.kvs[index:])
+			s.kvs[index] = KeyValue[string]{Key: key, Value: value}
+		}
+	}
+}
+
+func (s *sortedKeyValues) AddAll(items map[string]string) {
+	for k, v := range items {
+		s.kvs = append(s.kvs, KeyValue[string]{Key: k, Value: v})
+	}
+	sort.Sort(KeyValueSlice[string](s.kvs))
+}
+
+func (s *sortedKeyValues) Get(key string) string {
+	var value string
+	index := sort.Search(len(s.kvs), func(i int) bool {
+		return s.kvs[i].Key >= key
+	})
+	if index < len(s.kvs) && s.kvs[index].Key == key {
+		value = s.kvs[index].Value
+	}
+	return value
+}
+
+func (s *sortedKeyValues) Contains(key string) bool {
+	index := sort.Search(len(s.kvs), func(i int) bool {
+		return s.kvs[i].Key >= key
+	})
+	return index < len(s.kvs) && s.kvs[index].Key == key
+}
+
+func (s *sortedKeyValues) Delete(key string) {
+	index := sort.Search(len(s.kvs), func(i int) bool {
+		return s.kvs[i].Key >= key
+	})
+	if index < len(s.kvs) && s.kvs[index].Key == key {
+		s.kvs = append(s.kvs[:index], s.kvs[index+1:]...)
+	}
+}
+
+func (s *sortedKeyValues) Merge(other KeyValues[string]) {
+	s.AddAll(other.Iterator())
+}
+
+func (s *sortedKeyValues) Iterator() map[string]string {
+	if len(s.kvs) == 0 {
+		return nil
+	}
+
+	res := make(map[string]string, len(s.kvs))
+	for _, kv := range s.kvs {
+		res[kv.Key] = kv.Value
+	}
+	return res
+}
+
+func (s *sortedKeyValues) ToArray() []KeyValue[string] {
+	return s.kvs
+}
+
+func (s *sortedKeyValues) IsSorted() bool {
+	return true
+}
+
+func (s *sortedKeyValues) SortTo(buf []KeyValue[string]) []KeyValue[string] {
+	return append(buf, s.kvs...)
+}
+
+func (s *sortedKeyValues) Len() int {
+	return len(s.kvs)
+}
+
+func (s *sortedKeyValues) IsNil() bool {
+	return s == nil || len(s.kvs) == 0
 }
