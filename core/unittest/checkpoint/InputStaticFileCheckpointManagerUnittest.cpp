@@ -29,9 +29,11 @@ public:
     void TestInvalidCheckpointFile() const;
 
 protected:
-    static void SetUpTestCase() { sManager->mCheckpointRootPath = filesystem::path("./input_static_file"); }
-
-    void SetUp() override { filesystem::create_directories(sManager->mCheckpointRootPath); }
+    void SetUp() override {
+        sManager = InputStaticFileCheckpointManager::GetInstance();
+        sManager->mCheckpointRootPath = filesystem::path("./input_static_file");
+        filesystem::create_directories(sManager->mCheckpointRootPath);
+    }
 
     void TearDown() override {
         sManager->ClearUnusedCheckpoints();
@@ -40,11 +42,8 @@ protected:
     }
 
 private:
-    static InputStaticFileCheckpointManager* sManager;
+    InputStaticFileCheckpointManager* sManager;
 };
-
-InputStaticFileCheckpointManager* InputStaticFileCheckpointManagerUnittest::sManager
-    = InputStaticFileCheckpointManager::GetInstance();
 
 void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     // prepare logs
